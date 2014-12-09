@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
+
 from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -15,16 +17,23 @@ from pants.java.util import execute_java
 from pants.util.dirutil import safe_open
 
 
+_CWD_NOT_PRESENT='CWD NOT PRESENT'
+logger = logging.getLogger(__name__)
+
+
 def is_binary(target):
   return isinstance(target, JvmBinary)
 
 
 class JvmRun(JvmTask):
+
   @classmethod
   def register_options(cls, register):
     super(JvmRun, cls).register_options(register)
     register('--only-write-cmd-line',  metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
+    register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
+             help='Set the working directory. If no argument is passed, use the target path.')
 
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
@@ -51,6 +60,14 @@ class JvmRun(JvmTask):
     # http://jira.local.twitter.com/browse/AWESOME-1317
     target = self.require_single_root_target()
 
+    working_dir = None
+    cwd_opt = self.get_options().cwd
+    if cwd_opt != _CWD_NOT_PRESENT:
+      working_dir = self.get_options().cwd
+      if not working_dir:
+        working_dir = target.address.spec_path
+    logger.debug ("Working dir is {0}".format(working_dir))
+
     if isinstance(target, JvmApp):
       binary = target.binary
     else:
@@ -71,7 +88,8 @@ class JvmRun(JvmTask):
         args=self.args,
         workunit_factory=self.context.new_workunit,
         workunit_name='run',
-        workunit_labels=[WorkUnit.RUN]
+        workunit_labels=[WorkUnit.RUN],
+        cwd=working_dir,
       )
 
       if self.only_write_cmd_line:

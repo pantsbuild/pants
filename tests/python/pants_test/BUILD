@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/base:address',
     'src/python/pants/base:build_configuration',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_address_mapper',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:build_file_parser',
@@ -87,7 +88,7 @@ python_tests(
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:config',
-    'src/python/pants/base:dev_backend_loader',
+    'src/python/pants/base:extension_loader',
   ]
 )
 
@@ -95,7 +96,7 @@ target(
   name = 'integration',
   dependencies = [
     'tests/python/pants_test/android:integration',
-    'tests/python/pants_test/commands:integration',
+    'tests/python/pants_test/base:integration',
     'tests/python/pants_test/targets:integration',
     'tests/python/pants_test/tasks:integration',
     'tests/python/pants_test/python:integration',
@@ -114,7 +115,6 @@ python_test_suite(
     'tests/python/pants_test/backend',
     'tests/python/pants_test/base',
     'tests/python/pants_test/cache',
-    'tests/python/pants_test/commands',
     'tests/python/pants_test/engine',
     'tests/python/pants_test/fs',
     'tests/python/pants_test/graph',

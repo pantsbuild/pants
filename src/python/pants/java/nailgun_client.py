@@ -154,7 +154,7 @@ class NailgunClient(object):
       in which case no input is read
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
-    :param string workdir: the working directory for all nailgun commands (defaults to PWD)
+    :param string workdir: the default working directory for all nailgun commands (defaults to PWD)
     """
     self._host = host
     self._port = port
@@ -169,10 +169,11 @@ class NailgunClient(object):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     return sock if sock.connect_ex((self._host, self._port)) == 0 else None
 
-  def __call__(self, main_class, *args, **environment):
+  def __call__(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.
 
     :param string main_class: the fully qualified class name of the main entrypoint
+    :param string cwd: Set the working directory for this command
     :param list args: any arguments to pass to the main entrypoint
     :param dict environment: an environment mapping made available to native nails via the nail
       context
@@ -180,7 +181,7 @@ class NailgunClient(object):
     Returns the exit code of the main_class.
     """
     environment = dict(self.ENV_DEFAULTS.items() + environment.items())
-
+    cwd = cwd or self._workdir
     sock = self.try_connect()
     if not sock:
       raise self.NailgunError('Problem connecting to nailgun server'
@@ -188,7 +189,7 @@ class NailgunClient(object):
 
     session = NailgunSession(sock, self._ins, self._out, self._err)
     try:
-      return session.execute(self._workdir, main_class, *args, **environment)
+      return session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
       raise self.NailgunError('Problem contacting nailgun server %s:%d:'
                               ' %s' % (self._host, self._port, e))

@@ -127,7 +127,7 @@ EOF
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
     ./dist/self.pex goal binary ${INTERPRETER_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
-    ./dist/self.pex setup_py --recursive src/python/pants:pants-packaged
+    ./dist/self.pex goal setup-py --recursive src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
 fi
 

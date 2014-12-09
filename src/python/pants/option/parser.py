@@ -165,10 +165,12 @@ class Parser(object):
       if not arg.startswith('--') and len(arg) > 2:
         raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
                                 'with a double-dash'.format(arg, self._scope))
-    for k in ['nargs', 'required']:
-      if k in kwargs:
-        raise RegistrationError('{0} unsupported in registration of option {1} in '
-                                'scope {2}.'.format(k, args, self._scope))
+    if 'nargs' in kwargs and kwargs['nargs'] != '?':
+      raise RegistrationError('nargs={0} unsupported in registration of option {1} in '
+                              'scope {2}.'.format(kwargs['nargs'], args, self._scope))
+    if 'required' in kwargs:
+      raise RegistrationError('{0} unsupported in registration of option {1} in '
+                              'scope {2}.'.format(k, args, self._scope))
 
   def _set_dest(self, args, kwargs):
     """Maps the externally-used dest to a scoped one only seen internally.
@@ -213,9 +215,25 @@ class Parser(object):
     The source of the default value is chosen according to the ranking in RankedValue.
     """
     config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
-    env_var = 'PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), dest.upper())
+    udest = dest.upper()
+    if self._scope == GLOBAL_SCOPE:
+      # For convenience, we allow three forms of env var for global scope options. The fully-specified
+      # env var is PANTS_DEFAULT_FOO, which is uniform with PANTS_<SCOPE>_FOO for all the other scopes.
+      # However we also allow simply PANTS_FOO. And if the option name itself starts with 'pants-' then
+      # we also allow simply FOO. E.g., PANTS_WORKDIR instead of PANTS_PANTS_WORKDIR or PANTS_DEFAULT_PANTS_WORKDIR.
+      # We take the first specified value we find, in this order: PANTS_DEFAULT_FOO, PANTS_FOO, FOO.
+      env_vars = ['PANTS_DEFAULT_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
+      if udest.startswith('PANTS_'):
+        env_vars.append(udest)
+    else:
+      env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
     value_type = kwargs.get('type', str)
-    env_val_str = self._env.get(env_var) if self._env else None
+    env_val_str = None
+    if self._env:
+      for env_var in env_vars:
+        if env_var in self._env:
+          env_val_str = self._env.get(env_var)
+          break
 
     env_val = None if env_val_str is None else value_type(env_val_str)
     if kwargs.get('action') == 'append':

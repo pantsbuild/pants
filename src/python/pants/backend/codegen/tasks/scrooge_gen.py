@@ -69,6 +69,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
 
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found."""
+    pass
+
   class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
     @property
     def relative_outdir(self):
@@ -253,10 +257,12 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
           try:
             dependencies.update(self.context.resolve(depspec))
           except AddressLookupError as e:
-            raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key}" \
-                                      "in pants.ini" .format(message=e, section='thrift-gen',
-                                                             key="gen->deps->{category}"
-                                                             .format(cateegory=category)))
+            raise self.DepLookupError("{message}\n  referenced from [{section}] key: " \
+                                      "gen->deps->{category} in pants.ini".format(
+                                        message=e,
+                                        section=_CONFIG_SECTION,
+                                        category=category
+                                      ))
       return self.GenInfo(gen, deps)
 
     return self._inject_target(gentarget, dependees,

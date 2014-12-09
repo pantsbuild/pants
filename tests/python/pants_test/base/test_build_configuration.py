@@ -36,10 +36,7 @@ class BuildConfigurationTest(unittest.TestCase):
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
-    self.assertEqual(2, len(parse_state.parse_globals))
-
-    self.assertEqual(parse_state.parse_globals['__file__'],
-                     os.path.realpath('/tmp/fred'))
+    self.assertEqual(1, len(parse_state.parse_globals))
 
     target_call_proxy = parse_state.parse_globals['fred']
     target_call_proxy(name='jake')
@@ -68,9 +65,7 @@ class BuildConfigurationTest(unittest.TestCase):
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
-    self.assertEqual(2, len(parse_state.parse_globals))
-    self.assertEqual(parse_state.parse_globals['__file__'],
-                     os.path.realpath('/tmp/jane'))
+    self.assertEqual(1, len(parse_state.parse_globals))
     self.assertEqual(42, parse_state.parse_globals['jane'])
 
   def test_register_bad_exposed_object(self):
@@ -134,9 +129,7 @@ class BuildConfigurationTest(unittest.TestCase):
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
       self.assertEqual(0, len(parse_state.registered_addressable_instances))
-      self.assertEqual(2, len(parse_state.parse_globals))
-      self.assertEqual(os.path.realpath(build_file_path),
-                       parse_state.parse_globals['__file__'])
+      self.assertEqual(1, len(parse_state.parse_globals))
       yield parse_state.parse_globals['george']
 
   def test_register_bad_exposed_context_aware_object(self):

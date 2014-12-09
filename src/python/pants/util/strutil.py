@@ -28,6 +28,10 @@ def ensure_text(text_or_binary):
     raise TypeError('Argument is neither text nor binary type.')
 
 
+def is_text_or_binary(obj):
+  return isinstance(obj, (six.text_type, six.binary_type))
+
+
 def safe_shlex_split(text_or_binary):
   """Split a string using shell-like syntax.
 

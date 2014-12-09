@@ -5,8 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import json
-
 from pants.option.errors import ParseError
 
 
@@ -22,30 +20,28 @@ def _parse_error(s, msg):
 def dict_type(s):
   """An option of type 'dict'.
 
-  The value (on the command-line, in an env var or in the config file) must be a JSON object.
+  The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
   """
-  if isinstance(s, dict):
-    return s
-  try:
-    ret = json.loads(s)
-  except ValueError as e:
-    raise _parse_error(s, e.message)
-  if not isinstance(ret, dict):
-    raise _parse_error(s, 'Value is not dict')
-  return ret
+  return _convert(s, (dict,))
 
 
 def list_type(s):
   """An option of type 'list'.
 
-  The value (on the command-line, in an env var or in the config file) must be a JSON list.
+  The value (on the command-line, in an env var or in the config file) must be eval'able to a
+  list or tuple.
   """
-  if isinstance(s, (list, tuple)):
-    return s
+  return _convert(s, (list, tuple))
+
+
+def _convert(val, acceptable_types):
+  """Ensure that val is one of the acceptable types, converting it if needed."""
+  if isinstance(val, acceptable_types):
+    return val
   try:
-    ret = json.loads(s)
-  except ValueError as e:
-    raise _parse_error(s, e.message)
-  if not isinstance(ret, list):
-    raise _parse_error(s, 'Value is not list')
-  return ret
+    parsed_value = eval(val, {}, {})
+  except Exception as e:
+    raise _parse_error(val, 'Value cannot be evaluated: {0}'.format(e.message))
+  if not isinstance(parsed_value, acceptable_types):
+    raise _parse_error(val, 'Value is not of the acceptable types: {0}'.format(acceptable_types))
+  return parsed_value

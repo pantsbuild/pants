@@ -13,8 +13,9 @@ python_tests(
   sources = ['test_java_protobuf_library.py'],
   dependencies = [
     'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/base:build_file_aliases',
     'tests/python/pants_test:base_test',
-    ]
+  ]
 )
 
 python_tests(
@@ -22,6 +23,7 @@ python_tests(
   sources = ['test_java_wire_library.py'],
   dependencies = [
     'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/base:build_file_aliases',
     'tests/python/pants_test:base_test',
-    ]
+  ]
 )

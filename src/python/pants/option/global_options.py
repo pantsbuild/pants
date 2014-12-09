@@ -49,9 +49,5 @@ def register_global_options(register):
   register('--print-exception-stacktrace', action='store_true',
            help='Print to console the full exception stack trace if encountered.')
   register('--fail-fast', action='store_true',
-           help="When parsing specs, will stop on the first erronous BUILD file encountered. "
-                "Otherwise, will parse all builds in a spec and then throw an Exception.")
-  # This is only registered here so Pants doesn't complain when a user specifies it.
-  # It is actually read in rcfile.py directly from the args.
-  register('--pantsrc', action='store_true', default=True,
-           help="Specifies if pantsrc files should be read or not.")
+           help='When parsing specs, will stop on the first erronous BUILD file encountered. '
+                'Otherwise, will parse all builds in a spec and then throw an Exception.')

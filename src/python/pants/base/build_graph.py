@@ -291,30 +291,33 @@ class BuildGraph(object):
                          **kwargs)
     self.inject_target(target, dependencies=dependencies, derived_from=derived_from)
 
-  def inject_address(self, address):
-    """Delegates to an internal AddressMapper to resolve, construct, and inject a Target.
-
-    :param Address address: The address to inject.  Must be resolvable by `self._address_mapper`.
-    """
-    if not self.contains_address(address):
-      target_addressable = self._address_mapper.resolve(address)
-      target = self.target_addressable_to_target(address, target_addressable)
-      self.inject_target(target)
-
   def inject_address_closure(self, address):
-    """Recursively calls `inject_address` through the transitive closure of dependencies."""
+    """Resolves, constructs and injects a Target and its transitive closure of dependencies.
+
+    This method is idempotent and will short circuit for already injected addresses. For all other
+    addresses though, it delegates to an internal AddressMapper to resolve item the address points
+    to.
+
+    :param Address address: The address to inject.  Must be resolvable by `self._address_mapper` or
+                            else be the address of an already injected entity.
+    """
+
+    if self.contains_address(address):
+      # The address was either mapped in or synthetically injected already.
+      return
 
     if address in self._addresses_already_closed:
+      # We've visited this address already in the course of the active recursive injection.
       return
 
     mapper = self._address_mapper
 
-    target_addressable = mapper.resolve(address)
+    target_address, target_addressable = mapper.resolve(address)
 
-    self._addresses_already_closed.add(address)
+    self._addresses_already_closed.add(target_address)
     try:
       dep_addresses = list(mapper.specs_to_addresses(target_addressable.dependency_specs,
-                                                      relative_to=address.spec_path))
+                                                     relative_to=target_address.spec_path))
       deps_seen = set()
       for dep_address in dep_addresses:
         if dep_address in deps_seen:
@@ -324,43 +327,37 @@ class BuildGraph(object):
         deps_seen.add(dep_address)
         self.inject_address_closure(dep_address)
 
-      if not self.contains_address(address):
-        target = self.target_addressable_to_target(address, target_addressable)
+      if not self.contains_address(target_address):
+        target = self._target_addressable_to_target(target_address, target_addressable)
         self.inject_target(target, dependencies=dep_addresses)
       else:
         for dep_address in dep_addresses:
-          if not dep_address in self.dependencies_of(address):
-            self.inject_dependency(address, dep_address)
-        target = self.get_target(address)
+          if dep_address not in self.dependencies_of(target_address):
+            self.inject_dependency(target_address, dep_address)
+        target = self.get_target(target_address)
+
+      def inject_spec_closure(spec):
+        address = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
+        self.inject_address_closure(address)
 
       for traversable_spec in target.traversable_dependency_specs:
-        self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
+        inject_spec_closure(traversable_spec)
         traversable_spec_target = self.get_target_from_spec(traversable_spec,
-                                                            relative_to=address.spec_path)
+                                                            relative_to=target_address.spec_path)
         if traversable_spec_target not in target.dependencies:
           self.inject_dependency(dependent=target.address,
                                  dependency=traversable_spec_target.address)
           target.mark_transitive_invalidation_hash_dirty()
 
       for traversable_spec in target.traversable_specs:
-        self.inject_spec_closure(spec=traversable_spec, relative_to=address.spec_path)
+        inject_spec_closure(traversable_spec)
         target.mark_transitive_invalidation_hash_dirty()
 
     except AddressLookupError as e:
       raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
-                                       .format(message=e, spec=address.spec))
+                                       .format(message=e, spec=target_address.spec))
 
-
-  def inject_spec_closure(self, spec, relative_to=''):
-    """Constructs a SyntheticAddress from `spec` and calls `inject_address_closure`.
-
-    :param string spec: A Target spec
-    :param string relative_to: The spec_path of the BUILD file this spec was read from.
-    """
-    address = self._address_mapper.spec_to_address(spec, relative_to=relative_to)
-    self.inject_address_closure(address)
-
-  def target_addressable_to_target(self, address, addressable):
+  def _target_addressable_to_target(self, address, addressable):
     """Realizes a TargetAddressable into a Target at `address`.
 
     :param TargetAddressable addressable:

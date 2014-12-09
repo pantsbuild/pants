@@ -21,7 +21,14 @@ python_test_suite(
   name = 'all',
   dependencies = [
     ':base',
-  ],
+  ]
+)
+
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    ':test_spec_exclude_integration',
+  ]
 )
 
 python_test_suite(
@@ -37,14 +44,13 @@ python_test_suite(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
-    ':dev_backend_loader',
     ':double_dag',
+    ':extension_loader',
     ':fingerprint_strategy',
     ':generator',
     ':hash_utils',
     ':payload',
     ':payload_field',
-    ':rcfile',
     ':revision',
     ':run_info',
     ':source_root',
@@ -169,13 +175,13 @@ python_tests(
 )
 
 python_tests(
-  name = 'dev_backend_loader',
-  sources = ['test_dev_backend_loader.py'],
+  name = 'extension_loader',
+  sources = ['test_extension_loader.py'],
   dependencies = [
     'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:dev_backend_loader',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:extension_loader',
     'src/python/pants/base:target',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
@@ -259,15 +265,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'rcfile',
-  sources = ['test_rcfile.py'],
-  dependencies = [
-    'src/python/pants/base:rcfile',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
   name = 'revision',
   sources = ['test_revision.py'],
   dependencies = [
@@ -296,4 +293,12 @@ python_tests(
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
     ]
+)
+
+python_tests(
+  name = 'test_spec_exclude_integration',
+  sources = [ 'test_spec_exclude_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ]
 )

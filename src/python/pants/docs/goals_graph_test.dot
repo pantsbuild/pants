@@ -1,5 +1,5 @@
 digraph G {
-  rankdir=LR;
+  rankdir=RL;
   node [shape=box];
-  gen -> resolve -> compile -> test;
+  test -> compile -> resolve -> gen;
 }

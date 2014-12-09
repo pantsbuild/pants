@@ -177,7 +177,7 @@ the same sources. Consider the following refactor adding a subpackage:
     # src/java/com/twitter/tugboat/maint/MaintenanceLog.java
 
     # target src/java/com/twitter/tugboat
-    # Existing target now untentionally claims the 'maint' package.
+    # Existing target now unintentionally claims the 'maint' package.
     java_library(name='tugboat',
       sources=rglobs('*.java'),
     )

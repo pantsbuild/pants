@@ -11,7 +11,7 @@ body {
 }
 
 .mainflow {
-  margin: 64px 2% 40em 30%;
+  margin: 64px 2% 40em 300px;
 }
 
 
@@ -50,6 +50,35 @@ table.h-plus-pilcrow:hover a.pilcrow-link {
   color: #04a;
 }
 
+nav {
+  z-index: 1;
+}
+
+/* on small screens, hide navigation by default */
+@media screen and (max-width: 768px){
+  #navtoggler { display: block; }
+  nav { display: none; }
+  div.mainflow { margin-left: 2px; }
+}
+@media screen and (min-width: 769px){
+  #navtoggler { display: none; }
+}
+
+#navtoggler {
+  position: absolute;
+  left: 0.5rem;
+  top: 2px;
+  font-size: 200%;
+  background-color: #ccc;
+  color: #258;
+  border: 1px solid #147;
+  border-radius: 2px;
+}
+#navtoggler:hover {
+  cursor: pointer;
+}
+
+
 nav.breadcrumbs ul {
   margin: 0px; padding: 0px;
 }
@@ -82,7 +111,7 @@ nav.bignav {
   top: 0px;
   left: 0px;
   margin: 64px 0.5%;
-  max-width: 23%;
+  max-width: 290px;
   border: 3px solid #38c;
   border-radius: 3px;
   background-color: #888;

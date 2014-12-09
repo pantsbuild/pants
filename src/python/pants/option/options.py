@@ -27,6 +27,7 @@ class Options(object):
   in the following order:
     - The value of the --foo-bar flag in global scope.
     - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_FOO_BAR environment variable.
     - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
     - The hard-coded value provided at registration time.
     - None.
@@ -39,6 +40,7 @@ class Options(object):
     - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
     - The value of the PANTS_COMPILE_FOO_BAR environment variable.
     - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_FOO_BAR environment variable.
     - The value of the foo_bar key in the [compile.java] section of pants.ini.
     - The value of the foo_bar key in the [compile] section of pants.ini.
     - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
@@ -58,6 +60,7 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
+  GLOBAL_SCOPE = GLOBAL_SCOPE
 
   # Custom option types. You can specify these with type= when registering options.
 

@@ -188,6 +188,12 @@ code, commit locally. To update the code review with the new diff where
 Look over the fields in the web form; perhaps some could use updating.
 Press the web form's Publish button.
 
+If need a reminder of your review number, you can get a quick list with:
+
+    :::bash
+    $ ./rbt status
+    r/1234 - Make pants go even faster
+
 ### Commit Your Change
 
 At this point you've made a change, had it reviewed and are ready to

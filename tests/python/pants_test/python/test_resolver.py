@@ -25,7 +25,7 @@ platforms: [
   'linux-x86_64']
 ''')
       ini.close()
-      self.config = Config.load(configpath=ini.name)
+      self.config = Config.load(configpaths=[ini.name])
 
   def test_get_current_platform(self):
     expected_platforms = [Platform.current(), 'linux-x86_64']

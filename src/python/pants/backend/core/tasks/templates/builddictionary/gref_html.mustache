@@ -113,6 +113,17 @@ These command-line flags are available with all Pants goals.
 
 <ul>
 {{#glopts}}
-<li><code>{{st}}</code> {{hlp}}</li>
+{{#options}}
+<li><code>{{st}}</code>
+{{#typ}}
+    <code>{{typ}}</code>
+{{/typ}}
+{{#default}}
+      (Default: <code>{{default}}</code>)
+{{/default}}
+
+{{hlp}}
+
+{{/options}}
 {{/glopts}}
 </ul>

@@ -7,9 +7,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import errno
 import os
+import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
-from pants.base.dev_backend_loader import load_build_configuration_from_source
+from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
 
@@ -19,11 +20,20 @@ class JvmToolTaskTestBase(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return load_build_configuration_from_source().registered_aliases()
+    return load_plugins_and_backends().registered_aliases()
 
   def setUp(self):
     real_config = self.config()
     super(JvmToolTaskTestBase, self).setUp()
+
+    def link_or_copy(src, dest):
+      try:
+        os.link(src, dest)
+      except OSError as e:
+        if e.errno == errno.EXDEV:
+          shutil.copy(src, dest)
+        else:
+          raise e
 
     def link(path, optional=False, force=False):
       src = os.path.join(self.real_build_root, path)
@@ -31,11 +41,11 @@ class JvmToolTaskTestBase(TaskTestBase):
         dest = os.path.join(self.build_root, path)
         safe_mkdir(os.path.dirname(dest))
         try:
-          os.link(src, dest)
+          link_or_copy(src, dest)
         except OSError as e:
           if force and e.errno == errno.EEXIST:
             os.unlink(dest)
-            os.link(src, dest)
+            link_or_copy(src, dest)
           else:
             raise e
         return dest

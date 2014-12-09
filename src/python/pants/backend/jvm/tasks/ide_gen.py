@@ -98,7 +98,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       return set(self.context.address_mapper.addresses_in_spec_path(buildfile.spec_path))
 
     def get(self, address):
-      self.context.build_graph.inject_address(address)
+      self.context.build_graph.inject_address_closure(address)
       return self.context.build_graph.get_target(address)
 
   def __init__(self, *args, **kwargs):

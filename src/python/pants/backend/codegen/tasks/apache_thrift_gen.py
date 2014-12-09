@@ -74,14 +74,26 @@ class ApacheThriftGen(CodeGen):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
-    self.thrift_binary = select_thrift_binary(self.context.config,
-                                              version=self.get_options().version)
-
-    self.defaults = JavaThriftLibrary.Defaults(self.context.config)
-
     # TODO(pl): This is broken because of how __init__.py files are generated/cached
     # for combined python thrift packages.
     # self.setup_artifact_cache_from_config(config_section='thrift-gen')
+
+  _thrift_binary = None
+  @property
+  def thrift_binary(self):
+    if self._thrift_binary is None:
+      self._thrift_binary = select_thrift_binary(
+        self.context.config,
+        version=self.get_options().version
+      )
+    return self._thrift_binary
+
+  _defaults = None
+  @property
+  def defaults(self):
+    if self._defaults is None:
+      self._defaults = JavaThriftLibrary.Defaults(self.context.config)
+    return self._defaults
 
   def create_geninfo(self, key):
     gen_info = self.context.config.getdict('thrift-gen', key)
