@@ -21,7 +21,14 @@ python_test_suite(
   name = 'all',
   dependencies = [
     ':base',
-  ],
+  ]
+)
+
+python_test_suite(
+  name = 'integration',
+  dependencies = [
+    ':test_spec_exclude_integration',
+  ]
 )
 
 python_test_suite(
@@ -286,4 +293,12 @@ python_tests(
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
     ]
+)
+
+python_tests(
+  name = 'test_spec_exclude_integration',
+  sources = [ 'test_spec_exclude_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ]
 )
