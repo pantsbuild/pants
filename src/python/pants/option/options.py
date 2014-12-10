@@ -13,6 +13,7 @@ from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy
 
 
@@ -208,6 +209,7 @@ class Options(object):
           print('\n{0}: {1}\n'.format(goal.name, goal.description))
           for scope in goal.known_scopes():
             _maybe_help(scope)
+      print()
     else:
       print(pants_release())
       print('\nUsage:')
@@ -224,6 +226,8 @@ class Options(object):
 
       print('\nGlobal options:')
       print(self.format_global_help())
+
+    print(Parser.EPILOG)
 
     if msg is not None:
       print(msg)

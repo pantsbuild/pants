@@ -6,7 +6,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from argparse import ArgumentParser, _HelpAction
+from contextlib import contextmanager
 import copy
+import re
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
@@ -47,6 +49,22 @@ class Parser(object):
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.
   """
+
+  class InvalidOptionNameError(RegistrationError):
+    """Raised when an option name is invalid.
+
+    The ranked layering of option value sources requires option names be valid environment variable
+    names, ini file key names, and python identifiers.
+    """
+
+  class UnsupportedOptionError(RegistrationError):
+    """Raised when an underlying argparse option is not supported."""
+
+  class InvalidConfigValueError(RegistrationError):
+    """Raised when an environment variable or config file supplied option value is invalid."""
+
+  EPILOG = '* options that can only be set in pants.ini'
+
   def __init__(self, env, config, scope, parent_parser):
     self._env = env
     self._config = config
@@ -56,19 +74,27 @@ class Parser(object):
     self._frozen = False
 
     # The argparser we use for actually parsing args.
-    self._argparser = CustomArgumentParser(conflict_handler='resolve')
+    # This needs an epilog in case the parser aborts on a bad set of args and dumps help
+    # autonomously.
+    self._argparser = CustomArgumentParser(conflict_handler='resolve', epilog=self.EPILOG)
 
     # The argparser we use for formatting help messages.
     # We don't use self._argparser for this as it will have all options from enclosing scopes
     # registered on it too, which would create unnecessarily repetitive help messages.
+    # We elide the epilog here since controlled (user-requested) help is formatted by Options
+    # which handles the epilog.
     self._help_argparser = CustomArgumentParser(conflict_handler='resolve',
-                                                formatter_class=PantsHelpFormatter)
+                                                formatter_class=PantsHelpFormatter,
+                                                prefix_chars='-*')
 
     # If True, we have at least one option to show help for.
     self._has_help_options = False
 
     # Map of external to internal dest names. See docstring for _set_dest below.
     self._dest_forwardings = {}
+
+    # The 'defaults' calculated for config-only options
+    self._config_only_values = {}
 
     # A Parser instance, or None for the global scope parser.
     self._parent_parser = parent_parser
@@ -82,8 +108,10 @@ class Parser(object):
   def parse_args(self, args, namespace):
     """Parse the given args and set their values onto the namespace object's attributes."""
     namespace.add_forwardings(self._dest_forwardings)
+    options = self._config_only_values.copy()
     new_args = self._argparser.parse_args(args)
-    namespace.update(vars(new_args))
+    options.update(vars(new_args))
+    namespace.update(options)
     return namespace
 
   def format_help(self):
@@ -102,11 +130,17 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    self._validate(args, kwargs)
+    config_only = kwargs.pop('config_only', False)
+    self._validate(config_only, args, kwargs)
+
     dest = self._set_dest(args, kwargs)
 
     # Is this a boolean flag?
-    if kwargs.get('action') in ('store_false', 'store_true'):
+    if config_only:
+      inverse_args = None
+      arg = args[0]  # This is safe since args were already `_validate`d above.
+      help_args = ['*{0}'.format(arg)]
+    elif kwargs.get('action') in ('store_false', 'store_true'):
       inverse_args = []
       help_args = []
       for flag in args:
@@ -130,47 +164,94 @@ class Parser(object):
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if inverse_args:
       inverse_kwargs = self._create_inverse_kwargs(kwargs)
-      self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
+      self._register_boolean(config_only, dest, args, kwargs, inverse_args, inverse_kwargs)
     else:
-      self._register(dest, args, kwargs)
+      self._register(config_only, dest, args, kwargs)
 
-  def _register(self, dest, args, kwargs):
+  @contextmanager
+  def _argsparse_args(self, config_only, dest, args, kwargs):
+    ranked_default = self._compute_default(dest, kwargs)
+    if config_only:
+      choices = kwargs.get('choices')
+      if choices is not None and ranked_default.value not in choices:
+        raise self.InvalidConfigValueError('Config only option {0} in scope {1} has an invalid '
+                                           'value {2}.'.format(args, self._scope, ranked_default))
+      self._config_only_values[dest] = ranked_default.value
+      yield None
+    else:
+      kwargs_with_default = dict(kwargs, default=ranked_default)
+      yield args, kwargs_with_default
+
+  def _register(self, config_only, dest, args, kwargs):
     """Recursively register the option for parsing."""
-    ranked_default = self._compute_default(dest, kwargs)
-    kwargs_with_default = dict(kwargs, default=ranked_default)
-    self._argparser.add_argument(*args, **kwargs_with_default)
+    with self._argsparse_args(config_only, dest, args, kwargs) as argparse_arguments:
+      if argparse_arguments is not None:
+        argparse_args, argparse_kwargs = argparse_arguments
+        self._argparser.add_argument(*argparse_args, **argparse_kwargs)
 
     # Propagate registration down to inner scopes.
     for child_parser in self._child_parsers:
-      child_parser._register(dest, args, kwargs)
+      child_parser._register(config_only, dest, args, kwargs)
 
-  def _register_boolean(self, dest, args, kwargs, inverse_args, inverse_kwargs):
+  def _register_boolean(self, config_only, dest, args, kwargs, inverse_args, inverse_kwargs):
     """Recursively register the boolean option, and its inverse, for parsing."""
-    group = self._argparser.add_mutually_exclusive_group()
-    ranked_default = self._compute_default(dest, kwargs)
-    kwargs_with_default = dict(kwargs, default=ranked_default)
-    group.add_argument(*args, **kwargs_with_default)
-    group.add_argument(*inverse_args, **inverse_kwargs)
+    with self._argsparse_args(config_only, dest, args, kwargs) as argparse_arguments:
+      if argparse_arguments is not None:
+        argparse_args, argparse_kwargs = argparse_arguments
+        group = self._argparser.add_mutually_exclusive_group()
+        group.add_argument(*argparse_args, **argparse_kwargs)
+        group.add_argument(*inverse_args, **inverse_kwargs)
 
     # Propagate registration down to inner scopes.
     for child_parser in self._child_parsers:
-      child_parser._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
+      child_parser._register_boolean(config_only, dest, args, kwargs, inverse_args, inverse_kwargs)
 
-  def _validate(self, args, kwargs):
+  # The lowest common denominator in this validator regexp is environment variable names.  Although
+  # the regexp allows a '-' in the last position, we pre-process env-var names elsewhere to
+  # transform '-'s to '_'s making this safe.
+  VALID_ARG_NAME_RE = re.compile(r'^[a-zA-Z][[a-zA-Z0-9_-]*$')
+
+  def _validate(self, config_only, args, kwargs):
     """Ensure that the caller isn't trying to use unsupported argparse features."""
+    if len(args) == 0:
+      raise self.InvalidOptionNameError('An option name must be supplied for all options '
+                                        'in scope {0}.'.format(self._scope))
+
+    if config_only:
+      if len(args) > 1:
+        raise self.InvalidOptionNameError('Config only option with names {0} in scope {1} can '
+                                          'only have 1 name'.format(args, self._scope))
+      arg = args[0]
+      if arg.startswith('-'):
+        raise self.InvalidOptionNameError('Config only option {0} in scope {1} may not begin '
+                                          'with dashes'.format(arg, self._scope))
+      if kwargs.get('action') is not None:
+        raise self.UnsupportedOptionError('Config only option {0} in scope {1} may not specify an '
+                                          'action'.format(arg, self._scope))
+      if kwargs.get('const') is not None:
+        raise self.UnsupportedOptionError('Config only option {0} in scope {1} may not specify a '
+                                          'const value'.format(arg, self._scope))
+    else:
+      for arg in args:
+        if not arg.startswith('-'):
+          raise self.InvalidOptionNameError('Option {0} in scope {1} must begin '
+                                            'with a dash.'.format(arg, self._scope))
+        if not arg.startswith('--') and len(arg) > 2:
+          raise self.InvalidOptionNameError('Multi-character option {0} in scope {1} must begin '
+                                            'with a double-dash'.format(arg, self._scope))
+
     for arg in args:
-      if not arg.startswith('-'):
-        raise RegistrationError('Option {0} in scope {1} must begin '
-                                'with a dash.'.format(arg, self._scope))
-      if not arg.startswith('--') and len(arg) > 2:
-        raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
-                                'with a double-dash'.format(arg, self._scope))
+      if not self.VALID_ARG_NAME_RE.match(arg.lstrip('-')):
+        raise self.InvalidOptionNameError('Option {0} in scope {1} must match the regular '
+                                          'expression {2}.'.format(arg, self._scope,
+                                                                   self.VALID_ARG_NAME_RE.pattern))
+
     if 'nargs' in kwargs and kwargs['nargs'] != '?':
-      raise RegistrationError('nargs={0} unsupported in registration of option {1} in '
-                              'scope {2}.'.format(kwargs['nargs'], args, self._scope))
-    if 'required' in kwargs:
-      raise RegistrationError('{0} unsupported in registration of option {1} in '
-                              'scope {2}.'.format(k, args, self._scope))
+      raise self.UnsupportedOptionError('nargs={0} unsupported in registration of option {1} in '
+                                        'scope {2}.'.format(kwargs['nargs'], args, self._scope))
+    if kwargs.get('required', False):
+      raise self.UnsupportedOptionError('required=True unsupported in registration of option {1} '
+                                        'in scope {2}.'.format(args, self._scope))
 
   def _set_dest(self, args, kwargs):
     """Maps the externally-used dest to a scoped one only seen internally.
