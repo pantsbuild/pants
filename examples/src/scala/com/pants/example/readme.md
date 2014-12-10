@@ -3,10 +3,10 @@ Scala Projects with Pants
 
 Pants' Scala tooling has much in common with its Java tooling. (That's
 not surprising; Scala compiles to run on the JVM.) If you already know
-[[how to use Pants to build JVM code|pants('examples/src/java/com/pants/examples:readme')]],
+[[how to use Pants to build JVM code|pants('examples/src/java/com/pants/examples:readme')]]
  and you know that
-`BUILD` files can have <a xref="bdict_scala_library">`scala_library`</a>,
-you're set to use Pants with Scala code.
+`BUILD` files can have <a xref="bdict_scala_library">`scala_library`</a> targets,
+then you're set to use Pants with Scala code.
 
 Hello Pants Scala
 -----------------
@@ -18,7 +18,7 @@ shows how you can define a library of Scala code.
 Its `BUILD` file looks like that for a Java library, but contains a
 `scala_library` target with `.scala` sources:
 
-!inc[start-after=Seq-friendly wrapper](hello/welcome/BUILD)
+!inc[start-at=scala_library](hello/welcome/BUILD)
 
 There's a sample test in
 [examples/tests/scala/com/pants/example/hello/welcome](https://github.com/pantsbuild/pants/tree/master/examples/tests/scala/com/pants/example/hello/welcome).
@@ -27,7 +27,7 @@ It's a <a xref="bdict_junit_tests">`junit_tests`</a> with `.scala` sources.
 <a xref="bdict_scala_specs">`scala_specs`</a> target type for testing with
 Specs.)
 
-!inc[start-after=test it anyhow](../../../../../tests/scala/com/pants/example/hello/welcome/BUILD)
+!inc[start-at=junit_tests](../../../../../tests/scala/com/pants/example/hello/welcome/BUILD)
 
 Scala/Java Circular Dependencies
 --------------------------------
@@ -44,7 +44,15 @@ circular, you can set up targets to compile all of this code together:
 The [`scala_with_java_sources`](https://github.com/pantsbuild/pants/tree/master/examples/src/scala/com/pants/example/scala_with_java_sources)
 example shows how this can work:
 
-!inc[start-after=LICENSE](scala_with_java_sources/BUILD)
+!inc[start-at=scala_library](scala_with_java_sources/BUILD)
+
+The referred-to
+[`java_sources`](https://github.com/pantsbuild/pants/tree/master/examples/src/java/com/pants/examples/java_sources/BUILD)
+`java_library` has this `java_library` in its dependencies:
+
+!inc[start-at=java_library](../../../../java/com/pants/examples/java_sources/BUILD)
+
+
 
 Scala Console
 -------------
