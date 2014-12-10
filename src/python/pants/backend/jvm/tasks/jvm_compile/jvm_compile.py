@@ -593,12 +593,18 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
     vts_artifactfiles_pairs = []
     classes_by_source = self._compute_classes_by_source(analysis_file)
     resources_by_target = self.context.products.get_data('resources_by_target')
+
+    if resources_by_target is not None:
+      # Check that resources_by_target is a defaultdict of MultipleRootedProducts
+      assert isinstance(resources_by_target, defaultdict)
+      assert isinstance(resources_by_target['__bogus_target'], MultipleRootedProducts)
+
     for target, sources in sources_by_target.items():
       if target.has_label('no_cache'):
         continue
       artifacts = []
       if resources_by_target is not None:
-        for _, paths in resources_by_target.get(target).abs_paths():
+        for _, paths in resources_by_target[target].abs_paths():
           artifacts.extend(paths)
       for source in sources:
         classes = classes_by_source.get(source, [])
