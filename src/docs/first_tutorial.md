@@ -14,7 +14,7 @@ The first time you run `pants`, try it without arguments. This makes
 Pants "bootstrap" itself, downloading and compiling things it needs:
 
     :::bash
-    $ ./pants
+    $ ./pants goal goals
 
 Now you're ready to invoke pants for more useful things.
 
