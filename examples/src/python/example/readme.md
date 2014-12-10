@@ -77,16 +77,18 @@ run the PEX:
     Hello, world!
     $
 
-`examples/src/python/example/hello/main/BUILD` defines a `python_binary` target, a
-build-able thing that defines a runnable program made from Python code:
+[`examples/src/python/example/hello/main/BUILD`](https://github.com/pantsbuild/pants/blob/master/examples/src/python/example/hello/main/BUILD)
+defines a `python_binary` target, a build-able thing that defines a runnable program made from
+Python code:
 
-!inc[start-after=Like Hello](hello/main/BUILD)
+!inc[start-at=python_binary](hello/main/BUILD)
 
-This binary has a source file with its "main". A Python binary's "main" can be in a depended-upon
-`python_library` or in the `python_binary`'s `source`. (Notice that's `source`, not `sources`;
-a binary can have only one.)
+This binary has a source file, `main.py`, with its "main". A Python binary's "main" can be in a
+depended-upon `python_library` or in the `python_binary`'s `source`. (Notice that's `source`,
+not `sources`; a binary can have only one source file. If you want more, put them in a
+`python_library` and let the `python_binary` depend on that.)
 
-!inc[start-after=Apache License](hello/main/main.py)
+!inc[start-at=main](hello/main/main.py)
 
 This code imports code from another target. To make this work, the binary target has a dependency
 `examples/src/python/example/hello/greet` and the Python code can thus import things from
@@ -95,17 +97,20 @@ This code imports code from another target. To make this work, the binary target
 You remember that libraries configure "importable" code;
 `example/hello/greet/BUILD` has a `python_library`:
 
-!inc[start-after=Like Hello](hello/greet/BUILD)
+!inc[start-at=python_library](hello/greet/BUILD)
 
 This `python_library` pulls in `greet.py`'s Python code:
 
-!inc[start-after=Apache](hello/greet/greet.py)
+!inc[start-at=green](hello/greet/greet.py)
+
+BUILD for Tests
+---------------
 
 To test the library's code, we set up
-`examples/tests/python/example_test/hello/greet/BUILD` with a
-`python_tests` target. It depends on the library:
+[`examples/tests/python/example_test/hello/greet/BUILD`](https://github.com/pantsbuild/pants/blob/master/examples/tests/python/example_test/hello/greet/BUILD)
+with a `python_tests` target. It depends on the library:
 
-!inc[start-after=Apache](../../../tests/python/example_test/hello/greet/greet.py)
+!inc[start-at=python_tests](../../../tests/python/example_test/hello/greet/BUILD)
 
 Use `goal test` to run the tests:
 
