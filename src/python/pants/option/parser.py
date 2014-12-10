@@ -63,6 +63,8 @@ class Parser(object):
   class InvalidConfigValueError(RegistrationError):
     """Raised when an environment variable or config file supplied option value is invalid."""
 
+  EPILOG = '* options that can only be set in pants.ini'
+
   def __init__(self, env, config, scope, parent_parser):
     self._env = env
     self._config = config
@@ -72,14 +74,18 @@ class Parser(object):
     self._frozen = False
 
     # The argparser we use for actually parsing args.
-    self._argparser = CustomArgumentParser(conflict_handler='resolve')
+    # This needs an epilog in case the parser aborts on a bad set of args and dumps help
+    # autonomously.
+    self._argparser = CustomArgumentParser(conflict_handler='resolve', epilog=self.EPILOG)
 
     # The argparser we use for formatting help messages.
     # We don't use self._argparser for this as it will have all options from enclosing scopes
     # registered on it too, which would create unnecessarily repetitive help messages.
+    # We elide the epilog here since controlled (user-requested) help is formatted by Options
+    # which handles the epilog.
     self._help_argparser = CustomArgumentParser(conflict_handler='resolve',
                                                 formatter_class=PantsHelpFormatter,
-                                                prefix_chars='-[')
+                                                prefix_chars='-*')
 
     # If True, we have at least one option to show help for.
     self._has_help_options = False
@@ -133,12 +139,7 @@ class Parser(object):
     if config_only:
       inverse_args = None
       arg = args[0]  # This is safe since args were already `_validate`d above.
-
-      # TODO(John Sirois): This help formatting style does delineate flags from option-only, but it
-      # is misleading since the arg here is the key, which is not wrapped with [] in ini files,
-      # like the sections are.  Find a better way to format help to make clear what style
-      # of input an option accepts.
-      help_args = ['[{0}]'.format(arg)]
+      help_args = ['*{0}'.format(arg)]
     elif kwargs.get('action') in ('store_false', 'store_true'):
       inverse_args = []
       help_args = []
@@ -224,9 +225,6 @@ class Parser(object):
       if arg.startswith('-'):
         raise self.InvalidOptionNameError('Config only option {0} in scope {1} may not begin '
                                           'with dashes'.format(arg, self._scope))
-      if '[' in arg or ']' in arg:
-        raise self.InvalidOptionNameError("Config only option {0} in scope {1} may not contain "
-                                          "characters '[' or ']'".format(arg, self._scope))
       if kwargs.get('action') is not None:
         raise self.UnsupportedOptionError('Config only option {0} in scope {1} may not specify an '
                                           'action'.format(arg, self._scope))

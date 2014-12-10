@@ -27,10 +27,10 @@ class ParserTest(unittest.TestCase):
     found = False
     help_text = parser.format_help()
     for line in help_text.splitlines():
-      if line.strip().startswith('[foo]'):
+      if line.strip().startswith('*foo '):
         found = True
     self.assertTrue(found, "Expected to find help text for the 'foo' config-only option "
-                           "presented as '[foo]', got:\n{0}".format(help_text))
+                           "presented as '*foo', got:\n{0}".format(help_text))
 
   def test_config_only_none(self):
     parser = self.create_parser()
@@ -129,6 +129,15 @@ class ParserTest(unittest.TestCase):
       parser.register('-f', config_only=True)
     with self.assertRaises(parser.InvalidOptionNameError):
       parser.register('--foo', config_only=True)
+
+    # Check that help format config-only option-name-similar names cannot be used, ie: we don't
+    # want help to display **my_config_only_option
+    with self.assertRaises(parser.InvalidOptionNameError):
+      parser.register('*foo', config_only=True)
+    with self.assertRaises(parser.InvalidOptionNameError):
+      parser.register('foo*', config_only=True)
+    with self.assertRaises(parser.InvalidOptionNameError):
+      parser.register('f*o', config_only=True)
 
     # Check that ini-file section header-like names cannot be used.
     with self.assertRaises(parser.InvalidOptionNameError):
