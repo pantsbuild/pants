@@ -20,7 +20,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.goal import Goal
-from pants.option.bootstrap_options import register_bootstrap_options
+from pants.option.options_bootstrapper import register_bootstrap_options
 from pants.option.options import Options
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker

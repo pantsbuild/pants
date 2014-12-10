@@ -10,7 +10,6 @@ try:
 except ImportError:
   import configparser as ConfigParser
 
-import copy
 import getpass
 import itertools
 import os
@@ -19,11 +18,14 @@ from pants.base.build_environment import get_buildroot
 from pants.util.strutil import is_text_or_binary
 
 
-def reset_default_bootstrap_option_values(defaults, values=None):
+def reset_default_bootstrap_option_values(defaults, values=None, buildroot=None):
   """Reset the bootstrap options' default values.
 
   :param defaults: The dict to set the values on.
-  :param values: A namespace containing the values to set. If unspecified, uses hard-coded defaults.
+  :param values: A namespace containing the values to set. If unspecified, uses
+                 buildroot-based defaults.
+  :param buildroot: If values is None, use this buildroot to generate the hard-coded defaults.
+                    If unspecified, uses the detected buildroot.
 
   The bootstrapping code will use this to set the bootstrapped values. Code that doesn't trigger
   bootstrapping (i.e., the one remaining old-style command) will get the hard-coded defaults, as
@@ -38,6 +40,11 @@ def reset_default_bootstrap_option_values(defaults, values=None):
         which can pass these into Config.load() itself after bootstrapping them.
   """
 
+  buildroot = buildroot or get_buildroot()
+  defaults.update({
+    'buildroot': buildroot
+  })
+
   if values:
     defaults.update({
       'pants_workdir': values.pants_workdir,
@@ -46,9 +53,9 @@ def reset_default_bootstrap_option_values(defaults, values=None):
     })
   else:
     defaults.update({
-      'pants_workdir': os.path.join(get_buildroot(), '.pants.d'),
-      'pants_supportdir': os.path.join(get_buildroot(), 'build-support'),
-      'pants_distdir': os.path.join(get_buildroot(), 'dist')
+      'pants_workdir': os.path.join(buildroot, '.pants.d'),
+      'pants_supportdir': os.path.join(buildroot, 'build-support'),
+      'pants_distdir': os.path.join(buildroot, 'dist')
     })
 
 
@@ -61,7 +68,6 @@ class Config(object):
   DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
   _defaults = {
-    'buildroot': get_buildroot(),
     'homedir': os.path.expanduser('~'),
     'user': getpass.getuser(),
     'pants_bootstrapdir': os.path.expanduser('~/.pants.d'),
@@ -72,8 +78,8 @@ class Config(object):
     pass
 
   @classmethod
-  def reset_default_bootstrap_option_values(cls, values=None):
-    reset_default_bootstrap_option_values(cls._defaults, values)
+  def reset_default_bootstrap_option_values(cls, values=None, buildroot=None):
+    reset_default_bootstrap_option_values(cls._defaults, values, buildroot)
 
   _cached_config = None
 
@@ -118,16 +124,13 @@ class Config(object):
     return ChainedConfig(single_file_configs)
 
   @classmethod
-  def create_parser(cls, defaults=None):
+  def create_parser(cls):
     """Creates a config parser that supports %([key-name])s value substitution.
 
     Any defaults supplied will act as if specified in the loaded config file's DEFAULT section and
     be available for substitutions, along with all the standard defaults defined above.
     """
-    standard_defaults = copy.copy(cls._defaults)
-    if defaults:
-      standard_defaults.update(defaults)
-    return ConfigParser.SafeConfigParser(standard_defaults)
+    return ConfigParser.SafeConfigParser(cls._defaults)
 
   def getbool(self, section, option, default=None):
     """Equivalent to calling get with expected type string"""

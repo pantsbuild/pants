@@ -10,7 +10,6 @@ import inspect
 import re
 
 from docutils.core import publish_parts
-from pants.option.parser import Parser
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
@@ -18,9 +17,10 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.option.bootstrap_options import get_bootstrap_option_values, register_bootstrap_options
+from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants.option.options import Options
 from pants.option.global_options import register_global_options
+from pants.option.parser import Parser
 
 
 # Our CLI help and doc-website-gen use this to get useful help text.
@@ -419,11 +419,14 @@ def get_syms(build_file_parser):
   return syms
 
 
+def bootstrap_option_values():
+  return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
+
 def gen_goals_glopts_reference_data():
   option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
   def register(*args, **kwargs):
     option_parser.register(*args, **kwargs)
-  register.bootstrap = get_bootstrap_option_values(buildroot='<buildroot>')
+  register.bootstrap = bootstrap_option_values()
   register_bootstrap_options(register, buildroot='<buildroot>')
   register_global_options(register)
   argparser = option_parser._help_argparser
@@ -469,7 +472,7 @@ def gen_tasks_goals_reference_data():
       option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
       def register(*args, **kwargs):
         option_parser.register(*args, **kwargs)
-      register.bootstrap = get_bootstrap_option_values(buildroot='<buildroot>')
+      register.bootstrap = bootstrap_option_values()
       task_type.register_options(register)
       argparser = option_parser._help_argparser
       scope = Goal.scope(goal.name, task_name)

@@ -31,7 +31,7 @@ from pants.goal.context import Context
 from pants.goal.error import GoalError
 from pants.goal.initialize_reporting import update_reporting
 from pants.goal.goal import Goal
-from pants.option.bootstrap_options import create_bootstrapped_options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.global_options import register_global_options
 from pants.util.dirutil import safe_mkdir
 
@@ -55,7 +55,7 @@ class GoalRunner(Command):
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
 
-    self.new_options = create_bootstrapped_options(known_scopes=known_scopes)
+    self.new_options = OptionsBootstrapper().get_full_options(known_scopes=known_scopes)
     self.config = Config.from_cache()  # Get the bootstrapped version.
     super(GoalRunner, self).__init__(*args, needs_old_options=False, **kwargs)
 

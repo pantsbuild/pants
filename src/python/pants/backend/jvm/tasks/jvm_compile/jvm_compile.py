@@ -99,9 +99,10 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
   def get_args_default(cls, bootstrap_option_values):
     """Override to set default for --args option.
 
-    :param bootstrap_option_values: An the values of the "bootstrap options" (e.g., pants_workdir).
+    :param bootstrap_option_values: The values of the "bootstrap options" (e.g., pants_workdir).
                                     Implementations can use these when generating the default.
-                                    See src/python/pants/options/bootstrap_options.py for details.
+                                    See src/python/pants/options/options_bootstrapper.py for
+                                    details.
     """
     return ()
 
