@@ -17,8 +17,7 @@ from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
-from pants.base.dev_backend_loader import load_build_configuration_from_source
-from pants.base.rcfile import RcFile
+from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.workunit import WorkUnit
 from pants.commands.command import Command
 from pants.goal.initialize_reporting import initial_reporting
@@ -61,25 +60,18 @@ def _find_all_commands():
     yield '%s\t%s' % (cmd, cls.__doc__)
 
 
-def _add_default_options(command, args):
-  expanded_options = RcFile(paths=['/etc/pantsrc', '~/.pants.rc']).apply_defaults([command], args)
-  if expanded_options != args:
-    print("(using ~/.pantsrc expansion: pants %s %s)" % (command, ' '.join(expanded_options)),
-          file=sys.stderr)
-  return expanded_options
-
-
 def _synthesize_command(root_dir, args):
   command = args[0]
 
   if command in Command.all_commands():
     subcommand_args = args[1:] if len(args) > 1 else []
-    return command, _add_default_options(command, subcommand_args)
+    return command, subcommand_args
 
   if command.startswith('-'):
     _exit_and_fail('Invalid command: %s' % command)
 
-  _exit_and_fail('Pants build missing a command: %s' % traceback.format_exc())
+  _exit_and_fail('Pants build missing a command: args={args} tb=\n{tb}'
+                 .format(args=args, tb=traceback.format_exc()))
 
 
 def _parse_command(root_dir, args):
@@ -120,7 +112,18 @@ def _run():
                     dest='log_exit',
                     help='Log an exit message on success or failure.')
 
-  config = Config.from_cache()
+  # Temporary hack, so that backend-loading code can access config via the cache.
+  # Later, in GoalRunner, we bootstrap the config properly and cache it, overwriting this one.
+  # We need this hacked-in support for PANTS_CONFIG_OVERRIDE because ci.sh uses it in the
+  # self-distribution tests. In normal code PANTS_CONFIG_OVERRIDE is supported via the
+  # --config-override option.
+  # This will go away completely once Command is gone.
+  override = os.environ.get('PANTS_CONFIG_OVERRIDE', None)
+  configpaths = [os.path.join(get_buildroot(), 'pants.ini')]
+  if override:
+    configpaths.append(override)
+  config = Config.load(configpaths)
+  Config.cache(config)
 
   # XXX(wickman) This should be in the command goal, not in pants_exe.py!
   run_tracker = RunTracker.from_config(config)
@@ -133,8 +136,10 @@ def _run():
   else:
     run_tracker.log(Report.INFO, '(To run a reporting server: ./pants goal server)')
 
-  backend_packages = config.getlist('backends', 'packages')
-  build_configuration = load_build_configuration_from_source(additional_backends=backend_packages)
+  backend_packages = config.getlist('backends', 'packages', [])
+  plugins = config.getlist('backends', 'plugins', [])
+
+  build_configuration = load_plugins_and_backends(plugins, backend_packages)
   build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                       root_dir=root_dir,
                                       run_tracker=run_tracker)

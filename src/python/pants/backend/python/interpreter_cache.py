@@ -9,14 +9,15 @@ import os
 from pkg_resources import Requirement
 import shutil
 
-
+from pex.archiver import Archiver
+from pex.crawler import Crawler
 from pex.installer import EggInstaller
 from pex.interpreter import PythonIdentity, PythonInterpreter
-from pex.obtainer import Obtainer
+from pex.iterator import Iterator
 from pex.package import EggPackage, SourcePackage
 
 from pants.backend.python.python_setup import PythonSetup
-from pants.backend.python.resolver import crawler_from_config, fetchers_from_config
+from pants.backend.python.resolver import context_from_config, fetchers_from_config
 from pants.util.dirutil import safe_mkdir
 
 
@@ -39,7 +40,10 @@ def _resolve_interpreter(config, interpreter, requirement, logger=print):
     return interpreter
 
   def installer_provider(sdist):
-    return EggInstaller(sdist, strict=requirement.key != 'setuptools', interpreter=interpreter)
+    return EggInstaller(
+        Archiver.unpack(sdist),
+        strict=requirement.key != 'setuptools',
+        interpreter=interpreter)
 
   egg = _resolve_and_link(
       config,
@@ -47,25 +51,28 @@ def _resolve_interpreter(config, interpreter, requirement, logger=print):
       os.path.join(interpreter_dir, requirement.key),
       installer_provider,
       logger=logger)
+
   if egg:
-    return interpreter.with_extra(egg.name, egg.raw_version, egg.url)
+    return interpreter.with_extra(egg.name, egg.raw_version, egg.path)
   else:
     logger('Failed to resolve requirement %s for %s' % (requirement, interpreter))
 
 
 def _resolve_and_link(config, requirement, target_link, installer_provider, logger=print):
+  # Short-circuit if there is a local copy
   if os.path.exists(target_link) and os.path.exists(os.path.realpath(target_link)):
     egg = EggPackage(os.path.realpath(target_link))
     if egg.satisfies(requirement):
       return egg
+
   fetchers = fetchers_from_config(config)
-  crawler = crawler_from_config(config)
-  obtainer = Obtainer(crawler, fetchers, [])
-  obtainer_iterator = obtainer.iter(requirement)
-  links = [link for link in obtainer_iterator if isinstance(link, SourcePackage)]
+  context = context_from_config(config)
+  iterator = Iterator(fetchers=fetchers, crawler=Crawler(context))
+  links = [link for link in iterator.iter(requirement) if isinstance(link, SourcePackage)]
+
   for link in links:
     logger('    fetching %s' % link.url)
-    sdist = link.fetch()
+    sdist = context.fetch(link)
     logger('    installing %s' % sdist)
     installer = installer_provider(sdist)
     dist_location = installer.bdist()

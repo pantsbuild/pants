@@ -21,7 +21,7 @@ class PythonBinaryBuilder(object):
   class NotABinaryTargetException(Exception):
     pass
 
-  def __init__(self, target, run_tracker, interpreter=None, conn_timeout=None):
+  def __init__(self, target, run_tracker, interpreter=None):
     self.target = target
     self.interpreter = interpreter or PythonInterpreter.get()
     if not isinstance(target, PythonBinary):
@@ -45,8 +45,7 @@ class PythonBinaryBuilder(object):
         targets=[target],
         builder=builder,
         platforms=target.platforms,
-        interpreter=self.interpreter,
-        conn_timeout=conn_timeout)
+        interpreter=self.interpreter)
 
   def run(self):
     print('Building PythonBinary %s:' % self.target)

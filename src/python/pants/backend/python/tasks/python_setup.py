@@ -23,11 +23,11 @@ from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.tasks.python_task import PythonTask
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
-from pants.commands.command import Command
 from pants.util.dirutil import safe_rmtree, safe_walk
 
 
@@ -52,15 +52,24 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
-class SetupPy(Command):
+class PythonSetup(PythonTask):
   """Generate setup.py-based Python projects from python_library targets."""
 
   GENERATED_TARGETS = {
-      PythonAntlrLibrary: PythonAntlrBuilder,
-      PythonThriftLibrary: PythonThriftBuilder,
+    PythonAntlrLibrary: PythonAntlrBuilder,
+    PythonThriftLibrary: PythonThriftBuilder,
   }
   SOURCE_ROOT = b'src'
-  __command__ = 'setup_py'
+
+  @classmethod
+  def register_options(cls, register):
+    super(PythonSetup, cls).register_options(register)
+    register('--run',
+             help="The command to run against setup.py.  Don't forget to quote any additional "
+                  "parameters.  If no run command is specified, pants will by default generate "
+                  "and dump the source distribution.")
+    register('--recursive', action='store_true',
+             help='Transitively run setup_py on all provided downstream targets.')
 
   @classmethod
   def _combined_dependencies(cls, target):
@@ -147,7 +156,9 @@ class SetupPy(Command):
   @classmethod
   def declares_namespace_package(cls, filename):
     """Given a filename, walk its ast and determine if it is declaring a namespace package.
-       Intended only for __init__.py files though it will work for any .py."""
+
+    Intended only for __init__.py files though it will work for any .py.
+    """
     with open(filename) as fp:
       init_py = ast.parse(fp.read(), filename)
     calls = [node for node in ast.walk(init_py) if isinstance(node, ast.Call)]
@@ -192,7 +203,7 @@ class SetupPy(Command):
     return '.'.join(max(shared_packages, key=len)) if shared_packages else package
 
   @classmethod
-  def find_packages(cls, chroot):
+  def find_packages(cls, chroot, log=None):
     """Detect packages, namespace packages and resources from an existing chroot.
 
        Returns a tuple of:
@@ -225,7 +236,8 @@ class SetupPy(Command):
           # TODO(wickman) Consider changing this to a full-on error as it
           # could indicate bad BUILD hygiene.
           # raise cls.UndefinedSource('%s is source but does not belong to a package!' % filename)
-          print('WARNING!  %s is source but does not belong to a package!' % real_filename)
+          if log:
+            log.warn('%s is source but does not belong to a package.' % real_filename)
         else:
           continue
       submodule = cls.nearest_subpackage(module, packages)
@@ -250,33 +262,16 @@ class SetupPy(Command):
         install_requires.add(dep.provides.key)
     return install_requires
 
-  def setup_parser(self, parser, args):
-    parser.set_usage("\n"
-                     "  %prog setup_py (options) [spec]\n")
-    parser.add_option("--run", dest="run", default=None,
-                      help="The command to run against setup.py.  Don't forget to quote "
-                           "any additional parameters.  If no run command is specified, "
-                           "pants will by default generate and dump the source distribution.")
-    parser.add_option("--recursive", dest="recursive", default=False, action="store_true",
-                      help="Transitively run setup_py on all provided downstream targets.")
+  @staticmethod
+  def has_provides(tgt):
+    return isinstance(tgt, PythonTarget) and tgt.provides
 
   def __init__(self, *args, **kwargs):
-    super(SetupPy, self).__init__(*args, **kwargs)
-
-    if not self.args:
-      self.error("A spec argument is required")
-
+    super(PythonSetup, self).__init__(*args, **kwargs)
     self._config = Config.from_cache()
-    self._root = self.root_dir
-
-    self.build_graph.inject_spec_closure(self.args[0])
-    self.target = self.build_graph.get_target_from_spec(self.args[0])
-
-    if self.target is None:
-      self.error('%s is not a valid target!' % self.args[0])
-
-    if not self.target.provides:
-      self.error('Target must provide an artifact.')
+    self._root = get_buildroot()
+    self._run = self.get_options().run
+    self._recursive = self.get_options().recursive
 
   def write_contents(self, root_target, chroot):
     """Write contents of the target."""
@@ -323,7 +318,7 @@ class SetupPy(Command):
     setup_keywords = root_target.provides.setup_py_keywords
 
     package_dir = {b'': self.SOURCE_ROOT}
-    packages, namespace_packages, resources = self.find_packages(chroot)
+    packages, namespace_packages, resources = self.find_packages(chroot, self.context.log)
 
     if namespace_packages:
       setup_keywords['namespace_packages'] = list(sorted(namespace_packages))
@@ -394,29 +389,33 @@ class SetupPy(Command):
     safe_rmtree(setup_dir)
     shutil.move(chroot.path(), setup_dir)
 
-    if not self.old_options.run:
-      print('Running packager against %s' % setup_dir)
+    if not self._run:
+      self.context.log.info('Running packager against %s' % setup_dir)
       setup_runner = Packager(setup_dir)
       tgz_name = os.path.basename(setup_runner.sdist())
-      print('Writing %s' % os.path.join(dist_dir, tgz_name))
+      self.context.log.info('Writing %s' % os.path.join(dist_dir, tgz_name))
       shutil.move(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
       safe_rmtree(setup_dir)
     else:
-      print('Running %s against %s' % (self.old_options.run, setup_dir))
-      setup_runner = SetupPyRunner(setup_dir, self.old_options.run)
+      self.context.log.info('Running %s against %s' % (self._run, setup_dir))
+      setup_runner = SetupPyRunner(setup_dir, self._run)
       setup_runner.run()
 
   def execute(self):
-    if self.old_options.recursive:
-      setup_targets = OrderedSet()
+    targets = filter(PythonSetup.has_provides, self.context.target_roots)
+    if not targets:
+      self.error('Target(s) must provide an artifact.')
+
+    setup_targets = OrderedSet()
+    if self._recursive:
       def add_providing_target(target):
-        if isinstance(target, PythonTarget) and target.provides:
+        if PythonSetup.has_provides(target):
           setup_targets.add(target)
           return OrderedSet(target.provided_binaries.values())
-      self.target.walk(add_providing_target)
+      for target in targets:
+        target.walk(add_providing_target)
     else:
-      setup_targets = [self.target]
+      setup_targets = targets
 
     for target in setup_targets:
-      if isinstance(target, PythonTarget) and target.provides:
-        self.run_one(target)
+      self.run_one(target)

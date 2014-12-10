@@ -8,7 +8,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from pkg_resources import resource_string
 import os
 
-
 from pants.backend.core.tasks.reflect import (assemble_buildsyms,
                                               gen_goals_glopts_reference_data,
                                               gen_tasks_goals_reference_data)

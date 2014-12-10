@@ -11,27 +11,24 @@ from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibr
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-
-from pants.base.address import SyntheticAddress
-
+from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
 class JavaProtobufLibraryTest(BaseTest):
 
-  def setUp(self):
-    super(JavaProtobufLibraryTest, self).setUp()
-    self.build_file_parser._build_configuration.register_target_alias('java_protobuf_library', JavaProtobufLibrary)
-    self.build_file_parser._build_configuration.register_target_alias('jar_library', JarLibrary)
-    self.build_file_parser._build_configuration.register_exposed_object('jar', JarDependency)
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(targets={'java_protobuf_library': JavaProtobufLibrary,
+                                            'jar_library': JarLibrary},
+                                   objects={'jar': JarDependency})
 
   def test_empty(self):
     self.add_to_build_file('BUILD', dedent('''
     java_protobuf_library(name='foo',
       sources=[],
     )'''))
-    self.build_graph.inject_spec_closure('//:foo')
-    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     self.assertSequenceEqual([], target.imports)
     traversable_specs = [seq for seq in target.traversable_specs]
@@ -49,8 +46,7 @@ class JavaProtobufLibraryTest(BaseTest):
       ],
     )
     '''))
-    self.build_graph.inject_spec_closure('//:foo')
-    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     self.assertEquals(1, len(target.imports))
     import_jar_dep = target.imports[0]
@@ -67,8 +63,7 @@ class JavaProtobufLibraryTest(BaseTest):
         sources=[],
       )
       '''))
-    self.build_graph.inject_spec_closure('//:foo')
-    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JvmTarget.WrongTargetTypeError):
       target.imports
@@ -82,8 +77,7 @@ class JavaProtobufLibraryTest(BaseTest):
         ],
       )
       '''))
-    self.build_graph.inject_spec_closure('//:foo')
-    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JvmTarget.ExpectedAddressError):
       target.imports
@@ -107,8 +101,7 @@ class JavaProtobufLibraryTest(BaseTest):
         sources=[],
     )
     '''))
-    self.build_graph.inject_spec_closure('//:foo')
-    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     traversable_specs = [spec for spec in target.traversable_specs]
     self.assertSequenceEqual([':import_jars'], traversable_specs)

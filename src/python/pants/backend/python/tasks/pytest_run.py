@@ -49,7 +49,6 @@ class PytestRun(PythonTask):
       test_builder = PythonTestBuilder(targets=test_targets,
                                        args=args,
                                        interpreter=self.interpreter,
-                                       conn_timeout=self.conn_timeout,
                                        fast=self.get_options().fast,
                                        debug=debug)
       with self.context.new_workunit(name='run',

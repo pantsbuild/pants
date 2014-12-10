@@ -48,8 +48,7 @@ class PythonRepl(PythonTask):
           targets=targets,
           extra_requirements=extra_requirements,
           builder=builder,
-          interpreter=interpreter,
-          conn_timeout=self.conn_timeout)
+          interpreter=interpreter)
 
         chroot.dump()
         builder.freeze()

@@ -6,9 +6,10 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pex.fetcher import Fetcher, PyPIFetcher
-from pex.http import Crawler
+from pex.crawler import Crawler
+from pex.http import Context
 from pex.interpreter import PythonInterpreter
-from pex.obtainer import CachingObtainer
+from pex.iterator import Iterator
 from pex.platforms import Platform
 from pex.resolver import resolve
 from pex.translator import Translator
@@ -29,33 +30,17 @@ def fetchers_from_config(config):
   return fetchers
 
 
-def crawler_from_config(config, conn_timeout=None):
-  download_cache = PythonSetup(config).scratch_dir('download_cache', default_name='downloads')
-  return Crawler(cache=download_cache, conn_timeout=conn_timeout)
-
-
-class PantsObtainer(CachingObtainer):
-  def iter(self, requirement):
-    if hasattr(requirement, 'repository') and requirement.repository:
-      obtainer = CachingObtainer(
-          install_cache=self.install_cache,
-          ttl=self.ttl,
-          crawler=self._crawler,
-          fetchers=[Fetcher([requirement.repository])],
-          translators=self._translator)
-      for package in obtainer.iter(requirement):
-        yield package
-    else:
-      for package in super(PantsObtainer, self).iter(requirement):
-        yield package
+def context_from_config(config):
+  # TODO(wickman) Add retry, conn_timeout, threads, etc configuration here.
+  return Context.get()
 
 
 def resolve_multi(config,
                   requirements,
                   interpreter=None,
                   platforms=None,
-                  conn_timeout=None,
-                  ttl=3600):
+                  ttl=3600,
+                  find_links=None):
   """Multi-platform dependency resolution for PEX files.
 
      Given a pants configuration and a set of requirements, return a list of distributions
@@ -68,35 +53,31 @@ def resolve_multi(config,
                          If None specified, defaults to current interpreter.
      :param platforms: Optional list of platforms against requirements will be resolved. If
                          None specified, the defaults from `config` will be used.
-     :param conn_timeout: Optional connection timeout for any remote fetching.
      :param ttl: Time in seconds before we consider re-resolving an open-ended requirement, e.g.
                  "flask>=0.2" if a matching distribution is available on disk.  Defaults
                  to 3600.
+     :param find_links: Additional paths to search for source packages during resolution.
   """
   distributions = dict()
   interpreter = interpreter or PythonInterpreter.get()
   if not isinstance(interpreter, PythonInterpreter):
     raise TypeError('Expected interpreter to be a PythonInterpreter, got %s' % type(interpreter))
 
-  install_cache = PythonSetup(config).scratch_dir('install_cache', default_name='eggs')
+  cache = PythonSetup(config).scratch_dir('install_cache', default_name='eggs')
   platforms = get_platforms(platforms or config.getlist('python-setup', 'platforms', ['current']))
+  fetchers = fetchers_from_config(config)
+  if find_links:
+    fetchers.extend(Fetcher([path]) for path in find_links)
+  context = context_from_config(config)
 
   for platform in platforms:
-    translator = Translator.default(
-        install_cache=install_cache,
+    distributions[platform] = resolve(
+        requirements=requirements,
         interpreter=interpreter,
+        fetchers=fetchers,
         platform=platform,
-        conn_timeout=conn_timeout)
-
-    obtainer = PantsObtainer(
-        install_cache=install_cache,
-        crawler=crawler_from_config(config, conn_timeout=conn_timeout),
-        fetchers=fetchers_from_config(config) or [PyPIFetcher()],
-        translators=translator)
-
-    distributions[platform] = resolve(requirements=requirements,
-                                      obtainer=obtainer,
-                                      interpreter=interpreter,
-                                      platform=platform)
+        context=context,
+        cache=cache,
+        cache_ttl=ttl)
 
   return distributions

@@ -88,6 +88,11 @@ class OptionValueContainer(object):
       # in case of equal rank we overwrite. That way that the inner scope value wins.
       super(OptionValueContainer, self).__setattr__(key, value)
 
+  def __getitem__(self, key):
+    # Support natural dynamic access, options[key_var] is more idiomatic than
+    # getattr(option, key_var).
+    return getattr(self, key)
+
   def __getattr__(self, key):
     # Note: Called only if regular attribute lookup fails, so accesses
     # to non-forwarded attributes will be handled the normal way.

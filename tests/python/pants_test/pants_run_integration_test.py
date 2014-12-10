@@ -47,7 +47,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     safe_mkdir(root)
     return root
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None, **kwargs):
+  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
+                             **kwargs):
     config = config.copy() if config else {}
 
     # We add workdir to the DEFAULT section, and also ensure that it's emitted first.
@@ -64,11 +65,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with safe_open(ini_file_name, mode='w') as fp:
       fp.write(ini)
     env = os.environ.copy()
-    env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
     env.update(extra_env or {})
 
+    # TODO: We can replace the env var with a '--config-override={0}'.format(ini_file_name) arg,
+    # once we're rid of the special-case handling of this env var in pants_exe.
+    env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
+
     pants_command = ([os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)] + command +
-                     ['--no-lock', '--kill-nailguns'])
+                     ['--no-lock', '--kill-nailguns', '--no-pantsrc'])
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)

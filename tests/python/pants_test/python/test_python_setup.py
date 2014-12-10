@@ -5,30 +5,28 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import OrderedDict
 from contextlib import contextmanager
 import os
 
 from mock import MagicMock, Mock, call
 from twitter.common.collections import OrderedSet
-from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.python.commands.setup_py import SetupPy
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.tasks.python_setup import PythonSetup
 from pants.base.exceptions import TargetDefinitionException
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir
-from pants_test.base_test import BaseTest
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp
+from pants_test.task_test_base import TaskTestBase
 
 
-class MockableSetupPyCommand(SetupPy):
-  def __init__(self, target):
-    self.target = target
-
-
-class TestSetupPy(BaseTest):
+class TestPythonSetup(TaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return PythonSetup
 
   def create_dependencies(self, depmap):
     target_map = {}
@@ -49,19 +47,21 @@ class TestSetupPy(BaseTest):
     # foo -> bar -> baz
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['foo']),
                      OrderedSet([target_map['bar']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
-    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['baz==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['baz']), set([]))
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['baz']), OrderedSet())
+    self.assertEqual(PythonSetup.install_requires(target_map['foo']), set(['bar==0.0.0']))
+    self.assertEqual(PythonSetup.install_requires(target_map['bar']), set(['baz==0.0.0']))
+    self.assertEqual(PythonSetup.install_requires(target_map['baz']), set([]))
 
-  @classmethod
   @contextmanager
-  def run_execute(cls, target, recursive=False):
-    setup_py = MockableSetupPyCommand(target)
+  def run_execute(self, target, recursive=False):
+    self.set_new_options(recursive=recursive, interpreter=[])
+    context = self.context(target_roots=[target])
+    workdir = safe_mkdtemp(dir=self.build_root)
+    setup_py = self.create_task(context, workdir)
     setup_py.old_options = MagicMock()
     setup_py.old_options.recursive = recursive
     setup_py.run_one = MagicMock()
@@ -88,11 +88,11 @@ class TestSetupPy(BaseTest):
     # bar ----'
     dep_map = OrderedDict(foo=['bar', 'baz'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['foo']),
                      OrderedSet([target_map['bar']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['baz']), OrderedSet())
 
   def test_minified_dependencies_diamond(self):
     #   bar <-- foo --> baz
@@ -100,15 +100,15 @@ class TestSetupPy(BaseTest):
     #    `----> bak <----'
     dep_map = OrderedDict(foo=['bar', 'baz'], bar=['bak'], baz=['bak'], bak=[])
     target_map = self.create_dependencies(dep_map)
-    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['foo']),
                      OrderedSet([target_map['bar'], target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['bar']),
                      OrderedSet([target_map['bak']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']),
+    self.assertEqual(PythonSetup.minified_dependencies(target_map['baz']),
                      OrderedSet([target_map['bak']]))
-    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0', 'baz==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['bak==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['baz']), set(['bak==0.0.0']))
+    self.assertEqual(PythonSetup.install_requires(target_map['foo']), set(['bar==0.0.0', 'baz==0.0.0']))
+    self.assertEqual(PythonSetup.install_requires(target_map['bar']), set(['bak==0.0.0']))
+    self.assertEqual(PythonSetup.install_requires(target_map['baz']), set(['bak==0.0.0']))
 
   def test_binary_target_injected_into_minified_dependencies(self):
     foo_bin_dep = self.make_target(
@@ -136,8 +136,8 @@ class TestSetupPy(BaseTest):
       )
     )
 
-    self.assertEqual(SetupPy.minified_dependencies(foo), OrderedSet([foo_bin, foo_bin_dep]))
-    entry_points = dict(SetupPy.iter_entry_points(foo))
+    self.assertEqual(PythonSetup.minified_dependencies(foo), OrderedSet([foo_bin, foo_bin_dep]))
+    entry_points = dict(PythonSetup.iter_entry_points(foo))
     self.assertEqual(entry_points, {'foo_binary': 'foo.bin.foo'})
 
     with self.run_execute(foo, recursive=False) as setup_py_command:
@@ -177,9 +177,9 @@ class TestSetupPy(BaseTest):
     )
 
     # TODO(pl): Why is this set ordered?  Does the order actually matter?
-    assert SetupPy.minified_dependencies(bar) == OrderedSet([bar_bin, bar_bin_dep])
-    assert SetupPy.install_requires(bar) == set(['bar_bin_dep==0.0.0'])
-    entry_points = dict(SetupPy.iter_entry_points(bar))
+    assert PythonSetup.minified_dependencies(bar) == OrderedSet([bar_bin, bar_bin_dep])
+    assert PythonSetup.install_requires(bar) == set(['bar_bin_dep==0.0.0'])
+    entry_points = dict(PythonSetup.iter_entry_points(bar))
     assert entry_points == {'bar_binary': 'bar.bin.bar'}
 
     with self.run_execute(bar, recursive=False) as setup_py_command:
@@ -213,7 +213,7 @@ class TestSetupPy(BaseTest):
     )
 
     with self.assertRaises(TargetDefinitionException):
-      SetupPy.minified_dependencies(foo)
+      PythonSetup.minified_dependencies(foo)
 
 
 def test_detect_namespace_packages():
@@ -221,7 +221,7 @@ def test_detect_namespace_packages():
     with temporary_file() as fp:
       fp.write(stmt)
       fp.flush()
-      return SetupPy.declares_namespace_package(fp.name)
+      return PythonSetup.declares_namespace_package(fp.name)
 
   assert not has_ns('')
   assert not has_ns('add(1, 2); foo(__name__); self.shoot(__name__)')
@@ -238,7 +238,7 @@ def yield_chroot(packages, namespace_packages, resources):
 
   with temporary_dir() as td:
     def write(package, name, content):
-      package_path = os.path.join(td, SetupPy.SOURCE_ROOT, to_path(package))
+      package_path = os.path.join(td, PythonSetup.SOURCE_ROOT, to_path(package))
       safe_mkdir(os.path.dirname(os.path.join(package_path, name)))
       with open(os.path.join(package_path, name), 'w') as fp:
         fp.write(content)
@@ -258,7 +258,7 @@ def yield_chroot(packages, namespace_packages, resources):
 def test_find_packages():
   def assert_single_chroot(packages, namespace_packages, resources):
     with yield_chroot(packages, namespace_packages, resources) as chroot:
-      p, n_p, r = SetupPy.find_packages(chroot)
+      p, n_p, r = PythonSetup.find_packages(chroot)
       assert p == set(packages + namespace_packages)
       assert n_p == set(namespace_packages)
       assert r == dict((k, set(v)) for (k, v) in resources.items())
@@ -281,7 +281,7 @@ def test_find_packages():
 
   # assert that nearest-submodule is honored
   with yield_chroot(['foo', 'foo.bar'], [], resources) as chroot:
-    _, _, r = SetupPy.find_packages(chroot)
+    _, _, r = PythonSetup.find_packages(chroot)
     assert r == {
       'foo': set(['f0']),
       'foo.bar': set([
@@ -296,21 +296,21 @@ def test_find_packages():
       [],
       {'foo.bar1': ['f0']}) as chroot:
 
-    _, _, r = SetupPy.find_packages(chroot)
+    _, _, r = PythonSetup.find_packages(chroot)
     assert r == {'foo': set(['bar1/f0'])}
 
 
 def test_nearest_subpackage():
   # degenerate
-  assert SetupPy.nearest_subpackage('foo', []) == 'foo'
-  assert SetupPy.nearest_subpackage('foo', ['foo']) == 'foo'
-  assert SetupPy.nearest_subpackage('foo', ['bar']) == 'foo'
+  assert PythonSetup.nearest_subpackage('foo', []) == 'foo'
+  assert PythonSetup.nearest_subpackage('foo', ['foo']) == 'foo'
+  assert PythonSetup.nearest_subpackage('foo', ['bar']) == 'foo'
 
   # common prefix
-  assert 'foo' == SetupPy.nearest_subpackage('foo.bar', ['foo'])
-  assert 'foo.bar' == SetupPy.nearest_subpackage(
+  assert 'foo' == PythonSetup.nearest_subpackage('foo.bar', ['foo'])
+  assert 'foo.bar' == PythonSetup.nearest_subpackage(
       'foo.bar', ['foo', 'foo.bar'])
-  assert 'foo.bar' == SetupPy.nearest_subpackage(
+  assert 'foo.bar' == PythonSetup.nearest_subpackage(
       'foo.bar.topo', ['foo', 'foo.bar'])
-  assert 'foo' == SetupPy.nearest_subpackage(
+  assert 'foo' == PythonSetup.nearest_subpackage(
       'foo.barization', ['foo', 'foo.bar'])

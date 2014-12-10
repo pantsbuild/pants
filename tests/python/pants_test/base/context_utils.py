@@ -10,7 +10,7 @@ import sys
 from twitter.common.collections import maybe_list
 from twitter.common.lang import Compatibility
 
-from pants.base.config import Config
+from pants.base.config import Config, SingleFileConfig
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.run_tracker import RunTracker
@@ -45,7 +45,6 @@ def create_config(sample_ini=''):
   """Creates a ``Config`` from the ``sample_ini`` file contents.
 
   :param string sample_ini: The contents of the ini file containing the config values.
-  :param dict defaults: An optional dict of global default ini values to seed.
   """
   if not isinstance(sample_ini, Compatibility.string):
     raise ValueError('The sample_ini supplied must be a string, given: %s' % sample_ini)
@@ -53,7 +52,7 @@ def create_config(sample_ini=''):
   parser = Config.create_parser()
   with io.BytesIO(sample_ini.encode('utf-8')) as ini:
     parser.readfp(ini)
-  return Config(parser)
+  return SingleFileConfig('dummy/path', parser)
 
 
 def create_run_tracker(info_dir=None):
@@ -88,6 +87,10 @@ def create_context(config='', new_options=None, target_roots=None, **kwargs):
   :param ``**kwargs``: Any additional keyword arguments to pass through to the Context constructor.
   """
   config = config if isinstance(config, Config) else create_config(config)
+  # TODO: Get rid of this temporary hack after we plumb options through everywhere and can get
+  # rid of the config cache.
+  Config.cache(config)
+
   run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return Context(config, create_new_options(new_options or {}),

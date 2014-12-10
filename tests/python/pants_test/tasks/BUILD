@@ -305,6 +305,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:depmap',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
   ]
 )
 
@@ -312,6 +313,8 @@ python_tests(
   name = 'depmap_integration',
   sources = ['test_depmap_integration.py'],
   dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:config',
     'src/python/pants/ivy:ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
@@ -342,6 +345,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:filedeps',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:config',
   ],
 )
 

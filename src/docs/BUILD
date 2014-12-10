@@ -33,6 +33,7 @@ page(
   source='first_tutorial.md',
   links=[
     ':first_concepts',
+    ':invoking',
     'examples/src/java/com/pants/examples:readme',
     'examples/src/python/example:readme',
   ]

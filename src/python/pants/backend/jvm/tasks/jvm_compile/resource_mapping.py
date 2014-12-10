@@ -6,9 +6,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+from textwrap import dedent
 import os
 import re
-
 
 class ResourceMapping(object):
   RESOURCES_BY_CLASS_NAME_RE = re.compile(r'^(?P<classname>[\w+.]+) -> (?P<path>.+)$')

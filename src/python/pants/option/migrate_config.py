@@ -58,14 +58,19 @@ notes = {
 
 
 def check_config_file(path):
-  config = Config.from_cache(configpath=path)
+  config = Config.load(configpaths=[path])
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
   def section(s):
     return cyan('[{0}]'.format(s))
 
+  cp = config.configparser
+
   for (src_section, src_key), (dst_section, dst_key) in migrations.items():
-    if config.has_section(src_section) and config.has_option(src_section, src_key):
+    def has_non_default_option(section, key):
+      return cp.has_option(section, key) and cp.get(section, key) != cp.defaults().get(key, None)
+
+    if config.has_section(src_section) and has_non_default_option(src_section, src_key):
       print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
             '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
                                     dst_key=green(dst_key), dst_section=section(dst_section)),
@@ -74,7 +79,6 @@ def check_config_file(path):
         print('  Note: {0}'.format(notes[(src_section, src_key)]))
 
   # Check that all values are parseable.
-  cp = config.configparser
   for sec in ['DEFAULT'] + cp.sections():
     for key, value in cp.items(sec):
       value = value.strip()

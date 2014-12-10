@@ -65,11 +65,10 @@ class PythonTestBuilder(object):
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
 
-  def __init__(self, targets, args, interpreter=None, conn_timeout=None, fast=False, debug=False):
+  def __init__(self, targets, args, interpreter=None, fast=False, debug=False):
     self._targets = targets
     self._args = args
     self._interpreter = interpreter or PythonInterpreter.get()
-    self._conn_timeout = conn_timeout
 
     # If fast is true, we run all the tests in a single chroot. This is MUCH faster than
     # creating a chroot for each test target. However running each test separately is more
@@ -292,8 +291,7 @@ class PythonTestBuilder(object):
       extra_requirements=self._TESTING_TARGETS,
       builder=builder,
       platforms=('current',),
-      interpreter=self._interpreter,
-      conn_timeout=self._conn_timeout)
+      interpreter=self._interpreter)
     try:
       builder = chroot.dump()
       builder.freeze()

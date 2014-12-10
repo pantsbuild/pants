@@ -86,7 +86,15 @@ Common
 These command-line flags are available with all Pants goals.
 
 {{#glopts}}
-  ``{{st}}``
-{{hlp}}
-
+{{#options}}
+  * | ``{{st}}``
+{{#typ}}
+      ``{{typ}}``
+{{/typ}}
+{{#default}}
+      (Default: ``{{default}}``)
+{{/default}}
+    |
+{{{hlp}}}
+{{/options}}
 {{/glopts}}
