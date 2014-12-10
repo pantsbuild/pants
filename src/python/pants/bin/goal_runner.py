@@ -133,8 +133,19 @@ class GoalRunner(object):
     logger = logging.getLogger(__name__)
 
     goals = self.options.goals
-    specs = self.options.target_specs
+    raw_specs = self.options.target_specs
     fail_fast = self.options.for_global_scope().fail_fast
+
+    specs = []
+    aliases = self.options.for_global_scope().goal_aliases
+    if aliases:
+      for spec in raw_specs:
+        if spec in aliases:
+          goals.append(aliases[spec])
+        else:
+          specs.append(spec)
+    else:
+      specs = raw_specs
 
     for goal in goals:
       if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
