@@ -111,3 +111,5 @@ class ArgSplitterTest(unittest.TestCase):
                 {'': [], 'compile': []}, [], [], expected_is_help=True)
     self._split('./pants compile --help test', ['compile', 'test'],
                 {'': [], 'compile': [], 'test': []}, [], [], expected_is_help=True)
+    self._split('./pants test src/foo/bar:baz -h', ['test'],
+                {'': [], 'test': []}, ['src/foo/bar:baz'], [], expected_is_help=True)
