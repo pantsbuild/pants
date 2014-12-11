@@ -38,12 +38,16 @@ class BaseTest(unittest.TestCase):
 
   @classmethod
   def setUpClass(cls):
-    """Ensure that all code has a config to read from the cache.
-
-    TODO: Yuck. Get rid of this after plumbing options through in the right places.
-    """
     super(BaseTest, cls).setUpClass()
+    # Ensure that all code has a config to read from the cache.
+    # TODO(John Sirois): Yuck. Get rid of this after plumbing options through in the right places.
     Config.cache(Config.load())
+
+  @classmethod
+  def tearDownClass(cls):
+    super(BaseTest, cls).tearDownClass()
+    # TODO(John Sirois): Yuck. Get rid of this after plumbing options through in the right places.
+    Config.cache(None)
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
