@@ -171,10 +171,11 @@ closure of hello/main's dependencies pulled in hello/greet and, in turn,
 hello/greet's dependencies. Pants bundles up the closed set of all
 dependencies into into the PEX.
 
-Interactive Console with `repl`
--------------------------------
+Interactive Console with `repl` Goal
+------------------------------------
 
-Use the `repl` goal with a Python target to run an interactive Python REPL session.
+Use the <a pantsref="gref_goal_repl">`repl`</a> goal with a Python target to run an interactive
+Python REPL session.
 Within the session, you can `import` the target's code and the code of its dependencies.
 
 To drop into our example library target `examples/src/python/example/hello/greet` with verbosity
@@ -199,9 +200,9 @@ turn on to see what's going on in the background:
     (InteractiveConsole)
     >>>
 
-Pants loads `ansicolors` (greet's 3rdparty dependency). It would have
+Pants loads `ansicolors` (`greet`'s 3rdparty dependency). It would have
 fetched this dependency over the network if necessary. (It wasn't
-necessary to download `ansicolors`; Pants already fetched it while
+necessary to download `ansicolors`; Pants had already fetched it while
 "bootstrapping" itself.)
 
 To convince yourself that the environment contains `greet`'s dependencies, you can inspect
@@ -379,6 +380,60 @@ Paths are relative to the source root housing the python code; for this example,
 You can invoke the Python debugger on a test failure by leaving out the
 `goal test` and passing `--pdb`. This can be useful for inspecting the
 state of objects especially if you are mocking interfaces.
+
+Building a `setup.py` Distutils Package
+---------------------------------------
+
+You can build Distutils packages from `python_library` targets.
+
+To make a `python_library` "setup-able", give it a `provides` parameter; this parameter's value
+should be a <a pantsref="bdict_setup_py">`setup_py`</a> call; this call's parameters will be
+passed to the `setup` function.
+
+    :::python
+    python_library(
+      name='test_infra',
+      dependencies=[
+        'tests/python/pants_test:base_test',
+        ...
+      ],
+      provides=setup_py(
+        name='pantsbuild.pants.testinfra',
+        version='0.0.24',
+        description='Test support for writing pants plugins.',
+        long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
+        url='https://github.com/pantsbuild/pants',
+        license='Apache License, Version 2.0',
+        zip_safe=True,
+        namespace_packages=['pants_test'],
+        classifiers=[
+          'Intended Audience :: Developers',
+          'License :: OSI Approved :: Apache Software License',
+          'Operating System :: MacOS :: MacOS X',
+          'Operating System :: POSIX :: Linux',
+          'Programming Language :: Python',
+          'Topic :: Software Development :: Build Tools',
+          'Topic :: Software Development :: Testing',
+        ]
+      )
+    )
+
+The <a pantsref="gref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
+
+    :::bash
+    $ ./pants goal setup-py src/python/pants:test_infra
+    10:23:06 00:00 [main]
+                   (To run a reporting server: ./pants goal server)
+    10:23:07 00:01   [bootstrap]
+    10:23:07 00:01   [setup]
+    10:23:07 00:01     [parse]
+                   Executing tasks in goals: setup-py
+    10:23:07 00:01   [setup-py]
+    10:23:07 00:01     [setup-py]
+                       Running packager against /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24
+                       Writing /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24.tar.gz
+                   SUCCESS
+
 
 Manipulating PEX behavior with environment variables
 ----------------------------------------------------
