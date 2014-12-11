@@ -32,15 +32,17 @@ Relevant Goals and Targets
 > Pants can generate PEXes, executables built from Python. Invoke the
 > <a pantsref="gref_goal_binary">`binary`</a> goal on a
 > <a pantsref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
-> You can also invoke the <a pantsref="gref_goal_run">`run`</a> goal on a
+> You can also invoke the
+> <a pantsref="gref_goal_run">`run`</a> goal on a
 > `python_binary` to run its code "in place."
 
 **Importable Code**
 
-> <a pantsref="bdict_python_library">`python_library`</a> BUILD targets make Python code
-> "import-able". The rule of thumb is that each directory of `.py`
+> <a pantsref="bdict_python_library">`python_library`</a> BUILD targets make Python
+> code "import-able". The rule of thumb is that each directory of `.py`
 > files has a `BUILD` file with a `python_library` target. A Python
-> target that has a `python_library` in its `dependencies` can import its code.
+> target that has a `python_library` in its `dependencies` can import
+> its code.
 >
 > To use code that's not in your workspace, use a
 > <a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
@@ -90,9 +92,9 @@ not `sources`; a binary can have only one source file. If you want more, put the
 
 !inc[start-at=main](hello/main/main.py)
 
-This code imports code from another target. To make this work, the binary target has a dependency
-`examples/src/python/example/hello/greet` and the Python code can thus import things from
-`example.hello.greet`.
+This code imports code from another target. To make this work, the
+binary target has a dependency `examples/src/python/example/hello/greet`
+and the Python code can thus import things from `example.hello.greet`.
 
 You remember that libraries configure "importable" code;
 `example/hello/greet/BUILD` has a `python_library`:
@@ -149,9 +151,9 @@ Handling `python_requirement`
 <a pantsref="bdict_python_requirement_library">`python_requirement_library`</a> targets wrapping
 <a pantsref="bdict_python_requirement">`python_requirement`</a>s.
 
-Pants handles these dependencies for you. It never installs anything globally.
-Instead, it builds the dependencies, caches them in `.pants.d`, and assembles them *a la carte*
-into an execution environment.
+Pants handles these dependencies for you. It never installs anything
+globally. Instead, it builds the dependencies, caches them in `.pants.d`,
+and assembles them *a la carte* into an execution environment.
 
 PEX Contents
 ------------
@@ -266,9 +268,28 @@ And now dist/fab.pex behaves like a standalone fab binary:
 More About Python Tests
 -----------------------
 
-Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` via passthrough
-parameters if `test.pytest` is the last goal and task on your command line. E.g., to run only tests
-whose names contain `req`:
+Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
+`goal test.pytest --options`. For example, to only run tests whose names contain `req`,
+you could run:
+
+    :::bash
+    $ ./pants goal test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
+    ...
+                     ============== test session starts ===============
+                     platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
+                     plugins: cov, timeout
+                     collected 2 items
+
+                     ========= 2 tests deselected by '-kfoo' ==========
+                     ========== 2 deselected in 0.01 seconds ==========
+
+    13:34:28 00:02     [junit]
+    13:34:28 00:02     [specs]
+               SUCCESS
+
+You can pass CLI options to `pytest` via passthrough parameters if `test.pytest` is the last goal
+and task on your command line. E.g., to run only tests whose names contain `req` via passthrough
+parameters:
 
     :::bash
     $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -k req
@@ -291,25 +312,6 @@ whose names contain `req`:
     10:43:05 00:02     [junit]
     10:43:05 00:02     [specs]
                    SUCCESS
-
-Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
-`goal test.pytest --options`. For example, to only run tests whose names contain `req`,
-you could run:
-
-    :::bash
-    $ ./pants goal test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
-    ...
-                     ============== test session starts ===============
-                     platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
-                     plugins: cov, timeout
-                     collected 2 items
-
-                     ========= 2 tests deselected by '-kfoo' ==========
-                     ========== 2 deselected in 0.01 seconds ==========
-
-    13:34:28 00:02     [junit]
-    13:34:28 00:02     [specs]
-               SUCCESS
 
 ### Code Coverage
 
