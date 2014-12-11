@@ -316,6 +316,7 @@ def info_for_target_class(cls):
   paramdocs = param_docshards_to_template_datas(funcdoc_shards)
   return(argspec, funcdoc_rst, paramdocs)
 
+
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
@@ -422,6 +423,7 @@ def get_syms(build_file_parser):
 def bootstrap_option_values():
   return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
 
+
 def gen_goals_glopts_reference_data():
   option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
   def register(*args, **kwargs):
@@ -458,6 +460,7 @@ def gref_template_data_from_options(scope, argparser):
     title=title,
     options=option_l,
     pantsref=pantsref)
+
 
 def gen_tasks_goals_reference_data():
   """Generate the template data for the goals reference rst doc."""

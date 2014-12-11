@@ -18,13 +18,18 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.test_builder import PythonTestBuilder
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.config import Config
 from pants.util.contextutil import pushd, environment_as
 from pants_test.base_test import BaseTest
 
 
 class PythonTestBuilderTestBase(BaseTest):
   def run_tests(self, targets, args=None, fast=True, debug=False):
-    cache = PythonInterpreterCache(self.config())
+    # TODO(John Sirois): We need the real pants.ini config to pick up the pants interpreter
+    # constraints and thus avoid attempting to cache a python 3.2 interpreter below - which will
+    # blow up on unicode literals.  Find a cleaner way to do this.
+    real_config = Config.load(os.path.join(self.real_build_root, 'pants.ini'))
+    cache = PythonInterpreterCache(real_config)
     cache.setup()
 
     interpreter = None

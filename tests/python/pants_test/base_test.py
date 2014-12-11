@@ -28,7 +28,7 @@ from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
@@ -44,6 +44,12 @@ class BaseTest(unittest.TestCase):
     """
     super(BaseTest, cls).setUpClass()
     Config.cache(Config.load())
+
+  @classmethod
+  def tearDownClass(cls):
+    # TODO(John Sirois): Yuck. Get rid of this after plumbing options through in the right places.
+    super(BaseTest, cls).tearDownClass()
+    Config.cache(None)
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
