@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import copy
 import sys
+import textwrap
 
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
@@ -210,17 +211,20 @@ class Options(object):
             _maybe_help(scope)
     else:
       print(pants_release())
-      print('\nUsage:')
-      print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
-      print('  ./pants help                                 Get help.')
-      print('  ./pants help [goal]                          Get help for the specified goal.')
-      print('  ./pants goal goals                           List all installed goals.')
-      print('')
-      print('  [target] accepts two special forms:')
-      print('    dir:  to include all targets in the specified directory.')
-      print('    dir:: to include all targets found recursively under the directory.')
+      print(textwrap.dedent('''\
+        Usage:
+          ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.
+          ./pants --help                               Get help.
+          ./pants [goal] --help                        Get help for the specified goal.
+          ./pants goal goals                           List all installed goals.
+          ./pants goal list [target...]                List all this workspace\'s targets.
+          ./pants goal targets                         List all BUILD file symbols.
 
-      print('\nFriendly docs:\n  http://pantsbuild.github.io/')
+          [target] accepts two special forms:
+            dir:  to include all targets in the specified directory.
+            dir:: to include all targets found recursively under the directory.
+
+            Friendly docs: http://pantsbuild.github.io/'''))
 
       print('\nGlobal options:')
       print(self.format_global_help())
