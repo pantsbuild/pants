@@ -2,20 +2,41 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'pants_exe',
-  sources = ['pants_exe.py'],
+  name = 'bin',
+  sources = ['goal_runner.py', 'pants_exe.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.log',
 
     'src/python/internal_backend/repositories:plugin',
     'src/python/pants/backend/android:plugin',
     'src/python/pants/backend/authentication:authentication',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/backend/maven_layout:plugin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file_address_mapper',
+    'src/python/pants/base:build_file_parser',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:config',
+    'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:extension_loader',
+    'src/python/pants/base:target',
+    'src/python/pants/base:workunit',
+    'src/python/pants/engine',
+    'src/python/pants/goal',
+    'src/python/pants/goal:context',
+    'src/python/pants/goal:initialize_reporting',
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/option',
+    'src/python/pants/reporting',
+    'src/python/pants/util:dirutil',
 
     # XXX these are necessary to parse BUILD.commons.  Should instead be
     # added as plugins to pants.ini
@@ -27,14 +48,6 @@ python_library(
     'src/python/pants/backend/python:python_chroot',
     'src/python/pants/scm:git',
   ],
-)
-
-target(
-  name='pants_binary_deps',
-  dependencies=[
-    ':pants_exe',
-    'src/python/pants/commands:goal_runner',
-  ]
 )
 
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
@@ -54,7 +67,7 @@ python_binary(
   ],
   compatibility='CPython>=2.7,<3',
   dependencies = [
-    ':pants_binary_deps',
+    ':bin',
   ],
 )
 
@@ -64,7 +77,7 @@ python_binary(
   name = 'pants_local_binary',
   entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
-    ':pants_binary_deps',
+    ':bin',
     'src/python/internal_backend:plugins',
   ],
 )

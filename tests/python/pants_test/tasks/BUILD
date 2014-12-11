@@ -10,7 +10,6 @@ python_library(
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:target',
-    'src/python/pants/commands:goal_runner',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
     'tests/python/pants_test/base:context_utils',
