@@ -18,6 +18,5 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
 
   @classmethod
   def tearDownClass(cls):
-    super(NailgunTaskTestBase, cls).tearDownClass()
     # Kill any nailguns launched in our ephemeral build root
     NailgunTask.killall()
