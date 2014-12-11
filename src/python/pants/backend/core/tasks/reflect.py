@@ -13,6 +13,7 @@ from docutils.core import publish_parts
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
+from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
@@ -420,7 +421,16 @@ def get_syms(build_file_parser):
 
 
 def bootstrap_option_values():
-  return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
+  try:
+    return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
+  finally:
+    # Today, the OptionsBootstrapper mutates global state upon construction in the form of:
+    #  Config.reset_default_bootstrap_option_values(...)
+    # As such bootstrap options that use the buildroot get contaminated globally here.  We only
+    # need the contaminated values locally though for doc display, thus the reset of global state.
+    # TODO(John Sirois): remove this hack when mutable Config._defaults is killed.
+    Config.reset_default_bootstrap_option_values()
+
 
 def gen_goals_glopts_reference_data():
   option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
@@ -458,6 +468,7 @@ def gref_template_data_from_options(scope, argparser):
     title=title,
     options=option_l,
     pantsref=pantsref)
+
 
 def gen_tasks_goals_reference_data():
   """Generate the template data for the goals reference rst doc."""
