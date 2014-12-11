@@ -42,14 +42,14 @@ class BaseTest(unittest.TestCase):
 
     TODO: Yuck. Get rid of this after plumbing options through in the right places.
     """
-    super(BaseTest, cls).setUpClass()
     cls._cached_config = Config.from_cache()
+    super(BaseTest, cls).setUpClass()
     Config.cache(Config.load())
 
   @classmethod
   def tearDownClass(cls):
     # TODO(John Sirois): Yuck. Get rid of this after plumbing options through in the right places.
-    super(BaseTest, cls).setUpClass()
+    super(BaseTest, cls).tearDownClass()
     Config.cache(cls._cached_config)
 
   def build_path(self, relpath):
