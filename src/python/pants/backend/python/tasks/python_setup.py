@@ -27,7 +27,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.util.dirutil import safe_rmtree, safe_walk
 
 
@@ -404,7 +404,7 @@ class PythonSetup(PythonTask):
   def execute(self):
     targets = filter(PythonSetup.has_provides, self.context.target_roots)
     if not targets:
-      self.error('Target(s) must provide an artifact.')
+      raise TaskError('setup-py target(s) must provide an artifact.')
 
     setup_targets = OrderedSet()
     if self._recursive:
