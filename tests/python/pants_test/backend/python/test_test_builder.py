@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import glob
 import os
-import sys
 from textwrap import dedent
 import xml.dom.minidom as DOM
 
@@ -24,24 +23,20 @@ from pants_test.base_test import BaseTest
 
 
 class PythonTestBuilderTestBase(BaseTest):
-  def run_tests(self, targets, args=None, fast=True, debug=False):
+  def _cache_current_interpreter(self):
     cache = PythonInterpreterCache(self.config())
 
     # We only need to cache the current interpreter, avoid caching for every interpreter on the
     # PATH.
-    filter = PythonInterpreter.from_binary(sys.executable).identity.requirement
-    cache.setup(filters=[filter])
+    current_interpreter = PythonInterpreter.get()
+    for cached_interpreter in cache.setup(filters=[current_interpreter.identity.requirement]):
+      if cached_interpreter == current_interpreter:
+        return cached_interpreter
+    raise RuntimeError('Could not find suitable interpreter to run tests.')
 
-    interpreter = None
-    for interp in cache.interpreters:
-      if interp.binary == sys.executable:
-        interpreter = interp
-        break
-    else:
-      raise RuntimeError('Could not find suitable interpreter to run tests.')
-
+  def run_tests(self, targets, args=None, fast=True, debug=False):
     test_builder = PythonTestBuilder(
-        targets, args or [], fast=fast, debug=debug, interpreter=interpreter)
+        targets, args or [], fast=fast, debug=debug, interpreter=self._cache_current_interpreter())
 
     with pushd(self.build_root):
       return test_builder.run()
