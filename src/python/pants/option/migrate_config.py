@@ -25,6 +25,8 @@ migrations = {
 
   ('DEFAULT', 'checkstyle_suppression_files'): ('checkstyle', 'suppression_files'),
 
+  ('nailgun', 'autokill'): ('DEFAULT', 'kill_nailguns'),
+
   ('jvm-run', 'jvm_args'): ('run.jvm', 'jvm_options'),
   ('benchmark-run', 'jvm_args'): ('bench', 'jvm_options'),
   ('specs-run', 'jvm_args'): ('test.specs', 'jvm_options'),
@@ -40,7 +42,7 @@ migrations = {
   ('scala-repl', 'args'): ('repl.scala', 'args'),
 
   ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
-  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin-args'),
+  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
 
   ('markdown-to-html', 'extensions'): ('markdown', 'extensions'),
   ('markdown-to-html', 'code-style'): ('markdown', 'code_style'),

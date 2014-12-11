@@ -37,7 +37,6 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
-from pants.commands.goal_runner import GoalRunner
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -90,10 +89,6 @@ def build_file_aliases():
       'zglobs': ZGlobs,
     }
   )
-
-
-def register_commands():
-  GoalRunner._register()
 
 
 def register_goals():
