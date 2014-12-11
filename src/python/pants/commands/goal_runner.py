@@ -46,7 +46,6 @@ class GoalRunner(Command):
     pass
 
   __command__ = 'goal'
-  output = None
 
   def __init__(self, *args, **kwargs):
     self.targets = []

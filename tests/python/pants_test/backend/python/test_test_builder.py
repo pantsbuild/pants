@@ -12,6 +12,7 @@ from textwrap import dedent
 import xml.dom.minidom as DOM
 
 import coverage
+from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -25,10 +26,13 @@ from pants_test.base_test import BaseTest
 class PythonTestBuilderTestBase(BaseTest):
   def run_tests(self, targets, args=None, fast=True, debug=False):
     cache = PythonInterpreterCache(self.config())
-    cache.setup()
+
+    # We only need to cache the current interpreter, avoid caching for every interpreter on the
+    # PATH.
+    filter = PythonInterpreter.from_binary(sys.executable).identity.requirement
+    cache.setup(filters=[filter])
 
     interpreter = None
-
     for interp in cache.interpreters:
       if interp.binary == sys.executable:
         interpreter = interp
