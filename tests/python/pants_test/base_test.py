@@ -42,7 +42,6 @@ class BaseTest(unittest.TestCase):
 
     TODO: Yuck. Get rid of this after plumbing options through in the right places.
     """
-    cls._cached_config = Config.from_cache()
     super(BaseTest, cls).setUpClass()
     Config.cache(Config.load())
 
@@ -50,7 +49,7 @@ class BaseTest(unittest.TestCase):
   def tearDownClass(cls):
     # TODO(John Sirois): Yuck. Get rid of this after plumbing options through in the right places.
     super(BaseTest, cls).tearDownClass()
-    Config.cache(cls._cached_config)
+    Config.cache(None)
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
