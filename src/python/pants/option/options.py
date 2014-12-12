@@ -216,9 +216,9 @@ class Options(object):
           ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.
           ./pants --help                               Get help.
           ./pants [goal] --help                        Get help for the specified goal.
-          ./pants goal goals                           List all installed goals.
-          ./pants goal list [target...]                List all this workspace\'s targets.
-          ./pants goal targets                         List all BUILD file symbols.
+          ./pants goals                                List all installed goals.
+          ./pants list [target...]                     List all this workspace\'s targets.
+          ./pants targets                              List all BUILD file symbols.
 
           [target] accepts two special forms:
             dir:  to include all targets in the specified directory.
