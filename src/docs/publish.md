@@ -263,8 +263,10 @@ publish a target that depends on a target that has no `provides`, Pants
 doesn't know what to do. It stops:
 
     FAILURE: The following errors must be resolved to publish.
-      Cannot publish src/java/com/twitter/common/base/BUILD:base due to:
-        src/java/com/twitter/common/quantity/BUILD:quantity - Does not provide an artifact.
+      Cannot publish BuildFileAddress(/Users/archie/workspace/buoyancy/client/src/main/scala/com/bu
+    oyancy/client/BUILD, client) due to:
+        BuildFileAddress(/Users/archie/workspace/buoyancy/client/src/main/scala/com/buoyancy/client
+    /model/BUILD, model) - Does not provide an artifact.
 
 The solution is to add a `provides` to the target that lacks one.
 

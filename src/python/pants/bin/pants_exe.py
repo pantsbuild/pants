@@ -11,7 +11,7 @@ import sys
 import traceback
 
 from pants.base.build_environment import get_buildroot, pants_version
-from pants.commands.goal_runner import GoalRunner
+from pants.bin.goal_runner import GoalRunner
 
 
 _LOG_EXIT_OPTION = '--log-exit'

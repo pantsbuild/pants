@@ -18,6 +18,7 @@ from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibr
 from pants.base.build_environment import get_buildroot
 from pants.thrift_util import select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.strutil import ensure_binary
 
 
 class PythonThriftBuilder(CodeGenerator):
@@ -97,11 +98,13 @@ class PythonThriftBuilder(CodeGenerator):
     For example, 'from' will be converted to 'from_'.
     """
     rewrites = []
-    renames = dict((kw, '%s_' % kw) for kw in keyword.kwlist)
-    token_regex = re.compile(r'(\W)(%s)(\W)' % '|'.join(renames.keys()), re.MULTILINE)
+    # Use binary strings here as data read from files is binary, and mixing
+    # binary and text can cause problems
+    renames = dict((ensure_binary(kw), b'%s_' % kw) for kw in keyword.kwlist)
+    token_regex = re.compile(r'\b(%s)\b' % '|'.join(renames.keys()), re.MULTILINE)
 
     def token_replace(match):
-      return '%s%s%s' % (match.group(1), renames[match.group(2)], match.group(3))
+      return renames[match.group(1)]
 
     def replace_tokens(contents):
       return token_regex.sub(token_replace, contents)
