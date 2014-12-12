@@ -90,9 +90,8 @@ class ArgSplitter(object):
       self._unconsumed_args.pop()
     if self._unconsumed_args and self._unconsumed_args[-1] == 'goal':
       # TODO: Temporary warning. Eventually specifying 'goal' will be an error.
-      # Turned off for now because it's annoying. Will turn back on at some point during migration.
-      #print("WARNING: Specifying the 'goal' command explicitly is superfluous and deprecated.",
-      #      file=sys.stderr)
+      print("WARNING: Specifying 'goal' explicitly is no longer necessary, and deprecated.",
+            file=sys.stderr)
       self._unconsumed_args.pop()
 
     def assign_flag_to_scope(flag, default_scope):
