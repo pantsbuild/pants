@@ -47,7 +47,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_wire_dependent_targets(self):
     pants_run = self.run_pants(['bundle',
-                                '--deployjar'
+                                '--deployjar',
                                 'examples/src/java/com/pants/examples/wire/element'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-element-example-bundle')
