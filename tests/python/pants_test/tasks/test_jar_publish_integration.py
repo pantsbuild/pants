@@ -14,6 +14,7 @@ from pants.util.dirutil import safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.tasks.test_base import is_exe
 
+
 def shared_artifacts(version, extra_jar=None):
   published_file_list = ['ivy-{0}.xml'.format(version),
                          'hello-greet-{0}.jar'.format(version),
@@ -22,6 +23,7 @@ def shared_artifacts(version, extra_jar=None):
   if extra_jar:
     published_file_list.append(extra_jar)
   return {'com/pants/testproject/publish/hello-greet/{0}/'.format(version): published_file_list}
+
 
 def publish_extra_config(unique_config):
   return {
@@ -37,6 +39,7 @@ def publish_extra_config(unique_config):
               ],
             },
           }
+
 
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
   SCALADOC = is_exe('scaladoc')
@@ -97,7 +100,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_config=extra_config,
                       extra_env={'WRAPPER_SRCPATH': 'examples/src/python'},
                       success_expected=success_expected)
-
 
   #
   # Run through all the permutations of the config parameters for publish_extras.
@@ -165,13 +167,12 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as publish_dir:
       options = ['--publish-local=%s' % publish_dir,
                  '--no-publish-dryrun',
-                 '--publish-force',
-                 '--print-exception-stacktrace',]
+                 '--publish-force']
       if extra_options:
         options.extend(extra_options)
 
       yes = 'y' * expected_primary_artifact_count
-      pants_run = self.run_pants(['goal', 'publish', target] + options, config=extra_config,
+      pants_run = self.run_pants(['publish', target] + options, config=extra_config,
                                  stdin_data=yes, extra_env=extra_env)
 
       if success_expected:

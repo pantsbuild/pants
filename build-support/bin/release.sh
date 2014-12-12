@@ -25,7 +25,7 @@ PKG_PANTS=(
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
-  execute_packaged_pants_without_internal_backends goal list src:: && \
+  execute_packaged_pants_without_internal_backends list src:: && \
   [[ "$(execute_packaged_pants_without_internal_backends --version 2>/dev/null)" \
     == "$(local_version)" ]]
 }
@@ -96,7 +96,7 @@ function build_packages() {
 
     banner "Building package ${NAME}-$(local_version) with target '${BUILD_TARGET}' ..."
 
-    run_local_pants goal setup-py --recursive ${BUILD_TARGET} || \
+    run_local_pants setup-py --recursive ${BUILD_TARGET} || \
     die "Failed to build package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
   done
 }
@@ -111,7 +111,7 @@ function publish_packages() {
 
     # TODO(Jin Feng) Note --recursive option would cause some of the packages being
     # uploaded multiple times because of dependencies. No harms, but not efficient.
-    run_local_pants goal setup-py --run="sdist upload" --recursive ${BUILD_TARGET} || \
+    run_local_pants setup-py --run="sdist upload" --recursive ${BUILD_TARGET} || \
     die "Failed to publish package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
   done
 }

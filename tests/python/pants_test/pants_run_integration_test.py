@@ -71,8 +71,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # once we're rid of the special-case handling of this env var in pants_exe.
     env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
 
-    pants_command = ([os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)] + command +
-                     ['--no-lock', '--kill-nailguns', '--no-pantsrc'])
+    pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
+    pants_command = [pants_script,
+                     '--no-lock',
+                     '--kill-nailguns',
+                     '--no-pantsrc',
+                     '--print-exception-stacktrace'] + command
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
@@ -97,19 +101,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
   def bundle_and_run(self, target, bundle_name, args=None):
-    ''' Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
+    """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
+
     :param target: target name to compile
     :param bundle_name: resulting bundle filename (minus .jar extension)
     :param args: optional arguments to pass to executable
     :return: stdout as a string on success, raises an Exception on error
-    '''
-    pants_run = self.run_pants(['goal', 'bundle', '--bundle-archive=zip', target])
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal bundle expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
+    """
+    pants_run = self.run_pants(['bundle', '--archive=zip', target])
+    self.assert_success(pants_run)
 
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
     # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
@@ -133,11 +133,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return stdout
 
   def assert_success(self, pants_run, msg=None):
-    # TODO(John Sirois): de-dup ITs to use this helper
     self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)
 
   def assert_failure(self, pants_run, msg=None):
-    # TODO(John Sirois): de-dup ITs to use this helper
     self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=False, msg=msg)
 
   def assert_result(self, pants_run, value, expected=True, msg=None):

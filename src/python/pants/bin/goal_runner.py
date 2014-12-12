@@ -80,7 +80,7 @@ class GoalRunner(object):
     if url:
       self.run_tracker.log(Report.INFO, 'See a report at: %s' % url)
     else:
-      self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants goal server)')
+      self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
