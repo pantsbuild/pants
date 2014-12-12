@@ -14,15 +14,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class MarkdownIntegrationTest(PantsRunIntegrationTest):
   def test_markdown_normal(self):
-    pants_run = self.run_pants(
-        ['goal', 'markdown',
-         'testprojects/src/java/com/pants/testproject/page:readme', ])
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal bundle run expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
+    pants_run = self.run_pants(['markdown',
+                                'testprojects/src/java/com/pants/testproject/page:readme'])
+    self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'markdown/html',
                             'testprojects/src/java/com/pants/testproject/page',
                             'README.html')

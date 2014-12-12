@@ -19,6 +19,7 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
   method. If you add a target, you may need to expand the TOOLS list and perhaps define new
   BUILD_TOOLS or TARGET_SDK class variables.
   """
+
   TOOLS = [
     os.path.join('build-tools', AndroidIntegrationTest.BUILD_TOOLS, 'lib', 'dx.jar'),
     os.path.join('platforms', 'android-' + AndroidIntegrationTest.TARGET_SDK, 'android.jar')
@@ -29,15 +30,9 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
   @pytest.mark.skipif('not DxCompileIntegrationTest.tools',
                       reason='Android integration test requires tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
-
   def test_dx_compile(self):
     self.dx_test(AndroidIntegrationTest.TEST_TARGET)
 
   def dx_test(self, target):
-      pants_run = self.run_pants(['goal', 'dex', target])
-      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                        "goal publish expected success, got {0}\n"
-                        "got stderr:\n{1}\n"
-                        "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                    pants_run.stderr_data,
-                                                    pants_run.stdout_data))
+      pants_run = self.run_pants(['dex', target])
+      self.assert_success(pants_run)

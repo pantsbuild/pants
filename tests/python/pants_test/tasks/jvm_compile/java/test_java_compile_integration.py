@@ -20,9 +20,10 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     # A bug was introduced where if a java compile was run twice, the second
     # time the global_analysis.valid file would incorrectly be empty.
 
-    pants_run = self.run_pants_with_workdir(
-      ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main'],
-      workdir)
+    pants_run = self.run_pants_with_workdir([
+        'compile',
+        'testprojects/src/java/com/pants/testproject/unicode/main'],
+        workdir)
     self.assert_success(pants_run)
 
     # Parse the analysis file from the compilation.
@@ -48,9 +49,9 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.nocache.cache_me')
       config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(
-        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/nocache::'],
-        config)
+      pants_run = self.run_pants(['compile',
+                                  'testprojects/src/java/com/pants/testproject/nocache::'],
+                                 config)
       self.assert_success(pants_run)
 
       # The nocache target is labeled with no_cache so it should not be written to the
@@ -68,24 +69,23 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.unicode.main.main')
       config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(
-        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/unicode/main'],
-        config)
+      pants_run = self.run_pants(['compile',
+                                  'testprojects/src/java/com/pants/testproject/unicode/main'],
+                                 config)
       self.assert_success(pants_run)
 
       # One artifact for java 6
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
-      pants_run = self.run_pants(
-        ['goal', 'compile.java', '--target=1.7',
-         'testprojects/src/java/com/pants/testproject/unicode/main'],
-        config)
+      pants_run = self.run_pants(['compile.java',
+                                  '--target=1.7',
+                                  'testprojects/src/java/com/pants/testproject/unicode/main'],
+                                 config)
       self.assert_success(pants_run)
 
       # One artifact for java 6 and one for 7
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
-
 
   def test_java_compile_reads_resource_mapping(self):
     # Ensure that if an annotation processor produces a resource-mapping,
@@ -96,9 +96,9 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.annotation.main.main')
       config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(
-        ['goal', 'compile', 'testprojects/src/java/com/pants/testproject/annotation/main'],
-        config)
+      pants_run = self.run_pants(['compile',
+                                  'testprojects/src/java/com/pants/testproject/annotation/main'],
+                                 config)
       self.assert_success(pants_run)
 
       self.assertTrue(os.path.exists(artifact_dir))
@@ -118,26 +118,18 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     # We want to ensure that a project missing dependencies can be
     # whitelisted so that the missing deps do not break the build.
 
-    args = [
-      'goal',
-      'compile',
-      target,
-      fatal_flag
-    ]
+    args = ['compile', target, fatal_flag]
 
     # First check that without the whitelist we do break the build.
     pants_run = self.run_pants(args, {})
-    self.assertNotEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE)
+    self.assert_failure(pants_run)
 
     # Now let's use the target whitelist, this should succeed.
-    config = {
-      'jvm': {'missing_deps_target_whitelist': [whitelist]}
-    }
+    config = {'jvm': {'missing_deps_target_whitelist': [whitelist]}}
 
     pants_run = self.run_pants(args, config)
 
     self.assert_success(pants_run)
-
 
   def test_java_compile_missing_dep_analysis_whitelist(self):
     self._whitelist_test(
@@ -145,7 +137,6 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       '--compile-java-missing-deps=fatal',
       'testprojects/src/java/com/pants/testproject/missingdepswhitelist2'
     )
-
 
   def test_java_compile_missing_direct_dep_analysis_whitelist(self):
     self._whitelist_test(
