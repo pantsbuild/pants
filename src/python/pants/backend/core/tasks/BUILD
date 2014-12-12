@@ -259,6 +259,7 @@ python_library(
   sources = ['reflect.py'],
   dependencies = [
     'src/python/pants/base:build_manual',
+    'src/python/pants/base:config',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
