@@ -29,8 +29,11 @@ class PythonTestBuilderTestBase(BaseTest):
     # We only need to cache the current interpreter, avoid caching for every interpreter on the
     # PATH.
     current_interpreter = PythonInterpreter.get()
+    current_id = (current_interpreter.binary, current_interpreter.identity)
     for cached_interpreter in cache.setup(filters=[current_interpreter.identity.requirement]):
-      if cached_interpreter == current_interpreter:
+      # TODO(John Sirois): Revert to directly comparing interpreters when
+      # https://github.com/pantsbuild/pex/pull/31 is in, released and consumed by pants.
+      if (cached_interpreter.binary, cached_interpreter.identity) == current_id:
         return cached_interpreter
     raise RuntimeError('Could not find suitable interpreter to run tests.')
 
