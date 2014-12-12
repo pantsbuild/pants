@@ -106,11 +106,14 @@ class ArgSplitter(object):
       assign_flag_to_scope(flag, GLOBAL_SCOPE)
     scope, flags = self._consume_scope()
     while scope:
-      add_scope(scope)
-      goals.add(scope.partition('.')[0])
-      passthru_owner = scope
-      for flag in flags:
-        assign_flag_to_scope(flag, scope)
+      if scope.lower() == 'help':
+        self._is_help = True
+      else:
+        add_scope(scope)
+        goals.add(scope.partition('.')[0])
+        passthru_owner = scope
+        for flag in flags:
+          assign_flag_to_scope(flag, scope)
       scope, flags = self._consume_scope()
 
     while self._unconsumed_args and not self._at_double_dash():
@@ -128,8 +131,8 @@ class ArgSplitter(object):
       self._unconsumed_args.pop()
       passthru = list(reversed(self._unconsumed_args))
 
-    # We parse the word 'help' as a scope, but it's not a real one, so ignore it.
-    scope_to_flags.pop('help', None)
+    if not goals:
+      self._is_help = True
     return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
 
   def _consume_scope(self):
@@ -147,8 +150,6 @@ class ArgSplitter(object):
     if not self._at_scope():
       return None, []
     scope = self._unconsumed_args.pop()
-    if scope.lower() == 'help':
-      self._is_help = True
     flags = self._consume_flags()
     return scope, flags
 
