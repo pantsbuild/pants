@@ -22,6 +22,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -36,8 +37,9 @@ public class ResourceMappingProcessor extends AbstractProcessor {
   private static final String REPORT_FILE_NAME = "deprecation_report.txt";
 
   private ProcessingEnvironment processingEnvironment = null;
+  private Elements elementUtils;
 
-  private static final class Resource {
+    private static final class Resource {
     private final FileObject resource;
     private final Writer writer;
 
@@ -105,6 +107,7 @@ public class ResourceMappingProcessor extends AbstractProcessor {
 
   @Override public void init(ProcessingEnvironment processingEnvironment) {
     this.processingEnvironment = processingEnvironment;
+    this.elementUtils = processingEnvironment.getElementUtils();
   }
 
   @Override public Set<String> getSupportedAnnotationTypes() {
@@ -126,7 +129,6 @@ public class ResourceMappingProcessor extends AbstractProcessor {
     try {
       Set<String> typeNames = new HashSet<String>();
       PrintWriter writer = closer.register(new PrintWriter(outputFile.openWriter()));
-      writer.println("{");
       for (TypeElement appAnnotation : annotations) {
         Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(appAnnotation);
         Set<TypeElement> elements = ElementFilter.typesIn(annotatedElements);
@@ -134,13 +136,12 @@ public class ResourceMappingProcessor extends AbstractProcessor {
           if (!(elem instanceof TypeElement))
             continue;
           TypeElement typeElem = (TypeElement) elem;
-          String typeName = typeElem.getQualifiedName().toString();
+          String typeName = elementUtils.getBinaryName(typeElem).toString();
           typeNames.add(typeName);
-          writer.println(typeName + "\n");
+          writer.println(typeName);
         }
       }
 
-      writer.println("}\n");
       closer.close();
 
       writeResourceMapping(typeNames, outputFile);
