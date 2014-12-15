@@ -41,6 +41,24 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self._java_compile_produces_valid_analysis_file(workdir)
       self._java_compile_produces_valid_analysis_file(workdir)
 
+  def test_resources_by_target_and_partitions(self):
+    """
+    This tests that resources_by_target interacts correctly with
+    partitions; we want to make sure that even targets that are outside
+    the current partition don't cause crashes when they are looked up in
+    resources_by_targets (see jvm_compile.py).
+    """
+    with temporary_dir() as cache_dir:
+      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile', 'compile.java', '--partition-size-hint=1',
+           'testprojects/src/java/com/pants/testproject/publish/hello/main:',
+         ],
+          workdir, config)
+        self.assert_success(pants_run)
+
   def test_nocache(self):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir, 'JavaCompile',

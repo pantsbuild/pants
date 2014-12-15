@@ -598,7 +598,7 @@ class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
         continue
       artifacts = []
       if resources_by_target is not None:
-        for _, paths in resources_by_target.get(target).abs_paths():
+        for _, paths in resources_by_target[target].abs_paths():
           artifacts.extend(paths)
       for source in sources:
         classes = classes_by_source.get(source, [])
