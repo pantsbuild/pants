@@ -4,11 +4,23 @@
 python_test_suite(
   name = 'tasks',
   dependencies = [
+    ':checkstyle',
     ':ide_gen',
     ':idea_gen',
     ':junit_run',
     ':scalastyle',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
+  ]
+)
+
+python_tests(
+  name = 'checkstyle',
+  sources = ['test_checkstyle.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:checkstyle',
+    'src/python/pants/base:address',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )
 

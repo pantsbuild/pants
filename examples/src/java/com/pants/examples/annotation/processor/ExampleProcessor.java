@@ -61,7 +61,8 @@ public class ExampleProcessor extends AbstractProcessor {
         PrintWriter writer = closer.register(new PrintWriter(outputFile.openWriter()));
         writer.println("{");
         for (TypeElement appAnnotation : annotations) {
-          Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(appAnnotation);
+          Set<? extends Element> annotatedElements =
+              roundEnv.getElementsAnnotatedWith(appAnnotation);
           Set<TypeElement> exampleElements = ElementFilter.typesIn(annotatedElements);
           for (Element elem : exampleElements) {
             String typeName = elem.getSimpleName().toString();

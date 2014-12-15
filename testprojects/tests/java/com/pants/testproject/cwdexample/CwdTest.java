@@ -16,7 +16,8 @@ import static org.junit.Assert.fail;
 public class CwdTest {
   @Test
   public void testChangedCwd() {
-    // We don't want this to fail for pants goal testprojects::, so we're going to conditionalize on a system property
+    // We don't want this to fail for pants goal testprojects::, so we're going to
+    // conditionalize on a system property
     String cwdTestEnabledFlag = System.getProperty("cwd.test.enabled");
     boolean cwdTestEnabled = cwdTestEnabledFlag == null ? false :
         cwdTestEnabledFlag.toLowerCase().equals("true");

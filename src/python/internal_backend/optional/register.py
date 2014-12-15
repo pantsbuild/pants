@@ -5,11 +5,16 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
+  task(name='checkstyle', action=Checkstyle,
+       dependencies=['gen', 'resolve']
+  ).install('compile')
+
   task(name='scalastyle', action=Scalastyle,
        dependencies=['bootstrap']
-  ).install('compile').with_description('Scala source code style check.')
+  ).install('compile')
