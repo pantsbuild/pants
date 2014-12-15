@@ -14,4 +14,11 @@ public class Main {
   public static void main(String args[]) {
     System.out.println("Hello World!");
   }
+
+  /**
+   * Inner class marked with annotation.
+   */
+  @Deprecated
+  private static class TestInnerClass {
+  }
 }

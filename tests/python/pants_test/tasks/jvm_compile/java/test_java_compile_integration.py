@@ -130,7 +130,14 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
           for name in files:
             path = os.path.join(dirpath, name)
             all_files.add(path)
-        self.assertIn(os.path.join(extract_dir, "compile/jvm/java/classes/deprecation_report.txt"), all_files)
+
+        report_file_name = os.path.join(extract_dir, 'compile/jvm/java/classes/deprecation_report.txt')
+        self.assertIn(report_file_name, all_files)
+
+        annotated_classes = [line.rstrip() for line in file(report_file_name).read().splitlines()]
+        self.assertEquals(
+          {'com.pants.testproject.annotation.main.Main', 'com.pants.testproject.annotation.main.Main$TestInnerClass'},
+          set(annotated_classes))
 
   def _whitelist_test(self, target, fatal_flag, whitelist):
     # We want to ensure that a project missing dependencies can be
