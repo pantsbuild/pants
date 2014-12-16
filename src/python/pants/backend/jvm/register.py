@@ -174,7 +174,7 @@ def register_goals():
 
   task(name='binary', action=BinaryCreate,
        dependencies=['compile', 'resources', 'bootstrap']
-  ).install().with_description('Create a jvm binary jar.')
+  ).install().with_description('Create a runnable binary.')
 
   detect_duplicates.install('binary')
 
