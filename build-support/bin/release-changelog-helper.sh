@@ -40,7 +40,7 @@ change_count=$(git rev-list HEAD ^${LAST_RELEASE_SHA} | wc -l)
 git log --format="format:%H %aE %s" HEAD ^${LAST_RELEASE_SHA} | {
 
   echo
-  echo "There have been ${change_count} changes since the last release." 
+  echo "There have been ${change_count} changes since the last release."
   echo
 
   while read sha user subject
@@ -57,7 +57,7 @@ git log --format="format:%H %aE %s" HEAD ^${LAST_RELEASE_SHA} | {
           sed -Ee "s|[/\.]+$||"
       )
     )
-    
+
     echo ${date} ${user}
     echo "https://github.com/pantsbuild/pants/commit/${sha}"
     echo "=="
@@ -80,7 +80,7 @@ git log --format="format:%H %aE %s" HEAD ^${LAST_RELEASE_SHA} | {
         echo "  \`RB #${rb} <${url}>\`_"
       fi
     done
-    
+
     echo
   done
 }
