@@ -21,7 +21,6 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir, safe_walk
 
@@ -82,6 +81,8 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                   'its sibling source_root() entries define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
                   'test paths.')
+    cls.register_jvm_tool(register, 'checkstyle', default=['//:twitter-checkstyle'])
+    cls.register_jvm_tool(register, 'scalac', default=['//:scala-compiler-2.9.3'])
 
   class Error(TaskError):
     """IdeGen Error."""
@@ -136,20 +137,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     # is specified in the 'ide' section.
     jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)
     self.debug_port = self.context.config.getint('ide', 'debug_port', default=jvm_config_debug_port)
-
-    self.checkstyle_bootstrap_key = 'checkstyle'
-    self.register_jvm_tool_from_config(self.checkstyle_bootstrap_key, self.context.config,
-                                       ini_section='compile.checkstyle',
-                                       ini_key='bootstrap_tools',
-                                       default=['//:checkstyle'])
-
-    self.scalac_bootstrap_key = None
-    if not self.skip_scala:
-      self.scalac_bootstrap_key = 'scalac'
-      self.register_jvm_tool_from_config(self.scalac_bootstrap_key, self.context.config,
-                                         ini_section='scala-compile',
-                                         ini_key='compile-bootstrap-tools',
-                                         default=['//:scala-compiler-2.9.3'])
 
   def prepare(self, round_manager):
     if self.python:
@@ -332,14 +319,14 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       return False
 
     if _checkstyle_enabled():
-      checkstyle_classpath = self.tool_classpath(self.checkstyle_bootstrap_key)
+      checkstyle_classpath = self.tool_classpath('checkstyle')
     else:
       checkstyle_classpath = []
 
-    if self.scalac_bootstrap_key:
-      scalac_classpath = self.tool_classpath(self.scalac_bootstrap_key)
-    else:
+    if self.skip_scala:
       scalac_classpath = []
+    else:
+      scalac_classpath = self.tool_classpath('scalac')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     targets = self.context.targets()

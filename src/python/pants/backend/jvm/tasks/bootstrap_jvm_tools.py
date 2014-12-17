@@ -9,6 +9,7 @@ import threading
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -40,7 +41,6 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
   def execute(self):
     context = self.context
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
-      tool_product_map = context.products.get_data('jvm_build_tools') or {}
       callback_product_map = context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
       # We leave a callback in the products map because we want these Ivy calls
       # to be done lazily (they might never actually get executed) and we want
@@ -49,7 +49,9 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
-      for key, deplist in tool_product_map.iteritems():
+      for scope, key in JvmToolTaskMixin.get_registered_tools():
+        option = key.replace('-', '_')
+        deplist = self.context.new_options.for_scope(scope)[option]
         callback_product_map[key] = self.cached_bootstrap_classpath_callback(key, deplist)
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
                                         lambda: callback_product_map)
@@ -65,14 +67,14 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
         if not targets:
           raise KeyError
       except (KeyError, AddressLookupError) as e:
-        tool_product_config_map = self.context.products.get_data('jvm_build_tools_config')
+        tool_product_options_map = self.context.products.get_data('jvm_build_tools_options')
+        scope = tool_product_options_map[key].get('scope')
+        option = tool_product_options_map[key].get('option')
         self.context.log.error("Failed to resolve target for bootstrap tool: {tool}. "
                                "You probably need to add this dep to your tools "
                                "BUILD file(s), usually located in the root of the build. \n"
-                               "See pants.ini section: [{section}] key: {key}\n"
-                               "Error: {e}\n".format(tool=tool, e=e,
-                                                     section=tool_product_config_map[key]['ini_section'],
-                                                     key=tool_product_config_map[key]['ini_key']))
+                               "See option {option} in scope {scope}.\n"
+                               "Error: {e}\n".format(tool=tool, e=e, scope=scope, option=option))
         raise
       for target in targets:
         yield target

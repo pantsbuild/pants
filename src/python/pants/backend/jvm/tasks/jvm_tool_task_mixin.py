@@ -5,27 +5,35 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
+
 from pants.backend.jvm.jvm_tool_bootstrapper import JvmToolBootstrapper
+from pants.option.options import Options
 
 
 class JvmToolTaskMixin(object):
 
   _jvm_tool_bootstrapper = None
+  _tool_keys = []  # List of (scope, key) pairs.
+
+  @classmethod
+  def register_jvm_tool(cls, register, key, default=None):
+    register('--{0}'.format(key),
+             type=Options.list,
+             default=default or ['//:{0}'.format(key)],
+             help='Target specs for bootstrapping the {0} tool.'.format(key))
+    JvmToolTaskMixin._tool_keys.append((cls.options_scope, key))
+
+  @staticmethod
+  def get_registered_tools():
+    return JvmToolTaskMixin._tool_keys
+
   @property
   def jvm_tool_bootstrapper(self):
     if self._jvm_tool_bootstrapper is None:
-      self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
+      self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.new_options,
+                                                        self.context.products)
     return self._jvm_tool_bootstrapper
-
-  def register_jvm_tool(self, key, target_addrs, ini_section=None, ini_key=None):
-    self.jvm_tool_bootstrapper.register_jvm_tool(key, target_addrs,
-                                                 ini_section=ini_section, ini_key=ini_key)
-
-  def register_jvm_tool_from_config(self, key, config, ini_section, ini_key, default):
-    self.jvm_tool_bootstrapper.register_jvm_tool_from_config(key, config,
-                                                             ini_section=ini_section,
-                                                             ini_key=ini_key,
-                                                             default=default)
 
   def tool_classpath(self, key, executor=None):
     return self.jvm_tool_bootstrapper.get_jvm_tool_classpath(key, executor)

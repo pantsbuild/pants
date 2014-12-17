@@ -10,7 +10,8 @@ from pants.base.exceptions import TaskError
 
 class JvmToolBootstrapper(object):
 
-  def __init__(self, products):
+  def __init__(self, options, products):
+    self._options = options
     self._products = products
 
   def get_jvm_tool_classpath(self, key, executor=None):

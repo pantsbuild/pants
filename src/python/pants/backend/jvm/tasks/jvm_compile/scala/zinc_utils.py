@@ -47,7 +47,8 @@ class ZincUtils(object):
     self._jvm_options = jvm_options
     self._color = color
     self._log_level = log_level
-    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
+    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.new_options,
+                                                      self.context.products)
 
     # The target scala version.
     self._compile_bootstrap_key = 'scalac'

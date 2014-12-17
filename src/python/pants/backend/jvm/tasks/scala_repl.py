@@ -13,15 +13,13 @@ from pants.console.stty_utils import preserve_stty_settings
 
 
 class ScalaRepl(JvmTask, JvmToolTaskMixin):
+  @classmethod
+  def register_options(cls, register):
+    super(ScalaRepl, cls).register_options(register)
+    cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl-2.9.3'])
+
   def __init__(self, *args, **kwargs):
     super(ScalaRepl, self).__init__(*args, **kwargs)
-
-    self._bootstrap_key = 'scala-repl'
-    self.register_jvm_tool_from_config(self._bootstrap_key, self.context.config,
-                                       ini_section='scala-repl',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:scala-repl-2.9.3'])
-
     self.main = self.context.config.get('scala-repl', 'main')
 
   def prepare(self, round_manager):
@@ -36,7 +34,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     (accept_predicate, reject_predicate) = Target.lang_discriminator('java')
     targets = self.require_homogeneous_targets(accept_predicate, reject_predicate)
     if targets:
-      tools_classpath = self.tool_classpath(self._bootstrap_key)
+      tools_classpath = self.tool_classpath('scala-repl')
       self.context.release_lock()
       with preserve_stty_settings():
         exclusives_classpath = self.get_base_classpath_for_target(targets[0])
