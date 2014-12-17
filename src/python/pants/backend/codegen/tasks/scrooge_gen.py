@@ -136,7 +136,6 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)
 
-      compiler = partial_cmd.compiler
       import_paths, changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
       outdir = self._outdir(partial_cmd)
       if changed_srcs:
