@@ -277,6 +277,7 @@ class _Coverage(_JUnitRunner):
 
   @classmethod
   def register_options(cls, register):
+    super(_Coverage, cls).register_options(register)
     register('--coverage-patterns', action='append',
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
@@ -605,7 +606,6 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     _JUnitRunner.register_options(register)
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
-
 
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
