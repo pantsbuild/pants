@@ -7,11 +7,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import namedtuple
 import os
+import sys
 
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.collections.ordereddict import OrderedDict
 
-from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.engine.engine import Engine
 from pants.engine.round_manager import RoundManager
@@ -156,7 +156,8 @@ class RoundEngine(Engine):
 
   def _prepare(self, context, goals):
     if len(goals) == 0:
-      raise TaskError('No goals to prepare')
+      context.new_options.print_help()
+      sys.exit(0)
 
     goal_info_by_goal = OrderedDict()
     for goal in reversed(OrderedSet(goals)):
