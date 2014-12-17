@@ -30,7 +30,6 @@ migrations = {
   ('specs-run', 'jvm_args'): ('test.specs', 'jvm_options'),
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
-  ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
   ('benchmark-run', 'confs'): ('bench', 'confs'),

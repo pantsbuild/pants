@@ -26,7 +26,41 @@ from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
+CompilerConfig = namedtuple('CompilerConfig', ['name', 'config_section', 'profile',
+                                               'main', 'calc_srcs', 'langs'])
+
 _CONFIG_SECTION = 'scrooge-gen'
+
+
+class Compiler(namedtuple('CompilerConfigWithContext', ('context',) + CompilerConfig._fields)):
+  @classmethod
+  def from_config(cls, context, config):
+    return cls(context, **config._asdict())
+
+  @property
+  def jvm_args(self):
+    args = self.context.config.getlist(self.config_section, 'jvm_args', default=[])
+    args.append('-Dfile.encoding=UTF-8')
+    return args
+
+  @property
+  def strict(self):
+    return self.context.config.getbool(self.config_section, 'strict', default=False)
+
+
+# TODO(John Sirois): We used to support multiple incompatible scrooge compilers but no longer do.
+# As a result code in this file can be substantially simplified and made more direct.  Do so.
+# See: https://github.com/pantsbuild/pants/issues/288
+_COMPILERS = [
+    CompilerConfig(name='scrooge',
+                   config_section=_CONFIG_SECTION,
+                   profile='scrooge-gen',
+                   main='com.twitter.scrooge.Main',
+                   calc_srcs=calculate_compile_sources,
+                   langs=frozenset(['scala', 'java'])),
+]
+
+_CONFIG_FOR_COMPILER = dict((compiler.name, compiler) for compiler in _COMPILERS)
 
 _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
@@ -39,7 +73,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     """Thrown when a dependency can't be found."""
     pass
 
-  class PartialCmd(namedtuple('PC', ['language', 'rpc_style', 'namespace_map'])):
+  class PartialCmd(namedtuple('PC', ['compiler', 'language', 'rpc_style', 'namespace_map'])):
     @property
     def relative_outdir(self):
       namespace_sig = None
@@ -50,7 +84,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
           sha.update(ns_to)
         namespace_sig = sha.hexdigest()
       output_style = '-'.join(filter(None, (self.language, self.rpc_style, namespace_sig)))
-      return output_style
+      return os.path.join(self.compiler.name, output_style)
 
   @classmethod
   def register_options(cls, register):
@@ -63,11 +97,15 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
-    self.register_jvm_tool_from_config('scrooge-gen',
-                                       self.context.config,
-                                       ini_section=_CONFIG_SECTION,
-                                       ini_key='bootstrap-tools',
-                                       default=['//:scrooge-gen'])
+    self.compiler_for_name = dict((name, Compiler.from_config(self.context, config))
+                                  for name, config in _CONFIG_FOR_COMPILER.items())
+
+    for name, compiler in self.compiler_for_name.items():
+      self.register_jvm_tool_from_config(compiler.name, self.context.config,
+                                         ini_section=compiler.config_section,
+                                         ini_key='bootstrap-tools',
+                                         default=['//:{spec}'.format(spec=compiler.profile)])
+
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
   @property
@@ -108,6 +146,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       language = self.defaults.get_language(target)
       rpc_style = self.defaults.get_rpc_style(target)
       partial_cmd = self.PartialCmd(
+          compiler=self.compiler_for_name[compiler],
           language=language,
           rpc_style=rpc_style,
           namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
@@ -137,7 +176,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         invalid_targets.extend(vt.targets)
 
       compiler = partial_cmd.compiler
-      import_paths, changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
+      import_paths, changed_srcs = compiler.calc_srcs(invalid_targets, self.is_gentarget)
       outdir = self._outdir(partial_cmd)
       if changed_srcs:
         args = []
@@ -159,7 +198,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         args.extend(['--dest', outdir])
         safe_mkdir(outdir)
 
-        if not self.context.config.getbool(_CONFIG_SECTION, 'strict', default=False):
+        if not compiler.strict:
           args.append('--disable-strict')
 
         if self.get_options().verbose:
@@ -170,14 +209,12 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
         args.extend(changed_srcs)
 
-        classpath = self.tool_classpath('scrooge-gen')
-        jvm_options = self.context.config.getlist(_CONFIG_SECTION, 'jvm_options', default=[])
-        jvm_options.append('-Dfile.encoding=UTF-8')
+        classpath = self.tool_classpath(compiler.name)
         returncode = self.runjava(classpath=classpath,
-                                  main='com.twitter.scrooge.Main',
-                                  jvm_options=jvm_options,
+                                  main=compiler.main,
+                                  jvm_options=compiler.jvm_args,
                                   args=args,
-                                  workunit_name='scrooge-gen')
+                                  workunit_name=compiler.name)
         try:
           if 0 == returncode:
             gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
@@ -187,7 +224,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
           os.remove(gen_file_map_path)
 
         if 0 != returncode:
-          raise TaskError('Scrooge compiler exited non-zero ({0})'.format(returncode))
+          raise TaskError('java %s ... exited non-zero (%i)' % (compiler.main, returncode))
         self.write_gen_file_map(gen_files_for_source, invalid_targets, outdir)
 
     return self.gen_file_map(targets, outdir)
@@ -207,7 +244,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                          derived_from=gentarget)
 
     def create_geninfo(key):
-      gen_info = self.context.config.getdict(_CONFIG_SECTION, key,
+      compiler = self.compiler_for_name[self.defaults.get_compiler(gentarget)]
+      gen_info = self.context.config.getdict(compiler.config_section, key,
                                              default={'gen': key,
                                                       'deps': {'service': [], 'structs': []}})
       gen = gen_info['gen']
@@ -290,9 +328,15 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def is_gentarget(self, target):
     if not isinstance(target, JavaThriftLibrary):
       return False
+
+    compiler = self.defaults.get_compiler(target)
+    if compiler not in self.compiler_for_name.keys():
+      return False
+
     language = self.defaults.get_language(target)
-    if language not in ('scala', 'java'):
-      raise TaskError('Scrooge can not generate {0}'.format(language))
+    if language not in self.compiler_for_name[compiler].langs:
+      raise TaskError('%s can not generate %s' % (compiler, language))
+
     return True
 
   def _validate_compiler_configs(self, targets):
