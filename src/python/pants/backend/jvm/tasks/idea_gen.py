@@ -215,7 +215,6 @@ class IdeaGen(IdeGen):
       ),
       resource_extensions=list(project.resource_extensions),
       scala=scala,
-      checkstyle_suppression_files=','.join(project.checkstyle_suppression_files),
       checkstyle_classpath=';'.join(project.checkstyle_classpath),
       debug_port=project.debug_port,
       extra_components=[],

@@ -291,7 +291,7 @@ def calculate_python_genfiles(namespace, types):
   yield path('__init__')
   if 'const' in types:
     yield path('constants')
-  if set(['enum', 'exception', 'struct', 'union']) & set(types.keys()):
+  if 'const' in types or set(['enum', 'exception', 'struct', 'union']) & set(types.keys()):
     yield path('ttypes')
   for service in types['service']:
     yield path(service)

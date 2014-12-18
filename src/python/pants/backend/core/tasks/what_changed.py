@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import os
 
 from pants.backend.core.tasks.console_task import ConsoleTask
@@ -30,6 +31,8 @@ class WhatChanged(ConsoleTask):
     self._show_files = self.get_options().files
     self._workspace = self.context.workspace
     self._filemap = {}
+    self._loaded_build_files = set()
+    self._owning_targets = defaultdict(set)
 
   def console_output(self, _):
     if not self._workspace:
@@ -42,7 +45,12 @@ class WhatChanged(ConsoleTask):
     else:
       touched_targets = set()
       for path in touched_files:
-        for touched_target in self._owning_targets(path):
+        self._load_build_files(path)
+
+      self._compute_owning_targets()
+
+      for path in touched_files:
+        for touched_target in self._owning_targets[path]:
           if touched_target not in touched_targets:
             touched_targets.add(touched_target)
             yield touched_target.address.spec
@@ -53,31 +61,37 @@ class WhatChanged(ConsoleTask):
     except Workspace.WorkspaceError as e:
       raise TaskError(e)
 
-  def _owning_targets(self, path):
+  def _load_build_files(self, path):
+    build_graph = self.context.build_graph
+    build_file_parser = self.context.build_file_parser
     for build_file in self._candidate_owners(path):
-      build_graph = self.context.build_graph
-      build_file_parser = self.context.build_file_parser
-      address_map = build_file_parser.parse_build_file(build_file)
-      for address, _ in address_map.items():
-        build_graph.inject_address_closure(address)
-      is_build_file = (build_file.full_path == os.path.join(get_buildroot(), path))
+      if not build_file in self._loaded_build_files:
+        self._loaded_build_files.add(build_file)
+        address_map = build_file_parser.parse_build_file(build_file)
+        for address, _ in address_map.items():
+          build_graph.inject_address_closure(address)
 
-      for target in build_graph.targets():
-        # HACK: Python targets currently wrap old-style file resources in a synthetic
-        # resources target, but they do so lazily, when target.resources is first accessed.
-        # We force that access here, so that the targets will show up in the subsequent
-        # invocation of build_graph.targets().
-        if target.has_resources:
-          _ = target.resources
-      for target in build_graph.sorted_targets():
-        if (is_build_file and not target.is_synthetic and
-            target.address.build_file == build_file) or self._owns(target, path):
-          # We call concrete_derived_from because of the python target resources hack
-          # mentioned above; It's really the original target that owns the resource files.
-          yield target.concrete_derived_from
+  def _compute_owning_targets(self):
+    build_graph = self.context.build_graph
+    for target in build_graph.targets():
+      # HACK: Python targets currently wrap old-style file resources in a synthetic
+      # resources target, but they do so lazily, when target.resources is first accessed.
+      # We force that access here, so that the targets will show up in the subsequent
+      # invocation of build_graph.targets().
+      if target.has_resources:
+        _ = target.resources
+
+    for target in build_graph.sorted_targets():
+      realtarget = target.concrete_derived_from
+      for source_file in target.sources_relative_to_buildroot():
+        self._owning_targets[source_file].add(realtarget)
+      if not target.is_synthetic:
+        self._owning_targets[target.address.build_file.relpath].add(realtarget)
 
   def _candidate_owners(self, path):
-    build_file = BuildFile(get_buildroot(), relpath=os.path.dirname(path), must_exist=False)
+    build_file = BuildFile.from_cache(get_buildroot(),
+                                      relpath=os.path.dirname(path),
+                                      must_exist=False)
     if build_file.exists():
       yield build_file
     for sibling in build_file.siblings():

@@ -217,11 +217,12 @@ class Parser(object):
     config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
     udest = dest.upper()
     if self._scope == GLOBAL_SCOPE:
-      # For convenience, we allow three forms of env var for global scope options. The fully-specified
-      # env var is PANTS_DEFAULT_FOO, which is uniform with PANTS_<SCOPE>_FOO for all the other scopes.
-      # However we also allow simply PANTS_FOO. And if the option name itself starts with 'pants-' then
-      # we also allow simply FOO. E.g., PANTS_WORKDIR instead of PANTS_PANTS_WORKDIR or PANTS_DEFAULT_PANTS_WORKDIR.
-      # We take the first specified value we find, in this order: PANTS_DEFAULT_FOO, PANTS_FOO, FOO.
+      # For convenience, we allow three forms of env var for global scope options.
+      # The fully-specified env var is PANTS_DEFAULT_FOO, which is uniform with PANTS_<SCOPE>_FOO
+      # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
+      # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
+      # PANTS_PANTS_WORKDIR or PANTS_DEFAULT_PANTS_WORKDIR. We take the first specified value we
+      # find, in this order: PANTS_DEFAULT_FOO, PANTS_FOO, FOO.
       env_vars = ['PANTS_DEFAULT_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
       if udest.startswith('PANTS_'):
         env_vars.append(udest)

@@ -132,8 +132,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.intransitive = self.get_options().intransitive
 
-    self.checkstyle_suppression_files = self.context.config.get('checkstyle',
-      'suppression_files', type=list, default=[])
     # Everywhere else, debug_port is specified in the 'jvm' section. Use that as a default if none
     # is specified in the 'ide' section.
     jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)
@@ -141,9 +139,9 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.checkstyle_bootstrap_key = 'checkstyle'
     self.register_jvm_tool_from_config(self.checkstyle_bootstrap_key, self.context.config,
-                                       ini_section='checkstyle',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:twitter-checkstyle'])
+                                       ini_section='compile.checkstyle',
+                                       ini_key='bootstrap_tools',
+                                       default=['//:checkstyle'])
 
     self.scalac_bootstrap_key = None
     if not self.skip_scala:
@@ -166,12 +164,11 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
   def _prepare_project(self):
     targets, self._project = self.configure_project(
         self.context.targets(),
-        self.checkstyle_suppression_files,
         self.debug_port)
 
     self.configure_compile_context(targets)
 
-  def configure_project(self, targets, checkstyle_suppression_files, debug_port):
+  def configure_project(self, targets, debug_port):
     jvm_targets = [t for t in targets if t.has_label('jvm') or t.has_label('java')]
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
@@ -181,7 +178,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                       self.skip_scala,
                       self.use_source_root,
                       get_buildroot(),
-                      checkstyle_suppression_files,
                       debug_port,
                       jvm_targets,
                       not self.intransitive,
@@ -441,8 +437,7 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory,
-               target_util):
+               debug_port, targets, transitive, workunit_factory, target_util):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
@@ -465,7 +460,6 @@ class Project(object):
     self.has_scala = False
     self.has_tests = False
 
-    self.checkstyle_suppression_files = checkstyle_suppression_files  # Absolute paths.
     self.debug_port = debug_port
 
     self.internal_jars = OrderedSet()

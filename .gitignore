@@ -25,11 +25,12 @@
 3rdparty/android/authentication/keys/release/*
 # allow only the readme under 'release'
 !3rdparty/android/authentication/keys/release/readme.txt
-bin/
 build/
 codegen/classes/
 htmlcov/
 out/
+# remove root-level /bin, which is created by Eclipse
+/bin/
 /build-support/*.pex
 /build-support/*.venv
 /build-support/virtualenv-*

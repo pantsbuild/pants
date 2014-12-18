@@ -16,6 +16,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants_test.base.context_utils import create_config
 from pants_test.base_test import BaseTest
+from pants.util.strutil import ensure_binary
 
 
 sample_ini_test = """
@@ -40,37 +41,22 @@ class TestPythonThriftBuilder(BaseTest):
       )
     '''))
 
-  # TODO(pl): This breaks BUILD file parsing in a way I don't understand, presumably because of the
-  # crazy patching
-  # def test_keyword_replacement(self):
-  #   m = mock_open(read_data='')
-  #   with patch('__builtin__.open', m, create=True):
-  #     with patch('shutil.copyfile'):
-  #       builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
-  #                                     root_dir=self.build_root,
-  #                                     config=create_config(sample_ini=sample_ini_test))
-
-  #       builder._modify_thrift = MagicMock()
-  #       builder._run_thrift = MagicMock()
-  #       builder.run_thrifts()
-
-  #       builder._modify_thrift.assert_called_once_with(os.path.realpath('%s/thrift/py-thrift/%s'
-  #                                                                     % (self.build_root,
-  #                                                                       'thrift/keyword.thrift')))
-
   def test_keyword_replaced(self):
+    # These are ensure_binary because python's read() does not do decoding
     thrift_contents = dedent('''
+      # This file contains UTF-8: Anasûrimbor Kellhus
       namespace py gen.twitter.tweetypie.tweet
       struct UrlEntity {
         1: i16 from
       }
-    ''')
-    expected_replaced_contents = dedent('''
+    ''').encode('utf-8')
+    expected_replaced_contents = ensure_binary(dedent('''
+      # This file contains UTF-8: Anasûrimbor Kellhus
       namespace py gen.twitter.tweetypie.tweet
       struct UrlEntity {
         1: i16 from_
       }
-    ''')
+    ''').encode('utf-8'))
     builder = PythonThriftBuilder(target=self.target('test_thrift_replacement:one'),
                                   root_dir=self.build_root,
                                   config=create_config(sample_ini=sample_ini_test))

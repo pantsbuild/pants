@@ -14,7 +14,7 @@ The first time you run `pants`, try it without arguments. This makes
 Pants "bootstrap" itself, downloading and compiling things it needs:
 
     :::bash
-    $ ./pants
+    $ ./pants goal goals
 
 Now you're ready to invoke pants for more useful things.
 
@@ -138,7 +138,7 @@ tell Pants to "fail fast" on the first `junit` test failure instead of running a
 Here, `test` has become `test.junit`. The `test` goal is made up of parts, or *tasks*: `test.junit`,
 `test.pytest`, and `test.specs`. We want to specify a flag to the `test.junit` task, so we
 specify that part on the command line. (Pants still runs the other parts of the `test` goal.
-The dotted notation tells Pants whre to apply options.)
+The dotted notation tells Pants where to apply options.)
 
 We entered the `--fail-fast` flag after `test.junit` but before the target. Command-line flags
 for a goal or task go immediately after that goal or task.

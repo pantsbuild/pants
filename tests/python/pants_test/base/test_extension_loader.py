@@ -47,8 +47,7 @@ class LoaderTest(unittest.TestCase):
     Goal.clear()
 
   @contextmanager
-  def create_register(self, build_file_aliases=None, register_commands=None, register_goals=None,
-                      module_name='register'):
+  def create_register(self, build_file_aliases=None, register_goals=None, module_name='register'):
 
     package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
     self.assertFalse(package_name in sys.modules)
@@ -66,7 +65,6 @@ class LoaderTest(unittest.TestCase):
           setattr(register_module, function_name, function)
 
       register_entrypoint('build_file_aliases', build_file_aliases)
-      register_entrypoint('register_commands', register_commands)
       register_entrypoint('register_goals', register_goals)
 
       yield package_name

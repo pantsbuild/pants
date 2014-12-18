@@ -9,9 +9,8 @@ from textwrap import dedent
 import unittest2 as unittest
 
 from pants.base.config import Config
-from pants.option.bootstrap_options import get_bootstrap_option_values, create_bootstrapped_options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_file
-from pants_test.option.fake_config import FakeConfig
 
 
 class BootstrapOptionsTest(unittest.TestCase):
@@ -25,11 +24,18 @@ class BootstrapOptionsTest(unittest.TestCase):
       'pants_distdir': expected_vals[2]
     }
 
-    config_obj = FakeConfig({ 'DEFAULT': config }) if config else None
-    vals = get_bootstrap_option_values(env, config_obj, args, buildroot='/buildroot')
+    with temporary_file() as fp:
+      fp.write('[DEFAULT]\n')
+      if config:
+        for k, v in config.items():
+          fp.write('{0}: {1}\n'.format(k, v))
+      fp.close()
 
-    vals_dict = {k: getattr(vals, k) for k in expected_vals_dict }
-    self.assertEquals(expected_vals_dict, vals_dict)
+      vals = OptionsBootstrapper(env=env, configpath=fp.name, args=args,
+                                 buildroot='/buildroot').get_bootstrap_options().for_global_scope()
+
+      vals_dict = {k: getattr(vals, k) for k in expected_vals_dict }
+      self.assertEquals(expected_vals_dict, vals_dict)
 
   def test_bootstrap_option_values(self):
     # Check all defaults.
@@ -84,12 +90,12 @@ class BootstrapOptionsTest(unittest.TestCase):
       apple: %(pants_supportdir)s/banana
       """))
       fp.close()
-      opts = create_bootstrapped_options(known_scopes=['', 'foo', 'fruit'],
-                                         env={
+      bootstrapper = OptionsBootstrapper(env={
                                            'PANTS_SUPPORTDIR': '/pear'
                                          },
                                          configpath=fp.name,
                                          args=['--pants-workdir=/qux'])
+      opts = bootstrapper.get_full_options(known_scopes=['', 'foo', 'fruit'])
       opts.register('foo', '--bar')
       opts.register('fruit', '--apple')
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)

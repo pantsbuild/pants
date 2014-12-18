@@ -9,7 +9,7 @@ import sys
 
 from colors import cyan, green
 
-from pants.base.config import Config
+from pants.base.config import Config, SingleFileConfig
 from pants.option import custom_types
 from pants.option.errors import ParseError
 
@@ -23,13 +23,14 @@ migrations = {
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
 
-  ('DEFAULT', 'checkstyle_suppression_files'): ('checkstyle', 'suppression_files'),
+  ('nailgun', 'autokill'): ('DEFAULT', 'kill_nailguns'),
 
   ('jvm-run', 'jvm_args'): ('run.jvm', 'jvm_options'),
   ('benchmark-run', 'jvm_args'): ('bench', 'jvm_options'),
   ('specs-run', 'jvm_args'): ('test.specs', 'jvm_options'),
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
+  ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
   ('benchmark-run', 'confs'): ('bench', 'confs'),
@@ -39,8 +40,12 @@ migrations = {
 
   ('scala-repl', 'args'): ('repl.scala', 'args'),
 
+  ('checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'bootstrap_tools'),
+  ('checkstyle', 'configuration'): ('compile.checkstyle', 'configuration'),
+  ('checkstyle', 'properties'): ('compile.checkstyle', 'properties'),
+
   ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
-  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin-args'),
+  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
 
   ('markdown-to-html', 'extensions'): ('markdown', 'extensions'),
   ('markdown-to-html', 'code-style'): ('markdown', 'code_style'),
@@ -58,13 +63,14 @@ notes = {
 
 
 def check_config_file(path):
-  config = Config.load(configpaths=[path])
+  cp = Config.create_parser()
+  with open(path, 'r') as ini:
+    cp.readfp(ini)
+  config = SingleFileConfig(path, cp)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
   def section(s):
     return cyan('[{0}]'.format(s))
-
-  cp = config.configparser
 
   for (src_section, src_key), (dst_section, dst_key) in migrations.items():
     def has_non_default_option(section, key):

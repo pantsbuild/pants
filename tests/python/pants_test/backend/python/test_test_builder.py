@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import glob
 import os
-import sys
 from textwrap import dedent
 import xml.dom.minidom as DOM
 
 import coverage
+from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -23,21 +23,23 @@ from pants_test.base_test import BaseTest
 
 
 class PythonTestBuilderTestBase(BaseTest):
-  def run_tests(self, targets, args=None, fast=True, debug=False):
+  def _cache_current_interpreter(self):
     cache = PythonInterpreterCache(self.config())
-    cache.setup()
 
-    interpreter = None
+    # We only need to cache the current interpreter, avoid caching for every interpreter on the
+    # PATH.
+    current_interpreter = PythonInterpreter.get()
+    current_id = (current_interpreter.binary, current_interpreter.identity)
+    for cached_interpreter in cache.setup(filters=[current_interpreter.identity.requirement]):
+      # TODO(John Sirois): Revert to directly comparing interpreters when
+      # https://github.com/pantsbuild/pex/pull/31 is in, released and consumed by pants.
+      if (cached_interpreter.binary, cached_interpreter.identity) == current_id:
+        return cached_interpreter
+    raise RuntimeError('Could not find suitable interpreter to run tests.')
 
-    for interp in cache.interpreters:
-      if interp.binary == sys.executable:
-        interpreter = interp
-        break
-    else:
-      raise RuntimeError('Could not find suitable interpreter to run tests.')
-
+  def run_tests(self, targets, args=None, fast=True, debug=False):
     test_builder = PythonTestBuilder(
-        targets, args or [], fast=fast, debug=debug, interpreter=interpreter)
+        targets, args or [], fast=fast, debug=debug, interpreter=self._cache_current_interpreter())
 
     with pushd(self.build_root):
       return test_builder.run()
