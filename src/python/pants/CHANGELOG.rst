@@ -1,6 +1,15 @@
 RELEASE HISTORY
 ===============
 
+0.0.26 (12/17/2014)
+-------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix the `ScroogeGen` target selection predicate
+  `RB #1497 <https://rbcommons.com/s/twitter/r/1497>`_
+
 0.0.25 (12/17/2014)
 -------------------
 
