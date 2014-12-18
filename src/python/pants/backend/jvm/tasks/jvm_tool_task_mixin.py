@@ -43,7 +43,8 @@ class JvmToolTaskMixin(object):
     Returns a no-arg callable. Invoking it returns a list of paths.
     """
     scope = scope or self.options_scope
-    callback_product_map = self._products.get_data('jvm_build_tools_classpath_callbacks') or {}
+    callback_product_map = \
+      self.context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(scope, {}).get(key)
     if not callback:
       raise TaskError('No bootstrap callback registered for {key} in {scope}'.format(
