@@ -162,7 +162,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
     if scala_sources:
       def call(srcs):
-        cp = self.tool_classpath('scala')
+        cp = self.tool_classpath('scalastyle')
         return self.runjava(classpath=cp,
                             main=self._MAIN,
                             args=['-c', self._scalastyle_config] + srcs)
