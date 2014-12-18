@@ -26,6 +26,11 @@ class JvmToolTaskMixin(object):
   def get_registered_tools():
     return JvmToolTaskMixin._tool_keys
 
+  @staticmethod
+  def reset_registered_tools():
+    """Needed only for test isolation."""
+    JvmToolTaskMixin._tool_keys = []
+
   @property
   def jvm_tool_bootstrapper(self):
     if self._jvm_tool_bootstrapper is None:

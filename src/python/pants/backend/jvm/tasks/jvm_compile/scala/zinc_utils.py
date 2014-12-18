@@ -41,6 +41,13 @@ class ZincUtils(object):
 
   _ZINC_MAIN = 'com.typesafe.zinc.Main'
 
+  @classmethod
+  def register_options(cls, register, register_jvm_tool):
+    register_jvm_tool(register, 'scalac', default=['//:scala-compiler-2.9.3'])
+    register_jvm_tool(register, 'zinc')
+    register_jvm_tool(register, 'plugin-jars')
+
+
   def __init__(self, context, nailgun_task, jvm_options, color=True, log_level='info'):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
@@ -50,47 +57,18 @@ class ZincUtils(object):
     self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.new_options,
                                                       self.context.products)
 
-    # The target scala version.
-    self._compile_bootstrap_key = 'scalac'
-    self._compile_bootstrap_tools = TargetPlatform(config=context.config).compiler_specs
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key,
-                                                  self._compile_bootstrap_tools,
-                                                  ini_section='scala-compile',
-                                                  ini_key='compile-bootstrap-tools')
-
-    # The zinc version (and the scala version it needs, which may differ from the target version).
-    self._zinc_bootstrap_key = 'zinc'
-    self._jvm_tool_bootstrapper.register_jvm_tool_from_config(self._zinc_bootstrap_key,
-                                                              context.config,
-                                                              ini_section='scala-compile',
-                                                              ini_key='zinc-bootstrap-tools',
-                                                              default=['//:zinc'])
-
-    # Compiler plugins.
-    plugins_bootstrap_tools = context.config.getlist('scala-compile',
-                                                     'scalac-plugin-bootstrap-tools',
-                                                     default=[])
-    if plugins_bootstrap_tools:
-      self._plugins_bootstrap_key = 'plugins'
-      self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key,
-                                                    plugins_bootstrap_tools,
-                                                    ini_section='scala-compile',
-                                                    ini_key='scalac-plugin-bootstrap-tools')
-    else:
-      self._plugins_bootstrap_key = None
-
   @property
   def _zinc_classpath(self):
-    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._zinc_bootstrap_key)
+    return self._nailgun_task.tool_classpath('zinc')
 
   @property
   def _compiler_classpath(self):
-    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._compile_bootstrap_key)
+    return self._nailgun_task.tool_classpath('scalac')
 
   @property
   def _plugin_jars(self):
-    if self._plugins_bootstrap_key:
-      return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._plugins_bootstrap_key)
+    if self._nailgun_task.get_options().plugins:
+      return self._nailgun_task.tool_classpath('plugins')
     else:
       return []
 

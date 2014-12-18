@@ -22,9 +22,6 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
   def product_types(cls):
     return ['jvm_build_tools_classpath_callbacks']
 
-  def __init__(self, *args, **kwargs):
-    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
-
   def prepare(self, round_manager):
     # TODO(John Sirois): This is the sole use of data dependencies that does not follow the goal
     # lifecycle.  The BootstrapJvmTools task must execute before all JVM tool using tasks but
@@ -41,7 +38,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
 
   def execute(self):
     context = self.context
-    if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
+    if JvmToolTaskMixin.get_registered_tools():
       # Map of scope -> (map of key -> callback).
       callback_product_map = (context.products.get_data('jvm_build_tools_classpath_callbacks') or
                               defaultdict(dict))

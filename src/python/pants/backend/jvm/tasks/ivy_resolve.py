@@ -63,12 +63,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._open = self.get_options().open
     self._report = self._open or self.get_options().report
 
-    # self._ivy_bootstrap_key = 'ivy'
-    # self.register_jvm_tool_from_config(self._ivy_bootstrap_key, self.context.config,
-    #                                    ini_section=self._CONFIG_SECTION,
-    #                                    ini_key='bootstrap-tools',
-    #                                    default=['//:xalan'])
-
     self._ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
     # Typically this should be a local cache only, since classpaths aren't portable.

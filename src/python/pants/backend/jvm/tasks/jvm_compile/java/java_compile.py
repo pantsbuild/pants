@@ -86,18 +86,6 @@ class JavaCompile(JvmCompile):
 
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
-    # self._jmake_bootstrap_key = 'jmake'
-    # self.register_jvm_tool_from_config(self._jmake_bootstrap_key, self.context.config,
-    #                                    ini_section='java-compile',
-    #                                    ini_key='jmake-bootstrap-tools',
-    #                                    default=['//:jmake'])
-    #
-    # self._compiler_bootstrap_key = 'java-compiler'
-    # self.register_jvm_tool_from_config(self._compiler_bootstrap_key, self.context.config,
-    #                                    ini_section='java-compile',
-    #                                    ini_key='compiler-bootstrap-tools',
-    #                                    default=['//:java-compiler'])
-
   @property
   def config_section(self):
     return self._config_section
