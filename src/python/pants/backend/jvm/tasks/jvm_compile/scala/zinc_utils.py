@@ -116,7 +116,7 @@ class ZincUtils(object):
     ret = []
 
     # Go through all the bootstrap tools required to compile.
-    for target in self._compile_bootstrap_tools:
+    for target in self._nailgun_task.get_options().scalac:
       # Resolve to their actual targets.
       try:
         deps = self.context.resolve(target)
