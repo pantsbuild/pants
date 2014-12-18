@@ -34,8 +34,7 @@ class JvmToolTaskMixin(object):
   @property
   def jvm_tool_bootstrapper(self):
     if self._jvm_tool_bootstrapper is None:
-      self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.new_options,
-                                                        self.context.products)
+      self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
     return self._jvm_tool_bootstrapper
 
   def tool_classpath(self, key, scope=None, executor=None):

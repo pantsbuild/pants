@@ -43,7 +43,7 @@ class ZincUtils(object):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register_jvm_tool(register, 'scalac', default=['//:scala-compiler-2.9.3'])
+    register_jvm_tool(register, 'scalac', default=TargetPlatform.default_compiler_specs)
     register_jvm_tool(register, 'zinc')
     register_jvm_tool(register, 'plugin-jars')
 
@@ -54,8 +54,7 @@ class ZincUtils(object):
     self._jvm_options = jvm_options
     self._color = color
     self._log_level = log_level
-    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.new_options,
-                                                      self.context.products)
+    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
 
   @property
   def _zinc_classpath(self):
