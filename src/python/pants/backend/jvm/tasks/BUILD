@@ -403,7 +403,7 @@ python_library(
   name = 'jvm_tool_task_mixin',
   sources = ['jvm_tool_task_mixin.py'],
   dependencies = [
-    'src/python/pants/backend/jvm:jvm_tool_bootstrapper',
+    'src/python/pants/base:exceptions',
     'src/python/pants/option',
   ],
 )

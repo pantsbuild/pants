@@ -13,7 +13,6 @@ from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
 
-from pants.backend.jvm.jvm_tool_bootstrapper import JvmToolBootstrapper
 from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.address_lookup_error import AddressLookupError
@@ -54,7 +53,6 @@ class ZincUtils(object):
     self._jvm_options = jvm_options
     self._color = color
     self._log_level = log_level
-    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
 
   @property
   def _zinc_classpath(self):

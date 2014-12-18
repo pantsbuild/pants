@@ -113,7 +113,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',
-    'src/python/pants/backend/jvm:jvm_tool_bootstrapper',
     'src/python/pants/backend/jvm/scala:target_platform',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/util:contextutil',
