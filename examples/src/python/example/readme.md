@@ -77,6 +77,21 @@ run the PEX:
          ...much output...
     $ ./dist/main.pex # run the generated PEX
     Hello, world!
+    $ ./dist/main.pex Whirled
+    Hello, Whirled!
+    $
+
+You can also run the binary "from source" with the `run` goal:
+
+    :::bash
+    $ ./pants goal run.py --args='Whirled' examples/src/python/example/hello/main
+         ...much output...
+    14:32:01 00:00     [py]
+    14:32:02 00:01       [run]
+    Hello, Whirled!
+    
+    14:32:02 00:01     [jvm]
+                   SUCCESS
     $
 
 [`examples/src/python/example/hello/main/BUILD`](https://github.com/pantsbuild/pants/blob/master/examples/src/python/example/hello/main/BUILD)
