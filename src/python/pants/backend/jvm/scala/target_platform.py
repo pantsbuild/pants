@@ -22,13 +22,19 @@ class TargetPlatform(object):
     self._config = config or Config.from_cache()
 
   @property
-  def compiler_specs(self):
-    """Returns a list of target specs pointing to the scalac tool libraries."""
-    return self._config.getlist('scala-compile', 'compile-bootstrap-tools',
-                                default=['//:scala-compiler-2.9.3'])
+  def default_compiler_specs(self):
+    """Returns a list of target specs pointing to the default scalac tool libraries.
+
+    The tool libraries are set in option scalac in scope compile.scala, currently registered
+    in ZincUtils.register_options().
+    """
+    return ['//:scala-compiler-2.9.3']
 
   @property
   def library_specs(self):
-    """Returns a list of target specs pointing to the scala runtime libraries."""
+    """Returns a list of target specs pointing to the scala runtime libraries.
+
+    TODO: Convert this to an option, once we figure out how to plumb options through.
+    """
     return self._config.getlist('scala-compile', 'runtime-deps',
                                 default=['//:scala-library-2.9.3'])

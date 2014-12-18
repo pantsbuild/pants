@@ -6,10 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
-from textwrap import dedent
 import itertools
 import os
-import re
 import shutil
 import sys
 import uuid
@@ -20,7 +18,6 @@ from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
@@ -32,7 +29,7 @@ from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
 
-class JvmCompile(NailgunTaskBase, GroupMember, JvmToolTaskMixin):
+class JvmCompile(NailgunTaskBase, GroupMember):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
