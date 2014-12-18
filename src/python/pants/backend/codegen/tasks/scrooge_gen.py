@@ -289,6 +289,13 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def is_gentarget(self, target):
     if not isinstance(target, JavaThriftLibrary):
       return False
+
+    # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
+    # Apache thrift compiler
+    compiler = self.defaults.get_compiler(target)
+    if compiler != 'scrooge':
+      return False
+
     language = self.defaults.get_language(target)
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
