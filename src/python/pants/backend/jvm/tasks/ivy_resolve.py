@@ -45,6 +45,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     register('--mutable-pattern',
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
+    cls.register_jvm_tool(register, 'xalan')
 
   @classmethod
   def product_types(cls):
@@ -61,12 +62,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open
     self._report = self._open or self.get_options().report
-
-    self._ivy_bootstrap_key = 'ivy'
-    self.register_jvm_tool_from_config(self._ivy_bootstrap_key, self.context.config,
-                                       ini_section=self._CONFIG_SECTION,
-                                       ini_key='bootstrap-tools',
-                                       default=['//:xalan'])
 
     self._ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
@@ -177,7 +172,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
       with open(report, 'w') as report_handle:
         print(no_deps_xml, file=report_handle)
 
-    classpath = self.tool_classpath(self._ivy_bootstrap_key, self.create_java_executor())
+    classpath = self.tool_classpath('xalan', executor=self.create_java_executor())
 
     reports = []
     org, name = IvyUtils.identify(targets)

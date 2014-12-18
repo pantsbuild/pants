@@ -130,6 +130,12 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(55, options.for_scope('compile').num)
     self.assertEqual(44, options.for_scope('compile.java').num)
 
+  def test_is_known_scope(self):
+    options = self._parse('./pants')
+    for scope in self._known_scopes:
+      self.assertTrue(options.is_known_scope(scope))
+    self.assertFalse(options.is_known_scope('nonexistent_scope'))
+
   def test_designdoc_example(self):
     # The example from the design doc.
     # Get defaults from config and environment.

@@ -56,6 +56,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
+    cls.register_jvm_tool(register, 'scrooge')
 
   @classmethod
   def product_types(cls):
@@ -63,11 +64,6 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
-    self.register_jvm_tool_from_config('scrooge-gen',
-                                       self.context.config,
-                                       ini_section=_CONFIG_SECTION,
-                                       ini_key='bootstrap-tools',
-                                       default=['//:scrooge-gen'])
     self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
   @property
@@ -104,7 +100,6 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     gentargets = filter(self.is_gentarget, targets)
 
     for target in gentargets:
-      compiler = self.defaults.get_compiler(target)
       language = self.defaults.get_language(target)
       rpc_style = self.defaults.get_rpc_style(target)
       partial_cmd = self.PartialCmd(
@@ -169,7 +164,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
         args.extend(changed_srcs)
 
-        classpath = self.tool_classpath('scrooge-gen')
+        classpath = self.tool_classpath('scrooge')
         jvm_options = self.context.config.getlist(_CONFIG_SECTION, 'jvm_options', default=[])
         jvm_options.append('-Dfile.encoding=UTF-8')
         returncode = self.runjava(classpath=classpath,
