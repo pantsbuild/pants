@@ -81,6 +81,7 @@ python_tests(
   name = 'test_utf8_header',
   sources = ['test_utf8_header.py'],
   dependencies = [
+    ':base_test',
     '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/internal_backend:plugins',
     'src/python/pants/base:build_environment',
