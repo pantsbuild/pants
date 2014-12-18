@@ -63,11 +63,12 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       args = ['-o', java_out]
 
       if target.compiler == 'antlr3':
+        antlr_classpath = self.tool_classpath('antlr3')
         if target.package is not None:
           logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
-        antlr_classpath = self.tool_classpath('antlr3')
         java_main = 'org.antlr.Tool'
       elif target.compiler == 'antlr4':
+        antlr_classpath = self.tool_classpath('antlr4')
         args.append('-visitor')  # Generate Parse Tree Visitor As Well
         # Note that this assumes that there is no package set in the antlr file itself,
         # which is considered an ANTLR best practice.
@@ -76,7 +77,6 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
           args.append(self._get_sources_package(target))
         else:
           args.append(target.package)
-        antlr_classpath = self.tool_classpath('antlr4')
         java_main = 'org.antlr.v4.Tool'
       else:
         raise TaskError('Unknown ANTLR compiler: {}'.format(target.compiler))
