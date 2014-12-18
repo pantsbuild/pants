@@ -172,7 +172,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
       with open(report, 'w') as report_handle:
         print(no_deps_xml, file=report_handle)
 
-    classpath = self.tool_classpath('xalan', self.create_java_executor())
+    classpath = self.tool_classpath('xalan', executor=self.create_java_executor())
 
     reports = []
     org, name = IvyUtils.identify(targets)
