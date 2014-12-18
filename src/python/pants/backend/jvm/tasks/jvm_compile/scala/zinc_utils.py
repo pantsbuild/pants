@@ -42,7 +42,7 @@ class ZincUtils(object):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register_jvm_tool(register, 'scalac', default=TargetPlatform.default_compiler_specs)
+    register_jvm_tool(register, 'scalac', default=TargetPlatform().default_compiler_specs)
     register_jvm_tool(register, 'zinc')
     register_jvm_tool(register, 'plugin-jars')
 
