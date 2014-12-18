@@ -15,13 +15,11 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants import binary_util
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 logger = logging.getLogger(__name__)
@@ -81,8 +79,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                   'its sibling source_root() entries define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
                   'test paths.')
-    cls.register_jvm_tool(register, 'checkstyle', default=['//:twitter-checkstyle'])
-    cls.register_jvm_tool(register, 'scalac', default=['//:scala-compiler-2.9.3'])
 
   class Error(TaskError):
     """IdeGen Error."""
@@ -312,21 +308,15 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     self._prepare_project()
 
-    def _checkstyle_enabled():
-      for goal in Goal.all():
-        if goal.has_task_of_type(Checkstyle):
-          return True
-      return False
-
-    if _checkstyle_enabled():
-      checkstyle_classpath = self.tool_classpath('checkstyle')
-    else:
+    if self.context.new_options.is_known_scope('compile.checkstyle'):
+      checkstyle_classpath = self.tool_classpath('checkstyle', scope='compile.checkstyle')
+    else:  # Checkstyle not enabled.
       checkstyle_classpath = []
 
     if self.skip_scala:
       scalac_classpath = []
     else:
-      scalac_classpath = self.tool_classpath('scalac')
+      scalac_classpath = self.tool_classpath('scalac', scope='compile.scala')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     targets = self.context.targets()

@@ -33,8 +33,10 @@ class JvmToolTaskMixin(object):
                                                         self.context.products)
     return self._jvm_tool_bootstrapper
 
-  def tool_classpath(self, key, executor=None):
-    return self.jvm_tool_bootstrapper.get_jvm_tool_classpath(key, executor)
+  def tool_classpath(self, key, scope=None, executor=None):
+    scope = scope or self.options_scope
+    return self.jvm_tool_bootstrapper.get_jvm_tool_classpath(key, scope, executor)
 
-  def lazy_tool_classpath(self, key, executor=None):
-    return self.jvm_tool_bootstrapper.get_lazy_jvm_tool_classpath(key, executor)
+  def lazy_tool_classpath(self, key, scope=None, executor=None):
+    scope = scope or self.options_scope
+    return self.jvm_tool_bootstrapper.get_lazy_jvm_tool_classpath(key, scope, executor)

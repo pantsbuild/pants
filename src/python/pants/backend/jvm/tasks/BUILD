@@ -206,7 +206,6 @@ python_library(
   name = 'ide_gen',
   sources = ['ide_gen.py'],
   dependencies = [
-    ':checkstyle',
     ':jvm_binary_task',
     ':jvm_tool_task_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -214,7 +213,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
-    'src/python/pants/goal',
     'src/python/pants/backend/jvm:jvm_debug_config',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants:binary_util',

@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import threading
 
 from pants.backend.core.tasks.task import Task
@@ -41,7 +42,9 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
   def execute(self):
     context = self.context
     if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
-      callback_product_map = context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
+      # Map of scope -> (map of key -> callback).
+      callback_product_map = (context.products.get_data('jvm_build_tools_classpath_callbacks') or
+                              defaultdict(dict))
       # We leave a callback in the products map because we want these Ivy calls
       # to be done lazily (they might never actually get executed) and we want
       # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of
@@ -52,7 +55,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
       for scope, key in JvmToolTaskMixin.get_registered_tools():
         option = key.replace('-', '_')
         deplist = self.context.new_options.for_scope(scope)[option]
-        callback_product_map[key] = self.cached_bootstrap_classpath_callback(key, deplist)
+        callback_product_map[scope][key] = self.cached_bootstrap_classpath_callback(key, deplist)
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
                                         lambda: callback_product_map)
 
