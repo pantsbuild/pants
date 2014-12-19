@@ -36,12 +36,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     register('--confs', default=['default'],
              help='One or more ivy configurations to resolve for this target. This parameter is '
                   'not intended for general use. ')
-    register('--bootstrap-tools', type=Options.list, default=['//:checkstyle'],
-             help='Pants targets used to bootstrap this tool.')
-
-  def __init__(self, *args, **kwargs):
-    super(Checkstyle, self).__init__(*args, **kwargs)
-    self.register_jvm_tool(self._CHECKSTYLE_BOOTSTRAP_KEY, self.get_options().bootstrap_tools)
+    cls.register_jvm_tool(register, 'checkstyle')
 
   @property
   def config_section(self):
@@ -85,7 +80,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   def checkstyle(self, sources, targets):
     egroups = self.context.products.get_data('exclusives_groups')
     etag = egroups.get_group_key_for_target(targets[0])
-    classpath = self.tool_classpath(self._CHECKSTYLE_BOOTSTRAP_KEY)
+    classpath = self.tool_classpath('checkstyle')
     cp = egroups.get_classpath_for_group(etag)
     classpath.extend(jar for conf, jar in cp if conf in self.get_options().confs)
 

@@ -28,19 +28,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     super(ThriftLinter, cls).register_options(register)
     register('--strict', default=None, action='store_true',
              help='Fail the goal if thrift linter errors are found.')
+    cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
   def product_types(cls):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
-
-  def __init__(self, *args, **kwargs):
-    super(ThriftLinter, self).__init__(*args, **kwargs)
-
-    self._bootstrap_key = 'scrooge-linter'
-    self.register_jvm_tool_from_config(self._bootstrap_key, self.context.config,
-                                       self._CONFIG_SECTION, 'bootstrap-tools',
-                                       default=['//:scrooge-linter'])
 
   @property
   def config_section(self):
@@ -79,7 +72,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def lint(self, target, path):
     self.context.log.debug('Linting %s' % path)
 
-    classpath = self.tool_classpath(self._bootstrap_key)
+    classpath = self.tool_classpath('scrooge-linter')
     config_args = self.context.config.getlist(self._CONFIG_SECTION, 'linter_args', default=[])
     if not self.is_strict(target):
       config_args.append('--ignore-errors')

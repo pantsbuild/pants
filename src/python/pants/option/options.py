@@ -90,6 +90,7 @@ class Options(object):
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
+    self._known_scopes = set(known_scopes)
 
   @property
   def target_specs(self):
@@ -100,6 +101,10 @@ class Options(object):
   def goals(self):
     """The requested goals, in the order specified on the cmd line."""
     return self._goals
+
+  def is_known_scope(self, scope):
+    """Whether the given scope is known by this instance."""
+    return scope in self._known_scopes
 
   def passthru_args_for_scope(self, scope):
     # Passthru args "belong" to the last scope mentioned on the command-line.
