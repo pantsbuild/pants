@@ -33,6 +33,8 @@ def create_new_options(new_options):
       class TestOptionValues(object):
         def __init__(self):
           self.__dict__ = new_options[scope]
+        def __getitem__(self, key):
+          return getattr(self, key)
       return TestOptionValues()
 
     def for_global_scope(self):

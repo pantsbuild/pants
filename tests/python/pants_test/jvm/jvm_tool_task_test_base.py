@@ -10,6 +10,7 @@ import os
 import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
@@ -25,6 +26,8 @@ class JvmToolTaskTestBase(TaskTestBase):
   def setUp(self):
     real_config = self.config()
     super(JvmToolTaskTestBase, self).setUp()
+
+    JvmToolTaskMixin.reset_registered_tools()
 
     def link_or_copy(src, dest):
       try:
