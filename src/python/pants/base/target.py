@@ -365,7 +365,7 @@ class Target(AbstractTarget):
     """
     :return: True if this target did not originate from a BUILD file.
     """
-    return self.address.is_synthetic
+    return self.concrete_derived_from.address != self.address
 
   @property
   def is_original(self):
