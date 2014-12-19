@@ -192,15 +192,22 @@ class Config(object):
     if issubclass(type, str):
       return raw_value
 
+    def format_value(raw_value):
+      lines = raw_value.split('\n')
+      for line_number in range(0, len(lines)):
+        lines[line_number] = "{line_number:02}: {line}".format(
+          line_number=line_number + 1,
+          line=lines[line_number])
+      return '\n'.join(lines)
+    
     try:
       parsed_value = eval(raw_value, {}, {})
     except SyntaxError as e:
-      raise Config.ConfigError('No valid %s for %s.%s: %s\n%s' % (
-        type.__name__, section, option, raw_value, e))
-
+      raise Config.ConfigError('No valid %s for %s.%s:\n%s\n%s' % (
+        type.__name__, section, option, format_value(raw_value), e))
     if not isinstance(parsed_value, type):
-      raise Config.ConfigError('No valid %s for %s.%s: %s' % (
-        type.__name__, section, option, raw_value))
+      raise Config.ConfigError('No valid %s for %s.%s:\n%s' % (
+        type.__name__, section, option, format_value(raw_value)))
 
     return parsed_value
 
