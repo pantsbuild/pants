@@ -118,7 +118,6 @@ def load_backend(build_configuration, backend_package):
                         {},  # globals
                         {},  # locals
                         ['build_file_aliases',
-                         'register_commands',
                          'register_goals'])
   except ImportError as e:
     raise BackendConfigurationError('Failed to load the {backend} backend: {error}'
@@ -137,5 +136,4 @@ def load_backend(build_configuration, backend_package):
   if build_file_aliases:
     build_configuration.register_aliases(build_file_aliases)
 
-  invoke_entrypoint('register_commands')
   invoke_entrypoint('register_goals')

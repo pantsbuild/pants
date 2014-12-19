@@ -16,8 +16,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class IdeaIntegrationTest(PantsRunIntegrationTest):
 
   def _idea_test(self, specs, project_dir=os.path.join('.pants.d', 'idea', 'idea', 'IdeaGen'),
-      project_name=None, check_func=None, config=None):
+                 project_name=None, check_func=None, config=None):
     """Helper method that tests idea generation on the input spec list.
+
     :param project_dir: directory passed to --idea-project-dir
     :param project_name: name passed to --idea-project-name
     :param check_func: method to call back with the directory where project files are written.
@@ -37,15 +38,9 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       else:
         extra_flags += ['--idea-project-name={name}'.format(name=project_name)]
 
-      all_flags = ['goal', 'idea',] + specs + \
-                  ['--no-pantsrc', '--no-idea-open', '--print-exception-stacktrace' ] + extra_flags
+      all_flags = ['idea', '--no-open'] + specs + extra_flags
       pants_run = self.run_pants(all_flags, config=config)
-      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                        "goal idea expected success, got {0}\n"
-                        "got stderr:\n{1}\n"
-                        "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                    pants_run.stderr_data,
-                                                    pants_run.stdout_data))
+      self.assert_success(pants_run)
 
       expected_files = ('{project_name}.iml'.format(project_name=project_name),
                         '{project_name}.ipr'.format(project_name=project_name))

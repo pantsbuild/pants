@@ -101,6 +101,8 @@ class Executor(AbstractClass):
   def _create_command(self, classpath, main, jvm_options, args, cwd=None):
     cmd = [self._distribution.java]
     cmd.extend(jvm_options)
+    if cwd:
+      classpath = relativize_paths(classpath, cwd)
     cmd.extend(['-cp', os.pathsep.join(classpath), main])
     cmd.extend(args)
     return cmd
@@ -164,8 +166,7 @@ class SubprocessExecutor(Executor):
 
   def _create_command(self, classpath, main, jvm_options, args, cwd=None):
     cwd = cwd or self._buildroot
-    relative_classpath = relativize_paths(classpath, cwd)
-    return super(SubprocessExecutor, self)._create_command(relative_classpath, main, jvm_options,
+    return super(SubprocessExecutor, self)._create_command(classpath, main, jvm_options,
                                                            args, cwd=cwd)
 
   def _runner(self, classpath, main, jvm_options, args, cwd=None):

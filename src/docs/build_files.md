@@ -41,12 +41,14 @@ Use the recursive wildcard: `goal list ::`
     :::bash
     $ ./pants goal list ::
       ...lots of output...
-      File "pants/targets/internal.py", line 174, in dependencies
-      File "pants/targets/internal.py", line 189, in _maybe_apply_deps
-      File "pants/targets/internal.py", line 195, in update_dependencies
-      File "pants/targets/pants_target.py", line 60, in resolve
-    KeyError: 'Failed to find target for: src/python/pants/docs/BUILD:obsolete'
-    $ # Instead of listing all targets, a stack trace. We found a problem
+      File "pants/commands/command.py", line 79, in __init__
+      File "pants/commands/goal_runner.py", line 144, in setup_parser
+      File "pants/base/build_graph.py", line 351, in inject_address_closure
+    TransitiveLookupError: great was not found in BUILD file examples/src/java/com/pants/examples/h
+    ello/greet/BUILD. Perhaps you meant:
+      :greet
+      referenced from examples/src/scala/com/pants/example/hello/welcome:welcome
+    $ # Instead of listing all targets, an error message. We found a problem
 
 *Do I pull in the dependencies I expect?* Use `goal depmap` (JVM languages only):
 

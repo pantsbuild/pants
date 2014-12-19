@@ -5,10 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import subprocess
-
-from pants.fs.archive import ZIP
-from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -21,17 +17,12 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     :return: stdout as a string on success, raises an Exception on error
     '''
     # Avoid some known-to-choke-on interpreters.
-    command = ['goal', 'run', target,
+    command = ['run',
+               target,
                '--interpreter=CPython>=2.6,<3',
                '--interpreter=CPython>=3.3'] + list(args)
     pants_run = self.run_pants(command)
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal run expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
-
+    self.assert_success(pants_run)
     return pants_run.stdout_data
 
   def test_run_colliding_resources(self):
@@ -51,10 +42,10 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     """Tests the --cwd option that allows the working directory to change when running."""
 
     # Make sure the test fails if you don't specify a directory
-    pants_run = self.run_pants(['goal', 'run',
-                               'testprojects/src/java/com/pants/testproject/cwdexample',
-                               '--interpreter=CPython>=2.6,<3',
-                               '--interpreter=CPython>=3.3'])
+    pants_run = self.run_pants(['run',
+                                'testprojects/src/java/com/pants/testproject/cwdexample',
+                                '--interpreter=CPython>=2.6,<3',
+                                '--interpreter=CPython>=3.3'])
     self.assert_failure(pants_run)
     self.assertIn('Neither ExampleCwd.java nor readme.txt found.', pants_run.stdout_data)
 
@@ -65,6 +56,7 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
 
     # Explicit cwd specified
     stdout_data = self._exec_run('testprojects/src/java/com/pants/testproject/cwdexample',
-                                 '--run-jvm-cwd=testprojects/src/java/com/pants/testproject/cwdexample/subdir')
+                                 '--run-jvm-cwd='
+                                 'testprojects/src/java/com/pants/testproject/cwdexample/subdir')
     self.assertIn('Found readme.txt', stdout_data)
 
