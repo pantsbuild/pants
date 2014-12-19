@@ -1,6 +1,21 @@
 RELEASE HISTORY
 ===============
 
+0.0.27 (12/19/2014)
+-------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix python doc: "repl" and "setup-py" are goals now, don't use "py"
+  `RB #1302 <https://rbcommons.com/s/twitter/r/1302>`_
+
+* Fix python thrift generation
+  `RB #1517 <https://rbcommons.com/s/twitter/r/1517>`_
+
+* Fixup migrate_config to use new Config API
+  `RB #1514 <https://rbcommons.com/s/twitter/r/1514>`_
+
 0.0.26 (12/17/2014)
 -------------------
 
