@@ -64,17 +64,17 @@ class TaskTest(BaseTest):
     config = create_config(config or '')
     workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
 
-    new_options = Options(env={}, config=config, known_scopes=['', 'test'], args=args or [])
+    options = Options(env={}, config=config, known_scopes=['', 'test'], args=args or [])
     # A lot of basic code uses these options, so always register them.
-    register_bootstrap_options(new_options.register_global)
+    register_bootstrap_options(options.register_global)
 
     task_type.options_scope = 'test'
-    task_type.register_options_on_scope(new_options)
+    task_type.register_options_on_scope(options)
 
     run_tracker = create_run_tracker()
 
     context = Context(config,
-                      new_options,
+                      options,
                       run_tracker,
                       targets or [],
                       build_graph=build_graph,

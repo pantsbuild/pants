@@ -19,20 +19,20 @@ from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdtemp
 
 
-def create_new_options(new_options):
+def create_options(options):
   """Create a fake new-style options object for testing.
 
   Note that the returned object only provides access to the provided options values. There is
   no registration mechanism on this object. Code under test shouldn't care  about resolving
   cmd-line flags vs. config vs. env vars etc. etc.
 
-  :param dict new_options: An optional dict of scope -> (dict of option name -> value).
+  :param dict options: An optional dict of scope -> (dict of option name -> value).
   """
   class TestOptions(object):
     def for_scope(self, scope):
       class TestOptionValues(object):
         def __init__(self):
-          self.__dict__ = new_options[scope]
+          self.__dict__ = options[scope]
         def __getitem__(self, key):
           return getattr(self, key)
       return TestOptionValues()
@@ -79,12 +79,12 @@ def create_run_tracker(info_dir=None):
   return run_tracker
 
 
-def create_context(config='', new_options=None, target_roots=None, **kwargs):
+def create_context(config='', options=None, target_roots=None, **kwargs):
   """Creates a ``Context`` with no config values, options, or targets by default.
 
   :param config: Either a ``Context`` object or else a string representing the contents of the
     pants.ini to parse the config from.
-  :param new_options: An optional dict of scope -> (dict of name -> new-style option values).
+  :param options: An optional dict of scope -> (dict of name -> new-style option values).
   :param target_roots: An optional list of target roots to seed the context target graph from.
   :param ``**kwargs``: Any additional keyword arguments to pass through to the Context constructor.
   """
@@ -95,5 +95,5 @@ def create_context(config='', new_options=None, target_roots=None, **kwargs):
 
   run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return Context(config, create_new_options(new_options or {}),
+  return Context(config, create_options(options or {}),
                  run_tracker, target_roots, **kwargs)

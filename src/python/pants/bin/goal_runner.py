@@ -70,7 +70,7 @@ class GoalRunner(object):
       known_scopes.extend(filter(None, goal.known_scopes()))
 
     # Now that we have the known scopes we can get the full options.
-    self.new_options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
+    self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
 
     self.run_tracker = RunTracker.from_config(self.config)
@@ -108,36 +108,36 @@ class GoalRunner(object):
   def get_spec_excludes(self):
     # Note: Only call after register_options() has been called.
     return [os.path.join(self.root_dir, spec_exclude)
-            for spec_exclude in self.new_options.for_global_scope().spec_excludes]
+            for spec_exclude in self.options.for_global_scope().spec_excludes]
 
   @property
   def global_options(self):
-    return self.new_options.for_global_scope()
+    return self.options.for_global_scope()
 
   def register_options(self):
     # Add a 'bootstrap' attribute to the register function, so that register_global can
     # access the bootstrap option values.
     def register_global(*args, **kwargs):
-      return self.new_options.register_global(*args, **kwargs)
-    register_global.bootstrap = self.new_options.bootstrap_option_values()
+      return self.options.register_global(*args, **kwargs)
+    register_global.bootstrap = self.options.bootstrap_option_values()
     register_global_options(register_global)
     for goal in Goal.all():
-      goal.register_options(self.new_options)
+      goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):
     logger = logging.getLogger(__name__)
 
-    goals = self.new_options.goals
-    specs = self.new_options.target_specs
-    fail_fast = self.new_options.for_global_scope().fail_fast
+    goals = self.options.goals
+    specs = self.options.target_specs
+    fail_fast = self.options.for_global_scope().fail_fast
 
     for goal in goals:
       if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.new_options.is_help:
-      self.new_options.print_help(goals=goals)
+    if self.options.is_help:
+      self.options.print_help(goals=goals)
       sys.exit(0)
 
     self.requested_goals = goals
@@ -156,7 +156,7 @@ class GoalRunner(object):
     def fail():
       self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
 
-    kill_nailguns = self.new_options.for_global_scope().kill_nailguns
+    kill_nailguns = self.options.for_global_scope().kill_nailguns
     try:
       result = self._do_run()
       if result:
@@ -254,7 +254,7 @@ class GoalRunner(object):
 
     context = Context(
       config=self.config,
-      new_options=self.new_options,
+      options=self.options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
       requested_goals=self.requested_goals,

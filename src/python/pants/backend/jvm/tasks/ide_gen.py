@@ -308,7 +308,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     self._prepare_project()
 
-    if self.context.new_options.is_known_scope('compile.checkstyle'):
+    if self.context.options.is_known_scope('compile.checkstyle'):
       checkstyle_classpath = self.tool_classpath('checkstyle', scope='compile.checkstyle')
     else:  # Checkstyle not enabled.
       checkstyle_classpath = []

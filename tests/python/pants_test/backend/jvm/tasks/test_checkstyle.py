@@ -50,7 +50,7 @@ class CheckstyleTest(NailgunTaskTestBase):
 
   def _create_context(self, rules_xml=[], properties={}):
     return self.context(
-      new_options={
+      options={
         self.options_scope: {
           'bootstrap_tools': ['//:checkstyle'],
           'configuration': self._create_config_file(rules_xml),

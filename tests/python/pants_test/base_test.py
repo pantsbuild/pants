@@ -111,8 +111,8 @@ class BaseTest(unittest.TestCase):
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
-    self.new_options = defaultdict(dict)  # scope -> key-value mapping.
-    self.new_options[''] = {
+    self.options = defaultdict(dict)  # scope -> key-value mapping.
+    self.options[''] = {
       'pants_workdir': os.path.join(self.build_root, '.pants.d'),
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist')
@@ -137,13 +137,12 @@ class BaseTest(unittest.TestCase):
     else:
       return Config.load([ini_file])
 
-  def set_new_options_for_scope(self, scope, **kwargs):
-    self.new_options[scope].update(kwargs)
+  def set_options_for_scope(self, scope, **kwargs):
+    self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, config='', options=None, new_options=None,
-              target_roots=None, **kwargs):
+  def context(self, for_task_types=None, config='', options=None, target_roots=None, **kwargs):
     for_task_types = for_task_types or []
-    new_options = new_options or {}
+    options = options or {}
 
     new_option_values = defaultdict(dict)
 
@@ -169,17 +168,17 @@ class BaseTest(unittest.TestCase):
 
     # Now override with any caller-specified values.
 
-    # TODO(benjy): Get rid of the new_options arg, and require tests to call set_new_options.
-    for scope, opts in new_options.items():
+    # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
+    for scope, opts in options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 
-    for scope, opts in self.new_options.items():
+    for scope, opts in self.options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 
     return create_context(config=self.config(overrides=config),
-                          new_options = new_option_values,
+                          options = new_option_values,
                           target_roots=target_roots,
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,

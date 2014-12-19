@@ -58,7 +58,7 @@ class TestPythonSetup(TaskTestBase):
 
   @contextmanager
   def run_execute(self, target, recursive=False):
-    self.set_new_options(recursive=recursive, interpreter=[])
+    self.set_options(recursive=recursive, interpreter=[])
     context = self.context(target_roots=[target])
     workdir = safe_mkdtemp(dir=self.build_root)
     setup_py = self.create_task(context, workdir)

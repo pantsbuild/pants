@@ -113,7 +113,7 @@ class RoundEngine(Engine):
       task_type = goal.task_type_by_name(task_name)
       visited_task_types.add(task_type)
 
-      task_workdir = os.path.join(context.new_options.for_global_scope().pants_workdir,
+      task_workdir = os.path.join(context.options.for_global_scope().pants_workdir,
                                   goal.name, task_name)
       task = task_type(context, task_workdir)
       tasks_by_name[task_name] = task
@@ -170,7 +170,7 @@ class RoundEngine(Engine):
     execution_goals = ' -> '.join(e.goal.name for e in goal_executors)
     context.log.info('Executing tasks in goals: {goals}'.format(goals=execution_goals))
 
-    explain = context.new_options.for_global_scope().explain
+    explain = context.options.for_global_scope().explain
     if explain:
       print('Goal Execution Order:\n\n%s\n' % execution_goals)
       print('Goal [TaskRegistrar->Task] Order:\n')

@@ -101,7 +101,7 @@ class TaskBase(AbstractClass):
     self._cache_key_errors = set()
 
     default_invalidator_root = os.path.join(
-      self.context.new_options.for_global_scope().pants_workdir, 'build_invalidator')
+      self.context.options.for_global_scope().pants_workdir, 'build_invalidator')
     suffix_type = self.__class__.__name__
     self._build_invalidator_dir = os.path.join(
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
@@ -109,13 +109,13 @@ class TaskBase(AbstractClass):
 
   def get_options(self):
     """Returns the option values for this task's scope."""
-    return self.context.new_options.for_scope(self.options_scope)
+    return self.context.options.for_scope(self.options_scope)
 
   def get_passthru_args(self):
     if not self.supports_passthru_args():
       raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
     else:
-      return self.context.new_options.passthru_args_for_scope(self.options_scope)
+      return self.context.options.passthru_args_for_scope(self.options_scope)
 
   def prepare(self, round_manager):
     """Prepares a task for execution.
@@ -158,7 +158,7 @@ class TaskBase(AbstractClass):
 
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
-      pants_workdir = self.context.new_options.for_global_scope().pants_workdir
+      pants_workdir = self.context.options.for_global_scope().pants_workdir
       compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
       return create_artifact_cache(

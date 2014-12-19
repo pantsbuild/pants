@@ -40,7 +40,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
-    self._executor_workdir = os.path.join(self.context.new_options.for_global_scope().pants_workdir,
+    self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           'ng', self.__class__.__name__)
     self.set_distribution()  # Use default until told otherwise.
     # TODO: Choose default distribution based on options.

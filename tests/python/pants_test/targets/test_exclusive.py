@@ -32,8 +32,7 @@ class ExclusivesTargetTest(BaseTest):
     # Target e has conflicts; in this test, we want to check that partitioning
     # of valid targets works to prevent conflicts in chunks, so we only use a-d.
     a, b, c, d, _ = self.setup_targets()
-    context = self.context(target_roots=[a, b, c, d],
-                           options={'exclusives_error_on_collision':True})
+    context = self.context(target_roots=[a, b, c, d])
     context.products.require_data('exclusives_groups')
     with temporary_dir() as workdir:
       check_exclusives_task = CheckExclusives(context, workdir)

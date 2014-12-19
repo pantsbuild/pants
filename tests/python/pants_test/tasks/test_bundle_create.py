@@ -39,6 +39,6 @@ class BundleCreateTest(TaskTestBase):
       }
     }
 
-    bundle_create = self.create_task(self.context(config=sample_ini_test_1, new_options=options),
+    bundle_create = self.create_task(self.context(config=sample_ini_test_1, options=options),
                                      self.workdir)
     self.assertEquals(bundle_create._outdir, '/tmp/dist')

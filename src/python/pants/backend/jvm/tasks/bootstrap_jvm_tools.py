@@ -37,7 +37,7 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
       # targets. -pl
       for scope, key in JvmToolTaskMixin.get_registered_tools():
         option = key.replace('-', '_')
-        deplist = self.context.new_options.for_scope(scope)[option]
+        deplist = self.context.options.for_scope(scope)[option]
         callback_product_map[scope][key] = \
           self.cached_bootstrap_classpath_callback(key, scope, deplist)
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',

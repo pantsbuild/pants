@@ -36,7 +36,7 @@ class CheckExclusivesTest(TaskTestBase):
     d = self.make_target(':d', dependencies=[a, b])
     e = self.make_target(':e', dependencies=[a, c], exclusives={'c': '1'})
 
-    context = self.context(target_roots=[d, e], new_options={
+    context = self.context(target_roots=[d, e], options={
       self.options_scope: { 'exclusives_error_on_collision': True }
     }
     )

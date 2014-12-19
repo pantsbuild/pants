@@ -55,8 +55,7 @@ class JvmdocGenTest(TaskTestBase):
     self.t1 = self.make_target('t1', exclusives={'foo': 'a'})
     # Force exclusive propagation on the targets.
     self.t1.get_all_exclusives()
-    context = self.context(target_roots=[self.t1],
-                           options=options)
+    context = self.context(target_roots=[self.t1])
 
     self.targets = context.targets()
 
