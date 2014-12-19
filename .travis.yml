@@ -1,3 +1,8 @@
+# Enables support for a docker container-based build
+# which should provide faster startup times and beefier
+# "machines".
+sudo: false
+
 language: python
 
 python:
