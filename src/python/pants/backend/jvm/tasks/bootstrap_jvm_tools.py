@@ -38,11 +38,12 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
       for scope, key in JvmToolTaskMixin.get_registered_tools():
         option = key.replace('-', '_')
         deplist = self.context.new_options.for_scope(scope)[option]
-        callback_product_map[scope][key] = self.cached_bootstrap_classpath_callback(key, deplist)
+        callback_product_map[scope][key] = \
+          self.cached_bootstrap_classpath_callback(key, scope, deplist)
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
                                         lambda: callback_product_map)
 
-  def _resolve_tool_targets(self, tools, key):
+  def _resolve_tool_targets(self, tools, key, scope):
     if not tools:
       raise TaskError("BootstrapJvmTools.resolve_tool_targets called with no tool"
                       " dependency addresses.  This probably means that you don't"
@@ -53,26 +54,23 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
         if not targets:
           raise KeyError
       except (KeyError, AddressLookupError) as e:
-        tool_product_options_map = self.context.products.get_data('jvm_build_tools_options')
-        scope = tool_product_options_map[key].get('scope')
-        option = tool_product_options_map[key].get('option')
-        self.context.log.error("Failed to resolve target for bootstrap tool: {tool}. "
-                               "You probably need to add this dep to your tools "
-                               "BUILD file(s), usually located in the root of the build. \n"
-                               "See option {option} in scope {scope}.\n"
-                               "Error: {e}\n".format(tool=tool, e=e, scope=scope, option=option))
-        raise
+        self.context.log.error("Failed to resolve target for tool: {tool}.\n"
+                               "This target was obtained from option {option} in scope {scope}.\n"
+                               "You probably need to add this target to your tools "
+                               "BUILD file(s), usually located in the workspace root.\n"
+                               "".format(tool=tool, e=e, scope=scope, option=key))
+        raise TaskError()
       for target in targets:
         yield target
 
-  def cached_bootstrap_classpath_callback(self, key, tools):
+  def cached_bootstrap_classpath_callback(self, key, scope, tools):
     cache = {}
     cache_lock = threading.Lock()
 
     def bootstrap_classpath(executor=None):
       with cache_lock:
         if 'classpath' not in cache:
-          targets = list(self._resolve_tool_targets(tools, key))
+          targets = list(self._resolve_tool_targets(tools, key, scope))
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
                                                 executor=executor,

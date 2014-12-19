@@ -22,7 +22,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     register('--memory', default=False, action='store_true', help='Enable memory profiling.')
     cls.register_jvm_tool(register, 'benchmark-tool', default=['//:benchmark-caliper-0.5'])
     cls.register_jvm_tool(register, 'benchmark-agent',
-                          default=[':benchmark-java-allocation-instrumenter-2.1'])
+                          default=['//:benchmark-java-allocation-instrumenter-2.1'])
 
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)

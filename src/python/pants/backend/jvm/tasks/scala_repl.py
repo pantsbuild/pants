@@ -16,11 +16,9 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(ScalaRepl, cls).register_options(register)
+    register('--main', default='scala.tools.nsc.MainGenericRunner',
+             help='The entry point for running the repl.')
     cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl-2.9.3'])
-
-  def __init__(self, *args, **kwargs):
-    super(ScalaRepl, self).__init__(*args, **kwargs)
-    self.main = self.context.config.get('scala-repl', 'main')
 
   def prepare(self, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
@@ -46,7 +44,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
         try:
           # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
           execute_java(classpath=classpath,
-                       main=self.main,
+                       main=self.get_options().main,
                        jvm_options=self.jvm_options,
                        args=self.args)
         except KeyboardInterrupt:

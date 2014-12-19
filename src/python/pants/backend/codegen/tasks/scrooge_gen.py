@@ -56,7 +56,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
-    cls.register_jvm_tool(register, 'scrooge')
+    cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
   def product_types(cls):
@@ -164,7 +164,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
         args.extend(changed_srcs)
 
-        classpath = self.tool_classpath('scrooge')
+        classpath = self.tool_classpath('scrooge-gen')
         jvm_options = self.context.config.getlist(_CONFIG_SECTION, 'jvm_options', default=[])
         jvm_options.append('-Dfile.encoding=UTF-8')
         returncode = self.runjava(classpath=classpath,

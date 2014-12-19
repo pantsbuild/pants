@@ -58,10 +58,10 @@ migrations = {
   ('antlr-gen', 'javadeps'): ('gen.antlr', 'antlr3'),
   ('antlr4-gen', 'javadeps'): ('gen.antlr', 'antlr4'),
   ('scrooge-gen', 'bootstrap-tools'): ('gen.scrooge', 'scrooge'),
-  ('thrift-linter', 'bootstrap-tools'): ('thrift-linter', 'scrooge-linter'),
-  ('wire-gen', 'bootstrap-tools'): ('gen.wire', 'wire-compiler'),
-  ('benchmark-run', 'bootstrap-tools'): ('bench', 'benchmark-tool'),
-  ('benchmark-run', 'agent-bootstrap-tools'): ('bench', 'benchmark-agent'),
+  ('thrift-linter', 'bootstrap-tools'): ('thrift-linter', 'scrooge_linter'),
+  ('wire-gen', 'bootstrap-tools'): ('gen.wire', 'wire_compiler'),
+  ('benchmark-run', 'bootstrap-tools'): ('bench', 'benchmark_tool'),
+  ('benchmark-run', 'agent-bootstrap-tools'): ('bench', 'benchmark_agent'),
   ('compile.checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'checkstyle'),
   ('ivy-resolve', 'bootstrap-tools'): ('resolve.ivy', 'xalan'),
   ('jar-tool', 'bootstrap-tools'): ('DEFAULT', 'jar-tool'),
@@ -69,11 +69,11 @@ migrations = {
   ('junit-run', 'emma-bootstrap-tools'): ('test.junit', 'emma'),
   ('junit-run', 'cobertura-bootstrap-tools'): ('test.junit', 'cobertura'),
   ('java-compile', 'jmake-bootstrap-tools'): ('compile.java', 'jmake'),
-  ('java-compile', 'compiler-bootstrap-tools'): ('compile.java', 'java-compiler'),
+  ('java-compile', 'compiler-bootstrap-tools'): ('compile.java', 'java_compiler'),
   ('scala-compile', 'compile-bootstrap-tools'): ('compile.scala', 'scalac'),  # Note: compile-bootstrap-tools is not a typo.
   ('scala-compile', 'zinc-bootstrap-tools'): ('compile.scala', 'zinc'),
-  ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin-jars'),
-  ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala-repl'),
+  ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin_jars'),
+  ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala_repl'),
   ('specs-run', 'bootstrap-tools'): ('test.specs', 'specs'),
   }
 
@@ -81,7 +81,7 @@ notes = {
   ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
                                   'target: options. Other args should be placed in args: and '
                                   'prefixed with -C.',
-  ('jar-tool', 'bootstrap-tools'): 'Each JarTask sub-task can define this in its own section. or '
+  ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
 }
 
