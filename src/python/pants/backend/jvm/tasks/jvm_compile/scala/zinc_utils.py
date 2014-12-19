@@ -22,7 +22,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import open_zip as open_jar
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import relativize_paths, safe_open
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -151,24 +151,31 @@ class ZincUtils(object):
           ret.append(jar.cache_key())
     return sorted(ret)
 
-  def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+  @staticmethod
+  def _get_compile_args(opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     args = list(opts)  # Make a copy
-
-    args.extend(self._plugin_args())
 
     if upstream_analysis_files:
       args.extend(
         ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
+    relative_classpath = relativize_paths(classpath, get_buildroot())
     args.extend([
       '-analysis-cache', analysis_file,
-      # We add compiler_classpath to ensure the scala-library jar is on the classpath.
-      # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
-      # usually need. Be more selective?
-      '-classpath', ':'.join(self._compiler_classpath + classpath),
+      '-classpath', ':'.join(relative_classpath),
       '-d', output_dir
     ])
     args.extend(sources)
+    return args
+
+  def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+
+    # We add compiler_classpath to ensure the scala-library jar is on the classpath.
+    # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
+    # usually need. Be more selective?
+    big_classpath = self._compiler_classpath + classpath
+    args = ZincUtils._get_compile_args(opts + self._plugin_args(), big_classpath,
+                                       sources, output_dir, analysis_file, upstream_analysis_files)
     self.log_zinc_file(analysis_file)
     if self._run_zinc(args, workunit_labels=[WorkUnit.COMPILER]):
       raise TaskError('Zinc compile failed.')
