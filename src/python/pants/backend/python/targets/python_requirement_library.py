@@ -11,6 +11,7 @@ from pants.base.payload_field import PythonRequirementsField
 from pants.base.target import Target
 from pants.base.validation import assert_list
 
+
 class PythonRequirementLibrary(Target):
   """Named target for some pip requirements."""
   def __init__(self, payload=None, requirements=None, **kwargs):

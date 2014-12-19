@@ -62,8 +62,6 @@ class TestPythonSetup(TaskTestBase):
     context = self.context(target_roots=[target])
     workdir = safe_mkdtemp(dir=self.build_root)
     setup_py = self.create_task(context, workdir)
-    setup_py.old_options = MagicMock()
-    setup_py.old_options.recursive = recursive
     setup_py.run_one = MagicMock()
     setup_py.run_one.return_value = True
     setup_py.execute()
