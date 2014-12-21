@@ -30,7 +30,8 @@ if ! [ -f "${HERE}/virtualenv.dist/BOOTSTRAPPED-${VIRTUALENV_VERSION}" ]; then
     die "Failed to extract ${VIRTUALENV_PACKAGE_FULL_URL}."
   # TODO(ksweeney): Checksum
   touch virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED-${VIRTUALENV_VERSION} && \
-    mv virtualenv-${VIRTUALENV_VERSION} virtualenv.dist
+    rm -rf virtualenv.dist && \
+    mv -v virtualenv-${VIRTUALENV_VERSION} virtualenv.dist
   popd
 fi
 
