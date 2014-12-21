@@ -57,6 +57,11 @@ class GoalRunner(object):
     options_bootstrapper.get_bootstrap_options()
     self.config = Config.from_cache()
 
+    # Add any extra paths to python path (eg for loading extra source backends)
+    extra_paths = self.config.getlist('backends', 'python-path', [])
+    if extra_paths:
+      sys.path.extend(extra_paths)
+
     # Load plugins and backends.
     backend_packages = self.config.getlist('backends', 'packages', [])
     plugins = self.config.getlist('backends', 'plugins', [])
