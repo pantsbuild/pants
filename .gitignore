@@ -34,6 +34,7 @@ out/
 /build-support/*.pex
 /build-support/*.venv
 /build-support/virtualenv-*
+/build-support/virtualenv.dist/
 /build-support/phab/
 /dist/
 /lib/
