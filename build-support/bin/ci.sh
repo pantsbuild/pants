@@ -5,8 +5,10 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-bsrdpceat)"
+  echo "Usage: $0 (-h|-xbsrdpcieat)"
   echo " -h           print out this help message"
+  echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
+  echo "              fresh clone)"
   echo " -b           skip bootstraping pants from local sources"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
@@ -29,9 +31,10 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hbsrdpci:eat" opt; do
+while getopts "hxbsrdpci:eat" opt; do
   case ${opt} in
     h) usage ;;
+    x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
@@ -83,7 +86,9 @@ PANTS_ARGS=(
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   banner "Bootstrapping pants"
   (
-    ./build-support/python/clean.sh && \
+    if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
+      ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
+    fi
     PANTS_DEV=1 PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 \
       ./pants ${PANTS_ARGS[@]} binary src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex ./pants.pex && \

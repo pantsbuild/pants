@@ -44,7 +44,7 @@ before_script: |
 script: |
   uname -a
   java -version
-  ./build-support/bin/ci.sh -d ${CI_FLAGS}
+  ./build-support/bin/ci.sh -dx ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
 # for now which is enabled even with no `notifications` config.
