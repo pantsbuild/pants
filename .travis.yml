@@ -1,7 +1,15 @@
 # Enables support for a docker container-based build
 # which should provide faster startup times and beefier
-# "machines".
+# "machines". This is also required in order to use the
+# cache configured below.
 sudo: false
+
+cache:
+  directories:
+    - $HOME/.pants.d
+    - $HOME/.ivy2
+    - build-support/pants_dev_deps.venv
+    - build-support/virtualenv.dist
 
 language: python
 

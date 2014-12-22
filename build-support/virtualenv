@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wrapper for self-bootstrapping virtualenv
 set -e
-VIRTUALENV_VERSION=1.11.4
+VIRTUALENV_VERSION=1.11.6
 VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.python.org/packages/source/v/virtualenv}
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
@@ -19,18 +19,20 @@ fi
 log "Using ${PY}"
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-BOOTSTRAP_FILE=${HERE}/virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED
-if ! [ -f "${BOOTSTRAP_FILE}" ]; then
+if ! [ -f "${HERE}/virtualenv.dist/BOOTSTRAPPED-${VIRTUALENV_VERSION}" ]; then
   pushd "${HERE}"
   VIRTUALENV_PACKAGE_FULL_URL=${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-${VIRTUALENV_VERSION}.tar.gz
   log "Downloading ${VIRTUALENV_PACKAGE_FULL_URL}..."
   curl -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
     die "Failed to download ${VIRTUALENV_PACKAGE_FULL_URL}."
+  rm -rf virtualenv-${VIRTUALENV_VERSION} && \
   tar zxvf virtualenv-${VIRTUALENV_VERSION}.tar.gz || \
     die "Failed to extract ${VIRTUALENV_PACKAGE_FULL_URL}."
   # TODO(ksweeney): Checksum
-  touch ${BOOTSTRAP_FILE}  # 2PC
+  touch virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED-${VIRTUALENV_VERSION} && \
+    rm -rf virtualenv.dist && \
+    mv -v virtualenv-${VIRTUALENV_VERSION} virtualenv.dist
   popd
 fi
 
-exec "${PY}" "${HERE}/virtualenv-${VIRTUALENV_VERSION}/virtualenv.py" "$@"
+exec "${PY}" "${HERE}/virtualenv.dist/virtualenv.py" "$@"
