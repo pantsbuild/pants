@@ -70,6 +70,9 @@ class Git(Scm):
       from twitter.common import log as c_log
       self._log = c_log
 
+  def current_rev_identifier(self):
+    return 'HEAD'
+
   @property
   def commit_id(self):
     return self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)

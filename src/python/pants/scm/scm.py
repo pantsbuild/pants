@@ -23,6 +23,10 @@ class Scm(AbstractClass):
     """Indicates a problem performing a local scm operation."""
 
   @abstractproperty
+  def current_rev_identifier(self):
+    """Identifier for the tip/head of the current branch eg. "HEAD" in git"""
+
+  @abstractproperty
   def commit_id(self):
     """Returns the id of the current commit."""
 

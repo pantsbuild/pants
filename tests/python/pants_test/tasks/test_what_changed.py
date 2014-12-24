@@ -10,15 +10,15 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.what_changed import WhatChanged, Workspace
+from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
+from pants.goal.workspace import Workspace
 from pants_test.tasks.test_base import ConsoleTaskTest
-
 
 class BaseWhatChangedTest(ConsoleTaskTest):
   @property

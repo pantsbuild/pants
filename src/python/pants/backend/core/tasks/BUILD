@@ -339,11 +339,9 @@ python_library(
   name = 'what_changed',
   sources = ['what_changed.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    ':common',
     ':console_task',
-    'src/python/pants/base:build_file',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:lazy_source_mapper',
     'src/python/pants/base:target',
-    'src/python/pants/goal:workspace',
   ],
 )
