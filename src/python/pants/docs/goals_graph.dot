@@ -18,7 +18,7 @@ digraph G {
   subgraph cluster_compile {
     label="goal compile";
     color=blue;
-    jvm scalastyle;
+    jvm;
   }
 
   subgraph cluster_test {
