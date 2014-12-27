@@ -8,11 +8,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import closing
 from StringIO import StringIO
 
-from pants.backend.core.register import build_file_aliases as register_core
+import pants.backend.core.register as register_core
 from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants_test.tasks.test_base import BaseTest, TaskTest
+
 
 OUTDIR = '/tmp/dist'
 
@@ -22,7 +23,7 @@ outdir: %s
 """ % OUTDIR
 
 
-class BaseBuildBuildDictionaryTest(TaskTest):
+class BuildBuildDictionaryTest(TaskTest):
   @classmethod
   def task_type(cls):
     return builddictionary.BuildBuildDictionary
@@ -33,24 +34,20 @@ class BaseBuildBuildDictionaryTest(TaskTest):
       task.execute()
       return output.getvalue()
 
-
-class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
   def test_builddict_empty(self):
     """Execution should be silent."""
     # We don't care _that_ much that execution be silent. Nice if at least
     # one test executes the task and doesn't explode, tho.
     self.assertEqual('', self.execute_task())
 
-
 class ExtractedContentSanityTests(BaseTest):
   @property
   def alias_groups(self):
-    return register_core().merge(register_jvm().merge(register_python()))
+    return register_core.build_file_aliases().merge(register_jvm().merge(register_python()))
 
   def setUp(self):
     super(ExtractedContentSanityTests, self).setUp()
     self._syms = reflect.assemble_buildsyms(build_file_parser=self.build_file_parser)
-
 
   def test_sub_tocls(self):
     python_symbols = builddictionary.python_sub_tocl(self._syms).e
@@ -67,11 +64,13 @@ class ExtractedContentSanityTests(BaseTest):
     for sym in ['java_library', 'scala_library']:
       self.assertTrue(sym in jvm_symbols)
 
-
   def test_goals_ref_does_not_crash(self):
     # Invoke reflect.* functions used in generating Goals Reference.
+    # In this test context, goals is probably empty, so register some:
+    register_core.register_goals()
     goals = reflect.gen_tasks_goals_reference_data()
-    # In this test context, goals is probably empty
+    self.assertGreater(len(goals), 10,
+                       'Detected 10 or fewer core goals?!')
     glopts = reflect.gen_goals_glopts_reference_data()
     self.assertGreater(len(glopts.options), 10,
                        'Detected 10 or fewer global CLI options?!')
