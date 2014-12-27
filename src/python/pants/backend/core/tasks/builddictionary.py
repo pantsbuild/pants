@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pkg_resources import resource_string
 import os
+import re
 
 from pants.backend.core.tasks.reflect import (assemble_buildsyms,
                                               gen_goals_glopts_reference_data,
@@ -65,6 +66,12 @@ class BuildBuildDictionary(Task):
     self._templates_dir = os.path.join('templates', 'builddictionary')
     self._outdir = os.path.join(self.context.config.getdefault('pants_distdir'), 'builddict')
 
+  @classmethod
+  def register_options(cls, register):
+    super(BuildBuildDictionary, cls).register_options(register)
+    register('--omit_impl_re', action='append',
+             help='Omit goals who have a task matching one of these regexps.')
+
   def execute(self):
     self._gen_goals_reference()
     self._gen_build_dictionary()
@@ -97,6 +104,12 @@ class BuildBuildDictionary(Task):
   def _gen_goals_reference(self):
     """Generate the goals reference rst doc."""
     goals = gen_tasks_goals_reference_data()
+    filtered_goals = []
+    omit_impl_regexps = [re.compile(r) for r in self.get_options().omit_impl_re]
+    for g in goals:
+      if any(r.match(t['impl']) for r in omit_impl_regexps for t in g.tasks):
+        continue
+      filtered_goals.append(g)
     glopts = gen_goals_glopts_reference_data()
 
     # generate the .rst file
@@ -105,7 +118,7 @@ class BuildBuildDictionary(Task):
     filename = os.path.join(self._outdir, 'goals_reference.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
-      generator = Generator(template, goals=goals, glopts=glopts)
+      generator = Generator(template, goals=filtered_goals, glopts=glopts)
       generator.write(outfile)
 
     # generate the .html file
@@ -114,5 +127,5 @@ class BuildBuildDictionary(Task):
     filename = os.path.join(self._outdir, 'goals_reference.html')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
-      generator = Generator(template, goals=goals, glopts=glopts)
+      generator = Generator(template, goals=filtered_goals, glopts=glopts)
       generator.write(outfile)
