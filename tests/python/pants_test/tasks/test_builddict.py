@@ -40,6 +40,7 @@ class BuildBuildDictionaryTest(TaskTest):
     # one test executes the task and doesn't explode, tho.
     self.assertEqual('', self.execute_task())
 
+
 class ExtractedContentSanityTests(BaseTest):
   @property
   def alias_groups(self):

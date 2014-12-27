@@ -55,9 +55,6 @@ def python_sub_tocl(d):
   return sub_tocl(d, ['backend.python', 'core'], 'Python')
 
 
-
-
-
 class BuildBuildDictionary(Task):
   """Generate documentation for the Sphinx site."""
 
