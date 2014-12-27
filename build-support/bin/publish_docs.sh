@@ -36,7 +36,8 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${PANTS_EXE} builddict --print-exception-stacktrace || \
+${PANTS_EXE} builddict --print-exception-stacktrace \
+                       --omit_impl_re='internal_backend.*' || \
   die "Failed to generate the 'BUILD Dictionary' and/or 'Goals Reference'."
 
 function do_open() {
