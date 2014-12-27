@@ -66,3 +66,12 @@ class ExtractedContentSanityTests(BaseTest):
     jvm_symbols = builddictionary.jvm_sub_tocl(self._syms).e
     for sym in ['java_library', 'scala_library']:
       self.assertTrue(sym in jvm_symbols)
+
+
+  def test_goals_ref_does_not_crash(self):
+    # Invoke reflect.* functions used in generating Goals Reference.
+    goals = reflect.gen_tasks_goals_reference_data()
+    # In this test context, goals is probably empty
+    glopts = reflect.gen_goals_glopts_reference_data()
+    self.assertGreater(len(glopts.options), 10,
+                       'Detected 10 or fewer global CLI options?!')
