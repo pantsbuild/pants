@@ -494,6 +494,7 @@ def gen_tasks_goals_reference_data():
         if authored_task_type.__module__ != 'abc':
           break
       impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
+      if impl.startswith('internal_backend'): continue
       tasks.append(TemplateData(
           impl=impl,
           doc_html=doc_html,
