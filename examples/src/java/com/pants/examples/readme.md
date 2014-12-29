@@ -356,3 +356,11 @@ You can copy the archive somewhere, then unpack it on the destination machine. I
 are some "standard jars" that are already on the destination machine, you might want to exclude
 them from the archive.
 
+Further Reading
+---------------
+
+If you use Scala, see
+[[Scala Projects with Pants|pants('examples/src/scala/com/pants/example:readme')]].
+
+If you know Maven and want to know Pants equivalents, see
+[[Pants for Maven Experts|pants('examples/src/java/com/pants/examples:from_maven')]].

@@ -17,3 +17,11 @@ jvm_binary(name ='jvm-run-example',
     ':jvm-run-example-lib',
   ]
 )
+
+page(
+  name='readme',
+  source='readme.md',
+  links=[
+    'examples/src/java/com/pants/examples:readme',
+  ],
+)
