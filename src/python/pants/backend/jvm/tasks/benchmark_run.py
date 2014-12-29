@@ -61,9 +61,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
     targets = self.context.targets()
-    classpath = self.classpath(benchmark_tools_classpath,
-                               confs=self.confs,
-                               exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+    classpath = self.classpath(benchmark_tools_classpath, confs=self.confs)
 
     caliper_main = 'com.google.caliper.Runner'
     exit_code = execute_java(classpath=classpath,

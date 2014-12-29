@@ -11,7 +11,6 @@ python_library(
 python_test_suite(
   name = 'targets',
   dependencies = [
-    ':exclusive',
     ':jar_library',
     ':java_agent',
     ':java_tests',
@@ -40,17 +39,6 @@ python_tests(
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/base:exceptions',
-  ]
-)
-
-python_tests(
-  name = 'exclusive',
-  sources = ['test_exclusive.py'],
-  dependencies = [
-    'src/python/pants/base:config',
-    'src/python/pants/backend/core/tasks:check_exclusives',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
   ]
 )
 

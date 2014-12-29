@@ -107,7 +107,7 @@ def register_goals():
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve,
-       dependencies=['gen', 'check-exclusives', 'bootstrap']
+       dependencies=['gen', 'bootstrap']
   ).install('resolve').with_description('Resolve dependencies and produce dependency reports.')
 
   task(name='ivy-imports', action=IvyImports,
@@ -150,7 +150,7 @@ def register_goals():
   jvm_compile.add_member(JavaCompile)
 
   task(name='jvm', action=jvm_compile,
-       dependencies=['gen', 'resolve', 'check-exclusives', 'bootstrap']
+       dependencies=['gen', 'resolve', 'bootstrap']
   ).install('compile').with_description('Compile source code.')
 
   # Generate documentation.

@@ -79,9 +79,8 @@ class JvmRun(JvmTask):
     if isinstance(binary, JvmBinary):
       executor = CommandLineGrabber() if self.only_write_cmd_line else None
       self.context.release_lock()
-      exclusives_classpath = self.get_base_classpath_for_target(binary)
       result = execute_java(
-        classpath=(self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)),
+        classpath=(self.classpath(confs=self.confs)),
         main=binary.main,
         executor=executor,
         jvm_options=self.jvm_options,

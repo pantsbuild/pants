@@ -44,21 +44,21 @@ def build_file_aliases():
 
 def register_goals():
   task(name='python-binary-create', action=PythonBinaryCreate,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
+       dependencies=['bootstrap', 'resources']
   ).install('binary')
 
   task(name='pytest', action=PytestRun,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
+       dependencies=['bootstrap', 'resources']
   ).install('test')
 
   task(name='py', action=PythonRun,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
+       dependencies=['bootstrap', 'resources']
   ).install('run')
 
   task(name='python-repl', action=PythonRepl,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
+       dependencies=['bootstrap', 'resources']
   ).install('repl')
 
   task(name='setup-py', action=PythonSetup,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
+       dependencies=['bootstrap', 'resources']
   ).install()

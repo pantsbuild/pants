@@ -7,6 +7,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -43,12 +45,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     return self._CONFIG_SECTION
 
   def prepare(self, round_manager):
-    # TODO(John Sirois): this is a fake requirement on 'ivy_jar_products' in order to force
-    # resolve to run before this goal. Require a new CompileClasspath product to be produced by
-    # IvyResolve instead.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('ivy_jar_products')
-    round_manager.require_data('exclusives_groups')
+    round_manager.require_data('compile_classpath')
 
   def _is_checked(self, target):
     return (isinstance(target, Target) and
@@ -78,11 +75,9 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     return sources
 
   def checkstyle(self, sources, targets):
-    egroups = self.context.products.get_data('exclusives_groups')
-    etag = egroups.get_group_key_for_target(targets[0])
-    classpath = self.tool_classpath('checkstyle')
-    cp = egroups.get_classpath_for_group(etag)
-    classpath.extend(jar for conf, jar in cp if conf in self.get_options().confs)
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
+    union_classpath.update(jar for conf, jar in compile_classpath if conf in self.get_options().confs)
 
     args = [
       '-c', self.get_options().configuration,
@@ -99,7 +94,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     # We've hit known cases of checkstyle command lines being too long for the system so we guard
     # with Xargs since checkstyle does not accept, for example, @argfile style arguments.
     def call(xargs):
-      return self.runjava(classpath=classpath, main=self._CHECKSTYLE_MAIN,
+      return self.runjava(classpath=union_classpath, main=self._CHECKSTYLE_MAIN,
                           args=args + xargs, workunit_name='checkstyle')
     checks = Xargs(call)
 

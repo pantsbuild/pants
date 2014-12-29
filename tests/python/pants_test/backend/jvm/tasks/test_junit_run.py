@@ -87,19 +87,12 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     java_tests_products.add_rel_paths(test_abs_path, ['FooTest.class'])
     class_products[java_tests] = java_tests_products
 
-    # Also we need to add the FooTest.class's classpath to the exclusive_groups
+    # Also we need to add the FooTest.class's classpath to the compile_classpath
     # products data mapping so JUnitRun will be able to add that into the final
     # classpath under which the junit will be executed.
-    self.populate_exclusive_groups(
+    self.populate_compile_classpath(
       context=context,
-      classpaths=[test_abs_path],
-      # This is a bit hacky. The issue in https://github.com/pantsbuild/pants/issues/508
-      # is that normal resources specified in the BUILD targets are fine, but the
-      # synthetic resources ones generated on the fly don't have exclusive_groups data
-      # mapping entries thus later on in _JUnitRunner lookup it blows up. So we manually
-      # exclude the synthetic resources target here to simulate that situation and ensure
-      # the _JUnitRunner does filter out all the non-java-tests targets.
-      target_predicate=lambda t: t != resources)
+      classpath=[test_abs_path])
 
     # Finally execute the task.
     self.execute(context)

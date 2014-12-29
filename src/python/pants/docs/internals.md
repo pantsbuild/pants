@@ -69,14 +69,13 @@ helps here. Instead of building something, it echoes a summary of the goals and 
     $./pants goal --explain compile
     Goal Execution Order:
 
-    bootstrap -> imports -> gen -> check-exclusives -> resolve -> compile
+    bootstrap -> imports -> gen -> resolve -> compile
 
     Goal [TaskRegistrar->Task] Order:
 
     bootstrap [bootstrap-jvm-tools->BootstrapJvmTools]
     imports [ivy-imports->IvyImports]
     gen [thrift->ApacheThriftGen, scrooge->ScroogeGen, protoc->ProtobufGen, antlr->AntlrGen, ragel->RagelGen, jaxb->JaxbGen, aapt->AaptGen]
-    check-exclusives [check-exclusives->CheckExclusives]
     resolve [ivy->IvyResolve]
     compile [jvm->SingletonGroupTask]
     $

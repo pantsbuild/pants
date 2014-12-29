@@ -28,7 +28,7 @@ class JvmRunTest(TaskTest):
     round_manager = RoundManager(jvm_run.context)
     jvm_run.prepare(round_manager)
 
-    self.populate_exclusive_groups(context=jvm_run.context, classpaths=['bob', 'fred'])
+    self.populate_compile_classpath(context=jvm_run.context, classpath=['bob', 'fred'])
 
     with temporary_dir() as pwd:
       with pushd(pwd):

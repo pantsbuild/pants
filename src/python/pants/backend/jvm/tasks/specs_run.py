@@ -54,10 +54,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
         bootstrapped_cp = self.tool_classpath('specs')
-        classpath = self.classpath(
-            bootstrapped_cp,
-            confs=self.confs,
-            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        classpath = self.classpath(bootstrapped_cp, confs=self.confs)
 
         result = execute_java(
           classpath=classpath,

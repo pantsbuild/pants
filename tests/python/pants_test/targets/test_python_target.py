@@ -33,7 +33,7 @@ class PythonTargetTest(BaseTest):
 
   def test_validation(self):
 
-    internal_repo = Repository(url=None, push_db_basedir=None, exclusives=None)
+    internal_repo = Repository(url=None, push_db_basedir=None)
     # Adding a JVM Artifact as a provides on a PythonTarget doesn't make a lot of sense.
     # This test sets up that very scenario, and verifies that pants throws a
     # TargetDefinitionException.

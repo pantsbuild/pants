@@ -14,7 +14,6 @@ from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
-from pants.backend.core.tasks.check_exclusives import CheckExclusives
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.dependees import ReverseDepmap
@@ -139,10 +138,6 @@ def register_goals():
 
 
   # Linting.
-
-  task(name='check-exclusives', dependencies=['gen'], action=CheckExclusives
-  ).install('check-exclusives').with_description('Check for exclusivity violations.')
-
   task(name='buildlint', action=BuildLint, dependencies=['compile']
   ).install()
 

@@ -26,7 +26,7 @@ class PrepareResources(Task):
     self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
 
   def prepare(self, round_manager):
-    round_manager.require_data('exclusives_groups')
+    round_manager.require_data('compile_classpath')
     # NOTE(Garrett Malmquist): This is a fake dependency to force resources to occur after jvm
     # compile. It solves some problems we've been having getting our annotation processors to
     # compile consistently due to extraneous resources polluting the classpath. Perhaps this could
@@ -38,6 +38,8 @@ class PrepareResources(Task):
       self.context.products.safe_create_data('resources_by_target',
                                              lambda: defaultdict(MultipleRootedProducts))
 
+    # `targets` contains the transitive subgraph in pre-order, which is approximately how
+    # we want them ordered on the classpath. Thus, we preserve ordering here.
     targets = self.context.targets()
     if len(targets) == 0:
       return
@@ -67,15 +69,14 @@ class PrepareResources(Task):
                       os.path.join(target_dir, resource_file_from_source_root))
 
       resources_by_target = self.context.products.get_data('resources_by_target')
-      egroups = self.context.products.get_data('exclusives_groups')
-      group_key = egroups.get_group_key_for_target(targets[0])
+      compile_classpath = self.context.products.get_data('compile_classpath')
 
-      for resources_tgt in reversed(all_resources_tgts):
+      for resources_tgt in all_resources_tgts:
         target_dir = compute_target_dir(resources_tgt)
         for conf in self.confs:
           # TODO(John Sirois): Introduce the notion of RuntimeClasspath and populate that product
-          # instead of mutating exclusives_groups.
-          egroups.update_compatible_classpaths(group_key, [(conf, target_dir)])
+          # instead of mutating the compile_classpath.
+          compile_classpath.update([(conf, target_dir)])
         if resources_by_target is not None:
           resources_by_target[resources_tgt].add_rel_paths(
             target_dir, resources_tgt.sources_relative_to_source_root())

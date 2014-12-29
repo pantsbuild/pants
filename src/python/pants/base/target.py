@@ -167,7 +167,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, exclusives=None, tags=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -177,9 +177,6 @@ class Target(AbstractTarget):
     :param BuildGraph build_graph: The BuildGraph that this Target lives within
     :param Payload payload: The configuration encapsulated by this target.  Also in charge of
       most fingerprinting details.
-    :param exclusives: An optional map of exclusives tags.
-       `Keeps incompatible changes apart
-       <build_files.html#howto-check-exclusives>`_.
     :param iterable<string> tags: Arbitrary string tags that describe this target. Usable
         by downstream/custom tasks for reasoning about build graph. NOT included in payloads
         and thus not used in fingerprinting, thus not suitable for anything that affects how
@@ -194,11 +191,6 @@ class Target(AbstractTarget):
     self._build_graph = build_graph
     self.description = None
     self.labels = set()
-    self.declared_exclusives = collections.defaultdict(set)
-    if exclusives is not None:
-      for k in exclusives:
-        self.declared_exclusives[k].add(exclusives[k])
-    self.exclusives = None
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
@@ -371,39 +363,6 @@ class Target(AbstractTarget):
   def is_original(self):
     """Returns ``True`` if this target is derived from no other."""
     return self.derived_from == self
-
-  def get_all_exclusives(self):
-    """ Get a map of all exclusives declarations in the transitive dependency graph.
-
-    For a detailed description of the purpose and use of exclusives tags,
-    see the documentation of the CheckExclusives task.
-
-    """
-    if self.exclusives is None:
-      self._propagate_exclusives()
-    return self.exclusives
-
-  def _propagate_exclusives(self):
-    if self.exclusives is None:
-      self.exclusives = collections.defaultdict(set)
-      self.add_to_exclusives(self.declared_exclusives)
-      # This may perform more work than necessary.
-      # We want to just traverse the immediate dependencies of this target,
-      # but for a general target, we can't do that. _propagate_exclusives is overridden
-      # in subclasses when possible to avoid the extra work.
-      self.walk(lambda t: self._propagate_exclusives_work(t))
-
-  def _propagate_exclusives_work(self, target):
-    # Note: this will cause a stack overflow if there is a cycle in
-    # the dependency graph, so exclusives checking should occur after
-    # cycle detection.
-    self.add_to_exclusives(target.declared_exclusives)
-    return None
-
-  def add_to_exclusives(self, exclusives):
-    if exclusives is not None:
-      for key in exclusives:
-        self.exclusives[key] |= exclusives[key]
 
   @property
   def id(self):

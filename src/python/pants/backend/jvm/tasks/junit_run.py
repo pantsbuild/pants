@@ -48,7 +48,7 @@ _TaskExports = namedtuple('_TaskExports',
                            'jvm_options',
                            'args',
                            'confs',
-                           'get_base_classpath_for_target',
+                           'register_jvm_tool',
                            'tool_classpath',
                            'workdir'])
 
@@ -137,10 +137,7 @@ class _JUnitRunner(object):
                  else self._calculate_tests_from_targets(java_tests_targets))
     if tests:
       bootstrapped_cp = self._task_exports.tool_classpath('junit')
-      junit_classpath = self._task_exports.classpath(
-        cp=bootstrapped_cp,
-        confs=self._task_exports.confs,
-        exclusives_classpath=self._task_exports.get_base_classpath_for_target(java_tests_targets[0]))
+      junit_classpath = self._task_exports.classpath(cp=bootstrapped_cp, confs=self._task_exports.confs)
 
       self._context.release_lock()
       self.instrument(targets, tests, junit_classpath)
@@ -597,7 +594,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
                                 jvm_options=self.jvm_options,
                                 args=self.args,
                                 confs=self.confs,
-                                get_base_classpath_for_target=self.get_base_classpath_for_target,
+                                register_jvm_tool=self.register_jvm_tool,
                                 tool_classpath=self.tool_classpath,
                                 workdir=self.workdir)
 

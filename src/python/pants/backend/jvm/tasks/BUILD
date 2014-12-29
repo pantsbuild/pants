@@ -112,6 +112,7 @@ python_library(
   name = 'checkstyle',
   sources = ['checkstyle.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':common',
     ':jvm_tool_task_mixin',
     ':nailgun_task',
@@ -257,14 +258,15 @@ python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':ivy_task_mixin',
     ':jvm_tool_task_mixin',
     ':nailgun_task',
     'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants:binary_util',
     'src/python/pants/base:cache_manager',
     'src/python/pants/ivy',
     'src/python/pants/util:dirutil',
+    'src/python/pants:binary_util',
   ],
 )
 

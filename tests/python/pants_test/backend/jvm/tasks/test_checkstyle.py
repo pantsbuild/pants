@@ -107,14 +107,14 @@ class CheckstyleTest(NailgunTaskTestBase):
   def test_single_rule_pass(self):
     context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER])
     self._add_java_target_for_test(context, 'no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)
-    self.populate_exclusive_groups(context=context)
+    self.populate_compile_classpath(context=context)
     self.execute(context)
 
   def test_single_rule_fail(self):
     context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER])
     # add a tab in the source to trigger the tab check rule to fail.
     self._add_java_target_for_test(context, 'with_tab', self._TEST_JAVA_SOURCE_WITH_TAB)
-    self.populate_exclusive_groups(context=context)
+    self.populate_compile_classpath(context=context)
     with self.assertRaises(TaskError):
       self.execute(context)
 
@@ -143,5 +143,5 @@ class CheckstyleTest(NailgunTaskTestBase):
     self._add_java_target_for_test(context, 'with_tab_1', self._TEST_JAVA_SOURCE_WITH_TAB)
     self._add_java_target_for_test(context, 'with_tab_2', self._TEST_JAVA_SOURCE_WITH_TAB)
 
-    self.populate_exclusive_groups(context=context)
+    self.populate_compile_classpath(context=context)
     self.execute(context)
