@@ -272,7 +272,7 @@ resources) but whose `jvm_binary` has no source or main; the resulting
 bundle will have the files you want (along with a couple of
 not-so-useful stub `.jar` files).)
 
-**Generating a Bundle**
+### Generating a Bundle
 
 Invoke `./pants goal bundle` on a JVM app or JVM binary target:
 
@@ -282,7 +282,7 @@ Invoke `./pants goal bundle` on a JVM app or JVM binary target:
 With options, you can tell Pants to archive the bundle in a zip, a tar, and some other common
 formats. See the <a pantsref="gref_goal_bundle">bundle help</a> for built-in choices.
 
-**Contents of a Bundle**
+### Contents of a Bundle
 
 The generated bundle is basically a directory tree containing `.jar`s
 and extra files. The `.jar` in the top-level directory has a manifest so
@@ -322,7 +322,7 @@ That `greetee.txt` file came from the `bundles=` parameter.
 The `libs/` directory contains 3rdparty jars (if any). The `jar` in the top directory
 contains code compiled for this target.
 
-**Deploying a Bundle**
+### Deploying a Bundle
 
 Instead of just creating a directory tree, you can specify `goal bundle --archive=zip` to
 `./pants goal bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
@@ -356,3 +356,38 @@ You can copy the archive somewhere, then unpack it on the destination machine. I
 are some "standard jars" that are already on the destination machine, you might want to exclude
 them from the archive.
 
+### Omit Parts from Bundle
+
+Sometimes you don't want all the files to go into the bundle:
+
+* If you're deploying to Hadoop, some "shared library" jars are already uploaded to the cluster.
+  To compile your code, you needed them; but you don't want them in your bundle.
+* A 3rdparty dependency might have a transitive dependency with a bad manifest file.
+  If you try to run the jar you might get `Invalid signature file digest for Manifest main 
+  attributes`.
+  If you don't actually use the code in that transitive dependency, you might work around the
+  error by omitting the dependency.
+
+To tell Pants to omit some files from the bundle jar, set the `deploy_jar_rules` parameter of
+<a pantsref='bdict_jvm_binary'>`jvm_binary`</a> to a <a pantsref='bdict_jar_rules'>`jar_rules`</a>.
+E.g., to omit all files containing the regexp `Greeting`, you might set
+
+    :::python
+    deploy_jar_rules=jar_rules(rules=[Skip('Greeting')])
+
+After bundling this, if we check the bundle's jar's contents, there is no `Greeting.class`:
+
+    :::bash
+    $ jar -tf hello-example.jar
+    META-INF/
+    META-INF/MANIFEST.MF
+    com/
+    com/pants/
+    com/pants/examples/
+    com/pants/examples/hello/
+    com/pants/examples/hello/main/
+    com/pants/examples/hello/main/HelloMain.class
+    com/pants/example/
+    com/pants/example/hello/
+    com/pants/example/hello/world.txt
+    $ 
