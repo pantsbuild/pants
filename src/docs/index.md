@@ -17,7 +17,7 @@ configure build-able things in BUILD files.
 + [[JVM Projects|pants('examples/src/java/com/pants/examples:readme')]]
 + [[Python Projects|pants('examples/src/python/example:readme')]]
 + [[README Files and Markdown|pants('examples/src/java/com/pants/examples:page')]]
-+ [[Pants Conceptual Overview|pants('src/docs:build_files')]]
++ [[BUILD Files|pants('src/docs:build_files')]]
 + [[Invoking Pants Build|pants('src/docs:invoking')]]
 + [[Troubleshooting|pants('src/docs:tshoot')]]
 
