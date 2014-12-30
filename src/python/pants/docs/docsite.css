@@ -5,44 +5,75 @@
 
 
 body {
-  background-color: #e5e7f3;
+  background-color: #eee;
   color: #111;
-  font-family: sans-serif;
+  font-family: "Luxi Sans", "Lucida Sans", sans-serif;
 }
 
+h1, h2, h3, h4, h5, h6 {
+  color: #006;
+  margin: 1em 0 0 -0.01em;
+}
+
+/* 64px above for build status
+   300px on left to leave room for bignav,
+   40em below so jumping to anchor link works OK close to content bottom
+ */
 .mainflow {
-  margin: 64px 2% 40em 300px;
+  margin: 64px 1rem 40em 300px;
 }
 
+a:link, a:visited {
+  text-decoration: none;
+  color: #007;
+}
+
+a:hover {
+  background-color: #fff;
+}
 
 pre {
-  padding: 1em;
-  border-radius: 3px;
-  background-color: #eef;
-  color: #002;
+  border: 1px solid #ddd;
+  padding: 2px;
+  color: #006;
 }
 
-code,tt {
-  background-color: #eef;
+ul, ol, dl {
+  margin: 0px;
+  padding: 0px;
 }
 
+ul li {
+  margin-left: 24px;
+}
+
+/* "Pilcrows": each heading has a link to it, next to it. Handy for
+ *  copy-pasting section links in chat.
+ */
+table.h-plus-pilcrow {
+  border-spacing: 0px;
+}
+
+table.h-plus-pilcrow td {
+  padding: 0;
+  vertical-align: top;
+}
 
 div.pilcrow-div {
   margin: 1em 0.5em;
 }
 
-a.pilcrow-link {
+/* Pilcrow links are transparent until hovered over */
+a.pilcrow-link, a.pilcrow-link:link,a.pilcrow-link:visited {
   font-size: 150%;
   color: transparent;
   text-decoration: none;
 }
 
-table.h-plus-pilcrow td {
-  vertical-align: top;
-}
-
-table.h-plus-pilcrow:hover {
-  background-color: #eef;
+/* Most links get a background color when hovered over; but not
+   Pilcrow links. */
+table.h-plus-pilcrow:hover, table.h-plus-pilcrow:hover a:hover {
+  background-color: transparent;
   color: #002;
 }
 
@@ -60,25 +91,29 @@ nav {
   nav { display: none; }
   div.mainflow { margin-left: 2px; }
 }
+
+/* navtoggler button appears top-left of skinny screens */
 @media screen and (min-width: 769px){
   #navtoggler { display: none; }
 }
 
 #navtoggler {
   position: absolute;
-  left: 0.5rem;
-  top: 2px;
+  left: 4px;
+  top: 4px;
   font-size: 200%;
-  background-color: #ccc;
-  color: #258;
-  border: 1px solid #147;
+  background-color: #fff;
+  color: #55acee;
+  border: 1px solid #888;
   border-radius: 2px;
+  z-index: 10;
 }
 #navtoggler:hover {
   cursor: pointer;
 }
 
 
+/* "breadcrumbs" arrow-nav at top of content*/
 nav.breadcrumbs ul {
   margin: 0px; padding: 0px;
 }
@@ -86,154 +121,141 @@ nav.breadcrumbs ul {
 nav.breadcrumbs ul li {
   display: inline;
   list-style-type: none;
+  margin-left: 0;
 }
 
 nav.breadcrumbs ul li:before {
-  content: " ← ";
+  content: "←";
 }
 
 nav.breadcrumbs ul li:first-child:before {
-  content: none;
+  content: none; /* no arrow */
 }
 
-nav.breadcrumbs ul li a {
-  text-decoration: none;
-  background-color: #ddd;
-}
-
-nav.breadcrumbs ul li a:hover {
-  background-color: #fff;
-}
-
+/* bignav search box and site-wide TOC on page left-hand side */
 nav.bignav {
   font-size: larger;
   position: absolute;
   top: 0px;
   left: 0px;
-  margin: 64px 0.5%;
-  max-width: 290px;
-  border: 3px solid #38c;
-  border-radius: 3px;
-  background-color: #888;
+  margin: 0px;
+  max-width: 272px;
+  background-color: #55acee;
 }
 
 .bignav-logo {
   text-align: center;
-  margin-top: -20px;
+  margin-top: 4px;
 }
 .bignav-logo img {
-  border: 3px solid #38c;
+  border: 3px solid #55acee;
   border-radius: 3px;
 }
 
-form.search {
+nav.bignav form.search {
   padding: 1em 0px;
 }
 
-form.search input.query {
-  width: 70%;
+/* text entry for search terms */
+nav.bignav form.search input.query {
+  width: 246px;
+  margin-left: 4px;
   background-color: #fff;
-  padding: 0.5em 0.6em;
+  padding: 0.5em 8px;
   border: 1px solid #147;
-  border-radius: 2px;
+  border-radius: 20px;
 }
 
-form.search .button {
-  width: 20%;
-  padding: 0.5em 1em;
-  background-color: #e5e7f3;
-  color: #258;
-  border: 1px solid #147;
-  border-radius: 2px;
-}
-
+/* Site-wide table of contents */
 nav.bignav .site-toc {
-  background-color: #e5e7f3;
+  color: white;
+  background-color: #444;
 }
 
 .site-toc ul {
-  padding-left: 1em;
-  padding-right: 1em;
+  padding: 0.3rem 0px;
   list-style-type: none;
 }
 
+/* toc-here: within the site TOC, the entry for this page */
 .site-toc li.toc-here {
-  background-color: #fff;
+  background-color: #777;
 }
-.site-toc li:hover {
+.site-toc ul li {
+  margin: 0.6rem 0px;
+  padding-right: 0.5rem;
+}
+.site-toc ul li a {
+  color: white;
+}
+/* mainflow links get a white background on hover; bignav links get
+   a black one to contrast w/white text */
+.site-toc li:hover, .site-toc li:hover a:hover {
   background-color: black;
   color: white;
 }
-.site-toc li.toc-here:hover {
+/* ...and the this-page TOC entry has its own hover look */
+.site-toc li.toc-here:hover, .site-toc li.toc-here:hover a:hover {
   background-color: #e5e7f3;
   color: black;
 }
-.site-toc li:hover a {
-  color: white;
-}
 
-.site-toc .toc-h0 {
-  margin-left: 0px;
-  padding-left: 0px;
-  font-size: 120%;
+.site-toc ul li.toc-h0 {
+  padding-left: 0;
 }
-.site-toc .toc-h1 {
-  margin-left: 2px;
-  padding-left: 0px;
+.site-toc ul li.toc-h1 {
+  padding-left: 0.5em;
 }
-.site-toc .toc-h2 {
-  margin-left: 2px;
+.site-toc ul li.toc-h2 {
   padding-left: 1.0em;
 }
-.site-toc .toc-h3 {
-  margin-left: 2px;
+.site-toc ul li.toc-h3 {
+  padding-left: 1.5em;
+}
+.site-toc ul li.toc-h4 {
   padding-left: 2.0em;
 }
-.site-toc .toc-h4 {
-  margin-left: 2px;
-  padding-left: 3.0em;
-}
 
+/* page's table of contents */
 nav.pagetoc {
   float: right;
-  margin: 0px -1em 0px 1em;
-  padding-left: 1em;
-  padding-right: 1em;
-  background-color: #ddd;
+  margin: 0px -1.0rem 0px 1em;
+  background-color: #55acee;
   max-width: 24%;
-  border: 3px solid #38c;
-  border-radius: 3px;
 }
 
 nav.pagetoc ul {
-  padding-left: 0px;
+  padding: 1.0em 0px;
   list-style-type: none;
+  background-color: #dde;
 }
 
-nav.pagetoc li:hover {
+nav.pagetoc ul li {
+  margin: 0.5em 0px;
+  padding-right: 2px;
+}
+
+nav.pagetoc ul li:hover, nav.pagetoc ul li:hover a:hover {
   background-color: black;
   color: white;
 }
-nav.pagetoc li:hover a {
+nav.pagetoc ul li:hover a {
   color: white;
 }
-nav.pagetoc .toc-h1 {
-  margin-left: 2px;
-  padding-left: 2px;
+nav.pagetoc ul li.toc-h1 {
+  padding-left: 0.25em;
 }
-nav.pagetoc .toc-h2 {
-  margin-left: 2px;
-  padding-left: 6px;
+nav.pagetoc ul li.toc-h2 {
+  padding-left: 1.0em;
 }
-nav.pagetoc .toc-h3 {
-  margin-left: 2px;
-  padding-left: 10px;
+nav.pagetoc ul li.toc-h3 {
+  padding-left: 2.0em;
 }
-nav.pagetoc .toc-h4 {
-  margin-left: 2px;
-  padding-left: 14px;
+nav.pagetoc ul li.toc-h4 {
+  padding-left: 3.0em;
 }
 
+/* show the build/test/coverage status on each page */
 div.ci-status {
   position: absolute;
   top: 0px; right: 0px;
@@ -243,6 +265,7 @@ div.ci-status img {
   vertical-align: middle;
 }
 
+/* colophon at page bottom */
 .generated {
   margin-top: 5em;
   font-size: 70%;
@@ -257,3 +280,4 @@ div.ci-status img {
 .generated a:hover {
   background-color: #fff;
 }
+
