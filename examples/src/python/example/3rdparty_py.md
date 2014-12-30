@@ -18,6 +18,8 @@ Python artifacts, you might use the idiom of keeping them in a directory
 tree under `3rdparty/python`. If your organization has many such
 dependencies, you might arrange them in several directories: this can
 ease later "git detective work" when finding out who changed a version.
+(Pants itself doesn't have so many Python dependencies; thus, its `3rdparty` tree doesn't
+have many directories.)
 
 **pip-style requirements.txt:**
 
