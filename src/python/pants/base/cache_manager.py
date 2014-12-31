@@ -212,59 +212,30 @@ class InvalidationCacheManager(object):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
-    'cover' the input targets, possibly partitioning them, and are in topological order.
-    The caller can inspect these in order and, e.g., rebuild the invalid ones.
+    'cover' the input targets, possibly partitioning them.
+    Callers can inspect these and rebuild the invalid ones, for example.
 
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
     """
-    all_vts = self._sort_and_validate_targets(targets)
+    all_vts = self._wrap_targets(targets)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
-  def _sort_and_validate_targets(self, targets):
-    """Validate each target.
+  def _wrap_targets(self, targets):
+    """Wrap targets and their computed cache keys in VersionedTargets
 
-    Returns a topologically ordered set of VersionedTargets, each representing one input target.
+    Returns a list of VersionedTargets, each representing one input target.
     """
-    # We must check the targets in this order, to ensure correctness if invalidate_dependents=True,
-    # since we use earlier cache keys to compute later cache keys in this case.
-    ordered_targets = self._order_target_list(targets)
-
-    # This will be a list of VersionedTargets that correspond to @targets.
-    versioned_targets = []
-
-    # This will be a mapping from each target to its corresponding VersionedTarget.
-    versioned_targets_by_target = {}
-
-    # Map from id to current fingerprint of the target with that id. We update this as we iterate,
-    # in topological order, so when handling a target, this will already contain all its deps (in
-    # this round).
-    id_to_hash = {}
-
-    for target in ordered_targets:
-      cache_key = self._key_for(target, transitive=self._invalidate_dependents)
-      id_to_hash[target.id] = cache_key.hash
-
-      # Create a VersionedTarget corresponding to @target.
-      versioned_target = VersionedTarget(self, target, cache_key)
-
-      # Add the new VersionedTarget to the list of computed VersionedTargets.
-      versioned_targets.append(versioned_target)
-
-    return versioned_targets
+    return [VersionedTarget(self, target, self._key_for(target)) for target in sorted(targets)]
 
   def needs_update(self, cache_key):
     return self._invalidator.needs_update(cache_key)
 
-  def _order_target_list(self, targets):
-    """Orders the targets topologically, from least to most dependent."""
-    return filter(targets.__contains__, reversed(sort_targets(targets)))
-
-  def _key_for(self, target, transitive=False):
+  def _key_for(self, target):
     try:
       return self._cache_key_generator.key_for_target(target,
-                                                      transitive=transitive,
+                                                      transitive=self._invalidate_dependents,
                                                       fingerprint_strategy=self._fingerprint_strategy)
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
