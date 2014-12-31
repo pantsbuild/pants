@@ -241,6 +241,7 @@ python_tests(
     ':base',
     'src/python/pants/base:config',
     'src/python/pants/goal:context',
+    'src/python/pants/goal:error',
   ]
 )
 
