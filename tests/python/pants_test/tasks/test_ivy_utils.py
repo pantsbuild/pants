@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 from mock import Mock
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
@@ -101,6 +101,73 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     # If the same version is forced, use the forced version
     self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1, v1_force))
     self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1_force, v1))
+
+  def test_does_not_visit_diamond_dep_twice(self):
+    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
+
+    ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
+    seen = set()
+    def collector(r):
+      self.assertTrue(r not in seen)
+      seen.add(r)
+      return set([r])
+
+    result = ivy_info.traverse_dependency_graph(ref, collector)
+
+    self.assertEqual(
+          set([
+            IvyModuleRef("toplevel", "toplevelmodule", "latest"),
+            IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
+            IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
+            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
+          ]),
+          result)
+
+  def test_does_not_follow_cycle(self):
+    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_cycle.xml')
+
+    ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
+    seen = set()
+    def collector(r):
+      self.assertTrue(r not in seen)
+      seen.add(r)
+      return set([r])
+
+    result = ivy_info.traverse_dependency_graph(ref, collector)
+
+    self.assertEqual(
+          set([
+            IvyModuleRef("toplevel", "toplevelmodule", "latest"),
+            IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
+            IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
+            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
+          ]),
+          result)
+
+  def test_memo_reused_across_calls(self):
+    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
+
+    ref = IvyModuleRef(org='org1', name='name1', rev='0.0.1')
+    def collector(r):
+      return set([r])
+
+    memo = dict()
+    result1 = ivy_info.traverse_dependency_graph(ref, collector, memo=memo)
+    result2 = ivy_info.traverse_dependency_graph(ref, collector, memo=memo)
+
+    self.assertIs(result1, result2)
+    self.assertEqual(
+          set([
+            IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
+            IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
+            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
+          ]),
+          result1)
+
+  def parse_ivy_report(self, path):
+    ivy_info = IvyUtils._parse_xml_report(path)
+    self.assertNotEqual(None, ivy_info)
+    return ivy_info
 
   def find_single(self, elem, xpath):
     results = list(elem.findall(xpath))
