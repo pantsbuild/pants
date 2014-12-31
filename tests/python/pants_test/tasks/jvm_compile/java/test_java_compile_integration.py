@@ -49,7 +49,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     resources_by_targets (see jvm_compile.py).
     """
     with temporary_dir() as cache_dir:
-      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+      config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
@@ -65,7 +65,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.nocache.nocache')
       good_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
                                   'testprojects.src.java.com.pants.testproject.nocache.cache_me')
-      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+      config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(['compile',
                                   'testprojects/src/java/com/pants/testproject/nocache::'],
@@ -85,7 +85,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, 'JavaCompile',
                                   'testprojects.src.java.com.pants.testproject.unicode.main.main')
-      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+      config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(['compile',
                                   'testprojects/src/java/com/pants/testproject/unicode/main'],
@@ -112,7 +112,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, 'JavaCompile',
                                   'testprojects.src.java.com.pants.testproject.annotation.main.main')
-      config = {'java-compile': {'write_artifact_caches': [cache_dir]}}
+      config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(['compile',
                                   'testprojects/src/java/com/pants/testproject/annotation/main'],
@@ -150,7 +150,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run)
 
     # Now let's use the target whitelist, this should succeed.
-    config = {'jvm': {'missing_deps_target_whitelist': [whitelist]}}
+    config = {'compile.java': {'missing_deps_whitelist': [whitelist]}}
 
     pants_run = self.run_pants(args, config)
 

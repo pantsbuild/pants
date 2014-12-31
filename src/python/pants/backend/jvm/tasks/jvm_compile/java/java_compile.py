@@ -46,7 +46,6 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 class JavaCompile(JvmCompile):
   _language = 'java'
   _file_suffix = '.java'
-  _config_section = 'java-compile'
 
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
@@ -85,10 +84,6 @@ class JavaCompile(JvmCompile):
     self._buildroot = get_buildroot()
 
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
-
-  @property
-  def config_section(self):
-    return self._config_section
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context, JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)

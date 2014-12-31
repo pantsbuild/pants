@@ -17,7 +17,6 @@ from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 class ScalaCompile(JvmCompile):
   _language = 'scala'
   _file_suffix = '.scala'
-  _config_section = 'scala-compile'
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -49,10 +48,6 @@ class ScalaCompile(JvmCompile):
                                  jvm_options=self._jvm_options,
                                  color=color,
                                  log_level=self.get_options().level)
-
-  @property
-  def config_section(self):
-    return self._config_section
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)

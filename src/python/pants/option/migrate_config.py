@@ -15,10 +15,29 @@ from pants.option.errors import ParseError
 
 
 migrations = {
+  ('jvm', 'missing_deps_target_whitelist'): ('compile.java', 'missing_deps_whitelist'),
+
   ('java-compile', 'partition_size_hint'): ('compile.java', 'partition_size_hint'),
   ('java-compile', 'javac_args'): ('compile.java', 'args'),
+  ('java-compile', 'jvm_args'): ('compile.java', 'jvm_options'),
+  ('java-compile', 'confs'): ('compile.java', 'confs'),
+  ('java-compile', 'locally_changed_targets_heuristic_limit'): ('compile.java', 'changed_targets_heuristic_limit'),
   ('java-compile', 'warning_args'): ('compile.java', 'warning_args'),
   ('java-compile', 'no_warning_args'): ('compile.java', 'no_warning_args'),
+  ('java-compile', 'read_artifact_caches'): ('compile.java', 'read_artifact_caches'),
+  ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
+  ('java-compile', 'use_nailgun'): ('compile.java', 'use_nailgun'),
+
+  ('scala-compile', 'partition_size_hint'): ('compile.scala', 'partition_size_hint'),
+  ('scala-compile', 'jvm_args'): ('compile.scala', 'jvm_options'),
+  ('scala-compile', 'confs'): ('compile.scala', 'confs'),
+  ('scala-compile', 'locally_changed_targets_heuristic_limit'): ('compile.scala', 'changed_targets_heuristic_limit'),
+  ('scala-compile', 'warning_args'): ('compile.scala', 'warning_args'),
+  ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
+  ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
+  ('scala-compile', 'read_artifact_caches'): ('compile.scala', 'read_artifact_caches'),
+  ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
+  ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
@@ -78,6 +97,7 @@ migrations = {
   }
 
 notes = {
+  ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or compile.scala',
   ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
                                   'target: options. Other args should be placed in args: and '
                                   'prefixed with -C.',
