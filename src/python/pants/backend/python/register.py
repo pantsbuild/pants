@@ -61,4 +61,4 @@ def register_goals():
 
   task(name='setup-py', action=PythonSetup,
        dependencies=['bootstrap', 'resources']
-  ).install()
+  ).install().with_description('Build setup.py-based Python projects from python_library targets.')
