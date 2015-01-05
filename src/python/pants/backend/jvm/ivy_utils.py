@@ -48,7 +48,7 @@ class IvyInfo(object):
     :param ref an IvyModuleRef to start traversing the ivy dependency graph
     :param collector a function that takes a ref and returns a new set of values to collect for that ref,
            which will also be updated with all the dependencies accumulated values
-    :param memo is a table of ref -> collection that memoizes the results of each node in the graph.
+    :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
            If provided, allows for retaining cache across calls.
     """
 
@@ -74,6 +74,11 @@ class IvyInfo(object):
     return acc
 
   def get_jars_for_ivy_module(self, jar, memo=None):
+    """Collects dependency references of the passed jar
+    :param jar an IvyModuleRef for a third party dependency.
+    :param memo a dict of ref -> set that memoizes dependencies for each ref as they are resolved.
+    """
+
     ref = jar
     def create_collection(dep):
       s = OrderedSet()
