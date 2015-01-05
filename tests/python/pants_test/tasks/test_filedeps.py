@@ -58,7 +58,7 @@ class FileDepsTest(ConsoleTaskTest):
 
     self.create_file('pants.ini',
                      contents=dedent('''
-                       [scala-compile]
+                       [compile.scala]
                        runtime-deps: ['tools:scala-library']
                      '''),
                      mode='a')

@@ -24,6 +24,7 @@ from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
+from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
@@ -43,8 +44,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
+    register('--jvm-options', type=Options.list,
+             help='Run the compiler with these JVM options.')
+
     register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
-             help='Args to pass to the compiler.')
+             help='Pass these args to the compiler.')
+
+    register('--confs', type=Options.list, default=['default'],
+             help='Compile for these Ivy confs.')
 
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
@@ -69,10 +76,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                   'implementation detail. However it may still be useful to use this on '
                   'occasion. '.format(cls._language))
 
+    register('--missing-deps-whitelist', type=Options.list,
+             help="Don't report these targets even if they have missing deps.")
+
     register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
              help='Check for declared dependencies in {0} code that are not needed. This is a very '
                   'strict check. For example, generated code will often legitimately have BUILD '
                   'dependencies that are unused in practice.'.format(cls._language))
+
+    register('--changed-targets-heuristic-limit', type=int, default=0,
+             help='If non-zero, and we have fewer than this number of locally-changed targets, '
+                  'partition them separately, to preserve stability when compiling repeatedly.')
 
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
@@ -82,7 +96,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   # --------------------------
   _language = None
   _file_suffix = None
-  _config_section = None
 
   @classmethod
   def name(cls):
@@ -112,6 +125,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def get_no_warning_args_default(cls):
     """Override to set default for --no-warning-args option."""
     return ()
+
+  @property
+  def config_section(self):
+    return self.options_scope
 
   def select(self, target):
     return target.has_sources(self._file_suffix)
@@ -164,7 +181,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
-    config_section = self.config_section
 
     # Various working directories.
     self._classes_dir = os.path.join(self.workdir, 'classes')
@@ -189,10 +205,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._partition_size_hint = self.get_options().partition_size_hint
 
     # JVM options for running the compiler.
-    self._jvm_options = self.context.config.getlist(config_section, 'jvm_args')
+    self._jvm_options = self.get_options().jvm_options
 
     # The ivy confs for which we're building.
-    self._confs = self.context.config.getlist(config_section, 'confs', default=['default'])
+    self._confs = self.get_options().confs
 
     self._args = list(self.get_options().args)
     if self.get_options().warnings:
@@ -210,8 +226,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     check_unnecessary_deps = munge_flag('unnecessary_deps')
 
     if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
-      target_whitelist = self.context.config.getlist('jvm', 'missing_deps_target_whitelist', default=[])
-
+      target_whitelist = self.get_options().missing_deps_whitelist
       # Must init it here, so it can set requirements on the context.
       self._dep_analyzer = JvmDependencyAnalyzer(self.context,
                                                  check_missing_deps,
@@ -224,11 +239,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # If non-zero, and we have fewer than this number of locally-changed targets,
     # then we partition them separately, to preserve stability in the face of repeated
     # compilations.
-    self._locally_changed_targets_heuristic_limit = self.context.config.getint(config_section,
-        'locally_changed_targets_heuristic_limit', 0)
+    self._changed_targets_heuristic_limit = self.get_options().changed_targets_heuristic_limit
 
     self._upstream_class_to_path = None  # Computed lazily as needed.
-    self.setup_artifact_cache_from_config(config_section=config_section)
+    self.setup_artifact_cache_from_config(config_section=self.config_section)
 
     # Sources (relative to buildroot) present in the last analysis that have since been deleted.
     # Populated in prepare_execute().
@@ -356,10 +370,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # changes synced in from the SCM).
     # TODO(benjy): Should locally_changed_targets be available in all Tasks?
     locally_changed_targets = None
-    if self._locally_changed_targets_heuristic_limit:
+    if self._changed_targets_heuristic_limit:
       locally_changed_targets = self._find_locally_changed_targets(sources_by_target)
-      if locally_changed_targets and \
-              len(locally_changed_targets) > self._locally_changed_targets_heuristic_limit:
+      if (locally_changed_targets and
+          len(locally_changed_targets) > self._changed_targets_heuristic_limit):
         locally_changed_targets = None
 
     # Invalidation check. Everything inside the with block must succeed for the

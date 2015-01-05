@@ -34,7 +34,7 @@ class ScalaLibraryTest(BaseTest):
     super(ScalaLibraryTest, self).setUp()
 
     self.create_file('pants.ini', dedent('''
-        [scala-compile]
+        [compile.scala]
         runtime-deps: []
         '''))
 

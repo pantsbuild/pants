@@ -36,5 +36,5 @@ class TargetPlatform(object):
 
     TODO: Convert this to an option, once we figure out how to plumb options through.
     """
-    return self._config.getlist('scala-compile', 'runtime-deps',
+    return self._config.getlist('compile.scala', 'runtime-deps',
                                 default=['//:scala-library-2.9.3'])
