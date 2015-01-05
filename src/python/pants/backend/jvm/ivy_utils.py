@@ -43,19 +43,21 @@ class IvyInfo(object):
       self._deps_by_caller[caller].add(module.ref)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
-    """Traverses module graph, starting with ref, collecting values for each ref into the sets created by the collector function.
+    """Traverses module graph, starting with ref, collecting values for each ref into the sets
+    created by the collector function.
 
     :param ref an IvyModuleRef to start traversing the ivy dependency graph
     :param collector a function that takes a ref and returns a new set of values to collect for that ref,
            which will also be updated with all the dependencies accumulated values
     :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
            If provided, allows for retaining cache across calls.
+    :returns the accumulated set for ref
     """
 
     if memo is None:
       memo = dict()
 
-    memoized_value = memo.get(ref, ())
+    memoized_value = memo.get(ref)
     if memoized_value:
       return memoized_value
 
@@ -68,7 +70,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref, []):
+    for dep in self._deps_by_caller.get(ref, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc

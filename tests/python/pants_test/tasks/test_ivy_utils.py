@@ -108,19 +108,19 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
     def collector(r):
-      self.assertTrue(r not in seen)
+      self.assertNotIn(r, seen)
       seen.add(r)
       return set([r])
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
     self.assertEqual(
-          set([
+          {
             IvyModuleRef("toplevel", "toplevelmodule", "latest"),
             IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
             IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
             IvyModuleRef(org='org3', name='name3', rev='0.0.1')
-          ]),
+          },
           result)
 
   def test_does_not_follow_cycle(self):
@@ -129,19 +129,19 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
     def collector(r):
-      self.assertTrue(r not in seen)
+      self.assertNotIn(r, seen)
       seen.add(r)
       return set([r])
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
     self.assertEqual(
-          set([
+          {
             IvyModuleRef("toplevel", "toplevelmodule", "latest"),
             IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
             IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
             IvyModuleRef(org='org3', name='name3', rev='0.0.1')
-          ]),
+          },
           result)
 
   def test_memo_reused_across_calls(self):
@@ -157,16 +157,16 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     self.assertIs(result1, result2)
     self.assertEqual(
-          set([
+          {
             IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
             IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
             IvyModuleRef(org='org3', name='name3', rev='0.0.1')
-          ]),
+          },
           result1)
 
   def parse_ivy_report(self, path):
     ivy_info = IvyUtils._parse_xml_report(path)
-    self.assertNotEqual(None, ivy_info)
+    self.assertIsNotNone(ivy_info)
     return ivy_info
 
   def find_single(self, elem, xpath):
