@@ -58,6 +58,14 @@ class Scm(AbstractClass):
     """
 
   @abstractmethod
+  def changes_in(self, diffspec, relative_to=None):
+    """Returns a list of files changed by some diffspec (eg sha, range, ref, etc)
+
+    :param str diffspec: Some diffspec meaningful to the SCM.
+    :param str relative_to: a path to which results should be relative (instead of SCM root)
+    """
+
+  @abstractmethod
   def changelog(self, from_commit=None, files=None):
     """Produces a changelog from the given commit or the 1st commit if none is specified until the
     present workspace commit for the changes affecting the given files.

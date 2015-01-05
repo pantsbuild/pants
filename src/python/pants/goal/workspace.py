@@ -23,6 +23,10 @@ class Workspace(AbstractClass):
   def touched_files(self, parent):
     """Returns the paths modified between the parent state and the current workspace state."""
 
+  @abstractmethod
+  def changes_in(self, rev_or_range):
+    """Returns the paths modified by some revision, revision range or other identifier."""
+
 
 class ScmWorkspace(Workspace):
   """A workspace that uses an Scm to determine the touched files."""
@@ -43,3 +47,9 @@ class ScmWorkspace(Workspace):
                                      relative_to=get_buildroot())
     except Scm.ScmException as e:
       raise self.WorkspaceError("Problem detecting changed files.", e)
+
+  def changes_in(self, rev_or_range):
+    try:
+      return self._scm.changes_in(rev_or_range, relative_to=get_buildroot())
+    except Scm.ScmException as e:
+      raise self.WorkspaceError("Problem detecting changes in {}.".format(rev_or_range), e)

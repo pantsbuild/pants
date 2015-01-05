@@ -227,10 +227,65 @@ class GitTest(unittest.TestCase):
         worktree_relative_to('is/a', clone)
         worktree_relative_to('is/a/dir', clone)
 
+  def test_diffspec(self):
+    """Test finding changes in a diffspecs
+
+    To some extent this is just testing functionality of git not pants, since all pants says
+    is that it will pass the diffspec to git diff-tree, but this should serve to at least document
+    the functionality we belive works.
+    """
+    with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
+      def commit_contents_to_files(content, *files):
+        for path in files:
+          with safe_open(os.path.join(self.worktree, path), 'w') as fp:
+            fp.write(content)
+        subprocess.check_call(['git', 'add', '.'])
+        subprocess.check_call(['git', 'commit', '-m', 'change '+path])
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
+
+      # We can get changes in HEAD or by SHA
+      c1 = commit_contents_to_files('1', 'foo')
+      self.assertEqual(set(['foo']), self.git.changes_in('HEAD'))
+      self.assertEqual(set(['foo']), self.git.changes_in(c1))
+
+      # Changes in new HEAD, from old-to-new HEAD, in old HEAD, or from old-old-head to new.
+      c2 = commit_contents_to_files('2', 'bar')
+      self.assertEqual(set(['bar']), self.git.changes_in('HEAD'))
+      self.assertEqual(set(['bar']), self.git.changes_in('HEAD^..HEAD'))
+      self.assertEqual(set(['foo']), self.git.changes_in('HEAD^'))
+      self.assertEqual(set(['foo']), self.git.changes_in('HEAD~1'))
+      self.assertEqual(set(['foo', 'bar']), self.git.changes_in('HEAD^^..HEAD'))
+
+      # New commit doesn't change results-by-sha
+      self.assertEqual(set(['foo']), self.git.changes_in(c1))
+
+      # Files changed in multiple diffs within a range
+      c3 = commit_contents_to_files('3', 'foo')
+      self.assertEqual(set(['foo', 'bar']), self.git.changes_in('{}..{}'.format(c1, c3)))
+
+      # Changes in a tag
+      subprocess.check_call(['git', 'tag', 'v1'])
+      self.assertEqual(set(['foo']), self.git.changes_in('v1'))
+
+      # Introduce a new filename
+      c4 = commit_contents_to_files('4', 'baz')
+      self.assertEqual(set(['baz']), self.git.changes_in('HEAD'))
+
+      # Tag-to-sha
+      self.assertEqual(set(['baz']), self.git.changes_in('{}..{}'.format('v1', c4)))
+
+      # We can get multiple changes from one ref
+      c5 = commit_contents_to_files('5', 'foo', 'bar')
+      self.assertEqual(set(['foo', 'bar']), self.git.changes_in('HEAD'))
+      self.assertEqual(set(['foo', 'bar', 'baz']), self.git.changes_in('HEAD~4..HEAD'))
+      self.assertEqual(set(['foo', 'bar', 'baz']), self.git.changes_in('{}..HEAD'.format(c1)))
+      self.assertEqual(set(['foo', 'bar', 'baz']), self.git.changes_in('{}..{}'.format(c1, c4)))
+
   def test_refresh_with_conflict(self):
     with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
       self.assertEqual(set(), self.git.changed_files())
       self.assertEqual(set(['README']), self.git.changed_files(from_commit='HEAD^'))
+      self.assertEqual(set(['README']), self.git.changes_in('HEAD'))
 
       # Create a change on this branch that is incompatible with the change to master
       with open(self.readme_file, 'w') as readme:

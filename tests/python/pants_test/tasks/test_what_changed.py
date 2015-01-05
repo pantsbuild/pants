@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.goal.workspace import Workspace
 from pants_test.tasks.test_base import ConsoleTaskTest
@@ -44,15 +45,24 @@ class BaseWhatChangedTest(ConsoleTaskTest):
   def task_type(cls):
     return WhatChanged
 
-  def workspace(self, files=None, parent=None):
+  def workspace(self, files=None, parent=None, diffspec=None, diff_files=None):
     class MockWorkspace(Workspace):
       def touched_files(_, p):
         self.assertEqual(parent or 'HEAD', p)
         return files or []
+      def changes_in(_, ds):
+        self.assertEqual(diffspec, ds)
+        return diff_files or []
     return MockWorkspace()
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
+  def test_no_workspace(self):
+    with self.assertRaises(TaskError):
+      task = self.prepare_task(build_graph=self.build_graph)
+      task.context._workspace = None
+      task.execute()
+
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 
@@ -211,4 +221,25 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/scripts:scripts',
       workspace=self.workspace(files=['root/scripts/a/build', 'root/scripts/a/build/scripts.java'])
+    )
+
+  def test_fast(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      'root/src/py/1:numeric',
+      args=['--test-fast'],
+      workspace=self.workspace(
+        files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
+      ),
+    )
+
+  def test_diffspec(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      'root/src/py/1:numeric',
+      args=['--test-diffspec=42'],
+      workspace=self.workspace(
+        diffspec="42",
+        diff_files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
+      ),
     )

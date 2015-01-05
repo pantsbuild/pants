@@ -23,6 +23,8 @@ class ChangedFileTaskMixin(object):
              help='Stop searching for owners once a source is mapped to at least owning target.')
     register('--changes-since', '--parent',
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
+    register('--diffspec',
+             help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
 
   _mapper_cache = None
   @property
@@ -37,8 +39,11 @@ class ChangedFileTaskMixin(object):
       raise TaskError('No workspace provided.')
     if not self.context.scm:
       raise TaskError('No SCM available.')
-    since = self.get_options().changes_since or self.context.scm.current_rev_identifier()
-    return self.context.workspace.touched_files(since)
+    if self.get_options().diffspec:
+      return self.context.workspace.changes_in(self.get_options().diffspec)
+    else:
+      since = self.get_options().changes_since or self.context.scm.current_rev_identifier()
+      return self.context.workspace.touched_files(since)
 
   def _changed_targets(self):
     """Determine unique target addresses changed mapping scm changed files to targets"""
