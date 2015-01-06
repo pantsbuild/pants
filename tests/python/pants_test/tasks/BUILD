@@ -479,6 +479,7 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:listtargets',
+    'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_file_aliases',
