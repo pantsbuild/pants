@@ -31,8 +31,10 @@ from pants.base.target import Target
 from pants.util.contextutil import temporary_file, temporary_dir, environment_as
 from pants.util.dirutil import safe_mkdir, safe_open
 
+
 # Initialize logging, since tests do not run via pants_exe (where it is usually done)
 logging.basicConfig()
+
 
 class PythonTestResult(object):
   @staticmethod
@@ -321,8 +323,14 @@ class PythonTestBuilder(object):
       args.extend(sources)
 
       try:
-        rc = pex.run(args=args, setsid=True, stdout=stdout, stderr=stderr)
-        return PythonTestResult.rc(rc)
+        # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
+        # session on any test failure.  In order to support use of this pass-through flag we must
+        # turn off stdin buffering that otherwise occurs.  Setting the PYTHONUNBUFFERED env var to
+        # any value achieves this in python2.7.  We'll need a different solution when we support
+        # running pants under CPython 3 which does not unbuffer stdin using this trick.
+        with environment_as(PYTHONUNBUFFERED='1'):
+          rc = pex.run(args=args, setsid=True, stdout=stdout, stderr=stderr)
+          return PythonTestResult.rc(rc)
       except Exception:
         print('Failed to run test!', file=stderr)
         traceback.print_exc()
