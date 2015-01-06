@@ -17,9 +17,11 @@ changes, just:
 Publishing the site
 -------------------
 
-Use the same script as for generating the site, but request it also be
-published. Don't worry - you'll get a chance to abort the publish just
-before its comitted remotely:
+We publish the site via [Github Pages](https://pages.github.com/). You need `pantsbuild` commit
+privilege to publish the site.
+
+Use the same script as for generating the site, but request it also be published. Don't
+worry—you'll get a chance to abort the publish just before it's committed remotely:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
@@ -27,9 +29,8 @@ before its comitted remotely:
     # proceeding to publish to http://pantsbuild.github.io
     ./build-support/bin/publish_docs.sh -op
 
-If you'd like to publish remotely for others to preview your changes
-easily, there is a -d option that will create a copy of the site in a
-subdir of <http://pantsbuild.github.io/>:
+If you'd like to publish remotely for others to preview your changes easily, the `-d` option creates
+a copy of the site in a subdir of <http://pantsbuild.github.io/>:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
