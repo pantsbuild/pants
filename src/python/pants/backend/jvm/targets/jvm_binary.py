@@ -177,7 +177,7 @@ class JarRules(object):
     """Creates a new set of jar rules with the default duplicate action of ``Duplicate.SKIP``.
 
     :param rules: One or more rules that will be applied in order to jar entries being packaged in
-      a deploy jar.
+      a deploy jar. `Skip <#Skip>`_ rules can go here.
     :param default_dup_action: The default action to take when a duplicate entry is encountered and
       no explicit rules apply to the entry.
     """
