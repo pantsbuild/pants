@@ -22,8 +22,12 @@ makes it easier to reason about them.
 3rdparty/jvm
 ------------
 
-**The JVM part of 3rdparty is organized by org (Maven groupId)** Under
-there, see if there's already a `3rdparty/jvm/path/to/org/BUILD` file.
+**The JVM part of 3rdparty is organized by org (Maven groupId).**
+For an example of a repo with 3rdparty arranged this way, see
+[twitter/commons](https://github.com/twitter/commons/tree/master/3rdparty/jvm).
+(Pants' own 3rdparty isn't organized this way; it doesn't have enough 3rdparty
+dependencies for this to make sense.)
+Under there, see if there's already a `3rdparty/jvm/path/to/org/BUILD` file.
 If there isn't, then you want to create one. E.g., to import
 `com.sun.jersey-apache-client`, look in `3rdparty/jvm/com/sun` for a
 likely-looking `BUILD` file--in this example,
@@ -48,10 +52,12 @@ your organization to agree on one version. (If there's already a `jar`
 importing the code you want with the version you want, then great. Leave
 it there.)
 
-(You don't *need* a tree of `BUILD` files; you could instead have, e.g.,
-one `3rdparty/jvm/BUILD` file. In a large organization, a tree can ease
-some things. For example, `git log` quickly answers questions like "Who
-set up this dependency? Who cares if I bump the version?")
+(You don't *need* a tree of `BUILD` files; you could instead have, e.g., one `3rdparty/jvm/BUILD`
+file. Pants' own repo has its JVM 3rdparty targets in just one `BUILD` file. That works fine because
+Pants doesn't have many 3rdparty JVM dependencies. But as the number of these dependencies grows,
+it makes more sense to set up a directory tree. In a large organization, a tree can ease some
+common tasks. For example, `git log` quickly answers questions like "Who set up this dependency?
+Who cares if I bump the version?")
 
 Additionally, some families of jars have different groupId's but are
 logically part of the same project, or need to have their rev's kept in
