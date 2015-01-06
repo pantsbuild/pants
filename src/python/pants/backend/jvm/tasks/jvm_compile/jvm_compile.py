@@ -242,7 +242,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._changed_targets_heuristic_limit = self.get_options().changed_targets_heuristic_limit
 
     self._upstream_class_to_path = None  # Computed lazily as needed.
-    self.setup_artifact_cache_from_config(config_section=self.config_section)
+    self.setup_artifact_cache()
 
     # Sources (relative to buildroot) present in the last analysis that have since been deleted.
     # Populated in prepare_execute().

@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.option.options import Options
+
 
 def register_global_options(register):
   register('-t', '--timeout', type=int, metavar='<seconds>',
@@ -37,13 +39,17 @@ def register_global_options(register):
                 "you're doing.")
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
            help='Exclude these target specs when computing the command-line target specs.')
-  register('--read-from-artifact-cache', action='store_true', default=True,
-           help='Read build artifacts from cache, if available.')
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',
            help='Regex pattern to exclude from the target list (useful in conjunction with ::). '
                 'Multiple patterns may be specified by setting this flag multiple times.')
+  register('--read-from-artifact-cache', action='store_true', default=True,
+           help='Read build artifacts from cache, if available.')
+  register('--read-artifact-caches', type=Options.list,
+           help='The specs (paths or URLs) of artifact caches to read from.')
   register('--write-to-artifact-cache', action='store_true', default=True,
            help='Write build artifacts to cache, if possible.')
+  register('--write-artifact-caches', type=Options.list,
+           help='The specs (paths or URLs) of artifact caches to write to.')
   register('--overwrite-cache-artifacts', action='store_true',
            help='If writing to build artifacts to cache, overwrite (instead of skip) existing.')
   register('--print-exception-stacktrace', action='store_true',
