@@ -110,6 +110,29 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
+    self.add_to_build_file('root/src/py/dependency_tree/a', dedent("""
+      python_library(
+        name='a',
+        sources=['a.py'],
+      )
+    """))
+
+    self.add_to_build_file('root/src/py/dependency_tree/b', dedent("""
+      python_library(
+        name='b',
+        sources=['b.py'],
+        dependencies=['root/src/py/dependency_tree/a']
+      )
+    """))
+
+    self.add_to_build_file('root/src/py/dependency_tree/c', dedent("""
+      python_library(
+        name='c',
+        sources=['c.py'],
+        dependencies=['root/src/py/dependency_tree/b']
+      )
+    """))
+
     self.add_to_build_file('root/src/thrift', dedent("""
       java_thrift_library(
         name='thrift',
@@ -133,7 +156,6 @@ class WhatChangedTest(BaseWhatChangedTest):
       java_library(
         name='a_java',
         sources=['a.java'],
-        resources_targets=['root/resources/a:a_resources'],
       )
     """))
 
@@ -242,4 +264,25 @@ class WhatChangedTest(BaseWhatChangedTest):
         diffspec="42",
         diff_files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
       ),
+    )
+
+  def test_include_dependees(self):
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/b:b',
+      args=['--test-include-dependees=direct'],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/b:b',
+      'root/src/py/dependency_tree/c:c',
+      args=['--test-include-dependees=transitive'],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
