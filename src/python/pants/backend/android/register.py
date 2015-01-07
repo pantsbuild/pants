@@ -27,12 +27,6 @@ def build_file_aliases():
 
 def register_goals():
   task(name='aapt', action=AaptGen).install('gen')
-
-  task(name='dex', action=DxCompile,
-       dependencies=['compile']).install('dex')
-
-  task(name='apk', action=AaptBuilder,
-       dependencies=['dex']).install('bundle')
-
-  task(name='sign', action=JarsignerTask,
-       dependencies=['bundle']).install('sign')
+  task(name='dex', action=DxCompile).install('dex')
+  task(name='apk', action=AaptBuilder).install('bundle')
+  task(name='sign', action=JarsignerTask).install('sign')

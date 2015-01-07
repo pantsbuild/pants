@@ -7,6 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import functools
 import inspect
+import sys
+from textwrap import dedent
+import traceback
 
 from pants.goal.error import GoalError
 from pants.goal.goal import Goal
@@ -18,14 +21,13 @@ class TaskRegistrar(object):
     """
     :param name: the name of the task.
     :param action: the Task action object to invoke this task.
-    :param dependencies: the names of other goals which must be achieved before invoking this
-                         task's goal.
+    :param dependencies: DEPRECATED
+      the names of other goals which must be achieved before invoking this task's goal.
     :param serialize: a flag indicating whether or not the action to achieve this goal requires
       the global lock. If true, the action will block until it can acquire the lock.
     """
     self.serialize = serialize
     self.name = name
-    self.dependencies = [Goal.by_name(d) for d in dependencies] if dependencies else []
 
     if isinstance(type(action), type) and issubclass(action, Task):
       self._task = action
@@ -53,8 +55,24 @@ class TaskRegistrar(object):
 
       self._task = FuncTask
 
+    if dependencies:
+      # TODO(John Sirois): kill this warning and the kwarg after a deprecation cycle.
+      print(dedent('''
+          WARNING: Registered dependencies are now ignored and only `Task.product_types`
+          and product requirements as expressed in `Task.prepare` are used to
+          infer Task dependencies.
+
+          Please fix this registration:
+            {reg}
+            {location}
+          ''').format(reg=self,
+                     location=traceback.format_list([traceback.extract_stack()[-2]])[0]),
+            file=sys.stderr)
+
   def __repr__(self):
-    return "TaskRegistrar(%s; %s)" % (self.name, ','.join(map(str, self.dependencies)))
+    return 'TaskRegistrar({name}, {action} serialize={serialize})'.format(name=self.name,
+                                                                          action=self._task,
+                                                                          serialize=self.serialize)
 
   @property
   def task_type(self):

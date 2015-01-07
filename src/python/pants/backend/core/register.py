@@ -92,21 +92,18 @@ def build_file_aliases():
 
 def register_goals():
   # Getting help.
-  task(name='goals', action=ListGoals
-  ).install().with_description('List all documented goals.')
+  task(name='goals', action=ListGoals).install().with_description('List all documented goals.')
 
-  task(name='targets', action=TargetsHelp
-  ).install().with_description('List target types and BUILD file symbols (python_tests, jar, etc).')
+  task(name='targets', action=TargetsHelp).install().with_description(
+      'List target types and BUILD file symbols (python_tests, jar, etc).')
 
-  task(name='builddict', action=BuildBuildDictionary
-  ).install()
-
+  task(name='builddict', action=BuildBuildDictionary).install()
 
   # Cleaning.
-  invalidate = task(name='invalidate', action=Invalidator, dependencies=['ng-killall'])
+  invalidate = task(name='invalidate', action=Invalidator)
   invalidate.install().with_description('Invalidate all targets.')
 
-  clean_all = task(name='clean-all', action=Cleaner, dependencies=['invalidate']).install()
+  clean_all = task(name='clean-all', action=Cleaner).install()
   clean_all.with_description('Clean all build output.')
   clean_all.install(invalidate, first=True)
 
@@ -116,66 +113,59 @@ def register_goals():
             file=sys.stderr)
       print('Please update your usages to `clean-all`.', file=sys.stderr)
       super(AsyncCleaner, self).execute()
-  clean_all_async = task(name='clean-all-async', action=AsyncCleaner, dependencies=['invalidate']
-  ).install().with_description('[deprecated] Clean all build output in a background process.')
+  clean_all_async = task(name='clean-all-async', action=AsyncCleaner).install().with_description(
+      '[deprecated] Clean all build output in a background process.')
   clean_all_async.install(invalidate, first=True)
 
   # Reporting.
+  task(name='server', action=RunServer, serialize=False).install().with_description(
+      'Run the pants reporting server.')
 
-  task(name='server', action=RunServer, serialize=False
-  ).install().with_description('Run the pants reporting server.')
-
-  task(name='killserver', action=KillServer, serialize=False
-  ).install().with_description('Kill the reporting server.')
-
+  task(name='killserver', action=KillServer, serialize=False).install().with_description(
+      'Kill the reporting server.')
 
   # Bootstrapping.
-  task(name='prepare', action=PrepareResources
-  ).install('resources')
+  task(name='prepare', action=PrepareResources).install('resources')
 
-  task(name='markdown', action=MarkdownToHtml
-  ).install('markdown').with_description('Generate html from markdown docs.')
-
+  task(name='markdown', action=MarkdownToHtml).install('markdown').with_description(
+      'Generate html from markdown docs.')
 
   # Linting.
-  task(name='buildlint', action=BuildLint, dependencies=['compile']
-  ).install()
+  task(name='buildlint', action=BuildLint).install()
 
   task(name='pathdeps', action=PathDeps).install('pathdeps').with_description(
-    'Print out all paths containing BUILD files the target depends on.')
+      'Print out all paths containing BUILD files the target depends on.')
 
-  task(name='list', action=ListTargets
-  ).install('list').with_description('List available BUILD targets.')
-
+  task(name='list', action=ListTargets).install('list').with_description(
+      'List available BUILD targets.')
 
   # Build graph information.
+  task(name='path', action=Path).install().with_description(
+      'Find a dependency path from one target to another.')
 
-  task(name='path', action=Path
-  ).install().with_description('Find a dependency path from one target to another.')
+  task(name='paths', action=Paths).install().with_description(
+      'Find all dependency paths from one target to another.')
 
-  task(name='paths', action=Paths
-  ).install().with_description('Find all dependency paths from one target to another.')
+  task(name='dependees', action=ReverseDepmap).install().with_description(
+      "Print the target's dependees.")
 
-  task(name='dependees', action=ReverseDepmap
-  ).install().with_description("Print the target's dependees.")
+  task(name='filemap', action=Filemap).install().with_description(
+      'Outputs a mapping from source file to owning target.')
 
-  task(name='filemap', action=Filemap
-  ).install().with_description('Outputs a mapping from source file to owning target.')
+  task(name='minimize', action=MinimalCover).install().with_description(
+      'Print the minimal cover of the given targets.')
 
-  task(name='minimize', action=MinimalCover
-  ).install().with_description('Print the minimal cover of the given targets.')
+  task(name='filter', action=Filter).install().with_description(
+      'Filter the input targets based on various criteria.')
 
-  task(name='filter', action=Filter
-  ).install().with_description('Filter the input targets based on various criteria.')
+  task(name='sort', action=SortTargets).install().with_description(
+      'Topologically sort the targets.')
 
-  task(name='sort', action=SortTargets
-  ).install().with_description("Topologically sort the targets.")
+  task(name='roots', action=ListRoots).install('roots').with_description(
+      "Print the workspace's source roots and associated target types.")
 
-  task(name='roots', action=ListRoots
-  ).install('roots').with_description("Print the workspace's source roots and associated target types.")
+  task(name='run_prep_command', action=RunPrepCommand).install('test', first=True).with_description(
+      "Run a command before tests")
 
-  task(name='run_prep_command', action=RunPrepCommand
-  ).install('test', first=True).with_description("Run a command before tests")
-
-  task(name='changed', action=WhatChanged
-  ).install().with_description('Print the targets changed since some prior commit.')
+  task(name='changed', action=WhatChanged).install().with_description(
+      'Print the targets changed since some prior commit.')
