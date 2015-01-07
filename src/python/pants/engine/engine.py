@@ -29,7 +29,7 @@ class Engine(AbstractClass):
     except TaskError as e:
       message = str(e)
       if message:
-        print('\nFAILURE: %s\n' % e)
+        print('\nFAILURE: {0}\n'.format(e))
       else:
         print('\nFAILURE\n')
       return e.exit_code
