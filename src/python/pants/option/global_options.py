@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from pants.option.options import Options
 
 def register_global_options(register):
   register('-t', '--timeout', type=int, metavar='<seconds>',
@@ -51,3 +52,4 @@ def register_global_options(register):
   register('--fail-fast', action='store_true',
            help='When parsing specs, will stop on the first erronous BUILD file encountered. '
                 'Otherwise, will parse all builds in a spec and then throw an Exception.')
+  register('--goal-aliases', type=Options.dict, default={}, help="Alias goal names")
