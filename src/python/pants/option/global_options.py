@@ -36,7 +36,7 @@ def register_global_options(register):
                 "instances from stomping on each others data, so only use this if you know what "
                 "you're doing.")
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
-           help='Exclude these target specs when computing the command-line target specs.')
+           help='Exclude these paths when computing the command-line target specs.')
   register('--read-from-artifact-cache', action='store_true', default=True,
            help='Read build artifacts from cache, if available.')
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',

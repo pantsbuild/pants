@@ -5,7 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
+import logging
 import os
+import re
 import traceback
 
 from twitter.common.collections import maybe_list, OrderedSet
@@ -13,6 +16,8 @@ from twitter.common.collections import maybe_list, OrderedSet
 from pants.base.address import BuildFileAddress, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
+
+logger = logging.getLogger(__name__)
 
 
 # Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
@@ -43,14 +48,32 @@ class CmdLineSpecParser(object):
   The above expression would choose every target under src except for src/broken:test
   """
 
+  # Target specs are mapped to the patterns which match them, if any. This variable is a key for
+  # specs which don't match any exclusion regexps. We know it won't already be in the list of
+  # patterns, because the asterisks in its name make it an invalid regexp.
+  _UNMATCHED_KEY = '** unmatched **'
 
   class BadSpecError(Exception):
     """Indicates an invalid command line address selector."""
 
-  def __init__(self, root_dir, address_mapper, spec_excludes=None):
+  def __init__(self, root_dir, address_mapper, spec_excludes=None, exclude_target_regexps=None):
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
     self._spec_excludes = spec_excludes
+    self._exclude_target_regexps = exclude_target_regexps or []
+    self._exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
+    self._excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
+
+  def _not_excluded_address(self, address):
+    return self._not_excluded_spec(address.spec)
+
+  def _not_excluded_spec(self, spec):
+    for pattern in self._exclude_patterns:
+      if pattern.search(spec) is not None:
+        self._excluded_target_map[pattern.pattern].add(spec)
+        return False
+    self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY].add(spec)
+    return True
 
   def parse_addresses(self, specs, fail_fast=False):
     """Process a list of command line specs and perform expansion.  This method can expand a list
@@ -71,8 +94,26 @@ class CmdLineSpecParser(object):
       else:
         for address in self._parse_spec(spec, fail_fast):
           addresses.add(address)
-    for result in addresses - addresses_to_remove:
-      yield result
+
+    results = filter(self._not_excluded_address, addresses - addresses_to_remove)
+
+    # Print debug information about the excluded targets
+    if logger.getEffectiveLevel() <= logging.DEBUG and self._exclude_patterns:
+      logger.debug('excludes:\n  {excludes}'
+                   .format(excludes='\n  '.join(self._exclude_target_regexps)))
+      targets = ', '.join(self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY])
+      logger.debug('Targets after excludes: {targets}'.format(targets=targets))
+      for pattern, targets in self._excluded_target_map.iteritems():
+        excluded_count = 0
+        if pattern != CmdLineSpecParser._UNMATCHED_KEY:
+          logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
+                       .format(pattern=pattern,
+                               targets='\n  '.join(targets)))
+          excluded_count += len(targets)
+      logger.debug('Excluded {count} target{plural}.'
+                   .format(count=excluded_count,
+                           plural=('s' if excluded_count != 1 else '')))
+    return results
 
   def _parse_spec(self, spec, fail_fast=False):
     def normalize_spec_path(path):
@@ -108,7 +149,9 @@ class CmdLineSpecParser(object):
 
       for build_file in build_files:
         try:
-          addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
+          # This attempts to filter out broken BUILD files before we parse them.
+          if self._not_excluded_spec(build_file.spec_path):
+            addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
         except (BuildFile.BuildFileError, AddressLookupError) as e:
           if fail_fast:
             raise self.BadSpecError(e)
