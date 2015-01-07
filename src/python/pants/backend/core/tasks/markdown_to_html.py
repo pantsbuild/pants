@@ -191,7 +191,12 @@ def rst_to_html(in_rst):
   """
   if not in_rst:
     return ''
-  return publish_parts(in_rst, writer_name='html')['body'].strip()
+  pp = publish_parts(in_rst, writer_name='html')
+  return_value = ''
+  if 'html_title' in pp and pp['html_title']:
+    return_value += pp['html_title'] + '\n'
+  return_value += pp['body'].strip()
+  return return_value
 
 
 class MarkdownToHtml(Task):
