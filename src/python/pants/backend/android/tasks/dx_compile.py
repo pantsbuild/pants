@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-
 import os
 
 from pants.backend.android.targets.android_binary import AndroidBinary
@@ -48,8 +47,7 @@ class DxCompile(AndroidTask, NailgunTask):
     self._forced_build_tools_version = self.get_options().build_tools_version
     self._forced_jvm_options = self.get_options().jvm_options
 
-    config_section = self.config_section
-    self.setup_artifact_cache_from_config(config_section=config_section)
+    self.setup_artifact_cache()
 
   def prepare(self, round_manager):
     round_manager.require_data('classes_by_target')

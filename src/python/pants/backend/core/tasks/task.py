@@ -17,7 +17,6 @@ from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import call_insert, call_use_cached_files, UnreadableArtifact
@@ -135,18 +134,17 @@ class TaskBase(AbstractClass):
     """
     return self._workdir
 
-  def setup_artifact_cache_from_config(self, config_section=None):
+  def setup_artifact_cache(self):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
 
-    Uses standard config file keys to find the cache spec.
+    Uses the options system to find the cache specs.
     The cache is created lazily, as needed.
     """
-    section = config_section or Config.DEFAULT_SECTION
-    read_spec = self.context.config.getlist(section, 'read_artifact_caches', default=[])
-    write_spec = self.context.config.getlist(section, 'write_artifact_caches', default=[])
-    self.setup_artifact_cache(read_spec, write_spec)
+    read_spec = self.get_options().read_artifact_caches or []
+    write_spec = self.get_options().write_artifact_caches or []
+    self._setup_artifact_cache_from_specs(read_spec, write_spec)
 
-  def setup_artifact_cache(self, read_spec, write_spec):
+  def _setup_artifact_cache_from_specs(self, read_spec, write_spec):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
 
     See docstring for pants.cache.cache_setup.create_artifact_cache() for details on the spec format.

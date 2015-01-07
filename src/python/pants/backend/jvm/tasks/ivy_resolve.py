@@ -68,7 +68,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
     # Typically this should be a local cache only, since classpaths aren't portable.
-    self.setup_artifact_cache_from_config(config_section=self._CONFIG_SECTION)
+    self.setup_artifact_cache()
 
   @property
   def config_section(self):
