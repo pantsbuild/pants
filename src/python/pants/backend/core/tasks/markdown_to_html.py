@@ -9,6 +9,7 @@ import codecs
 import os
 import re
 
+from docutils.core import publish_parts
 import markdown
 from pkg_resources import resource_string
 from pygments import highlight
@@ -183,6 +184,16 @@ def page_to_html_path(page):
   return os.path.splitext(source_path)[0] + ".html"
 
 
+def rst_to_html(in_rst):
+  """Returns HTML rendering of an RST fragment.
+
+  :param in_rst: rst-formatted string
+  """
+  if not in_rst:
+    return ''
+  return publish_parts(in_rst, writer_name='html')['body'].strip()
+
+
 class MarkdownToHtml(Task):
   @classmethod
   def register_options(cls, register):
@@ -235,14 +246,21 @@ class MarkdownToHtml(Task):
     show = []
     for page in self.context.targets(is_page):
       def process_page(key, outdir, url_builder, config, genmap, fragment=False):
-        html_path = self.process(
-          os.path.join(outdir, page_to_html_path(page)),
-          os.path.join(page.payload.sources.rel_path, page.source),
-          self.fragment or fragment,
-          url_builder,
-          config,
-          css=css
-        )
+        if page.format() == 'rst':
+          html_path = self.process_rst(
+            os.path.join(outdir, page_to_html_path(page)),
+            os.path.join(page.payload.sources.rel_path, page.source),
+            self.fragment or fragment,
+          )
+        else:
+          html_path = self.process_md(
+            os.path.join(outdir, page_to_html_path(page)),
+            os.path.join(page.payload.sources.rel_path, page.source),
+            self.fragment or fragment,
+            url_builder,
+            config,
+            css=css
+          )
         self.context.log.info('Processed %s to %s' % (page.source, html_path))
         relpath = os.path.relpath(html_path, outdir)
         genmap.add(key, outdir, [relpath])
@@ -276,7 +294,7 @@ class MarkdownToHtml(Task):
 
   PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)(#.*)?''')
 
-  def process(self, output_path, source, fragmented, url_builder, get_config, css=None):
+  def process_md(self, output_path, source, fragmented, url_builder, get_config, css=None):
     def parse_url(spec):
       match = MarkdownToHtml.PANTS_LINK.match(spec)
       if match:
@@ -330,5 +348,25 @@ class MarkdownToHtml(Task):
           generator = Generator(template,
                                 style_link=style_link,
                                 md_html=md_html)
+          generator.write(output)
+        return output.name
+
+  def process_rst(self, output_path, source, fragmented):
+    safe_mkdir(os.path.dirname(output_path))
+    with codecs.open(output_path, 'w', 'utf-8') as output:
+      source_path = os.path.join(get_buildroot(), source)
+      with codecs.open(source_path, 'r', 'utf-8') as input:
+        rst_html = rst_to_html(input.read())
+        if fragmented:
+          template = resource_string(__name__,
+                                     os.path.join(self._templates_dir,
+                                                  'fragment.mustache'))
+          generator = Generator(template,
+                                md_html=rst_html)
+          generator.write(output)
+        else:
+          template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
+          generator = Generator(template,
+                                md_html=rst_html)
           generator.write(output)
         return output.name

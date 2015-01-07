@@ -74,12 +74,15 @@ class Page(Target):
                address=None,
                payload=None,
                source=None,
+               format=None,
                links=None,
                resources=None,
                provides=None,
                **kwargs):
     """
     :param source: Source of the page in markdown format.
+    :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
+       extension: ``.rst`` is ReStructured Text; anything else is Markdown.
     :param links: Other ``page`` targets that this `page` links to.
     :type links: List of target specs
     :param provides: Optional "Addresses" at which this page is published.
@@ -91,6 +94,7 @@ class Page(Target):
     payload.add_fields({
       'sources': SourcesField(sources=[source],
                               sources_rel_path=address.spec_path),
+      'format': PrimitiveField(format),
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
     })
@@ -127,3 +131,11 @@ class Page(Target):
     list.
     """
     return self.payload.provides
+
+  def format(self):
+    """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
+    if self.payload.format:
+      return self.payload.format
+    if self.source.endswith('.rst'):
+      return 'rst'
+    return 'md'
