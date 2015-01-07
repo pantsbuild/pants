@@ -80,7 +80,7 @@ class Page(Target):
                provides=None,
                **kwargs):
     """
-    :param source: Source of the page in markdown format.
+    :param source: Path to page source file.
     :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
        extension: ``.rst`` is ReStructured Text; anything else is Markdown.
     :param links: Other ``page`` targets that this `page` links to.

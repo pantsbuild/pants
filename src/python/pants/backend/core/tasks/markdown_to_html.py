@@ -193,8 +193,8 @@ def rst_to_html(in_rst):
     return ''
   pp = publish_parts(in_rst, writer_name='html')
   return_value = ''
-  if 'html_title' in pp and pp['html_title']:
-    return_value += pp['html_title'] + '\n'
+  if 'title' in pp and pp['title']:
+    return_value += '<title>{0}</title>\n<p style="font: 200% bold">{0}</p>\n'.format(pp['title'])
   return_value += pp['body'].strip()
   return return_value
 
