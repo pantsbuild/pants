@@ -24,8 +24,6 @@ migrations = {
   ('java-compile', 'locally_changed_targets_heuristic_limit'): ('compile.java', 'changed_targets_heuristic_limit'),
   ('java-compile', 'warning_args'): ('compile.java', 'warning_args'),
   ('java-compile', 'no_warning_args'): ('compile.java', 'no_warning_args'),
-  ('java-compile', 'read_artifact_caches'): ('compile.java', 'read_artifact_caches'),
-  ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
   ('java-compile', 'use_nailgun'): ('compile.java', 'use_nailgun'),
 
   ('scala-compile', 'partition_size_hint'): ('compile.scala', 'partition_size_hint'),
@@ -35,8 +33,6 @@ migrations = {
   ('scala-compile', 'warning_args'): ('compile.scala', 'warning_args'),
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
   ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
-  ('scala-compile', 'read_artifact_caches'): ('compile.scala', 'read_artifact_caches'),
-  ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
   ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
@@ -94,7 +90,20 @@ migrations = {
   ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin_jars'),
   ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala_repl'),
   ('specs-run', 'bootstrap-tools'): ('test.specs', 'specs'),
-  }
+
+  # Artifact cache spec migration.
+  ('dx-tool', 'read_artifact_caches'): ('dex', 'read_artifact_caches'),
+  ('thrift-gen', 'read_artifact_caches'): ('gen.thrift', 'read_artifact_caches'),
+  ('ivy-resolve', 'read_artifact_caches'): ('resolve.ivy', 'read_artifact_caches'),
+  ('java-compile', 'read_artifact_caches'): ('compile.java', 'read_artifact_caches'),
+  ('scala-compile', 'read_artifact_caches'): ('compile.scala', 'read_artifact_caches'),
+
+  ('dx-tool', 'write_artifact_caches'): ('dex', 'write_artifact_caches'),
+  ('thrift-gen', 'write_artifact_caches'): ('gen.thrift', 'write_artifact_caches'),
+  ('ivy-resolve', 'write_artifact_caches'): ('resolve.ivy', 'write_artifact_caches'),
+  ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
+  ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
+}
 
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or compile.scala',

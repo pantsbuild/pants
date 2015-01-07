@@ -76,7 +76,7 @@ class ApacheThriftGen(CodeGen):
 
     # TODO(pl): This is broken because of how __init__.py files are generated/cached
     # for combined python thrift packages.
-    # self.setup_artifact_cache_from_config(config_section='thrift-gen')
+    # self.setup_artifact_cache()
 
   _thrift_binary = None
   @property
