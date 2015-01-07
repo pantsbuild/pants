@@ -14,6 +14,7 @@ from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
+from pants.backend.core.tasks.changed_target_goals import (CompileChanged, TestChanged)
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.dependees import ReverseDepmap
@@ -23,6 +24,7 @@ from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
 from pants.backend.core.tasks.minimal_cover import MinimalCover
+from pants.backend.core.tasks.noop import (NoopCompile, NoopTest)
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
 from pants.backend.core.tasks.prepare_resources import PrepareResources
@@ -179,3 +181,11 @@ def register_goals():
 
   task(name='changed', action=WhatChanged
   ).install().with_description('Print the targets changed since some prior commit.')
+
+  task(name='compile', action=NoopCompile).install('compile') # Stub for scheduling 'compile'.
+  task(name='compile-changed', action=CompileChanged,
+  ).install().with_description('Compile changed targets.')
+
+  task(name='test', action=NoopTest).install('test') # Stub for scheduling 'test'.
+  task(name='test-changed', action=TestChanged,
+  ).install().with_description('Test changed targets.')
