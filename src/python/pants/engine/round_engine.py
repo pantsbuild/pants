@@ -33,13 +33,23 @@ class GoalExecutor(object):
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.
     """
+
+    if self._goal.can_run_tasks_independently():
+      independent_task_failures = {}
+
     with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.GOAL]):
       for name, task in reversed(self._tasks_by_name.items()):
         with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
           if explain:
             self._context.log.debug('Skipping execution of %s in explain mode' % name)
           else:
-            task.execute()
+            if self._goal.can_run_tasks_independently():
+              try:
+                task.execute()
+              except Exception as e:
+                independent_task_failures[(name, task)] = e
+            else:
+                task.execute()
 
       if explain:
         reversed_tasks_by_name = reversed(self._tasks_by_name.items())
@@ -47,6 +57,11 @@ class GoalExecutor(object):
             '%s->%s' % (name, task.__class__.__name__) for name, task in reversed_tasks_by_name)
         print('{goal} [{goal_to_task}]'.format(goal=self._goal.name, goal_to_task=goal_to_task))
 
+    if self._goal.can_run_tasks_independently() and independent_task_failures:
+      error_messages = []
+      for ((name, task), error) in independent_task_failures:
+        error_messages.add("({name}, {task}) failed with {e}".format(name=name, task=task, e=error))
+      raise TaskError("\n".join(error_messages))
 
 class RoundEngine(Engine):
 
