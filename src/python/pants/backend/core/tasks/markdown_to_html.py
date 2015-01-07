@@ -192,8 +192,6 @@ class MarkdownToHtml(Task):
              help='Open the generated documents in a browser.')
     register('--fragment', action='store_true',
              help='Generate a fragment of html to embed in a page.')
-    register('--extension', action='append', default=['.md', '.markdown'],
-             help='Process files with these extensions (as well as the standard extensions).')
 
 
   @classmethod
@@ -204,7 +202,6 @@ class MarkdownToHtml(Task):
     super(MarkdownToHtml, self).__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'markdown')
     self.open = self.get_options().open
-    self.extensions = set(self.get_options().extension)
     self.fragment = self.get_options().fragment
     self.code_style = self.get_options().code_style
 
@@ -237,43 +234,41 @@ class MarkdownToHtml(Task):
     wikigenmap = self.context.products.get('wiki_html')
     show = []
     for page in self.context.targets(is_page):
-      _, ext = os.path.splitext(page.source)
-      if ext in self.extensions:
-        def process_page(key, outdir, url_builder, config, genmap, fragment=False):
-          html_path = self.process(
-            os.path.join(outdir, page_to_html_path(page)),
-            os.path.join(page.payload.sources.rel_path, page.source),
-            self.fragment or fragment,
-            url_builder,
-            config,
-            css=css
-          )
-          self.context.log.info('Processed %s to %s' % (page.source, html_path))
-          relpath = os.path.relpath(html_path, outdir)
-          genmap.add(key, outdir, [relpath])
-          return html_path
+      def process_page(key, outdir, url_builder, config, genmap, fragment=False):
+        html_path = self.process(
+          os.path.join(outdir, page_to_html_path(page)),
+          os.path.join(page.payload.sources.rel_path, page.source),
+          self.fragment or fragment,
+          url_builder,
+          config,
+          css=css
+        )
+        self.context.log.info('Processed %s to %s' % (page.source, html_path))
+        relpath = os.path.relpath(html_path, outdir)
+        genmap.add(key, outdir, [relpath])
+        return html_path
 
-        def url_builder(linked_page, config=None):
-          dest = page_to_html_path(linked_page)
-          src_dir = os.path.dirname(page_to_html_path(page))
-          return linked_page.name, os.path.relpath(dest, src_dir)
+      def url_builder(linked_page, config=None):
+        dest = page_to_html_path(linked_page)
+        src_dir = os.path.dirname(page_to_html_path(page))
+        return linked_page.name, os.path.relpath(dest, src_dir)
 
-        page_path = os.path.join(outdir, 'html')
-        html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
-        if css and not self.fragment:
-          plaingenmap.add(page, self.workdir, list(css_path))
-        if self.open and page in roots:
-          show.append(html)
+      page_path = os.path.join(outdir, 'html')
+      html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
+      if css and not self.fragment:
+        plaingenmap.add(page, self.workdir, list(css_path))
+      if self.open and page in roots:
+        show.append(html)
 
-        if page.provides:
-          for wiki in page.provides:
-            def get_config(page):
-              # Take the first provided WikiArtifact. If a page is published to multiple places, it's
-              # undefined what the "proper" one is to link to. So we just take whatever is "first".
-              for wiki_artifact in page.payload.provides:
-                return wiki_artifact.config
-            basedir = os.path.join(self.workdir, str(hash(wiki)))
-            process_page((wiki, page), basedir, wiki.wiki.url_builder, get_config,
+      if page.provides:
+        for wiki in page.provides:
+          def get_config(page):
+            # Take the first provided WikiArtifact. If a page is published to multiple places, it's
+            # undefined what the "proper" one is to link to. So we just take whatever is "first".
+            for wiki_artifact in page.payload.provides:
+              return wiki_artifact.config
+          basedir = os.path.join(self.workdir, str(hash(wiki)))
+          process_page((wiki, page), basedir, wiki.wiki.url_builder, get_config,
                          wikigenmap, fragment=True)
 
     if show:
