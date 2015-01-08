@@ -43,22 +43,8 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='python-binary-create', action=PythonBinaryCreate,
-       dependencies=['bootstrap', 'resources']
-  ).install('binary')
-
-  task(name='pytest', action=PytestRun,
-       dependencies=['bootstrap', 'resources']
-  ).install('test')
-
-  task(name='py', action=PythonRun,
-       dependencies=['bootstrap', 'resources']
-  ).install('run')
-
-  task(name='python-repl', action=PythonRepl,
-       dependencies=['bootstrap', 'resources']
-  ).install('repl')
-
-  task(name='setup-py', action=PythonSetup,
-       dependencies=['bootstrap', 'resources']
-  ).install()
+  task(name='python-binary-create', action=PythonBinaryCreate).install('binary')
+  task(name='pytest', action=PytestRun).install('test')
+  task(name='py', action=PythonRun).install('run')
+  task(name='python-repl', action=PythonRepl).install('repl')
+  task(name='setup-py', action=PythonSetup).install()
