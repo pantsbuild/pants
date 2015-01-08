@@ -36,3 +36,12 @@ python_tests(
     'src/python/pants/util:strutil',
   ]
 )
+
+python_tests(
+  name = 'keywords',
+  sources = ['test_keywords.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:keywords',
+  ]
+)

@@ -14,7 +14,6 @@ python_test_suite(
     ':test_antlr_builder',
     ':test_interpreter_cache',
     ':test_resolver',
-    ':test_thrift_builder',
     ':test_thrift_namespace_packages',
   ]
 )
@@ -58,20 +57,6 @@ python_tests(name = 'test_resolver',
     'src/python/pants/backend/python:resolver',
     'src/python/pants/util:contextutil',
   ],
-)
-
-python_tests(name = 'test_thrift_builder',
-  sources = ['test_thrift_builder.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    '3rdparty/python:pex',
-    '3rdparty/python/twitter/commons:twitter.common.config',
-    'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/python:thrift_builder',
-    'src/python/pants/base:build_file_aliases',
-    'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test:base_test',
-  ]
 )
 
 python_library(
