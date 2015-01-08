@@ -122,8 +122,6 @@ To run just Pants' *unit* tests (skipping the can-be-slow integration tests), us
     :::bash
     $ ./pants goal test tests/python/pants_test:all
 
-To bring up the `pdb` debugger when Python tests fail, pass the `--pdb` flag.
-
 Before [[contributing a change to Pants|pants('src/python/pants/docs:howto_contribute')]],
 make sure it passes **all** of our continuous integration (CI) tests: everything builds,
 all tests pass. To try all the CI tests in a few configurations, you can run the same script
@@ -157,11 +155,11 @@ To run Pants under `pdb` and set a breakpoint, you can typically add
     :::python
     import pytest; pytest.set_trace()
 
-To run tests and bring up `pdb` for failing tests, you can instead pass
-`--pdb`:
+To run tests and bring up `pdb` for failing tests, you can instead pass `--pdb` to
+`test.pytest --options`:
 
     :::bash
-    $ ./pants tests/python/pants_test/tasks: --pdb
+    $ ./pants test.pytest --options='--pdb' tests/python/pants_test/tasks:
     ... plenty of test output ...
     tests/python/pants_test/tasks/test_targets_help.py E
     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

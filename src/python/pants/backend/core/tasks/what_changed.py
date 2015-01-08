@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from itertools import chain
+
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
 from pants.base.lazy_source_mapper import LazySourceMapper
@@ -25,6 +27,9 @@ class ChangedFileTaskMixin(object):
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
     register('--diffspec',
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
+    register('--include-dependees', choices=['none', 'direct', 'transitive'], default='none',
+             help='Include direct or transitive dependees of changed targets.')
+
 
   _mapper_cache = None
   @property
@@ -45,10 +50,33 @@ class ChangedFileTaskMixin(object):
       since = self.get_options().changes_since or self.context.scm.current_rev_identifier()
       return self.context.workspace.touched_files(since)
 
-  def _changed_targets(self):
+  def _directly_changed_targets(self):
     """Determine unique target addresses changed mapping scm changed files to targets"""
     targets_for_source = self._mapper.target_addresses_for_source
     return set(addr for src in self._changed_files() for addr in targets_for_source(src))
+
+  def _changed_targets(self):
+    build_graph = self.context.build_graph
+    dependees_inclusion = self.get_options().include_dependees
+
+    if dependees_inclusion != 'none':
+      # Load the whole build graph first since we'll need it for dependee finding anyway.
+      for address in self.context.address_mapper.scan_addresses():
+        build_graph.inject_address_closure(address)
+
+    changed = self._directly_changed_targets()
+
+    if dependees_inclusion == 'none':
+      return changed
+
+    if dependees_inclusion == 'direct':
+      return changed.union(*[build_graph.dependents_of(addr) for addr in changed])
+
+    if dependees_inclusion == 'transitive':
+      return set(t.address for t in build_graph.transitive_dependees_of_addresses(changed))
+
+    # Should never get here.
+    raise ValueError('Unknown dependee inclusion: {}'.format(dependees_inclusion))
 
 
 class WhatChanged(ConsoleTask, ChangedFileTaskMixin):

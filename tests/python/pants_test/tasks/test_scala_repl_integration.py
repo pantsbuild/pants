@@ -29,7 +29,7 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
       import com.pants.example.hello.welcome.WelcomeEverybody
       println(WelcomeEverybody("World" :: Nil).head)
       """))
-    self.assertEquals(len(output_lines), 11)
+    self.assertEquals(len(output_lines), 12)
     self.assertEquals('Hello, World!', output_lines[-3])
 
   def test_run_repl_transitive(self):
