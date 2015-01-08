@@ -66,7 +66,7 @@ Scala Console
 -------------
 
 To bring up Scala's interactive console, use Pants'
-<a xref="gref_goal_repl">`repl`</a> goal.
+<a xref="oref_goal_repl">`repl`</a> goal.
 In the resulting console, you can `import` code from the Pants invocation's
 targets and their dependencies.
 

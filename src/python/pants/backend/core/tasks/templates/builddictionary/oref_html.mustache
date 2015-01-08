@@ -31,26 +31,26 @@ goal.
 </ul>
 
 <style>
-div.gref_goal_section {
+div.oref_goal_section {
   margin-left: 2%;
 }
-div.gref_goal_section h2 {
+div.oref_goal_section h2 {
   border-top: 4px solid #9bf;
   margin-left: -2%;
 }
-div.gref_ogroup_section {
+div.oref_ogroup_section {
   margin-left: 2%;
 }
-div.gref_ogroup_section h3 {
+div.oref_ogroup_section h3 {
   border-top: 1px dotted #bcd;
   margin-left: -2%;
 }
 </style>
 
 {{#goals}}
-<div class="gref_goal_section">
+<div class="oref_goal_section">
 
-<a pantsmark="gref_goal_{{goal.name}}"> </a>
+<a pantsmark="oref_goal_{{goal.name}}"> </a>
 
 <h2 id="{{goal.name}}">{{goal.name}}</h2>
 
@@ -61,8 +61,8 @@ div.gref_ogroup_section h3 {
 {{#tasks}}
 
 {{#ogroup}}
-<div class="gref_ogroup_section">
-<a pantsmark="gref_cli_{{ogroup.pantsref}}"> </a>
+<div class="oref_ogroup_section">
+<a pantsmark="oref_cli_{{ogroup.pantsref}}"> </a>
 
 <h3 id="group_{{ogroup.pantsref}}">{{ogroup.title}}</h3>
 {{/ogroup}}

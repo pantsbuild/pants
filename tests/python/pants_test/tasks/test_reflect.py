@@ -40,5 +40,5 @@ class GoalDataTest(BaseTest):
   def test_gen_tasks_goals_reference_data(self):
     # can we run our reflection-y goal code without crashing? would be nice
     Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
-    gref_data = reflect.gen_tasks_goals_reference_data()
-    self.assertTrue(len(gref_data) > 0, 'Tried to generate data for goals reference, got emptiness')
+    oref_data = reflect.gen_tasks_goals_reference_data()
+    self.assertTrue(len(oref_data) > 0, 'Tried to generate data for goals reference, got emptiness')

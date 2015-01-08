@@ -23,7 +23,7 @@ target in a `BUILD` file as in this excerpt from
 !inc[start-after=README page](hello/main/BUILD)
 
 To render the page as HTML, use the
-<a pantsref="gref_goal_markdown">markdown goal</a>. For example, to view
+<a pantsref="oref_goal_markdown">markdown goal</a>. For example, to view
 `examples/src/java/com/pants/examples/hello/main/README.md` as HTML in
 your browser,
 

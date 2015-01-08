@@ -440,11 +440,11 @@ def gen_goals_glopts_reference_data():
   register_bootstrap_options(register, buildroot='<buildroot>')
   register_global_options(register)
   argparser = option_parser._help_argparser
-  return gref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
+  return oref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
 
 
-def gref_template_data_from_options(scope, argparser):
-  """Get data for the Goals Reference from a CustomArgumentParser instance."""
+def oref_template_data_from_options(scope, argparser):
+  """Get data for the Options Reference from a CustomArgumentParser instance."""
   if not argparser: return None
   title = scope or ''
   pantsref = ''.join([c for c in title if c.isalnum()])
@@ -498,7 +498,7 @@ def gen_tasks_goals_reference_data():
           impl=impl,
           doc_html=doc_html,
           doc_rst=doc_rst,
-          ogroup=gref_template_data_from_options(scope, argparser)))
+          ogroup=oref_template_data_from_options(scope, argparser)))
     goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
     goal_names.append(goal.name)
 

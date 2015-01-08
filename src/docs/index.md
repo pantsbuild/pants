@@ -61,7 +61,7 @@ Pants Reference Documentation
 -----------------------------
 
 + <a href="build_dictionary.html">BUILD Dictionary</a>
-+ <a href="goals_reference.html">Goals Reference</a>
++ <a href="options_reference.html">Options Reference</a>
 
 Contributing to Pants
 ---------------------

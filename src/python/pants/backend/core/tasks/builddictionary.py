@@ -120,7 +120,7 @@ class BuildBuildDictionary(Task):
 
     # generate the .html file
     template = resource_string(__name__,
-                               os.path.join(self._templates_dir, 'gref_html.mustache'))
+                               os.path.join(self._templates_dir, 'oref_html.mustache'))
     filename = os.path.join(self._outdir, 'goals_reference.html')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
