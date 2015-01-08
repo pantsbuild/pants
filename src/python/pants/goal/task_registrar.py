@@ -66,7 +66,7 @@ class TaskRegistrar(object):
             {reg}
             {location}
           ''').format(reg=self,
-                     location=traceback.format_list([traceback.extract_stack()[-2]])[0]),
+                      location=traceback.format_list([traceback.extract_stack()[-2]])[0]),
             file=sys.stderr)
 
   def __repr__(self):
