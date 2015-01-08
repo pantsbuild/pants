@@ -470,7 +470,7 @@ def oref_template_data_from_options(scope, argparser):
     pantsref=pantsref)
 
 
-def gen_tasks_goals_reference_data():
+def gen_tasks_options_reference_data():
   """Generate the template data for the goals reference rst doc."""
   goal_dict = {}
   goal_names = []

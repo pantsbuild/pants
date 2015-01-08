@@ -11,7 +11,7 @@ import re
 
 from pants.backend.core.tasks.reflect import (assemble_buildsyms,
                                               gen_goals_glopts_reference_data,
-                                              gen_tasks_goals_reference_data)
+                                              gen_tasks_options_reference_data)
 from pants.backend.core.tasks.task import Task
 from pants.util.dirutil import safe_open
 from pants.base.generator import Generator, TemplateData
@@ -70,7 +70,7 @@ class BuildBuildDictionary(Task):
              help='Omit goals who have a task matching one of these regexps.')
 
   def execute(self):
-    self._gen_goals_reference()
+    self._gen_options_reference()
     self._gen_build_dictionary()
 
   def _gen_build_dictionary(self):
@@ -98,9 +98,9 @@ class BuildBuildDictionary(Task):
                             defns=defns)
       generator.write(outfile)
 
-  def _gen_goals_reference(self):
+  def _gen_options_reference(self):
     """Generate the goals reference rst doc."""
-    goals = gen_tasks_goals_reference_data()
+    goals = gen_tasks_options_reference_data()
     filtered_goals = []
     omit_impl_regexps = [re.compile(r) for r in self.get_options().omit_impl_re]
     for g in goals:
@@ -111,8 +111,8 @@ class BuildBuildDictionary(Task):
 
     # generate the .rst file
     template = resource_string(__name__,
-                               os.path.join(self._templates_dir, 'goals_reference.mustache'))
-    filename = os.path.join(self._outdir, 'goals_reference.rst')
+                               os.path.join(self._templates_dir, 'options_reference.mustache'))
+    filename = os.path.join(self._outdir, 'options_reference.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
       generator = Generator(template, goals=filtered_goals, glopts=glopts)
@@ -121,7 +121,7 @@ class BuildBuildDictionary(Task):
     # generate the .html file
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'oref_html.mustache'))
-    filename = os.path.join(self._outdir, 'goals_reference.html')
+    filename = os.path.join(self._outdir, 'options_reference.html')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
       generator = Generator(template, goals=filtered_goals, glopts=glopts)
