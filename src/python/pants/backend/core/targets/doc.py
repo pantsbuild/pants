@@ -136,6 +136,6 @@ class Page(Target):
     """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
     if self.payload.format:
       return self.payload.format
-    if self.source.endswith('.rst'):
+    if self.source.lower().endswith('.rst'):
       return 'rst'
     return 'md'
