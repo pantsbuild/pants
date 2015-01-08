@@ -12,7 +12,7 @@ something like:
 For a full description of specifying target addresses, see
 [[Target Addresses|pants('src/docs:target_addresses')]].
 For a list of Pants' goals and their options, see the
-<a href="goals_reference.html">Options Reference</a>.
+<a href="options_reference.html">Options Reference</a>.
 
 Order of Arguments
 ------------------

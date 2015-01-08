@@ -14,7 +14,7 @@
     "first_concepts": "dist/markdown/html/src/docs/first_concepts.html",
     "first_tutorial": "dist/markdown/html/src/docs/first_tutorial.html",
     "from_maven": "dist/markdown/html/examples/src/java/com/pants/examples/from_maven.html",
-    "goals_reference": "dist/builddict/goals_reference.html",
+    "options_reference": "dist/builddict/options_reference.html",
     "howto_ask": "dist/markdown/html/src/python/pants/docs/howto_ask.html",
     "howto_contribute": "dist/markdown/html/src/python/pants/docs/howto_contribute.html",
     "howto_develop": "dist/markdown/html/src/python/pants/docs/howto_develop.html",
@@ -89,7 +89,7 @@
         { "page": "install" },
         { "page": "setup_repo" },
         { "page": "build_dictionary" },
-        { "page": "goals_reference" },
+        { "page": "options_reference" },
         { "page": "dev",
           "children": [
             { "page": "howto_contribute" },
