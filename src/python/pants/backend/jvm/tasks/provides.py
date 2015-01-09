@@ -92,13 +92,14 @@ class Provides(Task):
     return jar_paths
 
   def get_jar_paths_for_ivy_module(self, ivyinfo, ref):
-    jar_paths = OrderedSet()
-    module = ivyinfo.modules_by_ref[ref]
-    jar_paths.update([a.path for a in module.artifacts])
+    def create_collection(current_ref):
+      module = ivyinfo.modules_by_ref[current_ref]
+      return OrderedSet([a.path for a in module.artifacts])
+
     if self.transitive:
-      for dep in ivyinfo.deps_by_caller.get(ref, []):
-        jar_paths.update(self.get_jar_paths_for_ivy_module(ivyinfo, dep))
-    return jar_paths
+      return ivyinfo.traverse_dependency_graph(ref, create_collection)
+    else:
+      return create_collection(ref)
 
   def list_jar(self, path):
     with open_jar(path, 'r') as jar:
