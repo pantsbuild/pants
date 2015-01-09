@@ -34,6 +34,7 @@ migrations = {
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
   ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
   ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
+  ('scala-compile', 'args'): ('compile.scala', 'args'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
