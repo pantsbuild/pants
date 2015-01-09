@@ -221,7 +221,7 @@ class Depmap(ConsoleTask):
     targets_map = {}
     resource_target_map = {}
     ivy_info = IvyUtils.parse_xml_report(targets, 'default')
-
+    ivy_jar_memo = {}
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target
@@ -244,7 +244,7 @@ class Depmap(ConsoleTask):
           return OrderedSet()
         transitive_jars = OrderedSet()
         for jar in jar_lib.jar_dependencies:
-          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar))
+          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar, memo=ivy_jar_memo))
         return transitive_jars
 
       info = {
