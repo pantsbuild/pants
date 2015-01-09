@@ -141,9 +141,13 @@ def chmod_plus_x(path):
 
 
 def relativize_path(path, rootdir):
-  relative_path = os.path.relpath(path, rootdir)
-  final_path = relative_path if len(relative_path) < len(path) else path
-  return final_path
+  # Note that we can't test for length and return the shorter of the two, because we need these
+  # paths to be stable across systems (e.g., because they get embedded in analysis files),
+  # and this choice might be inconsistent across systems. So we assume the relpath is always
+  # shorter. We relativize because of a known case of very long full path prefixes on Aurora,
+  # so this seems like the right heuristic.
+  # Note also that we mustn't call realpath on the path - we need to preserve the symlink structure.
+  return os.path.relpath(path, rootdir)
 
 
 # When running pants under mesos/aurora, the sandbox pathname can be very long. Since it gets
