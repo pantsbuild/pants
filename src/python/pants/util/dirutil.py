@@ -141,9 +141,8 @@ def chmod_plus_x(path):
 
 
 def relativize_path(path, rootdir):
-  real_path = os.path.realpath(path)
-  relative_path = os.path.relpath(real_path, rootdir)
-  final_path = relative_path if len(relative_path) < len(real_path) else real_path
+  relative_path = os.path.relpath(path, rootdir)
+  final_path = relative_path if len(relative_path) < len(path) else path
   return final_path
 
 
