@@ -86,9 +86,19 @@ class JvmDependencyAnalyzer(object):
         deps_by_ref_memo = {}
 
         def get_transitive_jars_by_ref(ref1, visited=None):
-          def create_collection(current_ref):
-            return set(ivyinfo.modules_by_ref[current_ref].artifacts)
-          return ivyinfo.traverse_dependency_graph(ref1, create_collection, memo=deps_by_ref_memo)
+          if ref1 in deps_by_ref_memo:
+            return deps_by_ref_memo[ref1]
+          else:
+            visited = visited or set()
+            if ref1 in visited:
+              return set()  # Ivy allows circular deps.
+            visited.add(ref1)
+            jars = set()
+            jars.update(ivyinfo.modules_by_ref[ref1].artifacts)
+            for dep in ivyinfo.deps_by_caller.get(ref1, []):
+              jars.update(get_transitive_jars_by_ref(dep, visited))
+            deps_by_ref_memo[ref1] = jars
+            return jars
 
         target_key = (ref.org, ref.name)
         if target_key in jarlibs_by_id:
