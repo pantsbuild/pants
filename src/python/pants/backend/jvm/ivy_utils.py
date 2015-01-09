@@ -189,7 +189,7 @@ class IvyUtils(object):
   def parse_xml_report(cls, targets, conf):
     """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
     path = cls.xml_report_path(targets, conf)
-    cls._parse_xml_report(path)
+    return cls._parse_xml_report(path)
 
   @classmethod
   def _parse_xml_report(cls, path):
