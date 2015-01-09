@@ -104,6 +104,8 @@ migrations = {
   ('ivy-resolve', 'write_artifact_caches'): ('resolve.ivy', 'write_artifact_caches'),
   ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
   ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
+
+  ('backend', 'python-path'): ('DEFAULT', 'pythonpath')
 }
 
 notes = {
