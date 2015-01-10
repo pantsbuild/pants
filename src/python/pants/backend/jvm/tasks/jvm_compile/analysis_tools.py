@@ -14,13 +14,13 @@ from pants.util.contextutil import temporary_dir
 
 class AnalysisTools(object):
   """Analysis manipulation methods required by JvmCompile."""
-  _IVY_HOME_PLACEHOLDER = '/_IVY_HOME_PLACEHOLDER'
+  _IVY_CACHE_DIR_PLACEHOLDER = '/_IVY_HOME_PLACEHOLDER'
   _PANTS_HOME_PLACEHOLDER = '/_PANTS_HOME_PLACEHOLDER'
 
-  def __init__(self, context, parser, analysis_cls):
+  def __init__(self, java_home, ivy_cache_dir, parser, analysis_cls):
     self.parser = parser
-    self._java_home = context.java_home
-    self._ivy_home = context.ivy_home
+    self._java_home = java_home
+    self._ivy_cache_dir = ivy_cache_dir
     self._pants_home = get_buildroot()
     self._analysis_cls = analysis_cls
 
@@ -61,7 +61,7 @@ class AnalysisTools(object):
       # in those rare cases.
       rebasings = [
         (self._java_home, None),
-        (self._ivy_home, self._IVY_HOME_PLACEHOLDER),
+        (self._ivy_cache_dir, self._IVY_CACHE_DIR_PLACEHOLDER),
         (self._pants_home, self._PANTS_HOME_PLACEHOLDER),
         ]
       # Work on a tmpfile, for safety.
@@ -72,7 +72,7 @@ class AnalysisTools(object):
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis')
       rebasings = [
-        (AnalysisTools._IVY_HOME_PLACEHOLDER, self._ivy_home),
+        (AnalysisTools._IVY_CACHE_DIR_PLACEHOLDER, self._ivy_cache_dir),
         (AnalysisTools._PANTS_HOME_PLACEHOLDER, self._pants_home),
         ]
       # Work on a tmpfile, for safety.

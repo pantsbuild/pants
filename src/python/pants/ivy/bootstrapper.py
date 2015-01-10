@@ -122,9 +122,11 @@ class Bootstrapper(object):
     By default the ivy.cache_dir value found in pants.ini but can be overridden via the
     PANTS_IVY_CACHE_DIR environment variable.  If neither is specified defaults to ivy's built
     in default cache dir; ie: ~/.ivy2/cache.
+
+    TODO: Make this a regular option.
     """
     return (os.getenv('PANTS_IVY_CACHE_DIR')
-            or self._config.get('ivy', 'cache_dir', default=os.path.expanduser('~/.ivy2/cache')))
+            or self._config.get('ivy', 'cache_dir', default=os.path.expanduser('~/.ivy2/pants')))
 
   def _bootstrap_ivy_classpath(self, executor, workunit_factory, retry=True):
     # TODO(John Sirois): Extract a ToolCache class to control the path structure:

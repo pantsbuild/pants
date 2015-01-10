@@ -24,8 +24,6 @@ from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
 from pants.base.worker_pool import SubprocPool
 
-# Override with ivy -> cache_dir
-_IVY_CACHE_DIR_DEFAULT=os.path.expanduser('~/.ivy2/pants')
 
 class Context(object):
   """Contains the context for a single run of pants.
@@ -151,11 +149,6 @@ class Context(object):
     # e.g., for the purpose of rebasing. In practice, this seems to work fine.
     # Note that for our purposes we take the parent of java.home.
     return os.path.realpath(os.path.dirname(self.java_sysprops['java.home']))
-
-  @property
-  def ivy_home(self):
-    return os.path.realpath(self.config.get('ivy', 'cache_dir',
-                                            default=_IVY_CACHE_DIR_DEFAULT))
 
   @property
   def spec_excludes(self):
