@@ -60,12 +60,12 @@ class ZipArchiver(Archiver):
   """An archiver that stores files in a zip file with optional compression."""
 
   @classmethod
-  def extract(cls, path, outdir, filter=None):
+  def extract(cls, path, outdir, filter_func=None):
     """Extract from a zip file, with an optional filter
 
     :param string path: path to the zipfile to extract from
     :param string outdir: directory to extract files into
-    :param function filter: optional filter with the filename as the parameter.  Returns True if
+    :param function filter_func: optional filter with the filename as the parameter.  Returns True if
       the file should be extracted.
     """
     with open_zip(path) as archive_file:
@@ -78,7 +78,7 @@ class ZipArchiver(Archiver):
         # This method should work on for python 2.6-3.x.
         # TODO(Eric Ayers) Pants no longer builds with python 2.6. Can this be removed?
         if not name.endswith(b'/'):
-          if (not filter or filter(name)):
+          if (not filter_func or filter_func(name)):
             archive_file.extract(name, outdir)
 
   def __init__(self, compression):
