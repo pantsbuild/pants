@@ -25,7 +25,8 @@ class TestZincUtils(BaseTest):
     classpath_correct = False
     for arg in args:
       if classpath_found:
-        self.assertEquals('foo.jar:/outside-build-root/bar.jar', arg)
+        # Classpath elements are always relative to the build root.
+        self.assertEquals('foo.jar:../../../../../../../outside-build-root/bar.jar', arg)
         classpath_correct = True
         break
       if arg == '-classpath':
