@@ -15,3 +15,6 @@ page(name="circular",
        ':readme',
      ]
 )
+
+page(name="senserst",
+     source="sense.rst")

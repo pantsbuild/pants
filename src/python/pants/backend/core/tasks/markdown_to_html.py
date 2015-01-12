@@ -200,6 +200,7 @@ def rst_to_html(in_rst):
 
 
 class MarkdownToHtml(Task):
+
   @classmethod
   def register_options(cls, register):
     register('--code-style', choices=list(get_all_styles()), default='friendly',
@@ -208,7 +209,6 @@ class MarkdownToHtml(Task):
              help='Open the generated documents in a browser.')
     register('--fragment', action='store_true',
              help='Generate a fragment of html to embed in a page.')
-
 
   @classmethod
   def product_types(cls):
@@ -301,7 +301,7 @@ class MarkdownToHtml(Task):
 
   def process_md(self, output_path, source, fragmented, url_builder, get_config, css=None):
     def parse_url(spec):
-      match = MarkdownToHtml.PANTS_LINK.match(spec)
+      match = self.PANTS_LINK.match(spec)
       if match:
         address = SyntheticAddress.parse(match.group(1), relative_to=get_buildroot())
         page = self.context.build_graph.get_target(address)
