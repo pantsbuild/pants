@@ -286,3 +286,22 @@ class WhatChangedTest(BaseWhatChangedTest):
       args=['--test-include-dependees=transitive'],
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
+
+  def test_exclude(self):
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/b:b',
+      'root/src/py/dependency_tree/c:c',
+      args=['--test-include-dependees=transitive'],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/c:c',
+      args=[
+        '--test-include-dependees=transitive',
+        '--test-exclude-target-regexp=:b',
+      ],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
