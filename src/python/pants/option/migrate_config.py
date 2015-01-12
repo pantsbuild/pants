@@ -34,6 +34,7 @@ migrations = {
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
   ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
   ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
+  ('scala-compile', 'args'): ('compile.scala', 'args'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
@@ -103,6 +104,8 @@ migrations = {
   ('ivy-resolve', 'write_artifact_caches'): ('resolve.ivy', 'write_artifact_caches'),
   ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
   ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
+
+  ('backend', 'python-path'): ('DEFAULT', 'pythonpath')
 }
 
 notes = {

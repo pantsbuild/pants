@@ -40,7 +40,8 @@ def register_bootstrap_options(register, buildroot=None):
   register('--pantsrc-files', action='append', metavar='<path>',
            default=['/etc/pantsrc', '~/.pants.rc'],
            help='Override config with values from these files. Later files override eariler ones.')
-
+  register('--pythonpath', action='append',
+           help='Add these directories to PYTHONPATH to search for plugins.')
 
 class OptionsBootstrapper(object):
   """An object that knows how to create options in two stages: bootstrap, and then full options."""

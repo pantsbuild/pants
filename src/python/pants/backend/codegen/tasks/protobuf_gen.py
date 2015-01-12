@@ -25,6 +25,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
@@ -178,6 +179,11 @@ class ProtobufGen(CodeGen):
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
+    """
+    Find the appropriate source roots used for sources.
+
+    :return: mapping of source roots to  set of sources under the roots
+    """
     gentargets = OrderedSet()
     def add_to_gentargets(target):
       if self.is_gentarget(target):
@@ -187,11 +193,19 @@ class ProtobufGen(CodeGen):
       add_to_gentargets,
       postorder=True)
     sources_by_base = OrderedDict()
+    # TODO(Eric Ayers) Extract this logic for general use? When using jar_source_set it is needed
+    # to get the correct source root for paths outside the current BUILD tree.
     for target in gentargets:
-      base, sources = target.target_base, target.sources_relative_to_buildroot()
-      if base not in sources_by_base:
-        sources_by_base[base] = OrderedSet()
-      sources_by_base[base].update(sources)
+      for source in target.sources_relative_to_buildroot():
+        base = SourceRoot.find_by_path(source)
+        if not base:
+          base, _ = target.target_base, target.sources_relative_to_buildroot()
+          self.context.log.debug('Could not find source root for {source}.'
+                                 ' Missing call to SourceRoot.register()?  Fell back to {base}.'
+                                 .format(source=source, base=base))
+        if base not in sources_by_base:
+          sources_by_base[base] = OrderedSet()
+        sources_by_base[base].add(source)
     return sources_by_base
 
   def createtarget(self, lang, gentarget, dependees):

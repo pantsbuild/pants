@@ -254,6 +254,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def prepare(self, round_manager):
     round_manager.require_data('compile_classpath')
+    round_manager.require_data('ivy_cache_dir')
 
     # Require codegen we care about
     # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
@@ -451,7 +452,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
               actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
                   lambda: self._compute_classpath_elements_by_class(cp_entries))
               with self.context.new_workunit(name='find-missing-dependencies'):
-                self._dep_analyzer.check(sources, actual_deps)
+                self._dep_analyzer.check(sources, actual_deps, self.ivy_cache_dir)
 
             # Kick off the background artifact cache write.
             if self.artifact_cache_writes_enabled():
@@ -772,6 +773,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
+
+  @property
+  def ivy_cache_dir(self):
+    ret = self.context.products.get_data('ivy_cache_dir')
+    if ret is None:
+      raise TaskError('ivy_cache_dir product accessed before it was created.')
+    return ret
 
   def _sources_for_targets(self, targets):
     """Returns a map target->sources for the specified targets."""

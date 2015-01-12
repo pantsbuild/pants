@@ -51,7 +51,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    return ['compile_classpath', 'ivy_jar_products', 'jar_dependencies']
+    return ['compile_classpath', 'ivy_jar_products', 'jar_dependencies', 'ivy_cache_dir']
 
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
@@ -85,6 +85,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
     executor = self.create_java_executor()
     targets = self.context.targets()
+    self.context.products.safe_create_data('ivy_cache_dir', lambda: self._cachedir)
     compile_classpath = self.context.products.get_data('compile_classpath',
                                                        lambda: OrderedSet())
 

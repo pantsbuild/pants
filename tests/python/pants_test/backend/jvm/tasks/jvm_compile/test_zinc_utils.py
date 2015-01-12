@@ -15,8 +15,8 @@ from pants_test.base_test import BaseTest
 class TestZincUtils(BaseTest):
 
   def test_get_compile_args(self):
-    classpath = [os.path.join(self.build_root, 'foo.jar'),
-                 '/outside-build-root/bar.jar']
+    jar_outside_build_root = os.path.join(os.path.sep, 'outside-build-root', 'bar.jar')
+    classpath = [os.path.join(self.build_root, 'foo.jar'), jar_outside_build_root]
     sources = ['X.scala']
 
     args = ZincUtils._get_compile_args([], classpath, sources, 'bogus output dir',
@@ -25,7 +25,9 @@ class TestZincUtils(BaseTest):
     classpath_correct = False
     for arg in args:
       if classpath_found:
-        self.assertEquals('foo.jar:/outside-build-root/bar.jar', arg)
+        # Classpath elements are always relative to the build root.
+        jar_relpath = os.path.relpath(jar_outside_build_root, self.build_root)
+        self.assertEquals('foo.jar:{0}'.format(jar_relpath), arg)
         classpath_correct = True
         break
       if arg == '-classpath':

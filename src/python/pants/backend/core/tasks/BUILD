@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':build_lint',
     ':builddictionary',
+    ':changed_target_goals',
     ':clean',
     ':common',
     ':confluence_publish',
@@ -18,6 +19,7 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
+    ':noop',
     ':pathdeps',
     ':paths',
     ':prepare_resources',
@@ -198,6 +200,14 @@ python_library(
 )
 
 python_library(
+  name = 'noop',
+  sources = ['noop.py'],
+  dependencies = [
+    ':common',
+  ],
+)
+
+python_library(
   name = 'pathdeps',
   sources = ['pathdeps.py'],
   dependencies = [
@@ -327,5 +337,15 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:lazy_source_mapper',
     'src/python/pants/base:target',
+  ],
+)
+
+python_library(
+  name='changed_target_goals',
+  sources=['changed_target_goals.py'],
+  dependencies=[
+    ':common',
+    ':noop',
+    ':what_changed',
   ],
 )

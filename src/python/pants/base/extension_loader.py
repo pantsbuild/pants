@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pkg_resources import working_set, Requirement
+import traceback
 
 from twitter.common.collections import OrderedSet
 
@@ -120,6 +121,7 @@ def load_backend(build_configuration, backend_package):
                         ['build_file_aliases',
                          'register_goals'])
   except ImportError as e:
+    traceback.print_exc()
     raise BackendConfigurationError('Failed to load the {backend} backend: {error}'
                                     .format(backend=backend_module, error=e))
 
@@ -128,6 +130,7 @@ def load_backend(build_configuration, backend_package):
     try:
       return entrypoint()
     except TypeError as e:
+      traceback.print_exc()
       raise BackendConfigurationError(
           'Entrypoint {entrypoint} in {backend} must be a zero-arg callable: {error}'
           .format(entrypoint=name, backend=backend_module, error=e))
