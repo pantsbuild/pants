@@ -50,7 +50,8 @@ class ScalaCompile(JvmCompile):
                                  log_level=self.get_options().level)
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)
+    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
+                         ZincAnalysisParser(self._classes_dir), ZincAnalysis)
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.

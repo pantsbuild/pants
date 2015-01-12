@@ -123,7 +123,7 @@ class IvyTaskMixin(object):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    symlink_map = IvyUtils.symlink_cachepath(self.context.ivy_home, raw_target_classpath_file,
+    symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
                                              symlink_dir, target_classpath_file)
     with IvyTaskMixin.symlink_map_lock:
       all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)

@@ -137,8 +137,8 @@ class IvyUtils(object):
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   @staticmethod
-  def symlink_cachepath(ivy_home, inpath, symlink_dir, outpath):
-    """Symlinks all paths listed in inpath that are under ivy_home into symlink_dir.
+  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath):
+    """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
     Preserves all other paths. Writes the resulting paths to outpath.
     Returns a map of path -> symlink to that path.
@@ -148,10 +148,10 @@ class IvyUtils(object):
       paths = filter(None, infile.read().strip().split(os.pathsep))
     new_paths = []
     for path in paths:
-      if not path.startswith(ivy_home):
+      if not path.startswith(ivy_cache_dir):
         new_paths.append(path)
         continue
-      symlink = os.path.join(symlink_dir, os.path.relpath(path, ivy_home))
+      symlink = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
       try:
         os.makedirs(os.path.dirname(symlink))
       except OSError as e:
