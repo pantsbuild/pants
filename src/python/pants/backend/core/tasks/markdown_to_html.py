@@ -251,7 +251,7 @@ class MarkdownToHtml(Task):
     show = []
     for page in self.context.targets(is_page):
       def process_page(key, outdir, url_builder, config, genmap, fragment=False):
-        if page.format() == 'rst':
+        if page.format == 'rst':
           html_path = self.process_rst(
             os.path.join(outdir, page_to_html_path(page)),
             os.path.join(page.payload.sources.rel_path, page.source),
@@ -328,9 +328,9 @@ class MarkdownToHtml(Task):
     safe_mkdir(os.path.dirname(output_path))
     with codecs.open(output_path, 'w', 'utf-8') as output:
       source_path = os.path.join(get_buildroot(), source)
-      with codecs.open(source_path, 'r', 'utf-8') as input:
+      with codecs.open(source_path, 'r', 'utf-8') as source_stream:
         md_html = markdown.markdown(
-          input.read(),
+          source_stream.read(),
           extensions=['codehilite(guess_lang=False)',
                       'extra',
                       'tables',
@@ -343,16 +343,12 @@ class MarkdownToHtml(Task):
           template = resource_string(__name__,
                                      os.path.join(self._templates_dir,
                                                   'fragment.mustache'))
-          generator = Generator(template,
-                                style_css=style_css,
-                                md_html=md_html)
+          generator = Generator(template, style_css=style_css, md_html=md_html)
           generator.write(output)
         else:
           style_link = os.path.relpath(css, os.path.dirname(output_path))
           template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
-          generator = Generator(template,
-                                style_link=style_link,
-                                md_html=md_html)
+          generator = Generator(template, style_link=style_link, md_html=md_html)
           generator.write(output)
         return output.name
 
@@ -360,8 +356,8 @@ class MarkdownToHtml(Task):
     safe_mkdir(os.path.dirname(output_path))
     with codecs.open(output_path, 'w', 'utf-8') as output:
       source_path = os.path.join(get_buildroot(), source)
-      with codecs.open(source_path, 'r', 'utf-8') as input:
-        rst_html = rst_to_html(input.read())
+      with codecs.open(source_path, 'r', 'utf-8') as source_stream:
+        rst_html = rst_to_html(source_stream.read())
         if fragmented:
           template = resource_string(__name__,
                                      os.path.join(self._templates_dir,

@@ -91,6 +91,11 @@ class Page(Target):
     :param resources: An optional list of Resources objects.
     """
     payload = payload or Payload()
+    if not format:
+      if source and source.lower().endswith('.rst'):
+        format = 'rst'
+      else:
+        format = 'md'
     payload.add_fields({
       'sources': SourcesField(sources=[source],
                               sources_rel_path=address.spec_path),
@@ -132,10 +137,7 @@ class Page(Target):
     """
     return self.payload.provides
 
+  @property
   def format(self):
     """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
-    if self.payload.format:
-      return self.payload.format
-    if self.source.lower().endswith('.rst'):
-      return 'rst'
-    return 'md'
+    return self.payload.format

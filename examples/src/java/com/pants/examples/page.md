@@ -7,10 +7,10 @@ E.g., that `README.md` file in your source code is handy for editing;
 but you might want to generate a web page from that so folks can decide
 whether they want to look at your source code.
 
-Text to HTML
+Markdown to HTML
 ----------------
 
-To tell Pants about your Markdown file, use a
+To tell Pants about your Markdown or ReST file, use a
 <a pantsref="bdict_page">`page`</a>
 target in a `BUILD` file as in this excerpt from
 [examples/src/java/com/pants/examples/hello/main/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/main/BUILD):
@@ -27,8 +27,8 @@ your browser,
 
 Pants generates the HTML files in the `dist/markdown/` directory tree.
 
-Markdown
---------
+Markdown Syntax
+---------------
 
 Pants uses the Python `Markdown` module; thus, in addition to the usual
 Gruber `Markdown` syntax, there are [other
@@ -110,10 +110,10 @@ end-at=*substring*<br>
 When excerpting the file to include, stop at a line containing
 *substring*.
 
-ReStructedText
---------------
+ReStructedText Syntax
+---------------------
 
-Pants generate web content from
+Pants can generate web content from
 [docutils reStructuredText](http://docutils.sourceforge.net/rst.html)-formatted text.
 
 To tell Pants that your `page` target's source is in reStructuredText format, you can either
