@@ -65,7 +65,7 @@ class ZincUtils(object):
   @property
   def _plugin_jars(self):
     if self._nailgun_task.get_options().plugins:
-      return self._nailgun_task.tool_classpath('plugins')
+      return self._nailgun_task.tool_classpath('plugin-jars')
     else:
       return []
 

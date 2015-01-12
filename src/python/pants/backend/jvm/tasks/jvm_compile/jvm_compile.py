@@ -359,10 +359,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Add any extra compile-time-only classpath elements.
     # TODO(benjy): Model compile-time vs. runtime classpaths more explicitly.
-    # TODO(stuhood): This mutates the compile_classpath... should clone?
-    for conf in self._confs:
-      for jar in self.extra_compile_time_classpath_elements():
-        compile_classpath.insert(0, (conf, jar))
+    def extra_compile_classpath_iter():
+      for conf in self._confs:
+        for jar in self.extra_compile_time_classpath_elements():
+           yield (conf, jar)
+    compile_classpath = OrderedSet(list(extra_compile_classpath_iter()) + list(compile_classpath))
 
     # Target -> sources (relative to buildroot), for just this chunk's targets.
     sources_by_target = self._sources_for_targets(relevant_targets)
