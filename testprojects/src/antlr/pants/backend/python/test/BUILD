@@ -12,3 +12,11 @@ python_antlr_library(
   module = 'pants.backend.python.test2',
   sources = ['csv.g'],
 )
+
+# This target is intended to fail inside antlr, because
+# bogus.g is not a valid antlr grammar.
+python_antlr_library(
+  name = 'antlr_failure',
+  module = 'pants.backend.python.test3',
+  sources = ['bogus.g'],
+)
