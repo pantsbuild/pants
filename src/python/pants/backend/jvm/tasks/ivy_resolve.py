@@ -90,19 +90,23 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
 
     # After running ivy, we need to take the resulting classpath, and load it into
     # the build products.
-    ivy_classpath = self.ivy_resolve(targets,
-                                 executor=executor,
-                                 symlink_ivyxml=True,
-                                 workunit_name='ivy-resolve')
+    ivy_classpath, relevant_targets = self.ivy_resolve(
+      targets,
+      executor=executor,
+      symlink_ivyxml=True,
+      workunit_name='ivy-resolve',
+    )
+
     if self.context.products.is_required_data('ivy_jar_products'):
-      self._populate_ivy_jar_products(targets)
+      self._populate_ivy_jar_products(relevant_targets)
+
     for conf in self._confs:
       # It's important we add the full classpath as an (ordered) unit for code that is classpath
       # order sensitive
       compile_classpath.update(map(lambda entry: (conf, entry), ivy_classpath))
 
     if self._report:
-      self._generate_ivy_report(targets)
+      self._generate_ivy_report(relevant_targets)
 
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:

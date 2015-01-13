@@ -36,9 +36,12 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     if isinstance(target, JarLibrary):
       return target.payload.fingerprint()
     elif isinstance(target, JvmTarget):
-      return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
+      if target.payload.excludes or target.payload.configurations:
+        return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
+      else:
+        return None
     else:
-      return sha1().hexdigest()
+      return None
 
   def __hash__(self):
     return hash(type(self))
@@ -58,6 +61,9 @@ class IvyTaskMixin(object):
                   silent=False,
                   workunit_name=None,
                   workunit_labels=None):
+    if not targets:
+      return ([], set())
+
     # NOTE: Always pass all the targets to exec_ivy, as they're used to calculate the name of
     # the generated module, which in turn determines the location of the XML report file
     # ivy generates. We recompute this name from targets later in order to find that file.
@@ -67,8 +73,6 @@ class IvyTaskMixin(object):
                        % (executor, type(executor)))
     ivy = Bootstrapper.default_ivy(java_executor=executor,
                                    bootstrap_workunit_factory=self.context.new_workunit)
-    if not targets:
-      return []
 
     ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
     ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
@@ -76,9 +80,11 @@ class IvyTaskMixin(object):
     fingerprint_strategy = IvyResolveFingerprintStrategy()
 
     with self.invalidated(targets,
-                          invalidate_dependents=True,
+                          invalidate_dependents=False,
                           silent=silent,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+      if not invalidation_check.all_vts:
+        return ([], set())
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
       target_workdir = os.path.join(ivy_workdir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
@@ -98,7 +104,7 @@ class IvyTaskMixin(object):
         def exec_ivy():
           ivy_utils.exec_ivy(
               target_workdir=target_workdir,
-              targets=targets,
+              targets=global_vts.targets,
               args=args,
               ivy=ivy,
               workunit_name='ivy',
@@ -133,4 +139,4 @@ class IvyTaskMixin(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return [path for path in stripped_classpath if ivy_utils.is_classpath_artifact(path)]
+      return ([path for path in stripped_classpath if ivy_utils.is_classpath_artifact(path)], global_vts.targets)

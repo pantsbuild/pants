@@ -212,8 +212,11 @@ class InvalidationCacheManager(object):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
-    'cover' the input targets, possibly partitioning them.
-    Callers can inspect these and rebuild the invalid ones, for example.
+    'cover' the input targets, possibly partitioning them, with one caveat: if the FingerprintStrategy
+    opted out of fingerprinting a target because it doesn't contribute to invalidation, then that
+    target will be excluded from all_vts, invalid_vts, and the partitioned VTS.
+
+    Callers can inspect these vts and rebuild the invalid ones, for example.
 
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
@@ -222,12 +225,24 @@ class InvalidationCacheManager(object):
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
-  def _wrap_targets(self, targets):
-    """Wrap targets and their computed cache keys in VersionedTargets
+  def _wrap_targets(self, targets, topological_order=False):
+    """Wrap targets and their computed cache keys in VersionedTargets.
+
+    If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
+    have an associated VersionedTarget returned.
 
     Returns a list of VersionedTargets, each representing one input target.
     """
-    return [VersionedTarget(self, target, self._key_for(target)) for target in sorted(targets)]
+    def vt_iter():
+      if topological_order:
+        sorted_targets = [t for t in reversed(sort_targets(targets)) if t in targets]
+      else:
+        sorted_targets = sorted(targets)
+      for target in sorted_targets:
+        target_key = self._key_for(target)
+        if target_key is not None:
+          yield VersionedTarget(self, target, target_key)
+    return list(vt_iter())
 
   def needs_update(self, cache_key):
     return self._invalidator.needs_update(cache_key)
