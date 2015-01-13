@@ -18,8 +18,11 @@ class FingerprintStrategy(AbstractClass):
 
   def fingerprint_target(self, target):
     """Consumers of subclass instances call this to get a fingerprint labeled with the name"""
-    return '{fingerprint}-{name}'.format(fingerprint=self.compute_fingerprint(target),
-                                         name=type(self).__name__)
+    fingerprint = self.compute_fingerprint(target)
+    if fingerprint:
+      return '{fingerprint}-{name}'.format(fingerprint=fingerprint, name=type(self).__name__)
+    else:
+      return None
 
   @abstractmethod
   def __hash__(self):

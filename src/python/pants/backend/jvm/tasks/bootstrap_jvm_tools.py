@@ -76,6 +76,6 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
                                                 executor=executor,
                                                 silent=True,
                                                 workunit_name=workunit_name,
-                                                workunit_labels=[WorkUnit.BOOTSTRAP])
+                                                workunit_labels=[WorkUnit.BOOTSTRAP])[0]
         return cache['classpath']
     return bootstrap_classpath

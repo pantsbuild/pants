@@ -235,16 +235,25 @@ class Target(AbstractTarget):
     """
     :param FingerprintStrategy fingerprint_strategy: optional fingerprint strategy to use to compute
     the fingerprint of a target
-    :return: a fingerprint representing this target and all of its dependencies
+    :return: A fingerprint representing this target and all of its dependencies.
+      The return value can be `None`, indicating that this target and all of its transitive dependencies
+      did not contribute to the fingerprint, according to the provided FingerprintStrategy.
     :rtype: string
     """
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
       hasher = sha1()
-      direct_deps = sorted(self.dependencies)
-      for dep in direct_deps:
-        hasher.update(dep.transitive_invalidation_hash(fingerprint_strategy))
+      def dep_hash_iter():
+        for dep in self.dependencies:
+          dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy)
+          if dep_hash is not None:
+            yield dep_hash
+      dep_hashes = sorted(list(dep_hash_iter()))
+      for dep_hash in dep_hashes:
+        hasher.update(dep_hash)
       target_hash = self.invalidation_hash(fingerprint_strategy)
+      if target_hash is None and not dep_hashes:
+        return None
       dependencies_hash = hasher.hexdigest()[:12]
       combined_hash = '{target_hash}.{deps_hash}'.format(target_hash=target_hash,
                                                          deps_hash=dependencies_hash)
