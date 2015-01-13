@@ -208,7 +208,8 @@ class InvalidationCacheManager(object):
   def check(self,
             targets,
             partition_size_hint=None,
-            target_colors=None):
+            target_colors=None,
+            topological_order=False):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
@@ -218,16 +219,25 @@ class InvalidationCacheManager(object):
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
     """
-    all_vts = self._wrap_targets(targets)
+    all_vts = self._wrap_targets(targets, topological_order=topological_order)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
-  def _wrap_targets(self, targets):
+  def _wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets
 
     Returns a list of VersionedTargets, each representing one input target.
     """
-    return [VersionedTarget(self, target, self._key_for(target)) for target in sorted(targets)]
+    def vt_iter():
+      if topological_order:
+        sorted_targets = [t for t in reversed(sort_targets(targets)) if t in targets]
+      else:
+        sorted_targets = sorted(targets)
+      for target in sorted_targets:
+        target_key = self._key_for(target)
+        if target_key:
+          yield VersionedTarget(self, target, target_key)
+    return list(vt_iter())
 
   def needs_update(self, cache_key):
     return self._invalidator.needs_update(cache_key)
