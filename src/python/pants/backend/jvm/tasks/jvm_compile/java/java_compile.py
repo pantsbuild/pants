@@ -50,7 +50,7 @@ class JavaCompile(JvmCompile):
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
-  _JMAKE_MAIN = 'org.pantsbuild.jmake.Main'
+  _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
