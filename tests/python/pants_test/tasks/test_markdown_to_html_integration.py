@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import re
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
@@ -38,13 +37,13 @@ class MarkdownIntegrationTest(PantsRunIntegrationTest):
     with safe_open(out_path) as outfile:
       page_html = outfile.read()
       # should get Sense and Sensibility in title (or TITLE, sheesh):
-      assert(re.search(r'<title[^>]*>\s*Sense\s+and\s+Sensibility\s*</title', page_html,
-                       re.IGNORECASE))
+      self.assertRegexpMatches(page_html, 
+                               r'(?i).*<title[^>]*>\s*Sense\s+and\s+Sensibility\s*</title')
       # should get formatted with h1:
-      assert(re.search(r'<h1[^>]*>\s*They\s+Heard\s+Her\s+With\s+Surprise\s*</h1>', page_html,
-                       re.IGNORECASE))
+      self.assertRegexpMatches(page_html,
+                               r'(?i).*<h1[^>]*>\s*They\s+Heard\s+Her\s+With\s+Surprise\s*</h1>')
       # should get formatted with _something_
-      assert(re.search(r'>\s*inhabiting\s*</', page_html))
-      assert(re.search(r'>\s*civilly\s*</', page_html))
+      self.assertRegexpMatches(page_html, r'.*>\s*inhabiting\s*</')
+      self.assertRegexpMatches(page_html, r'.*>\s*civilly\s*</')
       # there should be a link that has href="http://www.calderdale.gov.uk/"
-      assert(re.search(r'<a [^>]*href\s*=\s*[\'"]http://www.calderdale', page_html, re.IGNORECASE))
+      self.assertRegexpMatches(page_html, r'.*<a [^>]*href\s*=\s*[\'"]http://www.calderdale')

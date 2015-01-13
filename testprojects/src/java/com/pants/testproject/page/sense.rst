@@ -5,7 +5,7 @@ Sense and Sensibility
 
 No sooner was her answer dispatched, than Mrs. Dashwood indulged herself in the pleasure of
 announcing to her son-in-law and his wife that she was provided with a house, and should
-incommode them no longer than till every thing were ready for her ``inhabiting`` it. 
+incommode them no longer than till every thing were ready for her ``inhabiting`` it.
 
 They Heard Her With Surprise
 ----------------------------
