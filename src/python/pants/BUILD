@@ -112,3 +112,8 @@ python_library(
   name = 'version',
   sources = ['version.py'],
 )
+
+page(
+  name='changelog',
+  source='CHANGELOG.rst'
+)

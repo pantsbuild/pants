@@ -1,7 +1,7 @@
 README Files and Markdown
 =========================
 
-You can write program documentation in the popular Markdown format;
+You can write program documentation in the popular Markdown or ReST format;
 Pants eases publishing your docs to places where your users can read it.
 E.g., that `README.md` file in your source code is handy for editing;
 but you might want to generate a web page from that so folks can decide
@@ -10,12 +10,7 @@ whether they want to look at your source code.
 Markdown to HTML
 ----------------
 
-Pants uses the Python `Markdown` module; thus, in addition to the usual
-Gruber `Markdown` syntax, there are [other
-features](http://pythonhosted.org/Markdown/) Pants uses Python
-Markdown's `codehilite`, `extra`, `tables`, and `toc` extensions.
-
-To tell Pants about your Markdown file, use a
+To tell Pants about your Markdown or ReST file, use a
 <a pantsref="bdict_page">`page`</a>
 target in a `BUILD` file as in this excerpt from
 [examples/src/java/com/pants/examples/hello/main/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/main/BUILD):
@@ -32,8 +27,15 @@ your browser,
 
 Pants generates the HTML files in the `dist/markdown/` directory tree.
 
-Link to Another `page`
-----------------------
+Markdown Syntax
+---------------
+
+Pants uses the Python `Markdown` module; thus, in addition to the usual
+Gruber `Markdown` syntax, there are [other
+features](http://pythonhosted.org/Markdown/) Pants uses Python
+Markdown's `codehilite`, `extra`, `tables`, and `toc` extensions.
+
+### Link to Another `page`
 
 One `page` can link to another. Regular Markdown-link syntax works for
 regular links; but if you use `page`s to generate both `.html` files and
@@ -69,8 +71,7 @@ therein:
 
 Pants replaces the `pants('path/to:dest')` with the appropriate link.
 
-Include a File Snippet
-----------------------
+### Include a File Snippet
 
 Sometimes the best way to explain `HelloWorld.java` is to show an
 excerpt from `HelloWorld.java`. You can use the `!inc` markdown to do
@@ -108,6 +109,17 @@ When excerpting the file to include, stop before a line containing
 end-at=*substring*<br>
 When excerpting the file to include, stop at a line containing
 *substring*.
+
+ReStructedText Syntax
+---------------------
+
+Pants can generate web content from
+[docutils reStructuredText](http://docutils.sourceforge.net/rst.html)-formatted text.
+
+To tell Pants that your `page` target's source is in reStructuredText format, you can either
+
+* give the `source` file an `.rst` file extension, or
+* pass `format='rst'` to the `page` target.
 
 Publishing
 ----------
