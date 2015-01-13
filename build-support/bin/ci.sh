@@ -167,6 +167,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
   # Targets that are intended to fail
   negative_test_targets=(
     testprojects/src/thrift/com/pants/thrift_linter:
+    testprojects/src/java/com/pants/testproject/missingdepswhitelist.*
   )
 
   targets_to_exclude=(
