@@ -178,6 +178,7 @@ python_library(
   sources = ['markdown_to_html.py'],
   resources = globs('templates/markdown/*.mustache'),
   dependencies = [
+    '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
     ':common',

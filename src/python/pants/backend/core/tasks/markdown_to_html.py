@@ -9,6 +9,7 @@ import codecs
 import os
 import re
 
+from docutils.core import publish_parts
 import markdown
 from pkg_resources import resource_string
 from pygments import highlight
@@ -183,7 +184,23 @@ def page_to_html_path(page):
   return os.path.splitext(source_path)[0] + ".html"
 
 
+def rst_to_html(in_rst):
+  """Returns HTML rendering of an RST fragment.
+
+  :param in_rst: rst-formatted string
+  """
+  if not in_rst:
+    return ''
+  pp = publish_parts(in_rst, writer_name='html')
+  return_value = ''
+  if 'title' in pp and pp['title']:
+    return_value += '<title>{0}</title>\n<p style="font: 200% bold">{0}</p>\n'.format(pp['title'])
+  return_value += pp['body'].strip()
+  return return_value
+
+
 class MarkdownToHtml(Task):
+
   @classmethod
   def register_options(cls, register):
     register('--code-style', choices=list(get_all_styles()), default='friendly',
@@ -192,9 +209,6 @@ class MarkdownToHtml(Task):
              help='Open the generated documents in a browser.')
     register('--fragment', action='store_true',
              help='Generate a fragment of html to embed in a page.')
-    register('--extension', action='append', default=['.md', '.markdown'],
-             help='Process files with these extensions (as well as the standard extensions).')
-
 
   @classmethod
   def product_types(cls):
@@ -204,7 +218,6 @@ class MarkdownToHtml(Task):
     super(MarkdownToHtml, self).__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'markdown')
     self.open = self.get_options().open
-    self.extensions = set(self.get_options().extension)
     self.fragment = self.get_options().fragment
     self.code_style = self.get_options().code_style
 
@@ -237,10 +250,15 @@ class MarkdownToHtml(Task):
     wikigenmap = self.context.products.get('wiki_html')
     show = []
     for page in self.context.targets(is_page):
-      _, ext = os.path.splitext(page.source)
-      if ext in self.extensions:
-        def process_page(key, outdir, url_builder, config, genmap, fragment=False):
-          html_path = self.process(
+      def process_page(key, outdir, url_builder, config, genmap, fragment=False):
+        if page.format == 'rst':
+          html_path = self.process_rst(
+            os.path.join(outdir, page_to_html_path(page)),
+            os.path.join(page.payload.sources.rel_path, page.source),
+            self.fragment or fragment,
+          )
+        else:
+          html_path = self.process_md(
             os.path.join(outdir, page_to_html_path(page)),
             os.path.join(page.payload.sources.rel_path, page.source),
             self.fragment or fragment,
@@ -248,32 +266,32 @@ class MarkdownToHtml(Task):
             config,
             css=css
           )
-          self.context.log.info('Processed %s to %s' % (page.source, html_path))
-          relpath = os.path.relpath(html_path, outdir)
-          genmap.add(key, outdir, [relpath])
-          return html_path
+        self.context.log.info('Processed %s to %s' % (page.source, html_path))
+        relpath = os.path.relpath(html_path, outdir)
+        genmap.add(key, outdir, [relpath])
+        return html_path
 
-        def url_builder(linked_page, config=None):
-          dest = page_to_html_path(linked_page)
-          src_dir = os.path.dirname(page_to_html_path(page))
-          return linked_page.name, os.path.relpath(dest, src_dir)
+      def url_builder(linked_page, config=None):
+        dest = page_to_html_path(linked_page)
+        src_dir = os.path.dirname(page_to_html_path(page))
+        return linked_page.name, os.path.relpath(dest, src_dir)
 
-        page_path = os.path.join(outdir, 'html')
-        html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
-        if css and not self.fragment:
-          plaingenmap.add(page, self.workdir, list(css_path))
-        if self.open and page in roots:
-          show.append(html)
+      page_path = os.path.join(outdir, 'html')
+      html = process_page(page, page_path, url_builder, lambda p: None, plaingenmap)
+      if css and not self.fragment:
+        plaingenmap.add(page, self.workdir, list(css_path))
+      if self.open and page in roots:
+        show.append(html)
 
-        if page.provides:
-          for wiki in page.provides:
-            def get_config(page):
-              # Take the first provided WikiArtifact. If a page is published to multiple places, it's
-              # undefined what the "proper" one is to link to. So we just take whatever is "first".
-              for wiki_artifact in page.payload.provides:
-                return wiki_artifact.config
-            basedir = os.path.join(self.workdir, str(hash(wiki)))
-            process_page((wiki, page), basedir, wiki.wiki.url_builder, get_config,
+      if page.provides:
+        for wiki in page.provides:
+          def get_config(page):
+            # Take the first provided WikiArtifact. If a page is published to multiple places, it's
+            # undefined what the "proper" one is to link to. So we just take whatever is "first".
+            for wiki_artifact in page.payload.provides:
+              return wiki_artifact.config
+          basedir = os.path.join(self.workdir, str(hash(wiki)))
+          process_page((wiki, page), basedir, wiki.wiki.url_builder, get_config,
                          wikigenmap, fragment=True)
 
     if show:
@@ -281,9 +299,9 @@ class MarkdownToHtml(Task):
 
   PANTS_LINK = re.compile(r'''pants\(['"]([^)]+)['"]\)(#.*)?''')
 
-  def process(self, output_path, source, fragmented, url_builder, get_config, css=None):
+  def process_md(self, output_path, source, fragmented, url_builder, get_config, css=None):
     def parse_url(spec):
-      match = MarkdownToHtml.PANTS_LINK.match(spec)
+      match = self.PANTS_LINK.match(spec)
       if match:
         address = SyntheticAddress.parse(match.group(1), relative_to=get_buildroot())
         page = self.context.build_graph.get_target(address)
@@ -310,9 +328,9 @@ class MarkdownToHtml(Task):
     safe_mkdir(os.path.dirname(output_path))
     with codecs.open(output_path, 'w', 'utf-8') as output:
       source_path = os.path.join(get_buildroot(), source)
-      with codecs.open(source_path, 'r', 'utf-8') as input:
+      with codecs.open(source_path, 'r', 'utf-8') as source_stream:
         md_html = markdown.markdown(
-          input.read(),
+          source_stream.read(),
           extensions=['codehilite(guess_lang=False)',
                       'extra',
                       'tables',
@@ -325,15 +343,31 @@ class MarkdownToHtml(Task):
           template = resource_string(__name__,
                                      os.path.join(self._templates_dir,
                                                   'fragment.mustache'))
-          generator = Generator(template,
-                                style_css=style_css,
-                                md_html=md_html)
+          generator = Generator(template, style_css=style_css, md_html=md_html)
           generator.write(output)
         else:
           style_link = os.path.relpath(css, os.path.dirname(output_path))
           template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
+          generator = Generator(template, style_link=style_link, md_html=md_html)
+          generator.write(output)
+        return output.name
+
+  def process_rst(self, output_path, source, fragmented):
+    safe_mkdir(os.path.dirname(output_path))
+    with codecs.open(output_path, 'w', 'utf-8') as output:
+      source_path = os.path.join(get_buildroot(), source)
+      with codecs.open(source_path, 'r', 'utf-8') as source_stream:
+        rst_html = rst_to_html(source_stream.read())
+        if fragmented:
+          template = resource_string(__name__,
+                                     os.path.join(self._templates_dir,
+                                                  'fragment.mustache'))
           generator = Generator(template,
-                                style_link=style_link,
-                                md_html=md_html)
+                                md_html=rst_html)
+          generator.write(output)
+        else:
+          template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
+          generator = Generator(template,
+                                md_html=rst_html)
           generator.write(output)
         return output.name
