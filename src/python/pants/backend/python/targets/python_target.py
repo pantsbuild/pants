@@ -87,6 +87,8 @@ class PythonTarget(Target):
 
   @property
   def traversable_specs(self):
+    for spec in super(PythonTarget, self).traversable_specs:
+      yield spec
     if self._provides:
       for spec in self._provides._binaries.values():
         address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
