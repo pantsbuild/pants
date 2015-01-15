@@ -61,6 +61,14 @@ class JvmdocGen(JvmTask):
     register('--skip', default=False, action='store_true',
              help='Skip {0} generation.'.format(tool_name))
 
+  @classmethod
+  def prepare(cls, round_manager):
+    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    # See: https://github.com/pantsbuild/pants/issues/310
+    round_manager.require_data('classes_by_target')
+
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
 
@@ -75,13 +83,6 @@ class JvmdocGen(JvmTask):
     self.combined = self.open or options.combined
     self.ignore_failure = options.ignore_failure
     self.skip = options.skip
-
-  def prepare(self, round_manager):
-    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
-    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
-    # and depend on that.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('classes_by_target')
 
   def generate_doc(self, language_predicate, create_jvmdoc_command):
     """

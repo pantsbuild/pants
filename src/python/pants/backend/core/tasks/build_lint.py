@@ -24,6 +24,12 @@ class BuildLint(Task):
     register('--action', action='append', choices=['diff', 'rewrite'], default=[],
              help='diff=print out diffs, rewrite=apply changes to BUILD files directly.')
 
+  @classmethod
+  def prepare(cls, round_manager):
+    # TODO(John Sirois): This is broken - the product is not populated by any task.
+    # TODO(John Sirois): XXX Kill?!
+    round_manager.require('missing_deps')
+
   def __init__(self, *args, **kwargs):
     super(BuildLint, self).__init__(*args, **kwargs)
     self.transitive = self.get_options().transitive
@@ -33,10 +39,6 @@ class BuildLint(Task):
     # diffs would always be printed, even if we only wanted to rewrite.
     if not self.actions:
       self.actions.add('diff')
-
-  def prepare(self, round_manager):
-    # TODO(John Sirois): This is broken - the product is not populated by any task.
-    round_manager.require('missing_deps')
 
   def execute(self):
     # Map from buildfile path to map of target name -> missing deps for that target.

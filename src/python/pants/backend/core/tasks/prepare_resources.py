@@ -16,24 +16,25 @@ from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
 from pants.util.dirutil import relativize_path, safe_mkdir
 
+
 class PrepareResources(Task):
 
   @classmethod
   def product_types(cls):
     return ['resources_by_target']
 
-  def __init__(self, *args, **kwargs):
-    super(PrepareResources, self).__init__(*args, **kwargs)
-    self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
-    self._buildroot = get_buildroot()
-
-  def prepare(self, round_manager):
+  @classmethod
+  def prepare(cls, round_manager):
     round_manager.require_data('compile_classpath')
     # NOTE(Garrett Malmquist): This is a fake dependency to force resources to occur after jvm
     # compile. It solves some problems we've been having getting our annotation processors to
     # compile consistently due to extraneous resources polluting the classpath. Perhaps this could
     # be fixed more elegantly whenever we get a formal classpath object?
     round_manager.require_data('classes_by_target')
+
+  def __init__(self, *args, **kwargs):
+    super(PrepareResources, self).__init__(*args, **kwargs)
+    self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
 
   def execute(self):
     if self.context.products.is_required_data('resources_by_target'):

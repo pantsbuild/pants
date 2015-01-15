@@ -31,6 +31,7 @@ from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 
+
 # Override with protobuf-gen -> supportdir
 _PROTOBUF_GEN_SUPPORTDIR_DEFAULT='bin/protobuf'
 
@@ -43,6 +44,7 @@ _PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
 # Override with in protobuf-gen -> pythondeps (Accepts a list)
 _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
+
 class ProtobufGen(CodeGen):
 
   @classmethod
@@ -50,6 +52,14 @@ class ProtobufGen(CodeGen):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
              help='Force generation of protobuf code for these languages.')
+
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
+  @classmethod
+  def prepare(cls, round_manager):
+    super(ProtobufGen, cls).prepare(round_manager)
+    round_manager.require_data('ivy_imports')
+    round_manager.require_data('deferred_sources')
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
@@ -74,13 +84,6 @@ class ProtobufGen(CodeGen):
       self.protoc_version,
       'protoc'
     )
-
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
-  def prepare(self, round_manager):
-    super(ProtobufGen, self).prepare(round_manager)
-    round_manager.require_data('ivy_imports')
-    round_manager.require_data('deferred_sources')
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def resolve_deps(self, key, default=None):
     default = default or []

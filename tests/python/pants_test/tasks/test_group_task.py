@@ -139,12 +139,13 @@ class BaseGroupTaskTest(BaseTest):
 
   def group_member(self, name, selector):
     class RecordingGroupMember(GroupMember):
+      @classmethod
+      def prepare(cls, round_manager):
+        self.recorded_actions.append(self.prepare_action(name))
+
       def __init__(me, *args, **kwargs):
         super(RecordingGroupMember, me).__init__(*args, **kwargs)
         self.recorded_actions.append(self.construct_action(name))
-
-      def prepare(me, round_manager):
-        self.recorded_actions.append(self.prepare_action(name))
 
       def select(me, target):
         return selector(target)

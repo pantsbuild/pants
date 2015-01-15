@@ -31,13 +31,14 @@ class JvmBinaryTask(JarTask):
     if main is not None:
       jar.main(main)
 
+  @classmethod
+  def prepare(cls, round_manager):
+    super(JvmBinaryTask, cls).prepare(round_manager)
+    round_manager.require('jar_dependencies', predicate=cls.is_binary)
+
   def __init__(self, *args, **kwargs):
     super(JvmBinaryTask, self).__init__(*args, **kwargs)
     self._jar_builder = self.prepare_jar_builder()
-
-  def prepare(self, round_manager):
-     super(JvmBinaryTask, self).prepare(round_manager)
-     round_manager.require('jar_dependencies', predicate=self.is_binary)
 
   def list_external_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.
