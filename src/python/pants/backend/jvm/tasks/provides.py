@@ -29,7 +29,7 @@ class Provides(Task):
              help='Also write the provides information to stdout.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('jars')
     round_manager.require_data('ivy_jar_products')
 

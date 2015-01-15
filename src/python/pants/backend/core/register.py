@@ -12,7 +12,6 @@ from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDepe
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
@@ -136,8 +135,6 @@ def register_goals():
       'Generate html from markdown docs.')
 
   # Linting.
-  task(name='buildlint', action=BuildLint).install()
-
   task(name='pathdeps', action=PathDeps).install('pathdeps').with_description(
       'Print out all paths containing BUILD files the target depends on.')
 

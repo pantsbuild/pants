@@ -28,7 +28,7 @@ class JarsignerTask(Task):
              help = 'Specifies the build type and keystore used to sign the package.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('apk')
 
   def __init__(self, *args, **kwargs):

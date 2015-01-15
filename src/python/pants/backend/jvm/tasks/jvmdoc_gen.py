@@ -62,7 +62,7 @@ class JvmdocGen(JvmTask):
              help='Skip {0} generation.'.format(tool_name))
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     # TODO(John Sirois): this is a fake requirement in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.

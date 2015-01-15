@@ -403,7 +403,7 @@ class JarPublish(JarTask, ScmPublish):
                   'Or: --restart-at=src/java/com/twitter/common/base')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require('jars')
     round_manager.require('javadoc')
     round_manager.require('scaladoc')

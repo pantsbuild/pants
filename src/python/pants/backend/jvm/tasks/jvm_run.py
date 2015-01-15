@@ -36,7 +36,7 @@ class JvmRun(JvmTask):
              help='Set the working directory. If no argument is passed, use the target path.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.

@@ -96,7 +96,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Leave intermediate scratch files around, for debugging build problems.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('compile_classpath')
     round_manager.require_data('ivy_cache_dir')
 

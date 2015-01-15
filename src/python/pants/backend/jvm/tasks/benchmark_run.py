@@ -25,7 +25,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
                           default=['//:benchmark-java-allocation-instrumenter-2.1'])
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile to run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.

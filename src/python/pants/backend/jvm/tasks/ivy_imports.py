@@ -23,7 +23,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(IvyImports, cls).prepare(round_manager)
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
 

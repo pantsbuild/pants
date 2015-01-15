@@ -214,7 +214,7 @@ class JarTask(NailgunTask):
     cls.register_jvm_tool(register, 'jar-tool')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
 

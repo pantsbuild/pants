@@ -64,7 +64,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'xalan')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('java')
     round_manager.require_data('scala')
 

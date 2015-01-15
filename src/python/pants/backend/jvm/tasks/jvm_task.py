@@ -32,7 +32,7 @@ class JvmTask(Task):
              help='Use only these Ivy configurations of external deps.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('compile_classpath')
 
   def __init__(self, *args, **kwargs):

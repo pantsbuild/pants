@@ -263,7 +263,7 @@ class GroupTask(Task):
     cls._member_types().append(group_member)
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('compile_classpath')
     for member_type in cls._member_types():
       member_type.prepare(round_manager)

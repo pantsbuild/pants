@@ -29,7 +29,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'specs', default=['//:scala-specs-2.9.3'])
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(SpecsRun, cls).prepare(round_manager)
 
     # TODO(John Sirois): these are fake requirements in order to force compile run before this

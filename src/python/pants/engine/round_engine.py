@@ -118,8 +118,9 @@ class RoundEngine(Engine):
       task = task_type(context, task_workdir)
       tasks_by_name[task_name] = task
 
+      options = context.options.for_scope(task.options_scope)
       round_manager = RoundManager(context)
-      task.prepare(round_manager)
+      task.prepare(options, round_manager)
       try:
         dependencies = round_manager.get_dependencies()
         for producer_info in dependencies:

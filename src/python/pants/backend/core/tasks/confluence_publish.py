@@ -35,7 +35,7 @@ class ConfluencePublish(Task):
     register('--user', help='Confluence user name, defaults to unix user.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require('wiki_html')
 
   def __init__(self, *args, **kwargs):

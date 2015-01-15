@@ -55,7 +55,7 @@ class ProtobufGen(CodeGen):
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(ProtobufGen, cls).prepare(round_manager)
     round_manager.require_data('ivy_imports')
     round_manager.require_data('deferred_sources')
