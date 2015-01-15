@@ -28,6 +28,11 @@ class Provides(Task):
     register('--also-write-to-stdout', default=False, action='store_true',
              help='Also write the provides information to stdout.')
 
+  @classmethod
+  def prepare(cls, round_manager):
+    round_manager.require_data('jars')
+    round_manager.require_data('ivy_jar_products')
+
   def __init__(self, *args, **kwargs):
     super(Provides, self).__init__(*args, **kwargs)
     self.confs = self.context.config.getlist('ivy', 'confs', default=['default'])
@@ -43,10 +48,6 @@ class Provides(Task):
     #   dependencies=self.target_roots,
     #   configurations=self.confs)
     # self.context.products.require('jars')
-
-  def prepare(self, round_manager):
-    round_manager.require_data('jars')
-    round_manager.require_data('ivy_jar_products')
 
   def execute(self):
     safe_mkdir(self.workdir)

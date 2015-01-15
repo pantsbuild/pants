@@ -46,6 +46,17 @@ class TaskBase(AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+
+  @classmethod
+  def product_types(self):
+    """The list of products this Task produces. Set the product type(s) for this
+    task i.e. the product type(s) this task creates e.g ['classes'].
+
+    By default, each task is considered as creating a unique product type(s).
+    Subclasses that create products, should override this to specify their unique product type(s).
+    """
+    return []
+
   # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
   options_scope = None
 
@@ -77,6 +88,18 @@ class TaskBase(AbstractClass):
   def supports_passthru_args(cls):
     """Subclasses may override to indicate that they can use passthru args."""
     return False
+
+  @classmethod
+  def prepare(cls, round_manager):
+    """Prepares a task for execution.
+
+    TODO(John Sirois): XXX FIX DOCS
+
+    Called before execution and prior to any tasks that may be (indirectly) depended upon.
+
+    Typically a task that requires products from other goals would register interest in those
+    products here and then retrieve the requested product mappings when executed.
+    """
 
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
@@ -115,15 +138,6 @@ class TaskBase(AbstractClass):
       raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
-
-  def prepare(self, round_manager):
-    """Prepares a task for execution.
-
-    Called before execution and prior to any tasks that may be (indirectly) depended upon.
-
-    Typically a task that requires products from other goals would register interest in those
-    products here and then retrieve the requested product mappings when executed.
-    """
 
   @property
   def workdir(self):
@@ -183,16 +197,6 @@ class TaskBase(AbstractClass):
 
   def artifact_cache_writes_enabled(self):
     return bool(self._write_artifact_cache_spec) and self.get_options().write_to_artifact_cache
-
-  @classmethod
-  def product_types(self):
-    """The list of products this Task produces. Set the product type(s) for this
-    task i.e. the product type(s) this task creates e.g ['classes'].
-
-    By default, each task is considered as creating a unique product type(s).
-    Subclasses that create products, should override this to specify their unique product type(s).
-    """
-    return []
 
   def invalidate_for_files(self):
     """Provides extra files that participate in invalidation.

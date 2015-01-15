@@ -44,7 +44,8 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  def prepare(self, round_manager):
+  @classmethod
+  def prepare(cls, round_manager):
     round_manager.require_data('compile_classpath')
 
   def _is_checked(self, target):
@@ -62,7 +63,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
         invalid_targets.extend(vt.targets)
       sources = self.calculate_sources(invalid_targets)
       if sources:
-        result = self.checkstyle(sources, invalid_targets)
+        result = self.checkstyle(sources)
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
@@ -74,7 +75,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
                      if source.endswith(self._JAVA_SOURCE_EXTENSION))
     return sources
 
-  def checkstyle(self, sources, targets):
+  def checkstyle(self, sources):
     compile_classpath = self.context.products.get_data('compile_classpath')
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
     union_classpath.update(jar for conf, jar in compile_classpath if conf in self.get_options().confs)

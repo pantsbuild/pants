@@ -7,14 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
-from optparse import OptionGroup
 import os
 
 from pants.backend.core.tasks.task import TaskBase, Task
 from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
 from pants.goal.goal import Goal
-from pants.goal.mkflag import Mkflag
 
 
 class GroupMember(TaskBase):
@@ -264,10 +262,17 @@ class GroupTask(Task):
     group_member.options_scope = Goal.scope(cls.parent_options_scope, group_member.name())
     cls._member_types().append(group_member)
 
+  @classmethod
+  def prepare(cls, round_manager):
+    round_manager.require_data('compile_classpath')
+    for member_type in cls._member_types():
+      member_type.prepare(round_manager)
+
   def __init__(self, *args, **kwargs):
     super(GroupTask, self).__init__(*args, **kwargs)
 
-    self._group_members = []
+    self._group_members = [member_type(self.context, os.path.join(self.workdir, member_type.name()))
+                           for member_type in self._member_types()]
 
   @abstractmethod
   def product_types(self):
@@ -276,13 +281,6 @@ class GroupTask(Task):
   @abstractproperty
   def group_name(self):
     """GroupTask must be sub-classed to provide a group name."""
-
-  def prepare(self, round_manager):
-    round_manager.require_data('compile_classpath')
-    for member_type in self._member_types():
-      group_member = member_type(self.context, os.path.join(self.workdir, member_type.name()))
-      group_member.prepare(round_manager)
-      self._group_members.append(group_member)
 
   def execute(self):
     with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):

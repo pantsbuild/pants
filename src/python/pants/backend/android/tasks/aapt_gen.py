@@ -42,12 +42,9 @@ class AaptGen(AaptTask, CodeGen):
   def _calculate_genfile(cls, package):
     return os.path.join(cls.package_path(package), 'R.java')
 
-  def __init__(self, *args, **kwargs):
-    super(AaptGen, self).__init__(*args, **kwargs)
-    self._jar_library_by_sdk = {}
-
-  def prepare(self, round_manager):
-    super(AaptGen, self).prepare(round_manager)
+  @classmethod
+  def prepare(cls, round_manager):
+    super(AaptGen, cls).prepare(round_manager)
 
     # prepare exactly N android jar targets where N is the number of SDKs in-play
     sdks = set(ar.target_sdk for ar in self.context.targets(predicate=self.is_gentarget))
@@ -56,6 +53,10 @@ class AaptGen(AaptTask, CodeGen):
       jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
       address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
       self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
+
+  def __init__(self, *args, **kwargs):
+    super(AaptGen, self).__init__(*args, **kwargs)
+    self._jar_library_by_sdk = {}
 
   def is_gentarget(self, target):
     return isinstance(target, AndroidResources)

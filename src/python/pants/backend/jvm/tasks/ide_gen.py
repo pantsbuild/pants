@@ -22,7 +22,9 @@ from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.util.dirutil import safe_mkdir, safe_walk
 
+
 logger = logging.getLogger(__name__)
+
 
 # We use custom checks for scala and java targets here for 2 reasons:
 # 1.) jvm_binary could have either a scala or java source file attached so we can't do a pure
@@ -61,7 +63,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
              help='Adds python support to the generated project configuration.')
     register('--java', action='store_true', default=True,
              help='Includes java sources in the project; otherwise compiles them and adds them '
-                   'to the project classpath.')
+                  'to the project classpath.')
     register('--java-language-level', type=int, default=7,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
     register('--java-jdk-name', default=None,
@@ -79,6 +81,22 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                   'its sibling source_root() entries define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
                   'test paths.')
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    if options.python:
+      round_manager.require('python')
+    if not options.skip_java:
+      round_manager.require('java')
+    if not options.skip_scala:
+      round_manager.require('scala')
+    # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
+    # the parameter. See John's comments on RB 716.
+    round_manager.require_data('ivy_jar_products')
+    round_manager.require('jar_dependencies')
+    round_manager.require('jar_map_default')
+    round_manager.require('jar_map_sources')
+    round_manager.require('jar_map_javadoc')
 
   class Error(TaskError):
     """IdeGen Error."""
@@ -133,21 +151,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     # is specified in the 'ide' section.
     jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)
     self.debug_port = self.context.config.getint('ide', 'debug_port', default=jvm_config_debug_port)
-
-  def prepare(self, round_manager):
-    if self.python:
-      round_manager.require('python')
-    if not self.skip_java:
-      round_manager.require('java')
-    if not self.skip_scala:
-      round_manager.require('scala')
-    # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
-    # the parameter. See John's comments on RB 716.
-    round_manager.require_data('ivy_jar_products')
-    round_manager.require('jar_dependencies')
-    round_manager.require('jar_map_default')
-    round_manager.require('jar_map_sources')
-    round_manager.require('jar_map_javadoc')
 
   def _prepare_project(self):
     targets, self._project = self.configure_project(
