@@ -12,8 +12,9 @@ import shutil
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
+from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import relativize_path, safe_mkdir
 
 class PrepareResources(Task):
 
@@ -24,6 +25,7 @@ class PrepareResources(Task):
   def __init__(self, *args, **kwargs):
     super(PrepareResources, self).__init__(*args, **kwargs)
     self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
+    self._buildroot = get_buildroot()
 
   def prepare(self, round_manager):
     round_manager.require_data('compile_classpath')
@@ -50,7 +52,9 @@ class PrepareResources(Task):
       all_resources_tgts.update(resources_tgts)
 
     def compute_target_dir(tgt):
-      return os.path.join(self.workdir, tgt.id)
+      # Sources are all relative to their roots: relativize directories as well to
+      # breaking filesystem limits.
+      return relativize_path(os.path.join(self.workdir, tgt.id), self._buildroot)
 
     with self.invalidated(all_resources_tgts) as invalidation_check:
       invalid_targets = set()
