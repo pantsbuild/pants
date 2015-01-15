@@ -24,6 +24,15 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'benchmark-agent',
                           default=['//:benchmark-java-allocation-instrumenter-2.1'])
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    # TODO(John Sirois): these are fake requirements in order to force compile to run before this
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    # See: https://github.com/pantsbuild/pants/issues/310
+    round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
+
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
     # TODO(Steve Gury):
@@ -36,14 +45,6 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
       self.args.append('--measureMemory')
     if self.get_options().debug:
       self.args.append('--debug')
-
-  def prepare(self, round_manager):
-    # TODO(John Sirois): these are fake requirements in order to force compile to run before this
-    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
-    # and depend on that.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
 
   def execute(self):
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
@@ -60,7 +61,6 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
 
     benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
-    targets = self.context.targets()
     classpath = self.classpath(benchmark_tools_classpath, confs=self.confs)
 
     caliper_main = 'com.google.caliper.Runner'

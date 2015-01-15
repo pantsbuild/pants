@@ -28,8 +28,8 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.assertTrue(self._context.is_unlocked())
     super(RoundEngineTest, self).tearDown()
 
-  def construct_action(self, tag):
-    return 'construct', tag, self._context
+  def alternate_target_roots_action(self, tag):
+    return 'alternate_target_roots', tag, self._context
 
   def prepare_action(self, tag):
     return 'prepare', tag, self._context
@@ -37,20 +37,28 @@ class RoundEngineTest(EngineTestBase, BaseTest):
   def execute_action(self, tag):
     return 'execute', tag, self._context
 
+  def construct_action(self, tag):
+    return 'construct', tag, self._context
+
   def record(self, tag, product_types=None, required_data=None):
     class RecordingTask(Task):
-      def __init__(me, *args, **kwargs):
-        super(RecordingTask, me).__init__(*args, **kwargs)
-        self.actions.append(self.construct_action(tag))
-
       @classmethod
       def product_types(cls):
         return product_types or []
 
-      def prepare(me, round_manager):
+      @classmethod
+      def alternate_target_roots(cls, options, address_mapper, build_graph):
+        self.actions.append(self.alternate_target_roots_action(tag))
+
+      @classmethod
+      def prepare(cls, options, round_manager):
         for requirement in (required_data or ()):
           round_manager.require_data(requirement)
         self.actions.append(self.prepare_action(tag))
+
+      def __init__(me, *args, **kwargs):
+        super(RecordingTask, me).__init__(*args, **kwargs)
+        self.actions.append(self.construct_action(tag))
 
       def execute(me):
         self.actions.append(self.execute_action(tag))
@@ -65,13 +73,15 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     expected_pre_execute_actions = set()
     expected_execute_actions = []
     for action in expected_execute_ordering:
-      expected_pre_execute_actions.add(self.construct_action(action))
+      expected_pre_execute_actions.add(self.alternate_target_roots_action(action))
       expected_pre_execute_actions.add(self.prepare_action(action))
+      expected_execute_actions.append(self.construct_action(action))
       expected_execute_actions.append(self.execute_action(action))
 
+    expeceted_execute_actions_length = len(expected_execute_ordering) * 2
     self.assertEqual(expected_pre_execute_actions,
-                     set(self.actions[:-len(expected_execute_ordering)]))
-    self.assertEqual(expected_execute_actions, self.actions[-len(expected_execute_ordering):])
+                     set(self.actions[:-expeceted_execute_actions_length]))
+    self.assertEqual(expected_execute_actions, self.actions[-expeceted_execute_actions_length:])
 
   def test_lifecycle_ordering(self):
     self.install_task('task1', goal='goal1', product_types=['1'])
@@ -183,5 +193,11 @@ class RoundEngineTest(EngineTestBase, BaseTest):
                         self.as_goals('goal1', 'goal2', 'goal1', 'goal3', 'goal2'))
 
     self.assert_actions('task1', 'task2', 'task3')
+
+  def test_replace_target_roots(self):
+    pass
+
+  def test_replace_target_roots_conflict(self):
+    pass
 
 

@@ -165,26 +165,32 @@ class Products(object):
   def require(self, typename, predicate=None):
     """Registers a requirement that file products of the given type by mapped.
 
-    If a target predicate is supplied, only targets matching the predicate are mapped.
+    If target predicates are supplied, only targets matching at least one of the predicates are
+    mapped.
     """
-    if predicate:
-      self.predicates_for_type[typename].append(predicate)
-    return self.products.setdefault(typename, Products.ProductMapping(typename))
+    # TODO(John Sirois): This is a broken API.  If one client does a require with no predicate and
+    # another requires with a predicate, the producer will only produce for the latter.  The former
+    # presumably intended to have all products of this type mapped.  Kill the predicate portion of
+    # the api by moving to the new tuple-based engine where all tasks require data for a specific
+    # set of targets.
+    self.predicates_for_type[typename].append(predicate or (lambda target: False))
 
   def isrequired(self, typename):
-    """Returns a predicate that selects targets required for the given type if mappings are required.
+    """Returns a predicate selecting targets required for the given type if mappings are required.
 
     Otherwise returns None.
     """
-    if typename not in self.products:
+    predicates = self.predicates_for_type[typename]
+    if not predicates:
       return None
+
     def combine(first, second):
       return lambda target: first(target) or second(target)
-    return reduce(combine, self.predicates_for_type[typename], lambda target: False)
+    return reduce(combine, predicates, lambda target: False)
 
   def get(self, typename):
     """Returns a ProductMapping for the given type name."""
-    return self.require(typename)
+    return self.products.setdefault(typename, Products.ProductMapping(typename))
 
   def require_data(self, typename):
     """ Registers a requirement that data produced by tasks is required.

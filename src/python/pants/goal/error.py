@@ -8,7 +8,3 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 class GoalError(Exception):
   """Raised to indicate a goal has failed."""
-
-
-class TargetRootReplacementError(Exception):
-  """Raised to indicate an attempt to replace target roots after they were read."""

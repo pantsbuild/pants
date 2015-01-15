@@ -28,7 +28,7 @@ class LazySourceMapperTest(BaseTest):
     self.set_mapper()
 
   def set_mapper(self, fast=False):
-    self.mapper = LazySourceMapper(self.context(), stop_after_match=fast)
+    self.mapper = LazySourceMapper(self.address_mapper, self.build_graph, stop_after_match=fast)
 
   def owner(self, owner, f):
     self.assertEqual(set(owner), set(i.spec for i in self.mapper.target_addresses_for_source(f)))

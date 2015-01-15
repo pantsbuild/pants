@@ -213,6 +213,11 @@ class JarTask(NailgunTask):
     super(JarTask, cls).register_options(register)
     cls.register_jvm_tool(register, 'jar-tool')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
+
   def __init__(self, *args, **kwargs):
     super(JarTask, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
@@ -222,10 +227,6 @@ class JarTask(NailgunTask):
   @property
   def config_section(self):
     return self._CONFIG_SECTION
-
-  def prepare(self, round_manager):
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
 
   @contextmanager
   def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):

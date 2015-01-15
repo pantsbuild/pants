@@ -18,10 +18,10 @@ from pants.engine.round_manager import RoundManager
 
 
 class GoalExecutor(object):
-  def __init__(self, context, goal, tasks_by_name):
+  def __init__(self, context, goal, tasktypes_by_name):
     self._context = context
     self._goal = goal
-    self._tasks_by_name = tasks_by_name
+    self._tasktypes_by_name = tasktypes_by_name
 
   @property
   def goal(self):
@@ -33,18 +33,22 @@ class GoalExecutor(object):
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.
     """
+    goal_workdir = os.path.join(self._context.options.for_global_scope().pants_workdir,
+                                self._goal.name)
     with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.GOAL]):
-      for name, task in reversed(self._tasks_by_name.items()):
+      for name, task_type in reversed(self._tasktypes_by_name.items()):
         with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
           if explain:
             self._context.log.debug('Skipping execution of %s in explain mode' % name)
           else:
+            task_workdir = os.path.join(goal_workdir, name)
+            task = task_type(self._context, task_workdir)
             task.execute()
 
       if explain:
-        reversed_tasks_by_name = reversed(self._tasks_by_name.items())
+        reversed_tasktypes_by_name = reversed(self._tasktypes_by_name.items())
         goal_to_task = ', '.join(
-            '%s->%s' % (name, task.__class__.__name__) for name, task in reversed_tasks_by_name)
+            '%s->%s' % (name, task_type.__name__) for name, task_type in reversed_tasktypes_by_name)
         print('{goal} [{goal_to_task}]'.format(goal=self._goal.name, goal_to_task=goal_to_task))
 
 
@@ -64,7 +68,7 @@ class RoundEngine(Engine):
   class MissingProductError(DependencyError):
     """Indicates an expressed data dependency if not provided by any installed task."""
 
-  GoalInfo = namedtuple('GoalInfo', ['goal', 'tasks_by_name', 'goal_dependencies'])
+  GoalInfo = namedtuple('GoalInfo', ['goal', 'tasktypes_by_name', 'goal_dependencies'])
 
   def _topological_sort(self, goal_info_by_goal):
     dependees_by_goal = OrderedDict()
@@ -98,28 +102,47 @@ class RoundEngine(Engine):
         # TODO(John Sirois): Do a better job here and actually collect and print cycle paths
         # between Goals/Tasks.  The developer can most directly address that data.
         raise self.GoalCycleError('Cycle detected in goal dependencies:\n\t{0}'
-                                   .format('\n\t'.join('{0} <- {1}'.format(goal, list(dependees))
-                                                       for goal, dependees
-                                                       in dependees_by_goal.items())))
+                                  .format('\n\t'.join('{0} <- {1}'.format(goal, list(dependees))
+                                                      for goal, dependees
+                                                      in dependees_by_goal.items())))
 
-  def _visit_goal(self, goal, context, goal_info_by_goal):
+  class TargetRootsReplacement(object):
+    class ConflictingProposalsError(Exception):
+      """"""
+
+    def __init__(self):
+      self._proposer = None
+      self._target_roots = None
+
+    def propose_alternates(self, proposer, target_roots):
+      if self._target_roots and target_roots and (self._target_roots != target_roots):
+        raise self.ConflictingProposalsError('')  # TODO(John Sirois): XXX custom exception type
+      self._proposer = proposer
+      self._target_roots = target_roots
+
+    def apply(self, context):
+      if self._target_roots:
+        context._replace_targets(self._target_roots)
+
+  def _visit_goal(self, goal, context, goal_info_by_goal, target_roots_replacement):
     if goal in goal_info_by_goal:
       return
 
-    tasks_by_name = OrderedDict()
+    tasktypes_by_name = OrderedDict()
     goal_dependencies = set()
     visited_task_types = set()
     for task_name in reversed(goal.ordered_task_names()):
       task_type = goal.task_type_by_name(task_name)
+      tasktypes_by_name[task_name] = task_type
       visited_task_types.add(task_type)
 
-      task_workdir = os.path.join(context.options.for_global_scope().pants_workdir,
-                                  goal.name, task_name)
-      task = task_type(context, task_workdir)
-      tasks_by_name[task_name] = task
+      alternate_target_roots = task_type._alternate_target_roots(context.options,
+                                                                 context.address_mapper,
+                                                                 context.build_graph)
+      target_roots_replacement.propose_alternates(task_type, alternate_target_roots)
 
       round_manager = RoundManager(context)
-      task.prepare(round_manager)
+      task_type._prepare(context.options, round_manager)
       try:
         dependencies = round_manager.get_dependencies()
         for producer_info in dependencies:
@@ -148,22 +171,24 @@ class RoundEngine(Engine):
             "Could not satisfy data dependencies for goal '{name}' with action {action}: {error}"
             .format(name=task_name, action=task_type.__name__, error=e))
 
-    goal_info = self.GoalInfo(goal, tasks_by_name, goal_dependencies)
+    goal_info = self.GoalInfo(goal, tasktypes_by_name, goal_dependencies)
     goal_info_by_goal[goal] = goal_info
 
     for goal_dependency in goal_dependencies:
-      self._visit_goal(goal_dependency, context, goal_info_by_goal)
+      self._visit_goal(goal_dependency, context, goal_info_by_goal, target_roots_replacement)
 
   def _prepare(self, context, goals):
     if len(goals) == 0:
       raise TaskError('No goals to prepare')
 
     goal_info_by_goal = OrderedDict()
+    target_roots_replacement = self.TargetRootsReplacement()
     for goal in reversed(OrderedSet(goals)):
-      self._visit_goal(goal, context, goal_info_by_goal)
+      self._visit_goal(goal, context, goal_info_by_goal, target_roots_replacement)
+    target_roots_replacement.apply(context)
 
     for goal_info in reversed(list(self._topological_sort(goal_info_by_goal))):
-      yield GoalExecutor(context, goal_info.goal, goal_info.tasks_by_name)
+      yield GoalExecutor(context, goal_info.goal, goal_info.tasktypes_by_name)
 
   def attempt(self, context, goals):
     goal_executors = list(self._prepare(context, goals))

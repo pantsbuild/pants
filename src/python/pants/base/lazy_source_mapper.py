@@ -11,6 +11,7 @@ import os
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 
+
 class LazySourceMapper(object):
   """A utility for lazily making a best-effort mapping of source files to targets that own them.
 
@@ -27,14 +28,18 @@ class LazySourceMapper(object):
   populating the BuildGraph is expensive, so in general there should only be one instance of it.
   """
 
-  def __init__(self, context, stop_after_match=False):
-    """Initialize LazySourceMapper
+  def __init__(self, address_mapper, build_graph, stop_after_match=False):
+    """Initialize LazySourceMapper.
 
-    :param Context context: A Context object as provided to Task instances.
+    :param AddressMapper address_mapper: An address mapper that can be used to populate the
+      `build_graph` with targets source mappings are needed for.
+    :param BuildGraph build_graph: The build graph to map sources from.
+    :param bool stop_after_match: If `True` a search will not traverse into parent directories once
+      an owner is identified.
     """
     self._stop_after_match = stop_after_match
-    self._build_graph = context.build_graph
-    self._address_mapper = context.address_mapper
+    self._build_graph = build_graph
+    self._address_mapper = address_mapper
     self._source_to_address = defaultdict(set)
     self._mapped_paths = set()
     self._searched_sources = set()
@@ -97,7 +102,7 @@ class LazySourceMapper(object):
         if not target.is_synthetic:
           self._source_to_address[target.address.build_file.relpath].add(target.address)
 
-  def target_addresses_for_source(self, source, must_find=False):
+  def target_addresses_for_source(self, source):
     """Attempt to find targets which own a source by searching up directory structure to buildroot.
 
     :param string source: The source to look up.

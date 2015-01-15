@@ -32,17 +32,17 @@ class UnpackJars(Task):
   class InvalidPatternError(Exception):
     """Thrown if a pattern can't be compiled for including or excluding args"""
 
-  def __init__(self, *args, **kwargs):
-    super(UnpackJars, self).__init__(*args, **kwargs)
-    self._buildroot = get_buildroot()
-
   @classmethod
   def product_types(cls):
     return ['unpacked_archives']
 
-  def prepare(self, round_manager):
-    super(UnpackJars, self).prepare(round_manager)
+  @classmethod
+  def prepare(cls, options, round_manager):
     round_manager.require_data('ivy_imports')
+
+  def __init__(self, *args, **kwargs):
+    super(UnpackJars, self).__init__(*args, **kwargs)
+    self._buildroot = get_buildroot()
 
   def _unpack_dir(self, unpacked_jars):
     return os.path.normpath(os.path.join(self._workdir, unpacked_jars.id))
