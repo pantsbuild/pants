@@ -12,6 +12,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
@@ -54,6 +55,7 @@ from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
+from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.goal.goal import Goal
@@ -66,6 +68,7 @@ def build_file_aliases():
       'benchmark': Benchmark,
       'credentials': Credentials,
       'jar_library': JarLibrary,
+      'unpacked_jars' : UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'java_tests': JavaTests,
@@ -110,6 +113,9 @@ def register_goals():
       'Resolve dependencies and produce dependency reports.')
 
   task(name='ivy-imports', action=IvyImports).install('imports')
+
+  task(name='unpack-jars', action=UnpackJars).install().with_description(
+    'Unpack artifacts specified by unpacked_jars() targets.')
 
   # Compilation.
 

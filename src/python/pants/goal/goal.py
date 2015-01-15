@@ -5,10 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from optparse import OptionGroup
 
 from pants.goal.error import GoalError
-from pants.goal.mkflag import Mkflag
 
 
 class Goal(object):

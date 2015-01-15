@@ -17,6 +17,7 @@ from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
+from pants.backend.core.tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
@@ -34,6 +35,7 @@ from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
+from pants.backend.core.from_target import FromTarget
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
@@ -85,6 +87,7 @@ def build_file_aliases():
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,
       'globs': Globs,
+      'from_target': FromTarget,
       'rglobs': RGlobs,
       'source_root': SourceRoot.factory,
       'zglobs': ZGlobs,
@@ -181,3 +184,6 @@ def register_goals():
   task(name='test', action=NoopTest).install('test')
   task(name='test-changed', action=TestChanged).install().with_description(
     'Test changed targets.')
+
+  task(name='deferred-sources', action=DeferredSourcesMapper).install().with_description(
+    'Map unpacked sources from archives.')

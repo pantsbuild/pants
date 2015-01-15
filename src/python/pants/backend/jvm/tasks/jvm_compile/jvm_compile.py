@@ -264,6 +264,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     round_manager.require_data('java')
     round_manager.require_data('scala')
 
+    # Allow the deferred_sources_mapping to take place first
+    round_manager.require_data('deferred_sources')
+
   def move(self, src, dst):
     if self._delete_scratch:
       shutil.move(src, dst)
