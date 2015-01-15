@@ -42,7 +42,7 @@ class DxCompile(AndroidTask, NailgunTask):
              help='Run dx with these JVM options.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):

@@ -36,7 +36,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
 

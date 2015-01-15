@@ -140,7 +140,7 @@ class BaseGroupTaskTest(BaseTest):
   def group_member(self, name, selector):
     class RecordingGroupMember(GroupMember):
       @classmethod
-      def prepare(cls, round_manager):
+      def prepare(cls, options, round_manager):
         self.recorded_actions.append(self.prepare_action(name))
 
       def __init__(me, *args, **kwargs):

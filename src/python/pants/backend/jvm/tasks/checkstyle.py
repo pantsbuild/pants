@@ -45,7 +45,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     return self._CONFIG_SECTION
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('compile_classpath')
 
   def _is_checked(self, target):

@@ -21,7 +21,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl-2.9.3'])
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.

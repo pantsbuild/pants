@@ -36,9 +36,16 @@ class ChangedTargetTask(NoopExecTask, ChangedFileTaskMixin):
     cls.register_change_file_options(register)
 
   # TODO(John Sirois): XXX
-  # need the context today, just the scoped options & build_graph in the new engine
+  # need the scope, context options today, just the scoped options & build_graph in the new engine.
+  # ==
+  # options
+  # address_mapper
+  # build_graph
+  # scm
+  # workspace
+
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(ChangedTargetTask, cls).prepare(round_manager)
     changed = self._changed_targets()
     self.context.replace_targets([self.context.build_graph.get_target(addr) for addr in changed])
@@ -49,7 +56,7 @@ class ChangedTargetTask(NoopExecTask, ChangedFileTaskMixin):
 class CompileChanged(ChangedTargetTask):
   """Find and compile changed targets."""
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(CompileChanged, cls).prepare(round_manager)  # Replaces target roots.
     round_manager.require_data(NoopCompile.product_types()[0])
 
@@ -57,6 +64,6 @@ class CompileChanged(ChangedTargetTask):
 class TestChanged(ChangedTargetTask):
   """Find and test changed targets."""
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(TestChanged, cls).prepare(round_manager) # Replaces target roots.
     round_manager.require_data(NoopTest.product_types()[0])

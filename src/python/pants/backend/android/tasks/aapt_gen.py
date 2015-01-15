@@ -42,18 +42,6 @@ class AaptGen(AaptTask, CodeGen):
   def _calculate_genfile(cls, package):
     return os.path.join(cls.package_path(package), 'R.java')
 
-  @classmethod
-  def prepare(cls, round_manager):
-    super(AaptGen, cls).prepare(round_manager)
-
-    # prepare exactly N android jar targets where N is the number of SDKs in-play
-    sdks = set(ar.target_sdk for ar in self.context.targets(predicate=self.is_gentarget))
-    for sdk in sdks:
-      jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
-      jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
-      address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
-      self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
-
   def __init__(self, *args, **kwargs):
     super(AaptGen, self).__init__(*args, **kwargs)
     self._jar_library_by_sdk = {}
@@ -66,6 +54,15 @@ class AaptGen(AaptTask, CodeGen):
 
   def is_forced(self, lang):
     return lang == 'java'
+
+  def prepare_gen(self, targets):
+    # prepare exactly N android jar targets where N is the number of SDKs in-play
+    sdks = set(ar.target_sdk for ar in targets)
+    for sdk in sdks:
+      jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
+      jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
+      address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
+      self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
   def render_args(self, target, output_dir):
     args = []

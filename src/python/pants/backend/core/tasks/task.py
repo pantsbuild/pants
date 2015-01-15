@@ -48,7 +48,7 @@ class TaskBase(AbstractClass):
   """
 
   @classmethod
-  def product_types(self):
+  def product_types(cls):
     """The list of products this Task produces. Set the product type(s) for this
     task i.e. the product type(s) this task creates e.g ['classes'].
 
@@ -90,7 +90,7 @@ class TaskBase(AbstractClass):
     return False
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     """Prepares a task for execution.
 
     TODO(John Sirois): XXX FIX DOCS

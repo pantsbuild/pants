@@ -587,7 +587,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(round_manager)
     round_manager.require_data('resources_by_target')
 

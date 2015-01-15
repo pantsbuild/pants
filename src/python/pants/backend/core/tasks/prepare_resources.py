@@ -24,7 +24,7 @@ class PrepareResources(Task):
     return ['resources_by_target']
 
   @classmethod
-  def prepare(cls, round_manager):
+  def prepare(cls, options, round_manager):
     round_manager.require_data('compile_classpath')
     # NOTE(Garrett Malmquist): This is a fake dependency to force resources to occur after jvm
     # compile. It solves some problems we've been having getting our annotation processors to
