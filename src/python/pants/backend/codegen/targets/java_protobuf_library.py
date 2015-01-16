@@ -20,17 +20,28 @@ logger = logging.getLogger(__name__)
 class JavaProtobufLibrary(ExportableJvmLibrary):
   """Generates a stub Java library from protobuf IDL files."""
 
-  def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
+  class ExpectedListError(Exception):
+    """Raised when an attribute has the wrong type."""
+    pass
+
+  def __init__(self, address=None, payload=None, buildflags=None, imports=None, **kwargs):
     """
     :param buildflags: Unused, and will be removed in a future release.
     :param list imports: List of addresses of `jar_library <#jar_library>`_
       targets which contain .proto definitions.
     """
     payload = payload or Payload()
+    if imports:
+      try:
+        self.assert_list(imports)
+      except Exception as e:
+        raise self.ExpectedListError(
+          "Target {target} should specify a list of addressses for imports.\n{msg}"
+          .format(target=address.spec, msg=e))
     payload.add_fields({
       'raw_imports': PrimitiveField(imports or ())
     })
-    super(JavaProtobufLibrary, self).__init__(payload=payload, **kwargs)
+    super(JavaProtobufLibrary, self).__init__(address=address, payload=payload, **kwargs)
     if buildflags is not None:
       logger.warn(" Target definition at {address} sets attribute 'buildflags' which is "
                   "ignored and will be removed in a future release"

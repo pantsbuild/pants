@@ -23,7 +23,11 @@ class UnpackedJars(Target):
     """Thrown when the target has no libraries defined."""
     pass
 
-  def __init__(self, payload=None, libraries=None, include_patterns=None, exclude_patterns=None,
+  class ExpectedListError(Exception):
+    """Raised when an attribute has the wrong type."""
+    pass
+
+  def __init__(self, address=None, payload=None, libraries=None, include_patterns=None, exclude_patterns=None,
                **kwargs):
     """
     :param libraries: List of addresses of `jar_library <#jar_library>`_
@@ -33,10 +37,17 @@ class UnpackedJars(Target):
     :param list exclude_patterns: fileset patterns to exclude from the archive
     """
     payload = payload or Payload()
+    if libraries:
+      try:
+        self.assert_list(libraries)
+      except Exception as e:
+        raise self.ExpectedListError(
+          "Target {target} should specify a list of addressses for libraries.\n{msg}"
+          .format(target=address.spec, msg=e))
     payload.add_fields({
       'raw_libraries': PrimitiveField(libraries or ())
     })
-    super(UnpackedJars, self).__init__(payload=payload, **kwargs)
+    super(UnpackedJars, self).__init__(address=address, payload=payload, **kwargs)
 
     self.include_patterns = include_patterns or []
     self.exclude_patterns = exclude_patterns or []
