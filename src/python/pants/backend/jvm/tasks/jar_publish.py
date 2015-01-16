@@ -320,12 +320,12 @@ class JarPublish(JarTask, ScmPublish):
   Example usage: ::
 
      # By default pants will perform a dry-run.
-     ./pants goal clean-all publish src/java/com/twitter/mybird
+     ./pants clean-all publish src/java/com/twitter/mybird
 
      # Actually publish.
-     ./pants goal clean-all publish src/java/com/twitter/mybird --no-publish-dryrun
+     ./pants clean-all publish src/java/com/twitter/mybird --no-publish-dryrun
 
-  Please see ``./pants goal publish -h`` for a detailed description of all
+  Please see ``./pants publish -h`` for a detailed description of all
   publishing options.
 
   Publishing can be configured in ``pants.ini`` as follows.

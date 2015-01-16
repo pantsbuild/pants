@@ -70,7 +70,7 @@ To bring up Scala's interactive console, use Pants'
 In the resulting console, you can `import` code from the Pants invocation's
 targets and their dependencies.
 
-    $ ./pants goal repl examples/src/scala/com/pants/example/hello/welcome
+    $ ./pants repl examples/src/scala/com/pants/example/hello/welcome
        ...much build output...
     15:08:13 00:11   [resources]
     15:08:13 00:11     [prepare]

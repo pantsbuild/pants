@@ -42,8 +42,8 @@ especially relevant.
 > executable because it contains a manifest file that specifies the main
 > class as well as classpath for all dependencies. If your program
 > contains only jars (and resources packaged in those jars), this is all
-> you need to run the binary. Use `./pants goal binary` to compile its
-> code; `./pants goal run` to run it "in place".
+> you need to run the binary. Use `./pants binary` to compile its
+> code; `./pants run` to run it "in place".
 
 **Importable Code**
 
@@ -162,20 +162,20 @@ Pants runs the tests. If they aren't test targets, Pants still compiles them sin
 must compile before it can test.
 
     :::bash
-    $ ./pants goal test examples/src/java/com/pants/examples/hello/:: examples/tests/java/com/pants/examples/hello/::
+    $ ./pants test examples/src/java/com/pants/examples/hello/:: examples/tests/java/com/pants/examples/hello/::
 
 Assuming you use `junit_test` targets, output from the `junit` run is written to
 `.pants.d/test/junit/`; you can see it on the console with `--no--suppress-output`:
 
     :::bash
-    $ ./pants goal test.junit --no-suppress-output examples/tests/java/com/pants/examples/hello::
+    $ ./pants test.junit --no-suppress-output examples/tests/java/com/pants/examples/hello::
 
 
 **Run just that one troublesome test class:** (assuming a JUnit test;
 other frameworks use other flags)
 
     :::bash
-    $ ./pants goal test.junit --test=com.pants.examples.hello.greet.GreetingTest examples/tests/java/com/pants/examples/hello/::
+    $ ./pants test.junit --test=com.pants.examples.hello.greet.GreetingTest examples/tests/java/com/pants/examples/hello/::
 
 **Packaging Binaries**
 
@@ -183,7 +183,7 @@ To create a <a pantsref="jvm_bundles">bundle</a> (a binary and its dependencies,
 including helper files):
 
     :::bash
-    $ ./pants goal bundle --archive=zip examples/src/java/com/pants/examples/hello/main
+    $ ./pants bundle --archive=zip examples/src/java/com/pants/examples/hello/main
        ...lots of build output...
     08:50:54 00:02       [create-monolithic-jar]
     08:50:54 00:02         [add-internal-classes]
@@ -218,13 +218,13 @@ Pants uses the java on your `PATH` (not `JAVA_HOME`). To specify a
 specific java version for just one pants invocation:
 
     :::bash
-    $ PATH=/usr/lib/jvm/java-1.7.0-openjdk7/bin:${PATH} ./pants goal ...
+    $ PATH=/usr/lib/jvm/java-1.7.0-openjdk7/bin:${PATH} ./pants ...
 
 If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can use a
 `compile.java` command-line arg to specify Java version:
 
     :::bash
-    ./pants goal bundle compile.java --target=7 --source=7 examples/src/java/com/pants/examples/hello/main
+    ./pants bundle compile.java --target=7 --source=7 examples/src/java/com/pants/examples/hello/main
 
 *BUT* beware: if you switch between Java versions, Pants doesn't realize
 when it needs to rebuild. If you build with version 7, change some code,
@@ -233,7 +233,7 @@ then build with version 6, java 6 will try to understand java
 Java version and are switching to another, you probably need to:
 
     :::bash
-    $ ./pants goal clean-all
+    $ ./pants clean-all
 
 so that the next build starts from scratch.
 
@@ -274,10 +274,10 @@ not-so-useful stub `.jar` files).)
 
 ### Generating a Bundle
 
-Invoke `./pants goal bundle` on a JVM app or JVM binary target:
+Invoke `./pants bundle` on a JVM app or JVM binary target:
 
     :::bash
-    $ ./pants goal bundle examples/src/java/com/pants/examples/hello/main:main
+    $ ./pants bundle examples/src/java/com/pants/examples/hello/main:main
 
 With options, you can tell Pants to archive the bundle in a zip, a tar, and some other common
 formats. See the <a pantsref="gref_goal_bundle">bundle help</a> for built-in choices.
@@ -325,13 +325,13 @@ contains code compiled for this target.
 ### Deploying a Bundle
 
 Instead of just creating a directory tree, you can specify `goal bundle --archive=zip` to
-`./pants goal bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
+`./pants bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
 format) instead.
 
 To use such an archive, put it where you want it, unpack it, and run:
 
     :::bash
-    $ ./pants goal bundle --archive=zip examples/src/java/com/pants/examples/hello/main
+    $ ./pants bundle --archive=zip examples/src/java/com/pants/examples/hello/main
         ...lots of build output...
     10:14:26 00:01       [create-monolithic-jar]
     10:14:26 00:01         [add-internal-classes]
@@ -378,7 +378,7 @@ After building our `hello` example, if we check the binary jar's contents, there
 `Greeting.class` (and running that jar crashes; we omitted a class this binary needs):
 
     :::bash
-    $ ./pants goal binary examples/src/java/com/pants/examples/hello/main:main
+    $ ./pants binary examples/src/java/com/pants/examples/hello/main:main
     $ jar -tf dist/hello-example.jar
     META-INF/
     META-INF/MANIFEST.MF

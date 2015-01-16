@@ -73,7 +73,7 @@ binary. You can use `goal binary` to build a PEX from it. You can then
 run the PEX:
 
     :::bash
-    $ ./pants goal binary examples/src/python/example/hello/main
+    $ ./pants binary examples/src/python/example/hello/main
          ...much output...
     $ ./dist/main.pex # run the generated PEX
     Hello, world!
@@ -84,7 +84,7 @@ run the PEX:
 You can also run the binary "from source" with the `run` goal:
 
     :::bash
-    $ ./pants goal run.py --args='Whirled' examples/src/python/example/hello/main
+    $ ./pants run.py --args='Whirled' examples/src/python/example/hello/main
          ...much output...
     14:32:01 00:00     [py]
     14:32:02 00:01       [run]
@@ -132,10 +132,10 @@ with a `python_tests` target. It depends on the library:
 Use `goal test` to run the tests. This uses `pytest`:
 
     :::bash
-    $ ./pants goal test examples/tests/python/example_test/hello/greet
+    $ ./pants test examples/tests/python/example_test/hello/greet
 
     13:29:28 00:00 [main]
-                   (To run a reporting server: ./pants goal server)
+                   (To run a reporting server: ./pants server)
     13:29:28 00:00   [bootstrap]
     13:29:28 00:00   [setup]
     13:29:28 00:00     [parse]
@@ -173,11 +173,11 @@ and assembles them *a la carte* into an execution environment.
 PEX Contents
 ------------
 
-To build a PEX, invoke `./pants goal binary` on a `python_binary`
+To build a PEX, invoke `./pants binary` on a `python_binary`
 target:
 
     :::bash
-    $ ./pants goal binary examples/src/python/example/hello/main
+    $ ./pants binary examples/src/python/example/hello/main
       ...
                      SUCCESS
     $ ./dist/main.pex
@@ -199,10 +199,10 @@ To drop into our example library target `examples/src/python/example/hello/greet
 turn on to see what's going on in the background:
 
     :::bash
-    $ PANTS_VERBOSE=1 ./pants goal repl examples/src/python/example/hello/greet
+    $ PANTS_VERBOSE=1 ./pants repl examples/src/python/example/hello/greet
     
     15:11:41 00:00 [main]
-                   (To run a reporting server: ./pants goal server)
+                   (To run a reporting server: ./pants server)
       ...lots of build output...
     15:11:42 00:01   [repl]
     15:11:42 00:01     [python-repl]Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))]:
@@ -288,7 +288,7 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
 you could run:
 
     :::bash
-    $ ./pants goal test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
+    $ ./pants test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
                      platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
@@ -307,7 +307,7 @@ and task on your command line. E.g., to run only tests whose names contain `req`
 parameters:
 
     :::bash
-    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -k req
+    $ ./pants test.pytest examples/tests/python/example_test/hello/greet -- -k req
        ...lots of build output...
     10:43:04 00:01   [test]
     10:43:04 00:01     [run_prep_command]
@@ -331,12 +331,12 @@ parameters:
 ...and to "unsilence" py.test (not suppress stderr and stdout), pass `-- -s`:
 
     :::bash
-    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -s
+    $ ./pants test.pytest examples/tests/python/example_test/hello/greet -- -s
 
 ...and to remind yourself of py.test's help:
 
     :::bash
-    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -h
+    $ ./pants test.pytest examples/tests/python/example_test/hello/greet -- -h
 
 ### Code Coverage
 
@@ -344,7 +344,7 @@ To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable. If 
 configured coverage data, it doesn't do much:
 
     :::bash
-    $ PANTS_PY_COVERAGE=1 ./pants goal test examples/tests/python/example_test/hello/greet:greet
+    $ PANTS_PY_COVERAGE=1 ./pants test examples/tests/python/example_test/hello/greet:greet
         ...lots of build output...
                          ============ 2 passed in 0.23 seconds ============
                          Name    Stmts   Miss  Cover
@@ -371,7 +371,7 @@ specification of package or module names to track coverage against. For
 example:
 
     :::bash
-    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants goal test examples/tests/python/example_test/hello/greet:greet
+    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants test examples/tests/python/example_test/hello/greet:greet
         ...lots of build output...
                      ============ 2 passed in 0.22 seconds ============
                      Name                                               Stmts   Miss Branch BrMiss  Cover
@@ -388,7 +388,7 @@ Similarly, a set of base paths can be specified containing the code for
 coverage to be measured over:
 
     :::bash
-    $ PANTS_PY_COVERAGE=paths:example/hello ./pants goal test examples/tests/python/example_test/hello/greet:greet
+    $ PANTS_PY_COVERAGE=paths:example/hello ./pants test examples/tests/python/example_test/hello/greet:greet
         ...lots of build output...
                      ============ 2 passed in 0.23 seconds ============
                      Name                                               Stmts   Miss Branch BrMiss  Cover
@@ -448,9 +448,9 @@ passed to the `setup` function.
 The <a pantsref="gref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
 
     :::bash
-    $ ./pants goal setup-py src/python/pants:test_infra
+    $ ./pants setup-py src/python/pants:test_infra
     10:23:06 00:00 [main]
-                   (To run a reporting server: ./pants goal server)
+                   (To run a reporting server: ./pants server)
     10:23:07 00:01   [bootstrap]
     10:23:07 00:01   [setup]
     10:23:07 00:01     [parse]

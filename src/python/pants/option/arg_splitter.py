@@ -38,7 +38,7 @@ class ArgSplitter(object):
 
   Recognizes, e.g.:
 
-  ./pants goal -x compile --foo compile.java -y target1 target2
+  ./pants -x compile --foo compile.java -y target1 target2
   ./pants -x compile --foo compile.java -y -- target1 target2
   ./pants -x compile target1 target2 --compile-java-flag
   ./pants -x --compile-java-flag compile target1 target2

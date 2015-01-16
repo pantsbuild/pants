@@ -126,7 +126,7 @@ How To
     to-be-published artifact. See
     <a pantsref="publish_local_test">Test with a Fake Local "Publish"</a>.
 -   Start the publish:
-    `./pants goal publish --no-dryrun [target]` Don't wander
+    `./pants publish --no-dryrun [target]` Don't wander
     off; Pants will ask for confirmation as it goes (making sure you
     aren't publishing artifact[s] you didn't mean to).
 
@@ -253,7 +253,7 @@ In git, this might mean:
 
     git reset origin/master # (if ``master`` is your release branch)
     git pull origin master
-    ./pants goal publish <your previous args>
+    ./pants publish <your previous args>
 
 Since you uploaded new versioned artifacts but the reset pushdb doesn't "remember" that, you might
 get "Versioned Artifact Already Exists" errors: see the section above and use `--override` to
@@ -336,7 +336,7 @@ Maven configured to use `~/.m2/repository` as a local repo. You can make
 pants publish to that local repo with:
 
     :::bash
-    ./pants goal publish --no-dryrun --local=~/.m2/repository
+    ./pants publish --no-dryrun --local=~/.m2/repository
 
 In the other codebase, change the dependencies to pull in the new
 artifact.

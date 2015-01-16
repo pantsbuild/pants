@@ -219,7 +219,7 @@ class Options(object):
       print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
       print('  ./pants help                                 Get help.')
       print('  ./pants help [goal]                          Get help for the specified goal.')
-      print('  ./pants goal goals                           List all installed goals.')
+      print('  ./pants goals                           List all installed goals.')
       print('')
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')

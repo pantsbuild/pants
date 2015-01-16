@@ -21,26 +21,26 @@ The following target addresses all specify the same single target.
 -   Fully qualified target address is `//` plus the BUILD file's directory path plus target name:
 
         :::bash
-        $ ./pants goal list //examples/src/java/com/pants/examples/hello/main:main
+        $ ./pants list //examples/src/java/com/pants/examples/hello/main:main
         examples/src/java/com/pants/examples/hello/main:main
 
 -   The starting double-slash is optional if the target isn't in the top directory:
 
         :::bash
-        $ ./pants goal list examples/src/java/com/pants/examples/hello/main:main
+        $ ./pants list examples/src/java/com/pants/examples/hello/main:main
         examples/src/java/com/pants/examples/hello/main:main
 
 -   Specify the default target (the target whose name matches the parent directory name):
 
         :::bash
-        $ ./pants goal list examples/src/java/com/pants/examples/hello/main
+        $ ./pants list examples/src/java/com/pants/examples/hello/main
         examples/src/java/com/pants/examples/hello/main:main
 
 -   Relative paths and trailing forward slashes are ignored on the
     command-line to accommodate tab completion:
 
         :::bash
-        $ ./pants goal list ./examples/src/java/com/pants/examples/hello/main/
+        $ ./pants list ./examples/src/java/com/pants/examples/hello/main/
         examples/src/java/com/pants/examples/hello/main:main
 
     Absolute paths are also allowed to support flexibility in scripting
@@ -77,9 +77,9 @@ BUILD file and *not* to the application target defined just above
 mybird. On the command line you could reference the root level
 application target with either of:
 
--   `$ ./pants goal list :application`
+-   `$ ./pants list :application`
 
--   `$ ./pants goal list //:application`
+-   `$ ./pants list //:application`
 
 Pants supports two globbing target selectors. These globbing selectors
 are provided as a convenience on the command-line. For target
@@ -89,7 +89,7 @@ A trailing single colon specifies a glob of targets at the specified
 location:
 
     :::bash
-    $ ./pants goal list tests/python/pants_test/:
+    $ ./pants list tests/python/pants_test/:
     tests/python/pants_test:base-test
     tests/python/pants_test:test_maven_layout
     tests/python/pants_test:test_thrift_util
@@ -99,7 +99,7 @@ A trailing double colon specifies a recursive glob of targets at the
 specified location:
 
     :::bash
-    $ ./pants goal list tests/python/pants_test/::
+    $ ./pants list tests/python/pants_test/::
     tests/python/pants_test:base-test
     tests/python/pants_test:test_maven_layout
     tests/python/pants_test:all
@@ -116,7 +116,7 @@ A leading caret specifies that this target or set of targets should be
 excluded from the list of targets:
 
     :::bash
-    $ ./pants goal list tests/python/pants_test/:: ^tests/python/pants_test/base::
+    $ ./pants list tests/python/pants_test/:: ^tests/python/pants_test/base::
     tests/python/pants_test:base-test
     tests/python/pants_test:test_maven_layout
     tests/python/pants_test:all
