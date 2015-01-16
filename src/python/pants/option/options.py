@@ -87,6 +87,7 @@ class Options(object):
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
     self._is_help = splitter.is_help
+    self._is_help_all = splitter.is_help_all
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
@@ -132,9 +133,14 @@ class Options(object):
     """Whether the command line indicates a request for help."""
     return self._is_help
 
+  def is_help_all(self):
+    """Whether the command line indicates a request for all the help."""
+    return self._is_help_all
+
   def format_global_help(self):
     """Generate a help message for global options."""
-    return self.get_global_parser().format_help()
+    return (self.get_global_parser().format_help() +
+            '--help-all              Show options for all goals and exit.')
 
   def format_help(self, scope):
     """Generate a help message for options at the specified scope."""
