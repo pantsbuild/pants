@@ -56,7 +56,7 @@ class ProtobufGen(CodeGen):
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ProtobufGen, cls).prepare(round_manager)
+    super(ProtobufGen, cls).prepare(options, round_manager)
     round_manager.require_data('ivy_imports')
     round_manager.require_data('deferred_sources')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
@@ -274,8 +274,10 @@ def calculate_genfiles(path, source):
   genfiles['java'].update(calculate_java_genfiles(protobuf_parse))
   return genfiles
 
+
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
+
 
 def calculate_java_genfiles(protobuf_parse):
   basepath = protobuf_parse.package.replace('.', os.path.sep)
@@ -288,6 +290,7 @@ def calculate_java_genfiles(protobuf_parse):
   for classname in classnames:
     yield os.path.join(basepath, '{0}.java'.format(classname))
 
+
 def _same_contents(a, b):
   """Perform a comparison of the two files"""
   with open(a, 'r') as f:
@@ -295,6 +298,7 @@ def _same_contents(a, b):
   with open(b, 'r') as f:
     b_data = f.read()
   return a_data == b_data
+
 
 def check_duplicate_conflicting_protos(sources_by_base, sources, log):
   """Checks if proto files are duplicate or conflicting.

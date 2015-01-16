@@ -588,7 +588,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JUnitRun, cls).prepare(round_manager)
+    super(JUnitRun, cls).prepare(options, round_manager)
     round_manager.require_data('resources_by_target')
 
     # List of FQCN, FQCN#method, sourcefile or sourcefile#method.

@@ -58,14 +58,7 @@ class ContextTest(BaseTest):
 
     context = self.context(target_roots=[b])
     self.assertEquals([b, a], context.targets())
-    context.replace_targets([a])
+    context._replace_targets([a])
     self.assertEquals([a], context.targets())
-    context.replace_targets([c])
+    context._replace_targets([c])
     self.assertEquals([c, b, a], context.targets())
-
-    context = self.context(target_roots=[b])
-    context.replace_targets([a], ignore_previous_reads=False)
-    self.assertEquals([a], context.targets())
-
-    with self.assertRaises(TargetRootReplacementError):
-      context.replace_targets([b], ignore_previous_reads=False)

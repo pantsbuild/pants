@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from twitter.common.lang import AbstractClass
 
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot
 from pants.scm.scm import Scm
 
 
@@ -34,11 +34,10 @@ class ScmWorkspace(Workspace):
   def __init__(self, scm):
     super(ScmWorkspace, self).__init__()
 
-    self._scm = scm or get_scm()
-
-    if self._scm is None:
+    if scm is None:
       raise self.WorkspaceError('Cannot figure out what changed without a configured '
                                 'source-control system.')
+    self._scm = scm
 
   def touched_files(self, parent):
     try:

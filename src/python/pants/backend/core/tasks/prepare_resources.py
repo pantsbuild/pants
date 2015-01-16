@@ -35,6 +35,7 @@ class PrepareResources(Task):
   def __init__(self, *args, **kwargs):
     super(PrepareResources, self).__init__(*args, **kwargs)
     self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
+    self._buildroot = get_buildroot()
 
   def execute(self):
     if self.context.products.is_required_data('resources_by_target'):

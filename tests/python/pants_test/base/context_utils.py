@@ -40,6 +40,8 @@ def create_options(options):
     def for_global_scope(self):
       return self.for_scope('')
 
+    def __getitem__(self, key):
+      return self.for_scope(key)
   return TestOptions()
 
 

@@ -33,7 +33,7 @@ class JvmBinaryTask(JarTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmBinaryTask, cls).prepare(round_manager)
+    super(JvmBinaryTask, cls).prepare(options, round_manager)
     round_manager.require('jar_dependencies', predicate=cls.is_binary)
 
   def __init__(self, *args, **kwargs):

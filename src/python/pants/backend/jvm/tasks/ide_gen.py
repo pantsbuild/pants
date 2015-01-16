@@ -172,7 +172,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                       debug_port,
                       jvm_targets,
                       not self.intransitive,
-                      self.context.new_workunit,
                       self.TargetUtil(self.context))
 
     if self.python:
@@ -217,7 +216,9 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     for target in targets:
       target.walk(prune)
 
-    self.context.replace_targets(compiles)
+    # TODO(John Sirois): Restructure to use alternate_target_roots Task lifecycle method
+    self.context._replace_targets(compiles)
+
     self.jar_dependencies = jars
 
     self.context.log.debug('pruned to cp:\n\t%s' % '\n\t'.join(
@@ -422,7 +423,7 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, targets, transitive, workunit_factory, target_util):
+               debug_port, targets, transitive, target_util):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
@@ -431,7 +432,6 @@ class Project(object):
     self.root_dir = root_dir
     self.targets = OrderedSet(targets)
     self.transitive = transitive
-    self.workunit_factory = workunit_factory
 
     self.sources = []
     self.py_sources = []
