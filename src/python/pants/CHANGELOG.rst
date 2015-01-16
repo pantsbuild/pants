@@ -777,7 +777,7 @@ Bugfixes
   `Issue #508 <https://github.com/pantsbuild/pants/issues/508>`_
   `RB #924 <https://rbcommons.com/s/twitter/r/924>`_
 
-* Fix `./pants targets`
+* Fix `./pants goal targets`
   `Issue #333 <https://github.com/pantsbuild/pants/issues/333>`_
   `RB #796 <https://rbcommons.com/s/twitter/r/796>`_
   `RB #914 <https://rbcommons.com/s/twitter/r/914>`_
