@@ -242,7 +242,6 @@ class ProtobufGen(CodeGen):
                                       derived_from=target,
                                       sources=genfiles,
                                       dependencies=self.pythondeps)
-    tgt.jar_dependencies.update(target.imports)
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
