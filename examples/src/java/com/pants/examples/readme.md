@@ -324,7 +324,7 @@ contains code compiled for this target.
 
 ### Deploying a Bundle
 
-Instead of just creating a directory tree, you can specify `goal bundle --archive=zip` to
+Instead of just creating a directory tree, you can specify `bundle --archive=zip` to
 `./pants bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
 format) instead.
 

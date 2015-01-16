@@ -92,7 +92,7 @@ Things can go wrong; you can recover:
     merge conflicts can happen, and folks don't always recover from them
     correctly.
 
-    In this situation, you probably want to pass `goal publish --overrride=<version>` to specify a
+    In this situation, you probably want to pass `publish --overrride=<version>` to specify a
     version to use instead of the automatically-computed already-existing version. Choose a version
     that's not already on the server. Pants records this version in the pushdb, so hopefully the
     next publisher won't have the same problem.
@@ -216,7 +216,7 @@ Try publishing again, but pass `--override` to specify the version number to use
 incrementing the version number from the pushdb. Be sure to use a version number that has not
 already been published this time. For example, to override the default publish version number for
 the `org.archie` buoyancy artifact, you might pass
-`goal publish --override=org.archie#buoyancy=2.5.8`.
+`publish --override=org.archie#buoyancy=2.5.8`.
 
 <a pantsmark="publish_pushdb_push"></a>
 
@@ -306,7 +306,7 @@ automatically prompts you to also publish depended-upon libraries whose
 source code changed. However, Pants does *not* automatically publish
 dependees of a depended-upon library. If you know you're about to
 publish a low-level library (perhaps via a "dry run" publish), you can
-use Pants' `goal dependees` to find other things to publish.
+use Pants' `dependees` to find other things to publish.
 
 For example, suppose your new library `high-level` depends on another
 library, `util`. If you tested `high-level` with `util` version 1.2, you

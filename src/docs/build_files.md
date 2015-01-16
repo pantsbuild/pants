@@ -28,7 +28,7 @@ Debugging a BUILD File
 If you're curious to know how Pants interprets your `BUILD` file, these
 techniques can be especially helpful:
 
-*Did I define the targets I meant to?* Use `goal list`:
+*Did I define the targets I meant to?* Use `list`:
 
     :::bash
     $ ./pants list examples/src/java/com/pants/examples/hello/greet
@@ -36,7 +36,7 @@ techniques can be especially helpful:
 
 *Did a change in one `BUILD` file break others?*
 List **every** target to find out:
-Use the recursive wildcard: `goal list ::`
+Use the recursive wildcard: `list ::`
 
     :::bash
     $ ./pants list ::
@@ -50,7 +50,7 @@ Use the recursive wildcard: `goal list ::`
       referenced from examples/src/scala/com/pants/example/hello/welcome:welcome
     $ # Instead of listing all targets, an error message. We found a problem
 
-*Do I pull in the dependencies I expect?* Use `goal depmap` (JVM languages only):
+*Do I pull in the dependencies I expect?* Use `depmap` (JVM languages only):
 
     :::bash
     $ ./pants depmap examples/tests/java/com/pants/examples/hello/greet
@@ -64,7 +64,7 @@ Use the recursive wildcard: `goal list ::`
       junit-junit-dep-4.11
       org.hamcrest-hamcrest-core-1.3
 
-*What source files do I depend on?* Use `goal filedeps`:
+*What source files do I depend on?* Use `filedeps`:
 
     :::bash
     $ ./pants filedeps examples/src/java/com/pants/examples/hello/main

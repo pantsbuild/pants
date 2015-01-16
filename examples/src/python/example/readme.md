@@ -69,7 +69,7 @@ BUILD for a Simple Binary
 -------------------------
 
 The pantsbuild/pants repo has a simple "hello world" sample Python
-binary. You can use `goal binary` to build a PEX from it. You can then
+binary. You can use `binary` to build a PEX from it. You can then
 run the PEX:
 
     :::bash
@@ -129,7 +129,7 @@ with a `python_tests` target. It depends on the library:
 
 !inc[start-at=python_tests](../../../tests/python/example_test/hello/greet/BUILD)
 
-Use `goal test` to run the tests. This uses `pytest`:
+Use `test` to run the tests. This uses `pytest`:
 
     :::bash
     $ ./pants test examples/tests/python/example_test/hello/greet
@@ -284,7 +284,7 @@ More About Python Tests
 -----------------------
 
 Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
-`goal test.pytest --options`. For example, to only run tests whose names contain `req`,
+`test.pytest --options`. For example, to only run tests whose names contain `req`,
 you could run:
 
     :::bash
@@ -405,7 +405,7 @@ Paths are relative to the source root housing the python code; for this example,
 ### Interactive Debugging on Test Failure
 
 You can invoke the Python debugger on a test failure by leaving out the
-`goal test` and passing `--pdb`. This can be useful for inspecting the
+`test` and passing `--pdb`. This can be useful for inspecting the
 state of objects especially if you are mocking interfaces.
 
 Building a `setup.py` Distutils Package
