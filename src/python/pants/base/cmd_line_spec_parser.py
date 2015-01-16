@@ -40,11 +40,6 @@ class CmdLineSpecParser(object):
 
     src::
 
-  If you have a list of specs to consume, you can also indicate that some targets should be
-  subtracted from the set as follows::
-
-     src::  ^src/broken:test
-
   The above expression would choose every target under src except for src/broken:test
   """
 
@@ -77,8 +72,7 @@ class CmdLineSpecParser(object):
 
   def parse_addresses(self, specs, fail_fast=False):
     """Process a list of command line specs and perform expansion.  This method can expand a list
-    of command line specs, some of which may be subtracted from the  return value if they include
-    the prefix '^'
+    of command line specs.
     :param list specs: either a single spec string or a list of spec strings.
     :return: a generator of specs parsed into addresses.
     :raises: CmdLineSpecParser.BadSpecError if any of the address selectors could not be parsed.
@@ -86,16 +80,11 @@ class CmdLineSpecParser(object):
     specs = maybe_list(specs)
 
     addresses = OrderedSet()
-    addresses_to_remove = set()
     for spec in specs:
-      if spec.startswith('^'):
-        for address in self._parse_spec(spec.lstrip('^'), fail_fast):
-          addresses_to_remove.add(address)
-      else:
-        for address in self._parse_spec(spec, fail_fast):
-          addresses.add(address)
+      for address in self._parse_spec(spec, fail_fast):
+        addresses.add(address)
 
-    results = filter(self._not_excluded_address, addresses - addresses_to_remove)
+    results = filter(self._not_excluded_address, addresses)
 
     # Print debug information about the excluded targets
     if logger.getEffectiveLevel() <= logging.DEBUG and self._exclude_patterns:
