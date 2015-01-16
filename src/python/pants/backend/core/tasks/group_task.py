@@ -207,6 +207,10 @@ class GroupTask(Task):
       class SingletonGroupTask(GroupTask):
         _MEMBER_TYPES = []
 
+        @classmethod
+        def product_types(cls):
+          return product_type
+
         # We'd prefer to get the parent_options_scope from cls.options_scope,
         # but unfortunately that hasn't been set yet.
         parent_options_scope = '.'.join(flag_namespace)
@@ -223,8 +227,16 @@ class GroupTask(Task):
             member_type.register_options_on_scope(options)
 
         @classmethod
-        def product_types(cls):
-          return product_type
+        def _alternate_target_roots(cls, options, address_mapper, build_graph):
+          # We don't support groups proposing alternate roots.
+          # There is currently just the jvm compile group which does not need this and GroupTask
+          # will be removed as part of parallelizing the RoundEngine.
+          return None
+
+        @classmethod
+        def _prepare(cls, options, round_manager):
+          for member_type in cls._member_types():
+            member_type._prepare(options, round_manager)
 
         @property
         def group_name(self):
@@ -261,12 +273,6 @@ class GroupTask(Task):
 
     group_member.options_scope = Goal.scope(cls.parent_options_scope, group_member.name())
     cls._member_types().append(group_member)
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data('compile_classpath')
-    for member_type in cls._member_types():
-      member_type.prepare(round_manager)
 
   def __init__(self, *args, **kwargs):
     super(GroupTask, self).__init__(*args, **kwargs)

@@ -31,9 +31,12 @@ class TaskBase(AbstractClass):
 
   Provides the base lifecycle methods that allow a task to interact with the command line, other
   tasks and the user.  The lifecycle is linear and run via the following sequence:
-  1. register_options - declare options configurable via cmd-line flag or config file.
-  2. __init__ - distill configuration into the information needed to execute
-  3. prepare - request any products needed from goal dependencies
+  1. product_types - declare the product types your task is capable of producing.
+  2. register_options - declare options configurable via cmd-line flag or config file.
+  3. alternate_target_roots - propose a different set of target roots to use than those specified
+                              via the CLI for the active pants run.
+  4. prepare - request any products needed from other tasks.
+  5. __init__ - distill configuration into the information needed to execute.
 
   Provides access to the current run context for scoping work.
 
@@ -90,10 +93,34 @@ class TaskBase(AbstractClass):
     return False
 
   @classmethod
+  def _scoped_options(cls, options):
+    return options[cls.options_scope]
+
+  @classmethod
+  def _alternate_target_roots(cls, options, address_mapper, build_graph):
+    # Subclasses should not generally need to override this method.
+    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
+    return cls.alternate_target_roots(cls._scoped_options(options), address_mapper, build_graph)
+
+  @classmethod
+  def alternate_target_roots(cls, options, address_mapper, build_graph):
+    """Allows a Task to propose alternate target roots from those specified on the CLI.
+
+    At most 1 unique proposal is allowed amongst all tasks involved in the run.  If more than 1
+    unique list of target roots is proposed an error is raised during task scheduling.
+
+    :returns list: The new target roots to use or none to accept the CLI specified target roots.
+    """
+
+  @classmethod
+  def _prepare(cls, options, round_manager):
+    # Subclasses should not generally need to override this method.
+    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
+    return cls.prepare(cls._scoped_options(options), round_manager)
+
+  @classmethod
   def prepare(cls, options, round_manager):
     """Prepares a task for execution.
-
-    TODO(John Sirois): XXX FIX DOCS
 
     Called before execution and prior to any tasks that may be (indirectly) depended upon.
 
@@ -463,6 +490,7 @@ class TaskBase(AbstractClass):
       # language-specific flags that would resolve the ambiguity here
       raise TaskError('Mutually incompatible targets specified: %s vs %s (and %d others)' %
                       (accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
+
 
 class Task(TaskBase):
   """An executable task.

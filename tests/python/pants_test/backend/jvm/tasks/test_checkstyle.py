@@ -48,17 +48,18 @@ class CheckstyleTest(NailgunTaskTestBase):
   def task_type(cls):
     return Checkstyle
 
-  def _create_context(self, rules_xml=[], properties={}):
+  def _create_context(self, rules_xml=(), properties=None, target_roots=None):
     return self.context(
       options={
         self.options_scope: {
           'bootstrap_tools': ['//:checkstyle'],
           'configuration': self._create_config_file(rules_xml),
-          'properties': properties,
+          'properties': properties or {},
         }
-      })
+      },
+      target_roots=target_roots)
 
-  def _create_config_file(self, rules_xml=[]):
+  def _create_config_file(self, rules_xml=()):
     return self.create_file(
       relpath='coding_style.xml',
       contents=dedent(
@@ -70,7 +71,7 @@ class CheckstyleTest(NailgunTaskTestBase):
              {rules_xml}
            </module>'''.format(rules_xml='\n'.join(rules_xml))))
 
-  def _create_suppression_file(self, suppresses_xml=[]):
+  def _create_suppression_file(self, suppresses_xml=()):
     return self.create_file(
       relpath='suppression.xml',
       contents=dedent(
@@ -83,37 +84,39 @@ class CheckstyleTest(NailgunTaskTestBase):
            </suppressions>
         '''.format(suppresses_xml='\n'.join(suppresses_xml))))
 
-  def _add_java_target_for_test(self, context, name, test_java_source):
+  def _create_target(self, name, test_java_source):
     rel_dir = os.path.join('src/java', name)
-    self.create_file(
-      relpath=os.path.join(rel_dir, '{name}.java'.format(name=name)),
-      contents=test_java_source)
+    self.create_file(relpath=os.path.join(rel_dir, '{name}.java'.format(name=name)),
+                     contents=test_java_source)
 
-    java_target_address = BuildFileAddress(
-      self.add_to_build_file(
-        os.path.join(rel_dir, 'BUILD'),
-        'java_library(name="{name}", sources=["{name}.java"])'.format(name=name)),
-      '{name}'.format(name=name))
+    build_file = self.add_to_build_file(rel_dir, dedent('''
+      java_library(
+        name="{name}",
+        sources=["{name}.java"]
+      )
+    '''.format(name=name)))
 
-    context.build_graph.inject_address_closure(java_target_address)
-    java_target = context.build_graph.get_target(java_target_address)
-    new_target_roots = [java_target]
-    new_target_roots.extend(context.target_roots if context.target_roots else [])
-    context.replace_targets(new_target_roots)
+    java_target_address = BuildFileAddress(build_file, name)
+    self.build_graph.inject_address_closure(java_target_address)
+    return self.build_graph.get_target(java_target_address)
 
   #
   # Test section
   #
   def test_single_rule_pass(self):
-    context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER])
-    self._add_java_target_for_test(context, 'no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)
+    no_tab = self._create_target('no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)
+    context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER],
+                                   target_roots=[no_tab])
+
     self.populate_compile_classpath(context=context)
     self.execute(context)
 
   def test_single_rule_fail(self):
-    context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER])
+    with_tab = self._create_target('with_tab', self._TEST_JAVA_SOURCE_WITH_TAB)
+    context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER],
+                                   target_roots=[with_tab])
     # add a tab in the source to trigger the tab check rule to fail.
-    self._add_java_target_for_test(context, 'with_tab', self._TEST_JAVA_SOURCE_WITH_TAB)
+
     self.populate_compile_classpath(context=context)
     with self.assertRaises(TaskError):
       self.execute(context)
@@ -130,6 +133,9 @@ class CheckstyleTest(NailgunTaskTestBase):
         '<suppress files=".*with_tab_2\.java" checks=".*" />',
       ])
 
+    no_tab = self._create_target('no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)
+    with_tab_1 = self._create_target('with_tab_1', self._TEST_JAVA_SOURCE_WITH_TAB)
+    with_tab_2 = self._create_target('with_tab_2', self._TEST_JAVA_SOURCE_WITH_TAB)
     context = self._create_context(
       rules_xml=[
         self._RULE_XML_SUPPRESSION_FILTER,
@@ -137,11 +143,8 @@ class CheckstyleTest(NailgunTaskTestBase):
       ],
       properties={
         'checkstyle.suppression.file': suppression_file,
-      })
-
-    self._add_java_target_for_test(context, 'no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)
-    self._add_java_target_for_test(context, 'with_tab_1', self._TEST_JAVA_SOURCE_WITH_TAB)
-    self._add_java_target_for_test(context, 'with_tab_2', self._TEST_JAVA_SOURCE_WITH_TAB)
+      },
+      target_roots=[no_tab, with_tab_1, with_tab_2])
 
     self.populate_compile_classpath(context=context)
     self.execute(context)

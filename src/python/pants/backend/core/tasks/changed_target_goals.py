@@ -5,8 +5,13 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
+
 from pants.backend.core.tasks.noop import (NoopExecTask, NoopCompile, NoopTest)
 from pants.backend.core.tasks.what_changed import ChangedFileTaskMixin
+
+
+logger = logging.getLogger(__name__)
 
 
 class ChangedTargetTask(NoopExecTask, ChangedFileTaskMixin):
@@ -35,29 +40,19 @@ class ChangedTargetTask(NoopExecTask, ChangedFileTaskMixin):
     super(ChangedTargetTask, cls).register_options(register)
     cls.register_change_file_options(register)
 
-  # TODO(John Sirois): XXX
-  # need the scope, context options today, just the scoped options & build_graph in the new engine.
-  # ==
-  # options
-  # address_mapper
-  # build_graph
-  # scm
-  # workspace
-
   @classmethod
-  def prepare(cls, options, round_manager):
-    super(ChangedTargetTask, cls).prepare(round_manager)
-    changed = self._changed_targets()
-    self.context.replace_targets([self.context.build_graph.get_target(addr) for addr in changed])
-    readable = ''.join(sorted('\n\t* {}'.format(addr.reference()) for addr in changed))
-    self.context.log.info('Operating on changed {} target(s): {}'.format(len(changed), readable))
+  def alternate_target_roots(cls, options, address_mapper, build_graph):
+    changed_addresses = cls.change_calculator(options, address_mapper, build_graph)
+    readable = ''.join(sorted('\n\t* {}'.format(addr.reference()) for addr in changed_addresses))
+    logger.info('Operating on changed {} target(s): {}'.format(len(changed_addresses), readable))
+    return [build_graph.get_target(addr) for addr in changed_addresses]
 
 
 class CompileChanged(ChangedTargetTask):
   """Find and compile changed targets."""
   @classmethod
   def prepare(cls, options, round_manager):
-    super(CompileChanged, cls).prepare(round_manager)  # Replaces target roots.
+    super(CompileChanged, cls).prepare(options, round_manager)
     round_manager.require_data(NoopCompile.product_types()[0])
 
 
@@ -65,5 +60,5 @@ class TestChanged(ChangedTargetTask):
   """Find and test changed targets."""
   @classmethod
   def prepare(cls, options, round_manager):
-    super(TestChanged, cls).prepare(round_manager) # Replaces target roots.
+    super(TestChanged, cls).prepare(options, round_manager)
     round_manager.require_data(NoopTest.product_types()[0])

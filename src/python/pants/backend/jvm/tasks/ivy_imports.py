@@ -24,7 +24,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(IvyImports, cls).prepare(round_manager)
+    super(IvyImports, cls).prepare(options, round_manager)
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
 
   @property
