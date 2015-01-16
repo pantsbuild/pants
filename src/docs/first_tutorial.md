@@ -55,10 +55,6 @@ build has a `pants` executable in its top-level directory.
 The first time you run `./pants`, it might take a while: it will probably auto-update by
 downloading the latest version.
 
-`goal`<br>
-Magic word that you use on most Pants command lines. We hope that
-someday we won't need to use this magic word anymore.
-
 `test`<br>
 `test` is a *goal*, a "verb" that Pants knows about. The `test` goal runs tests and reports results.
 
