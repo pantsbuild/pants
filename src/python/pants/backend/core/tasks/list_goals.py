@@ -6,6 +6,8 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.reflect import (gen_goals_glopts_reference_data,
+                                              gen_tasks_goals_reference_data)
 from pants.goal.goal import Goal
 
 
@@ -15,6 +17,8 @@ class ListGoals(ConsoleTask):
     super(ListGoals, cls).register_options(register)
     register('--graph', action='store_true',
              help='Generate a graphviz graph of installed goals.')
+    register('--list-options', action='store_true',
+             help='List options with goals. (For more readable, use ./pants goal foo -h)')
     register('--all', action='store_true',
              help='List all goals even if no description is available.')
 
@@ -36,6 +40,13 @@ class ListGoals(ConsoleTask):
         yield ''
         yield 'Undocumented goals:'
         yield '  %s' % ' '.join(undocumented)
+
+    def report_with_options():
+      yield self.context.new_options.format_global_help()
+      for goal in Goal.all():
+        yield '\n{0}: {1}\n'.format(goal.name, goal.description or '')
+        for scope in goal.known_scopes():
+          yield self.context.new_options.format_help(scope)
 
     def graph():
       # TODO(John Sirois): re-work and re-enable: https://github.com/pantsbuild/pants/issues/918
@@ -82,4 +93,9 @@ class ListGoals(ConsoleTask):
       yield 'You can follow final fix-up of --graph here:'
       yield '  https://github.com/pantsbuild/pants/issues/918'
 
-    return graph() if self.get_options().graph else report()
+    if self.get_options().graph:
+      return graph()
+    elif self.get_options().list_options:
+      return report_with_options()
+    else:
+      return report()
