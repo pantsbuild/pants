@@ -133,6 +133,7 @@ class Options(object):
     """Whether the command line indicates a request for help."""
     return self._is_help
 
+  @property
   def is_help_all(self):
     """Whether the command line indicates a request for all the help."""
     return self._is_help_all
