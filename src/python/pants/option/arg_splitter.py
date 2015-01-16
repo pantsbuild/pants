@@ -109,6 +109,8 @@ class ArgSplitter(object):
     add_scope(GLOBAL_SCOPE)
     for flag in global_flags:
       assign_flag_to_scope(flag, GLOBAL_SCOPE)
+    if '--help-all' in global_flags:
+      self._is_help_all = True
     scope, flags = self._consume_scope()
     while scope:
       if scope.lower() == 'help':
@@ -127,8 +129,6 @@ class ArgSplitter(object):
         # We assume any args here are in global scope.
         if arg in self._HELP_FLAGS:
           self._is_help = True
-        elif arg == '--help-all':
-          self._is_help_all = True
         else:
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
       else:
