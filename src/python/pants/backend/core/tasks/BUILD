@@ -11,6 +11,7 @@ target(
     ':common',
     ':confluence_publish',
     ':console_task',
+    ':deferred_sources_mapper',
     ':dependees',
     ':filemap',
     ':filter',
@@ -47,6 +48,9 @@ python_library(
   sources = ['build_lint.py'],
   dependencies = [
     ':common',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/base:source_root',
   ],
 )
 
@@ -104,6 +108,14 @@ python_library(
   dependencies = [
     ':common',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'deferred_sources_mapper',
+  sources= ['deferred_sources_mapper.py'],
+  dependencies = [
+    ':common',
   ],
 )
 
@@ -178,6 +190,7 @@ python_library(
   sources = ['markdown_to_html.py'],
   resources = globs('templates/markdown/*.mustache'),
   dependencies = [
+    '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
     ':common',

@@ -5,15 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import six
-
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.base.address import SyntheticAddress
 from pants.base.payload import Payload
-from pants.base.payload_field import (ConfigurationsField,
-                                      ExcludesField,
-                                      SourcesField)
+from pants.base.payload_field import ConfigurationsField, ExcludesField
 from pants.base.target import Target
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
@@ -32,6 +27,7 @@ class JvmTarget(Target, Jarable):
                resources=None,
                configurations=None,
                no_cache=False,
+               build_graph=None,
                **kwargs):
     """
     :param configurations: One or more ivy configurations to resolve for this target.
@@ -48,15 +44,15 @@ class JvmTarget(Target, Jarable):
       sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=self.assert_list(sources),
-                              sources_rel_path=sources_rel_path),
+      'sources': self.create_sources_field(sources, sources_rel_path, address, build_graph),
       'provides': provides,
       'excludes': ExcludesField(self.assert_list(excludes, expected_type=Exclude)),
       'configurations': ConfigurationsField(self.assert_list(configurations)),
     })
     self._resource_specs = self.assert_list(resources)
 
-    super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super(JvmTarget, self).__init__(address=address, payload=payload, build_graph=build_graph,
+                                    **kwargs)
     self.add_labels('jvm')
     if no_cache:
       self.add_labels('no_cache')
@@ -86,7 +82,7 @@ class JvmTarget(Target, Jarable):
 
   @property
   def traversable_dependency_specs(self):
-    for spec in super(JvmTarget, self).traversable_specs:
+    for spec in super(JvmTarget, self).traversable_dependency_specs:
       yield spec
     for resource_spec in self._resource_specs:
       yield resource_spec

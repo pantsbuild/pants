@@ -264,6 +264,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     round_manager.require_data('java')
     round_manager.require_data('scala')
 
+    # Allow the deferred_sources_mapping to take place first
+    round_manager.require_data('deferred_sources')
+
   def move(self, src, dst):
     if self._delete_scratch:
       shutil.move(src, dst)
@@ -384,7 +387,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=self._partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=self._jvm_fingerprint_strategy()) as invalidation_check:
+                          fingerprint_strategy=self._jvm_fingerprint_strategy(),
+                          topological_order=True) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid sources for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]

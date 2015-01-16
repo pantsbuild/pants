@@ -79,6 +79,7 @@ class ProtobufGen(CodeGen):
   def prepare(self, round_manager):
     super(ProtobufGen, self).prepare(round_manager)
     round_manager.require_data('ivy_imports')
+    round_manager.require_data('deferred_sources')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def resolve_deps(self, key, default=None):
@@ -193,7 +194,7 @@ class ProtobufGen(CodeGen):
       add_to_gentargets,
       postorder=True)
     sources_by_base = OrderedDict()
-    # TODO(Eric Ayers) Extract this logic for general use? When using jar_source_set it is needed
+    # TODO(Eric Ayers) Extract this logic for general use? When using unpacked_jars it is needed
     # to get the correct source root for paths outside the current BUILD tree.
     for target in gentargets:
       for source in target.sources_relative_to_buildroot():

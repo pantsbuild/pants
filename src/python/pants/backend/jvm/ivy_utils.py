@@ -13,7 +13,7 @@ import pkgutil
 import threading
 import xml
 
-from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -188,6 +188,9 @@ class IvyUtils(object):
   @classmethod
   def parse_xml_report(cls, targets, conf):
     """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
+    if not targets:
+      return None
+
     path = cls.xml_report_path(targets, conf)
     return cls._parse_xml_report(path)
 
@@ -361,10 +364,11 @@ class IvyUtils(object):
                    '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
       '-symlink',
     ]
+    confs = target.payload.get_field_value('configurations') or []
     self.exec_ivy(mapdir,
                   [target],
                   ivyargs,
-                  confs=target.payload.configurations,
+                  confs=maybe_list(confs),
                   ivy=Bootstrapper.default_ivy(executor),
                   workunit_factory=workunit_factory,
                   workunit_name='map-jars',
