@@ -137,7 +137,12 @@ class GoalRunner(object):
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.is_help:
+    if self.options.is_help_all:
+      self.options.print_help(goals=[g.name for g in Goal.all()])
+      print('\nGlobal options:')
+      print(self.options.format_global_help())
+      sys.exit(0)
+    elif self.options.is_help:
       self.options.print_help(goals=goals)
       sys.exit(0)
 
