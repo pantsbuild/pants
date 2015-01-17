@@ -128,10 +128,14 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     """Populate the build products with an IvyInfo object for each generated ivy report."""
     ivy_products = self.context.products.get_data('ivy_jar_products') or defaultdict(list)
     for conf in self._confs:
-      ivyinfo = IvyUtils.parse_xml_report(targets, conf)
-      if ivyinfo:
-        # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
-        ivy_products[conf].append(ivyinfo)
+      try:
+        ivyinfo = IvyUtils.parse_xml_report(targets, conf)
+        if ivyinfo:
+          # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
+          ivy_products[conf].append(ivyinfo)
+      except IvyUtils.IvyReportParseError as e:
+        self.context.log.warn("Ignoring malformed ivy XML report: {msg}".format(msg=e))
+
     self.context.products.safe_create_data('ivy_jar_products', lambda: ivy_products)
 
   def _generate_ivy_report(self, targets):

@@ -25,7 +25,6 @@ from pants.ivy.ivy import Ivy
 from pants.java import util
 from pants.util.dirutil import safe_mkdir, safe_open
 
-
 IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev'])
 IvyArtifact = namedtuple('IvyArtifact', ['path', 'classifier'])
 IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
@@ -92,6 +91,10 @@ class IvyInfo(object):
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
+
+  class IvyReportParseError(Exception):
+    """Raised when the report can't be parsed.."""
+    pass
 
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
@@ -187,7 +190,10 @@ class IvyUtils(object):
 
   @classmethod
   def parse_xml_report(cls, targets, conf):
-    """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
+    """Returns the IvyInfo representing the info in the xml report, or None if no report exists.
+
+    Raises IvyUtils.IvyReportParseError if the report can't be parsed for some reason.
+    """
     if not targets:
       return None
 
@@ -200,7 +206,12 @@ class IvyUtils(object):
       return None
 
     ret = IvyInfo()
-    etree = xml.etree.ElementTree.parse(path)
+    try:
+      etree = xml.etree.ElementTree.parse(path)
+    except xml.etree.ElementTree.ParseError as e:
+      raise cls.IvyReportParseError('Error parsing report at {path}: {msg}'
+                                    .format(path=path, msg=e))
+      return None
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')
