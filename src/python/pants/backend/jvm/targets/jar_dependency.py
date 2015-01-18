@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+import random
 
 from twitter.common.collections import OrderedSet
 
@@ -57,7 +57,6 @@ class JarDependency(object):
     'force',
     'excludes',
     'transitive',
-    'mutable',
   )
 
   def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
@@ -202,6 +201,10 @@ class JarDependency(object):
 
   def cache_key(self):
     key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
+    # TODO(Eric Ayers): Make a way for mutable jars to never be cached.  We don't have a
+    # mechanism for that right now so we just mix in some randomness into the cache key instead.
+    if self.mutable:
+      key += '{0}'.format(random.randint(1,100000000))
     key += ''.join(sorted(self._configurations))
     key += ''.join(a.cache_key() for a in sorted(self.artifacts, key=lambda a: a.name + a.type_))
     return key

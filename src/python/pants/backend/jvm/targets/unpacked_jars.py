@@ -43,8 +43,8 @@ class UnpackedJars(Target):
     self._files = None
 
     if not libraries:
-      raise  self.ExpectedImportsError('Expected non-empty libraries attribute for {spec}'
-                                       .format(spec=self.address.spec))
+      raise  self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
+                                         .format(spec=self.address.spec))
     self._libraries = None
 
     # Make sure the ivy-imports task
