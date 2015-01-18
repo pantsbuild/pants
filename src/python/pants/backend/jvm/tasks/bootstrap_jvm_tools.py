@@ -16,7 +16,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 
 
-class BootstrapJvmTools(Task, IvyTaskMixin):
+class BootstrapJvmTools(IvyTaskMixin, Task):
 
   @classmethod
   def product_types(cls):

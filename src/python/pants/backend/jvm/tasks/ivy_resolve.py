@@ -23,7 +23,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.util.dirutil import safe_mkdir
 
 
-class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
+class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   _CONFIG_SECTION = 'ivy-resolve'
 
   @classmethod
@@ -65,8 +65,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     self._open = self.get_options().open
     self._report = self._open or self.get_options().report
 
-    self._ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
-
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache()
 
@@ -94,7 +92,6 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     ivy_classpath, relevant_targets = self.ivy_resolve(
       targets,
       executor=executor,
-      symlink_ivyxml=True,
       workunit_name='ivy-resolve',
     )
 
@@ -113,10 +110,7 @@ class IvyResolve(NailgunTask, IvyTaskMixin, JvmToolTaskMixin):
     if create_jardeps_for:
       genmap = self.context.products.get('jar_dependencies')
       for target in filter(create_jardeps_for, targets):
-        # TODO: Add mapjars to IvyTaskMixin? Or get rid of the mixin? It's weird that we use
-        # self.ivy_resolve for some ivy invocations but this for others.
-        self._ivy_utils.mapjars(genmap, target, executor=executor,
-                                workunit_factory=self.context.new_workunit)
+        self.mapjars(genmap, target, executor=executor, workunit_factory=self.context.new_workunit)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible

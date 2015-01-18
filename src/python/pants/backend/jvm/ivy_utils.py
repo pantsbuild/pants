@@ -7,7 +7,9 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+import copy
 import errno
+import logging
 import os
 import pkgutil
 import threading
@@ -29,6 +31,9 @@ from pants.util.dirutil import safe_mkdir, safe_open
 IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev'])
 IvyArtifact = namedtuple('IvyArtifact', ['path', 'classifier'])
 IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
+
+
+logger = logging.getLogger(__name__)
 
 
 class IvyInfo(object):
@@ -96,17 +101,6 @@ class IvyUtils(object):
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
 
-  def __init__(self, config, log):
-    self._log = log
-
-    self._transitive = config.getbool('ivy-resolve', 'transitive', default=True)
-    self._args = config.getlist('ivy-resolve', 'args', default=[])
-    self._jvm_options = config.getlist('ivy-resolve', 'jvm_args', default=[])
-    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
-    self._jvm_options.append('-Dsun.io.useCanonCaches=false')
-    self._workdir = os.path.join(config.getdefault('pants_workdir'), 'ivy')
-    self._template_path = self.IVY_TEMPLATE_PATH
-
   @staticmethod
   def _generate_exclude_template(exclude):
     return TemplateData(org=exclude.org, name=exclude.name)
@@ -114,18 +108,6 @@ class IvyUtils(object):
   @staticmethod
   def _generate_override_template(jar):
     return TemplateData(org=jar.org, module=jar.module, version=jar.version)
-
-  @staticmethod
-  def is_classpath_artifact(path):
-    """Subclasses can override to determine whether a given artifact represents a classpath
-    artifact."""
-    return path.endswith('.jar') or path.endswith('.war')
-
-  @classmethod
-  def is_mappable_artifact(cls, org, name, path):
-    """Subclasses can override to determine whether a given artifact represents a mappable
-    artifact."""
-    return cls.is_classpath_artifact(path)
 
   @staticmethod
   @contextmanager
@@ -219,21 +201,9 @@ class IvyUtils(object):
         ret.add_module(IvyModule(IvyModuleRef(org, name, rev), artifacts, callers))
     return ret
 
-  def _extract_classpathdeps(self, targets):
-    """Subclasses can override to filter out a set of targets that should be resolved for classpath
-    dependencies.
-    """
-    def is_classpath(target):
-      return (target.is_jar or
-              target.is_internal and any(jar for jar in target.jar_dependencies if jar.rev))
-
-    classpath_deps = OrderedSet()
-    for target in targets:
-      classpath_deps.update(t for t in target.resolve() if t.is_concrete and is_classpath(t))
-    return classpath_deps
-
-  def _generate_ivy(self, targets, jars, excludes, ivyxml, confs):
-    org, name = self.identify(targets)
+  @classmethod
+  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs):
+    org, name = cls.identify(targets)
 
     # As it turns out force is not transitive - it only works for dependencies pants knows about
     # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
@@ -245,10 +215,10 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    dependencies = [self._generate_jar_template(jar, confs) for jar in jars]
-    overrides = [self._generate_override_template(dep) for dep in dependencies if dep.force]
+    dependencies = [cls._generate_jar_template(jar, confs) for jar in jars]
+    overrides = [cls._generate_override_template(dep) for dep in dependencies if dep.force]
 
-    excludes = [self._generate_exclude_template(exclude) for exclude in excludes]
+    excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
 
     template_data = TemplateData(
         org=org,
@@ -262,12 +232,13 @@ class IvyUtils(object):
 
     safe_mkdir(os.path.dirname(ivyxml))
     with open(ivyxml, 'w') as output:
-      generator = Generator(pkgutil.get_data(__name__, self._template_path),
+      generator = Generator(pkgutil.get_data(__name__, cls.IVY_TEMPLATE_PATH),
                             root_dir=get_buildroot(),
                             lib=template_data)
       generator.write(output)
 
-  def _calculate_classpath(self, targets):
+  @classmethod
+  def _calculate_classpath(cls, targets):
     jars = OrderedDict()
     excludes = set()
 
@@ -278,7 +249,7 @@ class IvyUtils(object):
       coordinate = (jar.org, jar.name)
       existing = jars.get(coordinate)
       jars[coordinate] = jar if not existing else (
-        self._resolve_conflict(existing=existing, proposed=jar)
+        cls._resolve_conflict(existing=existing, proposed=jar)
       )
 
     def collect_jars(target):
@@ -296,7 +267,8 @@ class IvyUtils(object):
 
     return jars.values(), excludes
 
-  def _resolve_conflict(self, existing, proposed):
+  @staticmethod
+  def _resolve_conflict(existing, proposed):
     if proposed == existing:
       if proposed.force:
         return proposed
@@ -306,19 +278,19 @@ class IvyUtils(object):
         proposed.org, proposed.name, existing.rev, proposed.rev
       ))
     elif existing.force:
-      self._log.debug('Ignoring rev %s for %s#%s already forced to %s' % (
+      logger.debug('Ignoring rev %s for %s#%s already forced to %s' % (
         proposed.rev, proposed.org, proposed.name, existing.rev
       ))
       return existing
     elif proposed.force:
-      self._log.debug('Forcing %s#%s from %s to %s' % (
+      logger.debug('Forcing %s#%s from %s to %s' % (
         proposed.org, proposed.name, existing.rev, proposed.rev
       ))
       return proposed
     else:
       try:
         if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
-          self._log.debug('Upgrading %s#%s from rev %s  to %s' % (
+          logger.debug('Upgrading %s#%s from rev %s  to %s' % (
             proposed.org, proposed.name, existing.rev, proposed.rev,
           ))
           return proposed
@@ -327,83 +299,42 @@ class IvyUtils(object):
       except Revision.BadRevision as e:
         raise TaskError('Failed to parse jar revision', e)
 
-  def _is_mutable(self, jar):
+  @staticmethod
+  def _is_mutable(jar):
     if jar.mutable is not None:
       return jar.mutable
     return False
 
-  def _generate_jar_template(self, jar, confs):
+  @classmethod
+  def _generate_jar_template(cls, jar, confs):
     template = TemplateData(
         org=jar.org,
         module=jar.name,
         version=jar.rev,
-        mutable=self._is_mutable(jar),
+        mutable=cls._is_mutable(jar),
         force=jar.force,
-        excludes=[self._generate_exclude_template(exclude) for exclude in jar.excludes],
+        excludes=[cls._generate_exclude_template(exclude) for exclude in jar.excludes],
         transitive=jar.transitive,
         artifacts=jar.artifacts,
         configurations=[conf for conf in jar.configurations if conf in confs])
     return template
 
-  def mapto_dir(self):
-    """Subclasses can override to establish an isolated jar mapping directory."""
-    return os.path.join(self._workdir, 'mapped-jars')
-
-  def mapjars(self, genmap, target, executor, workunit_factory=None, jars=None):
-    """Resolves jars for the target and stores their locations in genmap.
-    :param genmap: The jar_dependencies ProductMapping entry for the required products.
-    :param target: The target whose jar dependencies are being retrieved.
-    :param jars: If specified, resolves the given jars rather than
-    :type jars: List of :class:`pants.backend.jvm.targets.jar_dependency.JarDependency` (jar())
-      objects.
-    """
-    mapdir = os.path.join(self.mapto_dir(), target.id)
-    safe_mkdir(mapdir, clean=True)
-    ivyargs = [
-      '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
-                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
-      '-symlink',
-    ]
-    self.exec_ivy(mapdir,
-                  [target],
-                  ivyargs,
-                  confs=target.payload.configurations,
-                  ivy=Bootstrapper.default_ivy(executor),
-                  workunit_factory=workunit_factory,
-                  workunit_name='map-jars',
-                  jars=jars)
-
-    for org in os.listdir(mapdir):
-      orgdir = os.path.join(mapdir, org)
-      if os.path.isdir(orgdir):
-        for name in os.listdir(orgdir):
-          artifactdir = os.path.join(orgdir, name)
-          if os.path.isdir(artifactdir):
-            for conf in os.listdir(artifactdir):
-              confdir = os.path.join(artifactdir, conf)
-              for f in os.listdir(confdir):
-                if self.is_mappable_artifact(org, name, f):
-                  # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
-                  # conf whitelist
-                  genmap.add(org, confdir).append(f)
-                  genmap.add((org, name), confdir).append(f)
-
-                  genmap.add(target, confdir).append(f)
-                  genmap.add((target, conf), confdir).append(f)
-                  genmap.add((org, name, conf), confdir).append(f)
-
   ivy_lock = threading.RLock()
 
-  def exec_ivy(self,
+  @classmethod
+  def exec_ivy(cls,
                target_workdir,
                targets,
+               jvm_options,
                args,
                confs=None,
                ivy=None,
                workunit_name='ivy',
                workunit_factory=None,
-               symlink_ivyxml=False,
                jars=None):
+    ivy_jvm_options = copy.copy(jvm_options) if jvm_options else []
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
+    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
 
     ivy = ivy or Bootstrapper.default_ivy()
     if not isinstance(ivy, Ivy):
@@ -413,7 +344,7 @@ class IvyUtils(object):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
 
     if not jars:
-      jars, excludes = self._calculate_classpath(targets)
+      jars, excludes = cls._calculate_classpath(targets)
     else:
       excludes = set()
 
@@ -424,31 +355,14 @@ class IvyUtils(object):
     ivy_args.extend(confs_to_resolve)
 
     ivy_args.extend(args)
-    if not self._transitive:
-      ivy_args.append('-notransitive')
-    ivy_args.extend(self._args)
-
-    def safe_link(src, dest):
-      try:
-        os.unlink(dest)
-      except OSError as e:
-        if e.errno != errno.ENOENT:
-          raise
-      os.symlink(src, dest)
 
     with IvyUtils.ivy_lock:
-      self._generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve)
-      runner = ivy.runner(jvm_options=self._jvm_options, args=ivy_args)
+      cls.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve)
+      runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args)
       try:
         result = util.execute_runner(runner,
                                      workunit_factory=workunit_factory,
                                      workunit_name=workunit_name)
-
-        # Symlink to the current ivy.xml file (useful for IDEs that read it).
-        if symlink_ivyxml:
-          ivyxml_symlink = os.path.join(self._workdir, 'ivy.xml')
-          safe_link(ivyxml, ivyxml_symlink)
-
         if result != 0:
           raise TaskError('Ivy returned %d' % result)
       except runner.executor.Error as e:
