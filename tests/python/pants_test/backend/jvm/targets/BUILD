@@ -1,11 +1,20 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 python_test_suite(
   name = 'targets',
   dependencies = [
+    ':jar_dependencies',
     ':unpacked_jars',
+  ]
+)
+
+python_tests(
+  name = 'jar_dependencies',
+  sources = ['test_jar_dependencies.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'tests/python/pants_test:base_test',
   ]
 )
 
