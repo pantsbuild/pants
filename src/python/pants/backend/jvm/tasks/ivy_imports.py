@@ -5,21 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-
-
-class ImportsUtil(IvyUtils):
-  def __init__(self, context):
-    super(ImportsUtil, self).__init__(context.config, context.log)
-
-  def is_mappable_artifact(self, org, name, path):
-    return path.endswith('.jar') and super(ImportsUtil, self).is_mappable_artifact(org, name, path)
-
-  def mapto_dir(self):
-    return os.path.join(self._workdir, 'mapped-imports')
 
 
 class IvyImports(NailgunTask):
@@ -52,7 +39,7 @@ class IvyImports(NailgunTask):
 
     resolve_for = self.context.targets(lambda t: t.has_label('has_imports'))
     if resolve_for:
-      imports_util = ImportsUtil(self.context)
+      ivy_utils = IvyUtils(self.context.config, self.context.log)
       imports_map = self.context.products.get('ivy_imports')
       executor = self.create_java_executor()
       for target in resolve_for:
@@ -60,6 +47,6 @@ class IvyImports(NailgunTask):
         self.context.log.info('Mapping import jars for {target}: \n  {jars}'.format(
             target=nice_target_name(target),
             jars='\n  '.join(self._str_jar(s) for s in jars)))
-        imports_util.mapjars(imports_map, target, executor,
-                             workunit_factory=self.context.new_workunit,
-                             jars=jars)
+        ivy_utils.mapjars(imports_map, target, executor,
+                          workunit_factory=self.context.new_workunit,
+                          jars=jars)

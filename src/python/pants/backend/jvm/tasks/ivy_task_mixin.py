@@ -6,11 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
-from hashlib import sha1
 import logging
 import os
 import shutil
 import threading
+
+from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -20,6 +21,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.executor import Executor
+from pants.util.dirutil import safe_mkdir
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +53,18 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
 
 class IvyTaskMixin(object):
+  @classmethod
+  def register_options(cls, register):
+    super(IvyTaskMixin, cls).register_options(register)
+    register('--jvm-options', action='append', metavar='<option>...',
+             help='Run Ivy with these extra jvm options.')
+
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
 
   def ivy_resolve(self,
                   targets,
                   executor=None,
-                  symlink_ivyxml=False,
                   silent=False,
                   workunit_name=None,
                   workunit_labels=None):
@@ -75,7 +82,6 @@ class IvyTaskMixin(object):
                                    bootstrap_workunit_factory=self.context.new_workunit)
 
     ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
-    ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
     fingerprint_strategy = IvyResolveFingerprintStrategy()
 
@@ -102,14 +108,14 @@ class IvyTaskMixin(object):
         args = ['-cachepath', raw_target_classpath_file_tmp]
 
         def exec_ivy():
-          ivy_utils.exec_ivy(
+          IvyUtils.exec_ivy(
               target_workdir=target_workdir,
               targets=global_vts.targets,
               args=args,
+              jvm_options=self.get_options().jvm_options,
               ivy=ivy,
               workunit_name='ivy',
-              workunit_factory=self.context.new_workunit,
-              symlink_ivyxml=symlink_ivyxml)
+              workunit_factory=self.context.new_workunit)
 
         if workunit_name:
           with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):
@@ -139,4 +145,57 @@ class IvyTaskMixin(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return ([path for path in stripped_classpath if ivy_utils.is_classpath_artifact(path)], global_vts.targets)
+      return ([path for path in stripped_classpath if self.is_classpath_artifact(path)], global_vts.targets)
+
+  @staticmethod
+  def is_classpath_artifact(path):
+    """Subclasses can override to determine whether a given artifact represents a classpath
+    artifact."""
+    return path.endswith('.jar') or path.endswith('.war')
+
+  def mapjars(self, genmap, target, executor, workunit_factory=None, jars=None):
+    """Resolves jars for the target and stores their locations in genmap.
+
+    :param genmap: The jar_dependencies ProductMapping entry for the required products.
+    :param target: The target whose jar dependencies are being retrieved.
+    :param jars: If specified, resolves the given jars rather than
+    :type jars: List of :class:`pants.backend.jvm.targets.jar_dependency.JarDependency` (jar())
+      objects.
+    """
+    mapdir = os.path.join(self.workdir, 'mapped-jars', target.id)
+    safe_mkdir(mapdir, clean=True)
+    ivyargs = [
+      '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
+      '-symlink',
+      ]
+    confs = target.payload.get_field_value('configurations') or []
+    IvyUtils.exec_ivy(mapdir,
+                      [target],
+                      jvm_options=self.get_options().jvm_options,
+                      args=ivyargs,
+                      confs=maybe_list(confs),
+                      ivy=Bootstrapper.default_ivy(executor),
+                      workunit_factory=workunit_factory,
+                      workunit_name='map-jars',
+                      jars=jars)
+
+    for org in os.listdir(mapdir):
+      orgdir = os.path.join(mapdir, org)
+      if os.path.isdir(orgdir):
+        for name in os.listdir(orgdir):
+          artifactdir = os.path.join(orgdir, name)
+          if os.path.isdir(artifactdir):
+            for conf in os.listdir(artifactdir):
+              confdir = os.path.join(artifactdir, conf)
+              for f in os.listdir(confdir):
+                if self.is_classpath_artifact(f):
+                  # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
+                  # conf whitelist
+                  genmap.add(org, confdir).append(f)
+                  genmap.add((org, name), confdir).append(f)
+
+                  genmap.add(target, confdir).append(f)
+                  genmap.add((target, conf), confdir).append(f)
+                  genmap.add((org, name, conf), confdir).append(f)
+
