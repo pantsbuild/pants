@@ -11,9 +11,12 @@ cache:
     - build-support/pants_dev_deps.venv
     - build-support/virtualenv.dist
 
-language: python
+language: java
 
-python:
-  - "2.7"
+jdk:
+  jdk:
+    - openjdk6
+    - openjdk7
+    - oraclejdk8
 
 script: ./test_apt.sh
