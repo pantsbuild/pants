@@ -14,9 +14,8 @@ cache:
 language: java
 
 jdk:
-  jdk:
-    - openjdk6
-    - openjdk7
-    - oraclejdk8
+  - openjdk6
+  - openjdk7
+  - oraclejdk8
 
 script: ./test_apt.sh
