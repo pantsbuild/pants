@@ -23,6 +23,10 @@ from pants_test.base_test import BaseTest
 
 
 class PythonTestBuilderTestBase(BaseTest):
+  def setUp(self):
+    super(PythonTestBuilderTestBase, self).setUp()
+    self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
+
   def _cache_current_interpreter(self):
     cache = PythonInterpreterCache(self.config())
 
@@ -39,6 +43,7 @@ class PythonTestBuilderTestBase(BaseTest):
 
   def run_tests(self, targets, args=None, fast=True, debug=False):
     test_builder = PythonTestBuilder(
+        self.context(),
         targets, args or [], fast=fast, debug=debug, interpreter=self._cache_current_interpreter())
 
     with pushd(self.build_root):

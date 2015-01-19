@@ -56,11 +56,13 @@ class PythonChroot(object):
       Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
 
   def __init__(self,
+               context,
                targets,
                extra_requirements=None,
                builder=None,
                platforms=None,
                interpreter=None):
+    self.context = context
     self._config = Config.from_cache()
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
@@ -207,6 +209,7 @@ class PythonChroot(object):
          reqs_to_build,
          interpreter=self._interpreter,
          platforms=self._platforms,
+         ttl=self.context.options.for_global_scope().python_chroot_requirements_ttl,
          find_links=find_links)
 
     locations = set()
