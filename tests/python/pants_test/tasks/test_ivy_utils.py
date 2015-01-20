@@ -48,13 +48,11 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     self.simple = self.target('src/java/targets:simple')
     context = self.context()
-    self.ivy_utils = IvyUtils(context.config, logging.Logger('test'))
 
   def test_force_override(self):
     jars = list(self.simple.payload.jars)
     with temporary_file_path() as ivyxml:
-      self.ivy_utils._generate_ivy([self.simple], jars=jars, excludes=[], ivyxml=ivyxml,
-                                   confs=['default'])
+      IvyUtils.generate_ivy([self.simple], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
 
       doc = ET.parse(ivyxml).getroot()
 
@@ -91,16 +89,16 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     v2.rev = "2"
 
     # If neither version is forced, use the latest version
-    self.assertIs(v2, self.ivy_utils._resolve_conflict(v1, v2))
-    self.assertIs(v2, self.ivy_utils._resolve_conflict(v2, v1))
+    self.assertIs(v2, IvyUtils._resolve_conflict(v1, v2))
+    self.assertIs(v2, IvyUtils._resolve_conflict(v2, v1))
 
     # If an earlier version is forced, use the forced version
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1_force, v2))
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v2, v1_force))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v2))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v2, v1_force))
 
     # If the same version is forced, use the forced version
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1, v1_force))
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1_force, v1))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1, v1_force))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1))
 
   def test_does_not_visit_diamond_dep_twice(self):
     ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
