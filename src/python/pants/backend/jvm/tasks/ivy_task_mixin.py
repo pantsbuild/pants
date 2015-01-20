@@ -67,7 +67,8 @@ class IvyTaskMixin(object):
                   executor=None,
                   silent=False,
                   workunit_name=None,
-                  workunit_labels=None):
+                  workunit_labels=None,
+                  confs=None):
     if not targets:
       return ([], set())
 
@@ -115,7 +116,8 @@ class IvyTaskMixin(object):
               jvm_options=self.get_options().jvm_options,
               ivy=ivy,
               workunit_name='ivy',
-              workunit_factory=self.context.new_workunit)
+              workunit_factory=self.context.new_workunit,
+              confs=confs)
 
         if workunit_name:
           with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):

@@ -141,8 +141,13 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       round_manager.require('java')
     if not self.skip_scala:
       round_manager.require('scala')
+    # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
+    # the parameter. See John's comments on RB 716.
     round_manager.require_data('ivy_jar_products')
     round_manager.require('jar_dependencies')
+    round_manager.require('jar_map_default')
+    round_manager.require('jar_map_sources')
+    round_manager.require('jar_map_javadoc')
 
   def _prepare_project(self):
     targets, self._project = self.configure_project(
@@ -250,26 +255,26 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  def _get_jar_paths(self, jars=None, confs=None):
+  def _get_jar_paths(self, confs=None):
     """Returns a list of dicts containing the paths of various jar file resources.
 
     Keys include 'default' (normal jar path), 'sources' (path to source jar), and 'javadoc'
     (path to doc jar). None of them are guaranteed to be present, but 'sources' and 'javadoc'
     will never be present if 'default' isn't.
 
-    :param jardeps: JarDependency objects to resolve paths for
     :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
       left unspecified.
     """
-    # TODO(Garrett Malmquist): Get mapping working for source and javadoc jars.
     ivy_products = self.context.products.get_data('ivy_jar_products')
-    classpath_maps = []
-    for info_group in ivy_products.values():
+    classpath_maps = defaultdict(dict)
+    for conf, info_group in ivy_products.items():
+      if conf not in confs:
+        continue # We don't care about it.
       for info in info_group:
         for module in info.modules_by_ref.values():
           for artifact in module.artifacts:
-            classpath_maps.append({'default': artifact.path})
-    return classpath_maps
+            classpath_maps[(module.ref.org, module.ref.name, module.ref.rev,)][conf] = artifact.path
+    return classpath_maps.values()
 
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
@@ -516,6 +521,7 @@ class Project(object):
           base = target.target_base
           configure_source_sets(base, relative_sources(target), is_test=test)
 
+        # TODO(Garrett Malmquist): This is dead code, and should be redone/reintegrated.
         # Other BUILD files may specify sources in the same directory as this target. Those BUILD
         # files might be in parent directories (globs('a/b/*.java')) or even children directories if
         # this target globs children as well.  Gather all these candidate BUILD files to test for
