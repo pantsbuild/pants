@@ -145,7 +145,8 @@ class IvyTaskMixin(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return ([path for path in stripped_classpath if self.is_classpath_artifact(path)], global_vts.targets)
+      return ([path for path in stripped_classpath if self.is_classpath_artifact(path)],
+              global_vts.targets)
 
   @staticmethod
   def is_classpath_artifact(path):
@@ -168,7 +169,7 @@ class IvyTaskMixin(object):
       '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
                    '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
       '-symlink',
-      ]
+    ]
     confs = target.payload.get_field_value('configurations') or []
     IvyUtils.exec_ivy(mapdir,
                       [target],
