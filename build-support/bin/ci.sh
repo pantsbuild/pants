@@ -129,9 +129,10 @@ EOF
     ./pants.pex binary ${INTERPRETER_ARGS[@]} --config-override=${config} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
-    ./dist/self.pex binary ${INTERPRETER_ARGS[@]} \
+    ./dist/self.pex binary --config-override=${config} ${INTERPRETER_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
-    ./dist/self.pex setup-py --recursive src/python/pants:pants-packaged
+    ./dist/self.pex --config-override=${config} setup-py --recursive \
+      src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
 fi
 
