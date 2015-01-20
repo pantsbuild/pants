@@ -56,6 +56,7 @@ class _Goal(object):
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
+    self._subtasks_require_ordering = False
 
   def register_options(self, options):
     for task_type in sorted(self.task_types(), key=lambda cls: cls.options_scope):
@@ -96,6 +97,7 @@ class _Goal(object):
         tt.options_scope = None
       del otn[:]
       self._task_type_by_name = {}
+      self._subtasks_require_ordering = False
     if first:
       otn.insert(0, task_name)
     elif before in otn:
@@ -105,12 +107,20 @@ class _Goal(object):
     else:
       otn.append(task_name)
 
+    if first or before or after:
+      self._subtasks_require_ordering = True
+    if replace:
+      self._subtasks_require_ordering = False
+
     self._task_type_by_name[task_name] = task_type
 
     if task_registrar.serialize:
       self.serialize = True
 
     return self
+
+  def can_run_tasks_independently(self):
+    return self._subtasks_require_ordering
 
   def with_description(self, description):
     """Add a description to this goal."""
