@@ -126,8 +126,7 @@ packages: [
   ]
 EOF
     ) && \
-    export PANTS_CONFIG_OVERRIDE=${config} && \
-    ./pants.pex binary ${INTERPRETER_ARGS[@]} \
+    ./pants.pex binary ${INTERPRETER_ARGS[@]} --config-override=${config} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
     ./dist/self.pex binary ${INTERPRETER_ARGS[@]} \

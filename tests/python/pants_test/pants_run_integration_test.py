@@ -67,15 +67,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     env = os.environ.copy()
     env.update(extra_env or {})
 
-    # TODO: We can replace the env var with a '--config-override={0}'.format(ini_file_name) arg,
-    # once we're rid of the special-case handling of this env var in pants_exe.
-    env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
-
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script,
                      '--no-lock',
                      '--kill-nailguns',
                      '--no-pantsrc',
+                     '--config-override={0}'.format(ini_file_name),
                      '--print-exception-stacktrace'] + command
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
