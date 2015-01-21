@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import sys
+
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -142,7 +144,7 @@ class JarDependency(object):
     (This implies there *is* a source jar to fetch.) Used in contexts
     that can use source jars (as of 2014, just eclipse and idea goals)."""
     print("jar dependency org={org} name={name}:  with_sources() is now a noop and is deprecated."
-          .format(org=self.org, name=self.name))
+          .format(org=self.org, name=self.name), file=sys.stderr)
     return self
 
   @manual.builddict()
@@ -151,7 +153,7 @@ class JarDependency(object):
     (This implies there *is* a javadoc jar to fetch.) Used in contexts
     that can use source jars (as of 2014, just eclipse and idea goals)."""
     print("jar dependency org={org} name={name}:  with_docs() is now a noop and is deprecated."
-          .format(org=self.org, name=self.name))
+          .format(org=self.org, name=self.name), file=sys.stderr)
     return self
 
   @manual.builddict()
