@@ -17,7 +17,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
     # Unfortunately, as in being an integration test, it is difficult to mock the SCM used.
     # Thus this will use the pants commit log, so we need a commit that changes greet example.
     # Any comment/whitespace/etc change is enough though, as long as we know the SHA.
-    return '14cc5bc23561918dc7134427bfcb268506fcbcaa'
+    return 'badref'
 
   def greet_classfile(self, workdir, filename):
     path = 'compile/jvm/java/classes/com/pants/examples/hello/greet'.split('/')
