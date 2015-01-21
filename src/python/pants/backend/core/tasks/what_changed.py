@@ -46,6 +46,7 @@ class ChangedFileTaskMixin(object):
     if not self.context.scm:
       raise TaskError('No SCM available.')
     if self.get_options().diffspec:
+      self.context.log.info('Finding changes in {}'.format(self.get_options().diffspec))
       return self.context.workspace.changes_in(self.get_options().diffspec)
     else:
       since = self.get_options().changes_since or self.context.scm.current_rev_identifier()

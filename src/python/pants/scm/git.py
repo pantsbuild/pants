@@ -125,7 +125,11 @@ class Git(Scm):
   def changes_in(self, diffspec, relative_to=None):
     relative_to = relative_to or self._worktree
     cmd = ['diff-tree', '--no-commit-id', '--name-only', '-r', diffspec]
-    files = self._check_output(cmd, raise_type=Scm.LocalException).split()
+    print(cmd)
+    file_lines = self._check_output(cmd, raise_type=Scm.LocalException)
+    print('Output from git: "{}"'.format(file_lines))
+    files = file_lines.split()
+    print('Files: {}'.format(', '.join(files)))
     return set(self.fix_git_relative_path(f.strip(), relative_to) for f in files)
 
   def changelog(self, from_commit=None, files=None):
