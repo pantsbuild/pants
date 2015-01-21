@@ -5,15 +5,26 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import pytest
+from textwrap import dedent
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import BuildFileAddress, SyntheticAddress
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import DeferredSourcesField
+from pants.base.target import Target
+
 from pants_test.base_test import BaseTest
 
+
+class TestDeferredSourcesTarget(Target):
+  def __init__(self, deferred_sources_address=None, *args, **kwargs):
+    payload = Payload()
+    payload.add_fields({
+      'def_sources': DeferredSourcesField(ref_address=deferred_sources_address),
+    })
+    super(TestDeferredSourcesTarget, self).__init__(payload=payload, *args, **kwargs)
 
 class TargetTest(BaseTest):
   @property
@@ -31,8 +42,12 @@ class TargetTest(BaseTest):
     context = self.context()
 
     # add concrete target
-    build_file = self.add_to_build_file('y/BUILD',
-                                        'java_library(name="concrete", sources=["SourceA.scala"])')
+    build_file = self.add_to_build_file('y/BUILD', dedent('''
+    java_library(
+      name='concrete',
+      sources=['SourceA.scala'],
+    )
+    '''))
     concrete_address = BuildFileAddress(build_file, 'concrete')
     context.build_graph.inject_address_closure(concrete_address)
     concrete = context.build_graph.get_target(concrete_address)
@@ -51,3 +66,23 @@ class TargetTest(BaseTest):
     self.assertEquals(list(syn_two.derived_from_chain), [syn_one, concrete])
     self.assertEquals(list(syn_one.derived_from_chain), [concrete])
     self.assertEquals(list(concrete.derived_from_chain), [])
+
+  def test_empty_traversable_properties(self):
+    build_file = self.add_to_build_file('BUILD', dedent('''
+    java_library(
+      name='foo',
+      sources=["foo.java"],
+    )
+    '''))
+    self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
+    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    self.assertSequenceEqual([], list(target.traversable_specs))
+    self.assertSequenceEqual([], list(target.traversable_dependency_specs))
+
+  def test_deferred_sources_payload_field(self):
+    target = TestDeferredSourcesTarget(name='bar', address=SyntheticAddress.parse('//:bar'),
+                                       build_graph=self.build_graph,
+                                       deferred_sources_address=SyntheticAddress.parse('//:foo'))
+    self.assertSequenceEqual([], list(target.traversable_specs))
+    self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
+
