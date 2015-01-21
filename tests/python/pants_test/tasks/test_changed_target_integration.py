@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import sys
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -32,6 +33,8 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
       run = self.run_pants_with_workdir(cmd, workdir)
       self.assert_success(run)
+      print(run.stdout_data)
+      print(run.stderr_data, file=sys.stderr)
 
       # The directly changed target's produced classfile exists.
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
@@ -44,6 +47,8 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
       run = self.run_pants_with_workdir(cmd + ['--include-dependees=direct'], workdir)
       self.assert_success(run)
+      print(run.stdout_data)
+      print(run.stderr_data, file=sys.stderr)
 
       # The changed target's and its direct dependees' (eg its tests) classfiles exist.
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
@@ -64,5 +69,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
       run = self.run_pants_with_workdir(cmd + ['--include-dependees=direct'], workdir)
       self.assert_success(run)
+      print(run.stdout_data)
+      print(run.stderr_data, file=sys.stderr)
 
       self.assertTrue(os.path.exists(junit_out))

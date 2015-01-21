@@ -46,6 +46,7 @@ class ChangedFileTaskMixin(object):
     if not self.context.scm:
       raise TaskError('No SCM available.')
     if self.get_options().diffspec:
+      self.context.log.info('Finding changes in {}'.format(self.get_options().diffspec))
       return self.context.workspace.changes_in(self.get_options().diffspec)
     else:
       since = self.get_options().changes_since or self.context.scm.current_rev_identifier()
@@ -54,7 +55,9 @@ class ChangedFileTaskMixin(object):
   def _directly_changed_targets(self):
     """Internal helper to find target addresses containing SCM changes."""
     targets_for_source = self._mapper.target_addresses_for_source
-    return set(addr for src in self._changed_files() for addr in targets_for_source(src))
+    files = self._changed_files()
+    self.context.log.info('Changed files: ' + ','.join(files))
+    return set(addr for src in files for addr in targets_for_source(src))
 
   def _find_changed_targets(self):
     """Internal helper to find changed targets, optionally including their dependees."""
@@ -97,10 +100,14 @@ class ChangedFileTaskMixin(object):
 
     # Remove any that match the exclude_target_regexp list.
     excludes = [re.compile(pattern) for pattern in self.get_options().exclude_target_regexp]
-    return set([
+    ret = set([
       t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
     ])
 
+    excluded = changed - ret
+    if excluded:
+      self.context.log.info('Ignoring changes to targets: ', *excluded)
+    return ret
 
 
 class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
