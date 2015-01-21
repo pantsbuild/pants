@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
+import pytest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -22,6 +23,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
     path = 'compile/jvm/java/classes/com/pants/examples/hello/greet'.split('/')
     return os.path.join(workdir, *(path + [filename]))
 
+  @pytest.mark.xfail
   def test_compile_changed(self):
     cmd = ['compile-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
 
@@ -49,6 +51,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
 
+  @pytest.mark.xfail
   def test_test_changed(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       cmd = ['test-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
