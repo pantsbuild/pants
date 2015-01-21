@@ -67,13 +67,12 @@ class BootstrapJvmTools(IvyTaskMixin, Task):
     cache = {}
     cache_lock = threading.Lock()
 
-    def bootstrap_classpath(executor=None):
+    def bootstrap_classpath():
       with cache_lock:
         if 'classpath' not in cache:
           targets = list(self._resolve_tool_targets(tools, key, scope))
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
-                                                executor=executor,
                                                 silent=True,
                                                 workunit_name=workunit_name,
                                                 workunit_labels=[WorkUnit.BOOTSTRAP])[0]
