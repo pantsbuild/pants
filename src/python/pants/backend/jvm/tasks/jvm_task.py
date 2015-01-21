@@ -10,7 +10,6 @@ import os
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
 from pants.util.strutil import safe_shlex_split
 
 

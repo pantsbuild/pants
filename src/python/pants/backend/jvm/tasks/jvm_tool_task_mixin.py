@@ -30,14 +30,14 @@ class JvmToolTaskMixin(object):
     """Needed only for test isolation."""
     JvmToolTaskMixin._tool_keys = []
 
-  def tool_classpath(self, key, scope=None, executor=None):
+  def tool_classpath(self, key, scope=None):
     """Get a classpath for the tool previously registered under key in the given scope.
 
     Returns a list of paths.
     """
-    return self.lazy_tool_classpath(key, scope, executor)()
+    return self.lazy_tool_classpath(key, scope)()
 
-  def lazy_tool_classpath(self, key, scope=None, executor=None):
+  def lazy_tool_classpath(self, key, scope=None):
     """Get a lazy classpath for the tool previously registered under the key in the given scope.
 
     Returns a no-arg callable. Invoking it returns a list of paths.
@@ -49,4 +49,4 @@ class JvmToolTaskMixin(object):
     if not callback:
       raise TaskError('No bootstrap callback registered for {key} in {scope}'.format(
         key=key, scope=scope))
-    return lambda: callback(executor=executor)
+    return callback
