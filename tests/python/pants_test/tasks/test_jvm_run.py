@@ -26,7 +26,7 @@ class JvmRunTest(TaskTest):
                                 build_graph=self.build_graph)
 
     round_manager = RoundManager(jvm_run.context)
-    jvm_run.prepare(round_manager)
+    jvm_run.prepare(self.options, round_manager)
 
     self.populate_compile_classpath(context=jvm_run.context, classpath=['bob', 'fred'])
 

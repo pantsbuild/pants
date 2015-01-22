@@ -22,7 +22,7 @@ class UnpackJarsTest(TaskTestBase):
     with temporary_dir() as workdir:
       unpack_task = self.create_task(self.context(), workdir)
       round_manager = RoundManager(self.context())
-      unpack_task.prepare(round_manager)
+      unpack_task.prepare(self.options, round_manager)
 
   def test_invalid_pattern(self):
     with self.assertRaises(UnpackJars.InvalidPatternError):
