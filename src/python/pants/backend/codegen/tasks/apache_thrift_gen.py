@@ -177,7 +177,7 @@ class ApacheThriftGen(CodeGen):
       relsource = os.path.relpath(source, get_buildroot())
 
       if lang == "python":
-        copied_source = os.path.join(self._workdir, relsource)
+        copied_source = os.path.relpath(os.path.join(self._workdir, relsource), get_buildroot())
         safe_mkdir(os.path.dirname(copied_source))
         shutil.copyfile(source, copied_source)
         replace_python_keywords_in_file(copied_source)
