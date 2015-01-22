@@ -161,7 +161,7 @@ class IvyTaskMixin(object):
                    '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
       '-symlink',
     ]
-    confs = maybe_list(target.payload.get_field_value('configurations')) or []
+    confs = maybe_list(target.payload.get_field_value('configurations') or [])
     self.exec_ivy(mapdir,
                   [target],
                   executor=executor,
