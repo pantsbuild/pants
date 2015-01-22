@@ -86,9 +86,9 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
   def prepare(cls, options, round_manager):
     if options.python:
       round_manager.require('python')
-    if not options.skip_java:
+    if options.java:
       round_manager.require('java')
-    if not options.skip_scala:
+    if options.scala:
       round_manager.require('scala')
     # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
     # the parameter. See John's comments on RB 716.
