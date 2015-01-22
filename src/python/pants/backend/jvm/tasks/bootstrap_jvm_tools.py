@@ -13,7 +13,6 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
 
 
 class BootstrapJvmTools(IvyTaskMixin, Task):
@@ -74,7 +73,6 @@ class BootstrapJvmTools(IvyTaskMixin, Task):
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
                                                 silent=True,
-                                                workunit_name=workunit_name,
-                                                workunit_labels=[WorkUnit.BOOTSTRAP])[0]
+                                                workunit_name=workunit_name)[0]
         return cache['classpath']
     return bootstrap_classpath

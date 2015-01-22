@@ -53,9 +53,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     distribution = Distribution.cached(jdk=True)
     executor = SubprocessExecutor(distribution=distribution)
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
-    ivy = Bootstrapper.default_ivy(java_executor=executor)
+    ivy = Bootstrapper.default_ivy()
     ivy.execute(args=['-cachepath', classpath_file_abs_path,
-                      '-dependency', 'junit', 'junit-dep', '4.10'])
+                      '-dependency', 'junit', 'junit-dep', '4.10'], executor=executor)
     with open(classpath_file_abs_path) as fp:
       classpath = fp.read()
 

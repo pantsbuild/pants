@@ -20,16 +20,9 @@ class Ivy(object):
   class Error(Exception):
     """Indicates an error executing an ivy command."""
 
-  def __init__(self, classpath, java_executor=None, ivy_settings=None, ivy_cache_dir=None):
+  def __init__(self, classpath, ivy_settings=None, ivy_cache_dir=None):
     """Configures an ivy wrapper for the ivy distribution at the given classpath."""
-
     self._classpath = maybe_list(classpath)
-
-    self._java = java_executor or SubprocessExecutor()
-    if not isinstance(self._java, Executor):
-      raise ValueError('java_executor must be an Executor instance, given %s of type %s'
-                       % (self._java, type(self._java)))
-
     self._ivy_settings = ivy_settings
     if self._ivy_settings and not isinstance(self._ivy_settings, Compatibility.string):
       raise ValueError('ivy_settings must be a string, given %s of type %s'
@@ -66,13 +59,13 @@ class Ivy(object):
       if result != 0:
         raise self.Error('Ivy command failed with exit code %d%s'
                          % (result, ': ' + ' '.join(args) if args else ''))
-    except self._java.Error as e:
+    except executor.Error as e:
       raise self.Error('Problem executing ivy: %s' % e)
 
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
-    executor = executor or self._java
+    executor = executor or SubprocessExecutor()
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given %s of type %s'
                        % (executor, type(executor)))

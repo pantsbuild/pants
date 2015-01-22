@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
-import copy
 import errno
 import logging
 import os
@@ -23,8 +22,6 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.ivy.ivy import Ivy
-from pants.java import util
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -97,6 +94,8 @@ class IvyInfo(object):
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
+
+  ivy_lock = threading.RLock()
 
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
@@ -238,7 +237,7 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def _calculate_classpath(cls, targets):
+  def calculate_classpath(cls, targets):
     jars = OrderedDict()
     excludes = set()
 
@@ -319,50 +318,3 @@ class IvyUtils(object):
         configurations=maybe_list(confs))
     return template
 
-  ivy_lock = threading.RLock()
-
-  @classmethod
-  def exec_ivy(cls,
-               target_workdir,
-               targets,
-               jvm_options,
-               args,
-               confs=None,
-               ivy=None,
-               workunit_name='ivy',
-               workunit_factory=None,
-               jars=None):
-    ivy_jvm_options = copy.copy(jvm_options) if jvm_options else []
-    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
-    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
-
-    ivy = ivy or Bootstrapper.default_ivy()
-    if not isinstance(ivy, Ivy):
-      raise ValueError('The ivy argument supplied must be an Ivy instance, given %s of type %s'
-                       % (ivy, type(ivy)))
-
-    ivyxml = os.path.join(target_workdir, 'ivy.xml')
-
-    if not jars:
-      jars, excludes = cls._calculate_classpath(targets)
-    else:
-      excludes = set()
-
-    ivy_args = ['-ivy', ivyxml]
-
-    confs_to_resolve = confs or ['default']
-    ivy_args.append('-confs')
-    ivy_args.extend(confs_to_resolve)
-    ivy_args.extend(args)
-
-    with IvyUtils.ivy_lock:
-      cls.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve)
-      runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args)
-      try:
-        result = util.execute_runner(runner,
-                                     workunit_factory=workunit_factory,
-                                     workunit_name=workunit_name)
-        if result != 0:
-          raise TaskError('Ivy returned %d' % result)
-      except runner.executor.Error as e:
-        raise TaskError(e)
