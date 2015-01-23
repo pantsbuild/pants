@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
+import copy
 import logging
 import os
 import shutil
@@ -20,8 +21,9 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.java.executor import Executor
+from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
+
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +69,6 @@ class IvyTaskMixin(object):
                   executor=None,
                   silent=False,
                   workunit_name=None,
-                  workunit_labels=None,
                   confs=None):
     if not targets:
       return ([], set())
@@ -76,11 +77,7 @@ class IvyTaskMixin(object):
     # the generated module, which in turn determines the location of the XML report file
     # ivy generates. We recompute this name from targets later in order to find that file.
     # TODO: This is fragile. Refactor so that we're not computing the name twice.
-    if executor and not isinstance(executor, Executor):
-      raise ValueError('The executor must be an Executor instance, given %s of type %s'
-                       % (executor, type(executor)))
-    ivy = Bootstrapper.default_ivy(java_executor=executor,
-                                   bootstrap_workunit_factory=self.context.new_workunit)
+    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
 
     ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
 
@@ -108,22 +105,14 @@ class IvyTaskMixin(object):
       if invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
         args = ['-cachepath', raw_target_classpath_file_tmp]
 
-        def exec_ivy():
-          IvyUtils.exec_ivy(
-              target_workdir=target_workdir,
-              targets=global_vts.targets,
-              args=args,
-              jvm_options=self.get_options().jvm_options,
-              ivy=ivy,
-              workunit_name='ivy',
-              workunit_factory=self.context.new_workunit,
-              confs=confs)
-
-        if workunit_name:
-          with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):
-            exec_ivy()
-        else:
-          exec_ivy()
+        self.exec_ivy(
+            target_workdir=target_workdir,
+            targets=global_vts.targets,
+            args=args,
+            executor=executor,
+            ivy=ivy,
+            workunit_name=workunit_name,
+            confs=confs)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
           raise TaskError('Ivy failed to create classpath file at %s'
@@ -156,7 +145,7 @@ class IvyTaskMixin(object):
     artifact."""
     return path.endswith('.jar') or path.endswith('.war')
 
-  def mapjars(self, genmap, target, executor, workunit_factory=None, jars=None):
+  def mapjars(self, genmap, target, executor, jars=None):
     """Resolves jars for the target and stores their locations in genmap.
 
     :param genmap: The jar_dependencies ProductMapping entry for the required products.
@@ -172,16 +161,15 @@ class IvyTaskMixin(object):
                    '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
       '-symlink',
     ]
-    confs = target.payload.get_field_value('configurations') or []
-    IvyUtils.exec_ivy(mapdir,
-                      [target],
-                      jvm_options=self.get_options().jvm_options,
-                      args=ivyargs,
-                      confs=maybe_list(confs),
-                      ivy=Bootstrapper.default_ivy(executor),
-                      workunit_factory=workunit_factory,
-                      workunit_name='map-jars',
-                      jars=jars)
+    confs = maybe_list(target.payload.get_field_value('configurations') or [])
+    self.exec_ivy(mapdir,
+                  [target],
+                  executor=executor,
+                  args=ivyargs,
+                  confs=confs,
+                  ivy=Bootstrapper.default_ivy(),
+                  workunit_name='map-jars',
+                  jars=jars)
 
     for org in os.listdir(mapdir):
       orgdir = os.path.join(mapdir, org)
@@ -202,3 +190,41 @@ class IvyTaskMixin(object):
                   genmap.add((target, conf), confdir).append(f)
                   genmap.add((org, name, conf), confdir).append(f)
 
+  def exec_ivy(self,
+               target_workdir,
+               targets,
+               args,
+               executor=None,
+               confs=None,
+               ivy=None,
+               workunit_name='ivy',
+               jars=None):
+    ivy_jvm_options = copy.copy(self.get_options().jvm_options)
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
+    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
+
+    ivy = ivy or Bootstrapper.default_ivy()
+    ivyxml = os.path.join(target_workdir, 'ivy.xml')
+
+    if not jars:
+      jars, excludes = IvyUtils.calculate_classpath(targets)
+    else:
+      excludes = set()
+
+    ivy_args = ['-ivy', ivyxml]
+
+    confs_to_resolve = confs or ['default']
+    ivy_args.append('-confs')
+    ivy_args.extend(confs_to_resolve)
+    ivy_args.extend(args)
+
+    with IvyUtils.ivy_lock:
+      IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve)
+      runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
+      try:
+        result = execute_runner(runner, workunit_factory=self.context.new_workunit,
+                                workunit_name=workunit_name)
+        if result != 0:
+          raise TaskError('Ivy returned %d' % result)
+      except runner.executor.Error as e:
+        raise TaskError(e)

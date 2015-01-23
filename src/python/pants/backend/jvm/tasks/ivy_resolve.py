@@ -133,7 +133,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     if create_jardeps_for:
       genmap = self.context.products.get('jar_dependencies')
       for target in filter(create_jardeps_for, targets):
-        self.mapjars(genmap, target, executor=executor, workunit_factory=self.context.new_workunit)
+        self.mapjars(genmap, target, executor=executor)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible

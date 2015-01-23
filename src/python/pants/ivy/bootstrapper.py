@@ -62,18 +62,17 @@ class Bootstrapper(object):
     return cls._INSTANCE
 
   @classmethod
-  def default_ivy(cls, java_executor=None, bootstrap_workunit_factory=None):
+  def default_ivy(cls, bootstrap_workunit_factory=None):
     """Returns an Ivy instance using the default global bootstrapper.
 
-    By default runs ivy via a subprocess java executor.
+    By default runs ivy via a subprocess java executor.  Callers of execute() on the returned
+    Ivy instance can provide their own executor.
 
-    :param java_executor: the optional java executor to use
     :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
     :returns: an Ivy instance.
     :raises: Bootstrapper.Error if the default ivy instance could not be bootstrapped
     """
-    return cls.instance().ivy(java_executor=java_executor,
-                              bootstrap_workunit_factory=bootstrap_workunit_factory)
+    return cls.instance().ivy(bootstrap_workunit_factory=bootstrap_workunit_factory)
 
   def __init__(self):
     """Creates an ivy bootstrapper."""
@@ -84,25 +83,23 @@ class Bootstrapper(object):
     self._version_or_ivyxml = self._config.get('ivy', 'ivy_profile', default=self._DEFAULT_VERSION)
     self._classpath = None
 
-  def ivy(self, java_executor=None, bootstrap_workunit_factory=None):
+  def ivy(self, bootstrap_workunit_factory=None):
     """Returns an ivy instance bootstrapped by this bootstrapper.
 
-    :param java_executor: the optional java executor to use
     :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
     :raises: Bootstrapper.Error if ivy could not be bootstrapped
     """
-    return Ivy(self._get_classpath(java_executor, bootstrap_workunit_factory),
-               java_executor=java_executor,
+    return Ivy(self._get_classpath(bootstrap_workunit_factory),
                ivy_settings=self._ivy_settings,
                ivy_cache_dir=self.ivy_cache_dir)
 
-  def _get_classpath(self, executor, workunit_factory):
+  def _get_classpath(self, workunit_factory):
     """Returns the bootstrapped ivy classpath as a list of jar paths.
 
     :raises: Bootstrapper.Error if the classpath could not be bootstrapped
     """
     if not self._classpath:
-      self._classpath = self._bootstrap_ivy_classpath(executor, workunit_factory)
+      self._classpath = self._bootstrap_ivy_classpath(workunit_factory)
     return self._classpath
 
   @property
@@ -128,7 +125,7 @@ class Bootstrapper(object):
     return (os.getenv('PANTS_IVY_CACHE_DIR')
             or self._config.get('ivy', 'cache_dir', default=os.path.expanduser('~/.ivy2/pants')))
 
-  def _bootstrap_ivy_classpath(self, executor, workunit_factory, retry=True):
+  def _bootstrap_ivy_classpath(self, workunit_factory, retry=True):
     # TODO(John Sirois): Extract a ToolCache class to control the path structure:
     # https://jira.twitter.biz/browse/DPB-283
     ivy_bootstrap_dir = \
@@ -152,8 +149,7 @@ class Bootstrapper(object):
         args.extend(['-dependency', 'org.apache.ivy', 'ivy', self._version_or_ivyxml])
 
       try:
-        ivy.execute(args=args, executor=executor,
-                    workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
+        ivy.execute(args=args, workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
       except ivy.Error as e:
         safe_delete(classpath)
         raise self.Error('Failed to bootstrap an ivy classpath! %s' % e)
@@ -163,7 +159,7 @@ class Bootstrapper(object):
       if not all(map(os.path.exists, cp)):
         safe_delete(classpath)
         if retry:
-          return self._bootstrap_ivy_classpath(executor, workunit_factory, retry=False)
+          return self._bootstrap_ivy_classpath(workunit_factory, retry=False)
         raise self.Error('Ivy bootstrapping failed - invalid classpath: %s' % ':'.join(cp))
       return cp
 
