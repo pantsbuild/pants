@@ -42,14 +42,6 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[g])
     self.assertEquals([g, a, c, b, d], context.targets())
 
-  def test_targets_retrieved_status(self):
-    a = self.make_target('a')
-    # Check retrieved status
-    context = self.context(target_roots=[a])
-    self.assertEquals(False, context._target_roots_have_been_accessed)
-    self.assertEquals([a], context.targets())
-    self.assertEquals(True, context._target_roots_have_been_accessed)
-
   def test_targets_replace_targets(self):
     a = self.make_target('a')
     b = self.make_target('b', dependencies=[a])
