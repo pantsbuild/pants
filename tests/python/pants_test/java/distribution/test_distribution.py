@@ -38,6 +38,13 @@ class MockDistributionTest(unittest.TestCase):
     return cls.EXE(name, contents=contents)
 
   @contextmanager
+  def env(*args, **kwargs):
+    environment = dict(JDK_HOME=None, JAVA_HOME=None, PATH=None)
+    environment.update(**kwargs)
+    with environment_as(**environment):
+      yield
+
+  @contextmanager
   def distribution(self, files=None, executables=None):
     with temporary_dir() as jdk:
       for f in maybe_list(files or ()):
@@ -91,94 +98,90 @@ class MockDistributionTest(unittest.TestCase):
       Distribution(bin_path=jdk).binary('jar')
 
   def test_locate(self):
-    @contextmanager
-    def env(**kwargs):
-      environment = dict(JDK_HOME=None, JAVA_HOME=None, PATH=None)
-      environment.update(**kwargs)
-      with environment_as(**environment):
-        yield
 
     with pytest.raises(Distribution.Error):
-      with env():
+      with self.env():
         Distribution.locate()
 
     with pytest.raises(Distribution.Error):
       with self.distribution(files='java') as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate()
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate(jdk=True)
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.6.0')) as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate(minimum_version='1.7.0')
+
       with self.distribution(executables=self.exe('java', '1.8.0')) as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate(maximum_version='1.7.999')
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
-        with env(JDK_HOME=jdk):
+        with self.env(JDK_HOME=jdk):
           Distribution.locate()
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
-        with env(JAVA_HOME=jdk):
+        with self.env(JAVA_HOME=jdk):
           Distribution.locate()
 
     with self.distribution(executables=self.exe('java')) as jdk:
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate()
 
     with self.distribution(executables=[self.exe('java'), self.exe('javac')]) as jdk:
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(jdk=True)
 
     with self.distribution(executables=self.exe('java', '1.7.0')) as jdk:
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(minimum_version='1.6.0')
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(maximum_version='1.7.999')
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(minimum_version='1.6.0', maximum_version='1.7.999')
 
     with self.distribution(executables=self.exe('bin/java')) as jdk:
-      with env(JDK_HOME=jdk):
+      with self.env(JDK_HOME=jdk):
         Distribution.locate()
 
     with self.distribution(executables=self.exe('bin/java')) as jdk:
-      with env(JAVA_HOME=jdk):
+      with self.env(JAVA_HOME=jdk):
         Distribution.locate()
 
   def test_cached(self):
-    with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
-      Distribution.cached(maximum_version='1.8.0_20')
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        Distribution.cached(minimum_version='1.7.0_25')
+      with self.env(PATH=jdk):
+        Distribution.cached(maximum_version='1.7.0_55')
 
     with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+        with self.env(PATH=jdk):
+          Distribution.cached(maximum_version='1.6.0_20')
       with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
-        Distribution.cached(maximum_version='1.6.0_20')
+        with self.env(PATH=jdk):
+          Distribution.cached(minimum_version='1.8.0_20')
 
-    with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
-      Distribution.cached(minimum_version='1.6.0_20')
-
-    with pytest.raises(Distribution.Error):
-      with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
-        Distribution.cached(minimum_version='1.8.0_20')
-
-    with self.distribution(executables=self.exe('java', '1.7.0_20')) as jdk:
-      Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        Distribution.cached(minimum_version='1.6.0_19', maximum_version='1.7.0_66')
 
     with pytest.raises(Distribution.Error):
-      with self.distribution(executables=self.exe('java', '1.7.0_22')) as jdk:
-        Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
-
-    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+        with self.env(PATH=jdk):
+          Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
       with self.distribution(executables=self.exe('java', '1.7.0_18')) as jdk:
-        Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
+        with self.env(PATH=jdk):
+          Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
 
 def exe_path(name):
   process = subprocess.Popen(['which', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
