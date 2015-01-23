@@ -22,13 +22,14 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     return ['ivy_imports']
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(IvyImports, cls).prepare(options, round_manager)
+    round_manager.require_data('jvm_build_tools_classpath_callbacks')
+
   @property
   def config_section(self):
     return self._CONFIG_SECTION
-
-  def prepare(self, round_manager):
-    super(IvyImports, self).prepare(round_manager)
-    round_manager.require_data('jvm_build_tools_classpath_callbacks')
 
   def _str_jar(self, jar):
     return 'jar' + str((jar.org, jar.name, jar.rev))

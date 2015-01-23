@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.goal.error import TargetRootReplacementError
 from pants_test.base_test import BaseTest
 
 
@@ -43,14 +42,6 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[g])
     self.assertEquals([g, a, c, b, d], context.targets())
 
-  def test_targets_retrieved_status(self):
-    a = self.make_target('a')
-    # Check retrieved status
-    context = self.context(target_roots=[a])
-    self.assertEquals(False, context._target_roots_have_been_accessed)
-    self.assertEquals([a], context.targets())
-    self.assertEquals(True, context._target_roots_have_been_accessed)
-
   def test_targets_replace_targets(self):
     a = self.make_target('a')
     b = self.make_target('b', dependencies=[a])
@@ -58,14 +49,7 @@ class ContextTest(BaseTest):
 
     context = self.context(target_roots=[b])
     self.assertEquals([b, a], context.targets())
-    context.replace_targets([a])
+    context._replace_targets([a])
     self.assertEquals([a], context.targets())
-    context.replace_targets([c])
+    context._replace_targets([c])
     self.assertEquals([c, b, a], context.targets())
-
-    context = self.context(target_roots=[b])
-    context.replace_targets([a], ignore_previous_reads=False)
-    self.assertEquals([a], context.targets())
-
-    with self.assertRaises(TargetRootReplacementError):
-      context.replace_targets([b], ignore_previous_reads=False)

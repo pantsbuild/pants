@@ -185,6 +185,10 @@ class Options(object):
     self._values_by_scope[scope] = values
     return values
 
+  def __getitem__(self, scope):
+    """TODO(John Sirois): XXX docme"""
+    return self.for_scope(scope)
+
   def bootstrap_option_values(self):
     """Return the option values for bootstrap options.
 

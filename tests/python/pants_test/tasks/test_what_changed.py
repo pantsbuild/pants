@@ -21,6 +21,7 @@ from pants.base.source_root import SourceRoot
 from pants.goal.workspace import Workspace
 from pants_test.tasks.test_base import ConsoleTaskTest
 
+
 class BaseWhatChangedTest(ConsoleTaskTest):
   @property
   def alias_groups(self):
@@ -57,12 +58,6 @@ class BaseWhatChangedTest(ConsoleTaskTest):
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
-  def test_no_workspace(self):
-    with self.assertRaises(TaskError):
-      task = self.prepare_task(build_graph=self.build_graph)
-      task.context._workspace = None
-      task.execute()
-
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 

@@ -38,6 +38,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   """
 
   @classmethod
+  def product_types(cls):
+    return ['classes_by_target', 'classes_by_source', 'resources_by_target']
+
+  @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
     register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
@@ -91,6 +95,21 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('compile_classpath')
+    round_manager.require_data('ivy_cache_dir')
+
+    # Require codegen we care about
+    # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
+    # predicate to filter the full build graph is exposed, the requirement can be made automatic
+    # and in turn codegen tasks could denote the labels they produce automating wiring of the
+    # produce side
+    round_manager.require_data('java')
+    round_manager.require_data('scala')
+
+    # Allow the deferred_sources_mapping to take place first
+    round_manager.require_data('deferred_sources')
 
   # Subclasses must implement.
   # --------------------------
@@ -100,10 +119,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @classmethod
   def name(cls):
     return cls._language
-
-  @classmethod
-  def product_types(cls):
-    return ['classes_by_target', 'classes_by_source', 'resources_by_target']
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -251,21 +266,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None
-
-  def prepare(self, round_manager):
-    round_manager.require_data('compile_classpath')
-    round_manager.require_data('ivy_cache_dir')
-
-    # Require codegen we care about
-    # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
-    # predicate to filter the full build graph is exposed, the requirement can be made automatic
-    # and in turn codegen tasks could denote the labels they produce automating wiring of the
-    # produce side
-    round_manager.require_data('java')
-    round_manager.require_data('scala')
-
-    # Allow the deferred_sources_mapping to take place first
-    round_manager.require_data('deferred_sources')
 
   def move(self, src, dst):
     if self._delete_scratch:
