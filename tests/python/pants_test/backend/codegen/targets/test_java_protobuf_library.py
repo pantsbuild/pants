@@ -77,10 +77,9 @@ class JavaProtobufLibraryTest(BaseTest):
         ],
       )
       '''))
-    target = self.target('//:foo')
-    self.assertIsInstance(target, JavaProtobufLibrary)
-    with self.assertRaises(JarLibrary.ExpectedAddressError):
-      target.imports
+    with self.assertRaises(JavaProtobufLibrary.ExpectedListError):
+      self.target('//:foo')
+
 
   def test_traversable_specs(self):
     self.add_to_build_file('BUILD', dedent('''
