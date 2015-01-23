@@ -38,6 +38,7 @@ class PythonRun(PythonTask):
       interpreter = self.select_interpreter_for_targets(self.context.targets())
       with self.temporary_pex_builder(interpreter=interpreter, pex_info=binary.pexinfo) as builder:
         chroot = PythonChroot(
+          context=self.context,
           targets=[binary],
           builder=builder,
           platforms=binary.platforms,

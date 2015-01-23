@@ -39,6 +39,7 @@ class PythonTestBuilderTestBase(BaseTest):
 
   def run_tests(self, targets, args=None, fast=True, debug=False):
     test_builder = PythonTestBuilder(
+        self.context(),
         targets, args or [], fast=fast, debug=debug, interpreter=self._cache_current_interpreter())
 
     with pushd(self.build_root):
