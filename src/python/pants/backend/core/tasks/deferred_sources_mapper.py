@@ -32,13 +32,6 @@ class DeferredSourcesMapper(Task):
     """Raised when there are no files found unpacked from the archive"""
     pass
 
-  def __init__(self, *args, **kwargs):
-    super(DeferredSourcesMapper, self).__init__(*args, **kwargs)
-
-  def prepare(self, round_manager):
-    super(DeferredSourcesMapper, self).prepare(round_manager)
-    round_manager.require_data('unpacked_archives')
-
   @classmethod
   def product_types(cls):
     """
@@ -49,6 +42,10 @@ class DeferredSourcesMapper(Task):
     :return:
     """
     return ['deferred_sources']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('unpacked_archives')
 
   def execute(self):
     deferred_sources_fields = []

@@ -31,9 +31,12 @@ class TaskBase(AbstractClass):
 
   Provides the base lifecycle methods that allow a task to interact with the command line, other
   tasks and the user.  The lifecycle is linear and run via the following sequence:
-  1. register_options - declare options configurable via cmd-line flag or config file.
-  2. __init__ - distill configuration into the information needed to execute
-  3. prepare - request any products needed from goal dependencies
+  1. product_types - declare the product types your task is capable of producing.
+  2. register_options - declare options configurable via cmd-line flag or config file.
+  3. alternate_target_roots - propose a different set of target roots to use than those specified
+                              via the CLI for the active pants run.
+  4. prepare - request any products needed from other tasks.
+  5. __init__ - distill configuration into the information needed to execute.
 
   Provides access to the current run context for scoping work.
 
@@ -46,6 +49,17 @@ class TaskBase(AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+
+  @classmethod
+  def product_types(cls):
+    """The list of products this Task produces. Set the product type(s) for this
+    task i.e. the product type(s) this task creates e.g ['classes'].
+
+    By default, each task is considered as creating a unique product type(s).
+    Subclasses that create products, should override this to specify their unique product type(s).
+    """
+    return []
+
   # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
   options_scope = None
 
@@ -77,6 +91,42 @@ class TaskBase(AbstractClass):
   def supports_passthru_args(cls):
     """Subclasses may override to indicate that they can use passthru args."""
     return False
+
+  @classmethod
+  def _scoped_options(cls, options):
+    return options[cls.options_scope]
+
+  @classmethod
+  def _alternate_target_roots(cls, options, address_mapper, build_graph):
+    # Subclasses should not generally need to override this method.
+    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
+    return cls.alternate_target_roots(cls._scoped_options(options), address_mapper, build_graph)
+
+  @classmethod
+  def alternate_target_roots(cls, options, address_mapper, build_graph):
+    """Allows a Task to propose alternate target roots from those specified on the CLI.
+
+    At most 1 unique proposal is allowed amongst all tasks involved in the run.  If more than 1
+    unique list of target roots is proposed an error is raised during task scheduling.
+
+    :returns list: The new target roots to use or none to accept the CLI specified target roots.
+    """
+
+  @classmethod
+  def _prepare(cls, options, round_manager):
+    # Subclasses should not generally need to override this method.
+    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
+    return cls.prepare(cls._scoped_options(options), round_manager)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    """Prepares a task for execution.
+
+    Called before execution and prior to any tasks that may be (indirectly) depended upon.
+
+    Typically a task that requires products from other goals would register interest in those
+    products here and then retrieve the requested product mappings when executed.
+    """
 
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
@@ -115,15 +165,6 @@ class TaskBase(AbstractClass):
       raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
-
-  def prepare(self, round_manager):
-    """Prepares a task for execution.
-
-    Called before execution and prior to any tasks that may be (indirectly) depended upon.
-
-    Typically a task that requires products from other goals would register interest in those
-    products here and then retrieve the requested product mappings when executed.
-    """
 
   @property
   def workdir(self):
@@ -183,16 +224,6 @@ class TaskBase(AbstractClass):
 
   def artifact_cache_writes_enabled(self):
     return bool(self._write_artifact_cache_spec) and self.get_options().write_to_artifact_cache
-
-  @classmethod
-  def product_types(self):
-    """The list of products this Task produces. Set the product type(s) for this
-    task i.e. the product type(s) this task creates e.g ['classes'].
-
-    By default, each task is considered as creating a unique product type(s).
-    Subclasses that create products, should override this to specify their unique product type(s).
-    """
-    return []
 
   def invalidate_for_files(self):
     """Provides extra files that participate in invalidation.
@@ -459,6 +490,7 @@ class TaskBase(AbstractClass):
       # language-specific flags that would resolve the ambiguity here
       raise TaskError('Mutually incompatible targets specified: %s vs %s (and %d others)' %
                       (accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
+
 
 class Task(TaskBase):
   """An executable task.

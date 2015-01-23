@@ -167,24 +167,23 @@ class Products(object):
 
     If a target predicate is supplied, only targets matching the predicate are mapped.
     """
-    if predicate:
-      self.predicates_for_type[typename].append(predicate)
-    return self.products.setdefault(typename, Products.ProductMapping(typename))
+    self.predicates_for_type[typename].append(predicate or (lambda target: False))
 
   def isrequired(self, typename):
     """Returns a predicate that selects targets required for the given type if mappings are required.
 
     Otherwise returns None.
     """
-    if typename not in self.products:
+    requirements = self.predicates_for_type[typename]
+    if not requirements:
       return None
     def combine(first, second):
       return lambda target: first(target) or second(target)
-    return reduce(combine, self.predicates_for_type[typename], lambda target: False)
+    return reduce(combine, requirements, lambda target: False)
 
   def get(self, typename):
     """Returns a ProductMapping for the given type name."""
-    return self.require(typename)
+    return self.products.setdefault(typename, Products.ProductMapping(typename))
 
   def require_data(self, typename):
     """ Registers a requirement that data produced by tasks is required.

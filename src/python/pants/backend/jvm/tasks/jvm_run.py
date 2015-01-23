@@ -17,7 +17,7 @@ from pants.java.util import execute_java
 from pants.util.dirutil import safe_open
 
 
-_CWD_NOT_PRESENT='CWD NOT PRESENT'
+_CWD_NOT_PRESENT = 'CWD NOT PRESENT'
 logger = logging.getLogger(__name__)
 
 
@@ -30,22 +30,23 @@ class JvmRun(JvmTask):
   @classmethod
   def register_options(cls, register):
     super(JvmRun, cls).register_options(register)
-    register('--only-write-cmd-line',  metavar='<file>',
+    register('--only-write-cmd-line', metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the target path.')
 
-  def __init__(self, *args, **kwargs):
-    super(JvmRun, self).__init__(*args, **kwargs)
-    self.only_write_cmd_line = self.get_options().only_write_cmd_line
-
-  def prepare(self, round_manager):
+  @classmethod
+  def prepare(cls, options, round_manager):
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
+
+  def __init__(self, *args, **kwargs):
+    super(JvmRun, self).__init__(*args, **kwargs)
+    self.only_write_cmd_line = self.get_options().only_write_cmd_line
 
   def execute(self):
     # The called binary may block for a while, allow concurrent pants activity during this pants
