@@ -116,7 +116,8 @@ class BaseTest(unittest.TestCase):
     self.options[''] = {
       'pants_workdir': os.path.join(self.build_root, '.pants.d'),
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
-      'pants_distdir': os.path.join(self.build_root, 'dist')
+      'pants_distdir': os.path.join(self.build_root, 'dist'),
+      'python_chroot_requirements_ttl': 1000000000,
     }
     BuildRoot().path = self.build_root
 
