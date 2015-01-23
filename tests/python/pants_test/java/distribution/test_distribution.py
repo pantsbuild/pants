@@ -154,6 +154,31 @@ class MockDistributionTest(unittest.TestCase):
       with env(JAVA_HOME=jdk):
         Distribution.locate()
 
+  def test_cached(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
+      Distribution.cached(maximum_version='1.8.0_20')
+
+    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
+        Distribution.cached(maximum_version='1.6.0_20')
+
+    with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
+      Distribution.cached(minimum_version='1.6.0_20')
+
+    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
+        Distribution.cached(minimum_version='1.8.0_20')
+
+    with self.distribution(executables=self.exe('java', '1.7.0_20')) as jdk:
+      Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
+
+    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.7.0_22')) as jdk:
+        Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
+
+    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java', '1.7.0_18')) as jdk:
+        Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
 
 def exe_path(name):
   process = subprocess.Popen(['which', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
