@@ -13,6 +13,7 @@ from mock import Mock
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
 
@@ -38,21 +39,38 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.add_to_build_file('src/java/targets',
         dedent("""
             jar_library(
-              name='simple',
+              name='a',
               jars=[
                 jar('org1', 'name1', 'rev1'),
                 jar('org2', 'name2', 'rev2', force=True),
-              ]
+              ],
             )
         """))
 
-    self.simple = self.target('src/java/targets:simple')
+    self.b_org = 'com.example'
+    self.b_name = 'b'
+    self.add_to_build_file('src/java/targets',
+        dedent("""
+            java_library(
+              name='b',
+              dependencies=[':a'],
+              provides=artifact('{org}', '{name}', repo=Repository()),
+              sources=['z.java'],
+            )
+        """.format(org=self.b_org, name=self.b_name)))
+
+    self.a = self.target('src/java/targets:a')
+    self.b = self.target('src/java/targets:b')
     context = self.context()
 
+  def test_exclude_exported(self):
+    _, excludes = IvyUtils.calculate_classpath([self.b])
+    self.assertEqual(excludes, set([Exclude(org=self.b_org, name=self.b_name)]))
+
   def test_force_override(self):
-    jars = list(self.simple.payload.jars)
+    jars = list(self.a.payload.jars)
     with temporary_file_path() as ivyxml:
-      IvyUtils.generate_ivy([self.simple], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
+      IvyUtils.generate_ivy([self.a], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
 
       doc = ET.parse(ivyxml).getroot()
 

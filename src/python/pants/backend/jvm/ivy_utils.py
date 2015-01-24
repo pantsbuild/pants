@@ -16,6 +16,7 @@ import xml
 
 from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
 
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -260,6 +261,10 @@ class IvyUtils(object):
       target_excludes = target.payload.get_field_value('excludes')
       if target_excludes:
         excludes.update(target_excludes)
+      if target.is_exported:
+        # if a source dep is exported, it should always override remote/binary versions
+        # of itself, ie "round trip" dependencies
+        excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     for target in targets:
       target.walk(collect_jars)
