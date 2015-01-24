@@ -12,6 +12,7 @@ from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.base.build_environment import get_buildroot
 from pants.option.options import Options
+from pants.option.parser import Parser
 
 
 def register_bootstrap_options(register, buildroot=None):
@@ -43,6 +44,7 @@ def register_bootstrap_options(register, buildroot=None):
   register('--pythonpath', action='append',
            help='Add these directories to PYTHONPATH to search for plugins.')
 
+
 class OptionsBootstrapper(object):
   """An object that knows how to create options in two stages: bootstrap, and then full options."""
   def __init__(self, env=None, configpath=None, args=None, buildroot=None):
@@ -62,8 +64,13 @@ class OptionsBootstrapper(object):
     """Returns an Options instance that only knows about the bootstrap options."""
     if not self._bootstrap_options:
       flags = set()
+
       def capture_the_flags(*args, **kwargs):
-        flags.update(args)
+        for flag in Parser.expand_flags(*args, **kwargs):
+          flags.add(flag.name)
+          if flag.inverse_name:
+            flags.add(flag.inverse_name)
+
       register_bootstrap_options(capture_the_flags, buildroot=self._buildroot)
       # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
       bargs = filter(lambda x: x.partition('=')[0] in flags, self._args or [])
