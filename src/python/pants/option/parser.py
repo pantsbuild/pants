@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from argparse import ArgumentParser, _HelpAction
+from collections import namedtuple
 import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -47,6 +48,31 @@ class Parser(object):
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.
   """
+
+  class Flag(namedtuple('Flag', ['name', 'inverse_name', 'help_arg'])):
+    """A struct describing a single flag and its corresponding help representation.
+
+    No-argument boolean flags also support an `inverse_name` to set the corresponding option value
+    in the opposite sense from its default.  All other flags will have no `inverse_name`
+    """
+    @classmethod
+    def _create(cls, flag, **kwargs):
+      if (kwargs.get('action') in ('store_false', 'store_true') and
+            flag.startswith('--') and not flag.startswith('--no-')):
+        name = flag[2:]
+        return cls(flag, '--no-' + name, '--[no-]' + name)
+      else:
+        return cls(flag, None, flag)
+
+  @classmethod
+  def expand_flags(cls, *args, **kwargs):
+    """Returns a list of the flags associated with an option registration.
+
+    :param *args: The args (flag names), that would be passed to an option registration.
+    :param **kwargs: The kwargs that would be passed to an option registration.
+    """
+    return [cls.Flag._create(flag, **kwargs) for flag in args]
+
   def __init__(self, env, config, scope, parent_parser):
     self._env = env
     self._config = config
@@ -106,18 +132,12 @@ class Parser(object):
     dest = self._set_dest(args, kwargs)
 
     # Is this a boolean flag?
-    if kwargs.get('action') in ('store_false', 'store_true'):
-      inverse_args = []
-      help_args = []
-      for flag in args:
-        if flag.startswith('--') and not flag.startswith('--no-'):
-          inverse_args.append('--no-' + flag[2:])
-          help_args.append('--[no-]{0}'.format(flag[2:]))
-        else:
-          help_args.append(flag)
-    else:
-      inverse_args = None
-      help_args = args
+    inverse_args = []
+    help_args = []
+    for flag in self.expand_flags(*args, **kwargs):
+      if flag.inverse_name:
+        inverse_args.append(flag.inverse_name)
+      help_args.append(flag.help_arg)
 
     # Register the option, only on this scope, for the purpose of displaying help.
     # Note that we'll only display the default value for this scope, even though the
