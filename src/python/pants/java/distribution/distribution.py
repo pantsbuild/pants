@@ -76,7 +76,8 @@ class Distribution(object):
 
     for path in filter(None, search_path()):
       try:
-        dist = cls(bin_path=path, minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
+        dist = cls(bin_path=path, minimum_version=minimum_version,
+                   maximum_version=maximum_version, jdk=jdk)
         dist.validate()
         log.debug('Located %s for constraints: minimum_version'
                   ' %s, maximum_version %s, jdk %s' % (dist, minimum_version, maximum_version, jdk))
