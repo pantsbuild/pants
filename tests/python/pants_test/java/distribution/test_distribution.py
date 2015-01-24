@@ -163,7 +163,7 @@ class MockDistributionTest(unittest.TestCase):
       with self.env(PATH=jdk):
         Distribution.cached(maximum_version='1.7.0_55')
 
-    with pytest.raises(Distribution.Error):
+    with self.assertRaises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
         with self.env(PATH=jdk):
           Distribution.cached(maximum_version='1.6.0_20')
@@ -175,13 +175,18 @@ class MockDistributionTest(unittest.TestCase):
       with self.env(PATH=jdk):
         Distribution.cached(minimum_version='1.6.0_19', maximum_version='1.7.0_66')
 
-    with pytest.raises(Distribution.Error):
+    with self.assertRaises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
         with self.env(PATH=jdk):
           Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
       with self.distribution(executables=self.exe('java', '1.7.0_18')) as jdk:
         with self.env(PATH=jdk):
           Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
+
+    with self.assertRaises(ValueError):
+      with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+        with self.env(PATH=jdk):
+          Distribution.cached(minimum_version=1.7, maximum_version=1.8)
 
 def exe_path(name):
   process = subprocess.Popen(['which', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
