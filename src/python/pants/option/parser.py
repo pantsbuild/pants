@@ -58,7 +58,7 @@ class Parser(object):
     @classmethod
     def _create(cls, flag, **kwargs):
       if (kwargs.get('action') in ('store_false', 'store_true') and
-            flag.startswith('--') and not flag.startswith('--no-')):
+          flag.startswith('--') and not flag.startswith('--no-')):
         name = flag[2:]
         return cls(flag, '--no-' + name, '--[no-]' + name)
       else:
@@ -67,6 +67,21 @@ class Parser(object):
   @classmethod
   def expand_flags(cls, *args, **kwargs):
     """Returns a list of the flags associated with an option registration.
+
+    For example:
+
+      >>> from pants.option.parser import Parser
+      >>> def print_flags(flags):
+      ...   print('\n'.join(map(str, flags)))
+      ...
+      >>> print_flags(Parser.expand_flags('-h', '--help', help='Display command line help.'))
+      Flag(name='-h', inverse_name=None, help_arg='-h')
+      Flag(name='--help', inverse_name=None, help_arg='--help')
+      >>> print_flags(Parser.expand_flags('-q', '--quiet', action='store_true',
+      ...                                 help='Squelches all console output apart from errors.'))
+      Flag(name='-q', inverse_name=None, help_arg='-q')
+      Flag(name='--quiet', inverse_name=u'--no-quiet', help_arg=u'--[no-]quiet')
+      >>>
 
     :param *args: The args (flag names), that would be passed to an option registration.
     :param **kwargs: The kwargs that would be passed to an option registration.
