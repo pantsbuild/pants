@@ -5,43 +5,28 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import defaultdict
 import threading
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
 
 
-class BootstrapJvmTools(Task, IvyTaskMixin):
+class BootstrapJvmTools(IvyTaskMixin, Task):
 
   @classmethod
   def product_types(cls):
     return ['jvm_build_tools_classpath_callbacks']
 
-  def __init__(self, *args, **kwargs):
-    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
-
-  def prepare(self, round_manager):
-    # TODO(John Sirois): This is the sole use of data dependencies that does not follow the goal
-    # lifecycle.  The BootstrapJvmTools task must execute before all JVM tool using tasks but
-    # the 'jvm_build_tools' "data" must be produced by each JVM tool using task before it executes.
-    # Normally data dependencies flow between task executions. Untangle this data dependency abuse.
-    # One idea is to leverage rounds and have each JVM tool using task require a 'runtime_classpath'
-    # for a restricted target graph which is just comprised of the tool dependency specs.  This
-    # should allow killing BootstrapJvmTools outright - IvyResolve will do the job in the sub-round
-    # and all standard caching will apply.
-
-    # NB: commented out because this is an unsatisfiable dep under strict checks of proper ordering.
-    #round_manager.require_data('jvm_build_tools')
-    pass
-
   def execute(self):
     context = self.context
-    if context.products.is_required_data('jvm_build_tools_classpath_callbacks'):
-      tool_product_map = context.products.get_data('jvm_build_tools') or {}
-      callback_product_map = context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
+    if JvmToolTaskMixin.get_registered_tools():
+      # Map of scope -> (map of key -> callback).
+      callback_product_map = (context.products.get_data('jvm_build_tools_classpath_callbacks') or
+                              defaultdict(dict))
       # We leave a callback in the products map because we want these Ivy calls
       # to be done lazily (they might never actually get executed) and we want
       # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of
@@ -49,12 +34,15 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
-      for key, deplist in tool_product_map.iteritems():
-        callback_product_map[key] = self.cached_bootstrap_classpath_callback(key, deplist)
+      for scope, key in JvmToolTaskMixin.get_registered_tools():
+        option = key.replace('-', '_')
+        deplist = self.context.options.for_scope(scope)[option]
+        callback_product_map[scope][key] = \
+          self.cached_bootstrap_classpath_callback(key, scope, deplist)
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
                                         lambda: callback_product_map)
 
-  def _resolve_tool_targets(self, tools, key):
+  def _resolve_tool_targets(self, tools, key, scope):
     if not tools:
       raise TaskError("BootstrapJvmTools.resolve_tool_targets called with no tool"
                       " dependency addresses.  This probably means that you don't"
@@ -65,31 +53,26 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
         if not targets:
           raise KeyError
       except (KeyError, AddressLookupError) as e:
-        tool_product_config_map = self.context.products.get_data('jvm_build_tools_config')
-        self.context.log.error("Failed to resolve target for bootstrap tool: {tool}. "
-                               "You probably need to add this dep to your tools "
-                               "BUILD file(s), usually located in the root of the build. \n"
-                               "See pants.ini section: [{section}] key: {key}\n"
-                               "Error: {e}\n".format(tool=tool, e=e,
-                                                     section=tool_product_config_map[key]['ini_section'],
-                                                     key=tool_product_config_map[key]['ini_key']))
-        raise
+        self.context.log.error("Failed to resolve target for tool: {tool}.\n"
+                               "This target was obtained from option {option} in scope {scope}.\n"
+                               "You probably need to add this target to your tools "
+                               "BUILD file(s), usually located in the workspace root.\n"
+                               "".format(tool=tool, e=e, scope=scope, option=key))
+        raise TaskError()
       for target in targets:
         yield target
 
-  def cached_bootstrap_classpath_callback(self, key, tools):
+  def cached_bootstrap_classpath_callback(self, key, scope, tools):
     cache = {}
     cache_lock = threading.Lock()
 
-    def bootstrap_classpath(executor=None):
+    def bootstrap_classpath():
       with cache_lock:
         if 'classpath' not in cache:
-          targets = list(self._resolve_tool_targets(tools, key))
+          targets = list(self._resolve_tool_targets(tools, key, scope))
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
-                                                executor=executor,
                                                 silent=True,
-                                                workunit_name=workunit_name,
-                                                workunit_labels=[WorkUnit.BOOTSTRAP])
+                                                workunit_name=workunit_name)[0]
         return cache['classpath']
     return bootstrap_classpath

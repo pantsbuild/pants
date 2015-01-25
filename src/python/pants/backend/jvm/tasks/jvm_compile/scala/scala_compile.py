@@ -17,7 +17,6 @@ from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 class ScalaCompile(JvmCompile):
   _language = 'scala'
   _file_suffix = '.scala'
-  _config_section = 'scala-compile'
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -37,6 +36,7 @@ class ScalaCompile(JvmCompile):
     # Note: Used in ZincUtils.
     # TODO: Revisit this. It's unintuitive for ZincUtils to reach back into the task for options.
     register('--plugins', action='append', help='Use these scalac plugins.')
+    ZincUtils.register_options(register, cls.register_jvm_tool)
 
   def __init__(self, *args, **kwargs):
     super(ScalaCompile, self).__init__(*args, **kwargs)
@@ -49,12 +49,9 @@ class ScalaCompile(JvmCompile):
                                  color=color,
                                  log_level=self.get_options().level)
 
-  @property
-  def config_section(self):
-    return self._config_section
-
   def create_analysis_tools(self):
-    return AnalysisTools(self.context, ZincAnalysisParser(self._classes_dir), ZincAnalysis)
+    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
+                         ZincAnalysisParser(self._classes_dir), ZincAnalysis)
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.

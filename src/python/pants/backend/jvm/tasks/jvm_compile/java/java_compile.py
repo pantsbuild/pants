@@ -46,12 +46,11 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 class JavaCompile(JvmCompile):
   _language = 'java'
   _file_suffix = '.java'
-  _config_section = 'java-compile'
 
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
-  _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
+  _JMAKE_MAIN = 'org.pantsbuild.jmake.Main'
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -75,6 +74,8 @@ class JavaCompile(JvmCompile):
     super(JavaCompile, cls).register_options(register)
     register('--source', help='Provide source compatibility with this release.')
     register('--target', help='Generate class files for this JVM version.')
+    cls.register_jvm_tool(register, 'jmake')
+    cls.register_jvm_tool(register, 'java-compiler')
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
@@ -84,24 +85,9 @@ class JavaCompile(JvmCompile):
 
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
-    self._jmake_bootstrap_key = 'jmake'
-    self.register_jvm_tool_from_config(self._jmake_bootstrap_key, self.context.config,
-                                       ini_section='java-compile',
-                                       ini_key='jmake-bootstrap-tools',
-                                       default=['//:jmake'])
-
-    self._compiler_bootstrap_key = 'java-compiler'
-    self.register_jvm_tool_from_config(self._compiler_bootstrap_key, self.context.config,
-                                       ini_section='java-compile',
-                                       ini_key='compiler-bootstrap-tools',
-                                       default=['//:java-compiler'])
-
-  @property
-  def config_section(self):
-    return self._config_section
-
   def create_analysis_tools(self):
-    return AnalysisTools(self.context, JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)
+    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
+                         JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)
 
   def extra_products(self, target):
     ret = []
@@ -119,7 +105,7 @@ class JavaCompile(JvmCompile):
 
   def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
-    jmake_classpath = self.tool_classpath(self._jmake_bootstrap_key)
+    jmake_classpath = self.tool_classpath('jmake')
     args = [
       '-classpath', ':'.join(relative_classpath + [self._classes_dir]),
       '-d', self._classes_dir,
@@ -127,7 +113,7 @@ class JavaCompile(JvmCompile):
       '-pdb-text-format',
       ]
 
-    compiler_classpath = self.tool_classpath(self._compiler_bootstrap_key)
+    compiler_classpath = self.tool_classpath('java-compiler')
     args.extend([
       '-jcpath', ':'.join(compiler_classpath),
       '-jcmainclass', 'com.twitter.common.tools.Compiler',

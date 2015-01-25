@@ -38,42 +38,48 @@ class ListGoals(ConsoleTask):
         yield '  %s' % ' '.join(undocumented)
 
     def graph():
-      def get_cluster_name(goal):
-        return 'cluster_%s' % goal.name.replace('-', '_')
-
-      def get_node_name(goal, task_name):
-        name = '%s_%s' % (goal.name, task_name)
-        return name.replace('-', '_')
-
-      yield '\n'.join([
-        'digraph G {',
-        '  rankdir=LR;',
-        '  graph [compound=true];',
-        ])
-      for goal in Goal.all():
-        yield '\n'.join([
-          '  subgraph %s {' % get_cluster_name(goal),
-          '    node [style=filled];',
-          '    color = blue;',
-          '    label = "%s";' % goal.name,
-        ])
-        for name in goal.ordered_task_names():
-          yield '    %s [label="%s"];' % (get_node_name(goal, name), name)
-        yield '  }'
-
-      edges = set()
-      for goal in Goal.all():
-        tail_task_name = goal.ordered_task_names()[-1]
-        for dep in goal.dependencies:
-          edge = 'ltail=%s lhead=%s' % (get_cluster_name(goal), get_cluster_name(dep))
-          if edge not in edges:
-            # We display edges between clusters (representing goals), but dot still requires
-            # us to specify them between nodes (representing tasks) and then add ltail, lhead
-            # annotations.  We connect the last task in the dependee to the first task in
-            # the dependency, as this leads to the neatest-looking graph.
-            yield '  %s -> %s [%s];' % (get_node_name(goal, tail_task_name),
-                                        get_node_name(dep, dep.ordered_task_names()[0]), edge)
-          edges.add(edge)
-      yield '}'
+      # TODO(John Sirois): re-work and re-enable: https://github.com/pantsbuild/pants/issues/918
+      # def get_cluster_name(goal):
+      #   return 'cluster_%s' % goal.name.replace('-', '_')
+      #
+      # def get_node_name(goal, task_name):
+      #   name = '%s_%s' % (goal.name, task_name)
+      #   return name.replace('-', '_')
+      #
+      # yield '\n'.join([
+      #   'digraph G {',
+      #   '  rankdir=LR;',
+      #   '  graph [compound=true];',
+      #   ])
+      # for goal in Goal.all():
+      #   yield '\n'.join([
+      #     '  subgraph %s {' % get_cluster_name(goal),
+      #     '    node [style=filled];',
+      #     '    color = blue;',
+      #     '    label = "%s";' % goal.name,
+      #   ])
+      #   for name in goal.ordered_task_names():
+      #     yield '    %s [label="%s"];' % (get_node_name(goal, name), name)
+      #   yield '  }'
+      #
+      # edges = set()
+      # for goal in Goal.all():
+      #   tail_task_name = goal.ordered_task_names()[-1]
+      #   for dep in goal.dependencies:
+      #     edge = 'ltail=%s lhead=%s' % (get_cluster_name(goal), get_cluster_name(dep))
+      #     if edge not in edges:
+      #       # We display edges between clusters (representing goals), but dot still requires
+      #       # us to specify them between nodes (representing tasks) and then add ltail, lhead
+      #       # annotations.  We connect the last task in the dependee to the first task in
+      #       # the dependency, as this leads to the neatest-looking graph.
+      #       yield '  %s -> %s [%s];' % (get_node_name(goal, tail_task_name),
+      #                                   get_node_name(dep, dep.ordered_task_names()[0]), edge)
+      #     edges.add(edge)
+      # yield '}'
+      yield 'Graph support is currently broken but will be resurrected pending engine rework'
+      yield 'You can follow progress towards this milestone here:'
+      yield '  https://github.com/pantsbuild/pants/milestones/engine%20rework'
+      yield 'You can follow final fix-up of --graph here:'
+      yield '  https://github.com/pantsbuild/pants/issues/918'
 
     return graph() if self.get_options().graph else report()

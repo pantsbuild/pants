@@ -15,9 +15,11 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
   def run_repl(self, target, program):
     """Run a repl for the given target with the given input, and return stdout_data"""
     # Run a repl on a library target. Avoid some known-to-choke-on interpreters.
-    command = ['goal', 'repl', target,
+    command = ['repl',
+               target,
                '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3', '--quiet']
+               '--interpreter=CPython>=3.3',
+               '--quiet']
     pants_run = self.run_pants(command=command, stdin_data=program)
     self.assert_success(pants_run)
     return pants_run.stdout_data.rstrip().split('\n')
@@ -27,7 +29,7 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
       import com.pants.example.hello.welcome.WelcomeEverybody
       println(WelcomeEverybody("World" :: Nil).head)
       """))
-    self.assertEquals(len(output_lines), 11)
+    self.assertEquals(len(output_lines), 12)
     self.assertEquals('Hello, World!', output_lines[-3])
 
   def test_run_repl_transitive(self):

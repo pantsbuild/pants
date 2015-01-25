@@ -24,7 +24,8 @@ def python_requirements(parse_context, requirements_relpath='requirements.txt'):
   NB some requirements files can't be unambiguously translated; ie: multiple
   find links.  For these files a ValueError will be raised that points out the issue.
 
-  See the requirements file spec here: http://www.pip-installer.org/en/1.1/requirements.html
+  See the requirements file spec here:
+  https://pip.pypa.io/en/latest/reference/pip_install.html#requirements-file-format
 
   :param parse_context: (Don't specify this in a BUILD file; it's set automatically)
   :param string requirements_relpath: The relative path from the parent dir of the BUILD file using

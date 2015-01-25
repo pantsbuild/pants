@@ -17,6 +17,8 @@ from pants.util.contextutil import open_zip as open_jar
 from pants.util.dirutil import safe_mkdir
 
 
+# XXX(pl): This task is very broken and has been for a long time.
+# Remove it after confirming it has no users.
 class Provides(Task):
   @classmethod
   def register_options(cls, register):
@@ -44,6 +46,7 @@ class Provides(Task):
 
   def prepare(self, round_manager):
     round_manager.require_data('jars')
+    round_manager.require_data('ivy_jar_products')
 
   def execute(self):
     safe_mkdir(self.workdir)
@@ -53,10 +56,21 @@ class Provides(Task):
                              '{0}.{1}.provides'.format(IvyUtils.identify(targets)[1], conf))
       if self.transitive:
         outpath += '.transitive'
-      ivyinfo = IvyUtils.parse_xml_report(self.context.target_roots, conf)
+      ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
+      # This product is a list for historical reasons (exclusives groups) but in practice should
+      # have either 0 or 1 entries.
+      ivy_info_list = ivy_jar_products.get(conf)
+      if ivy_info_list:
+        assert len(ivy_info_list) == 1, (
+          'The values in ivy_jar_products should always be length 1,'
+          ' since we no longer have exclusives groups.'
+        )
+        ivy_info = ivy_info_list[0]
+      else:
+        ivy_info = None
       jar_paths = OrderedSet()
       for root in self.target_roots:
-        jar_paths.update(self.get_jar_paths(ivyinfo, root, conf))
+        jar_paths.update(self.get_jar_paths(ivy_info, root, conf))
 
       with open(outpath, 'w') as outfile:
         def do_write(s):
@@ -72,33 +86,34 @@ class Provides(Task):
               do_write('\n')
       self.context.log.info('Wrote provides information to %s' % outpath)
 
-  def get_jar_paths(self, ivyinfo, target, conf):
+  def get_jar_paths(self, ivy_info, target, conf):
     jar_paths = OrderedSet()
     if target.is_jar_library:
       # Jar library proxies jar dependencies or jvm targets, so the jars are just those of the
       # dependencies.
-      for paths in [self.get_jar_paths(ivyinfo, dep, conf) for dep in target.dependencies]:
+      for paths in [self.get_jar_paths(ivy_info, dep, conf) for dep in target.dependencies]:
         jar_paths.update(paths)
     elif isinstance(target, JarDependency):
       ref = IvyModuleRef(target.org, target.name, target.rev, conf)
-      jar_paths.update(self.get_jar_paths_for_ivy_module(ivyinfo, ref))
+      jar_paths.update(self.get_jar_paths_for_ivy_module(ivy_info, ref))
     elif target.is_jvm:
       for basedir, jars in self.context.products.get('jars').get(target).items():
         jar_paths.update([os.path.join(basedir, jar) for jar in jars])
     if self.transitive:
       for dep in target.dependencies:
-        jar_paths.update(self.get_jar_paths(ivyinfo, dep, conf))
+        jar_paths.update(self.get_jar_paths(ivy_info, dep, conf))
 
     return jar_paths
 
-  def get_jar_paths_for_ivy_module(self, ivyinfo, ref):
-    jar_paths = OrderedSet()
-    module = ivyinfo.modules_by_ref[ref]
-    jar_paths.update([a.path for a in module.artifacts])
+  def get_jar_paths_for_ivy_module(self, ivy_info, ref):
+    def create_collection(current_ref):
+      module = ivy_info.modules_by_ref[current_ref]
+      return OrderedSet([a.path for a in module.artifacts])
+
     if self.transitive:
-      for dep in ivyinfo.deps_by_caller.get(ref, []):
-        jar_paths.update(self.get_jar_paths_for_ivy_module(ivyinfo, dep))
-    return jar_paths
+      return ivy_info.traverse_dependency_graph(ref, create_collection)
+    else:
+      return create_collection(ref)
 
   def list_jar(self, path):
     with open_jar(path, 'r') as jar:

@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from argparse import ArgumentParser, _HelpAction
+from collections import namedtuple
 import copy
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -47,6 +48,46 @@ class Parser(object):
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.
   """
+
+  class Flag(namedtuple('Flag', ['name', 'inverse_name', 'help_arg'])):
+    """A struct describing a single flag and its corresponding help representation.
+
+    No-argument boolean flags also support an `inverse_name` to set the corresponding option value
+    in the opposite sense from its default.  All other flags will have no `inverse_name`
+    """
+    @classmethod
+    def _create(cls, flag, **kwargs):
+      if (kwargs.get('action') in ('store_false', 'store_true') and
+          flag.startswith('--') and not flag.startswith('--no-')):
+        name = flag[2:]
+        return cls(flag, '--no-' + name, '--[no-]' + name)
+      else:
+        return cls(flag, None, flag)
+
+  @classmethod
+  def expand_flags(cls, *args, **kwargs):
+    """Returns a list of the flags associated with an option registration.
+
+    For example:
+
+      >>> from pants.option.parser import Parser
+      >>> def print_flags(flags):
+      ...   print('\n'.join(map(str, flags)))
+      ...
+      >>> print_flags(Parser.expand_flags('-h', '--help', help='Display command line help.'))
+      Flag(name='-h', inverse_name=None, help_arg='-h')
+      Flag(name='--help', inverse_name=None, help_arg='--help')
+      >>> print_flags(Parser.expand_flags('-q', '--quiet', action='store_true',
+      ...                                 help='Squelches all console output apart from errors.'))
+      Flag(name='-q', inverse_name=None, help_arg='-q')
+      Flag(name='--quiet', inverse_name=u'--no-quiet', help_arg=u'--[no-]quiet')
+      >>>
+
+    :param *args: The args (flag names), that would be passed to an option registration.
+    :param **kwargs: The kwargs that would be passed to an option registration.
+    """
+    return [cls.Flag._create(flag, **kwargs) for flag in args]
+
   def __init__(self, env, config, scope, parent_parser):
     self._env = env
     self._config = config
@@ -105,19 +146,12 @@ class Parser(object):
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
 
-    # Is this a boolean flag?
-    if kwargs.get('action') in ('store_false', 'store_true'):
-      inverse_args = []
-      help_args = []
-      for flag in args:
-        if flag.startswith('--') and not flag.startswith('--no-'):
-          inverse_args.append('--no-' + flag[2:])
-          help_args.append('--[no-]{0}'.format(flag[2:]))
-        else:
-          help_args.append(flag)
-    else:
-      inverse_args = None
-      help_args = args
+    inverse_args = []
+    help_args = []
+    for flag in self.expand_flags(*args, **kwargs):
+      if flag.inverse_name:
+        inverse_args.append(flag.inverse_name)
+      help_args.append(flag.help_arg)
 
     # Register the option, only on this scope, for the purpose of displaying help.
     # Note that we'll only display the default value for this scope, even though the
@@ -215,9 +249,26 @@ class Parser(object):
     The source of the default value is chosen according to the ranking in RankedValue.
     """
     config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
-    env_var = 'PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), dest.upper())
+    udest = dest.upper()
+    if self._scope == GLOBAL_SCOPE:
+      # For convenience, we allow three forms of env var for global scope options.
+      # The fully-specified env var is PANTS_DEFAULT_FOO, which is uniform with PANTS_<SCOPE>_FOO
+      # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
+      # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
+      # PANTS_PANTS_WORKDIR or PANTS_DEFAULT_PANTS_WORKDIR. We take the first specified value we
+      # find, in this order: PANTS_DEFAULT_FOO, PANTS_FOO, FOO.
+      env_vars = ['PANTS_DEFAULT_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
+      if udest.startswith('PANTS_'):
+        env_vars.append(udest)
+    else:
+      env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
     value_type = kwargs.get('type', str)
-    env_val_str = self._env.get(env_var) if self._env else None
+    env_val_str = None
+    if self._env:
+      for env_var in env_vars:
+        if env_var in self._env:
+          env_val_str = self._env.get(env_var)
+          break
 
     env_val = None if env_val_str is None else value_type(env_val_str)
     if kwargs.get('action') == 'append':

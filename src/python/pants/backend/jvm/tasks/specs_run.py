@@ -26,16 +26,10 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     # TODO: Get rid of this in favor of the inherited global color flag.
     register('--color', action='store_true', default=True,
              help='Emit test result with ANSI terminal color codes.')
+    cls.register_jvm_tool(register, 'specs', default=['//:scala-specs-2.9.3'])
 
   def __init__(self, *args, **kwargs):
     super(SpecsRun, self).__init__(*args, **kwargs)
-
-    self._specs_bootstrap_key = 'specs'
-    self.register_jvm_tool_from_config(self._specs_bootstrap_key, self.context.config,
-                                       ini_section='specs-run',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:scala-specs-2.9.3'])
-
     self.skip = self.get_options().skip
     self.color = self.get_options().color
     self.tests = self.get_options().test
@@ -59,11 +53,8 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
         args.append('--specs=%s' % ','.join(tests))
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
-        bootstrapped_cp = self.tool_classpath(self._specs_bootstrap_key)
-        classpath = self.classpath(
-            bootstrapped_cp,
-            confs=self.confs,
-            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        bootstrapped_cp = self.tool_classpath('specs')
+        classpath = self.classpath(bootstrapped_cp, confs=self.confs)
 
         result = execute_java(
           classpath=classpath,

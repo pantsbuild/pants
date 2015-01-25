@@ -9,12 +9,10 @@ necessarily to develop Pants itself, see
 IntelliJ Setup
 --------------
 
-As pants is a python application, the "Ultimate" (aka paid-for) edition
-of IntelliJ is required, as is the Python plugin. You'll need to:
+Set up IntelliJ for Python (if you haven't already):
 
--   Download "IntelliJ IDEA Ultimate Edition" from
-    <http://www.jetbrains.com/>.
--   Within IntelliJ, install the Python plugin.
+- Download "IntelliJ IDEA Community Edition" from <http://www.jetbrains.com/>.
+- Within IntelliJ, install the *Python Community Edition* plugin.
 
 Project Setup
 -------------

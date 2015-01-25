@@ -164,6 +164,8 @@ and tweak to fit your situation. You can change the location of this file in `pa
     [ivy]
     ivy_settings: some/other/path/ivysettings.xml
 
+If the `PANTS_IVY_SETTINGS_XML` environment variable is defined, Pants uses that value instead
+of the one in `pants.ini`.
 
 Integrate New Tools via a Pants Plugin
 --------------------------------------
@@ -232,14 +234,11 @@ as shown in
 [`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
 
 `BUILD` targets can use this Repository's alias as the `repo` parameter
-to an <a pantsref="bdict_artifact">`artifact`</a>. For example, the
-`src/java/com/pants/examples/hello/greet/BUILD` refers to the `public`
-repostiory defined above. (Notice it's a Python object, not a string.)
+to an <a pantsref="bdict_artifact">`artifact`</a>. For example,
+[examples/src/java/com/pants/examples/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/greet/BUILD)
+refers to the `public` repository defined above. (Notice it's a Python object, not a string.)
 
-    :::python
-    provides = artifact(org='com.pants.examples',
-                        name='hello-greet',
-                        repo=public,)
+!inc[start-at=java_library](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
 
 If you get an error that the repo name (here, `public`) isn't defined,
 your plugin didn't register with Pants successfully. Make sure you

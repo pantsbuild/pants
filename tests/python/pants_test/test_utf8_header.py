@@ -6,17 +6,17 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import unittest2 as unittest
 
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.config import Config
-from pants.base.dev_backend_loader import load_build_configuration_from_source
+from pants.base.extension_loader import load_plugins_and_backends
+from pants_test.base_test import BaseTest
 
 
-class Utf8HeaderTest(unittest.TestCase):
+class Utf8HeaderTest(BaseTest):
 
   def test_file_have_coding_utf8(self):
     """
@@ -25,7 +25,7 @@ class Utf8HeaderTest(unittest.TestCase):
 
     config = Config.load()
     backend_packages = config.getlist('backends', 'packages')
-    build_configuration = load_build_configuration_from_source(backend_packages)
+    build_configuration = load_plugins_and_backends(backends=backend_packages)
     build_file_parser = BuildFileParser(root_dir=get_buildroot(),
                                         build_configuration=build_configuration)
     address_mapper = BuildFileAddressMapper(build_file_parser)

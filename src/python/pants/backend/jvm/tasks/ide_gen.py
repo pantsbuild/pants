@@ -15,14 +15,11 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants import binary_util
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
-from pants.goal.goal import Goal
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 logger = logging.getLogger(__name__)
@@ -98,7 +95,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       return set(self.context.address_mapper.addresses_in_spec_path(buildfile.spec_path))
 
     def get(self, address):
-      self.context.build_graph.inject_address(address)
+      self.context.build_graph.inject_address_closure(address)
       return self.context.build_graph.get_target(address)
 
   def __init__(self, *args, **kwargs):
@@ -132,26 +129,10 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
     self.intransitive = self.get_options().intransitive
 
-    self.checkstyle_suppression_files = self.context.config.get('checkstyle',
-      'suppression_files', type=list, default=[])
     # Everywhere else, debug_port is specified in the 'jvm' section. Use that as a default if none
     # is specified in the 'ide' section.
     jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)
     self.debug_port = self.context.config.getint('ide', 'debug_port', default=jvm_config_debug_port)
-
-    self.checkstyle_bootstrap_key = 'checkstyle'
-    self.register_jvm_tool_from_config(self.checkstyle_bootstrap_key, self.context.config,
-                                       ini_section='checkstyle',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:twitter-checkstyle'])
-
-    self.scalac_bootstrap_key = None
-    if not self.skip_scala:
-      self.scalac_bootstrap_key = 'scalac'
-      self.register_jvm_tool_from_config(self.scalac_bootstrap_key, self.context.config,
-                                         ini_section='scala-compile',
-                                         ini_key='compile-bootstrap-tools',
-                                         default=['//:scala-compiler-2.9.3'])
 
   def prepare(self, round_manager):
     if self.python:
@@ -160,18 +141,22 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
       round_manager.require('java')
     if not self.skip_scala:
       round_manager.require('scala')
+    # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
+    # the parameter. See John's comments on RB 716.
     round_manager.require_data('ivy_jar_products')
     round_manager.require('jar_dependencies')
+    round_manager.require('jar_map_default')
+    round_manager.require('jar_map_sources')
+    round_manager.require('jar_map_javadoc')
 
   def _prepare_project(self):
     targets, self._project = self.configure_project(
         self.context.targets(),
-        self.checkstyle_suppression_files,
         self.debug_port)
 
     self.configure_compile_context(targets)
 
-  def configure_project(self, targets, checkstyle_suppression_files, debug_port):
+  def configure_project(self, targets, debug_port):
     jvm_targets = [t for t in targets if t.has_label('jvm') or t.has_label('java')]
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
@@ -181,7 +166,6 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
                       self.skip_scala,
                       self.use_source_root,
                       get_buildroot(),
-                      checkstyle_suppression_files,
                       debug_port,
                       jvm_targets,
                       not self.intransitive,
@@ -271,26 +255,26 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  def _get_jar_paths(self, jars=None, confs=None):
+  def _get_jar_paths(self, confs=None):
     """Returns a list of dicts containing the paths of various jar file resources.
 
     Keys include 'default' (normal jar path), 'sources' (path to source jar), and 'javadoc'
     (path to doc jar). None of them are guaranteed to be present, but 'sources' and 'javadoc'
     will never be present if 'default' isn't.
 
-    :param jardeps: JarDependency objects to resolve paths for
     :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
       left unspecified.
     """
-    # TODO(Garrett Malmquist): Get mapping working for source and javadoc jars.
     ivy_products = self.context.products.get_data('ivy_jar_products')
-    classpath_maps = []
-    for info_group in ivy_products.values():
+    classpath_maps = defaultdict(dict)
+    for conf, info_group in ivy_products.items():
+      if conf not in confs:
+        continue # We don't care about it.
       for info in info_group:
         for module in info.modules_by_ref.values():
           for artifact in module.artifacts:
-            classpath_maps.append({'default': artifact.path})
-    return classpath_maps
+            classpath_maps[(module.ref.org, module.ref.name, module.ref.rev,)][conf] = artifact.path
+    return classpath_maps.values()
 
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
@@ -329,21 +313,15 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
     self._prepare_project()
 
-    def _checkstyle_enabled():
-      for goal in Goal.all():
-        if goal.has_task_of_type(Checkstyle):
-          return True
-      return False
-
-    if _checkstyle_enabled():
-      checkstyle_classpath = self.tool_classpath(self.checkstyle_bootstrap_key)
-    else:
+    if self.context.options.is_known_scope('compile.checkstyle'):
+      checkstyle_classpath = self.tool_classpath('checkstyle', scope='compile.checkstyle')
+    else:  # Checkstyle not enabled.
       checkstyle_classpath = []
 
-    if self.scalac_bootstrap_key:
-      scalac_classpath = self.tool_classpath(self.scalac_bootstrap_key)
-    else:
+    if self.skip_scala:
       scalac_classpath = []
+    else:
+      scalac_classpath = self.tool_classpath('scalac', scope='compile.scala')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     targets = self.context.targets()
@@ -441,8 +419,7 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               checkstyle_suppression_files, debug_port, targets, transitive, workunit_factory,
-               target_util):
+               debug_port, targets, transitive, workunit_factory, target_util):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
@@ -465,7 +442,6 @@ class Project(object):
     self.has_scala = False
     self.has_tests = False
 
-    self.checkstyle_suppression_files = checkstyle_suppression_files  # Absolute paths.
     self.debug_port = debug_port
 
     self.internal_jars = OrderedSet()
@@ -545,6 +521,7 @@ class Project(object):
           base = target.target_base
           configure_source_sets(base, relative_sources(target), is_test=test)
 
+        # TODO(Garrett Malmquist): This is dead code, and should be redone/reintegrated.
         # Other BUILD files may specify sources in the same directory as this target. Those BUILD
         # files might be in parent directories (globs('a/b/*.java')) or even children directories if
         # this target globs children as well.  Gather all these candidate BUILD files to test for

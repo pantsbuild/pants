@@ -18,6 +18,8 @@ Python artifacts, you might use the idiom of keeping them in a directory
 tree under `3rdparty/python`. If your organization has many such
 dependencies, you might arrange them in several directories: this can
 ease later "git detective work" when finding out who changed a version.
+(Pants itself doesn't have many Python dependencies; thus, we haven't split its `3rdparty` tree
+into many directories.)
 
 **pip-style requirements.txt:**
 
@@ -27,7 +29,7 @@ file and make a pip `requirements.txt` file in the same directory.
 
 E.g, your `3rdparty/python/BUILD` file might look like:
 
-!inc[start-after=Licensed under&end-before=target](../../../../3rdparty/python/BUILD)
+!inc[start-at=python_requirement&end-before=target](../../../../3rdparty/python/BUILD)
 
 ...with `3rdparty/python/requirements.txt` like:
 
@@ -61,7 +63,7 @@ Your Code's BUILD File
 In your code's `BUILD` file, introduce a dependency on the `3rdparty`
 target:
 
-!inc[start-after=Like Hello](hello/greet/BUILD)
+!inc[start-at=python_library](hello/greet/BUILD)
 
 Then in your Python code, you can `import` from that package:
 

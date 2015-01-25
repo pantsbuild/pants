@@ -40,6 +40,7 @@ python_library(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants:thrift_util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:keywords',
   ],
 )
 

@@ -140,12 +140,13 @@ python_library(
   sources = ['config.py'],
   dependencies = [
     ':build_environment',
+    'src/python/pants/util:strutil',
   ]
 )
 
 python_library(
-  name = 'dev_backend_loader',
-  sources = ['dev_backend_loader.py'],
+  name = 'extension_loader',
+  sources = ['extension_loader.py'],
   dependencies = [
     ':exceptions',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -193,6 +194,15 @@ python_library(
 )
 
 python_library(
+  name = 'lazy_source_mapper',
+  sources = ['lazy_source_mapper.py'],
+  dependencies = [
+    ':build_file',
+    ':build_environment',
+  ]
+)
+
+python_library(
   name = 'mustache',
   sources = ['mustache.py'],
   dependencies = [
@@ -225,16 +235,6 @@ python_library(
     '3rdparty/python:six',
     ':build_environment',
     ':validation',
-  ]
-)
-
-python_library(
-  name = 'rcfile',
-  sources = ['rcfile.py'],
-  dependencies = [
-    ':config',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    '3rdparty/python/twitter/commons:twitter.common.log',
   ]
 )
 
@@ -284,6 +284,7 @@ python_library(
     ':build_manual',
     ':fingerprint_strategy',
     ':hash_utils',
+    ':lazy_source_mapper',
     ':payload',
     ':source_root',
     ':target_addressable',

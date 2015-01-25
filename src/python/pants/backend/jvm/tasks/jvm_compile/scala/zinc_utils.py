@@ -13,7 +13,6 @@ from xml.etree import ElementTree
 
 from twitter.common.collections import OrderedDict
 
-from pants.backend.jvm.jvm_tool_bootstrapper import JvmToolBootstrapper
 from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.address_lookup_error import AddressLookupError
@@ -22,7 +21,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import open_zip as open_jar
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import relativize_paths, safe_open
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -41,55 +40,32 @@ class ZincUtils(object):
 
   _ZINC_MAIN = 'com.typesafe.zinc.Main'
 
+  @classmethod
+  def register_options(cls, register, register_jvm_tool):
+    register_jvm_tool(register, 'scalac', default=TargetPlatform().default_compiler_specs)
+    register_jvm_tool(register, 'zinc')
+    register_jvm_tool(register, 'plugin-jars')
+
+
   def __init__(self, context, nailgun_task, jvm_options, color=True, log_level='info'):
     self.context = context
     self._nailgun_task = nailgun_task  # We run zinc on this task's behalf.
     self._jvm_options = jvm_options
     self._color = color
     self._log_level = log_level
-    self._jvm_tool_bootstrapper = JvmToolBootstrapper(self.context.products)
-
-    # The target scala version.
-    self._compile_bootstrap_key = 'scalac'
-    self._compile_bootstrap_tools = TargetPlatform(config=context.config).compiler_specs
-    self._jvm_tool_bootstrapper.register_jvm_tool(self._compile_bootstrap_key,
-                                                  self._compile_bootstrap_tools,
-                                                  ini_section='scala-compile',
-                                                  ini_key='compile-bootstrap-tools')
-
-    # The zinc version (and the scala version it needs, which may differ from the target version).
-    self._zinc_bootstrap_key = 'zinc'
-    self._jvm_tool_bootstrapper.register_jvm_tool_from_config(self._zinc_bootstrap_key,
-                                                              context.config,
-                                                              ini_section='scala-compile',
-                                                              ini_key='zinc-bootstrap-tools',
-                                                              default=['//:zinc'])
-
-    # Compiler plugins.
-    plugins_bootstrap_tools = context.config.getlist('scala-compile',
-                                                     'scalac-plugin-bootstrap-tools',
-                                                     default=[])
-    if plugins_bootstrap_tools:
-      self._plugins_bootstrap_key = 'plugins'
-      self._jvm_tool_bootstrapper.register_jvm_tool(self._plugins_bootstrap_key,
-                                                    plugins_bootstrap_tools,
-                                                    ini_section='scala-compile',
-                                                    ini_key='scalac-plugin-bootstrap-tools')
-    else:
-      self._plugins_bootstrap_key = None
 
   @property
   def _zinc_classpath(self):
-    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._zinc_bootstrap_key)
+    return self._nailgun_task.tool_classpath('zinc')
 
   @property
   def _compiler_classpath(self):
-    return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._compile_bootstrap_key)
+    return self._nailgun_task.tool_classpath('scalac')
 
   @property
   def _plugin_jars(self):
-    if self._plugins_bootstrap_key:
-      return self._jvm_tool_bootstrapper.get_jvm_tool_classpath(self._plugins_bootstrap_key)
+    if self._nailgun_task.get_options().plugins:
+      return self._nailgun_task.tool_classpath('plugin-jars')
     else:
       return []
 
@@ -137,38 +113,44 @@ class ZincUtils(object):
     ret = []
 
     # Go through all the bootstrap tools required to compile.
-    for target in self._compile_bootstrap_tools:
+    for target in self._nailgun_task.get_options().scalac:
       # Resolve to their actual targets.
       try:
         deps = self.context.resolve(target)
       except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
-                                  .format(message=e, section='scala-compile',
-                                          key='compile-bootstrap-tools'))
+        raise self.DepLookupError("{message}\n  specified by option --scalac in scope {scope}."
+                                  .format(message=e, scope=self._nailgun_task.options_scope))
 
       for lib in (t for t in deps if isinstance(t, JarLibrary)):
         for jar in lib.jar_dependencies:
           ret.append(jar.cache_key())
     return sorted(ret)
 
-  def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+  @staticmethod
+  def _get_compile_args(opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
     args = list(opts)  # Make a copy
-
-    args.extend(self._plugin_args())
 
     if upstream_analysis_files:
       args.extend(
         ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
 
+    relative_classpath = relativize_paths(classpath, get_buildroot())
     args.extend([
       '-analysis-cache', analysis_file,
-      # We add compiler_classpath to ensure the scala-library jar is on the classpath.
-      # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
-      # usually need. Be more selective?
-      '-classpath', ':'.join(self._compiler_classpath + classpath),
+      '-classpath', ':'.join(relative_classpath),
       '-d', output_dir
     ])
     args.extend(sources)
+    return args
+
+  def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+
+    # We add compiler_classpath to ensure the scala-library jar is on the classpath.
+    # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
+    # usually need. Be more selective?
+    big_classpath = self._compiler_classpath + classpath
+    args = ZincUtils._get_compile_args(opts + self._plugin_args(), big_classpath,
+                                       sources, output_dir, analysis_file, upstream_analysis_files)
     self.log_zinc_file(analysis_file)
     if self._run_zinc(args, workunit_labels=[WorkUnit.COMPILER]):
       raise TaskError('Zinc compile failed.')

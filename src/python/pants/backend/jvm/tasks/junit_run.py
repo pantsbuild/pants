@@ -50,7 +50,6 @@ _TaskExports = namedtuple('_TaskExports',
                            'jvm_options',
                            'args',
                            'confs',
-                           'get_base_classpath_for_target',
                            'register_jvm_tool',
                            'tool_classpath',
                            'workdir'])
@@ -67,8 +66,7 @@ class _JUnitRunner(object):
   The default behavior is to just run JUnit tests."""
 
   @classmethod
-  def register_options(cls, register):
-    _Coverage.register_options(register)
+  def register_options(cls, register, register_jvm_tool):
     register('--skip', action='store_true', help='Skip running junit.')
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
@@ -90,23 +88,11 @@ class _JUnitRunner(object):
              help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the first target path.')
-
-  def register_jvm_tool(self, key, ini_section, ini_key, default):
-    tool = self._context.config.getlist(ini_section, ini_key, default)
-    self._task_exports.register_jvm_tool(key,
-                                         tool,
-                                         ini_section=ini_section,
-                                         ini_key=ini_key)
+    register_jvm_tool(register, 'junit')
 
   def __init__(self, task_exports, context):
     self._task_exports = task_exports
     self._context = context
-    self._junit_bootstrap_key = 'junit'
-    self.register_jvm_tool(key=self._junit_bootstrap_key,
-                           ini_section='junit-run',
-                           ini_key='junit-bootstrap-tools',
-                           default=['//:junit'])
-
     options = task_exports.task_options
     self._tests_to_run = options.test
     self._batch_size = options.batch_size
@@ -152,11 +138,8 @@ class _JUnitRunner(object):
     tests = list(self._get_tests_to_run() if self._tests_to_run
                  else self._calculate_tests_from_targets(java_tests_targets))
     if tests:
-      bootstrapped_cp = self._task_exports.tool_classpath(self._junit_bootstrap_key)
-      junit_classpath = self._task_exports.classpath(
-        cp=bootstrapped_cp,
-        confs=self._task_exports.confs,
-        exclusives_classpath=self._task_exports.get_base_classpath_for_target(java_tests_targets[0]))
+      bootstrapped_cp = self._task_exports.tool_classpath('junit')
+      junit_classpath = self._task_exports.classpath(cp=bootstrapped_cp, confs=self._task_exports.confs)
 
       self._context.release_lock()
       self.instrument(targets, tests, junit_classpath)
@@ -288,7 +271,7 @@ class _Coverage(_JUnitRunner):
   """Base class for emma-like coverage processors. Do not instantiate."""
 
   @classmethod
-  def register_options(cls, register):
+  def register_options(cls, register, register_jvm_tool):
     register('--coverage-patterns', action='append',
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
@@ -368,17 +351,13 @@ class _Coverage(_JUnitRunner):
 class Emma(_Coverage):
   """Class to run coverage tests with Emma."""
 
-  def __init__(self, task_exports, context):
-    super(Emma, self).__init__(task_exports, context)
-    self._emma_bootstrap_key = 'emma'
-    self.register_jvm_tool(self._emma_bootstrap_key,
-                           ini_section='junit-run',
-                           ini_key='emma-bootstrap-tools',
-                           default=['//:emma'])
+  @classmethod
+  def register_options(cls, register, register_jvm_tool):
+    register_jvm_tool(register, 'emma')
 
   def instrument(self, targets, tests, junit_classpath):
     safe_mkdir(self._coverage_instrument_dir, clean=True)
-    self._emma_classpath = self._task_exports.tool_classpath(self._emma_bootstrap_key)
+    self._emma_classpath = self._task_exports.tool_classpath('emma')
     with binary_util.safe_args(self.get_coverage_patterns(targets)) as patterns:
       args = [
         'instr',
@@ -456,25 +435,15 @@ class Emma(_Coverage):
 class Cobertura(_Coverage):
   """Class to run coverage tests with cobertura."""
 
+  @classmethod
+  def register_options(cls, register, register_jvm_tool):
+    register_jvm_tool(register, 'cobertura-instrument')
+    register_jvm_tool(register, 'cobertura-run')
+    register_jvm_tool(register, 'cobertura-report')
+
   def __init__(self, task_exports, context):
     super(Cobertura, self).__init__(task_exports, context)
-    self._cobertura_instrument_bootstrap_key = 'cobertura-instrument'
-    self._cobertura_run_bootstrap_key = 'cobertura-run'
-    self._cobertura_report_bootstrap_key = 'cobertura-report'
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
-    touch(self._coverage_datafile)
-    self.register_jvm_tool(self._cobertura_instrument_bootstrap_key,
-                           ini_section='junit-run',
-                           ini_key='cobertura-instrument-bootstrap-tools',
-                           default=['//:cobertura-instrument'])
-    self.register_jvm_tool(self._cobertura_run_bootstrap_key,
-                           ini_section='junit-run',
-                           ini_key='cobertura-run-bootstrap-tools',
-                           default=['//:cobertura-run'])
-    self.register_jvm_tool(self._cobertura_report_bootstrap_key,
-                           ini_section='junit-run',
-                           ini_key='cobertura-report-bootstrap-tools',
-                           default=['//:cobertura-report'])
     self._rootdirs = defaultdict(OrderedSet)
     self._include_filters = []
     self._exclude_filters = []
@@ -486,7 +455,7 @@ class Cobertura(_Coverage):
     self._nothing_to_instrument = True
 
   def instrument(self, targets, tests, junit_classpath):
-    cobertura_cp = self._task_exports.tool_classpath(self._cobertura_instrument_bootstrap_key)
+    cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
     aux_classpath = ':'.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
     classes_by_target = self._context.products.get_data('classes_by_target')
@@ -545,7 +514,7 @@ class Cobertura(_Coverage):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
-    cobertura_cp = self._task_exports.tool_classpath(self._cobertura_run_bootstrap_key)
+    cobertura_cp = self._task_exports.tool_classpath('cobertura-run')
     self._run_tests(tests,
                     cobertura_cp + junit_classpath,
                     JUnitRun._MAIN,
@@ -580,7 +549,7 @@ class Cobertura(_Coverage):
         self._context.log.warn('Generating report even though tests failed%')
       else:
         return
-    cobertura_cp = self._task_exports.tool_classpath(self._cobertura_report_bootstrap_key)
+    cobertura_cp = self._task_exports.tool_classpath('cobertura-report')
     # Link files in the real source tree to files named using the classname.
     # Do not include class file names containing '$', as these will always have
     # a corresponding $-less class file, and they all point back to the same
@@ -655,10 +624,11 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(JUnitRun, cls).register_options(register)
-    _JUnitRunner.register_options(register)
+    # TODO: Yuck, but can't be helped until we refactor the _JUnitRunner/_TaskExports mechanism.
+    for c in [_JUnitRunner, _Coverage, Emma, Cobertura]:
+      c.register_options(register, cls.register_jvm_tool)
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
-
 
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
@@ -668,7 +638,6 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
                                 jvm_options=self.jvm_options,
                                 args=self.args,
                                 confs=self.confs,
-                                get_base_classpath_for_target=self.get_base_classpath_for_target,
                                 register_jvm_tool=self.register_jvm_tool,
                                 tool_classpath=self.tool_classpath,
                                 workdir=self.workdir)

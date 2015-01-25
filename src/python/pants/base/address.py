@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+from collections import namedtuple
 import os
 
 from twitter.common.lang import AbstractClass
@@ -15,8 +16,8 @@ def parse_spec(spec, relative_to=None):
   and Target name.
 
   :param string spec: Target address spec.
-  :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
-    the missing spec_path part as `relative_to`.
+  :param string relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
+    interprets the missing spec_path part as `relative_to`.
 
   For Example::
 
@@ -82,6 +83,15 @@ def parse_spec(spec, relative_to=None):
   check_path(spec_path)
   check_target_name(target_name)
   return spec_path, target_name
+
+
+class Addresses (namedtuple('Addresses', ['addresses', 'rel_path'])):
+  """ Used as a sentinel type for identifying a list of string specs.
+
+  addresses: list of string specs
+  rel_path: addresses might be relative specs, so they need to be interpreted
+  relative to the path of the BUILD file they were declared in.
+  """
 
 
 class Address(AbstractClass):
@@ -189,6 +199,12 @@ class BuildFileAddress(Address):
 class SyntheticAddress(Address):
   @classmethod
   def parse(cls, spec, relative_to=''):
+    """
+    :param string spec: an address in string form <path>:<name>
+    :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
+    the missing spec_path part as `relative_to`.
+    :return:
+    """
     spec_path, target_name = parse_spec(spec, relative_to=relative_to)
     return cls(spec_path, target_name)
 

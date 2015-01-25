@@ -45,11 +45,11 @@ class PythonRepl(PythonTask):
       with self.temporary_pex_builder(interpreter=interpreter) as builder:
         builder.set_entry_point(entry_point)
         chroot = PythonChroot(
+          context=self.context,
           targets=targets,
           extra_requirements=extra_requirements,
           builder=builder,
-          interpreter=interpreter,
-          conn_timeout=self.conn_timeout)
+          interpreter=interpreter)
 
         chroot.dump()
         builder.freeze()

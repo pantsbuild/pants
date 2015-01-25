@@ -26,7 +26,6 @@ python_library(
     'src/python/pants/goal:task_registrar',
     ':artifact',
     ':ivy_utils',
-    ':jvm_tool_bootstrapper',
     ':repository',
   ],
 )
@@ -43,16 +42,7 @@ python_library(
     'src/python/pants/base:revision',
     'src/python/pants/base:target',
     'src/python/pants/ivy',
-    'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'jvm_tool_bootstrapper',
-  sources = ['jvm_tool_bootstrapper.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
   ],
 )
 

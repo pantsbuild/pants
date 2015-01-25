@@ -189,7 +189,6 @@ class JarTask(NailgunTask):
   """
 
   _CONFIG_SECTION = 'jar-tool'
-  _JAR_TOOL_CLASSPATH_KEY = 'jar_tool'
 
   @staticmethod
   def _flag(bool_value):
@@ -209,16 +208,16 @@ class JarTask(NailgunTask):
       raise ValueError('Unrecognized duplicate action: %s' % action)
     return name
 
+  @classmethod
+  def register_options(cls, register):
+    super(JarTask, cls).register_options(register)
+    cls.register_jvm_tool(register, 'jar-tool')
+
   def __init__(self, *args, **kwargs):
     super(JarTask, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
-
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
-    self.register_jvm_tool_from_config(self._JAR_TOOL_CLASSPATH_KEY, self.context.config,
-                                       ini_section=self._CONFIG_SECTION,
-                                       ini_key='bootstrap-tools',
-                                       default=['//:jar-tool'])
 
   @property
   def config_section(self):
@@ -272,10 +271,10 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
-        jvm_args = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
-        self.runjava(self.tool_classpath(self._JAR_TOOL_CLASSPATH_KEY),
+        jvm_options = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
+        self.runjava(self.tool_classpath('jar-tool'),
                      'com.twitter.common.jar.tool.Main',
-                     jvm_options=jvm_args,
+                     jvm_options=jvm_options,
                      args=args,
                      workunit_name='jar-tool',
                      workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])

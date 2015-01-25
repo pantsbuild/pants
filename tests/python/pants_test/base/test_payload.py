@@ -74,7 +74,7 @@ class PayloadTest(BaseTest):
   def test_no_nested_globs(self):
     # nesting no longer allowed
     self.add_to_build_file('z/BUILD', 'java_library(name="z", sources=[globs("*")])')
-    with self.assertRaises(TargetDefinitionException):
+    with self.assertRaises(ValueError):
       self.context().scan(self.build_root)
 
   def test_flat_globs_list(self):

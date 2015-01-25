@@ -27,6 +27,7 @@ class Options(object):
   in the following order:
     - The value of the --foo-bar flag in global scope.
     - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_FOO_BAR environment variable.
     - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
     - The hard-coded value provided at registration time.
     - None.
@@ -39,6 +40,7 @@ class Options(object):
     - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
     - The value of the PANTS_COMPILE_FOO_BAR environment variable.
     - The value of the PANTS_DEFAULT_FOO_BAR environment variable.
+    - The value of the PANTS_FOO_BAR environment variable.
     - The value of the foo_bar key in the [compile.java] section of pants.ini.
     - The value of the foo_bar key in the [compile] section of pants.ini.
     - The value of the foo_bar key in the [DEFAULT] section of pants.ini.
@@ -58,6 +60,7 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
+  GLOBAL_SCOPE = GLOBAL_SCOPE
 
   # Custom option types. You can specify these with type= when registering options.
 
@@ -84,9 +87,11 @@ class Options(object):
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
     self._is_help = splitter.is_help
+    self._is_help_all = splitter.is_help_all
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
+    self._known_scopes = set(known_scopes)
 
   @property
   def target_specs(self):
@@ -97,6 +102,10 @@ class Options(object):
   def goals(self):
     """The requested goals, in the order specified on the cmd line."""
     return self._goals
+
+  def is_known_scope(self, scope):
+    """Whether the given scope is known by this instance."""
+    return scope in self._known_scopes
 
   def passthru_args_for_scope(self, scope):
     # Passthru args "belong" to the last scope mentioned on the command-line.
@@ -124,9 +133,15 @@ class Options(object):
     """Whether the command line indicates a request for help."""
     return self._is_help
 
+  @property
+  def is_help_all(self):
+    """Whether the command line indicates a request for all the help."""
+    return self._is_help_all
+
   def format_global_help(self):
     """Generate a help message for global options."""
-    return self.get_global_parser().format_help()
+    return (self.get_global_parser().format_help() +
+            '--help-all              Show options for all goals and exit.')
 
   def format_help(self, scope):
     """Generate a help message for options at the specified scope."""

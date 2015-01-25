@@ -27,8 +27,9 @@ class JvmBinaryTask(JarTask):
 
     If the binary declares a main then a 'Main-Class' manifest entry will be included.
     """
-    main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
-    jar.main(main)
+    main = binary.main
+    if main is not None:
+      jar.main(main)
 
   def __init__(self, *args, **kwargs):
     super(JvmBinaryTask, self).__init__(*args, **kwargs)

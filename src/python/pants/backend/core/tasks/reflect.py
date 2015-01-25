@@ -7,19 +7,22 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import argparse
 import inspect
-import optparse
 import re
 
 from docutils.core import publish_parts
-from pants.option.parser import Parser
 from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
+from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.goal.option_helpers import add_global_options
+from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
+from pants.option.options import Options
+from pants.option.global_options import register_global_options
+from pants.option.parser import Parser
+
 
 # Our CLI help and doc-website-gen use this to get useful help text.
 
@@ -417,16 +420,27 @@ def get_syms(build_file_parser):
   return syms
 
 
+def bootstrap_option_values():
+  try:
+    return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
+  finally:
+    # Today, the OptionsBootstrapper mutates global state upon construction in the form of:
+    #  Config.reset_default_bootstrap_option_values(...)
+    # As such bootstrap options that use the buildroot get contaminated globally here.  We only
+    # need the contaminated values locally though for doc display, thus the reset of global state.
+    # TODO(John Sirois): remove this hack when mutable Config._defaults is killed.
+    Config.reset_default_bootstrap_option_values()
+
+
 def gen_goals_glopts_reference_data():
-  global_option_parser = optparse.OptionParser(add_help_option=False)
-  add_global_options(global_option_parser)
-  glopts = []
-  for o in global_option_parser.option_list:
-    hlp = None
-    if o.help:
-      hlp = indent_docstring_by_n(o.help.replace('[%default]', '').strip(), 2)
-    glopts.append(TemplateData(st=str(o), hlp=hlp))
-  return glopts
+  option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
+  def register(*args, **kwargs):
+    option_parser.register(*args, **kwargs)
+  register.bootstrap = bootstrap_option_values()
+  register_bootstrap_options(register, buildroot='<buildroot>')
+  register_global_options(register)
+  argparser = option_parser._help_argparser
+  return gref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
 
 
 def gref_template_data_from_options(scope, argparser):
@@ -444,7 +458,7 @@ def gref_template_data_from_options(scope, argparser):
       default = o.default
     hlp = None
     if o.help:
-      hlp = indent_docstring_by_n(o.help.replace('[%default]', '').strip(), 6)
+      hlp = indent_docstring_by_n(o.help, 6)
     option_l.append(TemplateData(
         st=st,
         default=default,
@@ -454,6 +468,7 @@ def gref_template_data_from_options(scope, argparser):
     title=title,
     options=option_l,
     pantsref=pantsref)
+
 
 def gen_tasks_goals_reference_data():
   """Generate the template data for the goals reference rst doc."""
@@ -466,7 +481,10 @@ def gen_tasks_goals_reference_data():
       doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
       doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
       option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
-      task_type.register_options(option_parser.register)
+      def register(*args, **kwargs):
+        option_parser.register(*args, **kwargs)
+      register.bootstrap = bootstrap_option_values()
+      task_type.register_options(register)
       argparser = option_parser._help_argparser
       scope = Goal.scope(goal.name, task_name)
       # task_type may actually be a synthetic subclass of the authored class from the source code.

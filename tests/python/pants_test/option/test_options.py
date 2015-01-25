@@ -20,7 +20,8 @@ class OptionsTest(unittest.TestCase):
     options.register_global('-n', '--num', type=int, default=99)
     options.register_global('-x', '--xlong', action='store_true')
     options.register_global('--y', action='append', type=int)
-
+    options.register_global('--pants-foo')
+    options.register_global('--bar-baz')
     # Custom types.
     options.register_global('--dicty', type=Options.dict, default='{"a": "b"}')
     options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
@@ -129,6 +130,12 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(55, options.for_scope('compile').num)
     self.assertEqual(44, options.for_scope('compile.java').num)
 
+  def test_is_known_scope(self):
+    options = self._parse('./pants')
+    for scope in self._known_scopes:
+      self.assertTrue(options.is_known_scope(scope))
+    self.assertFalse(options.is_known_scope('nonexistent_scope'))
+
   def test_designdoc_example(self):
     # The example from the design doc.
     # Get defaults from config and environment.
@@ -165,3 +172,50 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual([], options.passthru_args_for_scope('test'))
     self.assertEqual([], options.passthru_args_for_scope(''))
     self.assertEqual([], options.passthru_args_for_scope(None))
+
+  def test_global_scope_env_vars(self):
+    def check_pants_foo(expected_val, env):
+      val = self._parse('./pants', env=env).for_global_scope().pants_foo
+      self.assertEqual(expected_val, val)
+
+    check_pants_foo('AAA', {
+      'PANTS_DEFAULT_PANTS_FOO': 'AAA',
+      'PANTS_PANTS_FOO': 'BBB',
+      'PANTS_FOO': 'CCC',
+    })
+    check_pants_foo('BBB', {
+      'PANTS_PANTS_FOO': 'BBB',
+      'PANTS_FOO': 'CCC',
+    })
+    check_pants_foo('CCC', {
+      'PANTS_FOO': 'CCC',
+    })
+    check_pants_foo(None, {
+    })
+    # Check that an empty string is distinct from no value being specified.
+    check_pants_foo('', {
+      'PANTS_PANTS_FOO': '',
+      'PANTS_FOO': 'CCC',
+    })
+
+    # A global option that doesn't begin with 'pants-': Setting BAR_BAZ should have no effect.
+
+    def check_bar_baz(expected_val, env):
+      val = self._parse('./pants', env=env).for_global_scope().bar_baz
+      self.assertEqual(expected_val, val)
+
+    check_bar_baz('AAA', {
+      'PANTS_DEFAULT_BAR_BAZ': 'AAA',
+      'PANTS_BAR_BAZ': 'BBB',
+      'BAR_BAZ': 'CCC',
+    })
+    check_bar_baz('BBB', {
+      'PANTS_BAR_BAZ': 'BBB',
+      'BAR_BAZ': 'CCC',
+    })
+    check_bar_baz(None, {
+      'BAR_BAZ': 'CCC',
+    })
+    check_bar_baz(None, {
+    })
+

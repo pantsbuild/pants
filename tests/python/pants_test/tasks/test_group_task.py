@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import itertools, uuid
 
-from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.group_task import GroupMember, GroupIterator, GroupTask
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -106,9 +105,7 @@ class BaseGroupTaskTest(BaseTest):
     super(BaseGroupTaskTest, self).setUp()
     self._context = self.context(target_roots=self.create_targets())
 
-    exclusives_mapping = ExclusivesMapping(self._context)
-    exclusives_mapping._populate_target_maps(self._context.targets())
-    self._context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
+    self.populate_compile_classpath(self._context)
 
     self.recorded_actions = []
     # NB: GroupTask has a cache of tasks by name... use a distinct name

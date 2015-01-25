@@ -4,11 +4,24 @@
 python_test_suite(
   name = 'tasks',
   dependencies = [
+    ':checkstyle',
     ':ide_gen',
     ':idea_gen',
     ':junit_run',
     ':scalastyle',
+    ':unpack_jars',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
+  ]
+)
+
+python_tests(
+  name = 'checkstyle',
+  sources = ['test_checkstyle.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:checkstyle',
+    'src/python/pants/base:address',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )
 
@@ -61,4 +74,15 @@ python_tests(
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
+)
+
+python_tests(
+  name = 'unpack_jars',
+  sources = ['test_unpack_jars.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/tasks:unpack_jars',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:task_test_base',
+    ]
 )

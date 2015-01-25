@@ -68,7 +68,7 @@ class ScalastyleTest(NailgunTaskTestBase):
         config: {config}
         excludes:
       '''.format(config=self._create_scalastyle_config_file())),
-      new_options=options or self._with_no_skip_option())
+      options=options or self._with_no_skip_option())
 
   def _create_scalastyle_task(self, config=None, options=None):
     return self.create_task(self._create_context(config, options), self.build_root)

@@ -6,6 +6,7 @@
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
     "build_dictionary": "dist/builddict/build_dictionary.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
+    "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
     "credits": "dist/markdown/html/src/python/pants/docs/credits.html",
     "dev": "dist/markdown/html/src/python/pants/docs/readme.html",
     "dev_tasks": "dist/markdown/html/src/python/pants/docs/dev_tasks.html",
@@ -31,6 +32,7 @@
     "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
     "release": "dist/markdown/html/src/python/pants/docs/release.html",
+    "scala": "dist/markdown/html/examples/src/scala/com/pants/example/readme.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
     "tshoot": "dist/markdown/html/src/docs/tshoot.html",
@@ -60,6 +62,7 @@
         { "page": "JVMProjects",
           "children": [
             { "page": "3rdparty_jvm" },
+            { "page": "scala" },
             { "page": "from_maven" }
           ]
         },
@@ -88,6 +91,7 @@
         { "page": "setup_repo" },
         { "page": "build_dictionary" },
         { "page": "goals_reference" },
+        { "page": "changelog" },
         { "page": "dev",
           "children": [
             { "page": "howto_contribute" },

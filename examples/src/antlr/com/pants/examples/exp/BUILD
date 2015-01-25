@@ -16,5 +16,4 @@ java_antlr_library(name='exp_antlr3',
 java_antlr_library(name='exp_antlr4',
   sources=['ExpAntlr4.g'],
   compiler='antlr4',
-  package='com.pants.examples.exp',
 )

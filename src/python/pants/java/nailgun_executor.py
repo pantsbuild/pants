@@ -78,16 +78,16 @@ class NailgunExecutor(Executor):
     return None
 
   @staticmethod
-  def _fingerprint(jvm_args, classpath, java_version):
+  def _fingerprint(jvm_options, classpath, java_version):
     """Compute a fingerprint for this invocation of a Java task.
 
-    :param list jvm_args:  JVM arguments passed to the java invocation
+    :param list jvm_options: JVM options passed to the java invocation
     :param list classpath: The -cp arguments passed to the java invocation
     :param Revision java_version: return value from Distribution.version()
     :return: a hexstring representing a fingerprint of the java invocation
     """
     digest = hashlib.sha1()
-    digest.update(''.join(sorted(jvm_args)))
+    digest.update(''.join(sorted(jvm_options)))
     digest.update(''.join(sorted(classpath)))  # TODO(John Sirois): hash classpath contents?
     digest.update(repr(java_version))
     return digest.hexdigest()
@@ -207,9 +207,9 @@ class NailgunExecutor(Executor):
       log.debug('Found ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
     return endpoint
 
-  def _get_nailgun_client(self, jvm_args, classpath, stdout, stderr):
+  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
     classpath = self._nailgun_classpath + classpath
-    new_fingerprint = self._fingerprint(jvm_args, classpath, self._distribution.version)
+    new_fingerprint = self._fingerprint(jvm_options, classpath, self._distribution.version)
 
     endpoint = self._get_nailgun_endpoint()
     running = endpoint and self._check_pid(endpoint.pid)
@@ -222,7 +222,7 @@ class NailgunExecutor(Executor):
         log.debug(
           'Killing ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
         self.kill()
-      return self._spawn_nailgun_server(new_fingerprint, jvm_args, classpath, stdout, stderr)
+      return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr)
 
   # 'NGServer started on 127.0.0.1, port 53785.'
   _PARSE_NG_PORT = re.compile('.*\s+port\s+(\d+)\.$')
@@ -280,7 +280,7 @@ class NailgunExecutor(Executor):
   def _create_ngclient(self, port, stdout, stderr):
     return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, workdir=get_buildroot())
 
-  def _spawn_nailgun_server(self, fingerprint, jvm_args, classpath, stdout, stderr):
+  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     log.debug('No ng server found with fingerprint {fingerprint}, spawning...'
               .format(fingerprint=fingerprint))
 
@@ -291,8 +291,8 @@ class NailgunExecutor(Executor):
     if pid != 0:
       # In the parent tine - block on ng being up for connections
       return self._await_nailgun_server(stdout, stderr,
-                                        'jvm_args={jvm_args} classpath={classpath}'
-                                        .format(jvm_args=jvm_args, classpath=classpath))
+                                        'jvm_options={jvm_options} classpath={classpath}'
+                                        .format(jvm_options=jvm_options, classpath=classpath))
 
 
     os.setsid()
@@ -302,13 +302,13 @@ class NailgunExecutor(Executor):
 
     java = SubprocessExecutor(self._distribution)
 
-    jvm_args = jvm_args + [self._PANTS_NG_ARG,
+    jvm_options = jvm_options + [self._PANTS_NG_ARG,
                            self.create_owner_arg(self._workdir),
                            self._create_fingerprint_arg(fingerprint)]
 
     process = java.spawn(classpath=classpath,
                          main='com.martiansoftware.nailgun.NGServer',
-                         jvm_options=jvm_args,
+                         jvm_options=jvm_options,
                          args=[':0'],
                          stdin=in_fd,
                          stdout=out_fd,

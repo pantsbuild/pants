@@ -11,7 +11,6 @@ from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.python_setup import PythonSetup
-from pants.backend.python.commands.setup_py import SetupPy
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import python_requirements
@@ -43,27 +42,9 @@ def build_file_aliases():
   )
 
 
-def register_commands():
-  SetupPy._register()
-
-
 def register_goals():
-  task(name='python-binary-create', action=PythonBinaryCreate,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('binary')
-
-  task(name='pytest', action=PytestRun,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('test')
-
-  task(name='py', action=PythonRun,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('run')
-
-  task(name='python-repl', action=PythonRepl,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('repl')
-
-  task(name='setup-py', action=PythonSetup,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install()
+  task(name='python-binary-create', action=PythonBinaryCreate).install('binary')
+  task(name='pytest', action=PytestRun).install('test')
+  task(name='py', action=PythonRun).install('run')
+  task(name='python-repl', action=PythonRepl).install('repl')
+  task(name='setup-py', action=PythonSetup).install()

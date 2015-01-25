@@ -32,6 +32,7 @@ python_library(
   name = 'context',
   sources = ['context.py'],
   dependencies = [
+    ':error',
     ':products',
     ':workspace',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -63,14 +64,6 @@ python_library(
   ],
 )
 
-python_library(
-  name = 'option_helpers',
-  sources = ['option_helpers.py'],
-  dependencies = [
-    'src/python/pants/base:config',
-  ],
-)
-
 # TODO(benjy): As a result of a renaming, we ended up with this target owning only one source
 # file, whereas its name might indicate to the casual reader that it represents the entire package.
 # However the targets in this BUILD file (and elsewhere) are probably too fine-grained anyway, so
@@ -80,14 +73,6 @@ python_library(
   sources = ['goal.py'],
   dependencies = [
     ':error',
-    ':mkflag',
-  ],
-)
-
-python_library(
-  name = 'mkflag',
-  sources = ['mkflag.py'],
-  dependencies = [
   ],
 )
 

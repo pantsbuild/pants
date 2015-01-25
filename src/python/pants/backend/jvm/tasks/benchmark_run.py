@@ -20,23 +20,12 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     super(BenchmarkRun, cls).register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
     register('--memory', default=False, action='store_true', help='Enable memory profiling.')
+    cls.register_jvm_tool(register, 'benchmark-tool', default=['//:benchmark-caliper-0.5'])
+    cls.register_jvm_tool(register, 'benchmark-agent',
+                          default=['//:benchmark-java-allocation-instrumenter-2.1'])
 
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
-
-    config = self.context.config
-
-    self._benchmark_bootstrap_key = 'benchmark-tool'
-    self.register_jvm_tool_from_config(self._benchmark_bootstrap_key, config,
-                                       ini_section='benchmark-run',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:benchmark-caliper-0.5'])
-    self._agent_bootstrap_key = 'benchmark-agent'
-    self.register_jvm_tool_from_config(self._agent_bootstrap_key, config,
-                                       ini_section='benchmark-run',
-                                       ini_key='agent-bootstrap-tools',
-                                       default=[':benchmark-java-allocation-instrumenter-2.1'])
-
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938
@@ -60,7 +49,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.
     # The MANIFEST list a jar 'allocation.jar' this is why we have to rename it
-    agent_tools_classpath = self.tool_classpath(self._agent_bootstrap_key)
+    agent_tools_classpath = self.tool_classpath('benchmark-agent')
     agent_jar = agent_tools_classpath[0]
     allocation_jar = os.path.join(os.path.dirname(agent_jar), "allocation.jar")
 
@@ -69,12 +58,10 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     shutil.copyfile(agent_jar, allocation_jar)
     os.environ['ALLOCATION_JAR'] = str(allocation_jar)
 
-    benchmark_tools_classpath = self.tool_classpath(self._benchmark_bootstrap_key)
+    benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
     targets = self.context.targets()
-    classpath = self.classpath(benchmark_tools_classpath,
-                               confs=self.confs,
-                               exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+    classpath = self.classpath(benchmark_tools_classpath, confs=self.confs)
 
     caliper_main = 'com.google.caliper.Runner'
     exit_code = execute_java(classpath=classpath,

@@ -56,12 +56,13 @@ class PythonChroot(object):
       Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
 
   def __init__(self,
+               context,
                targets,
                extra_requirements=None,
                builder=None,
                platforms=None,
-               interpreter=None,
-               conn_timeout=None):
+               interpreter=None):
+    self.context = context
     self._config = Config.from_cache()
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
@@ -69,7 +70,6 @@ class PythonChroot(object):
     self._interpreter = interpreter or PythonInterpreter.get()
     self._builder = builder or PEXBuilder(os.path.realpath(tempfile.mkdtemp()),
                                           interpreter=self._interpreter)
-    self._conn_timeout = conn_timeout
 
     # Note: unrelated to the general pants artifact cache.
     self._egg_cache_root = os.path.join(
@@ -127,10 +127,9 @@ class PythonChroot(object):
                                resource=resources_tgt.address.spec))
           raise
 
-  def _dump_requirement(self, req, dynamic, repo):
-    self.debug('  Dumping requirement: %s%s%s' % (str(req),
-      ' (dynamic)' if dynamic else '', ' (repo: %s)' % repo if repo else ''))
-    self._builder.add_requirement(req, dynamic, repo)
+  def _dump_requirement(self, req):
+    self.debug('  Dumping requirement: %s' % req)
+    self._builder.add_requirement(req)
 
   def _dump_distribution(self, dist):
     self.debug('  Dumping distribution: .../%s' % os.path.basename(dist.location))
@@ -194,19 +193,24 @@ class PythonChroot(object):
         reqs_from_libraries.add(req)
 
     reqs_to_build = OrderedSet()
+    find_links = []
+
     for req in reqs_from_libraries | generated_reqs | self._extra_requirements:
       if not req.should_build(self._interpreter.python, Platform.current()):
         self.debug('Skipping %s based upon version filter' % req)
         continue
       reqs_to_build.add(req)
-      self._dump_requirement(req._requirement, False, req._repository)
+      self._dump_requirement(req.requirement)
+      if req.repository:
+        find_links.append(req.repository)
 
     distributions = resolve_multi(
          self._config,
          reqs_to_build,
          interpreter=self._interpreter,
          platforms=self._platforms,
-         conn_timeout=self._conn_timeout)
+         ttl=self.context.options.for_global_scope().python_chroot_requirements_ttl,
+         find_links=find_links)
 
     locations = set()
     for platform, dist_set in distributions.items():

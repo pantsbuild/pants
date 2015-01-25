@@ -12,9 +12,11 @@ from tempfile import mkdtemp
 from textwrap import dedent
 import unittest2 as unittest
 
-from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_configuration import BuildConfiguration
@@ -34,6 +36,15 @@ from pants_test.base.context_utils import create_context
 
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
+
+  @classmethod
+  def setUpClass(cls):
+    """Ensure that all code has a config to read from the cache.
+
+    TODO: Yuck. Get rid of this after plumbing options through in the right places.
+    """
+    super(BaseTest, cls).setUpClass()
+    Config.cache(Config.load())
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
@@ -101,8 +112,8 @@ class BaseTest(unittest.TestCase):
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
-    self.new_options = defaultdict(dict)  # scope -> key-value mapping.
-    self.new_options[''] = {
+    self.options = defaultdict(dict)  # scope -> key-value mapping.
+    self.options[''] = {
       'pants_workdir': os.path.join(self.build_root, '.pants.d'),
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist')
@@ -118,22 +129,21 @@ class BaseTest(unittest.TestCase):
 
   def config(self, overrides=''):
     """Returns a config valid for the test build root."""
+    ini_file = os.path.join(get_buildroot(), 'pants.ini')
     if overrides:
-      with temporary_file() as fp:
+      with temporary_file(cleanup=False) as fp:
         fp.write(overrides)
         fp.close()
-        with environment_as(PANTS_CONFIG_OVERRIDE=fp.name):
-          return Config.load()
+        return Config.load([ini_file, fp.name])
     else:
-      return Config.load()
+      return Config.load([ini_file])
 
-  def set_new_options_for_scope(self, scope, **kwargs):
-    self.new_options[scope].update(kwargs)
+  def set_options_for_scope(self, scope, **kwargs):
+    self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, config='', options=None, new_options=None,
-              target_roots=None, **kwargs):
+  def context(self, for_task_types=None, config='', options=None, target_roots=None, **kwargs):
     for_task_types = for_task_types or []
-    new_options = new_options or {}
+    options = options or {}
 
     new_option_values = defaultdict(dict)
 
@@ -159,17 +169,17 @@ class BaseTest(unittest.TestCase):
 
     # Now override with any caller-specified values.
 
-    # TODO(benjy): Get rid of the new_options arg, and require tests to call set_new_options.
-    for scope, opts in new_options.items():
+    # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
+    for scope, opts in options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 
-    for scope, opts in self.new_options.items():
+    for scope, opts in self.options.items():
       for key, val in opts.items():
         new_option_values[scope][key] = val
 
     return create_context(config=self.config(overrides=config),
-                          new_options = new_option_values,
+                          options = new_option_values,
                           target_roots=target_roots,
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,
@@ -189,9 +199,9 @@ class BaseTest(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    if self.build_graph.get_target_from_spec(spec) is None:
-      self.build_graph.inject_spec_closure(spec)
-    return self.build_graph.get_target_from_spec(spec)
+    address = SyntheticAddress.parse(spec)
+    self.build_graph.inject_address_closure(address)
+    return self.build_graph.get_target(address)
 
   def create_files(self, path, files):
     """Writes to a file under the buildroot with contents same as file name.
@@ -252,20 +262,13 @@ class BaseTest(unittest.TestCase):
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
 
-  def populate_exclusive_groups(self, context, key=None, classpaths=None, target_predicate=None):
+  def populate_compile_classpath(self, context, classpath=None):
     """
-    Helps actual test cases to populate the "exclusives_groups" products data mapping
-    in the context, which holds the classpath values for targets.
+    Helps actual test cases to populate the 'compile_classpath' products data mapping
+    in the context, which holds the classpath value for targets.
 
     :param context: The execution context where the products data mapping lives.
-    :param key: key for list of classpaths in the "exclusives_groups" data mapping.
-      None is the default value for most common cases.
-    :param classpaths: a list of classpath strings. If not specified, ['none'] will be used.
-    :param target_predicate: filter predicate for the context.targets(). For most common test
-      cases, None value is good enough.
+    :param classpath: a list of classpath strings. If not specified, ['none'] will be used.
     """
-    exclusives_mapping = ExclusivesMapping(context)
-    exclusives_mapping.set_base_classpath_for_group(
-      key or '<none>', [('default', entry) for entry in classpaths or ['none']])
-    exclusives_mapping._populate_target_maps(context.targets(target_predicate))
-    context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
+    compile_classpath = context.products.get_data('compile_classpath', lambda: OrderedSet())
+    compile_classpath.update([('default', entry) for entry in classpath or ['none']])

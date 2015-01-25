@@ -25,6 +25,13 @@ build target can have a `provides` parameter of type
 The `artifact` specifies an "address" similar to
 what you might see in `3rdparty` `BUILD` files: an artifact's location.
 It does *not* specify a version; that changes each time you publish.
+For an example, see
+[examples/src/java/com/pants/examples/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/greet/BUILD):
+
+!inc[start-at=java_library](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
+
+(That `repo=` parameter assumes someone has set up your Pants configuration to know about that
+artifact repository. If that assumption is false, keep reading to find out how to set this up.)
 
 Pants' `publish` goal builds the library, bumps the library's version
 number, and uploads the library to its repository. Actually, it does
@@ -263,8 +270,10 @@ publish a target that depends on a target that has no `provides`, Pants
 doesn't know what to do. It stops:
 
     FAILURE: The following errors must be resolved to publish.
-      Cannot publish src/java/com/twitter/common/base/BUILD:base due to:
-        src/java/com/twitter/common/quantity/BUILD:quantity - Does not provide an artifact.
+      Cannot publish BuildFileAddress(/Users/archie/workspace/buoyancy/client/src/main/scala/com/bu
+    oyancy/client/BUILD, client) due to:
+        BuildFileAddress(/Users/archie/workspace/buoyancy/client/src/main/scala/com/buoyancy/client
+    /model/BUILD, model) - Does not provide an artifact.
 
 The solution is to add a `provides` to the target that lacks one.
 

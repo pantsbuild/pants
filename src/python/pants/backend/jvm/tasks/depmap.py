@@ -21,7 +21,7 @@ from pants.base.exceptions import TaskError
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
-# Please add fkorotkov, jconvey, tdesai to reviews for this file
+# Please add fkorotkov, tdesai to reviews for this file
 # XXX(pl): JVM hairball violator
 class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
@@ -220,8 +220,20 @@ class Depmap(ConsoleTask):
   def project_info_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    ivy_info = IvyUtils.parse_xml_report(targets, 'default')
+    ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
+    # This product is a list for historical reasons (exclusives groups) but in practice should
+    # have either 0 or 1 entries.
+    ivy_info_list = ivy_jar_products.get('default')
+    if ivy_info_list:
+      assert len(ivy_info_list) == 1, (
+        'The values in ivy_jar_products should always be length 1,'
+        ' since we no longer have exclusives groups.'
+      )
+      ivy_info = ivy_info_list[0]
+    else:
+      ivy_info = None
 
+    ivy_jar_memo = {}
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target
@@ -244,7 +256,7 @@ class Depmap(ConsoleTask):
           return OrderedSet()
         transitive_jars = OrderedSet()
         for jar in jar_lib.jar_dependencies:
-          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar))
+          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar, memo=ivy_jar_memo))
         return transitive_jars
 
       info = {

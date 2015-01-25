@@ -15,6 +15,7 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/python:python_artifact',
+    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:target',

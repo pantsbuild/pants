@@ -6,11 +6,12 @@ target(
   dependencies = [
     ':build_lint',
     ':builddictionary',
-    ':check_exclusives',
+    ':changed_target_goals',
     ':clean',
     ':common',
     ':confluence_publish',
     ':console_task',
+    ':deferred_sources_mapper',
     ':dependees',
     ':filemap',
     ':filter',
@@ -19,6 +20,7 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
+    ':noop',
     ':pathdeps',
     ':paths',
     ':prepare_resources',
@@ -46,6 +48,9 @@ python_library(
   sources = ['build_lint.py'],
   dependencies = [
     ':common',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/base:source_root',
   ],
 )
 
@@ -69,22 +74,8 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
-    'src/python/pants/goal:option_helpers',
     'src/python/pants/goal',
     'src/python/pants/util:dirutil',
-  ],
-)
-
-
-
-python_library(
-  name = 'check_exclusives',
-  sources = ['check_exclusives.py'],
-  dependencies = [
-    ':common',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/core/targets:common',
   ],
 )
 
@@ -117,6 +108,14 @@ python_library(
   dependencies = [
     ':common',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'deferred_sources_mapper',
+  sources= ['deferred_sources_mapper.py'],
+  dependencies = [
+    ':common',
   ],
 )
 
@@ -159,13 +158,11 @@ python_library(
   name = 'group_task',
   sources = ['group_task.py'],
   dependencies = [
-    ':check_exclusives',
     ':task',
     '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
-    'src/python/pants/goal:mkflag',
   ],
 )
 
@@ -192,6 +189,7 @@ python_library(
   sources = ['markdown_to_html.py'],
   resources = globs('templates/markdown/*.mustache'),
   dependencies = [
+    '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
     ':common',
@@ -210,6 +208,14 @@ python_library(
   sources = ['minimal_cover.py'],
   dependencies = [
     ':console_task',
+  ],
+)
+
+python_library(
+  name = 'noop',
+  sources = ['noop.py'],
+  dependencies = [
+    ':common',
   ],
 )
 
@@ -260,10 +266,11 @@ python_library(
   sources = ['reflect.py'],
   dependencies = [
     'src/python/pants/base:build_manual',
+    'src/python/pants/base:config',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
-    'src/python/pants/goal:option_helpers',
+    'src/python/pants/option',
   ],
 )
 
@@ -323,7 +330,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_invalidator',
     'src/python/pants/base:cache_manager',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:worker_pool',
@@ -339,11 +345,19 @@ python_library(
   name = 'what_changed',
   sources = ['what_changed.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    ':common',
     ':console_task',
-    'src/python/pants/base:build_file',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:lazy_source_mapper',
     'src/python/pants/base:target',
-    'src/python/pants/goal:workspace',
+  ],
+)
+
+python_library(
+  name='changed_target_goals',
+  sources=['changed_target_goals.py'],
+  dependencies=[
+    ':common',
+    ':noop',
+    ':what_changed',
   ],
 )

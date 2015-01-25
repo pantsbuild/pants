@@ -19,9 +19,11 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self._maybe_run_version('2.7')
 
   def test_die(self):
-    command = ['goal', 'run', 'tests/python/pants_test/python:die'
+    command = ['run',
+               'tests/python/pants_test/python:die'
                '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3', '--quiet']
+               '--interpreter=CPython>=3.3',
+               '--quiet']
     pants_run = self.run_pants(command=command)
     assert pants_run.returncode == 1
 
@@ -41,8 +43,10 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     binary_target = 'tests/python/pants_test/python:' + binary_name
     # Build a pex.
     # Avoid some known-to-choke-on interpreters.
-    command = ['goal', 'run', binary_target,
+    command = ['run',
+               binary_target,
                '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3', '--quiet']
+               '--interpreter=CPython>=3.3',
+               '--quiet']
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]

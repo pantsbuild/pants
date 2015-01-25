@@ -10,15 +10,16 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.what_changed import WhatChanged, Workspace
+from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.goal.workspace import Workspace
 from pants_test.tasks.test_base import ConsoleTaskTest
-
 
 class BaseWhatChangedTest(ConsoleTaskTest):
   @property
@@ -44,15 +45,24 @@ class BaseWhatChangedTest(ConsoleTaskTest):
   def task_type(cls):
     return WhatChanged
 
-  def workspace(self, files=None, parent=None):
+  def workspace(self, files=None, parent=None, diffspec=None, diff_files=None):
     class MockWorkspace(Workspace):
       def touched_files(_, p):
         self.assertEqual(parent or 'HEAD', p)
         return files or []
+      def changes_in(_, ds):
+        self.assertEqual(diffspec, ds)
+        return diff_files or []
     return MockWorkspace()
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
+  def test_no_workspace(self):
+    with self.assertRaises(TaskError):
+      task = self.prepare_task(build_graph=self.build_graph)
+      task.context._workspace = None
+      task.execute()
+
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 
@@ -100,6 +110,29 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
+    self.add_to_build_file('root/src/py/dependency_tree/a', dedent("""
+      python_library(
+        name='a',
+        sources=['a.py'],
+      )
+    """))
+
+    self.add_to_build_file('root/src/py/dependency_tree/b', dedent("""
+      python_library(
+        name='b',
+        sources=['b.py'],
+        dependencies=['root/src/py/dependency_tree/a']
+      )
+    """))
+
+    self.add_to_build_file('root/src/py/dependency_tree/c', dedent("""
+      python_library(
+        name='c',
+        sources=['c.py'],
+        dependencies=['root/src/py/dependency_tree/b']
+      )
+    """))
+
     self.add_to_build_file('root/src/thrift', dedent("""
       java_thrift_library(
         name='thrift',
@@ -123,7 +156,6 @@ class WhatChangedTest(BaseWhatChangedTest):
       java_library(
         name='a_java',
         sources=['a.java'],
-        resources_targets=['root/resources/a:a_resources'],
       )
     """))
 
@@ -211,4 +243,65 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/scripts:scripts',
       workspace=self.workspace(files=['root/scripts/a/build', 'root/scripts/a/build/scripts.java'])
+    )
+
+  def test_fast(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      'root/src/py/1:numeric',
+      args=['--test-fast'],
+      workspace=self.workspace(
+        files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
+      ),
+    )
+
+  def test_diffspec(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      'root/src/py/1:numeric',
+      args=['--test-diffspec=42'],
+      workspace=self.workspace(
+        diffspec="42",
+        diff_files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
+      ),
+    )
+
+  def test_include_dependees(self):
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/b:b',
+      args=['--test-include-dependees=direct'],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/b:b',
+      'root/src/py/dependency_tree/c:c',
+      args=['--test-include-dependees=transitive'],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+  def test_exclude(self):
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/b:b',
+      'root/src/py/dependency_tree/c:c',
+      args=['--test-include-dependees=transitive'],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+    self.assert_console_output(
+      'root/src/py/dependency_tree/a:a',
+      'root/src/py/dependency_tree/c:c',
+      args=[
+        '--test-include-dependees=transitive',
+        '--test-exclude-target-regexp=:b',
+      ],
+      workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )

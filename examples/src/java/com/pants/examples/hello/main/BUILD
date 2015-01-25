@@ -25,6 +25,7 @@ jvm_binary(name = 'main-bin',
   source = 'HelloMain.java',
   main = 'com.pants.examples.hello.main.HelloMain',
   basename = 'hello-example',
+  deploy_jar_rules=jar_rules(rules=[Skip('Greeting')])
 )
 
 # README page:
