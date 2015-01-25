@@ -186,7 +186,7 @@ class Products(object):
 
     def combine(first, second):
       return lambda target: first(target) or second(target)
-    return reduce(combine, self.predicates_for_type[typename], lambda target: False)
+    return reduce(combine, predicates, lambda target: False)
 
   def get(self, typename):
     """Returns a ProductMapping for the given type name."""
