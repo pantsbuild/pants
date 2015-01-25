@@ -146,7 +146,6 @@ class Parser(object):
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
 
-    # Is this a boolean flag?
     inverse_args = []
     help_args = []
     for flag in self.expand_flags(*args, **kwargs):
