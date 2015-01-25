@@ -40,16 +40,17 @@ class DuplicateDetector(JvmBinaryTask):
     register('--max-dups', type=int, default=10,
              help='Maximum number of duplicate classes to display per artifact.')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('resources_by_target')
+    round_manager.require_data('classes_by_target')
+
   def __init__(self, *args, **kwargs):
     super(DuplicateDetector, self).__init__(*args, **kwargs)
     self._fail_fast = self.get_options().fail_fast
     excludes = self.get_options().excludes
     self._excludes = set([x.lower() for exclude in excludes for x in exclude.split(',')])
     self._max_dups = int(self.get_options().max_dups)
-
-  def prepare(self, round_manager):
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
 
   def execute(self):
     for binary_target in filter(self.is_binary, self.context.targets()):
