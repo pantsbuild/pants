@@ -22,6 +22,8 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(ScalaRepl, cls).prepare(options, round_manager)
+
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.

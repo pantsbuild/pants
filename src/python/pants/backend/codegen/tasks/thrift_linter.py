@@ -24,11 +24,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return target.is_thrift
 
   @classmethod
-  def product_types(cls):
-    # Declare the product of this goal. Gen depends on thrift-linter.
-    return ['thrift-linter']
-
-  @classmethod
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
     register('--strict', default=None, action='store_true',
@@ -36,7 +31,13 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
+  def product_types(cls):
+    # Declare the product of this goal. Gen depends on thrift-linter.
+    return ['thrift-linter']
+
+  @classmethod
   def prepare(cls, options, round_manager):
+    super(ThriftLinter, cls).prepare(options, round_manager)
     # Linter depends on ivy running before it.
     round_manager.require_data('ivy_imports')
 

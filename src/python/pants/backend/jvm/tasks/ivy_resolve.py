@@ -30,17 +30,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     """Error in IvyResolve."""
 
   @classmethod
-  def product_types(cls):
-    return [
-        'compile_classpath',
-        'ivy_cache_dir',
-        'ivy_jar_products',
-        'jar_dependencies',
-        'jar_map_default',
-        'jar_map_sources',
-        'jar_map_javadoc']
-
-  @classmethod
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
     register('--override', action='append',
@@ -64,7 +53,19 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'xalan')
 
   @classmethod
+  def product_types(cls):
+    return [
+        'compile_classpath',
+        'ivy_cache_dir',
+        'ivy_jar_products',
+        'jar_dependencies',
+        'jar_map_default',
+        'jar_map_sources',
+        'jar_map_javadoc']
+
+  @classmethod
   def prepare(cls, options, round_manager):
+    super(IvyResolve, cls).prepare(options, round_manager)
     round_manager.require_data('java')
     round_manager.require_data('scala')
 

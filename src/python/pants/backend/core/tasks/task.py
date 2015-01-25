@@ -31,8 +31,8 @@ class TaskBase(AbstractClass):
 
   Provides the base lifecycle methods that allow a task to interact with the command line, other
   tasks and the user.  The lifecycle is linear and run via the following sequence:
-  1. product_types - declare the product types your task is capable of producing.
-  2. register_options - declare options configurable via cmd-line flag or config file.
+  1. register_options - declare options configurable via cmd-line flag or config file.
+  2. product_types - declare the product types your task is capable of producing.
   3. alternate_target_roots - propose a different set of target roots to use than those specified
                               via the CLI for the active pants run.
   4. prepare - request any products needed from other tasks.

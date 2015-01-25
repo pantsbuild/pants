@@ -404,6 +404,7 @@ class JarPublish(JarTask, ScmPublish):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(JarPublish, cls).prepare(options, round_manager)
     round_manager.require('jars')
     round_manager.require('javadoc')
     round_manager.require('scaladoc')

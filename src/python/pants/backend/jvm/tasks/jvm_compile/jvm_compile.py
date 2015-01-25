@@ -38,10 +38,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   """
 
   @classmethod
-  def product_types(cls):
-    return ['classes_by_target', 'classes_by_source', 'resources_by_target']
-
-  @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
     register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
@@ -96,7 +92,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Leave intermediate scratch files around, for debugging build problems.')
 
   @classmethod
+  def product_types(cls):
+    return ['classes_by_target', 'classes_by_source', 'resources_by_target']
+
+  @classmethod
   def prepare(cls, options, round_manager):
+    super(JvmCompile, cls).prepare(options, round_manager)
+
     round_manager.require_data('compile_classpath')
     round_manager.require_data('ivy_cache_dir')
 

@@ -47,7 +47,7 @@ class ChangeCalculator(object):
       self._mapper_cache = LazySourceMapper(self._address_mapper, self._build_graph, self._fast)
     return self._mapper_cache
 
-  def changed_files(self,):
+  def changed_files(self):
     """Determines the files changed according to SCM/workspace and options."""
     if self._diffspec:
       return self._workspace.changes_in(self._diffspec)

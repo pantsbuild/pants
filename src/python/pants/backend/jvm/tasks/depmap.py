@@ -79,6 +79,7 @@ class Depmap(ConsoleTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(Depmap, cls).prepare(options, round_manager)
     if options.project_info:
       # Require information about jars
       round_manager.require_data('ivy_jar_products')

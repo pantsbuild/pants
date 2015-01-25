@@ -84,6 +84,7 @@ class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(IdeGen, cls).prepare(options, round_manager)
     if options.python:
       round_manager.require('python')
     if options.java:

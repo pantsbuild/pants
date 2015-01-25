@@ -42,6 +42,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(Checkstyle, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
 
   @property

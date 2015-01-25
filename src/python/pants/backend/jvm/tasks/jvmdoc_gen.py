@@ -28,10 +28,6 @@ class JvmdocGen(JvmTask):
     raise NotImplementedError()
 
   @classmethod
-  def product_types(cls):
-    return [cls.jvmdoc().product_type]
-
-  @classmethod
   def register_options(cls, register):
     super(JvmdocGen, cls).register_options(register)
     tool_name = cls.jvmdoc().tool_name
@@ -62,7 +58,13 @@ class JvmdocGen(JvmTask):
              help='Skip {0} generation.'.format(tool_name))
 
   @classmethod
+  def product_types(cls):
+    return [cls.jvmdoc().product_type]
+
+  @classmethod
   def prepare(cls, options, round_manager):
+    super(JvmdocGen, cls).prepare(options, round_manager)
+
     # TODO(John Sirois): this is a fake requirement in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.

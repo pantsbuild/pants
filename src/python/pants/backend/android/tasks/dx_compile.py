@@ -30,10 +30,6 @@ class DxCompile(AndroidTask, NailgunTask):
     return isinstance(target, AndroidBinary)
 
   @classmethod
-  def product_types(cls):
-    return ['dex']
-
-  @classmethod
   def register_options(cls, register):
     super(DxCompile, cls).register_options(register)
     register('--build-tools-version',
@@ -42,7 +38,12 @@ class DxCompile(AndroidTask, NailgunTask):
              help='Run dx with these JVM options.')
 
   @classmethod
+  def product_types(cls):
+    return ['dex']
+
+  @classmethod
   def prepare(cls, options, round_manager):
+    super(DxCompile, cls).prepare(options, round_manager)
     round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):

@@ -36,6 +36,7 @@ class AaptBuilder(AaptTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(AaptBuilder, cls).prepare(options, round_manager)
     round_manager.require_data('dex')
 
   def render_args(self, target, resource_dir, inputs):

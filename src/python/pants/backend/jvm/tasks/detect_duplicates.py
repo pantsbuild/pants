@@ -42,6 +42,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(DuplicateDetector, cls).prepare(options, round_manager)
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
 
