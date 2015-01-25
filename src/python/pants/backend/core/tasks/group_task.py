@@ -7,14 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
-from optparse import OptionGroup
 import os
 
 from pants.backend.core.tasks.task import TaskBase, Task
 from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
 from pants.goal.goal import Goal
-from pants.goal.mkflag import Mkflag
 
 
 class GroupMember(TaskBase):
