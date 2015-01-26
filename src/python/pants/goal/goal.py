@@ -5,10 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from optparse import OptionGroup
 
 from pants.goal.error import GoalError
-from pants.goal.mkflag import Mkflag
 
 
 class Goal(object):
@@ -55,7 +53,6 @@ class _Goal(object):
     """
     self.name = name
     self.description = None
-    self.dependencies = set()  # The Goals this Goal depends on.
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
@@ -109,7 +106,6 @@ class _Goal(object):
       otn.append(task_name)
 
     self._task_type_by_name[task_name] = task_type
-    self.dependencies.update(task_registrar.dependencies)
 
     if task_registrar.serialize:
       self.serialize = True
@@ -126,10 +122,8 @@ class _Goal(object):
 
     Allows external plugins to modify the execution plan. Use with caution.
 
-    Note: Does not remove goal dependencies or relax a serialization requirement that originated
+    Note: Does not relax a serialization requirement that originated
     from the uninstalled task's install() call.
-    TODO(benjy): Should it? We're moving away from explicit goal deps towards a
-                 product consumption-production model anyway.
     """
     if name in self._task_type_by_name:
       self._task_type_by_name[name].options_scope = None

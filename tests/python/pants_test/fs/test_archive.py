@@ -64,5 +64,5 @@ class ArchiveTest(unittest.TestCase):
       with temporary_dir() as archivedir:
         archive = ZIP.create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
-          ZIP.extract(archive, todir, filter=do_filter)
+          ZIP.extract(archive, todir, filter_func=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))

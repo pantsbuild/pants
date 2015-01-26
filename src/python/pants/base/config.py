@@ -133,23 +133,23 @@ class Config(object):
     return ConfigParser.SafeConfigParser(cls._defaults)
 
   def getbool(self, section, option, default=None):
-    """Equivalent to calling get with expected type string"""
+    """Equivalent to calling get with expected type bool."""
     return self.get(section, option, type=bool, default=default)
 
   def getint(self, section, option, default=None):
-    """Equivalent to calling get with expected type int"""
+    """Equivalent to calling get with expected type int."""
     return self.get(section, option, type=int, default=default)
 
   def getfloat(self, section, option, default=None):
-    """Equivalent to calling get with expected type float"""
+    """Equivalent to calling get with expected type float."""
     return self.get(section, option, type=float, default=default)
 
   def getlist(self, section, option, default=None):
-    """Equivalent to calling get with expected type list"""
+    """Equivalent to calling get with expected type list."""
     return self.get(section, option, type=list, default=default)
 
   def getdict(self, section, option, default=None):
-    """Equivalent to calling get with expected type dict"""
+    """Equivalent to calling get with expected type dict."""
     return self.get(section, option, type=dict, default=default)
 
   def getdefault(self, option, type=str, default=None):
@@ -181,9 +181,20 @@ class Config(object):
     :raises: :class:`pants.base.config.Config.ConfigError` if option is not found.
     """
     val = self.get(section, option, type=type)
-    if val is None:
+    # Empty str catches blank options. If blank entries are ok, use get(..., default='') instead.
+    if val is None or val == '':
       raise Config.ConfigError('Required option %s.%s is not defined.' % (section, option))
     return val
+
+  @staticmethod
+  def format_raw_value(raw_value):
+    lines = raw_value.splitlines()
+    for line_number in range(0, len(lines)):
+      lines[line_number] = "{line_number:{width}}: {line}".format(
+        line_number=line_number + 1,
+        line=lines[line_number],
+        width=len(str(len(lines))))
+    return '\n'.join(lines)
 
   def _getinstance(self, section, option, type, default=None):
     if not self.has_option(section, option):
@@ -195,12 +206,18 @@ class Config(object):
     try:
       parsed_value = eval(raw_value, {}, {})
     except SyntaxError as e:
-      raise Config.ConfigError('No valid %s for %s.%s: %s\n%s' % (
-        type.__name__, section, option, raw_value, e))
-
+      raise Config.ConfigError('No valid {type_name} for {section}.{option}:\n{value}\n{error}'
+                               .format(type_name=type.__name__,
+                                       section=section,
+                                       option=option,
+                                       value=Config.format_raw_value(raw_value),
+                                       error=e))
     if not isinstance(parsed_value, type):
-      raise Config.ConfigError('No valid %s for %s.%s: %s' % (
-        type.__name__, section, option, raw_value))
+      raise Config.ConfigError('No valid {type_name} for {section}.{option}:\n{value}'
+                               .format(type_name=type.__name__,
+                                       section=section,
+                                       option=option,
+                                       value=Config.format_raw_value(raw_value)))
 
     return parsed_value
 

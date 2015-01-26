@@ -103,11 +103,7 @@ class CmdLineSpecParserTest(BaseTest):
 
   def test_cmd_line_spec_list(self):
     self.assert_parsed_list(cmdline_spec_list=['a', 'a/b'], expected=['a', 'a/b'])
-    self.assert_parsed_list(cmdline_spec_list=['a', 'a/b', '^a/b'], expected=['a'])
-    self.assert_parsed_list(cmdline_spec_list=['^a/b', 'a', 'a/b'], expected=['a'])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
-    self.assert_parsed_list(cmdline_spec_list=['::', '^a/b::'], expected=[':root', 'a', 'a:b'])
-    self.assert_parsed_list(cmdline_spec_list=['^a/b::', '::'], expected=[':root', 'a', 'a:b'])
 
   def test_does_not_exist(self):
     with self.assertRaises(self.spec_parser.BadSpecError):
@@ -145,6 +141,17 @@ class CmdLineSpecParserTest(BaseTest):
                                          spec_excludes=[os.path.join(self.build_root, '.pants.d')])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
+  def test_exclude_malformed_build_file(self):
+    expected_specs=[':root', 'a', 'a:b', 'a/b', 'a/b:c']
+
+    # This bogus BUILD file gets in the way of parsing.
+    self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
+    with self.assertRaises(CmdLineSpecParser.BadSpecError):
+      self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
+
+    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
+                                         exclude_target_regexps=[r'.*some/dir.*'])
+    self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
 class CmdLineSpecParserBadBuildTest(BaseTest):
   def setUp(self):
@@ -177,3 +184,4 @@ Invalid BUILD files for \[::\]$""", re.DOTALL)
   def test_bad_build_files_fail_fast(self):
     with self.assertRaisesRegexp(self.spec_parser.BadSpecError, self.FAIL_FAST_RE):
       list(self.spec_parser.parse_addresses('::', True))
+

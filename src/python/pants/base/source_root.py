@@ -236,6 +236,8 @@ class SourceRoot(object):
     :returns: the source_root that has been registered as a prefix of the specified path, or None if
     no matching source root was registered.
     """
+    if os.path.isabs(path):
+      path = SourceRoot._relative_to_buildroot(path)
     found_source_root, _ = cls._SOURCE_ROOT_TREE.get_root_and_types(path)
     return found_source_root
 
@@ -245,6 +247,8 @@ class SourceRoot(object):
     :param path: path containing source
     :return: all source root siblings for this path
     """
+    if os.path.isabs(path):
+      path = SourceRoot._relative_to_buildroot(path)
     return cls._SOURCE_ROOT_TREE.get_root_siblings(path)
 
   @classmethod
@@ -283,6 +287,18 @@ class SourceRoot(object):
     cls._register(basedir, True, *allowed_target_types)
 
   @classmethod
+  def _relative_to_buildroot(cls, path):
+    # Verify that source_root_dir doesn't reach outside buildroot.
+    buildroot = os.path.normpath(get_buildroot())
+    if path.startswith(buildroot):
+      abspath = os.path.normpath(path)
+    else:
+      abspath = os.path.normpath(os.path.join(buildroot, path))
+    if not abspath.startswith(buildroot):
+      raise ValueError('Source root %s is not under the build root %s' % (abspath, buildroot))
+    return os.path.relpath(abspath, buildroot)
+
+  @classmethod
   def _register(cls, source_root_dir, mutable, *allowed_target_types):
     """Registers a source root.
 
@@ -291,15 +307,7 @@ class SourceRoot(object):
     :param list allowed_target_types: Optional list of target types. If specified, we enforce that
                           only targets of those types appear under this source root.
     """
-    # Verify that source_root_dir doesn't reach outside buildroot.
-    buildroot = os.path.normpath(get_buildroot())
-    if source_root_dir.startswith(buildroot):
-      abspath = os.path.normpath(source_root_dir)
-    else:
-      abspath = os.path.normpath(os.path.join(buildroot, source_root_dir))
-    if not abspath.startswith(buildroot):
-      raise ValueError('Source root %s is not under the build root %s' % (abspath, buildroot))
-    source_root_dir = os.path.relpath(abspath, buildroot)
+    source_root_dir = SourceRoot._relative_to_buildroot(source_root_dir)
 
     types = cls._TYPES_BY_ROOT.get(source_root_dir)
     if types is None:

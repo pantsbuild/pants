@@ -27,6 +27,14 @@ def stable_json_sha1(obj):
   return sha1(stable_json_dumps(obj)).hexdigest()
 
 
+def combine_hashes(hashes):
+  """A simple helper function to combine other hashes.  Sorts the hashes before rolling them in."""
+  hasher = sha1()
+  for h in sorted(hashes):
+    hasher.update(h)
+  return hasher.hexdigest()
+
+
 class PayloadField(AbstractClass):
   """An immutable, hashable structure to be mixed into Payload instances."""
   _fingerprint_memo = None
@@ -50,19 +58,30 @@ class PayloadField(AbstractClass):
     return self
 
 
-def combine_hashes(hashes):
-  """A simple helper function to combine other hashes.  Sorts the hashes before rolling them in."""
-  hasher = sha1()
-  for h in sorted(hashes):
-    hasher.update(h)
-  return hasher.hexdigest()
-
-
 class SourcesField(PayloadField):
   """A PayloadField encapsulating specified sources."""
-  def __init__(self, sources_rel_path, sources):
-    self.rel_path = sources_rel_path
-    self.source_paths = assert_list(sources)
+  def __init__(self, sources_rel_path, sources, ref_address=None):
+    """
+    :param sources_rel_path: path that sources parameter may be relative to
+    :param sources: list of strings representing relative file paths
+    :param ref_address: optional address spec of target that provides these sources
+    """
+    self._rel_path = sources_rel_path
+    self._source_paths = assert_list(sources)
+    self._ref_address = ref_address
+
+  @property
+  def rel_path(self):
+    return self._rel_path
+
+  @property
+  def source_paths(self):
+    return self._source_paths
+
+  @property
+  def address(self):
+    """Returns the address this sources field refers to (used by some derived classses)"""
+    return self._ref_address
 
   @property
   def num_chunking_units(self):
@@ -71,10 +90,14 @@ class SourcesField(PayloadField):
     By default, this is just the number of sources.  Other heuristics might consider the number
     of bytes or lines in the combined source files.
     """
-    return len(self.source_paths)
+    if self._source_paths:
+      return len(self._source_paths)
+    return 1
 
-  def has_sources(self, extension=''):
-    return any(source.endswith(extension) for source in self.source_paths)
+  def has_sources(self, extension=None):
+    if not self._source_paths:
+      return False
+    return any(source.endswith(extension) for source in self._source_paths)
 
   def relative_to_buildroot(self):
     """All sources joined with ``self.rel_path``."""
@@ -82,12 +105,66 @@ class SourcesField(PayloadField):
 
   def _compute_fingerprint(self):
     hasher = sha1()
-    hasher.update(self.rel_path)
+    hasher.update(self._rel_path)
     for source in sorted(self.relative_to_buildroot()):
       hasher.update(source)
       with open(os.path.join(get_buildroot(), source), 'rb') as f:
         hasher.update(f.read())
     return hasher.hexdigest()
+
+
+class DeferredSourcesField(SourcesField):
+  """ A SourcesField that isn't populated immediately when the graph is constructed.
+
+   You must subclass this and provide a fingerprint implementation. Requires a task
+   to call populate() to provide its contents later during processing.  For example,
+   if sources are in an archive, you might use the fingerprint of the archive. If they
+   are from an external artifact, you might take a fingerprint of the name and version of
+   the artifact.
+  """
+
+  class AlreadyPopulatedError(Exception):
+    """Raised when a DeferredSourcesField has already been populated."""
+    pass
+
+  class NotPopulatedError(Exception):
+    """ Raised when the PayloadField has not been populated yet."""
+    def __init__(self):
+      super(Exception, self).__init__(
+        "Field requires a call to populate() before this method can be called.")
+
+  def __init__(self, ref_address):
+    self._populated = False
+    super(DeferredSourcesField, self).__init__(sources_rel_path=None, sources=[],
+                                               ref_address=ref_address)
+
+  def populate(self, sources, rel_path=None):
+    """Call this method to set the list of files represented by the target.
+
+    Intended to be invoked by the DeferredSourcesMapper task.
+    :param list sources: strings representing absolute paths of files to be included in the source set
+    :param string rel_path: common prefix for files.
+    """
+    if self._populated:
+      raise self.AlreadyPopulatedError("Called with rel_path={rel_path} sources={sources}"
+      .format(rel_path=rel_path, sources=sources))
+    self._rel_path = rel_path
+    self._source_paths = assert_list(sources)
+    self._populated = True
+
+  @property
+  def source_paths(self):
+    if not self._populated:
+      raise self.NotPopulatedError()
+    return self._source_paths
+
+  def _compute_fingerprint(self):
+    """A subclass must provide an implementation of _compute_fingerprint that can return a valid
+    fingerprint even if the sources aren't unpacked yet.
+    """
+    if not self._populated:
+      raise self.NotPopulatedError()
+    return super(DeferredSourcesField, self)._compute_fingerprint()
 
 
 class PythonRequirementsField(frozenset, PayloadField):

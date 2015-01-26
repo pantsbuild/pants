@@ -119,6 +119,7 @@ python_test_suite(
     'tests/python/pants_test/engine',
     'tests/python/pants_test/fs',
     'tests/python/pants_test/graph',
+    'tests/python/pants_test/goal',
     'tests/python/pants_test/java',
     'tests/python/pants_test/net',
     'tests/python/pants_test/option',

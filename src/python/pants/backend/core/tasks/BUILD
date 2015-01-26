@@ -4,12 +4,13 @@
 target(
   name = 'all',
   dependencies = [
-    ':build_lint',
     ':builddictionary',
+    ':changed_target_goals',
     ':clean',
     ':common',
     ':confluence_publish',
     ':console_task',
+    ':deferred_sources_mapper',
     ':dependees',
     ':filemap',
     ':filter',
@@ -18,6 +19,7 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
+    ':noop',
     ':pathdeps',
     ':paths',
     ':prepare_resources',
@@ -38,14 +40,6 @@ target(
     ':task',
     'src/python/pants/base:exceptions',
   ]
-)
-
-python_library(
-  name = 'build_lint',
-  sources = ['build_lint.py'],
-  dependencies = [
-    ':common',
-  ],
 )
 
 python_library(
@@ -106,6 +100,14 @@ python_library(
 )
 
 python_library(
+  name = 'deferred_sources_mapper',
+  sources= ['deferred_sources_mapper.py'],
+  dependencies = [
+    ':common',
+  ],
+)
+
+python_library(
   name = 'dependees',
   sources = ['dependees.py'],
   dependencies = [
@@ -149,7 +151,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
-    'src/python/pants/goal:mkflag',
   ],
 )
 
@@ -176,6 +177,7 @@ python_library(
   sources = ['markdown_to_html.py'],
   resources = globs('templates/markdown/*.mustache'),
   dependencies = [
+    '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
     ':common',
@@ -194,6 +196,14 @@ python_library(
   sources = ['minimal_cover.py'],
   dependencies = [
     ':console_task',
+  ],
+)
+
+python_library(
+  name = 'noop',
+  sources = ['noop.py'],
+  dependencies = [
+    ':common',
   ],
 )
 
@@ -308,7 +318,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_invalidator',
     'src/python/pants/base:cache_manager',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:worker_pool',
@@ -328,5 +337,15 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:lazy_source_mapper',
     'src/python/pants/base:target',
+  ],
+)
+
+python_library(
+  name='changed_target_goals',
+  sources=['changed_target_goals.py'],
+  dependencies=[
+    ':common',
+    ':noop',
+    ':what_changed',
   ],
 )

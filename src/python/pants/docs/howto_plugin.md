@@ -12,7 +12,7 @@ override an existing part of Pants), a plugin gives you a way to
 register your code with Pants.
 
 Much of Pants' own functionality is organized in plugins; see them in
-`src/python/pants/backend/*`.
+[`src/python/pants/backend/*`](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend).
 
 A plugin registers its functionality with Pants by defining some
 functions in a `register.py` file in its top directory. For example,
@@ -20,7 +20,6 @@ Pants' `jvm` code registers in
 [src/python/pants/backend/jvm/register.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/register.py)
 Pants' backend-loader code assumes your plugin has a `register.py` file
 there.
-
 
 Simple Configuration
 --------------------
@@ -102,3 +101,42 @@ it.
         packages: [
             "ext_maven_layout",
           ]
+
+Examples from `twitter/commons`
+-------------------------------
+
+For an example of a code repo with plugins to add features to Pants when building in that repo,
+take a look at [`twitter/commons`](https://github.com/twitter/commons), especially its
+[`pants-plugin` directory](https://github.com/twitter/commons).
+
+This repo has a [`pants` wrapper script](https://github.com/twitter/commons/blob/master/pants)
+that script adds `pants-plugins/src/python` to `PYTHONPATH`.
+
+The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/master/pants) has a
+`[backends]` section listing the plugin packages (packages with `register.py` files):
+
+    :::python
+    [backends]
+    packages: [
+        'twitter.common.pants.jvm.args',
+        'twitter.common.pants.jvm.extras',
+        'twitter.common.pants.python.commons',
+    ]
+
+The [`...jvm/extras/register.py`](https://github.com/twitter/commons/blob/master/pants-plugins/src/python/twitter/common/pants/jvm/extras/register.py)
+file registers a `checkstyle` goal. To find the code for this task, come back to the
+`pantsbuild/pants` repo: Pants defines the
+[`Checkstyle` task class](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/tasks/checkstyle.py) but doesn't register it. But other Pants workspaces can register it, as
+`twitter/commons` illustrates.
+
+The [`...jvm/args/register.py`](https://github.com/twitter/commons/blob/master/pants-plugins/src/python/twitter/common/pants/jvm/args/register.py)
+registers a goal, `args-apt`. This plugin also defines the
+[`Task` class for this goal](https://github.com/twitter/commons/blob/master/pants-plugins/src/python/twitter/common/pants/jvm/args/tasks/resource_mapper.py).
+
+(Somewhat confusingly, `twitter/commons`' has a `BUILD` file so it can publish its plugins as a
+`setup_py` artifact. If you only use your plugin to build code in the *same* workspace,
+your plugin directory tree does *not* need any `BUILD` files. By publishing this plugin, Twitter can
+use its code in other workspaces, e.g., Twitter's internal codebase. Other folks can use it too:
+introduce a dependency on `twitter.common.pants` and add entries to their `pants.ini [backends]`
+section.)
+

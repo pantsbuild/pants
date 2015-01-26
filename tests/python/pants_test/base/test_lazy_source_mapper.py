@@ -5,14 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import os
-from textwrap import dedent
-
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.lazy_source_mapper import LazySourceMapper
-
 from pants_test.base_test import BaseTest
+
 
 class LazySourceMapperTest(BaseTest):
   @property
@@ -28,7 +25,7 @@ class LazySourceMapperTest(BaseTest):
     self.set_mapper()
 
   def set_mapper(self, fast=False):
-    self.mapper = LazySourceMapper(self.context(), stop_after_match=fast)
+    self.mapper = LazySourceMapper(self.address_mapper, self.build_graph, stop_after_match=fast)
 
   def owner(self, owner, f):
     self.assertEqual(set(owner), set(i.spec for i in self.mapper.target_addresses_for_source(f)))
@@ -61,7 +58,6 @@ class LazySourceMapperTest(BaseTest):
     # Unclaimed nested sibling correctly unclaimed.
     self.owner([], 'date/time/unit/minute.py')
 
-
   def test_with_root_level_build(self):
     self.create_library('', 'java_library', 'top', ['foo.py', 'text/common/const/emoji.py'])
     self.create_library('text', 'java_library', 'text', ['localize.py'])
@@ -85,7 +81,6 @@ class LazySourceMapperTest(BaseTest):
     self.set_mapper(fast=False)
     self.owner([':top'], 'foo.py')
     self.owner([':top', 'a/b:b'], 'a/b/bar.py')
-
 
     # With fast=False, loading a parent first vs after now affects results.
     self.set_mapper(fast=True)

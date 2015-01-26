@@ -6,11 +6,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from collections import defaultdict
-from hashlib import sha1
+import copy
 import logging
 import os
 import shutil
 import threading
+
+from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -19,7 +21,9 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.java.executor import Executor
+from pants.java.util import execute_runner
+from pants.util.dirutil import safe_mkdir
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +40,12 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     if isinstance(target, JarLibrary):
       return target.payload.fingerprint()
     elif isinstance(target, JvmTarget):
-      return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
+      if target.payload.excludes or target.payload.configurations:
+        return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
+      else:
+        return None
     else:
-      return sha1().hexdigest()
+      return None
 
   def __hash__(self):
     return hash(type(self))
@@ -48,37 +55,40 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
 
 class IvyTaskMixin(object):
+  @classmethod
+  def register_options(cls, register):
+    super(IvyTaskMixin, cls).register_options(register)
+    register('--jvm-options', action='append', metavar='<option>...',
+             help='Run Ivy with these extra jvm options.')
+
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
 
   def ivy_resolve(self,
                   targets,
                   executor=None,
-                  symlink_ivyxml=False,
                   silent=False,
                   workunit_name=None,
-                  workunit_labels=None):
+                  confs=None):
+    if not targets:
+      return ([], set())
+
     # NOTE: Always pass all the targets to exec_ivy, as they're used to calculate the name of
     # the generated module, which in turn determines the location of the XML report file
     # ivy generates. We recompute this name from targets later in order to find that file.
     # TODO: This is fragile. Refactor so that we're not computing the name twice.
-    if executor and not isinstance(executor, Executor):
-      raise ValueError('The executor must be an Executor instance, given %s of type %s'
-                       % (executor, type(executor)))
-    ivy = Bootstrapper.default_ivy(java_executor=executor,
-                                   bootstrap_workunit_factory=self.context.new_workunit)
-    if not targets:
-      return []
+    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
 
     ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
-    ivy_utils = IvyUtils(config=self.context.config, log=self.context.log)
 
     fingerprint_strategy = IvyResolveFingerprintStrategy()
 
     with self.invalidated(targets,
-                          invalidate_dependents=True,
+                          invalidate_dependents=False,
                           silent=silent,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+      if not invalidation_check.all_vts:
+        return ([], set())
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
       target_workdir = os.path.join(ivy_workdir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
@@ -95,21 +105,14 @@ class IvyTaskMixin(object):
       if invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
         args = ['-cachepath', raw_target_classpath_file_tmp]
 
-        def exec_ivy():
-          ivy_utils.exec_ivy(
-              target_workdir=target_workdir,
-              targets=targets,
-              args=args,
-              ivy=ivy,
-              workunit_name='ivy',
-              workunit_factory=self.context.new_workunit,
-              symlink_ivyxml=symlink_ivyxml)
-
-        if workunit_name:
-          with self.context.new_workunit(name=workunit_name, labels=workunit_labels or []):
-            exec_ivy()
-        else:
-          exec_ivy()
+        self.exec_ivy(
+            target_workdir=target_workdir,
+            targets=global_vts.targets,
+            args=args,
+            executor=executor,
+            ivy=ivy,
+            workunit_name=workunit_name,
+            confs=confs)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
           raise TaskError('Ivy failed to create classpath file at %s'
@@ -123,7 +126,7 @@ class IvyTaskMixin(object):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    symlink_map = IvyUtils.symlink_cachepath(self.context.ivy_home, raw_target_classpath_file,
+    symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
                                              symlink_dir, target_classpath_file)
     with IvyTaskMixin.symlink_map_lock:
       all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
@@ -133,4 +136,95 @@ class IvyTaskMixin(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return [path for path in stripped_classpath if ivy_utils.is_classpath_artifact(path)]
+      return ([path for path in stripped_classpath if self.is_classpath_artifact(path)],
+              global_vts.targets)
+
+  @staticmethod
+  def is_classpath_artifact(path):
+    """Subclasses can override to determine whether a given artifact represents a classpath
+    artifact."""
+    return path.endswith('.jar') or path.endswith('.war')
+
+  def mapjars(self, genmap, target, executor, jars=None):
+    """Resolves jars for the target and stores their locations in genmap.
+
+    :param genmap: The jar_dependencies ProductMapping entry for the required products.
+    :param target: The target whose jar dependencies are being retrieved.
+    :param jars: If specified, resolves the given jars rather than
+    :type jars: List of :class:`pants.backend.jvm.targets.jar_dependency.JarDependency` (jar())
+      objects.
+    """
+    mapdir = os.path.join(self.workdir, 'mapped-jars', target.id)
+    safe_mkdir(mapdir, clean=True)
+    ivyargs = [
+      '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
+      '-symlink',
+    ]
+    confs = maybe_list(target.payload.get_field_value('configurations') or [])
+    self.exec_ivy(mapdir,
+                  [target],
+                  executor=executor,
+                  args=ivyargs,
+                  confs=confs,
+                  ivy=Bootstrapper.default_ivy(),
+                  workunit_name='map-jars',
+                  jars=jars)
+
+    for org in os.listdir(mapdir):
+      orgdir = os.path.join(mapdir, org)
+      if os.path.isdir(orgdir):
+        for name in os.listdir(orgdir):
+          artifactdir = os.path.join(orgdir, name)
+          if os.path.isdir(artifactdir):
+            for conf in os.listdir(artifactdir):
+              confdir = os.path.join(artifactdir, conf)
+              for f in os.listdir(confdir):
+                if self.is_classpath_artifact(f):
+                  # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
+                  # conf whitelist
+                  genmap.add(org, confdir).append(f)
+                  genmap.add((org, name), confdir).append(f)
+
+                  genmap.add(target, confdir).append(f)
+                  genmap.add((target, conf), confdir).append(f)
+                  genmap.add((org, name, conf), confdir).append(f)
+
+  def exec_ivy(self,
+               target_workdir,
+               targets,
+               args,
+               executor=None,
+               confs=None,
+               ivy=None,
+               workunit_name='ivy',
+               jars=None):
+    ivy_jvm_options = copy.copy(self.get_options().jvm_options)
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
+    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
+
+    ivy = ivy or Bootstrapper.default_ivy()
+    ivyxml = os.path.join(target_workdir, 'ivy.xml')
+
+    if not jars:
+      jars, excludes = IvyUtils.calculate_classpath(targets)
+    else:
+      excludes = set()
+
+    ivy_args = ['-ivy', ivyxml]
+
+    confs_to_resolve = confs or ['default']
+    ivy_args.append('-confs')
+    ivy_args.extend(confs_to_resolve)
+    ivy_args.extend(args)
+
+    with IvyUtils.ivy_lock:
+      IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve)
+      runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
+      try:
+        result = execute_runner(runner, workunit_factory=self.context.new_workunit,
+                                workunit_name=workunit_name)
+        if result != 0:
+          raise TaskError('Ivy returned %d' % result)
+      except runner.executor.Error as e:
+        raise TaskError(e)

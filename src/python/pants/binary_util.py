@@ -36,6 +36,7 @@ _PATH_BY_ID = {
   ('linux', 'x86_64'):  ['linux', 'x86_64'],
   ('linux', 'amd64'):   ['linux', 'x86_64'],
   ('linux', 'i386'):    ['linux', 'i386'],
+  ('linux', 'i686'):    ['linux', 'i386'],
   ('darwin', '9'):      ['mac', '10.5'],
   ('darwin', '10'):     ['mac', '10.6'],
   ('darwin', '11'):     ['mac', '10.7'],

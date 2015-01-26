@@ -5,6 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import pytest
+
 from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.task import Task
 from pants.goal.goal import Goal
@@ -78,6 +80,9 @@ class ListGoalsTest(ConsoleTaskTest):
       args=['--test-all'],
     )
 
+  # TODO(John Sirois): Re-enable when fixing up ListGoals `--graph` in
+  # https://github.com/pantsbuild/pants/issues/918
+  @pytest.mark.xfail
   def test_list_goals_graph(self):
     Goal.clear()
 

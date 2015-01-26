@@ -27,14 +27,22 @@ class TaskTestBase(BaseTest):
 
   def setUp(self):
     super(TaskTestBase, self).setUp()
+    self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
 
-    # Create a synthetic subclass of the task type, with a unique scope, to ensure
-    # proper test isolation (unfortunately we currently rely on class-level state in Task.)
+  def synthesize_task_subtype(self, task_type):
+    """Creates a synthetic subclass of the task type.
+
+    The returned type has a unique options scope, to ensure proper test isolation (unfortunately
+    we currently rely on class-level state in Task.)
+
     # TODO: Get rid of this once we re-do the Task lifecycle.
-    self.options_scope = str(uuid.uuid4())
-    subclass_name = b'test_{0}_{1}'.format(self.task_type().__name__, self.options_scope)
-    self._testing_task_type = type(subclass_name, (self.task_type(),),
-                                   {'options_scope': self.options_scope})
+
+    :param task_type: The task type to subtype.
+    :return: A pair (type, options_scope)
+    """
+    options_scope = uuid.uuid4().hex
+    subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    return type(subclass_name, (task_type,), {'options_scope': options_scope}), options_scope
 
   def set_options(self, **kwargs):
     self.set_options_for_scope(self.options_scope, **kwargs)

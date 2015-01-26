@@ -28,7 +28,7 @@ class TargetPlatform(object):
     The tool libraries are set in option scalac in scope compile.scala, currently registered
     in ZincUtils.register_options().
     """
-    return ['//:scala-compiler-2.9.3']
+    return ['//:scala-compiler']
 
   @property
   def library_specs(self):
@@ -36,5 +36,5 @@ class TargetPlatform(object):
 
     TODO: Convert this to an option, once we figure out how to plumb options through.
     """
-    return self._config.getlist('scala-compile', 'runtime-deps',
-                                default=['//:scala-library-2.9.3'])
+    return self._config.getlist('compile.scala', 'runtime-deps',
+                                default=['//:scala-library'])

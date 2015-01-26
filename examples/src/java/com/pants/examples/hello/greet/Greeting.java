@@ -36,6 +36,6 @@ public final class Greeting {
   }
 
   private Greeting() {
-      // not called. placates checkstyle
+    // Not called. Placates checkstyle.
   }
 }

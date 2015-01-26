@@ -23,8 +23,6 @@ from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
 from pants.base.worker_pool import SubprocPool
 
-# Override with ivy -> cache_dir
-_IVY_CACHE_DIR_DEFAULT=os.path.expanduser('~/.ivy2/pants')
 
 class Context(object):
   """Contains the context for a single run of pants.
@@ -79,7 +77,7 @@ class Context(object):
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._spec_excludes = spec_excludes
-    self.replace_targets(target_roots)
+    self._replace_targets(target_roots)
 
   @property
   def config(self):
@@ -147,11 +145,6 @@ class Context(object):
     # e.g., for the purpose of rebasing. In practice, this seems to work fine.
     # Note that for our purposes we take the parent of java.home.
     return os.path.realpath(os.path.dirname(self.java_sysprops['java.home']))
-
-  @property
-  def ivy_home(self):
-    return os.path.realpath(self.config.get('ivy', 'cache_dir',
-                                            default=_IVY_CACHE_DIR_DEFAULT))
 
   @property
   def spec_excludes(self):
@@ -235,10 +228,16 @@ class Context(object):
     """Whether the global lock object is actively holding the lock."""
     return not self._lock.i_am_locking()
 
-  def replace_targets(self, target_roots):
-    """Replaces all targets in the context with the given roots and their transitive
-    dependencies.
-    """
+  def _replace_targets(self, target_roots):
+    # Replaces all targets in the context with the given roots and their transitive dependencies.
+    #
+    # If another task has already retrieved the current targets, mutable state may have been
+    # initialized somewhere, making it now unsafe to replace targets. Thus callers of this method
+    # must know what they're doing!
+    #
+    # TODO(John Sirois): This currently has 0 uses (outside ContextTest) in pantsbuild/pants and
+    # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
+    # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
   def add_new_target(self, address, target_type, dependencies=None, **kwargs):
@@ -268,7 +267,7 @@ class Context(object):
     :return: a list of targets evaluated by the predicate in preorder (or postorder, if the
     postorder parameter is True) traversal order.
     """
-    target_root_addresses = [target.address for target in self._target_roots]
+    target_root_addresses = [target.address for target in self.target_roots]
     target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses,
                                                                    postorder=postorder)
     return filter(predicate, target_set)

@@ -72,14 +72,6 @@ python_library(
   sources = ['goal.py'],
   dependencies = [
     ':error',
-    ':mkflag',
-  ],
-)
-
-python_library(
-  name = 'mkflag',
-  sources = ['mkflag.py'],
-  dependencies = [
   ],
 )
 

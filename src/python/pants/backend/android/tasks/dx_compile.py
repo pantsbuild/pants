@@ -5,7 +5,6 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-
 import os
 
 from pants.backend.android.targets.android_binary import AndroidBinary
@@ -25,6 +24,11 @@ class DxCompile(AndroidTask, NailgunTask):
   DEX_NAME = 'classes.dex'
   _CONFIG_SECTION = 'dx-tool'
 
+  @staticmethod
+  def is_dextarget(target):
+    """Return true if target has class files to be compiled into dex"""
+    return isinstance(target, AndroidBinary)
+
   @classmethod
   def register_options(cls, register):
     super(DxCompile, cls).register_options(register)
@@ -34,13 +38,13 @@ class DxCompile(AndroidTask, NailgunTask):
              help='Run dx with these JVM options.')
 
   @classmethod
-  def is_dextarget(cls, target):
-    """Return true if target has class files to be compiled into dex"""
-    return isinstance(target, AndroidBinary)
-
-  @classmethod
   def product_types(cls):
     return ['dex']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(DxCompile, cls).prepare(options, round_manager)
+    round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):
     super(DxCompile, self).__init__(*args, **kwargs)
@@ -48,11 +52,7 @@ class DxCompile(AndroidTask, NailgunTask):
     self._forced_build_tools_version = self.get_options().build_tools_version
     self._forced_jvm_options = self.get_options().jvm_options
 
-    config_section = self.config_section
-    self.setup_artifact_cache_from_config(config_section=config_section)
-
-  def prepare(self, round_manager):
-    round_manager.require_data('classes_by_target')
+    self.setup_artifact_cache()
 
   @property
   def config_section(self):

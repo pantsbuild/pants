@@ -29,7 +29,7 @@ from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
@@ -179,7 +179,7 @@ class BaseTest(unittest.TestCase):
         new_option_values[scope][key] = val
 
     return create_context(config=self.config(overrides=config),
-                          options = new_option_values,
+                          options=new_option_values,
                           target_roots=target_roots,
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,

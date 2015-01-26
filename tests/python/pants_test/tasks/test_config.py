@@ -28,6 +28,7 @@ class ConfigTest(unittest.TestCase):
         disclaimer:
           Let it be known
           that.
+        blank_section:
 
         [a]
         list: [1, 2, 3, %(answer)s]
@@ -89,6 +90,16 @@ that.""",
     self.assertEquals(dict(a=1, b=42, c=['42', 42]), self.config.getdict('b', 'dict'))
     self._check_defaults(self.config.get, {})
     self._check_defaults(self.config.get, dict(a=42))
+
+  def test_get_required(self):
+    self.assertEquals('foo', self.config.get_required('a', 'name'))
+    self.assertEquals(42, self.config.get_required('a', 'answer', type=int))
+    with self.assertRaises(Config.ConfigError):
+      self.config.get_required('a', 'answer', type=dict)
+    with self.assertRaises(Config.ConfigError):
+      self.config.get_required('a', 'no_section')
+    with self.assertRaises(Config.ConfigError):
+      self.config.get_required('a', 'blank_section')
 
   def _check_defaults(self, accessor, default):
     self.assertEquals(None, accessor('c', 'fast'))

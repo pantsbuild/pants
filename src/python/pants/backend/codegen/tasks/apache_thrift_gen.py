@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 import errno
 import os
 import re
+import shutil
 import subprocess
 
 from twitter.common import log
@@ -25,6 +26,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
+from pants.util.keywords import replace_python_keywords_in_file
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -76,7 +78,7 @@ class ApacheThriftGen(CodeGen):
 
     # TODO(pl): This is broken because of how __init__.py files are generated/cached
     # for combined python thrift packages.
-    # self.setup_artifact_cache_from_config(config_section='thrift-gen')
+    # self.setup_artifact_cache()
 
   _thrift_binary = None
   @property
@@ -173,6 +175,14 @@ class ApacheThriftGen(CodeGen):
       # TODO(John Sirois): file paths should be normalized early on and uniformly, fix the need to
       # relpath here at all.
       relsource = os.path.relpath(source, get_buildroot())
+
+      if lang == "python":
+        copied_source = os.path.relpath(os.path.join(self._workdir, relsource), get_buildroot())
+        safe_mkdir(os.path.dirname(copied_source))
+        shutil.copyfile(source, copied_source)
+        replace_python_keywords_in_file(copied_source)
+        source = relsource = copied_source
+
       outdir = os.path.join(self.session_dir, '.'.join(relsource.split(os.path.sep)))
       safe_mkdir(outdir)
 

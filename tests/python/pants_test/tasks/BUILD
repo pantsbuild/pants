@@ -139,6 +139,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'changed_target_integration',
+  sources = ['test_changed_target_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'junit_tests_integration',
   sources = ['test_junit_tests_integration.py'],
   dependencies = [
@@ -478,6 +487,7 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:listtargets',
+    'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_file_aliases',

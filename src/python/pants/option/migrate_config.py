@@ -15,10 +15,26 @@ from pants.option.errors import ParseError
 
 
 migrations = {
+  ('jvm', 'missing_deps_target_whitelist'): ('compile.java', 'missing_deps_whitelist'),
+
   ('java-compile', 'partition_size_hint'): ('compile.java', 'partition_size_hint'),
   ('java-compile', 'javac_args'): ('compile.java', 'args'),
+  ('java-compile', 'jvm_args'): ('compile.java', 'jvm_options'),
+  ('java-compile', 'confs'): ('compile.java', 'confs'),
+  ('java-compile', 'locally_changed_targets_heuristic_limit'): ('compile.java', 'changed_targets_heuristic_limit'),
   ('java-compile', 'warning_args'): ('compile.java', 'warning_args'),
   ('java-compile', 'no_warning_args'): ('compile.java', 'no_warning_args'),
+  ('java-compile', 'use_nailgun'): ('compile.java', 'use_nailgun'),
+
+  ('scala-compile', 'partition_size_hint'): ('compile.scala', 'partition_size_hint'),
+  ('scala-compile', 'jvm_args'): ('compile.scala', 'jvm_options'),
+  ('scala-compile', 'confs'): ('compile.scala', 'confs'),
+  ('scala-compile', 'locally_changed_targets_heuristic_limit'): ('compile.scala', 'changed_targets_heuristic_limit'),
+  ('scala-compile', 'warning_args'): ('compile.scala', 'warning_args'),
+  ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
+  ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
+  ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
+  ('scala-compile', 'args'): ('compile.scala', 'args'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
@@ -31,6 +47,7 @@ migrations = {
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
   ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
+  ('ivy-resolve', 'jvm_args'): ('resolve.ivy', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
   ('benchmark-run', 'confs'): ('bench', 'confs'),
@@ -75,14 +92,35 @@ migrations = {
   ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin_jars'),
   ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala_repl'),
   ('specs-run', 'bootstrap-tools'): ('test.specs', 'specs'),
-  }
+
+  # Artifact cache spec migration.
+  ('dx-tool', 'read_artifact_caches'): ('dex', 'read_artifact_caches'),
+  ('thrift-gen', 'read_artifact_caches'): ('gen.thrift', 'read_artifact_caches'),
+  ('ivy-resolve', 'read_artifact_caches'): ('resolve.ivy', 'read_artifact_caches'),
+  ('java-compile', 'read_artifact_caches'): ('compile.java', 'read_artifact_caches'),
+  ('scala-compile', 'read_artifact_caches'): ('compile.scala', 'read_artifact_caches'),
+
+  ('dx-tool', 'write_artifact_caches'): ('dex', 'write_artifact_caches'),
+  ('thrift-gen', 'write_artifact_caches'): ('gen.thrift', 'write_artifact_caches'),
+  ('ivy-resolve', 'write_artifact_caches'): ('resolve.ivy', 'write_artifact_caches'),
+  ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
+  ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
+
+  ('backend', 'python-path'): ('DEFAULT', 'pythonpath')
+}
 
 notes = {
+  ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or compile.scala',
   ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
                                   'target: options. Other args should be placed in args: and '
                                   'prefixed with -C.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
+  ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
+                               'bootstrap.bootstrap-jvm-tools and imports.ivy-imports '
+                               '(as jvm_options). Easiest way to do this is to define '
+                               'ivy_jvm_options in DEFAULT and then interpolate it: '
+                               'jvm_options: %(ivy_jvm_options)s'
 }
 
 

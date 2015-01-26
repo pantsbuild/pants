@@ -11,25 +11,6 @@ from pants_test.base.context_utils import create_context
 from pants_test.engine.base_engine_test import EngineTestBase
 
 
-# TODO(John Sirois): Kill this test - the core Engine should unlearn dependencies ordering
-# and leave this to subclasses that can form a strategy for this like RoundEngine.
-class ExecutionOrderTest(EngineTestBase):
-  def test_execution_order(self):
-    self.install_task('invalidate')
-    self.install_task('clean-all', dependencies=['invalidate'])
-
-    self.install_task('resolve')
-    self.install_task('javac', dependencies=['resolve'], goal='compile')
-    self.install_task('scalac', dependencies=['resolve'], goal='compile')
-    self.install_task('junit', dependencies=['compile'], goal='test')
-
-    self.assertEqual(self.as_goals('invalidate', 'clean-all', 'resolve', 'compile', 'test'),
-                     list(Engine.execution_order(self.as_goals('clean-all', 'test'))))
-
-    self.assertEqual(self.as_goals('resolve', 'compile', 'test', 'invalidate', 'clean-all'),
-                     list(Engine.execution_order(self.as_goals('test', 'clean-all'))))
-
-
 class EngineTest(EngineTestBase):
   class RecordingEngine(Engine):
     def __init__(self, action=None):

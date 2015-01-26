@@ -1,9 +1,8 @@
 Pants Conceptual Overview
 =========================
 
-Pants is a build system for software. It works particularly well for a
-source code repository that contains many distinct but interdependent
-pieces.
+Pants is a build system for software. It works particularly well for a source code workspace
+containing many distinct but interdependent pieces.
 
 Pants is similar to `make`, `maven`, `ant`, `gradle`, `sbt`, etc.; but
 pants pursues different design goals. Pants optimizes for
@@ -140,6 +139,49 @@ straightforward way to build the right things after some files' contents
 change. (It *can* surprise you if you `touch` a file, start a compile,
 and nothing happens. If you want to, e.g., see `Foo.java`'s compile
 warnings again, instead of using `touch`, you might append a newline.)
+
+Why Choose Pants?
+-----------------
+
+As your engineering organization grows past 100 people, your codebase grows even faster.
+As your codebase grows, your tools need to scale with it. If you keep buiding everything, builds
+get slower. If you don't build everything, then you need to know which parts to build. You want
+to decompose your code into parts, each part quickly buildable.
+
+You need a way to keep track of which parts of your code depend on which other parts.
+
+* To build *this* app, which code must be built? (And which can be ignored?)
+* If you change *this* low-level "common" code, which other code is affected?
+
+Pants eases this organization into quick-compiling pieces. Pants models code modules (known as
+"targets") and their dependencies in `BUILD` files—in a manner similar to Google's [internal build
+system](http://google-engtools.blogspot.com/2011/08/build-in-cloud-how-build-system-works.html).
+It builds only the parts of the codebase you actually need, ignoring the rest.
+
+Pants builds faster because it builds less. It helps you organize your code into small chunks and it
+only builds the chunks you need. As your codebase grows and those chunks grow, it's relatively easy
+to subdivide them into more chunks. Pants supports local and distributed caching so it doesn't
+re-build things it doesn't have to. If you make a small change, Pants can do a quick incremental
+build.
+
+Pants features include:
+
+- Builds [Java, Scala](http://pantsbuild.github.io/JVMProjects.html), and
+  [Python](http://pantsbuild.github.io/python-readme.html).
+- Generates code from [thrift](http://pantsbuild.github.io/ThriftDeps.html), Protocol
+  Buffers.
+- Supports a distributed cache.
+- Fetches external dependencies from Maven (JVM) repos and Pypi-like Python package repos.
+- Runs tests, spawns REPLs, builds deployable packages.
+- Runs on Linux and Mac OS X.
+
+Where Pants is missing a feature you need, adding that feature may be easier than you thought.
+You can extend Pants with plugins written in Python. Support for new languages is especially
+straightforward. Pants' active developer community is eager to integrate your improvements to Pants.
+
+If your codebase is growing beyond your toolchain's capacity but you're reluctant to divide it
+into totally separate projects, you might want to give Pants a try. It may be of particular
+interest if you have complex dependencies, generated code, and custom build steps.
 
 Next Step
 ---------

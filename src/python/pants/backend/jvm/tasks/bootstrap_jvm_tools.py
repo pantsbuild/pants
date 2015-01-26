@@ -13,10 +13,9 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
 
 
-class BootstrapJvmTools(Task, IvyTaskMixin):
+class BootstrapJvmTools(IvyTaskMixin, Task):
 
   @classmethod
   def product_types(cls):
@@ -67,15 +66,13 @@ class BootstrapJvmTools(Task, IvyTaskMixin):
     cache = {}
     cache_lock = threading.Lock()
 
-    def bootstrap_classpath(executor=None):
+    def bootstrap_classpath():
       with cache_lock:
         if 'classpath' not in cache:
           targets = list(self._resolve_tool_targets(tools, key, scope))
           workunit_name = 'bootstrap-%s' % str(key)
           cache['classpath'] = self.ivy_resolve(targets,
-                                                executor=executor,
                                                 silent=True,
-                                                workunit_name=workunit_name,
-                                                workunit_labels=[WorkUnit.BOOTSTRAP])
+                                                workunit_name=workunit_name)[0]
         return cache['classpath']
     return bootstrap_classpath

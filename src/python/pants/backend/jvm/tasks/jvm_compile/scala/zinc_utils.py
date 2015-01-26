@@ -65,7 +65,7 @@ class ZincUtils(object):
   @property
   def _plugin_jars(self):
     if self._nailgun_task.get_options().plugins:
-      return self._nailgun_task.tool_classpath('plugins')
+      return self._nailgun_task.tool_classpath('plugin-jars')
     else:
       return []
 
@@ -118,9 +118,8 @@ class ZincUtils(object):
       try:
         deps = self.context.resolve(target)
       except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
-                                  .format(message=e, section='scala-compile',
-                                          key='compile-bootstrap-tools'))
+        raise self.DepLookupError("{message}\n  specified by option --scalac in scope {scope}."
+                                  .format(message=e, scope=self._nailgun_task.options_scope))
 
       for lib in (t for t in deps if isinstance(t, JarLibrary)):
         for jar in lib.jar_dependencies:

@@ -129,7 +129,7 @@ with a `python_tests` target. It depends on the library:
 
 !inc[start-at=python_tests](../../../tests/python/example_test/hello/greet/BUILD)
 
-Use `goal test` to run the tests:
+Use `goal test` to run the tests. This uses `pytest`:
 
     :::bash
     $ ./pants goal test examples/tests/python/example_test/hello/greet
@@ -327,6 +327,16 @@ parameters:
     10:43:05 00:02     [junit]
     10:43:05 00:02     [specs]
                    SUCCESS
+
+...and to "unsilence" py.test (not suppress stderr and stdout), pass `-- -s`:
+
+    :::bash
+    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -s
+
+...and to remind yourself of py.test's help:
+
+    :::bash
+    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -h
 
 ### Code Coverage
 

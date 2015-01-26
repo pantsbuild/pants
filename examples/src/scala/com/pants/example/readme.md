@@ -33,10 +33,10 @@ Specs.)
 Scala/Java Circular Dependencies
 --------------------------------
 
-Scala code and Java code can depend on each other. As long as the
-dependencies aren't circular, `scala_library` targets can depend on
-`java_library` targets and vice versa. If the dependencies *are*
-circular, you can set up targets to compile all of this code together:
+Scala code and Java code can depend on each other. As long as the dependencies aren't circular,
+`scala_library` targets can depend on `java_library` targets and vice versa. If the dependencies
+*are* circular, you can set up targets to compile all of this code together. Assuming your `*.java`
+and `*scala` files are in separate directories, you can:
 
 -   a `java_library` whose `sources` param is the `*.java` files; one of its
     dependencies should be...
@@ -58,7 +58,9 @@ The referred-to
 
 !inc[start-at=java_library](../../../../java/com/pants/examples/java_sources/BUILD)
 
-
+(If your circularly-referencing `*.scala` and `*.java` files are in the *same* directory, you don't
+need separate `java_library` and `scala_library` targets. Instead, use
+`scala_library(sources=globs('*.scala', '*.java'),...)`.)
 
 Scala Console
 -------------
@@ -77,7 +79,7 @@ targets and their dependencies.
     15:08:13 00:11     [python-repl]
     15:08:13 00:11     [scala-repl]
     15:08:13 00:11       [bootstrap-scala-repl]
-    Welcome to Scala version 2.9.3 (Java HotSpot(TM) 64-Bit Server VM, Java 1.7.0_60).
+    Welcome to Scala version 2.10.4 (Java HotSpot(TM) 64-Bit Server VM, Java 1.7.0_60).
     Type in expressions to have them evaluated.
     Type :help for more information.
 
