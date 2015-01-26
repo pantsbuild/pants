@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import SyntheticAddress, BuildFileAddress
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -25,15 +25,15 @@ class UnpackedJarsTest(BaseTest):
     self.build_file_parser._build_configuration.register_exposed_object('jar', JarDependency)
 
   def test_empty_libraries(self):
-    self.add_to_build_file('BUILD', dedent('''
+    build_file = self.add_to_build_file('BUILD', dedent('''
     unpacked_jars(name='foo',
     )'''))
-    with self.assertRaises(UnpackedJars.ExpectedImportsError):
-      self.build_graph.inject_spec_closure('//:foo')
+    with self.assertRaises(UnpackedJars.ExpectedLibrariesError):
+      self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
 
 
   def test_simple(self):
-    self.add_to_build_file('BUILD', dedent('''
+    build_file = self.add_to_build_file('BUILD', dedent('''
     unpacked_jars(name='foo',
       libraries=[':import_jars'],
     )
@@ -44,11 +44,11 @@ class UnpackedJarsTest(BaseTest):
     )
    '''))
 
-    self.build_graph.inject_spec_closure('//:foo')
+    self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
     target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
     self.assertIsInstance(target, UnpackedJars)
     traversable_specs = [spec for spec in target.traversable_specs]
     self.assertSequenceEqual([':import_jars'], traversable_specs)
-    self.assertEquals(1, len(target.libraries))
-    import_jar_dep = target.libraries[0]
+    self.assertEquals(1, len(target.imports))
+    import_jar_dep = target.imports[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
