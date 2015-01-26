@@ -185,6 +185,11 @@ class Options(object):
     self._values_by_scope[scope] = values
     return values
 
+  def __getitem__(self, scope):
+    # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
+    # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
+    return self.for_scope(scope)
+
   def bootstrap_option_values(self):
     """Return the option values for bootstrap options.
 

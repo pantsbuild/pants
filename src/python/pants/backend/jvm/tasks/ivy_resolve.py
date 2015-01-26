@@ -55,14 +55,19 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   @classmethod
   def product_types(cls):
     return [
-      'compile_classpath',
-      'ivy_cache_dir',
-      'ivy_jar_products',
-      'jar_dependencies',
-      'jar_map_default',
-      'jar_map_sources',
-      'jar_map_javadoc',
-      ]
+        'compile_classpath',
+        'ivy_cache_dir',
+        'ivy_jar_products',
+        'jar_dependencies',
+        'jar_map_default',
+        'jar_map_sources',
+        'jar_map_javadoc']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(IvyResolve, cls).prepare(options, round_manager)
+    round_manager.require_data('java')
+    round_manager.require_data('scala')
 
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
@@ -94,10 +99,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
           calculated_confs.add(conf)
       self._confs = calculated_confs
     return self._confs
-
-  def prepare(self, round_manager):
-    round_manager.require_data('java')
-    round_manager.require_data('scala')
 
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over

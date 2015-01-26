@@ -16,10 +16,10 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.goal.workspace import Workspace
 from pants_test.tasks.test_base import ConsoleTaskTest
+
 
 class BaseWhatChangedTest(ConsoleTaskTest):
   @property
@@ -57,12 +57,6 @@ class BaseWhatChangedTest(ConsoleTaskTest):
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
-  def test_no_workspace(self):
-    with self.assertRaises(TaskError):
-      task = self.prepare_task(build_graph=self.build_graph)
-      task.context._workspace = None
-      task.execute()
-
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 

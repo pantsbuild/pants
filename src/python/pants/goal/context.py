@@ -16,7 +16,6 @@ from pants.base.build_graph import BuildGraph
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
-from pants.goal.error import TargetRootReplacementError
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.java.distribution.distribution import Distribution
@@ -78,8 +77,7 @@ class Context(object):
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._spec_excludes = spec_excludes
-    self._target_roots_have_been_accessed = False
-    self.replace_targets(target_roots)
+    self._replace_targets(target_roots)
 
   @property
   def config(self):
@@ -109,8 +107,6 @@ class Context(object):
     Note that for a command line invocation that uses wildcard selectors : or ::, the targets
     globbed by the wildcards are considered to be target roots.
     """
-    # If debugging a TargetRootReplacementError, might be useful to inspect/print caller here.
-    self._target_roots_have_been_accessed = True
     return self._target_roots
 
   @property
@@ -232,18 +228,16 @@ class Context(object):
     """Whether the global lock object is actively holding the lock."""
     return not self._lock.i_am_locking()
 
-  def replace_targets(self, target_roots, ignore_previous_reads=True):
-    """Replaces all targets in the context with the given roots and their transitive
-    dependencies (optionally checking first that it is safe to do so).
-
-    If another task has already retrieved the current targets, mutable state may have been
-    initialized somewhere, making it now unsafe to replace targets. Thus callers of this method may
-    want it to raise an error if context.targets or context.target_roots have already been called.
-
-    :param bool ignore_previous_reads: Allow replacing even if previously read by another caller.
-    """
-    if self._target_roots_have_been_accessed and not ignore_previous_reads:
-      raise TargetRootReplacementError('Cannot replace targets after they have been read.')
+  def _replace_targets(self, target_roots):
+    # Replaces all targets in the context with the given roots and their transitive dependencies.
+    #
+    # If another task has already retrieved the current targets, mutable state may have been
+    # initialized somewhere, making it now unsafe to replace targets. Thus callers of this method
+    # must know what they're doing!
+    #
+    # TODO(John Sirois): This currently has 0 uses (outside ContextTest) in pantsbuild/pants and
+    # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
+    # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
   def add_new_target(self, address, target_type, dependencies=None, **kwargs):

@@ -28,14 +28,9 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
              help='Emit test result with ANSI terminal color codes.')
     cls.register_jvm_tool(register, 'specs', default=['//:scala-specs-2.9.3'])
 
-  def __init__(self, *args, **kwargs):
-    super(SpecsRun, self).__init__(*args, **kwargs)
-    self.skip = self.get_options().skip
-    self.color = self.get_options().color
-    self.tests = self.get_options().test
-
-  def prepare(self, round_manager):
-    super(SpecsRun, self).prepare(round_manager)
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(SpecsRun, cls).prepare(options, round_manager)
 
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
@@ -43,6 +38,12 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
+
+  def __init__(self, *args, **kwargs):
+    super(SpecsRun, self).__init__(*args, **kwargs)
+    self.skip = self.get_options().skip
+    self.color = self.get_options().color
+    self.tests = self.get_options().test
 
   def execute(self):
     if not self.skip:

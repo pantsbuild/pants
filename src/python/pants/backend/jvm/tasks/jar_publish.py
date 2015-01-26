@@ -402,6 +402,13 @@ class JarPublish(JarTask, ScmPublish):
                   'For example: --restart-at=com.twitter.common#quantity '
                   'Or: --restart-at=src/java/com/twitter/common/base')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarPublish, cls).prepare(options, round_manager)
+    round_manager.require('jars')
+    round_manager.require('javadoc')
+    round_manager.require('scaladoc')
+
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
     ScmPublish.__init__(self, get_scm(),
@@ -498,11 +505,6 @@ class JarPublish(JarTask, ScmPublish):
   @property
   def config_section(self):
     return self._CONFIG_SECTION
-
-  def prepare(self, round_manager):
-    round_manager.require('jars')
-    round_manager.require('javadoc')
-    round_manager.require('scaladoc')
 
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
