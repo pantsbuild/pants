@@ -41,4 +41,5 @@ class GoalDataTest(BaseTest):
     # can we run our reflection-y goal code without crashing? would be nice
     Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
     oref_data = reflect.gen_tasks_options_reference_data()
-    self.assertTrue(len(oref_data) > 0, 'Tried to generate data for goals reference, got emptiness')
+    self.assertTrue(len(oref_data) > 0,
+                    'Tried to generate data for options reference, got emptiness')

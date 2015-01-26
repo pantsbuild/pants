@@ -432,7 +432,7 @@ def bootstrap_option_values():
     Config.reset_default_bootstrap_option_values()
 
 
-def gen_goals_glopts_reference_data():
+def gen_glopts_reference_data():
   option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
   def register(*args, **kwargs):
     option_parser.register(*args, **kwargs)
@@ -471,7 +471,7 @@ def oref_template_data_from_options(scope, argparser):
 
 
 def gen_tasks_options_reference_data():
-  """Generate the template data for the goals reference rst doc."""
+  """Generate the template data for the options reference rst doc."""
   goal_dict = {}
   goal_names = []
   for goal in Goal.all():
