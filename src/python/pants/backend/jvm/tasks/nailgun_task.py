@@ -72,15 +72,6 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
       client = SubprocessExecutor(self._dist)
     return client
 
-  @property
-  def jvm_args(self):
-    """Default jvm args the nailgun will be launched with.
-
-    By default no special jvm args are used.  If a value for ``jvm_args`` is specified in pants.ini
-    globally in the ``DEFAULT`` section or in the ``nailgun`` section, then that list will be used.
-    """
-    return self.context.config.getlist('nailgun', 'jvm_args', default=[])
-
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
               workunit_labels=None):
     """Runs the java main using the given classpath and args.

@@ -12,10 +12,11 @@ from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDepe
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.build_lint import BuildLint
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
+from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
+from pants.backend.core.tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
@@ -23,6 +24,7 @@ from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
 from pants.backend.core.tasks.minimal_cover import MinimalCover
+from pants.backend.core.tasks.noop import NoopCompile, NoopTest
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
 from pants.backend.core.tasks.prepare_resources import PrepareResources
@@ -32,6 +34,7 @@ from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
+from pants.backend.core.from_target import FromTarget
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
@@ -83,6 +86,7 @@ def build_file_aliases():
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,
       'globs': Globs,
+      'from_target': FromTarget,
       'rglobs': RGlobs,
       'source_root': SourceRoot.factory,
       'zglobs': ZGlobs,
@@ -131,8 +135,6 @@ def register_goals():
       'Generate html from markdown docs.')
 
   # Linting.
-  task(name='buildlint', action=BuildLint).install()
-
   task(name='pathdeps', action=PathDeps).install('pathdeps').with_description(
       'Print out all paths containing BUILD files the target depends on.')
 
@@ -169,3 +171,16 @@ def register_goals():
 
   task(name='changed', action=WhatChanged).install().with_description(
       'Print the targets changed since some prior commit.')
+
+  # Stub for other goals to schedule 'compile'. See noop.py for more on why this is useful.
+  task(name='compile', action=NoopCompile).install('compile')
+  task(name='compile-changed', action=CompileChanged).install().with_description(
+    'Compile changed targets.')
+
+  # Stub for other goals to schedule 'test'. See noop.py for more on why this is useful.
+  task(name='test', action=NoopTest).install('test')
+  task(name='test-changed', action=TestChanged).install().with_description(
+    'Test changed targets.')
+
+  task(name='deferred-sources', action=DeferredSourcesMapper).install().with_description(
+    'Map unpacked sources from archives.')

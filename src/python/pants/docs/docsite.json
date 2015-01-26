@@ -6,6 +6,7 @@
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
     "build_dictionary": "dist/builddict/build_dictionary.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
+    "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
     "credits": "dist/markdown/html/src/python/pants/docs/credits.html",
     "dev": "dist/markdown/html/src/python/pants/docs/readme.html",
     "dev_tasks": "dist/markdown/html/src/python/pants/docs/dev_tasks.html",
@@ -90,6 +91,7 @@
         { "page": "setup_repo" },
         { "page": "build_dictionary" },
         { "page": "options_reference" },
+        { "page": "changelog" },
         { "page": "dev",
           "children": [
             { "page": "howto_contribute" },

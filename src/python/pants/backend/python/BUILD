@@ -21,7 +21,6 @@ python_library(
     ':code_generator',
     ':interpreter_cache',
     ':python_artifact',
-    ':python_builder',
     ':python_chroot',
     ':python_requirement',
     ':python_requirements',
@@ -98,17 +97,6 @@ python_library(
   name = 'python_artifact',
   sources = ['python_artifact.py'],
   dependencies = [],
-)
-
-python_library(
-  name = 'python_builder',
-  sources = ['python_builder.py'],
-  dependencies = [
-    ':binary_builder',
-    ':python_chroot',
-    ':test_builder',
-    'src/python/pants/backend/python/targets:python',
-  ],
 )
 
 python_library(
@@ -191,5 +179,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants:thrift_util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:keywords',
   ]
 )

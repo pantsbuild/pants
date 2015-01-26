@@ -50,7 +50,7 @@ class JavaCompile(JvmCompile):
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
-  _JMAKE_MAIN = 'com.sun.tools.jmake.Main'
+  _JMAKE_MAIN = 'org.pantsbuild.jmake.Main'
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -86,7 +86,8 @@ class JavaCompile(JvmCompile):
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context, JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)
+    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
+                         JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)
 
   def extra_products(self, target):
     ret = []

@@ -42,7 +42,6 @@ python_library(
     'src/python/pants/base:revision',
     'src/python/pants/base:target',
     'src/python/pants/ivy',
-    'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
   ],
 )

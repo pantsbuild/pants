@@ -25,10 +25,12 @@ from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
+
 
 # Override with protobuf-gen -> supportdir
 _PROTOBUF_GEN_SUPPORTDIR_DEFAULT='bin/protobuf'
@@ -42,6 +44,7 @@ _PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
 # Override with in protobuf-gen -> pythondeps (Accepts a list)
 _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
+
 class ProtobufGen(CodeGen):
 
   @classmethod
@@ -49,6 +52,14 @@ class ProtobufGen(CodeGen):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
              help='Force generation of protobuf code for these languages.')
+
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ProtobufGen, cls).prepare(options, round_manager)
+    round_manager.require_data('ivy_imports')
+    round_manager.require_data('deferred_sources')
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
@@ -73,12 +84,6 @@ class ProtobufGen(CodeGen):
       self.protoc_version,
       'protoc'
     )
-
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
-  def prepare(self, round_manager):
-    super(ProtobufGen, self).prepare(round_manager)
-    round_manager.require_data('ivy_imports')
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def resolve_deps(self, key, default=None):
     default = default or []
@@ -178,6 +183,11 @@ class ProtobufGen(CodeGen):
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
+    """
+    Find the appropriate source roots used for sources.
+
+    :return: mapping of source roots to  set of sources under the roots
+    """
     gentargets = OrderedSet()
     def add_to_gentargets(target):
       if self.is_gentarget(target):
@@ -187,11 +197,19 @@ class ProtobufGen(CodeGen):
       add_to_gentargets,
       postorder=True)
     sources_by_base = OrderedDict()
+    # TODO(Eric Ayers) Extract this logic for general use? When using unpacked_jars it is needed
+    # to get the correct source root for paths outside the current BUILD tree.
     for target in gentargets:
-      base, sources = target.target_base, target.sources_relative_to_buildroot()
-      if base not in sources_by_base:
-        sources_by_base[base] = OrderedSet()
-      sources_by_base[base].update(sources)
+      for source in target.sources_relative_to_buildroot():
+        base = SourceRoot.find_by_path(source)
+        if not base:
+          base, _ = target.target_base, target.sources_relative_to_buildroot()
+          self.context.log.debug('Could not find source root for {source}.'
+                                 ' Missing call to SourceRoot.register()?  Fell back to {base}.'
+                                 .format(source=source, base=base))
+        if base not in sources_by_base:
+          sources_by_base[base] = OrderedSet()
+        sources_by_base[base].add(source)
     return sources_by_base
 
   def createtarget(self, lang, gentarget, dependees):
@@ -242,7 +260,6 @@ class ProtobufGen(CodeGen):
                                       derived_from=target,
                                       sources=genfiles,
                                       dependencies=self.pythondeps)
-    tgt.jar_dependencies.update(target.imports)
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
@@ -257,8 +274,10 @@ def calculate_genfiles(path, source):
   genfiles['java'].update(calculate_java_genfiles(protobuf_parse))
   return genfiles
 
+
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
+
 
 def calculate_java_genfiles(protobuf_parse):
   basepath = protobuf_parse.package.replace('.', os.path.sep)
@@ -271,6 +290,7 @@ def calculate_java_genfiles(protobuf_parse):
   for classname in classnames:
     yield os.path.join(basepath, '{0}.java'.format(classname))
 
+
 def _same_contents(a, b):
   """Perform a comparison of the two files"""
   with open(a, 'r') as f:
@@ -278,6 +298,7 @@ def _same_contents(a, b):
   with open(b, 'r') as f:
     b_data = f.read()
   return a_data == b_data
+
 
 def check_duplicate_conflicting_protos(sources_by_base, sources, log):
   """Checks if proto files are duplicate or conflicting.

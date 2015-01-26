@@ -48,13 +48,14 @@ Using Pants With...
 News
 ----
 
++ [[Release History (Changelog)|pants('src/python/pants:changelog')]]
 + [[2014-09-16 Announcement|pants('src/docs:announce_201409')]]
   "Hello Pants Build"
 
 Advanced Documentation
 ----------------------
 
-+ [[Set up your Source Tree for Pants|pants('src/docs:announce_201409')]]
++ [[Set up your Source Tree for Pants|pants('src/docs:setup_repo')]]
 + [[Installing Pants|pants('src/docs:install')]]
 
 Pants Reference Documentation

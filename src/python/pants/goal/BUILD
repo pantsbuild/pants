@@ -32,7 +32,6 @@ python_library(
   name = 'context',
   sources = ['context.py'],
   dependencies = [
-    ':error',
     ':products',
     ':workspace',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -73,14 +72,6 @@ python_library(
   sources = ['goal.py'],
   dependencies = [
     ':error',
-    ':mkflag',
-  ],
-)
-
-python_library(
-  name = 'mkflag',
-  sources = ['mkflag.py'],
-  dependencies = [
   ],
 )
 

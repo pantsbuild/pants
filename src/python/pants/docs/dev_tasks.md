@@ -74,6 +74,16 @@ Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
 task provides, Pants errors out.)
 
+A task can have more than one product type. You might want to know which type[s] were `require`d
+by other tasks. If one product is especially "expensive" to make, perhaps your task should only
+do so if another task will use it. Use `self.context.products.isrequired` to find out if a task
+required a product type. `isrequired` returns a predicate function that a task can use to find
+out if any task required a product (`isrequired` returns `None` if none did) and which targets
+were required&mdash;`require` takes an optional target filter predicate function; you can call
+this function to find out which targets to generate the product for:
+
+!inc[start-at=isrequired('jar_dependencies')&end-before=def](../backend/jvm/tasks/ivy_resolve.py)
+
 Products Map: how one task uses products of another
 ---------------------------------------------------
 

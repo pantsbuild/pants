@@ -67,7 +67,8 @@ class PythonTestBuilder(object):
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
 
-  def __init__(self, targets, args, interpreter=None, fast=False, debug=False):
+  def __init__(self, context, targets, args, interpreter=None, fast=False, debug=False):
+    self.context = context
     self._targets = targets
     self._args = args
     self._interpreter = interpreter or PythonInterpreter.get()
@@ -289,6 +290,7 @@ class PythonTestBuilder(object):
     builder = PEXBuilder(interpreter=self._interpreter)
     builder.info.entry_point = 'pytest'
     chroot = PythonChroot(
+      context=self.context,
       targets=targets,
       extra_requirements=self._TESTING_TARGETS,
       builder=builder,

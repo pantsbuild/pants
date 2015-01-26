@@ -133,23 +133,23 @@ class Config(object):
     return ConfigParser.SafeConfigParser(cls._defaults)
 
   def getbool(self, section, option, default=None):
-    """Equivalent to calling get with expected type string"""
+    """Equivalent to calling get with expected type bool."""
     return self.get(section, option, type=bool, default=default)
 
   def getint(self, section, option, default=None):
-    """Equivalent to calling get with expected type int"""
+    """Equivalent to calling get with expected type int."""
     return self.get(section, option, type=int, default=default)
 
   def getfloat(self, section, option, default=None):
-    """Equivalent to calling get with expected type float"""
+    """Equivalent to calling get with expected type float."""
     return self.get(section, option, type=float, default=default)
 
   def getlist(self, section, option, default=None):
-    """Equivalent to calling get with expected type list"""
+    """Equivalent to calling get with expected type list."""
     return self.get(section, option, type=list, default=default)
 
   def getdict(self, section, option, default=None):
-    """Equivalent to calling get with expected type dict"""
+    """Equivalent to calling get with expected type dict."""
     return self.get(section, option, type=dict, default=default)
 
   def getdefault(self, option, type=str, default=None):
@@ -181,7 +181,8 @@ class Config(object):
     :raises: :class:`pants.base.config.Config.ConfigError` if option is not found.
     """
     val = self.get(section, option, type=type)
-    if val is None:
+    # Empty str catches blank options. If blank entries are ok, use get(..., default='') instead.
+    if val is None or val == '':
       raise Config.ConfigError('Required option %s.%s is not defined.' % (section, option))
     return val
 

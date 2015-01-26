@@ -586,6 +586,15 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JUnitRun, cls).prepare(options, round_manager)
+    round_manager.require_data('resources_by_target')
+
+    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
+    round_manager.require_data('classes_by_target')
+    round_manager.require_data('classes_by_source')
+
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
 
@@ -609,14 +618,6 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
         raise TaskError('unknown coverage processor %s' % coverage_processor)
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
-
-  def prepare(self, round_manager):
-    super(JUnitRun, self).prepare(round_manager)
-    round_manager.require_data('resources_by_target')
-
-    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-    round_manager.require_data('classes_by_target')
-    round_manager.require_data('classes_by_source')
 
   def execute(self):
     if not self.get_options().skip:

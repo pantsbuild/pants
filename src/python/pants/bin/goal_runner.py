@@ -52,13 +52,11 @@ class GoalRunner(object):
 
     # Force config into the cache so we (and plugin/backend loading code) can use it.
     # TODO: Plumb options in explicitly.
-    options_bootstrapper.get_bootstrap_options()
+    bootstrap_options = options_bootstrapper.get_bootstrap_options()
     self.config = Config.from_cache()
 
     # Add any extra paths to python path (eg for loading extra source backends)
-    extra_paths = self.config.getlist('backends', 'python-path', [])
-    if extra_paths:
-      sys.path.extend(extra_paths)
+    sys.path.extend(bootstrap_options.for_global_scope().pythonpath)
 
     # Load plugins and backends.
     backend_packages = self.config.getlist('backends', 'packages', [])
@@ -139,7 +137,12 @@ class GoalRunner(object):
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.is_help:
+    if self.options.is_help_all:
+      self.options.print_help(goals=[g.name for g in Goal.all()])
+      print('\nGlobal options:')
+      print(self.options.format_global_help())
+      sys.exit(0)
+    elif self.options.is_help:
       self.options.print_help(goals=goals)
       sys.exit(0)
 

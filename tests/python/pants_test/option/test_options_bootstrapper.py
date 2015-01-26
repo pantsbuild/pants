@@ -18,12 +18,12 @@ class BootstrapOptionsTest(unittest.TestCase):
     Config.reset_default_bootstrap_option_values()
 
   def _do_test(self, expected_vals, config, env, args):
-    expected_vals_dict = {
-      'pants_workdir': expected_vals[0],
-      'pants_supportdir': expected_vals[1],
-      'pants_distdir': expected_vals[2]
-    }
+    self._test_bootstrap_options(config, env, args,
+                                 pants_workdir=expected_vals[0],
+                                 pants_supportdir=expected_vals[1],
+                                 pants_distdir=expected_vals[2])
 
+  def _test_bootstrap_options(self, config, env, args, **expected_entries):
     with temporary_file() as fp:
       fp.write('[DEFAULT]\n')
       if config:
@@ -34,8 +34,8 @@ class BootstrapOptionsTest(unittest.TestCase):
       vals = OptionsBootstrapper(env=env, configpath=fp.name, args=args,
                                  buildroot='/buildroot').get_bootstrap_options().for_global_scope()
 
-      vals_dict = {k: getattr(vals, k) for k in expected_vals_dict }
-      self.assertEquals(expected_vals_dict, vals_dict)
+      vals_dict = {k: getattr(vals, k) for k in expected_entries}
+      self.assertEquals(expected_entries, vals_dict)
 
   def test_bootstrap_option_values(self):
     # Check all defaults.
@@ -77,6 +77,14 @@ class BootstrapOptionsTest(unittest.TestCase):
                     'PANTS_DISTDIR': '/from_env/dist'
                   },
                   args=['--pants-distdir=/from_args/dist', '--foo=bar', '--baz'])
+
+  def test_bootstrap_bool_option_values(self):
+    # Check the default.
+    self._test_bootstrap_options(config=None, env={}, args=[], pantsrc=True)
+
+    # Check an override via flag - currently bools (for store_true and store_false actions) cannot
+    # be inverted from the default via env vars or the config.
+    self._test_bootstrap_options(config={}, env={}, args=['--no-pantsrc'], pantsrc=False)
 
   def test_create_bootstrapped_options(self):
     # Check that we can set a bootstrap option from a cmd-line flag and have that interpolate

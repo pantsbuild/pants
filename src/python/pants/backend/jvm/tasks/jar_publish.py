@@ -402,6 +402,13 @@ class JarPublish(JarTask, ScmPublish):
                   'For example: --restart-at=com.twitter.common#quantity '
                   'Or: --restart-at=src/java/com/twitter/common/base')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarPublish, cls).prepare(options, round_manager)
+    round_manager.require('jars')
+    round_manager.require('javadoc')
+    round_manager.require('scaladoc')
+
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
     ScmPublish.__init__(self, get_scm(),
@@ -409,7 +416,7 @@ class JarPublish(JarTask, ScmPublish):
                                                     'restrict_push_branches'))
     self.cachedir = os.path.join(self.workdir, 'cache')
 
-    self._jvmargs = self.context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
+    self._jvm_options = self.context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
 
     if self.get_options().local:
       local_repo = dict(
@@ -499,11 +506,6 @@ class JarPublish(JarTask, ScmPublish):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  def prepare(self, round_manager):
-    round_manager.require('jars')
-    round_manager.require('javadoc')
-    round_manager.require('scaladoc')
-
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
        particular coordinate.   Return True if the push should be done"""
@@ -535,27 +537,27 @@ class JarPublish(JarTask, ScmPublish):
         safe_mkdir(os.path.dirname(path))
         shutil.copy(os.path.join(basedir, artifact), path)
 
-  def _ivy_jvm_args(self, repo):
-    """Get the JVM arguments for ivy authentication, if needed"""
-    # Get authentication for the publish repo if needed
+  def _ivy_jvm_options(self, repo):
+    """Get the JVM options for ivy authentication, if needed."""
+    # Get authentication for the publish repo if needed.
     if not repo.get('auth'):
-      return self._jvmargs
+      return self._jvm_options
 
-    jvm_args = self._jvmargs
+    jvm_options = self._jvm_options
     user = repo.get('username')
     password = repo.get('password')
     if user and password:
-      jvm_args.append('-Dlogin=%s' % user)
-      jvm_args.append('-Dpassword=%s' % password)
+      jvm_options.append('-Dlogin=%s' % user)
+      jvm_options.append('-Dpassword=%s' % password)
     else:
       raise TaskError('Unable to publish to %s. %s' %
                       (repo.get('resolver'), repo.get('help', '')))
-    return jvm_args
+    return jvm_options
 
   def publish(self, ivyxml_path, jar, entry, repo, published):
     """Run ivy to publish a jar.  ivyxml_path is the path to the ivy file; published
     is a list of jars published so far (including this one). entry is a pushdb entry."""
-    jvm_args = self._ivy_jvm_args(repo)
+    jvm_options = self._ivy_jvm_options(repo)
     resolver = repo['resolver']
     path = repo.get('path')
 
@@ -583,7 +585,7 @@ class JarPublish(JarTask, ScmPublish):
       args.append('-overwrite')
 
     try:
-      ivy.execute(jvm_options=jvm_args, args=args,
+      ivy.execute(jvm_options=jvm_options, args=args,
                   workunit_factory=self.context.new_workunit, workunit_name='jar-publish')
     except Ivy.Error as e:
       raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))

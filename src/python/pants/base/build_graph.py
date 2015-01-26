@@ -33,6 +33,10 @@ class BuildGraph(object):
     self.run_tracker = run_tracker
     self.reset()
 
+  @property
+  def address_mapper(self):
+    return self._address_mapper
+
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies."""
     self._addresses_already_closed = set()

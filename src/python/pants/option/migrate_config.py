@@ -34,6 +34,7 @@ migrations = {
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
   ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
   ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
+  ('scala-compile', 'args'): ('compile.scala', 'args'),
 
   ('javadoc-gen', 'include_codegen'): ('gen.javadoc', 'include_codegen'),
   ('scaladoc-gen', 'include_codegen'): ('gen.scaladoc', 'include_codegen'),
@@ -46,6 +47,7 @@ migrations = {
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
   ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
+  ('ivy-resolve', 'jvm_args'): ('resolve.ivy', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
   ('benchmark-run', 'confs'): ('bench', 'confs'),
@@ -103,6 +105,8 @@ migrations = {
   ('ivy-resolve', 'write_artifact_caches'): ('resolve.ivy', 'write_artifact_caches'),
   ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
   ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
+
+  ('backend', 'python-path'): ('DEFAULT', 'pythonpath')
 }
 
 notes = {
@@ -112,6 +116,11 @@ notes = {
                                   'prefixed with -C.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
+  ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
+                               'bootstrap.bootstrap-jvm-tools and imports.ivy-imports '
+                               '(as jvm_options). Easiest way to do this is to define '
+                               'ivy_jvm_options in DEFAULT and then interpolate it: '
+                               'jvm_options: %(ivy_jvm_options)s'
 }
 
 

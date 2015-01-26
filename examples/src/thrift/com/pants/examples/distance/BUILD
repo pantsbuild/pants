@@ -7,3 +7,7 @@
 java_thrift_library(name='distance-java',
   sources=['distance.thrift'],
 )
+
+python_thrift_library(name='distance-python',
+  sources=['distance.thrift'],
+)

@@ -28,8 +28,8 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.assertTrue(self._context.is_unlocked())
     super(RoundEngineTest, self).tearDown()
 
-  def construct_action(self, tag):
-    return 'construct', tag, self._context
+  def alternate_target_roots_action(self, tag):
+    return 'alternate_target_roots', tag, self._context
 
   def prepare_action(self, tag):
     return 'prepare', tag, self._context
@@ -37,41 +37,53 @@ class RoundEngineTest(EngineTestBase, BaseTest):
   def execute_action(self, tag):
     return 'execute', tag, self._context
 
-  def record(self, tag, product_types=None, required_data=None):
-    class RecordingTask(Task):
-      def __init__(me, *args, **kwargs):
-        super(RecordingTask, me).__init__(*args, **kwargs)
-        self.actions.append(self.construct_action(tag))
+  def construct_action(self, tag):
+    return 'construct', tag, self._context
 
+  def record(self, tag, product_types=None, required_data=None, alternate_target_roots=None):
+    class RecordingTask(Task):
       @classmethod
       def product_types(cls):
         return product_types or []
 
-      def prepare(me, round_manager):
+      @classmethod
+      def alternate_target_roots(cls, options, address_mapper, build_graph):
+        self.actions.append(self.alternate_target_roots_action(tag))
+        return alternate_target_roots
+
+      @classmethod
+      def prepare(cls, options, round_manager):
         for requirement in (required_data or ()):
           round_manager.require_data(requirement)
         self.actions.append(self.prepare_action(tag))
+
+      def __init__(me, *args, **kwargs):
+        super(RecordingTask, me).__init__(*args, **kwargs)
+        self.actions.append(self.construct_action(tag))
 
       def execute(me):
         self.actions.append(self.execute_action(tag))
 
     return RecordingTask
 
-  def install_task(self, name, product_types=None, goal=None, required_data=None):
-    task = self.record(name, product_types, required_data)
+  def install_task(self, name, product_types=None, goal=None, required_data=None,
+                   alternate_target_roots=None):
+    task = self.record(name, product_types, required_data, alternate_target_roots)
     return super(RoundEngineTest, self).install_task(name=name, action=task, goal=goal)
 
   def assert_actions(self, *expected_execute_ordering):
     expected_pre_execute_actions = set()
     expected_execute_actions = []
     for action in expected_execute_ordering:
-      expected_pre_execute_actions.add(self.construct_action(action))
+      expected_pre_execute_actions.add(self.alternate_target_roots_action(action))
       expected_pre_execute_actions.add(self.prepare_action(action))
+      expected_execute_actions.append(self.construct_action(action))
       expected_execute_actions.append(self.execute_action(action))
 
+    expeceted_execute_actions_length = len(expected_execute_ordering) * 2
     self.assertEqual(expected_pre_execute_actions,
-                     set(self.actions[:-len(expected_execute_ordering)]))
-    self.assertEqual(expected_execute_actions, self.actions[-len(expected_execute_ordering):])
+                     set(self.actions[:-expeceted_execute_actions_length]))
+    self.assertEqual(expected_execute_actions, self.actions[-expeceted_execute_actions_length:])
 
   def test_lifecycle_ordering(self):
     self.install_task('task1', goal='goal1', product_types=['1'])
@@ -184,4 +196,17 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
     self.assert_actions('task1', 'task2', 'task3')
 
+  def test_replace_target_roots(self):
+    self.install_task('task1', goal='goal1')
+    self.install_task('task2', goal='goal2', alternate_target_roots=[42])
 
+    self.assertEquals([], self._context.target_roots)
+    self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
+    self.assertEquals([42], self._context.target_roots)
+
+  def test_replace_target_roots_conflict(self):
+    self.install_task('task1', goal='goal1', alternate_target_roots=[42])
+    self.install_task('task2', goal='goal2', alternate_target_roots=[1, 2])
+
+    with self.assertRaises(self.engine.TargetRootsReplacement.ConflictingProposalsError):
+      self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))

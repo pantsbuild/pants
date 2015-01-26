@@ -20,11 +20,11 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.goal import Goal
-from pants.option.options_bootstrapper import register_bootstrap_options
+from pants.option.global_options import register_global_options
+from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants.option.options import Options
 from pants_test.base_test import BaseTest
 from pants_test.base.context_utils import create_config, create_run_tracker
-
 
 def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
@@ -64,9 +64,18 @@ class TaskTest(BaseTest):
     config = create_config(config or '')
     workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
 
+    bootstrap_options = OptionsBootstrapper().get_bootstrap_options()
+
     options = Options(env={}, config=config, known_scopes=['', 'test'], args=args or [])
     # A lot of basic code uses these options, so always register them.
     register_bootstrap_options(options.register_global)
+
+    # We need to wrap register_global (can't set .bootstrap attr on the bound instancemethod).
+    def register_global_wrapper(*args, **kwargs):
+      return options.register_global(*args, **kwargs)
+
+    register_global_wrapper.bootstrap = bootstrap_options.for_global_scope()
+    register_global_options(register_global_wrapper)
 
     task_type.options_scope = 'test'
     task_type.register_options_on_scope(options)
