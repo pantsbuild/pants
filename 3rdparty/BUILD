@@ -45,11 +45,11 @@ jar_library(name='cucumber-java',
 )
 
 # common rev for all com.twitter%finagle* artifacts
-FINAGLE_REV = '6.8.1'
+FINAGLE_REV = '6.24.0'
 
 jar_library(name='finagle-core',
             jars = [
-              jar(org='com.twitter', name='finagle-core_2.9.2', rev=FINAGLE_REV),
+              jar(org='com.twitter', name='finagle-core_2.10', rev=FINAGLE_REV),
             ],
             dependencies = [
               ':util-core'
@@ -57,7 +57,7 @@ jar_library(name='finagle-core',
 
 jar_library(name='finagle-thrift',
             jars = [
-              jar(org='com.twitter', name='finagle-thrift_2.9.2', rev=FINAGLE_REV),
+              jar(org='com.twitter', name='finagle-thrift_2.10', rev=FINAGLE_REV),
             ])
 
 # common rev for all com.google.guava%guava* artifacts
@@ -109,26 +109,26 @@ jar_library(name='protobuf-test-import',
 
 jar_library(name='scala-compiler',
             jars = [
-              jar(org='org.scala-lang', name='scala-compiler', rev='2.9.3'),
+              jar(org='org.scala-lang', name='scala-compiler', rev='2.9.3').with_sources()
             ]
            )
 
 jar_library(name='scala-library',
             jars = [
-              jar(org='org.scala-lang', name='scala-library', rev='2.9.3'),
+              jar(org='org.scala-lang', name='scala-library', rev='2.9.3').with_sources()
             ]
            )
 
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.9.2', rev='3.12.1'),
+              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.17.0'),
             ]
           )
 
 jar_library(name='shapeless',
             jars=[
-              jar(org='com.chuusai', name='shapeless_2.9.2', rev='1.2.4'),
+              jar(org='com.chuusai', name='shapeless_2.10.4', rev='2.0.0'),
             ],
 )
 
@@ -167,11 +167,11 @@ jar_library(name='thrift',
             dependencies = [ ':thrift-0.5.0' ])
 
 # common rev for all com.twitter%util* artifacts
-UTIL_REV = '6.8.1'
+UTIL_REV = '6.23.0'
 
 jar_library(name='util-core',
             jars = [
-              jar(org='com.twitter', name='util-core_2.9.2', rev=UTIL_REV),
+              jar(org='com.twitter', name='util-core_2.10', rev=UTIL_REV),
             ]
            )
 
@@ -192,10 +192,8 @@ jar_library(name='junit',
             ],
            )
 
-jar_library(name='specs_2.9',
+jar_library(name='specs',
             jars = [
-              jar(org='org.scala-tools.testing', name='specs_2.9.3', rev='1.6.9'),
+              jar(org='org.scala-tools.testing', name='specs_2.10', rev='1.6.9'),
             ]
            )
-
-jar_library(name='specs', dependencies = [ ':specs_2.9' ])

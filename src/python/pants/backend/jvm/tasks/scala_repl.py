@@ -18,7 +18,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
     super(ScalaRepl, cls).register_options(register)
     register('--main', default='scala.tools.nsc.MainGenericRunner',
              help='The entry point for running the repl.')
-    cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl-2.9.3'])
+    cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl'])
 
   @classmethod
   def prepare(cls, options, round_manager):

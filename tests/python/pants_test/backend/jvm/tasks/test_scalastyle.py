@@ -181,7 +181,7 @@ class ScalastyleTest(NailgunTaskTestBase):
         synthetic_scala_target
       ])
 
-    # scala_library would bring in 'scala-library-2.9.3 defined in BUILD.tools
+    # scala_library would bring in 'scala-library defined in BUILD.tools
     # so we have an extra target here.
     self.assertEqual(5, len(context.targets()))
 
