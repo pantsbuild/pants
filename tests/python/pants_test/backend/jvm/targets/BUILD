@@ -24,7 +24,10 @@ python_tests(
   name = 'unpacked_jars',
   sources = ['test_unpacked_jars.py'],
   dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:address',
     'tests/python/pants_test:base_test',
   ]
 )
