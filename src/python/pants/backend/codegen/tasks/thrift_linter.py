@@ -45,7 +45,8 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  def _to_bool(self, value):
+  @staticmethod
+  def _to_bool(value):
     # Converts boolean and string values to boolean.
     return str(value) == 'True'
 

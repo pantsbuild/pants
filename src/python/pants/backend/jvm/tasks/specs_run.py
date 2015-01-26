@@ -26,7 +26,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     # TODO: Get rid of this in favor of the inherited global color flag.
     register('--color', action='store_true', default=True,
              help='Emit test result with ANSI terminal color codes.')
-    cls.register_jvm_tool(register, 'specs', default=['//:scala-specs-2.9.3'])
+    cls.register_jvm_tool(register, 'specs', default=['//:scala-specs'])
 
   @classmethod
   def prepare(cls, options, round_manager):
