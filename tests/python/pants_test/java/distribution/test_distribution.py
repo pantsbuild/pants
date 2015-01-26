@@ -118,6 +118,7 @@ class MockDistributionTest(unittest.TestCase):
         with self.env(PATH=jdk):
           Distribution.locate(minimum_version='1.7.0')
 
+    with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.8.0')) as jdk:
         with self.env(PATH=jdk):
           Distribution.locate(maximum_version='1.7.999')
@@ -163,30 +164,36 @@ class MockDistributionTest(unittest.TestCase):
       with self.env(PATH=jdk):
         Distribution.cached(maximum_version='1.7.0_55')
 
+  def test_cached_max(self):
     with self.assertRaises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
         with self.env(PATH=jdk):
           Distribution.cached(maximum_version='1.6.0_20')
 
+  def test_cached_min(self):
     with self.assertRaises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_25')) as jdk:
           with self.env(PATH=jdk):
             Distribution.cached(minimum_version='1.8.0_20')
 
+  def test_cached_bounded(self):
     with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
       with self.env(PATH=jdk):
         Distribution.cached(minimum_version='1.6.0_19', maximum_version='1.7.0_66')
 
+  def test_cached_over_max(self):
     with self.assertRaises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
         with self.env(PATH=jdk):
           Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
 
+  def test_cached_below_min(self):
     with self.assertRaises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.7.0_18')) as jdk:
         with self.env(PATH=jdk):
           Distribution.cached(minimum_version='1.7.0_19', maximum_version='1.7.0_21')
 
+  def test_cached_bad_input_type(self):
     with self.assertRaises(ValueError):
       with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
         with self.env(PATH=jdk):
