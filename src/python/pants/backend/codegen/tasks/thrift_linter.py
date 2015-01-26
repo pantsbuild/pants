@@ -35,13 +35,15 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ThriftLinter, cls).prepare(options, round_manager)
+    # Linter depends on ivy running before it.
+    round_manager.require_data('ivy_imports')
+
   @property
   def config_section(self):
     return self._CONFIG_SECTION
-
-  def prepare(self, round_manager):
-    # Linter depends on ivy running before it.
-    round_manager.require_data('ivy_imports')
 
   def _to_bool(self, value):
     # Converts boolean and string values to boolean.

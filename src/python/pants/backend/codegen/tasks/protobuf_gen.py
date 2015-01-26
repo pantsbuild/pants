@@ -31,6 +31,7 @@ from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 
+
 # Override with protobuf-gen -> supportdir
 _PROTOBUF_GEN_SUPPORTDIR_DEFAULT='bin/protobuf'
 
@@ -43,6 +44,7 @@ _PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
 # Override with in protobuf-gen -> pythondeps (Accepts a list)
 _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
 
+
 class ProtobufGen(CodeGen):
 
   @classmethod
@@ -50,6 +52,14 @@ class ProtobufGen(CodeGen):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
              help='Force generation of protobuf code for these languages.')
+
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ProtobufGen, cls).prepare(options, round_manager)
+    round_manager.require_data('ivy_imports')
+    round_manager.require_data('deferred_sources')
+  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
@@ -74,13 +84,6 @@ class ProtobufGen(CodeGen):
       self.protoc_version,
       'protoc'
     )
-
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
-  def prepare(self, round_manager):
-    super(ProtobufGen, self).prepare(round_manager)
-    round_manager.require_data('ivy_imports')
-    round_manager.require_data('deferred_sources')
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def resolve_deps(self, key, default=None):
     default = default or []
@@ -271,8 +274,10 @@ def calculate_genfiles(path, source):
   genfiles['java'].update(calculate_java_genfiles(protobuf_parse))
   return genfiles
 
+
 def calculate_python_genfiles(source):
   yield re.sub(r'\.proto$', '_pb2.py', source)
+
 
 def calculate_java_genfiles(protobuf_parse):
   basepath = protobuf_parse.package.replace('.', os.path.sep)
@@ -285,6 +290,7 @@ def calculate_java_genfiles(protobuf_parse):
   for classname in classnames:
     yield os.path.join(basepath, '{0}.java'.format(classname))
 
+
 def _same_contents(a, b):
   """Perform a comparison of the two files"""
   with open(a, 'r') as f:
@@ -292,6 +298,7 @@ def _same_contents(a, b):
   with open(b, 'r') as f:
     b_data = f.read()
   return a_data == b_data
+
 
 def check_duplicate_conflicting_protos(sources_by_base, sources, log):
   """Checks if proto files are duplicate or conflicting.
