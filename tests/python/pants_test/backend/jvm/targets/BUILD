@@ -5,7 +5,18 @@
 python_test_suite(
   name = 'targets',
   dependencies = [
+    ':jvm_target',
     ':unpacked_jars',
+  ]
+)
+
+python_tests(
+  name = 'jvm_target',
+  sources = ['test_jvm_target.py'],
+  dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'tests/python/pants_test:base_test',
   ]
 )
 
