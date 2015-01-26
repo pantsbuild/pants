@@ -51,6 +51,7 @@ from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
+from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
@@ -210,6 +211,9 @@ def register_goals():
       'Create an Ensime project from the given targets.')
 
   # Build graph information.
+  task(name='provides', action=Provides).install().with_description(
+      'Print the symbols provided by the given targets.')
+
   # XXX(pl): These should be core, but they have dependencies on JVM
   task(name='depmap', action=Depmap).install().with_description("Depict the target's dependencies.")
 
