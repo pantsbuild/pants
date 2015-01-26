@@ -216,7 +216,7 @@ class ApacheThriftGen(CodeGen):
               # so thrift doesn't read a half-written file
               shutil.copyfile(includefile_abspath, copied_include + '.new')
               os.rename(copied_include + '.new', copied_include)
-              replace_python_keywords_in_file(copied_source)
+              replace_python_keywords_in_file(copied_include)
               copy_deps(includefile_abspath)
 
         copy_deps(source)
