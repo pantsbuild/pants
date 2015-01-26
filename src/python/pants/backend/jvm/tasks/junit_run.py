@@ -177,6 +177,8 @@ class _JUnitRunner(object):
       the junit tests will be executed.
     """
 
+    self._run_tests(tests, junit_classpath, JUnitRun._MAIN, cwd=cwd)
+
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
 
@@ -444,6 +446,7 @@ class Cobertura(_Coverage):
   def __init__(self, task_exports, context):
     super(Cobertura, self).__init__(task_exports, context)
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
+    touch(self._coverage_datafile)
     self._rootdirs = defaultdict(OrderedSet)
     self._include_filters = []
     self._exclude_filters = []
