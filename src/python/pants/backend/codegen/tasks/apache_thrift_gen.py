@@ -186,9 +186,11 @@ class ApacheThriftGen(CodeGen):
 
         # Copy over all (transitive) included files
         def copy_deps(source):
-          for line in open(source):
-            match = INCLUDE_RE.match(line)
-            if match:
+          with open(source) as f:
+            for line in f:
+              match = INCLUDE_RE.match(line)
+              if not match:
+                continue
               includefile = match.group(1)
               includefile_abspath = None
               for base in bases:
@@ -212,7 +214,7 @@ class ApacheThriftGen(CodeGen):
                 continue
               already_copied.add(copied_include)
               safe_mkdir(os.path.dirname(copied_include))
-              # But just in case we wend up doing so anyway, do it atomically
+              # But just in case we end up doing so anyway, do it atomically
               # so thrift doesn't read a half-written file
               shutil.copyfile(includefile_abspath, copied_include + '.new')
               os.rename(copied_include + '.new', copied_include)
