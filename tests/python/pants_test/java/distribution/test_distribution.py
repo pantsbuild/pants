@@ -118,6 +118,7 @@ class MockDistributionTest(unittest.TestCase):
         with self.env(PATH=jdk):
           Distribution.locate(minimum_version='1.7.0')
 
+    with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.8.0')) as jdk:
         with self.env(PATH=jdk):
           Distribution.locate(maximum_version='1.7.999')
@@ -157,6 +158,9 @@ class MockDistributionTest(unittest.TestCase):
         Distribution.locate()
 
   def test_cached(self):
+    # Clear cache so the machine's jdks don't get found during tests.
+    Distribution._CACHE = {}
+
     with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
       with self.env(PATH=jdk):
         Distribution.cached(minimum_version='1.7.0_25')
