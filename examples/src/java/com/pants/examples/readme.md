@@ -280,7 +280,7 @@ Invoke `./pants goal bundle` on a JVM app or JVM binary target:
     $ ./pants goal bundle examples/src/java/com/pants/examples/hello/main:main
 
 With options, you can tell Pants to archive the bundle in a zip, a tar, and some other common
-formats. See the <a pantsref="gref_goal_bundle">bundle help</a> for built-in choices.
+formats. See the <a pantsref="oref_goal_bundle">bundle help</a> for built-in choices.
 
 ### Contents of a Bundle
 
