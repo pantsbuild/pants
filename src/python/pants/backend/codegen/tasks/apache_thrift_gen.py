@@ -29,7 +29,7 @@ from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.keywords import replace_python_keywords_in_file
 from pants.util.dirutil import safe_mkdir, safe_walk
 
-INCLUDE_RE = re.compile(r'include "(.*?)"')
+INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
 
 def _copytree(from_base, to_base):
   def abort(error):
@@ -191,7 +191,7 @@ class ApacheThriftGen(CodeGen):
               match = INCLUDE_RE.match(line)
               if not match:
                 continue
-              includefile = match.group(1)
+              includefile = match.group(1) or match.group(2)
               includefile_abspath = None
               for base in bases:
                 # Maybe it's a path relative to a base
