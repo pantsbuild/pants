@@ -55,6 +55,5 @@ python_tests(
   ],
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
-    'tests/python/pants_test/tasks:base',
   ],
 )

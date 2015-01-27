@@ -66,7 +66,6 @@ class MockDistributionTest(unittest.TestCase):
   def tearDown(self):
     super(MockDistributionTest, self).tearDown()
     Distribution._CACHE = self._local_cache
-    self.assertEquals(self._local_cache, Distribution._CACHE)
 
   def test_validate_basic(self):
     with pytest.raises(Distribution.Error):
