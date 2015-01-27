@@ -4,5 +4,5 @@
 # Example of thrift with python keywords
 
 python_thrift_library(name='keywords-python',
-  sources=['keywords.thrift'],
+  sources=['keywords.thrift', 'another.thrift'],
 )

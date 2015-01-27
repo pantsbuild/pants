@@ -29,6 +29,7 @@ from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.keywords import replace_python_keywords_in_file
 from pants.util.dirutil import safe_mkdir, safe_walk
 
+INCLUDE_RE = re.compile(r'include "(.*?)"')
 
 def _copytree(from_base, to_base):
   def abort(error):
@@ -176,11 +177,51 @@ class ApacheThriftGen(CodeGen):
       # relpath here at all.
       relsource = os.path.relpath(source, get_buildroot())
 
+      already_copied = set()
       if lang == "python":
         copied_source = os.path.relpath(os.path.join(self._workdir, relsource), get_buildroot())
         safe_mkdir(os.path.dirname(copied_source))
         shutil.copyfile(source, copied_source)
         replace_python_keywords_in_file(copied_source)
+
+        # Copy over all (transitive) included files
+        def copy_deps(source):
+          with open(source) as f:
+            for line in f:
+              match = INCLUDE_RE.match(line)
+              if not match:
+                continue
+              includefile = match.group(1)
+              includefile_abspath = None
+              for base in bases:
+                # Maybe it's a path relative to a base
+                abspath = os.path.join(get_buildroot(), base, includefile)
+                if os.path.exists(abspath):
+                  includefile_abspath = abspath
+                  includefile_relpath = includefile
+                break
+              if not includefile_abspath:
+                # It's a path relative to the dir this file is in
+                includefile_abspath = os.path.join(os.path.dirname(source), includefile)
+                includefile_relpath = os.path.relpath(includefile_abspath, get_buildroot())
+
+              copied_include = os.path.relpath(os.path.join(self._workdir, includefile_relpath),
+                                               get_buildroot())
+
+              # We don't want to copy a file twice because that could cause it to be
+              # overwritten while another file is in the middle of reading it
+              if copied_include in already_copied:
+                continue
+              already_copied.add(copied_include)
+              safe_mkdir(os.path.dirname(copied_include))
+              # But just in case we end up doing so anyway, do it atomically
+              # so thrift doesn't read a half-written file
+              shutil.copyfile(includefile_abspath, copied_include + '.new')
+              os.rename(copied_include + '.new', copied_include)
+              replace_python_keywords_in_file(copied_include)
+              copy_deps(includefile_abspath)
+
+        copy_deps(source)
         source = relsource = copied_source
 
       outdir = os.path.join(self.session_dir, '.'.join(relsource.split(os.path.sep)))
