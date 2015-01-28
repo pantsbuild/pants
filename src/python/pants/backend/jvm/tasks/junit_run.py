@@ -148,7 +148,7 @@ class _JUnitRunner(object):
         self.report(targets, tests, tests_failed_exception=exception)
 
       try:
-        self.run(tests, junit_classpath)
+        self.run(tests, junit_classpath, cwd=working_dir)
         _do_report(exception=None)
       except TaskError as e:
         _do_report(exception=e)
