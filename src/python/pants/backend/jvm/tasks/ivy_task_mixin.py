@@ -136,14 +136,7 @@ class IvyTaskMixin(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return ([path for path in stripped_classpath if self.is_classpath_artifact(path)],
-              global_vts.targets)
-
-  @staticmethod
-  def is_classpath_artifact(path):
-    """Subclasses can override to determine whether a given artifact represents a classpath
-    artifact."""
-    return path.endswith('.jar') or path.endswith('.war')
+      return (stripped_classpath, global_vts.targets)
 
   def mapjars(self, genmap, target, executor, jars=None):
     """Resolves jars for the target and stores their locations in genmap.
@@ -180,15 +173,14 @@ class IvyTaskMixin(object):
             for conf in os.listdir(artifactdir):
               confdir = os.path.join(artifactdir, conf)
               for f in os.listdir(confdir):
-                if self.is_classpath_artifact(f):
-                  # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
-                  # conf whitelist
-                  genmap.add(org, confdir).append(f)
-                  genmap.add((org, name), confdir).append(f)
+                # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
+                # conf whitelist
+                genmap.add(org, confdir).append(f)
+                genmap.add((org, name), confdir).append(f)
 
-                  genmap.add(target, confdir).append(f)
-                  genmap.add((target, conf), confdir).append(f)
-                  genmap.add((org, name, conf), confdir).append(f)
+                genmap.add(target, confdir).append(f)
+                genmap.add((target, conf), confdir).append(f)
+                genmap.add((org, name, conf), confdir).append(f)
 
   def exec_ivy(self,
                target_workdir,
