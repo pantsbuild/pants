@@ -11,8 +11,9 @@ import unittest2 as unittest
 
 from mock import call, mock_open, patch
 
+import pants.util.keywords
+from pants.util.contextutil import temporary_file
 from pants.util.strutil import ensure_binary
-from pants.util.keywords import replace_python_keywords_in_file
 
 
 class TestKeywords(unittest.TestCase):
@@ -32,13 +33,17 @@ class TestKeywords(unittest.TestCase):
         1: i16 from_
       }
     ''').encode('utf-8'))
-    m = mock_open(read_data=thrift_contents)
-    with patch('__builtin__.open', m, create=True):
-      replace_python_keywords_in_file('thrift_dummmy.thrift')
-      expected_open_call_list = [call('thrift_dummmy.thrift'), call('thrift_dummmy.thrift', 'w')]
-      m.call_args_list == expected_open_call_list
-      mock_file_handle = m()
-      mock_file_handle.write.assert_called_once_with(expected_replaced_contents)
+    read_mock = mock_open(read_data=thrift_contents)
+    tmp_mock = mock_open()
+    with temporary_file() as tmp:
+      tmp_mock.return_value.name = tmp.name
+      with patch('__builtin__.open', read_mock, create=True):
+        with patch('pants.util.keywords.temporary_file', tmp_mock, create=True):
+          pants.util.keywords.replace_python_keywords_in_file('thrift_dummmy.thrift')
+          expected_open_call_list = [call('thrift_dummmy.thrift')]
+          self.assertEquals(expected_open_call_list, read_mock.call_args_list)
+          mock_file_handle = tmp_mock()
+          mock_file_handle.write.assert_called_once_with(expected_replaced_contents)
 
   def test_non_keyword_file(self):
     thrift_contents = dedent('''
@@ -51,10 +56,14 @@ class TestKeywords(unittest.TestCase):
         5: i16 fromsuffix
       }
     ''')
-    m = mock_open(read_data=thrift_contents)
-    with patch('__builtin__.open', m, create=True):
-      replace_python_keywords_in_file('thrift_dummmy.thrift')
-      expected_open_call_list = [call('thrift_dummmy.thrift'), call('thrift_dummmy.thrift', 'w')]
-      m.call_args_list == expected_open_call_list
-      mock_file_handle = m()
-      mock_file_handle.write.assert_called_once_with(thrift_contents)
+    read_mock = mock_open(read_data=thrift_contents)
+    tmp_mock = mock_open()
+    with temporary_file() as tmp:
+      tmp_mock.return_value.name = tmp.name
+      with patch('__builtin__.open', read_mock, create=True):
+        with patch('pants.util.keywords.temporary_file', tmp_mock, create=True):
+          pants.util.keywords.replace_python_keywords_in_file('thrift_dummmy.thrift')
+          expected_open_call_list = [call('thrift_dummmy.thrift')]
+          self.assertEquals(expected_open_call_list, read_mock.call_args_list)
+          mock_file_handle = tmp_mock()
+          mock_file_handle.write.assert_called_once_with(thrift_contents)
