@@ -173,17 +173,18 @@ class Parser(object):
       if flag.inverse_name:
         inverse_args.append(flag.inverse_name)
       help_args.append(flag.help_arg)
+    is_invertible = len(inverse_args) > 0
 
     # Register the option, only on this scope, for the purpose of displaying help.
     # Note that we'll only display the default value for this scope, even though the
     # default may be overridden in inner scopes.
-    raw_default = self._compute_default(dest, kwargs).value
+    raw_default = self._compute_default(dest, is_invertible, kwargs).value
     kwargs_with_default = dict(kwargs, default=raw_default)
     self._help_argparser.add_argument(*help_args, **kwargs_with_default)
     self._has_help_options = True
 
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
-    if inverse_args:
+    if is_invertible:
       inverse_kwargs = self._create_inverse_kwargs(kwargs)
       self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
     else:
@@ -191,7 +192,7 @@ class Parser(object):
 
   def _register(self, dest, args, kwargs):
     """Recursively register the option for parsing."""
-    ranked_default = self._compute_default(dest, kwargs)
+    ranked_default = self._compute_default(dest, False, kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
     self._argparser.add_argument(*args, **kwargs_with_default)
 
@@ -202,7 +203,7 @@ class Parser(object):
   def _register_boolean(self, dest, args, kwargs, inverse_args, inverse_kwargs):
     """Recursively register the boolean option, and its inverse, for parsing."""
     group = self._argparser.add_mutually_exclusive_group()
-    ranked_default = self._compute_default(dest, kwargs)
+    ranked_default = self._compute_default(dest, True, kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
     group.add_argument(*args, **kwargs_with_default)
     group.add_argument(*inverse_args, **inverse_kwargs)
@@ -264,7 +265,7 @@ class Parser(object):
     arg = next((a for a in args if a.startswith('--')), args[0])
     return arg.lstrip('-').replace('-', '_')
 
-  def _compute_default(self, dest, kwargs):
+  def _compute_default(self, dest, is_invertible, kwargs):
     """Compute the default value to use for an option's registration.
 
     The source of the default value is chosen according to the ranking in RankedValue.
@@ -283,15 +284,7 @@ class Parser(object):
         env_vars.append(udest)
     else:
       env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
-    action_arg =  kwargs.get('action', None)
-    type_arg = kwargs.get('type', None)
-    if type_arg is None:
-      if action_arg in ('store_false', 'store_true'):
-        value_type = self.str_to_bool
-      else:
-        value_type = str
-    else:
-      value_type = type_arg
+    value_type = self.str_to_bool if is_invertible else kwargs.get('type', str)
     env_val_str = None
     if self._env:
       for env_var in env_vars:
