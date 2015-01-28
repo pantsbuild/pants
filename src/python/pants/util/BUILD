@@ -30,6 +30,12 @@ python_library(
   name = 'keywords',
   sources = ['keywords.py'],
   dependencies = [
+    ':contextutil',
     ':strutil',
   ],
+)
+
+python_library(
+  name = 'fileutil',
+  sources = ['fileutil.py'],
 )
