@@ -43,6 +43,10 @@ and goal options on the command line.
 <em>Global options</em> are the options that `./pants -h` lists, options that affect the whole
 Pants run, e.g., `-ldebug`. Specify global options after "goal".
 
+When setting a value for an option, beware spaces. For example, `-l debug` and `--level debug`
+don't do what you want. If you're tempted to put a space between an option and its value, use an
+equals sign instead: `--level=debug`, `-ldebug`, and even `-l=debug` all work.
+
 Some goals and tasks take "passthrough" args. That is, you can specify command-line args that are
 passed through to some tool that Pants invoke in turn. These are specified last on the command
 line after a double-hyphen like `-- foo bar` and are passed to the last goal specified. E.g., to
