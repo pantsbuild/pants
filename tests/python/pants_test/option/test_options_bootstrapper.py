@@ -86,6 +86,8 @@ class BootstrapOptionsTest(unittest.TestCase):
     # be inverted from the default via env vars or the config.
     self._test_bootstrap_options(config={}, env={}, args=['--no-pantsrc'], pantsrc=False)
 
+    self._test_bootstrap_options(config={'pantsrc': False}, env={}, args=[], pantsrc=False)
+
   def test_create_bootstrapped_options(self):
     # Check that we can set a bootstrap option from a cmd-line flag and have that interpolate
     # correctly into regular config.

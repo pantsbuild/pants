@@ -8,6 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from argparse import ArgumentParser, _HelpAction
 from collections import namedtuple
 import copy
+import six
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
@@ -48,6 +49,10 @@ class Parser(object):
   :param parent_parser: the parser for the scope immediately enclosing this one, or
          None if this is the global scope.
   """
+
+  class BooleanConversionError(ParseError):
+    """Raised when a value other than 'True' or 'False' is encountered."""
+    pass
 
   class Flag(namedtuple('Flag', ['name', 'inverse_name', 'help_arg'])):
     """A struct describing a single flag and its corresponding help representation.
@@ -119,6 +124,22 @@ class Parser(object):
 
     if self._parent_parser:
       self._parent_parser._register_child_parser(self)
+
+  @staticmethod
+  def str_to_bool(s):
+    if isinstance(s, six.string_types):
+      if s.lower() == 'true':
+        return True
+      elif s.lower() == 'false':
+        return False
+      else:
+        raise Parser.BooleanConversionError('Got "{0}". Expected "True" or "False".'.format(s))
+    if s is True:
+      return True
+    elif s is False:
+      return False
+    else:
+      raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
 
   def parse_args(self, args, namespace):
     """Parse the given args and set their values onto the namespace object's attributes."""
@@ -262,14 +283,21 @@ class Parser(object):
         env_vars.append(udest)
     else:
       env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
-    value_type = kwargs.get('type', str)
+    action_arg =  kwargs.get('action', None)
+    type_arg = kwargs.get('type', None)
+    if type_arg is None:
+      if action_arg in ('store_false', 'store_true'):
+        value_type = self.str_to_bool
+      else:
+        value_type = str
+    else:
+      value_type = type_arg
     env_val_str = None
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
           env_val_str = self._env.get(env_var)
           break
-
     env_val = None if env_val_str is None else value_type(env_val_str)
     if kwargs.get('action') == 'append':
       config_val_strs = self._config.getlist(config_section, dest) if self._config else None

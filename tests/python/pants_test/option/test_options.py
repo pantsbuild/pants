@@ -9,6 +9,7 @@ import shlex
 import unittest2 as unittest
 
 from pants.option.options import Options
+from pants.option.parser import Parser
 from pants_test.option.fake_config import FakeConfig
 
 
@@ -22,7 +23,14 @@ class OptionsTest(unittest.TestCase):
     options.register_global('--y', action='append', type=int)
     options.register_global('--pants-foo')
     options.register_global('--bar-baz')
-    # Custom types.
+    options.register_global('--store-true-flag', action='store_true')
+    options.register_global('--store-false-flag', action='store_false')
+    options.register_global('--store-true-def-true-flag', action='store_true', default=True)
+    options.register_global('--store-true-def-false-flag', action='store_true', default=False)
+    options.register_global('--store-false-def-false-flag', action='store_false', default=False)
+    options.register_global('--store-false-def-true-flag', action='store_false', default=True)
+
+  # Custom types.
     options.register_global('--dicty', type=Options.dict, default='{"a": "b"}')
     options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
 
@@ -36,6 +44,7 @@ class OptionsTest(unittest.TestCase):
     # For the design doc example test.
     options.register('compile', '--c', type=int)
     options.register('compile.java', '--b', type=str, default='foo')
+
 
   def _parse(self, args_str, env=None, config=None):
     args = shlex.split(str(args_str))
@@ -91,6 +100,76 @@ class OptionsTest(unittest.TestCase):
     # Test dict-typed option.
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
+
+  def test_boolean_defaults(self):
+    options = self._parse('./pants')
+    self.assertFalse(options.for_global_scope().store_true_flag)
+    self.assertFalse(options.for_global_scope().store_false_flag)
+    self.assertFalse(options.for_global_scope().store_true_def_false_flag)
+    self.assertTrue(options.for_global_scope().store_true_def_true_flag)
+    self.assertFalse(options.for_global_scope().store_false_def_false_flag)
+    self.assertTrue(options.for_global_scope().store_false_def_true_flag)
+
+  def test_boolean_set_option(self):
+    options = self._parse('./pants --store-true-flag --store-false-flag '
+                          + ' --store-true-def-true-flag --store-true-def-false-flag '
+                          + ' --store-false-def-true-flag --store-false-def-false-flag')
+
+    self.assertTrue(options.for_global_scope().store_true_flag)
+    self.assertFalse(options.for_global_scope().store_false_flag)
+    self.assertTrue(options.for_global_scope().store_true_def_false_flag)
+    self.assertTrue(options.for_global_scope().store_true_def_true_flag)
+    self.assertFalse(options.for_global_scope().store_false_def_false_flag)
+    self.assertFalse(options.for_global_scope().store_false_def_true_flag)
+
+  def test_boolean_negate_option(self):
+    options = self._parse('./pants --no-store-true-flag --no-store-false-flag '
+                          + ' --no-store-true-def-true-flag --no-store-true-def-false-flag '
+                          + ' --no-store-false-def-true-flag --no-store-false-def-false-flag')
+    self.assertFalse(options.for_global_scope().store_true_flag)
+    self.assertTrue(options.for_global_scope().store_false_flag)
+    self.assertFalse(options.for_global_scope().store_true_def_false_flag)
+    self.assertFalse(options.for_global_scope().store_true_def_true_flag)
+    self.assertTrue(options.for_global_scope().store_false_def_false_flag)
+    self.assertTrue(options.for_global_scope().store_false_def_true_flag)
+
+  def test_boolean_config_override_true(self):
+    options = self._parse('./pants', config={'DEFAULT': {'store_true_flag': True,
+                                                         'store_false_flag': True,
+                                                         'store_true_def_true_flag': True,
+                                                         'store_true_def_false_flag': True,
+                                                         'store_false_def_true_flag': True,
+                                                         'store_false_def_false_flag': True,
+                                                         }})
+    self.assertTrue(options.for_global_scope().store_true_flag)
+    self.assertTrue(options.for_global_scope().store_false_flag)
+    self.assertTrue(options.for_global_scope().store_true_def_false_flag)
+    self.assertTrue(options.for_global_scope().store_true_def_true_flag)
+    self.assertTrue(options.for_global_scope().store_false_def_false_flag)
+    self.assertTrue(options.for_global_scope().store_false_def_true_flag)
+
+  def test_boolean_config_override_false(self):
+    options = self._parse('./pants', config={'DEFAULT': {'store_true_flag': False,
+                                                         'store_false_flag': False,
+                                                         'store_true_def_true_flag': False,
+                                                         'store_true_def_false_flag': False,
+                                                         'store_false_def_true_flag': False,
+                                                         'store_false_def_false_flag': False,
+                                                         }})
+    self.assertFalse(options.for_global_scope().store_true_flag)
+    self.assertFalse(options.for_global_scope().store_false_flag)
+    self.assertFalse(options.for_global_scope().store_true_def_false_flag)
+    self.assertFalse(options.for_global_scope().store_true_def_true_flag)
+    self.assertFalse(options.for_global_scope().store_false_def_false_flag)
+    self.assertFalse(options.for_global_scope().store_false_def_true_flag)
+
+  def test_boolean_invalid_value(self):
+    with self.assertRaises(Parser.BooleanConversionError):
+      self._parse('./pants', config={'DEFAULT': {'store_true_flag': 11,
+                                                 }})
+    with self.assertRaises(Parser.BooleanConversionError):
+      self._parse('./pants', config={'DEFAULT': {'store_true_flag': 'AlmostTrue',
+                                               }})
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -218,4 +297,3 @@ class OptionsTest(unittest.TestCase):
     })
     check_bar_baz(None, {
     })
-
