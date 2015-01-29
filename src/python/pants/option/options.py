@@ -86,6 +86,14 @@ class Options(object):
     splitter = ArgSplitter(known_scopes)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
+
+    if bootstrap_option_values:
+      target_spec_files = bootstrap_option_values.target_spec_files
+      if target_spec_files:
+        for spec in target_spec_files:
+          with open(spec) as f:
+            self._target_specs.extend(filter(None, [line.strip() for line in f]))
+
     self._is_help = splitter.is_help
     self._is_help_all = splitter.is_help_all
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)

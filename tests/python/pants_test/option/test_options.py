@@ -6,9 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import shlex
+import tempfile
+from textwrap import dedent
 import unittest2 as unittest
 
 from pants.option.options import Options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants_test.option.fake_config import FakeConfig
 
@@ -45,10 +48,10 @@ class OptionsTest(unittest.TestCase):
     options.register('compile', '--c', type=int)
     options.register('compile.java', '--b', type=str, default='foo')
 
-
-  def _parse(self, args_str, env=None, config=None):
+  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args)
+    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args,
+                      bootstrap_option_values=bootstrap_option_values)
     self._register(options)
     return options
 
@@ -242,6 +245,22 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(3, options.for_scope('compile.java').a)
     self.assertEqual('foo', options.for_scope('compile.java').b)
     self.assertEqual(4, options.for_scope('compile.java').c)
+
+  def test_file_spec_args(self):
+    with tempfile.NamedTemporaryFile() as tmp:
+      tmp.write(dedent(
+        '''
+        foo
+        bar
+        '''
+      ))
+      tmp.flush()
+      cmdline = './pants --target-spec-file={filename} compile morx fleem'.format(filename=tmp.name)
+      bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
+      bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
+      options = self._parse(cmdline, bootstrap_option_values=bootstrap_options)
+      sorted_specs = sorted(options.target_specs)
+      self.assertEqual(['bar', 'fleem', 'foo', 'morx'], sorted_specs)
 
   def test_passthru_args(self):
     options = self._parse('./pants compile foo -- bar --baz')
