@@ -3,13 +3,13 @@
 
 # Illustrate using Thrift-generated code from Python.
 
-import unittest2 as unittest
+import unittest
 
 from com.pants.examples.distance.ttypes import Distance
 from com.pants.examples.precipitation.ttypes import Precipitation
 from com.pants.examples.keywords.keywords.ttypes import Keywords
 from com.pants.examples.keywords.another.ttypes import Another
-from thrift.protocol import TProtocol
+
 
 class UseThriftTest(unittest.TestCase):
   def test_make_it_rain(self):

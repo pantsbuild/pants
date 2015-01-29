@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from contextlib import contextmanager
 import os
-import unittest2 as unittest
+import unittest
 
 from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
 from pants.base.build_file import BuildFile
