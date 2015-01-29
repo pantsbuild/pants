@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import shlex
 import tempfile
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 import os
 import subprocess
 import textwrap
-import unittest2 as unittest
+import unittest
 
 from pants.java.distribution.distribution import Distribution
 from pants.java.executor import SubprocessExecutor

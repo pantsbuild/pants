@@ -9,7 +9,7 @@ from collections import namedtuple
 from operator import eq, ne
 import os
 import subprocess
-import unittest2 as unittest
+import unittest
 
 from pants.fs.archive import ZIP
 from pants.base.build_environment import get_buildroot

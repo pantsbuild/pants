@@ -7,7 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
 from mock import call, mock_open, patch
 

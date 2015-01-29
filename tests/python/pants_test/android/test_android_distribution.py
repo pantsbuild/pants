@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import contextmanager
 import os
 import pytest
-import unittest2 as unittest
+import unittest
 
 from twitter.common.collections import maybe_list
 

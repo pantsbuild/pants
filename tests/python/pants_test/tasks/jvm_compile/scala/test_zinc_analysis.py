@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import contextlib
 import os
 import tarfile
-import unittest2 as unittest
+import unittest
 
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
