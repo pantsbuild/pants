@@ -17,6 +17,7 @@ class AndroidTarget(JvmTarget):
 
   # Missing attributes from the AndroidManifest would eventually error in the compilation process.
   # But since the error would raise here in the target definition, we are catching the exception
+
   class BadManifestError(Exception):
     """Indicates an invalid android manifest."""
 
@@ -32,7 +33,6 @@ class AndroidTarget(JvmTarget):
       Defaults to the latest full release.
     :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
       to the BUILD file's directory.
-      Set as 'debug' by default.
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
 
@@ -48,6 +48,9 @@ class AndroidTarget(JvmTarget):
       raise TargetDefinitionException(self, 'The given manifest {0} is not a file '
                                             'at path {1}'.format(manifest, manifest_path))
     self.manifest = manifest_path
+
+    # This will be filled with Keystore objects by backend.android.credentials.keystore_resolver.
+    self.keystores = []
 
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
@@ -76,5 +79,8 @@ class AndroidTarget(JvmTarget):
   def get_app_name(self):
     """Return a string with the application name of the package, return None if not found."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('activity')
-    package_name = tgt_manifest[0].getAttribute('android:name')
-    return package_name.split(".")[-1]
+    try:
+      package_name = tgt_manifest[0].getAttribute('android:name')
+      return package_name.split(".")[-1]
+    except:
+      return None

@@ -1,0 +1,56 @@
+# coding=utf-8
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
+import os
+import textwrap
+
+from pants.util.dirutil import safe_mkdir
+
+
+class AndroidConfigUtil(object):
+  """Utility methods for Pants-specific Android configurations."""
+
+  @classmethod
+  def setup_keystore_config(cls, config):
+    """
+    Create a config file for Android keystores and seed with the default keystore.
+
+    :param string config: Desired location for the new keystore config .ini file.
+    """
+
+    # Unless the config file in ~/.pants.d/android is deleted, this method should only run once,
+    # the first time an android_target is built. What I don't like about this is that the
+    # example config is only generated after the first time an android_target is built,
+    # instead of being available beforehand.
+
+    ini = textwrap.dedent(
+      """
+      # Android Keystore definitions. Follow this format when adding a keystore definition.
+      # Each keystore has an arbitrary name and is required to have all five fields below.
+
+      # These definitions can go anywhere in your file system, passed to pants as the option
+      # '--keystore-config-location' in pants.ini or on the CLI.
+
+      # The 'default-debug' definition is a well-known key installed along with the Android SDK.
+
+      [default-debug]
+
+      build_type: debug
+      keystore_location: %(homedir)s/.android/debug.keystore
+      keystore_alias: androiddebugkey
+      keystore_password: android
+      key_password: android
+      """
+    )
+
+    config = os.path.expanduser(config)
+    safe_mkdir(os.path.dirname(config))
+    with open(config, 'w') as config_file:
+      config_file.write(ini)
+      config_file.close()
+    return config_file

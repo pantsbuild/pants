@@ -44,6 +44,7 @@ class AaptBuilder(AaptTask):
 
     # Glossary of used aapt flags. Aapt handles a ton of action, this will continue to expand.
     #   : 'package' is the main aapt operation (see class docstring for more info).
+    #   : '-f' to 'force' overwrites if the package already exists.
     #   : '-M' is the AndroidManifest.xml of the project.
     #   : '-S' points to the resource_dir to "spider" down while collecting resources.
     #   : '-I' packages to add to base "include" set, here the android.jar of the target-sdk.
@@ -51,12 +52,13 @@ class AaptBuilder(AaptTask):
     #   : '-F' The name and location of the .apk file to output
     #   : additional positional arguments are treated as input directories to gather files from.
     args.extend([self.aapt_tool(target.build_tools_version)])
-    args.extend(['package', '-M', target.manifest])
+    args.extend(['package', '-f'])
+    args.extend(['-M', target.manifest])
     args.extend(['-S'])
     args.extend(resource_dir)
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    args.extend(['-F', os.path.join(self.workdir, target.app_name + '-unsigned.apk')])
+    args.extend(['-F', os.path.join(self.workdir, target.app_name + '.unsigned.apk')])
     args.extend(inputs)
     log.debug('Executing: {0}'.format(args))
     return args
@@ -91,5 +93,6 @@ class AaptBuilder(AaptTask):
           if result != 0:
             raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
     for target in targets:
-      self.context.products.get('apk').add(target, self.workdir).append(target.app_name + "-unsigned.apk")
+      self.context.products.get('apk').add(target, self.workdir).append(target.app_name
+                                                                        + ".unsigned.apk")
 
