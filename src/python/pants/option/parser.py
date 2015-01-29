@@ -192,7 +192,7 @@ class Parser(object):
 
   def _register(self, dest, args, kwargs):
     """Recursively register the option for parsing."""
-    ranked_default = self._compute_default(dest, False, kwargs)
+    ranked_default = self._compute_default(dest, is_invertible=False, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
     self._argparser.add_argument(*args, **kwargs_with_default)
 
@@ -203,7 +203,7 @@ class Parser(object):
   def _register_boolean(self, dest, args, kwargs, inverse_args, inverse_kwargs):
     """Recursively register the boolean option, and its inverse, for parsing."""
     group = self._argparser.add_mutually_exclusive_group()
-    ranked_default = self._compute_default(dest, True, kwargs)
+    ranked_default = self._compute_default(dest, is_invertible=True, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
     group.add_argument(*args, **kwargs_with_default)
     group.add_argument(*inverse_args, **inverse_kwargs)
