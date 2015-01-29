@@ -69,7 +69,8 @@ class IvyTaskMixin(object):
                   executor=None,
                   silent=False,
                   workunit_name=None,
-                  confs=None):
+                  confs=None,
+                  custom_args=None):
     if not targets:
       return ([], set())
 
@@ -103,7 +104,7 @@ class IvyTaskMixin(object):
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
       if invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
-        args = ['-cachepath', raw_target_classpath_file_tmp]
+        args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
         self.exec_ivy(
             target_workdir=target_workdir,

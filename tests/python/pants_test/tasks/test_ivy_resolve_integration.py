@@ -45,3 +45,38 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(found,
                       msg="Couldn't find ivy report in {report_dir}"
                       .format(report_dir=ivy_report_dir))
+
+  def test_ivy_args(self):
+    pants_run = self.run_pants([
+        'resolve',
+        '--resolve-ivy-args=-blablabla',
+        'examples/src/scala::'
+    ])
+    self.assert_failure(pants_run)
+    self.assertTrue('Unrecognized option: -blablabla' in pants_run.stdout_data)
+
+  def test_ivy_confs_success(self):
+    pants_run = self.run_pants([
+        'resolve',
+        '--resolve-ivy-confs=default',
+        '--resolve-ivy-confs=sources',
+        '--resolve-ivy-confs=javadoc',
+        '3rdparty:junit'
+    ])
+    self.assert_success(pants_run)
+
+  def test_ivy_confs_failure(self):
+    pants_run = self.run_pants([
+        'resolve',
+        '--resolve-ivy-confs=parampampam',
+        '3rdparty:junit'
+    ])
+    self.assert_failure(pants_run)
+
+  def test_ivy_confs_ini_failure(self):
+    pants_ini_config = {'resolve.ivy': {'confs': 'parampampam'}}
+    pants_run = self.run_pants([
+        'resolve',
+        '3rdparty:junit'
+    ], config=pants_ini_config)
+    self.assert_failure(pants_run)

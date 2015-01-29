@@ -78,7 +78,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout_data, stderr_data) = proc.communicate(stdin_data)
-    return PantsResult(pants_command, proc.returncode, stdout_data, stderr_data)
+    return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"), stderr_data.decode("utf-8"))
 
   def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     """Runs pants in a subprocess.

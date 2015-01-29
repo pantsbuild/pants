@@ -54,6 +54,7 @@ migrations = {
   ('specs-run', 'confs'): ('test.specs', 'confs'),
   ('junit-run', 'confs'): ('test.junit', 'confs'),
   ('scala-repl', 'confs'): ('repl.scala', 'confs'),
+  ('ivy-resolve', 'confs'): ('resolve.ivy', 'confs'),
 
   ('scala-repl', 'args'): ('repl.scala', 'args'),
 
