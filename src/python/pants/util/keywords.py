@@ -7,8 +7,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import functools
 import keyword
+import os
 import re
 
+from pants.util.contextutil import temporary_file
+from pants.util.fileutil import atomic_copy
 from pants.util.strutil import ensure_binary
 
 
@@ -48,6 +51,8 @@ def replace_python_keywords_in_file(source):
   with open(source) as contents:
     modified = functools.reduce(lambda txt, rewrite: rewrite(txt), rewrites, contents.read())
     contents.close()
-    with open(source, 'w') as thrift:
+    with temporary_file() as thrift:
       thrift.write(modified)
+      thrift.close()
+      atomic_copy(thrift.name, source)
   return source

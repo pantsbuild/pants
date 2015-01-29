@@ -11,8 +11,9 @@ import unittest2 as unittest
 
 from mock import call, mock_open, patch
 
+import pants.util.keywords
+from pants.util.contextutil import temporary_file
 from pants.util.strutil import ensure_binary
-from pants.util.keywords import replace_python_keywords_in_file
 
 
 class TestKeywords(unittest.TestCase):
@@ -32,13 +33,13 @@ class TestKeywords(unittest.TestCase):
         1: i16 from_
       }
     ''').encode('utf-8'))
-    m = mock_open(read_data=thrift_contents)
-    with patch('__builtin__.open', m, create=True):
-      replace_python_keywords_in_file('thrift_dummmy.thrift')
-      expected_open_call_list = [call('thrift_dummmy.thrift'), call('thrift_dummmy.thrift', 'w')]
-      m.call_args_list == expected_open_call_list
-      mock_file_handle = m()
-      mock_file_handle.write.assert_called_once_with(expected_replaced_contents)
+
+    with temporary_file() as tmp:
+      tmp.write(thrift_contents)
+      tmp.flush()
+      pants.util.keywords.replace_python_keywords_in_file(tmp.name)
+      with open(tmp.name) as f:
+        self.assertEquals(expected_replaced_contents, f.read())
 
   def test_non_keyword_file(self):
     thrift_contents = dedent('''
@@ -51,10 +52,9 @@ class TestKeywords(unittest.TestCase):
         5: i16 fromsuffix
       }
     ''')
-    m = mock_open(read_data=thrift_contents)
-    with patch('__builtin__.open', m, create=True):
-      replace_python_keywords_in_file('thrift_dummmy.thrift')
-      expected_open_call_list = [call('thrift_dummmy.thrift'), call('thrift_dummmy.thrift', 'w')]
-      m.call_args_list == expected_open_call_list
-      mock_file_handle = m()
-      mock_file_handle.write.assert_called_once_with(thrift_contents)
+    with temporary_file() as tmp:
+      tmp.write(thrift_contents)
+      tmp.flush()
+      pants.util.keywords.replace_python_keywords_in_file(tmp.name)
+      with open(tmp.name) as f:
+        self.assertEquals(thrift_contents, f.read())

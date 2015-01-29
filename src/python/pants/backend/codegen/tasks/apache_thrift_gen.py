@@ -28,6 +28,7 @@ from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.keywords import replace_python_keywords_in_file
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.fileutil import atomic_copy
 
 INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
 
@@ -181,7 +182,7 @@ class ApacheThriftGen(CodeGen):
       if lang == "python":
         copied_source = os.path.relpath(os.path.join(self._workdir, relsource), get_buildroot())
         safe_mkdir(os.path.dirname(copied_source))
-        shutil.copyfile(source, copied_source)
+        atomic_copy(source, copied_source)
         replace_python_keywords_in_file(copied_source)
 
         # Copy over all (transitive) included files
@@ -214,10 +215,7 @@ class ApacheThriftGen(CodeGen):
                 continue
               already_copied.add(copied_include)
               safe_mkdir(os.path.dirname(copied_include))
-              # But just in case we end up doing so anyway, do it atomically
-              # so thrift doesn't read a half-written file
-              shutil.copyfile(includefile_abspath, copied_include + '.new')
-              os.rename(copied_include + '.new', copied_include)
+              atomic_copy(includefile_abspath, copied_include)
               replace_python_keywords_in_file(copied_include)
               copy_deps(includefile_abspath)
 
