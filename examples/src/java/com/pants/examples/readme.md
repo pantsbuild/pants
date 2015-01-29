@@ -214,11 +214,11 @@ Pants uses Jmake, a dependency tracking compiler facade.
 Java7 vs Java6, Which Java
 --------------------------
 
-Pants uses the java on your `PATH` (not `JAVA_HOME`). To specify a
+Normally, Pants uses the first java it finds in `JDK_HOME`, `JAVA_HOME`, or `PATH`. To specify a
 specific java version for just one pants invocation:
 
     :::bash
-    $ PATH=/usr/lib/jvm/java-1.7.0-openjdk7/bin:${PATH} ./pants goal ...
+    $ JDK_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 ./pants goal ...
 
 If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can use a
 `compile.java` command-line arg to specify Java version:
