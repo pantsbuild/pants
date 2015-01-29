@@ -5,7 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from twitter.common.collections.ordereddict import OrderedDict
+from collections import OrderedDict
+
 from twitter.common.lang import Compatibility
 
 

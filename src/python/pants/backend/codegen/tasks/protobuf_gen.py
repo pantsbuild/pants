@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from hashlib import sha1
 import itertools
 import os
@@ -13,7 +13,7 @@ import re
 import subprocess
 
 from twitter.common import log
-from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen

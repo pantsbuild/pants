@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import functools
 import getpass
 import hashlib
@@ -16,7 +16,7 @@ import shutil
 import sys
 import traceback
 
-from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 from twitter.common.log.options import LogOptions
 

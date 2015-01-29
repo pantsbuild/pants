@@ -5,11 +5,11 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import logging
 import traceback
 
-from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.collections import OrderedSet
 
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
