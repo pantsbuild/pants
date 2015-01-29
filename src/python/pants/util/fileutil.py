@@ -5,7 +5,7 @@
 import os
 import shutil
 
-from contextutil import temporary_file
+from pants.util.contextutil import temporary_file
 
 
 def atomic_copy(src, dst):
