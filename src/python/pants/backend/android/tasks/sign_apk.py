@@ -19,7 +19,7 @@ from twitter.common import log
 
 
 class SignApkTask(Task):
-  """Sign Android packages with jarsigner tool."""
+  """Sign Android packages with keystores using the jarsigner tool."""
 
   _DEFAULT_KEYSTORE_CONFIG = 'android/keystore/default_config.ini'
   _CONFIG_SECTION = 'android-keystore-location'
