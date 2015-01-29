@@ -8,12 +8,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 """Support for wholesale archive creation and extraction in a uniform API across archive types."""
 
-import os
-
 from abc import abstractmethod
+from collections import OrderedDict
+import os
 from zipfile import ZIP_DEFLATED
 
-from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.lang import AbstractClass
 
 from pants.util.contextutil import open_tar, open_zip

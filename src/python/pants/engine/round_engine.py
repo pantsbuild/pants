@@ -5,11 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 import os
 
 from twitter.common.collections.orderedset import OrderedSet
-from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
