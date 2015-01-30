@@ -105,6 +105,8 @@ if [ ! -z "${R}" ]; then
   exit 1
 fi
 
+build-support/bin/check_header.sh || exit 1
+
 # Sanity checks
 ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
 ./pants.pex goals ${PANTS_ARGS[@]} || die "Failed to list goals."
