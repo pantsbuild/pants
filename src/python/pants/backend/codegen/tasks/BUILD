@@ -41,7 +41,6 @@ python_library(
     'src/python/pants:thrift_util',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
-    'src/python/pants/util:keywords',
   ],
 )
 

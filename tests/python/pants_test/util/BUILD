@@ -39,16 +39,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'keywords',
-  sources = ['test_keywords.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:keywords',
-  ]
-)
-
-python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [

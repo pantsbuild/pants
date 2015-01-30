@@ -7,7 +7,6 @@ python_tests(name='usethrift',
   sources=['use_thrift_test.py',],
   dependencies=[
     'examples/src/thrift/com/pants/examples/distance:distance-python',
-    'examples/src/thrift/com/pants/examples/keywords:keywords-python',
     'examples/src/thrift/com/pants/examples/precipitation:precipitation-python',
   ],
 )

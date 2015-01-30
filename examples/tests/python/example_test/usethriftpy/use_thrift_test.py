@@ -7,8 +7,6 @@ import unittest
 
 from com.pants.examples.distance.ttypes import Distance
 from com.pants.examples.precipitation.ttypes import Precipitation
-from com.pants.examples.keywords.keywords.ttypes import Keywords
-from com.pants.examples.keywords.another.ttypes import Another
 
 
 class UseThriftTest(unittest.TestCase):
@@ -17,10 +15,3 @@ class UseThriftTest(unittest.TestCase):
     self.assertTrue(hasattr(distance, 'Number'))
     sprinkle = Precipitation()
     self.assertTrue(hasattr(sprinkle, 'distance'))
-    sprinkle = Keywords()
-    self.assertTrue(hasattr(sprinkle, 'from_'))
-    self.assertTrue(hasattr(sprinkle, 'None_'))
-
-    another = Another()
-    self.assertTrue(hasattr(another, 'from_'))
-    self.assertTrue(hasattr(another, 'None_'))
