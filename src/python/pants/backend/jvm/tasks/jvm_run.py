@@ -32,8 +32,16 @@ class JvmRun(JvmTask):
     super(JvmRun, cls).register_options(register)
     register('--only-write-cmd-line', metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
+    # Note the unusual registration pattern. This is so we can support three cases:
+    # --cwd=<path>
+    # --cwd (defaults to the value of 'const', which is None here)
+    # No explicit --cwd at all (defaults to the value of 'default')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the target path.')
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -49,6 +57,7 @@ class JvmRun(JvmTask):
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
     self.only_write_cmd_line = self.get_options().only_write_cmd_line
+    self.args.extend(self.get_passthru_args())
 
   def execute(self):
     # The called binary may block for a while, allow concurrent pants activity during this pants
