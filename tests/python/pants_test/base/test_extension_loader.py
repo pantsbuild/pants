@@ -9,17 +9,27 @@ from contextlib import contextmanager
 import uuid
 import sys
 import types
+import unittest
 
-import unittest2 as unittest
+from pkg_resources import (
+    yield_lines,
+    working_set,
+    Distribution,
+    WorkingSet,
+    EmptyProvider,
+    VersionConflict)
 
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.extension_loader import load_backend, load_plugins, PluginNotFound, PluginLoadOrderError
+from pants.base.extension_loader import (
+    load_backend,
+    load_plugins,
+    PluginNotFound,
+    PluginLoadOrderError)
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.target import Target
 from pants.goal.task_registrar import TaskRegistrar
 from pants.goal.goal import Goal
-from pkg_resources import yield_lines, working_set, Distribution, WorkingSet, EmptyProvider, VersionConflict
 
 
 class MockMetadata(EmptyProvider):

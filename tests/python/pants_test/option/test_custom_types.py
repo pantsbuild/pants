@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import unittest2 as unittest
+import unittest
 from pants.option.custom_types import dict_type, list_type
 from pants.option.errors import ParseError
 

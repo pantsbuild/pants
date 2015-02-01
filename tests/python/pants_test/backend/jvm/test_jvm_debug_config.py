@@ -6,11 +6,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 
 from pants_test.base.context_utils import create_config
+
 
 class JvmDebugConfigTest(unittest.TestCase):
   def test_debug_config_default(self):

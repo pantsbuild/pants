@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
 from pants.base.config import Config
 from pants.option.options_bootstrapper import OptionsBootstrapper

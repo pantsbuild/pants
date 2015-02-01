@@ -6,11 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import argparse
+from collections import OrderedDict
 import inspect
 import re
 
 from docutils.core import publish_parts
-from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
 from pants.base.config import Config

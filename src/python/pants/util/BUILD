@@ -27,9 +27,9 @@ python_library(
 )
 
 python_library(
-  name = 'keywords',
-  sources = ['keywords.py'],
+  name = 'fileutil',
+  sources = ['fileutil.py'],
   dependencies = [
-    ':strutil',
+    ':contextutil',
   ],
 )

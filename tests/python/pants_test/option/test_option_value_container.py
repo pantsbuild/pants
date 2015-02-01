@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import copy
-import unittest2 as unittest
+import unittest
 
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import RankedValue

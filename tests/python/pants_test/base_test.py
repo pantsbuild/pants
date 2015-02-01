@@ -10,7 +10,7 @@ from contextlib import contextmanager
 import os
 from tempfile import mkdtemp
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
 from twitter.common.collections import OrderedSet
 
