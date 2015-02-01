@@ -51,6 +51,7 @@ python_library(
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -60,8 +61,8 @@ python_library(
   sources = ['aapt_task.py'],
   dependencies = [
     'src/python/pants/backend/android/tasks:android_task',
-    ],
-  )
+  ],
+)
 
 python_library(
   name = 'dx_compile',
@@ -91,5 +92,5 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/java:distribution',
     'src/python/pants/util:dirutil',
-    ],
-  )
+  ],
+)

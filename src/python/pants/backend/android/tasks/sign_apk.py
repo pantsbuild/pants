@@ -99,7 +99,7 @@ class SignApkTask(Task):
                                              key.build_type + '.signed.apk'))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
-    log.debug('Executing: {0}'.format(args))
+    log.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def execute(self):
@@ -143,7 +143,8 @@ class SignApkTask(Task):
                 workunit.output('stderr').write(stderr)
               workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
               if process.returncode:
-                raise TaskError('This SignApk jarsigner command exited non-zero: {0}'
+                # Jarsigner sends it's debug messages to stdout.
+                raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
                                 .format(stdout))
               # I will handle the output products with the next CR for the final step in the build.
 
