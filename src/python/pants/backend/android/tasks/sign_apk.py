@@ -120,7 +120,7 @@ class SignApkTask(Task):
       for target in invalid_targets:
 
           def get_products_path(target):
-            """Get path of a target's unsigned apks created by AaptBuilder."""
+            """Get path of target's unsigned apks as created by AaptBuilder."""
             unsigned_apks = self.context.products.get('apk')
             if unsigned_apks.get(target):
               # This allows for multiple apks but we expect only one per target.
