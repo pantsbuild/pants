@@ -119,17 +119,16 @@ class SignApkTask(Task):
         invalid_targets.extend(vt.targets)
       for target in invalid_targets:
 
-          def get_apk(target):
-            """Get path of the unsigned.apk product created by AaptBuilder."""
+          def get_products_path(target):
+            """Get path of a target's unsigned apks created by AaptBuilder."""
             unsigned_apks = self.context.products.get('apk')
-            apks = []
             if unsigned_apks.get(target):
+              # This allows for multiple apks but we expect only one per target.
               for tgts, products in unsigned_apks.get(target).items():
                 for prod in products:
-                  apks.append(os.path.join(tgts, prod))
-            return apks
+                  yield os.path.join(tgts, prod)
 
-          packages = get_apk(target)
+          packages = list(get_products_path(target))
           for unsigned_apk in packages:
             keystores = KeystoreResolver.resolve(self.config_file)
             for key in keystores:
