@@ -120,33 +120,36 @@ class SignApkTask(Task):
       for target in invalid_targets:
 
           def get_apk(target):
-            """Get a handle for the unsigned.apk product created by AaptBuilder."""
+            """Get path of the unsigned.apk product created by AaptBuilder."""
             unsigned_apks = self.context.products.get('apk')
-            for tgts, products in unsigned_apks.get(target).items():
-              unsigned_path = os.path.join(tgts)
-              for prod in products:
-                return os.path.join(unsigned_path, prod)
+            apks = []
+            if unsigned_apks.get(target):
+              for tgts, products in unsigned_apks.get(target).items():
+                for prod in products:
+                  apks.append(os.path.join(tgts, prod))
+            return apks
 
-          unsigned_apk = get_apk(target)
-          keystores = KeystoreResolver.resolve(self.config_file)
-          for key in keystores:
-            outdir = (self.sign_apk_out(target, key.keystore_name))
-            safe_mkdir(outdir)
-            with self.context.new_workunit(name='sign_apk',
-                                           labels=[WorkUnit.MULTITOOL]) as workunit:
-              args = self.render_args(target, key, unsigned_apk, outdir)
-              process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-              stdout, stderr = process.communicate()
+          packages = get_apk(target)
+          for unsigned_apk in packages:
+            keystores = KeystoreResolver.resolve(self.config_file)
+            for key in keystores:
+              outdir = (self.sign_apk_out(target, key.keystore_name))
+              safe_mkdir(outdir)
+              with self.context.new_workunit(name='sign_apk',
+                                             labels=[WorkUnit.MULTITOOL]) as workunit:
+                args = self.render_args(target, key, unsigned_apk, outdir)
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = process.communicate()
 
-              if workunit:
-                workunit.output('stdout').write(stdout)
-                workunit.output('stderr').write(stderr)
-              workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
-              if process.returncode:
-                # Jarsigner sends it's debug messages to stdout.
-                raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
-                                .format(stdout))
-              # I will handle the output products with the next CR for the final step in the build.
+                if workunit:
+                  workunit.output('stdout').write(stdout)
+                  workunit.output('stderr').write(stderr)
+                workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
+                if process.returncode:
+                  # Jarsigner sends its debug messages to stdout.
+                  raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
+                                  .format(stdout))
+                # I will handle the output products with the next CR for the final build step.
 
   def sign_apk_out(self, target, key_name):
     """Compute the outdir for a target, one outdir per keystore."""
