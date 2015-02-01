@@ -135,12 +135,11 @@ class SignApkTask(Task):
             for key in keystores:
               outdir = (self.sign_apk_out(target, key.keystore_name))
               safe_mkdir(outdir)
+              args = self.render_args(target, key, unsigned_apk, outdir)
               with self.context.new_workunit(name='sign_apk',
                                              labels=[WorkUnit.MULTITOOL]) as workunit:
-                args = self.render_args(target, key, unsigned_apk, outdir)
                 process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = process.communicate()
-
                 if workunit:
                   workunit.output('stdout').write(stdout)
                   workunit.output('stderr').write(stderr)

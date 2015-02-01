@@ -88,18 +88,16 @@ class AaptGen(AaptTask, CodeGen):
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: {0}'.format(lang))
-      with self.context.new_workunit(name='aapt_gen',
-                                     labels=[WorkUnit.MULTITOOL]) as workunit:
-        process = subprocess.Popen(self.render_args(target, self.workdir))
+      args = self.render_args(target, self.workdir)
+      with self.context.new_workunit(name='aapt_gen', labels=[WorkUnit.MULTITOOL]) as workunit:
+        process = subprocess.Popen(args)
         stdout, stderr = process.communicate()
-
         if workunit:
           workunit.output('stdout').write(stdout)
           workunit.output('stderr').write(stderr)
         workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
         if process.returncode:
-          raise TaskError('The AaptGen process exited non-zero: {0}'
-                          .format(stdout))
+          raise TaskError('The AaptGen process exited non-zero: {0}'.format(stdout))
 
   def createtarget(self, lang, gentarget, dependees):
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))

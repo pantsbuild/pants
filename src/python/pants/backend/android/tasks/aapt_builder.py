@@ -85,18 +85,16 @@ class AaptBuilder(AaptTask):
             gen_out.append(os.path.join(get_buildroot(), target.resource_dir))
 
         target.walk(gather_resources)
+        args = self.render_args(target, gen_out, input_dirs)
         with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]) as workunit:
-          args = self.render_args(target, gen_out, input_dirs)
           process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
           stdout, stderr = process.communicate()
-
           if workunit:
             workunit.output('stdout').write(stdout)
             workunit.output('stderr').write(stderr)
           workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
           if process.returncode:
-            raise TaskError('Android aapt tool exited non-zero: {0}'
-                            .format(stderr))
+            raise TaskError('Android aapt tool exited non-zero: {0}'.format(stderr))
     for target in targets:
       self.context.products.get('apk').add(target, self.workdir).append("{0}.unsigned.apk"
                                                                         .format(target.app_name))

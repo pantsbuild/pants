@@ -16,7 +16,7 @@ class AndroidTarget(JvmTarget):
   """A base class for all Android targets."""
 
   # Missing attributes from the AndroidManifest would eventually error in the compilation process.
-  # But since the error would raise here in the target definition, we are catching the exception
+  # But since the error would raise here in the target definition, we are catching the exception.
 
   class BadManifestError(Exception):
     """Indicates an invalid android manifest."""
@@ -35,7 +35,6 @@ class AndroidTarget(JvmTarget):
       to the BUILD file's directory.
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
-
     self.add_labels('android')
 
     # TODO(pl): These attributes should live in the payload
@@ -56,7 +55,7 @@ class AndroidTarget(JvmTarget):
 
   # TODO(mateor) Peel parsing into a ManifestParser class to ensure it's robust against bad input.
   # Parsing as in Android Donut's testrunner:
-  # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py
+  # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py.
   def get_package_name(self):
     """Return the package name of the Android target."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
