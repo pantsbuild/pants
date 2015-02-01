@@ -1,6 +1,6 @@
 # coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE)
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
@@ -49,15 +49,12 @@ class AndroidTarget(JvmTarget):
                                             'at path {1}'.format(manifest, manifest_path))
     self.manifest = manifest_path
 
-    # This will be filled with Keystore objects by backend.android.credentials.keystore_resolver.
-    self.keystores = []
-
     self.package = self.get_package_name()
     self.target_sdk = self.get_target_sdk()
     # If unable to parse application name, silently falls back to target name.
     self.app_name = self.get_app_name() if self.get_app_name() else self.name
 
-  # TODO(mateor) Peel parsing into a ManifestParser class to ensure it's robust against bad input
+  # TODO(mateor) Peel parsing into a ManifestParser class to ensure it's robust against bad input.
   # Parsing as in Android Donut's testrunner:
   # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py
   def get_package_name(self):

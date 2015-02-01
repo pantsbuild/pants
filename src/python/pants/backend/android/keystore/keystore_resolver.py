@@ -29,11 +29,11 @@ class KeystoreResolver(object):
 
   @classmethod
   def resolve(cls, config_file):
-    """Parse a target's keystore_config_file and return a list of Keystore objects."""
+    """Parse a keystore config file and return a list of Keystore objects."""
 
     config = Config.create_parser()
     try:
-      with open(config_file, 'r') as keystore_config:
+      with open(config_file, 'rb') as keystore_config:
         config.readfp(keystore_config)
     except IOError:
       raise KeystoreResolver.Error("The \'--{0}\' option must point at a valid .ini file holding "

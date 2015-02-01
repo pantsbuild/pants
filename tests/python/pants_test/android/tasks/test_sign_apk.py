@@ -98,7 +98,6 @@ class SignApkTest(TaskTest):
       task = self.prepare_task(config=self._get_config(location=temp),
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
-      task.execute()
       task.config_file
       self.assertEquals(temp, task.config_file)
 
@@ -141,5 +140,5 @@ class SignApkTest(TaskTest):
     expected_args.extend(['{0}/{1}.{2}.signed.apk'.format(temp, target.app_name,
                                                           fake_key.build_type)])
     expected_args.extend(['unsigned_apk_product', 'key_alias'])
-    self.assertEquals(expected_args, task.render_args(target, fake_key, 'unsigned_apk_product', temp))
-
+    self.assertEquals(expected_args, task.render_args(target, fake_key, 'unsigned_apk_product',
+                                                      temp))

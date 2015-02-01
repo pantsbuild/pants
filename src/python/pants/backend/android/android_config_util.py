@@ -15,12 +15,15 @@ from pants.util.dirutil import safe_mkdir
 class AndroidConfigUtil(object):
   """Utility methods for Pants-specific Android configurations."""
 
+  class AndroidConfigError(Exception):
+    """Exception to raise on errors reading Android config files."""
+
   @classmethod
   def setup_keystore_config(cls, config):
     """
     Create a config file for Android keystores and seed with the default keystore.
 
-    :param string config: Desired location for the new keystore config .ini file.
+    :param string config: Desired location for the new .ini config file.
     """
 
     # Unless the config file in ~/.pants.d/android is deleted, this method should only run once,
@@ -49,8 +52,11 @@ class AndroidConfigUtil(object):
     )
 
     config = os.path.expanduser(config)
-    safe_mkdir(os.path.dirname(config))
-    with open(config, 'w') as config_file:
-      config_file.write(ini)
-      config_file.close()
+
+    try:
+      safe_mkdir(os.path.dirname(config))
+      with open(config, 'w') as config_file:
+        config_file.write(ini)
+    except OSError as e:
+      raise cls.AndroidConfigError("Problem creating Android keystore config file: {0}".format(e))
     return config_file

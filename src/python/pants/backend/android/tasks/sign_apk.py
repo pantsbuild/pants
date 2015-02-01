@@ -2,6 +2,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import subprocess
 
@@ -100,41 +103,48 @@ class SignApkTask(Task):
     return args
 
   def execute(self):
-    with self.context.new_workunit(name='sign_apk', labels=[WorkUnit.MULTITOOL]):
-      targets = self.context.targets(self.is_signtarget)
+    targets = self.context.targets(self.is_signtarget)
+    # Check for Android keystore config file (where the default keystore definition is kept).
+    config_dir = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
+                              self._DEFAULT_KEYSTORE_CONFIG)
+    if not os.path.isfile(config_dir):
+      try:
+        AndroidConfigUtil.setup_keystore_config(config_dir)
+      except OSError as e:
+        raise TaskError(self, e)
 
-      # Check for Android keystore config file (where the default keystore definition is kept).
-      config_dir = (os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
-                                 self._DEFAULT_KEYSTORE_CONFIG))
-      if not os.path.isfile(config_dir):
-        try:
-          AndroidConfigUtil.setup_keystore_config(config_dir)
-        except OSError as e:
-          raise TaskError(self, e)
+    with self.invalidated(targets) as invalidation_check:
+      invalid_targets = []
+      for vt in invalidation_check.invalid_vts:
+        invalid_targets.extend(vt.targets)
+      for target in invalid_targets:
 
-      with self.invalidated(targets) as invalidation_check:
-        invalid_targets = []
-        for vt in invalidation_check.invalid_vts:
-          invalid_targets.extend(vt.targets)
-        for target in invalid_targets:
+          def get_apk(target):
+            """Get a handle for the unsigned.apk product created by AaptBuilder."""
+            unsigned_apks = self.context.products.get('apk')
+            for tgts, products in unsigned_apks.get(target).items():
+              unsigned_path = os.path.join(tgts)
+              for prod in products:
+                return os.path.join(unsigned_path, prod)
 
-            def get_apk(target):
-              """Get a handle for the unsigned.apk product created by AaptBuilder."""
-              unsigned_apks = self.context.products.get('apk')
-              for tgts, products in unsigned_apks.get(target).items():
-                unsigned_path = os.path.join(tgts)
-                for prod in products:
-                  return os.path.join(unsigned_path, prod)
+          unsigned_apk = get_apk(target)
+          keystores = KeystoreResolver.resolve(self.config_file)
+          for key in keystores:
+            outdir = (self.sign_apk_out(target, key.keystore_name))
+            safe_mkdir(outdir)
+            with self.context.new_workunit(name='sign_apk',
+                                           labels=[WorkUnit.MULTITOOL]) as workunit:
+              args = self.render_args(target, key, unsigned_apk, outdir)
+              process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+              stdout, stderr = process.communicate()
 
-            unsigned_apk = get_apk(target)
-            keystores = KeystoreResolver.resolve(self.config_file)
-            for key in keystores:
-              outdir = (self.sign_apk_out(target, key.keystore_name))
-              safe_mkdir(outdir)
-              process = subprocess.Popen(self.render_args(target, key, unsigned_apk, outdir))
-              result = process.wait()
-              if result != 0:
-                raise TaskError('Jarsigner tool exited non-zero ({code})'.format(code=result))
+              if workunit:
+                workunit.output('stdout').write(stdout)
+                workunit.output('stderr').write(stderr)
+              workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
+              if process.returncode:
+                raise TaskError('This SignApk jarsigner command exited non-zero: {0}'
+                                .format(stdout))
               # I will handle the output products with the next CR for the final step in the build.
 
   def sign_apk_out(self, target, key_name):
