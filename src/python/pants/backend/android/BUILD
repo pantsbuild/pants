@@ -15,7 +15,7 @@ python_library(
 
 python_library(
   name = 'android_config_util',
-  sources = globs('android_config_util.py'),
+  sources =['android_config_util.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
   ]
@@ -23,12 +23,12 @@ python_library(
 
 python_library(
   name = 'android_distribution',
-  sources = globs('distribution/android_distribution.py'),
+  sources = ['distribution/android_distribution.py'],
 )
 
 python_library(
   name = 'keystore_resolver',
-  sources = globs('keystore/keystore_resolver.py'),
+  sources = ['keystore/keystore_resolver.py'],
   dependencies = [
     'src/python/pants/base:config',
   ]

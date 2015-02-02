@@ -33,11 +33,11 @@ python_tests(
   name = 'android_config_util',
   sources = [
     'test_android_config_util.py',
-    ],
+  ],
   dependencies = [
     'src/python/pants/backend/android:android_config_util',
     'src/python/pants/util:contextutil',
-    ]
+  ]
 )
 
 python_tests(

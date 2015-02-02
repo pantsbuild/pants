@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
 import subprocess
 
@@ -20,8 +21,10 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
-from twitter.common import log
 from twitter.common.collections import OrderedSet
+
+
+logger = logging.getLogger(__name__)
 
 
 class AaptGen(AaptTask, CodeGen):
@@ -80,7 +83,7 @@ class AaptGen(AaptTask, CodeGen):
     args.extend(['-S', target.resource_dir])
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    log.debug('Executing: {0}'.format(' '.join(args)))
+    logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def genlang(self, lang, targets):
@@ -90,14 +93,10 @@ class AaptGen(AaptTask, CodeGen):
         raise TaskError('Unrecognized android gen lang: {0}'.format(lang))
       args = self.render_args(target, self.workdir)
       with self.context.new_workunit(name='aapt_gen', labels=[WorkUnit.MULTITOOL]) as workunit:
-        process = subprocess.Popen(args)
-        stdout, stderr = process.communicate()
-        if workunit:
-          workunit.output('stdout').write(stdout)
-          workunit.output('stderr').write(stderr)
-        workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
-        if process.returncode:
-          raise TaskError('The AaptGen process exited non-zero: {0}'.format(stdout))
+        returncode = subprocess.call(args, stdout=workunit.output('stdout'),
+                                     stderr=workunit.output('stderr'))
+        if returncode:
+          raise TaskError('The AaptGen process exited non-zero: {0}'.format(returncode))
 
   def createtarget(self, lang, gentarget, dependees):
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))

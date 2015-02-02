@@ -27,7 +27,6 @@ python_library(
   name = 'aapt_builder',
   sources = ['aapt_builder.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:aapt_task',
     'src/python/pants/base:build_environment',
@@ -42,7 +41,6 @@ python_library(
   sources = ['aapt_gen.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:aapt_task',
     'src/python/pants/backend/codegen/tasks:code_gen',
@@ -82,7 +80,6 @@ python_library(
   name = 'sign_apk',
   sources = ['sign_apk.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/backend/android:android_config_util',
     'src/python/pants/backend/android:keystore_resolver',
     'src/python/pants/backend/android/targets:android',

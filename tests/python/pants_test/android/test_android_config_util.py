@@ -45,5 +45,4 @@ class TestAndroidConfigUtil(unittest.TestCase):
 
   def test_no_permission_keystore_config(self):
     with self.assertRaises(AndroidConfigUtil.AndroidConfigError):
-      with temporary_file() as config:
-        AndroidConfigUtil.setup_keystore_config("/outside/home/directory")
+      AndroidConfigUtil.setup_keystore_config("/outside/home/directory")

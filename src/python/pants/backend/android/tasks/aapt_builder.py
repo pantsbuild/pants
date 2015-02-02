@@ -5,10 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
 import subprocess
 
-from twitter.common import log
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
@@ -17,6 +17,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
+
+
+logger = logging.getLogger(__name__)
 
 
 class AaptBuilder(AaptTask):
@@ -58,9 +61,9 @@ class AaptBuilder(AaptTask):
     args.extend(resource_dir)
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    args.extend(['-F', os.path.join(self.workdir, "{0}.unsigned.apk".format(target.app_name))])
+    args.extend(['-F', os.path.join(self.workdir, '{0}.unsigned.apk'.format(target.app_name))])
     args.extend(inputs)
-    log.debug('Executing: {0}'.format(' '.join(args)))
+    logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def execute(self):
@@ -87,14 +90,10 @@ class AaptBuilder(AaptTask):
         target.walk(gather_resources)
         args = self.render_args(target, gen_out, input_dirs)
         with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]) as workunit:
-          process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-          stdout, stderr = process.communicate()
-          if workunit:
-            workunit.output('stdout').write(stdout)
-            workunit.output('stderr').write(stderr)
-          workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
-          if process.returncode:
-            raise TaskError('Android aapt tool exited non-zero: {0}'.format(stderr))
+          returncode = subprocess.call(args, stdout=workunit.output('stdout'),
+                                       stderr=workunit.output('stderr'))
+          if returncode:
+            raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
     for target in targets:
-      self.context.products.get('apk').add(target, self.workdir).append("{0}.unsigned.apk"
+      self.context.products.get('apk').add(target, self.workdir).append('{0}.unsigned.apk'
                                                                         .format(target.app_name))

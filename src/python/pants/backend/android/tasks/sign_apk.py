@@ -5,6 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
 import subprocess
 
@@ -18,7 +19,8 @@ from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
-from twitter.common import log
+
+logger = logging.getLogger(__name__)
 
 
 class SignApkTask(Task):
@@ -26,6 +28,7 @@ class SignApkTask(Task):
 
   _DEFAULT_KEYSTORE_CONFIG = 'android/keystore/default_config.ini'
   _CONFIG_SECTION = 'android-keystore-location'
+  _CONFIG_OPTION = 'keystore_config_location'
 
   @classmethod
   def register_options(cls, register):
@@ -47,7 +50,7 @@ class SignApkTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(SignApkTask, self).__init__(*args, **kwargs)
-    self._distdir = self.context.config.getdefault('pants_distdir')
+    self._distdir = self.get_options().pants_distdir
     self._config_file = self.get_options().keystore_config_location
     self._dist = None
 
@@ -57,10 +60,11 @@ class SignApkTask(Task):
     if self._config_file in (None, ""):
       try:
         self._config_file = self.context.config.get_required(self._CONFIG_SECTION,
-                                                             'keystore_config_location')
+                                                             self._CONFIG_OPTION )
       except Config.ConfigError:
-       raise TaskError(self, "To sign .apks an '{0}' option must declare the location of an "
-                             ".ini file holding keystore definitions.".format(self._CONFIG_SECTION))
+       raise TaskError('The "[{0}]: {1}" option must declare the location of an .ini file '
+                             'holding keystore definitions.'.format(self._CONFIG_SECTION,
+                                                                    self._CONFIG_OPTION))
     return self._config_file
 
   @property
@@ -68,7 +72,7 @@ class SignApkTask(Task):
     if self._dist is None:
       # Currently no Java 8 for Android. I considered max=1.7.0_50. See comment in render_args().
       self._dist = Distribution.cached(minimum_version='1.6.0_00',
-                                       maximum_version="1.7.0_99",
+                                       maximum_version='1.7.0_99',
                                        jdk=True)
     return self._dist
 
@@ -86,7 +90,7 @@ class SignApkTask(Task):
     # http://bugs.java.com/view_bug.do?bug_id=8023338
 
     args = []
-    args.extend([self.distribution.binary('jarsigner')])
+    args.append(self.distribution.binary('jarsigner'))
 
     # These first two params are required flags for JDK 7+
     args.extend(['-sigalg', 'SHA1withRSA'])
@@ -99,19 +103,19 @@ class SignApkTask(Task):
                                              key.build_type + '.signed.apk'))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
-    log.debug('Executing: {0}'.format(' '.join(args)))
+    logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def execute(self):
     targets = self.context.targets(self.is_signtarget)
     # Check for Android keystore config file (where the default keystore definition is kept).
-    config_dir = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
-                              self._DEFAULT_KEYSTORE_CONFIG)
-    if not os.path.isfile(config_dir):
+    config_file = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
+                               self._DEFAULT_KEYSTORE_CONFIG)
+    if not os.path.isfile(config_file):
       try:
-        AndroidConfigUtil.setup_keystore_config(config_dir)
+        AndroidConfigUtil.setup_keystore_config(config_file)
       except OSError as e:
-        raise TaskError(self, e)
+        raise TaskError('Failed to setup keystore config: {0}'.format(e))
 
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
@@ -119,35 +123,30 @@ class SignApkTask(Task):
         invalid_targets.extend(vt.targets)
       for target in invalid_targets:
 
-          def get_products_path(target):
-            """Get path of target's unsigned apks as created by AaptBuilder."""
-            unsigned_apks = self.context.products.get('apk')
-            if unsigned_apks.get(target):
-              # This allows for multiple apks but we expect only one per target.
-              for tgts, products in unsigned_apks.get(target).items():
-                for prod in products:
-                  yield os.path.join(tgts, prod)
+        def get_products_path(target):
+          """Get path of target's unsigned apks as created by AaptBuilder."""
+          unsigned_apks = self.context.products.get('apk')
+          if unsigned_apks.get(target):
+            # This allows for multiple apks but we expect only one per target.
+            for tgts, products in unsigned_apks.get(target).items():
+              for prod in products:
+                yield os.path.join(tgts, prod)
 
-          packages = list(get_products_path(target))
-          for unsigned_apk in packages:
-            keystores = KeystoreResolver.resolve(self.config_file)
-            for key in keystores:
-              outdir = (self.sign_apk_out(target, key.keystore_name))
-              safe_mkdir(outdir)
-              args = self.render_args(target, key, unsigned_apk, outdir)
-              with self.context.new_workunit(name='sign_apk',
-                                             labels=[WorkUnit.MULTITOOL]) as workunit:
-                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = process.communicate()
-                if workunit:
-                  workunit.output('stdout').write(stdout)
-                  workunit.output('stderr').write(stderr)
-                workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
-                if process.returncode:
-                  # Jarsigner sends its debug messages to stdout.
-                  raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
-                                  .format(stdout))
-                # I will handle the output products with the next CR for the final build step.
+        packages = list(get_products_path(target))
+        for unsigned_apk in packages:
+          keystores = KeystoreResolver.resolve(self.config_file)
+          for key in keystores:
+            outdir = (self.sign_apk_out(target, key.keystore_name))
+            safe_mkdir(outdir)
+            args = self.render_args(target, key, unsigned_apk, outdir)
+            with self.context.new_workunit(name='sign_apk',
+                                           labels=[WorkUnit.MULTITOOL]) as workunit:
+              returncode = subprocess.call(args, stdout=workunit.output('stdout'),
+                                           stderr=workunit.output('stderr'))
+              if returncode:
+                raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
+                                .format(returncode))
+              # I will handle the output products with the next CR for the final build step.
 
   def sign_apk_out(self, target, key_name):
     """Compute the outdir for a target, one outdir per keystore."""
