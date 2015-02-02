@@ -37,7 +37,8 @@ class SignApkTask(Task):
              help='Location of the .ini file containing keystore definitions.')
 
   @classmethod
-  def prepare(self, options, round_manager):
+  def prepare(cls, options, round_manager):
+    super(SignApkTask, cls).prepare(options, round_manager)
     round_manager.require_data('apk')
 
   @classmethod
