@@ -47,12 +47,14 @@ migrations = {
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
   ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
+  ('ivy-resolve', 'jvm_args'): ('resolve.ivy', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
   ('benchmark-run', 'confs'): ('bench', 'confs'),
   ('specs-run', 'confs'): ('test.specs', 'confs'),
   ('junit-run', 'confs'): ('test.junit', 'confs'),
   ('scala-repl', 'confs'): ('repl.scala', 'confs'),
+  ('ivy-resolve', 'confs'): ('resolve.ivy', 'confs'),
 
   ('scala-repl', 'args'): ('repl.scala', 'args'),
 
@@ -115,6 +117,11 @@ notes = {
                                   'prefixed with -C.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
+  ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
+                               'bootstrap.bootstrap-jvm-tools and imports.ivy-imports '
+                               '(as jvm_options). Easiest way to do this is to define '
+                               'ivy_jvm_options in DEFAULT and then interpolate it: '
+                               'jvm_options: %(ivy_jvm_options)s'
 }
 
 

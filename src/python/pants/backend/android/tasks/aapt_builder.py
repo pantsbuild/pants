@@ -25,18 +25,18 @@ class AaptBuilder(AaptTask):
   This class gathers compiled classes (an Android dex archive) and packages it with the
   target's resource files. The output is an unsigned .apk, an Android application package file.
   """
-  @classmethod
-  def product_types(cls):
-    return ['apk']
 
   @staticmethod
   def is_app(target):
     return isinstance(target, AndroidBinary)
 
-  def __init__(self, *args, **kwargs):
-    super(AaptBuilder, self).__init__(*args, **kwargs)
+  @classmethod
+  def product_types(cls):
+    return ['apk']
 
-  def prepare(self, round_manager):
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(AaptBuilder, cls).prepare(options, round_manager)
     round_manager.require_data('dex')
 
   def render_args(self, target, resource_dir, inputs):

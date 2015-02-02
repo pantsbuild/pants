@@ -77,22 +77,6 @@ python_tests(
   ]
 )
 
-python_tests(
-  name = 'test_utf8_header',
-  sources = ['test_utf8_header.py'],
-  dependencies = [
-    ':base_test',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    'src/python/internal_backend:plugins',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file_address_mapper',
-    'src/python/pants/base:build_file_parser',
-    'src/python/pants/base:build_graph',
-    'src/python/pants/base:config',
-    'src/python/pants/base:extension_loader',
-  ]
-)
-
 target(
   name = 'integration',
   dependencies = [
@@ -110,7 +94,6 @@ python_test_suite(
     ':test_binary_util',
     ':test_maven_layout',
     ':test_thrift_util',
-    ':test_utf8_header',
     'tests/python/pants_test/android',
     'tests/python/pants_test/authentication:netrc',
     'tests/python/pants_test/backend',
@@ -119,6 +102,7 @@ python_test_suite(
     'tests/python/pants_test/engine',
     'tests/python/pants_test/fs',
     'tests/python/pants_test/graph',
+    'tests/python/pants_test/goal',
     'tests/python/pants_test/java',
     'tests/python/pants_test/net',
     'tests/python/pants_test/option',

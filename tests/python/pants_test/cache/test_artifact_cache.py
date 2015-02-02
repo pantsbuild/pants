@@ -5,12 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from contextlib import contextmanager
 import SimpleHTTPServer
 import SocketServer
+from contextlib import contextmanager
 import os
-import unittest2 as unittest
 from threading import Thread
+import unittest
 
 from pants.base.build_invalidator import CacheKey
 from pants.cache.artifact_cache import call_use_cached_files, call_insert
@@ -24,12 +24,14 @@ from pants.util.dirutil import safe_mkdir
 from pants_test.testutils.mock_logger import MockLogger
 from pants_test.base.context_utils import create_context
 
+
 class MockPinger(object):
   def __init__(self, hosts_to_times):
     self._hosts_to_times = hosts_to_times
   # Returns a fake ping time such that the last host is always the 'fastest'.
   def pings(self, hosts):
     return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)
+
 
 # A very trivial server that serves files under the cwd.
 class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
@@ -59,8 +61,10 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_error(404, 'File not found')
     self.end_headers()
 
+
 TEST_CONTENT1 = 'muppet'
 TEST_CONTENT2 = 'kermit'
+
 
 class TestArtifactCache(unittest.TestCase):
   @contextmanager

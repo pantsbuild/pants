@@ -164,6 +164,8 @@ and tweak to fit your situation. You can change the location of this file in `pa
     [ivy]
     ivy_settings: some/other/path/ivysettings.xml
 
+If the `PANTS_IVY_SETTINGS_XML` environment variable is defined, Pants uses that value instead
+of the one in `pants.ini`.
 
 Integrate New Tools via a Pants Plugin
 --------------------------------------

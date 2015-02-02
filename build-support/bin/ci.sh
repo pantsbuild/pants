@@ -105,6 +105,8 @@ if [ ! -z "${R}" ]; then
   exit 1
 fi
 
+build-support/bin/check_header.sh || exit 1
+
 # Sanity checks
 ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
 ./pants.pex goals ${PANTS_ARGS[@]} || die "Failed to list goals."
@@ -126,13 +128,13 @@ packages: [
   ]
 EOF
     ) && \
-    export PANTS_CONFIG_OVERRIDE=${config} && \
-    ./pants.pex binary ${INTERPRETER_ARGS[@]} \
+    ./pants.pex binary ${INTERPRETER_ARGS[@]} --config-override=${config} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
-    ./dist/self.pex binary ${INTERPRETER_ARGS[@]} \
+    ./dist/self.pex binary --config-override=${config} ${INTERPRETER_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
-    ./dist/self.pex setup-py --recursive src/python/pants:pants-packaged
+    ./dist/self.pex --config-override=${config} setup-py --recursive \
+      src/python/pants:pants-packaged
   ) || die "Failed to create pants distributions."
 fi
 
@@ -168,6 +170,8 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
   negative_test_targets=(
     testprojects/src/thrift/com/pants/thrift_linter:
     testprojects/src/java/com/pants/testproject/missingdepswhitelist.*
+    testprojects/src/java/com/pants/testproject/cycle1
+    testprojects/src/java/com/pants/testproject/cycle2
     testprojects/src/antlr/pants/backend/python/test:antlr_failure
     testprojects/src/python/antlr:test_antlr_failure
   )

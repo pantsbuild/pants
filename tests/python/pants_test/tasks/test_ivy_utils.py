@@ -13,6 +13,7 @@ from mock import Mock
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
 
@@ -38,23 +39,38 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.add_to_build_file('src/java/targets',
         dedent("""
             jar_library(
-              name='simple',
+              name='a',
               jars=[
                 jar('org1', 'name1', 'rev1'),
                 jar('org2', 'name2', 'rev2', force=True),
-              ]
+              ],
             )
         """))
 
-    self.simple = self.target('src/java/targets:simple')
+    self.b_org = 'com.example'
+    self.b_name = 'b'
+    self.add_to_build_file('src/java/targets',
+        dedent("""
+            java_library(
+              name='b',
+              dependencies=[':a'],
+              provides=artifact('{org}', '{name}', repo=Repository()),
+              sources=['z.java'],
+            )
+        """.format(org=self.b_org, name=self.b_name)))
+
+    self.a = self.target('src/java/targets:a')
+    self.b = self.target('src/java/targets:b')
     context = self.context()
-    self.ivy_utils = IvyUtils(context.config, logging.Logger('test'))
+
+  def test_exclude_exported(self):
+    _, excludes = IvyUtils.calculate_classpath([self.b])
+    self.assertEqual(excludes, set([Exclude(org=self.b_org, name=self.b_name)]))
 
   def test_force_override(self):
-    jars = list(self.simple.payload.jars)
+    jars = list(self.a.payload.jars)
     with temporary_file_path() as ivyxml:
-      self.ivy_utils._generate_ivy([self.simple], jars=jars, excludes=[], ivyxml=ivyxml,
-                                   confs=['default'])
+      IvyUtils.generate_ivy([self.a], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
 
       doc = ET.parse(ivyxml).getroot()
 
@@ -91,16 +107,16 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     v2.rev = "2"
 
     # If neither version is forced, use the latest version
-    self.assertIs(v2, self.ivy_utils._resolve_conflict(v1, v2))
-    self.assertIs(v2, self.ivy_utils._resolve_conflict(v2, v1))
+    self.assertIs(v2, IvyUtils._resolve_conflict(v1, v2))
+    self.assertIs(v2, IvyUtils._resolve_conflict(v2, v1))
 
     # If an earlier version is forced, use the forced version
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1_force, v2))
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v2, v1_force))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v2))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v2, v1_force))
 
     # If the same version is forced, use the forced version
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1, v1_force))
-    self.assertIs(v1_force, self.ivy_utils._resolve_conflict(v1_force, v1))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1, v1_force))
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1))
 
   def test_does_not_visit_diamond_dep_twice(self):
     ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')

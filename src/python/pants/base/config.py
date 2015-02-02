@@ -181,7 +181,8 @@ class Config(object):
     :raises: :class:`pants.base.config.Config.ConfigError` if option is not found.
     """
     val = self.get(section, option, type=type)
-    if val is None:
+    # Empty str catches blank options. If blank entries are ok, use get(..., default='') instead.
+    if val is None or val == '':
       raise Config.ConfigError('Required option %s.%s is not defined.' % (section, option))
     return val
 

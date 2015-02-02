@@ -9,7 +9,7 @@ from collections import namedtuple
 from operator import eq, ne
 import os
 import subprocess
-import unittest2 as unittest
+import unittest
 
 from pants.fs.archive import ZIP
 from pants.base.build_environment import get_buildroot
@@ -67,21 +67,18 @@ class PantsRunIntegrationTest(unittest.TestCase):
     env = os.environ.copy()
     env.update(extra_env or {})
 
-    # TODO: We can replace the env var with a '--config-override={0}'.format(ini_file_name) arg,
-    # once we're rid of the special-case handling of this env var in pants_exe.
-    env['PANTS_CONFIG_OVERRIDE'] = ini_file_name
-
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script,
                      '--no-lock',
                      '--kill-nailguns',
                      '--no-pantsrc',
+                     '--config-override={0}'.format(ini_file_name),
                      '--print-exception-stacktrace'] + command
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout_data, stderr_data) = proc.communicate(stdin_data)
-    return PantsResult(pants_command, proc.returncode, stdout_data, stderr_data)
+    return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"), stderr_data.decode("utf-8"))
 
   def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     """Runs pants in a subprocess.

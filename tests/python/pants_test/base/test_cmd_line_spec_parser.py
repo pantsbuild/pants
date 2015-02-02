@@ -103,11 +103,7 @@ class CmdLineSpecParserTest(BaseTest):
 
   def test_cmd_line_spec_list(self):
     self.assert_parsed_list(cmdline_spec_list=['a', 'a/b'], expected=['a', 'a/b'])
-    self.assert_parsed_list(cmdline_spec_list=['a', 'a/b', '^a/b'], expected=['a'])
-    self.assert_parsed_list(cmdline_spec_list=['^a/b', 'a', 'a/b'], expected=['a'])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
-    self.assert_parsed_list(cmdline_spec_list=['::', '^a/b::'], expected=[':root', 'a', 'a:b'])
-    self.assert_parsed_list(cmdline_spec_list=['^a/b::', '::'], expected=[':root', 'a', 'a:b'])
 
   def test_does_not_exist(self):
     with self.assertRaises(self.spec_parser.BadSpecError):

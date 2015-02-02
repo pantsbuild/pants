@@ -2,7 +2,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
@@ -32,17 +31,17 @@ class UnpackJars(Task):
   class InvalidPatternError(Exception):
     """Thrown if a pattern can't be compiled for including or excluding args"""
 
-  def __init__(self, *args, **kwargs):
-    super(UnpackJars, self).__init__(*args, **kwargs)
-    self._buildroot = get_buildroot()
-
   @classmethod
   def product_types(cls):
     return ['unpacked_archives']
 
-  def prepare(self, round_manager):
-    super(UnpackJars, self).prepare(round_manager)
+  @classmethod
+  def prepare(cls, options, round_manager):
     round_manager.require_data('ivy_imports')
+
+  def __init__(self, *args, **kwargs):
+    super(UnpackJars, self).__init__(*args, **kwargs)
+    self._buildroot = get_buildroot()
 
   def _unpack_dir(self, unpacked_jars):
     return os.path.normpath(os.path.join(self._workdir, unpacked_jars.id))
@@ -75,7 +74,6 @@ class UnpackJars(Task):
           'In {spec}, "{field_value}" in {field_name} can\'t be compiled: {msg}'
           .format(field_name=field_name, field_value=p, spec=spec, msg=e))
     return compiled_patterns
-
 
   def _unpack(self, unpacked_jars):
     """Extracts files from the downloaded jar files and places them in a work directory.

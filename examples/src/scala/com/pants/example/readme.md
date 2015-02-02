@@ -66,7 +66,7 @@ Scala Console
 -------------
 
 To bring up Scala's interactive console, use Pants'
-<a xref="gref_goal_repl">`repl`</a> goal.
+<a xref="oref_goal_repl">`repl`</a> goal.
 In the resulting console, you can `import` code from the Pants invocation's
 targets and their dependencies.
 
@@ -79,7 +79,7 @@ targets and their dependencies.
     15:08:13 00:11     [python-repl]
     15:08:13 00:11     [scala-repl]
     15:08:13 00:11       [bootstrap-scala-repl]
-    Welcome to Scala version 2.9.3 (Java HotSpot(TM) 64-Bit Server VM, Java 1.7.0_60).
+    Welcome to Scala version 2.10.4 (Java HotSpot(TM) 64-Bit Server VM, Java 1.7.0_60).
     Type in expressions to have them evaluated.
     Type :help for more information.
 

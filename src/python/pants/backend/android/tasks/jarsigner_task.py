@@ -2,6 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
+                        print_function, unicode_literals)
+
 import os
 import subprocess
 
@@ -17,6 +20,10 @@ from pants.util.dirutil import safe_mkdir
 class JarsignerTask(Task):
   """Sign Android packages with keystore."""
 
+  @staticmethod
+  def is_signtarget(target):
+    return isinstance(target, AndroidBinary)
+
   @classmethod
   def register_options(cls, register):
     super(JarsignerTask, cls).register_options(register)
@@ -24,8 +31,8 @@ class JarsignerTask(Task):
              help = 'Specifies the build type and keystore used to sign the package.')
 
   @classmethod
-  def is_signtarget(cls, target):
-    return isinstance(target, AndroidBinary)
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('apk')
 
   def __init__(self, *args, **kwargs):
     super(JarsignerTask, self).__init__(*args, **kwargs)
@@ -37,9 +44,6 @@ class JarsignerTask(Task):
   @property
   def distribution(self):
     return self._dist
-
-  def prepare(self, round_manager):
-    round_manager.require_data('apk')
 
   def render_args(self, target, unsigned_apk, key):
     """Create arg list for the jarsigner process.

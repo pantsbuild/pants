@@ -7,6 +7,7 @@ target(
     ':contextutil',
     ':dirutil',
     ':strutil',
+    ':fileutil',
   ]
 )
 
@@ -38,10 +39,10 @@ python_tests(
 )
 
 python_tests(
-  name = 'keywords',
-  sources = ['test_keywords.py'],
+  name = 'fileutil',
+  sources = ['test_fileutil.py'],
   dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/util:keywords',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
   ]
 )

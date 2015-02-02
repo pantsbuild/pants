@@ -1,15 +1,13 @@
 # coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-# coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
 import os
 
+from pants.java.distribution.distribution import Distribution
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -25,6 +23,8 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
   TARGET_SDK = '19'
   ANDROID_SDK_LOCATION = 'ANDROID_HOME'
 
+  JAVA_MIN = '1.6.0_00'
+  JAVA_MAX = '1.7.0_99'
   TEST_TARGET = 'examples/src/android/example:hello'
 
   @classmethod
@@ -36,5 +36,9 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
         if not os.path.isfile(os.path.join(android_sdk, tool)):
           return False
     else:
+      return False
+    try:
+      Distribution.cached(minimum_version=cls.JAVA_MIN, maximum_version=cls.JAVA_MAX)
+    except:
       return False
     return True

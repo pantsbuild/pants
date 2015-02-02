@@ -2,7 +2,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
@@ -32,13 +31,6 @@ class DeferredSourcesMapper(Task):
     """Raised when there are no files found unpacked from the archive"""
     pass
 
-  def __init__(self, *args, **kwargs):
-    super(DeferredSourcesMapper, self).__init__(*args, **kwargs)
-
-  def prepare(self, round_manager):
-    super(DeferredSourcesMapper, self).prepare(round_manager)
-    round_manager.require_data('unpacked_archives')
-
   @classmethod
   def product_types(cls):
     """
@@ -49,6 +41,10 @@ class DeferredSourcesMapper(Task):
     :return:
     """
     return ['deferred_sources']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('unpacked_archives')
 
   def execute(self):
     deferred_sources_fields = []

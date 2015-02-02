@@ -14,7 +14,7 @@ lives in docstrings and comments; but some information for Pants *users* lives i
 ### Goals, Tasks, and Options
 
 When a user views a goal's options by entering `./pants compile -h` or browsing the
-<a pantsref="gref_goal_compile">Pants Goals Reference</a>, they see text that "lives" in the
+<a pantsref="oref_goal_compile">Pants Options Reference</a>, they see text that "lives" in the
 Pants source code. If you [develop a `Task`](dev_tasks.html), document it:
 
 **Goal description:** When registering a `Task` with a goal, call

@@ -98,48 +98,19 @@ class PayloadTest(BaseTest):
       JarsField([jar2]).fingerprint(),
     )
 
-  def test_jars_field_configuration_order(self):
-    """Like artifacts, JarDependencies throw away order information about their configurations.
-
-    But only in the hash key, the internal representation is in the order inserted.
+  def test_deprecated_jars_field_methods(self):
+    """with_sources() and with_docs() are now no-ops.  This test shows they don't affect
+    fingerprinting.
     """
-    jar1 = (JarDependency('com', 'foo', '1.0.0')
-              .with_docs()
-              .with_sources())
+    jar1 = (JarDependency('com', 'foo', '1.0.0'))
     jar2 = (JarDependency('com', 'foo', '1.0.0')
-              .with_sources()
-              .with_docs())
+            .with_sources()
+            .with_docs())
 
     self.assertEqual(
       JarsField([jar1]).fingerprint(),
       JarsField([jar2]).fingerprint(),
-    )
-
-  def test_jars_field_configuration(self):
-    jar1 = (JarDependency('com', 'foo', '1.0.0')
-              .with_sources())
-    jar2 = (JarDependency('com', 'foo', '1.0.0')
-              .with_docs())
-
-    self.assertNotEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
-
-  def test_jars_field_artifact_configuration(self):
-    """Like artifacts, JarDependencies throw away order information about their configurations.
-
-    But only in the hash key, the internal representation is in the order inserted.
-    """
-    jar1 = (JarDependency('com', 'foo', '1.0.0')
-              .with_sources())
-    jar2 = (JarDependency('com', 'foo', '1.0.0')
-              .with_docs())
-
-    self.assertNotEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
+      )
 
   def test_jars_field_apidocs(self):
     """apidocs are not properly rolled into the cache key right now.  Is this intentional?"""

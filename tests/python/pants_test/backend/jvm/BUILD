@@ -5,6 +5,7 @@ python_test_suite(
   name = 'jvm',
   dependencies = [
     ':jvm_debug_config',
+    'tests/python/pants_test/backend/jvm/targets',
     'tests/python/pants_test/backend/jvm/tasks',
   ]
 )

@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import shlex
-import unittest2 as unittest
+import unittest
 
 from pants.option.arg_splitter import ArgSplitter
 

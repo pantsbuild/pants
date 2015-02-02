@@ -30,10 +30,10 @@ Relevant Goals and Targets
 **Runnable Binary**
 
 > Pants can generate PEXes, executables built from Python. Invoke the
-> <a pantsref="gref_goal_binary">`binary`</a> goal on a
+> <a pantsref="oref_goal_binary">`binary`</a> goal on a
 > <a pantsref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
 > You can also invoke the
-> <a pantsref="gref_goal_run">`run`</a> goal on a
+> <a pantsref="oref_goal_run">`run`</a> goal on a
 > `python_binary` to run its code "in place."
 
 **Importable Code**
@@ -57,7 +57,7 @@ Relevant Goals and Targets
 
 > A <a pantsref="bdict_python_tests">`python_tests`</a> BUILD target has some `pytest` tests.
 > It normally depends on a `python_library` target so it can import and test the library's code.
-> Use the <a pantsref="gref_goal_test">`test`</a> goal to run these tests.
+> Use the <a pantsref="oref_goal_test">`test`</a> goal to run these tests.
 
 **Generated Code**
 
@@ -191,7 +191,7 @@ dependencies into into the PEX.
 Interactive Console with `repl` Goal
 ------------------------------------
 
-Use the <a pantsref="gref_goal_repl">`repl`</a> goal with a Python target to run an interactive
+Use the <a pantsref="oref_goal_repl">`repl`</a> goal with a Python target to run an interactive
 Python REPL session.
 Within the session, you can `import` the target's code and the code of its dependencies.
 
@@ -445,7 +445,7 @@ passed to the `setup` function.
       )
     )
 
-The <a pantsref="gref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
+The <a pantsref="oref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
 
     :::bash
     $ ./pants setup-py src/python/pants:test_infra

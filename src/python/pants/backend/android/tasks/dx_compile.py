@@ -24,6 +24,11 @@ class DxCompile(AndroidTask, NailgunTask):
   DEX_NAME = 'classes.dex'
   _CONFIG_SECTION = 'dx-tool'
 
+  @staticmethod
+  def is_dextarget(target):
+    """Return true if target has class files to be compiled into dex"""
+    return isinstance(target, AndroidBinary)
+
   @classmethod
   def register_options(cls, register):
     super(DxCompile, cls).register_options(register)
@@ -33,13 +38,13 @@ class DxCompile(AndroidTask, NailgunTask):
              help='Run dx with these JVM options.')
 
   @classmethod
-  def is_dextarget(cls, target):
-    """Return true if target has class files to be compiled into dex"""
-    return isinstance(target, AndroidBinary)
-
-  @classmethod
   def product_types(cls):
     return ['dex']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(DxCompile, cls).prepare(options, round_manager)
+    round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):
     super(DxCompile, self).__init__(*args, **kwargs)
@@ -48,9 +53,6 @@ class DxCompile(AndroidTask, NailgunTask):
     self._forced_jvm_options = self.get_options().jvm_options
 
     self.setup_artifact_cache()
-
-  def prepare(self, round_manager):
-    round_manager.require_data('classes_by_target')
 
   @property
   def config_section(self):

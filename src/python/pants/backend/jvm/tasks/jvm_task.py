@@ -10,7 +10,6 @@ import os
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
 from pants.util.strutil import safe_shlex_split
 
 
@@ -32,6 +31,10 @@ class JvmTask(Task):
     register('--confs', action='append', default=['default'],
              help='Use only these Ivy configurations of external deps.')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('compile_classpath')
+
   def __init__(self, *args, **kwargs):
     super(JvmTask, self).__init__(*args, **kwargs)
 
@@ -47,9 +50,6 @@ class JvmTask(Task):
       self.args.extend(safe_shlex_split(arg))
 
     self.confs = self.get_options().confs
-
-  def prepare(self, round_manager):
-    round_manager.require_data('compile_classpath')
 
   def classpath(self, cp=None, confs=None):
     classpath = list(cp) if cp else []

@@ -4,7 +4,6 @@
 target(
   name = 'all',
   dependencies = [
-    ':build_lint',
     ':builddictionary',
     ':changed_target_goals',
     ':clean',
@@ -41,17 +40,6 @@ target(
     ':task',
     'src/python/pants/base:exceptions',
   ]
-)
-
-python_library(
-  name = 'build_lint',
-  sources = ['build_lint.py'],
-  dependencies = [
-    ':common',
-    'src/python/pants/base:address_lookup_error',
-    'src/python/pants/base:payload_field',
-    'src/python/pants/base:source_root',
-  ],
 )
 
 python_library(
@@ -163,7 +151,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
-    'src/python/pants/goal:mkflag',
   ],
 )
 

@@ -5,12 +5,104 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from itertools import chain
 import re
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
 from pants.base.lazy_source_mapper import LazySourceMapper
+from pants.goal.workspace import ScmWorkspace
+
+
+class ChangeCalculator(object):
+  """A utility for calculating changed files or changed target addresses."""
+
+  def __init__(self,
+               scm,
+               workspace,
+               address_mapper,
+               build_graph,
+               fast=False,
+               changes_since=None,
+               diffspec=None,
+               include_dependees=None,
+               exclude_target_regexp=None):
+
+    self._scm = scm
+    self._workspace = workspace
+    self._address_mapper = address_mapper
+    self._build_graph = build_graph
+
+    self._fast = fast
+    self._changes_since = changes_since
+    self._diffspec = diffspec
+    self._include_dependees = include_dependees
+    self._exclude_target_regexp = exclude_target_regexp
+
+    self._mapper_cache = None
+
+  @property
+  def _mapper(self):
+    if self._mapper_cache is None:
+      self._mapper_cache = LazySourceMapper(self._address_mapper, self._build_graph, self._fast)
+    return self._mapper_cache
+
+  def changed_files(self):
+    """Determines the files changed according to SCM/workspace and options."""
+    if self._diffspec:
+      return self._workspace.changes_in(self._diffspec)
+    else:
+      since = self._changes_since or self._scm.current_rev_identifier()
+      return self._workspace.touched_files(since)
+
+  def _directly_changed_targets(self):
+    # Internal helper to find target addresses containing SCM changes.
+    targets_for_source = self._mapper.target_addresses_for_source
+    return set(addr for src in self.changed_files() for addr in targets_for_source(src))
+
+  def _find_changed_targets(self):
+    # Internal helper to find changed targets, optionally including their dependees.
+    changed = self._directly_changed_targets()
+
+    # Skip loading the graph or doing any further work if no directly changed targets found.
+    if not changed:
+      return changed
+
+    if self._include_dependees is None:
+      return changed
+
+    # Load the whole build graph since we need it for dependee finding in either remaining case.
+    for address in self._address_mapper.scan_addresses():
+      self._build_graph.inject_address_closure(address)
+
+    if self._include_dependees == 'direct':
+      return changed.union(*[self._build_graph.dependents_of(addr) for addr in changed])
+
+    if self._include_dependees == 'transitive':
+      return set(t.address for t in self._build_graph.transitive_dependees_of_addresses(changed))
+
+    # Should never get here.
+    raise ValueError('Unknown dependee inclusion: "{}"'.format(self._include_dependees))
+
+  def changed_target_addresses(self):
+    """Find changed targets, according to SCM.
+
+    This is the intended entry point for finding changed targets unless callers have a specific
+    reason to call one of the above internal helpers. It will find changed targets and:
+      - Optionally find changes in a given diffspec (commit, branch, tag, range, etc).
+      - Optionally include direct or transitive dependees.
+      - Optionally filter targets matching exclude_target_regexp.
+
+    :returns: A set of target addresses.
+    """
+    # Find changed targets (and maybe their dependees).
+    changed = self._find_changed_targets()
+
+    # Remove any that match the exclude_target_regexp list.
+    excludes = [re.compile(pattern) for pattern in self._exclude_target_regexp]
+    return set([
+      t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
+    ])
 
 
 class ChangedFileTaskMixin(object):
@@ -28,79 +120,27 @@ class ChangedFileTaskMixin(object):
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
     register('--diffspec',
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
-    register('--include-dependees', choices=['none', 'direct', 'transitive'], default='none',
+    register('--include-dependees', choices=['direct', 'transitive'], default=None,
              help='Include direct or transitive dependees of changed targets.')
 
-
-  _mapper_cache = None
-  @property
-  def _mapper(self):
-    if self._mapper_cache is None:
-      self._mapper_cache = LazySourceMapper(self.context, self.get_options().fast)
-    return self._mapper_cache
-
-  def _changed_files(self):
-    """Determines the files changed according to SCM/workspace and options."""
-    if not self.context.workspace:
-      raise TaskError('No workspace provided.')
-    if not self.context.scm:
+  @classmethod
+  def change_calculator(cls, options, address_mapper, build_graph, scm=None, workspace=None):
+    scm = scm or get_scm()
+    if scm is None:
       raise TaskError('No SCM available.')
-    if self.get_options().diffspec:
-      return self.context.workspace.changes_in(self.get_options().diffspec)
-    else:
-      since = self.get_options().changes_since or self.context.scm.current_rev_identifier()
-      return self.context.workspace.touched_files(since)
+    workspace = workspace or ScmWorkspace(scm)
 
-  def _directly_changed_targets(self):
-    """Internal helper to find target addresses containing SCM changes."""
-    targets_for_source = self._mapper.target_addresses_for_source
-    return set(addr for src in self._changed_files() for addr in targets_for_source(src))
-
-  def _find_changed_targets(self):
-    """Internal helper to find changed targets, optionally including their dependees."""
-    build_graph = self.context.build_graph
-    dependees_inclusion = self.get_options().include_dependees
-
-    changed = self._directly_changed_targets()
-
-    # Skip loading the graph or doing any further work if no directly changed targets found.
-    if not changed:
-      return changed
-
-    if dependees_inclusion == 'none':
-      return changed
-
-    # Load the whole build graph since we need it for dependee finding in either remaining case.
-    for address in self.context.address_mapper.scan_addresses():
-      build_graph.inject_address_closure(address)
-
-    if dependees_inclusion == 'direct':
-      return changed.union(*[build_graph.dependents_of(addr) for addr in changed])
-
-    if dependees_inclusion == 'transitive':
-      return set(t.address for t in build_graph.transitive_dependees_of_addresses(changed))
-
-    # Should never get here.
-    raise ValueError('Unknown dependee inclusion: "{}"'.format(dependees_inclusion))
-
-  def _changed_targets(self):
-    """Find changed targets, according to SCM.
-
-    This is the intended entry point for finding changed targets unless callers have a specific
-    reason to call one of the above internal helpers. It will find changed targets and:
-      - Optionally find changes in a given diffspec (commit, branch, tag, range, etc).
-      - Optionally include direct or transitive dependees.
-      - Optionally filter targets matching exclude_target_regexp.
-    """
-    # Find changed targets (and maybe their dependees).
-    changed = self._find_changed_targets()
-
-    # Remove any that match the exclude_target_regexp list.
-    excludes = [re.compile(pattern) for pattern in self.get_options().exclude_target_regexp]
-    return set([
-      t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
-    ])
-
+    return ChangeCalculator(scm,
+                            workspace,
+                            address_mapper,
+                            build_graph,
+                            fast=options.fast,
+                            changes_since=options.changes_since,
+                            diffspec=options.diffspec,
+                            include_dependees=options.include_dependees,
+                            # NB: exclude_target_regexp is a global scope option registered
+                            # elsewhere
+                            exclude_target_regexp=options.exclude_target_regexp)
 
 
 class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
@@ -113,9 +153,14 @@ class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
              help='Show changed files instead of the targets that own them.')
 
   def console_output(self, _):
+    change_calculator = self.change_calculator(self.get_options(),
+                                               self.context.address_mapper,
+                                               self.context.build_graph,
+                                               scm=self.context.scm,
+                                               workspace=self.context.workspace)
     if self.get_options().files:
-      for f in sorted(self._changed_files()):
+      for f in sorted(change_calculator.changed_files()):
         yield f
     else:
-      for addr in sorted(self._changed_targets()):
+      for addr in sorted(change_calculator.changed_target_addresses()):
         yield addr.spec

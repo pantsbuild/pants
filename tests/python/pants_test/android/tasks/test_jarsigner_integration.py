@@ -9,7 +9,6 @@ import os
 import pytest
 
 from pants_test.android.android_integration_test import AndroidIntegrationTest
-from pants_test.tasks.test_base import is_exe
 
 
 class JarsignerIntegrationTest(AndroidIntegrationTest):
@@ -27,11 +26,10 @@ class JarsignerIntegrationTest(AndroidIntegrationTest):
     os.path.join('platforms', 'android-' + AndroidIntegrationTest.TARGET_SDK, 'android.jar')
   ]
 
-  JAVA = is_exe('java')
 
-  tools = AndroidIntegrationTest.requirements(TOOLS) and JAVA
+  requirements = AndroidIntegrationTest.requirements(TOOLS)
 
-  @pytest.mark.skipif('not JarsignerIntegrationTest.tools',
+  @pytest.mark.skipif('not JarsignerIntegrationTest.requirements',
                       reason='Jarsigner integration test requires the JDK, Android tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_jarsigner(self):
