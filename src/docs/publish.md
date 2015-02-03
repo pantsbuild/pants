@@ -92,7 +92,7 @@ Things can go wrong; you can recover:
     merge conflicts can happen, and folks don't always recover from them
     correctly.
 
-    In this situation, you probably want to pass `goal publish --overrride=<version>` to specify a
+    In this situation, you probably want to pass `publish --overrride=<version>` to specify a
     version to use instead of the automatically-computed already-existing version. Choose a version
     that's not already on the server. Pants records this version in the pushdb, so hopefully the
     next publisher won't have the same problem.
@@ -126,7 +126,7 @@ How To
     to-be-published artifact. See
     <a pantsref="publish_local_test">Test with a Fake Local "Publish"</a>.
 -   Start the publish:
-    `./pants goal publish --no-dryrun [target]` Don't wander
+    `./pants publish --no-dryrun [target]` Don't wander
     off; Pants will ask for confirmation as it goes (making sure you
     aren't publishing artifact[s] you didn't mean to).
 
@@ -216,7 +216,7 @@ Try publishing again, but pass `--override` to specify the version number to use
 incrementing the version number from the pushdb. Be sure to use a version number that has not
 already been published this time. For example, to override the default publish version number for
 the `org.archie` buoyancy artifact, you might pass
-`goal publish --override=org.archie#buoyancy=2.5.8`.
+`publish --override=org.archie#buoyancy=2.5.8`.
 
 <a pantsmark="publish_pushdb_push"></a>
 
@@ -253,7 +253,7 @@ In git, this might mean:
 
     git reset origin/master # (if ``master`` is your release branch)
     git pull origin master
-    ./pants goal publish <your previous args>
+    ./pants publish <your previous args>
 
 Since you uploaded new versioned artifacts but the reset pushdb doesn't "remember" that, you might
 get "Versioned Artifact Already Exists" errors: see the section above and use `--override` to
@@ -306,7 +306,7 @@ automatically prompts you to also publish depended-upon libraries whose
 source code changed. However, Pants does *not* automatically publish
 dependees of a depended-upon library. If you know you're about to
 publish a low-level library (perhaps via a "dry run" publish), you can
-use Pants' `goal dependees` to find other things to publish.
+use Pants' `dependees` to find other things to publish.
 
 For example, suppose your new library `high-level` depends on another
 library, `util`. If you tested `high-level` with `util` version 1.2, you
@@ -336,7 +336,7 @@ Maven configured to use `~/.m2/repository` as a local repo. You can make
 pants publish to that local repo with:
 
     :::bash
-    ./pants goal publish --no-dryrun --local=~/.m2/repository
+    ./pants publish --no-dryrun --local=~/.m2/repository
 
 In the other codebase, change the dependencies to pull in the new
 artifact.

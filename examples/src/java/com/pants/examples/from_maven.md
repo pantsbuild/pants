@@ -50,14 +50,14 @@ Pants Equivalents
 -----------------
 
 `exec:java` run a binary<br>
-`goal run`
+`run`
 
 `-Xdebug` run a binary in the debugger<br>
-`goal run.jvm --debug`
+`run.jvm --debug`
 
 `-Dtest=com.foo.BarSpec -Dmaven.surefire.debug=true test` run one test in the debugger<br>
-`goal test.junit --debug --test=com.foo.BarSpec` or
-`goal test.specs --debug --test=com.foo.BarSpec`
+`test.junit --debug --test=com.foo.BarSpec` or
+`test.specs --debug --test=com.foo.BarSpec`
 
 Depending on Source, not Jars
 -----------------------------

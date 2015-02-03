@@ -116,7 +116,7 @@ package, you can dump your dependency "tree" with versions with an Ivy resolve r
 To generate a report for a target such as the `junit`-using `hello/greet` example tests:
 
     :::bash
-    $ ./pants goal resolve.ivy --open examples/tests/java/com/pants/examples/hello/greet
+    $ ./pants resolve.ivy --open examples/tests/java/com/pants/examples/hello/greet
 
 Ivy's report shows which which package is pulling in the package-version you didn't expect.
 (It might not be clear which version you *want*; but at least you've narrowed down the problem.)

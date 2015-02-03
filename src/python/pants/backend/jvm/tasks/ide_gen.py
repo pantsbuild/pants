@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # 1.) jvm_binary could have either a scala or java source file attached so we can't do a pure
 #     target type test
 # 2.) the target may be under development in which case it may not have sources yet - its pretty
-#     common to write a BUILD and ./pants goal idea the target inside to start development at which
+#     common to write a BUILD and ./pants idea the target inside to start development at which
 #     point there are no source files yet - and the developer intents to add them using the ide.
 
 def is_scala(target):
