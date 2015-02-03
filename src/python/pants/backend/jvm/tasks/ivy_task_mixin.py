@@ -69,7 +69,8 @@ class IvyTaskMixin(object):
                   executor=None,
                   silent=False,
                   workunit_name=None,
-                  confs=None):
+                  confs=None,
+                  custom_args=None):
     if not targets:
       return ([], set())
 
@@ -103,7 +104,7 @@ class IvyTaskMixin(object):
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
       if invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
-        args = ['-cachepath', raw_target_classpath_file_tmp]
+        args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
         self.exec_ivy(
             target_workdir=target_workdir,
@@ -136,14 +137,7 @@ class IvyTaskMixin(object):
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
-      return ([path for path in stripped_classpath if self.is_classpath_artifact(path)],
-              global_vts.targets)
-
-  @staticmethod
-  def is_classpath_artifact(path):
-    """Subclasses can override to determine whether a given artifact represents a classpath
-    artifact."""
-    return path.endswith('.jar') or path.endswith('.war')
+      return (stripped_classpath, global_vts.targets)
 
   def mapjars(self, genmap, target, executor, jars=None):
     """Resolves jars for the target and stores their locations in genmap.
@@ -180,15 +174,14 @@ class IvyTaskMixin(object):
             for conf in os.listdir(artifactdir):
               confdir = os.path.join(artifactdir, conf)
               for f in os.listdir(confdir):
-                if self.is_classpath_artifact(f):
-                  # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
-                  # conf whitelist
-                  genmap.add(org, confdir).append(f)
-                  genmap.add((org, name), confdir).append(f)
+                # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
+                # conf whitelist
+                genmap.add(org, confdir).append(f)
+                genmap.add((org, name), confdir).append(f)
 
-                  genmap.add(target, confdir).append(f)
-                  genmap.add((target, conf), confdir).append(f)
-                  genmap.add((org, name, conf), confdir).append(f)
+                genmap.add(target, confdir).append(f)
+                genmap.add((target, conf), confdir).append(f)
+                genmap.add((org, name, conf), confdir).append(f)
 
   def exec_ivy(self,
                target_workdir,

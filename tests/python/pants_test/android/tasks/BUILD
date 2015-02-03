@@ -11,9 +11,9 @@ python_test_suite(
 python_test_suite(
   name = 'integration',
   dependencies = [
-    ':dx_compile_integration',
     ':aapt_builder_integration',
-    ':jarsigner_integration',
+    ':dx_compile_integration',
+    ':sign_apk_integration',
   ],
 )
 
@@ -28,11 +28,11 @@ python_tests(
 )
 
 python_tests(
-  name='aapt_gen',
-  sources=[
+  name = 'aapt_gen',
+  sources = [
     'test_aapt_gen.py',
   ],
-  dependencies=[
+  dependencies = [
     'src/python/pants/backend/android/tasks:all',
   ],
 )
@@ -47,14 +47,27 @@ python_tests(
   ],
 )
 
+python_tests(
+  name = 'sign_apk',
+  sources = [
+    'test_sign_apk.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:sign_apk',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:base'
+  ],
+)
 
 python_tests(
-  name = 'jarsigner_integration',
+  name = 'sign_apk_integration',
   sources = [
-    'test_jarsigner_integration.py',
+    'test_sign_apk_integration.py',
   ],
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
-    'tests/python/pants_test/tasks:base',
   ],
 )

@@ -10,7 +10,7 @@ import os
 import tempfile
 
 import mox
-import unittest2 as unittest
+import unittest
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir

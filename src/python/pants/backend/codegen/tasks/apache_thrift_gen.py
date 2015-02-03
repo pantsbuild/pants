@@ -9,7 +9,6 @@ from collections import defaultdict, namedtuple
 import errno
 import os
 import re
-import shutil
 import subprocess
 
 from twitter.common import log
@@ -26,9 +25,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
-from pants.util.keywords import replace_python_keywords_in_file
 from pants.util.dirutil import safe_mkdir, safe_walk
 
+INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
 
 def _copytree(from_base, to_base):
   def abort(error):
@@ -176,19 +175,12 @@ class ApacheThriftGen(CodeGen):
       # relpath here at all.
       relsource = os.path.relpath(source, get_buildroot())
 
-      if lang == "python":
-        copied_source = os.path.relpath(os.path.join(self._workdir, relsource), get_buildroot())
-        safe_mkdir(os.path.dirname(copied_source))
-        shutil.copyfile(source, copied_source)
-        replace_python_keywords_in_file(copied_source)
-        source = relsource = copied_source
-
       outdir = os.path.join(self.session_dir, '.'.join(relsource.split(os.path.sep)))
       safe_mkdir(outdir)
 
       cmd = args[:]
       cmd.extend(('-o', outdir))
-      cmd.append(source)
+      cmd.append(relsource)
       log.debug('Executing: %s' % ' '.join(cmd))
       sessions.append(self.ThriftSession(outdir, cmd, subprocess.Popen(cmd)))
 

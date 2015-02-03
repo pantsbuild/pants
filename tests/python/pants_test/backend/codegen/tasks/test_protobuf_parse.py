@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import pytest
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
 from pants.backend.codegen.tasks.protobuf_parse import (MESSAGE_PARSER, ProtobufParse,
                                                         camelcase, get_outer_class_name,

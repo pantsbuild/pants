@@ -4,11 +4,11 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-from contextlib import contextmanager
 
+from collections import OrderedDict
+from contextlib import contextmanager
 import os
 
-from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.tasks.jar_task import JarTask

@@ -47,4 +47,5 @@ def register_goals():
   task(name='pytest', action=PytestRun).install('test')
   task(name='py', action=PythonRun).install('run')
   task(name='python-repl', action=PythonRepl).install('repl')
-  task(name='setup-py', action=PythonSetup).install()
+  task(name='setup-py', action=PythonSetup).install().with_description(
+    'Build setup.py-based Python projects from python_library targets.')

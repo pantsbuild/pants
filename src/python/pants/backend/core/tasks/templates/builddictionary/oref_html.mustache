@@ -1,26 +1,19 @@
 <!DOCTYPE html>
 <head>
-  <title>Pants Goals Reference</title>
+  <title>Pants Options Reference</title>
 </head>
 <body>
 
-<h1>Goals Reference</h1>
+<h1>Options Reference</h1>
 
 <p>
-This page documents <code>goals</code>, actions that can be taken on build
-targets.
-A goal identifies some high-level goal that you wish to accomplish, such as
-compiling your code.
+This page documents Pants options: command-line options, options in a <tt>pants.ini</tt> file.
+These options are organized by <em>goal</em>. Goals are actions that can be taken on build targets.
+A goal identifies some high-level goal that you wish to accomplish, such as compiling your code.
 
 <p>
-A goal depends on other goals that must happen first; for example, Pants must
-compile code before it can run tests.
-
-<p>
-Each goal is implemented by one or more Tasks. For example, the
-``JavaCompile`` task compiles Java code, and its installed in the ``compile``
-goal.
-
+Some goals have sub-goals, or <em>tasks</em>. For example, the <tt>compile.jvm</tt> task compiles
+Java code, and is installed in the <tt>compile</tt> goal.
 
 <p><b>Goals and Tasks summary</b>
 
@@ -31,26 +24,26 @@ goal.
 </ul>
 
 <style>
-div.gref_goal_section {
+div.oref_goal_section {
   margin-left: 2%;
 }
-div.gref_goal_section h2 {
+div.oref_goal_section h2 {
   border-top: 4px solid #9bf;
   margin-left: -2%;
 }
-div.gref_ogroup_section {
+div.oref_ogroup_section {
   margin-left: 2%;
 }
-div.gref_ogroup_section h3 {
+div.oref_ogroup_section h3 {
   border-top: 1px dotted #bcd;
   margin-left: -2%;
 }
 </style>
 
 {{#goals}}
-<div class="gref_goal_section">
+<div class="oref_goal_section">
 
-<a pantsmark="gref_goal_{{goal.name}}"> </a>
+<a pantsmark="oref_goal_{{goal.name}}"> </a>
 
 <h2 id="{{goal.name}}">{{goal.name}}</h2>
 
@@ -61,8 +54,8 @@ div.gref_ogroup_section h3 {
 {{#tasks}}
 
 {{#ogroup}}
-<div class="gref_ogroup_section">
-<a pantsmark="gref_cli_{{ogroup.pantsref}}"> </a>
+<div class="oref_ogroup_section">
+<a pantsmark="oref_cli_{{ogroup.pantsref}}"> </a>
 
 <h3 id="group_{{ogroup.pantsref}}">{{ogroup.title}}</h3>
 {{/ogroup}}

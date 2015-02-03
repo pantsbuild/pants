@@ -13,9 +13,9 @@ import shutil
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants import binary_util
+from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -41,8 +41,7 @@ def is_java(target):
   return target.has_sources('.java') or target.is_java
 
 
-# XXX(pl): JVM hairball violator (or is it just JVM specific?)
-class IdeGen(JvmBinaryTask, JvmToolTaskMixin):
+class IdeGen(JvmToolTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):

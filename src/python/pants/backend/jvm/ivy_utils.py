@@ -5,7 +5,7 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 from contextlib import contextmanager
 import errno
 import logging
@@ -14,7 +14,7 @@ import pkgutil
 import threading
 import xml
 
-from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_environment import get_buildroot

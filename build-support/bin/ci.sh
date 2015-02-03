@@ -105,6 +105,8 @@ if [ ! -z "${R}" ]; then
   exit 1
 fi
 
+build-support/bin/check_header.sh || exit 1
+
 # Sanity checks
 ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
 ./pants.pex goals ${PANTS_ARGS[@]} || die "Failed to list goals."
@@ -168,6 +170,8 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
   negative_test_targets=(
     testprojects/src/thrift/com/pants/thrift_linter:
     testprojects/src/java/com/pants/testproject/missingdepswhitelist.*
+    testprojects/src/java/com/pants/testproject/cycle1
+    testprojects/src/java/com/pants/testproject/cycle2
     testprojects/src/antlr/pants/backend/python/test:antlr_failure
     testprojects/src/python/antlr:test_antlr_failure
   )

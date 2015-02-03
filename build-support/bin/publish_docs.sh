@@ -38,7 +38,7 @@ done
 
 ${PANTS_EXE} builddict --print-exception-stacktrace \
                        --omit-impl-re='internal_backend.*' || \
-  die "Failed to generate the 'BUILD Dictionary' and/or 'Goals Reference'."
+  die "Failed to generate the 'BUILD Dictionary' and/or 'Options Reference'."
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then

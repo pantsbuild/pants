@@ -21,6 +21,7 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.util.dirutil import safe_mkdir
+from pants.util.strutil import safe_shlex_split
 
 
 class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
@@ -47,6 +48,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     register('--outdir', help='Emit ivy report outputs in to this directory.')
     register('--args', action='append',
              help='Pass these extra args to ivy.')
+    register('--confs', action='append', default=['default'],
+             help='Pass a configuration to ivy in addition to the default ones.')
     register('--mutable-pattern',
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
@@ -80,6 +83,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     self._report = self._open or self.get_options().report
     self._confs = None
 
+    self._args = []
+    for arg in self.get_options().args:
+      self._args.extend(safe_shlex_split(arg))
+
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache()
 
@@ -90,14 +97,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   @property
   def confs(self):
     if self._confs is None:
-      # The confs we get from the config file may be incomplete; make sure we map any jars that the
-      # targets we operate on request.
-      default_confs = self.context.config.getlist(self._CONFIG_SECTION, 'confs', default=['default'])
-      calculated_confs = set(default_confs) # Important not to modify the original reference.
-      for conf in ('default', 'sources', 'javadoc',):
+      self._confs = set(self.get_options().confs)
+      for conf in ('default', 'sources', 'javadoc'):
         if self.context.products.isrequired('jar_map_{conf}'.format(conf=conf)):
-          calculated_confs.add(conf)
-      self._confs = calculated_confs
+          self._confs.add(conf)
     return self._confs
 
   def execute(self):
@@ -118,6 +121,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       executor=executor,
       workunit_name='ivy-resolve',
       confs=self.confs,
+      custom_args=self._args,
     )
 
     for conf in self.confs:

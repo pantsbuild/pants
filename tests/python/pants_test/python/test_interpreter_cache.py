@@ -5,15 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-import contextlib
-import shutil
-import tempfile
-import unittest2 as unittest
+import unittest
+
+import mock
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.util.contextutil import temporary_dir
-
-import mock
 
 
 class TestInterpreterCache(unittest.TestCase):

@@ -16,7 +16,6 @@ from pants.backend.python.code_generator import CodeGenerator
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.base.build_environment import get_buildroot
 from pants.thrift_util import select_thrift_binary
-from pants.util.keywords import replace_python_keywords_in_file
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.strutil import ensure_binary
 
@@ -64,7 +63,7 @@ class PythonThriftBuilder(CodeGenerator):
 
       safe_mkdir(os.path.dirname(copied_source))
       shutil.copyfile(abs_source, copied_source)
-      copied_sources.add(replace_python_keywords_in_file(copied_source))
+      copied_sources.add(copied_source)
 
     for src in copied_sources:
       if not self._run_thrift(src):

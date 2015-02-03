@@ -43,6 +43,8 @@ def register_bootstrap_options(register, buildroot=None):
            help='Override config with values from these files. Later files override eariler ones.')
   register('--pythonpath', action='append',
            help='Add these directories to PYTHONPATH to search for plugins.')
+  register('--target-spec-file', action='append', dest='target_spec_files',
+           help='Read additional specs from this file, one per line')
 
 
 class OptionsBootstrapper(object):

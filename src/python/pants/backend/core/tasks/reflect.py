@@ -6,11 +6,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import argparse
+from collections import OrderedDict
 import inspect
 import re
 
 from docutils.core import publish_parts
-from twitter.common.collections.ordereddict import OrderedDict
 
 from pants.base.build_manual import get_builddict_info
 from pants.base.config import Config
@@ -432,7 +432,7 @@ def bootstrap_option_values():
     Config.reset_default_bootstrap_option_values()
 
 
-def gen_goals_glopts_reference_data():
+def gen_glopts_reference_data():
   option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
   def register(*args, **kwargs):
     option_parser.register(*args, **kwargs)
@@ -440,11 +440,11 @@ def gen_goals_glopts_reference_data():
   register_bootstrap_options(register, buildroot='<buildroot>')
   register_global_options(register)
   argparser = option_parser._help_argparser
-  return gref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
+  return oref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
 
 
-def gref_template_data_from_options(scope, argparser):
-  """Get data for the Goals Reference from a CustomArgumentParser instance."""
+def oref_template_data_from_options(scope, argparser):
+  """Get data for the Options Reference from a CustomArgumentParser instance."""
   if not argparser: return None
   title = scope or ''
   pantsref = ''.join([c for c in title if c.isalnum()])
@@ -470,8 +470,8 @@ def gref_template_data_from_options(scope, argparser):
     pantsref=pantsref)
 
 
-def gen_tasks_goals_reference_data():
-  """Generate the template data for the goals reference rst doc."""
+def gen_tasks_options_reference_data():
+  """Generate the template data for the options reference rst doc."""
   goal_dict = {}
   goal_names = []
   for goal in Goal.all():
@@ -498,7 +498,7 @@ def gen_tasks_goals_reference_data():
           impl=impl,
           doc_html=doc_html,
           doc_rst=doc_rst,
-          ogroup=gref_template_data_from_options(scope, argparser)))
+          ogroup=oref_template_data_from_options(scope, argparser)))
     goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
     goal_names.append(goal.name)
 
