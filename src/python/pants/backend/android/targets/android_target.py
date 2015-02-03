@@ -16,7 +16,8 @@ class AndroidTarget(JvmTarget):
   """A base class for all Android targets."""
 
   # Missing attributes from the AndroidManifest would eventually error in the compilation process.
-  # But since the error would raise here in the target definition, we are catching the exception
+  # But since the error would raise here in the target definition, we are catching the exception.
+
   class BadManifestError(Exception):
     """Indicates an invalid android manifest."""
 
@@ -32,10 +33,8 @@ class AndroidTarget(JvmTarget):
       Defaults to the latest full release.
     :param manifest: path/to/file of 'AndroidManifest.xml' (required name). Paths are relative
       to the BUILD file's directory.
-      Set as 'debug' by default.
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
-
     self.add_labels('android')
 
     # TODO(pl): These attributes should live in the payload
@@ -54,9 +53,9 @@ class AndroidTarget(JvmTarget):
     # If unable to parse application name, silently falls back to target name.
     self.app_name = self.get_app_name() if self.get_app_name() else self.name
 
-  # TODO(mateor) Peel parsing into a ManifestParser class to ensure it's robust against bad input
+  # TODO(mateor) Peel parsing into a ManifestParser class to ensure it's robust against bad input.
   # Parsing as in Android Donut's testrunner:
-  # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py
+  # https://github.com/android/platform_development/blob/master/testrunner/android_manifest.py.
   def get_package_name(self):
     """Return the package name of the Android target."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('manifest')
@@ -76,5 +75,8 @@ class AndroidTarget(JvmTarget):
   def get_app_name(self):
     """Return a string with the application name of the package, return None if not found."""
     tgt_manifest = parse(self.manifest).getElementsByTagName('activity')
-    package_name = tgt_manifest[0].getAttribute('android:name')
-    return package_name.split(".")[-1]
+    try:
+      package_name = tgt_manifest[0].getAttribute('android:name')
+      return package_name.split(".")[-1]
+    except:
+      return None

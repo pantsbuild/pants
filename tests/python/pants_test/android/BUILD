@@ -6,6 +6,7 @@ python_test_suite(
   name = 'android',
   dependencies = [
     ':android_distribution',
+    ':keystore_resolver',
     'tests/python/pants_test/android/tasks',
   ]
 )
@@ -29,6 +30,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'android_config_util',
+  sources = [
+    'test_android_config_util.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android:android_config_util',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
   name = 'android_distribution',
   sources = [
     'test_android_distribution.py',
@@ -38,5 +50,16 @@ python_tests(
     'src/python/pants/backend/android:android_distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'keystore_resolver',
+  sources = [
+    'test_keystore_resolver.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android:keystore_resolver',
+    'src/python/pants/util:contextutil',
   ]
 )

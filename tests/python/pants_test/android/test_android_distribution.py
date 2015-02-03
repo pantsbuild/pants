@@ -17,7 +17,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 
-class TestAndroidDistributionTest(unittest.TestCase):
+class TestAndroidDistribution(unittest.TestCase):
 
   @contextmanager
   # default for testing purposes being sdk 18 and 19, with latest build-tools 19.1.0
