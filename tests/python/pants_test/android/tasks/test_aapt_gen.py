@@ -7,13 +7,13 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 
 import os
-import unittest2 as unittest
+import unittest
 
 from pants.backend.android.tasks.aapt_gen import AaptGen
 
 
 class AaptGenCalculateGenfilesTest(unittest.TestCase):
-  """Test the package translation methods in pants.backend.android.aapt_gen."""
+  """Test the package translation methods in pants.backend.android.tasks.aapt_gen."""
 
   def assert_files(self, package, expected_file):
     self.assertEqual(AaptGen._calculate_genfile(package), expected_file)

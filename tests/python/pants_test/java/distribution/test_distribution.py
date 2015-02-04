@@ -10,7 +10,7 @@ from contextlib import contextmanager
 import os
 import subprocess
 import textwrap
-import unittest2 as unittest
+import unittest
 
 import pytest
 from twitter.common.collections import maybe_list
@@ -23,6 +23,7 @@ from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 class MockDistributionTest(unittest.TestCase):
   EXE = namedtuple('Exe', ['name', 'contents'])
+
 
   @classmethod
   def exe(cls, name, version=None):
@@ -38,6 +39,13 @@ class MockDistributionTest(unittest.TestCase):
     return cls.EXE(name, contents=contents)
 
   @contextmanager
+  def env(self, **kwargs):
+    environment = dict(JDK_HOME=None, JAVA_HOME=None, PATH=None)
+    environment.update(**kwargs)
+    with environment_as(**environment):
+      yield
+
+  @contextmanager
   def distribution(self, files=None, executables=None):
     with temporary_dir() as jdk:
       for f in maybe_list(files or ()):
@@ -48,6 +56,16 @@ class MockDistributionTest(unittest.TestCase):
           fp.write(exe.contents or '')
         chmod_plus_x(path)
       yield jdk
+
+  def setUp(self):
+    super(MockDistributionTest, self).setUp()
+    # Save local cache and then flush so tests get a clean environment. _CACHE restored in tearDown.
+    self._local_cache = Distribution._CACHE
+    Distribution._CACHE = {}
+
+  def tearDown(self):
+    super(MockDistributionTest, self).tearDown()
+    Distribution._CACHE = self._local_cache
 
   def test_validate_basic(self):
     with pytest.raises(Distribution.Error):
@@ -91,69 +109,115 @@ class MockDistributionTest(unittest.TestCase):
       Distribution(bin_path=jdk).binary('jar')
 
   def test_locate(self):
-    @contextmanager
-    def env(**kwargs):
-      environment = dict(JDK_HOME=None, JAVA_HOME=None, PATH=None)
-      environment.update(**kwargs)
-      with environment_as(**environment):
-        yield
 
     with pytest.raises(Distribution.Error):
-      with env():
+      with self.env():
         Distribution.locate()
 
     with pytest.raises(Distribution.Error):
       with self.distribution(files='java') as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate()
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate(jdk=True)
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.6.0')) as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate(minimum_version='1.7.0')
+
+    with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java', '1.8.0')) as jdk:
-        with env(PATH=jdk):
+        with self.env(PATH=jdk):
           Distribution.locate(maximum_version='1.7.999')
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
-        with env(JDK_HOME=jdk):
+        with self.env(JDK_HOME=jdk):
           Distribution.locate()
 
     with pytest.raises(Distribution.Error):
       with self.distribution(executables=self.exe('java')) as jdk:
-        with env(JAVA_HOME=jdk):
+        with self.env(JAVA_HOME=jdk):
           Distribution.locate()
 
     with self.distribution(executables=self.exe('java')) as jdk:
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate()
 
     with self.distribution(executables=[self.exe('java'), self.exe('javac')]) as jdk:
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(jdk=True)
 
     with self.distribution(executables=self.exe('java', '1.7.0')) as jdk:
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(minimum_version='1.6.0')
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(maximum_version='1.7.999')
-      with env(PATH=jdk):
+      with self.env(PATH=jdk):
         Distribution.locate(minimum_version='1.6.0', maximum_version='1.7.999')
 
     with self.distribution(executables=self.exe('bin/java')) as jdk:
-      with env(JDK_HOME=jdk):
+      with self.env(JDK_HOME=jdk):
         Distribution.locate()
 
     with self.distribution(executables=self.exe('bin/java')) as jdk:
-      with env(JAVA_HOME=jdk):
+      with self.env(JAVA_HOME=jdk):
         Distribution.locate()
 
+  def test_cached_good_min(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        Distribution.cached(minimum_version='1.7.0_25')
+
+  def test_cached_good_max(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        Distribution.cached(maximum_version='1.7.0_50')
+
+  def test_cached_good_bounds(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        Distribution.cached(minimum_version='1.6.0_35', maximum_version='1.7.0_55')
+
+  def test_cached_too_low(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        with self.assertRaises(Distribution.Error):
+          Distribution.cached(minimum_version='1.7.0_40')
+
+  def test_cached_too_high(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_83')) as jdk:
+      with self.env(PATH=jdk):
+        with self.assertRaises(Distribution.Error):
+          Distribution.cached(maximum_version='1.7.0_55')
+
+  def test_cached_low_fault(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        with self.assertRaises(Distribution.Error):
+          Distribution.cached(minimum_version='1.7.0_35', maximum_version='1.7.0_55')
+
+  def test_cached_high_fault(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        with self.assertRaises(Distribution.Error):
+          Distribution.cached(minimum_version='1.6.0_00', maximum_version='1.6.0_50')
+
+  def test_cached_conflicting(self):
+    with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+      with self.env(PATH=jdk):
+        with self.assertRaises(Distribution.Error):
+          Distribution.cached(minimum_version='1.7.0_00', maximum_version='1.6.0_50')
+
+  def test_cached_bad_input(self):
+    with self.assertRaises(ValueError):
+      with self.distribution(executables=self.exe('java', '1.7.0_33')) as jdk:
+        with self.env(PATH=jdk):
+          Distribution.cached(minimum_version=1.7, maximum_version=1.8)
 
 def exe_path(name):
   process = subprocess.Popen(['which', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)

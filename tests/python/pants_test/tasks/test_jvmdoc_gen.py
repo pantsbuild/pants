@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
-from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
 from pants_test.task_test_base import TaskTestBase
@@ -52,19 +51,12 @@ class JvmdocGenTest(TaskTestBase):
     super(JvmdocGenTest, self).setUp()
     self.workdir = safe_mkdtemp()
 
-    self.t1 = self.make_target('t1', exclusives={'foo': 'a'})
-    # Force exclusive propagation on the targets.
-    self.t1.get_all_exclusives()
-    context = self.context(target_roots=[self.t1],
-                           options=options)
+    self.t1 = self.make_target('t1')
+    context = self.context(target_roots=[self.t1])
 
     self.targets = context.targets()
 
-    # Create the exclusives mapping.
-    exclusives_mapping = ExclusivesMapping(context)
-    exclusives_mapping._populate_target_maps(self.targets)
-    exclusives_mapping.set_base_classpath_for_group('foo=a', ['baz'])
-    context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
+    self.populate_compile_classpath(context)
 
     self.task = self.create_task(context, self.workdir)
 

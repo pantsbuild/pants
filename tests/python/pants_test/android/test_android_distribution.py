@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 from contextlib import contextmanager
 import os
 import pytest
-import unittest2 as unittest
+import unittest
 
 from twitter.common.collections import maybe_list
 
@@ -17,7 +17,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 
-class TestAndroidDistributionTest(unittest.TestCase):
+class TestAndroidDistribution(unittest.TestCase):
 
   @contextmanager
   # default for testing purposes being sdk 18 and 19, with latest build-tools 19.1.0

@@ -17,7 +17,6 @@ from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import call_insert, call_use_cached_files, UnreadableArtifact
@@ -33,8 +32,11 @@ class TaskBase(AbstractClass):
   Provides the base lifecycle methods that allow a task to interact with the command line, other
   tasks and the user.  The lifecycle is linear and run via the following sequence:
   1. register_options - declare options configurable via cmd-line flag or config file.
-  2. __init__ - distill configuration into the information needed to execute
-  3. prepare - request any products needed from goal dependencies
+  2. product_types - declare the product types your task is capable of producing.
+  3. alternate_target_roots - propose a different set of target roots to use than those specified
+                              via the CLI for the active pants run.
+  4. prepare - request any products needed from other tasks.
+  5. __init__ - distill configuration into the information needed to execute.
 
   Provides access to the current run context for scoping work.
 
@@ -47,6 +49,17 @@ class TaskBase(AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+
+  @classmethod
+  def product_types(cls):
+    """The list of products this Task produces. Set the product type(s) for this
+    task i.e. the product type(s) this task creates e.g ['classes'].
+
+    By default, each task is considered as creating a unique product type(s).
+    Subclasses that create products, should override this to specify their unique product type(s).
+    """
+    return []
+
   # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
   options_scope = None
 
@@ -79,6 +92,42 @@ class TaskBase(AbstractClass):
     """Subclasses may override to indicate that they can use passthru args."""
     return False
 
+  @classmethod
+  def _scoped_options(cls, options):
+    return options[cls.options_scope]
+
+  @classmethod
+  def _alternate_target_roots(cls, options, address_mapper, build_graph):
+    # Subclasses should not generally need to override this method.
+    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
+    return cls.alternate_target_roots(cls._scoped_options(options), address_mapper, build_graph)
+
+  @classmethod
+  def alternate_target_roots(cls, options, address_mapper, build_graph):
+    """Allows a Task to propose alternate target roots from those specified on the CLI.
+
+    At most 1 unique proposal is allowed amongst all tasks involved in the run.  If more than 1
+    unique list of target roots is proposed an error is raised during task scheduling.
+
+    :returns list: The new target roots to use or none to accept the CLI specified target roots.
+    """
+
+  @classmethod
+  def _prepare(cls, options, round_manager):
+    # Subclasses should not generally need to override this method.
+    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
+    return cls.prepare(cls._scoped_options(options), round_manager)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    """Prepares a task for execution.
+
+    Called before execution and prior to any tasks that may be (indirectly) depended upon.
+
+    Typically a task that requires products from other goals would register interest in those
+    products here and then retrieve the requested product mappings when executed.
+    """
+
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
 
@@ -101,7 +150,7 @@ class TaskBase(AbstractClass):
     self._cache_key_errors = set()
 
     default_invalidator_root = os.path.join(
-      self.context.new_options.for_global_scope().pants_workdir, 'build_invalidator')
+      self.context.options.for_global_scope().pants_workdir, 'build_invalidator')
     suffix_type = self.__class__.__name__
     self._build_invalidator_dir = os.path.join(
         context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
@@ -109,22 +158,13 @@ class TaskBase(AbstractClass):
 
   def get_options(self):
     """Returns the option values for this task's scope."""
-    return self.context.new_options.for_scope(self.options_scope)
+    return self.context.options.for_scope(self.options_scope)
 
   def get_passthru_args(self):
     if not self.supports_passthru_args():
       raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
     else:
-      return self.context.new_options.passthru_args_for_scope(self.options_scope)
-
-  def prepare(self, round_manager):
-    """Prepares a task for execution.
-
-    Called before execution and prior to any tasks that may be (indirectly) depended upon.
-
-    Typically a task that requires products from other goals would register interest in those
-    products here and then retrieve the requested product mappings when executed.
-    """
+      return self.context.options.passthru_args_for_scope(self.options_scope)
 
   @property
   def workdir(self):
@@ -135,18 +175,17 @@ class TaskBase(AbstractClass):
     """
     return self._workdir
 
-  def setup_artifact_cache_from_config(self, config_section=None):
+  def setup_artifact_cache(self):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
 
-    Uses standard config file keys to find the cache spec.
+    Uses the options system to find the cache specs.
     The cache is created lazily, as needed.
     """
-    section = config_section or Config.DEFAULT_SECTION
-    read_spec = self.context.config.getlist(section, 'read_artifact_caches', default=[])
-    write_spec = self.context.config.getlist(section, 'write_artifact_caches', default=[])
-    self.setup_artifact_cache(read_spec, write_spec)
+    read_spec = self.get_options().read_artifact_caches or []
+    write_spec = self.get_options().write_artifact_caches or []
+    self._setup_artifact_cache_from_specs(read_spec, write_spec)
 
-  def setup_artifact_cache(self, read_spec, write_spec):
+  def _setup_artifact_cache_from_specs(self, read_spec, write_spec):
     """Subclasses can call this in their __init__() to set up artifact caching for that task type.
 
     See docstring for pants.cache.cache_setup.create_artifact_cache() for details on the spec format.
@@ -158,7 +197,7 @@ class TaskBase(AbstractClass):
 
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
-      pants_workdir = self.context.new_options.for_global_scope().pants_workdir
+      pants_workdir = self.context.options.for_global_scope().pants_workdir
       compression = self.context.config.getint('cache', 'compression', default=5)
       my_name = self.__class__.__name__
       return create_artifact_cache(
@@ -185,16 +224,6 @@ class TaskBase(AbstractClass):
 
   def artifact_cache_writes_enabled(self):
     return bool(self._write_artifact_cache_spec) and self.get_options().write_to_artifact_cache
-
-  @classmethod
-  def product_types(self):
-    """The list of products this Task produces. Set the product type(s) for this
-    task i.e. the product type(s) this task creates e.g ['classes'].
-
-    By default, each task is considered as creating a unique product type(s).
-    Subclasses that create products, should override this to specify their unique product type(s).
-    """
-    return []
 
   def invalidate_for_files(self):
     """Provides extra files that participate in invalidation.
@@ -232,7 +261,8 @@ class TaskBase(AbstractClass):
                   partition_size_hint=sys.maxint,
                   silent=False,
                   locally_changed_targets=None,
-                  fingerprint_strategy=None):
+                  fingerprint_strategy=None,
+                  topological_order=False):
     """Checks targets for invalidation, first checking the artifact cache.
     Subclasses call this to figure out what to work on.
 
@@ -276,7 +306,7 @@ class TaskBase(AbstractClass):
           colors[t] = 'locally_changed'
         else:
           colors[t] = 'not_locally_changed'
-    invalidation_check = cache_manager.check(targets, partition_size_hint, colors)
+    invalidation_check = cache_manager.check(targets, partition_size_hint, colors, topological_order=topological_order)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
@@ -460,6 +490,7 @@ class TaskBase(AbstractClass):
       # language-specific flags that would resolve the ambiguity here
       raise TaskError('Mutually incompatible targets specified: %s vs %s (and %d others)' %
                       (accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
+
 
 class Task(TaskBase):
   """An executable task.

@@ -38,6 +38,9 @@ class Globs(FilesetRelPathWrapper):
   """Returns Fileset containing matching files in same directory as this BUILD file.
 
   E.g., ``sources = globs('*java'),`` to get .java files in this directory.
+
+  You can use "math" on the return value of ``globs()``. E.g., ``globs('*') - globs('*.java')`` gives
+  all files in this directory *except* ``.java`` files.
   """
   wrapped_fn = Fileset.globs
 
@@ -47,6 +50,10 @@ class RGlobs(FilesetRelPathWrapper):
 
   E.g., ``bundle().add(rglobs('config/*')),`` to bundle up all files in
   the config, config/foo, config/foo/bar directories.
+
+  You can use "math" on the return value of ``rglobs()``. E.g.,
+  ``rglobs('config/*') - rglobs('config/foo/*')`` gives all files under `config` *except*
+  those in ``config/foo``.
   """
   wrapped_fn = Fileset.rglobs
 

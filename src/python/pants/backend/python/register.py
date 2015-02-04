@@ -43,22 +43,9 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='python-binary-create', action=PythonBinaryCreate,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('binary')
-
-  task(name='pytest', action=PytestRun,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('test')
-
-  task(name='py', action=PythonRun,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('run')
-
-  task(name='python-repl', action=PythonRepl,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install('repl')
-
-  task(name='setup-py', action=PythonSetup,
-       dependencies=['bootstrap', 'check-exclusives', 'resources']
-  ).install()
+  task(name='python-binary-create', action=PythonBinaryCreate).install('binary')
+  task(name='pytest', action=PytestRun).install('test')
+  task(name='py', action=PythonRun).install('run')
+  task(name='python-repl', action=PythonRepl).install('repl')
+  task(name='setup-py', action=PythonSetup).install().with_description(
+    'Build setup.py-based Python projects from python_library targets.')

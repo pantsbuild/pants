@@ -51,6 +51,7 @@ class ArgSplitter(object):
     self._known_scopes = set(known_scopes + ['help'])
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._is_help = False  # True if the user asked for help.
+    self._is_help_all = False  # True if the user asked for --help-all.
 
     # For historical reasons we allow --scope-flag-name anywhere on the cmd line,
     # as an alternative to ... scope --flag-name. This makes the transition to
@@ -63,6 +64,10 @@ class ArgSplitter(object):
   @property
   def is_help(self):
     return self._is_help
+
+  @property
+  def is_help_all(self):
+    return self._is_help_all
 
   def split_args(self, args=None):
     """Split the specified arg list (or sys.argv if unspecified).
@@ -104,13 +109,18 @@ class ArgSplitter(object):
     add_scope(GLOBAL_SCOPE)
     for flag in global_flags:
       assign_flag_to_scope(flag, GLOBAL_SCOPE)
+    if '--help-all' in global_flags:
+      self._is_help_all = True
     scope, flags = self._consume_scope()
     while scope:
-      add_scope(scope)
-      goals.add(scope.partition('.')[0])
-      passthru_owner = scope
-      for flag in flags:
-        assign_flag_to_scope(flag, scope)
+      if scope.lower() == 'help':
+        self._is_help = True
+      else:
+        add_scope(scope)
+        goals.add(scope.partition('.')[0])
+        passthru_owner = scope
+        for flag in flags:
+          assign_flag_to_scope(flag, scope)
       scope, flags = self._consume_scope()
 
     while self._unconsumed_args and not self._at_double_dash():
@@ -128,8 +138,8 @@ class ArgSplitter(object):
       self._unconsumed_args.pop()
       passthru = list(reversed(self._unconsumed_args))
 
-    # We parse the word 'help' as a scope, but it's not a real one, so ignore it.
-    scope_to_flags.pop('help', None)
+    if not goals:
+      self._is_help = True
     return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
 
   def _consume_scope(self):
@@ -147,8 +157,6 @@ class ArgSplitter(object):
     if not self._at_scope():
       return None, []
     scope = self._unconsumed_args.pop()
-    if scope.lower() == 'help':
-      self._is_help = True
     flags = self._consume_flags()
     return scope, flags
 

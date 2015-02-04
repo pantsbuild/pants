@@ -164,6 +164,8 @@ and tweak to fit your situation. You can change the location of this file in `pa
     [ivy]
     ivy_settings: some/other/path/ivysettings.xml
 
+If the `PANTS_IVY_SETTINGS_XML` environment variable is defined, Pants uses that value instead
+of the one in `pants.ini`.
 
 Integrate New Tools via a Pants Plugin
 --------------------------------------
@@ -232,14 +234,11 @@ as shown in
 [`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
 
 `BUILD` targets can use this Repository's alias as the `repo` parameter
-to an <a pantsref="bdict_artifact">`artifact`</a>. For example, the
-`src/java/com/pants/examples/hello/greet/BUILD` refers to the `public`
-repostiory defined above. (Notice it's a Python object, not a string.)
+to an <a pantsref="bdict_artifact">`artifact`</a>. For example,
+[examples/src/java/com/pants/examples/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/greet/BUILD)
+refers to the `public` repository defined above. (Notice it's a Python object, not a string.)
 
-    :::python
-    provides = artifact(org='com.pants.examples',
-                        name='hello-greet',
-                        repo=public,)
+!inc[start-at=java_library](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
 
 If you get an error that the repo name (here, `public`) isn't defined,
 your plugin didn't register with Pants successfully. Make sure you
@@ -292,3 +291,45 @@ you give Pants a new ability.
 to find out how to
 develop a special Task to include "extra" data with published artifacts.
 
+Outside Caches
+--------------
+
+You can tell Pants to use outside caches when building. Pants automatically caches much of its
+work in its working directory. But you can tell it to use (and generate) pre-built things in
+another directory or a remote RESTful server. E.g, to use a shared server for cached builds,
+and having set up such a server, set `..._caches` options in `pants.ini`:
+
+    [DEFAULT]
+    read_artifact_caches: ['https://myserver.co/pantscache']
+    write_artifact_caches: ['https://myserver.co/pantscache']
+
+When building, Pants first tries to read built things from places in `read_artifact_caches`.
+If it builds something, it caches those built things in places in  `write_artifact_caches`.
+(It's handy that these are separate settings; if members of your organization can install wacky
+tools on their laptops, you might not want their builds to write to the cache, but would want
+them to be able to read from it.)
+
+Valid option values include
+
+* `[ 'https://myserver.co/pcache' ]` RESTful server URL
+* `[ '/tmp/pantscache' ]` local machine file location
+* `[ 'https://myserver.us/pcache|https://myserver.bf/pcache' ]` pipe-separated list of URLs--Pants pings each and uses fastest
+* `[ '/tmp/pantscache', 'https://myserver.co/pcache' ]` try local fs first, then remote server
+
+For a list of allowed values see the `create_artifact_cache` docstring in
+[`cache_setup.py`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/cache/cache_setup.py)
+
+To make a cache server, you need to write it. It's basically a RESTful server that can handle
+`GET`, `HEAD`, `PUT`, and `DELETE` requests on big binary blobs. If you implement this via `nginx`,
+then the `dav_methods PUT DELETE;` directive is good. (You might want to add some
+organization-specific business logic on top of that. E.g., if you're worried about the
+"wacky laptop tools" case, your server should only accept artifacts from known-legitimate
+machines.)
+When *reading* from a cache server, Pants tries to `GET` an URL at some path under the server URL;
+respond with 404 if there's nothing there, 200 if there is.
+When *writing* to a cache server, Pants first tries a `HEAD` request to see if the file's already
+there; respond with 404 if there's nothing there, 200 if there is. If Pants gets a 404, it will
+then try a `PUT` request; store the file it sends.
+If the user's `.netrc` has authentication information for the cache server[s], Pants will use it.
+(Thus, if only some users with known-good setups should be able to write to the cache, you might
+find it handy to use `.netrc` to authenticate those users.)

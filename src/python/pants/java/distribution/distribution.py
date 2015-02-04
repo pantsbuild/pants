@@ -33,16 +33,20 @@ class Distribution(object):
   @classmethod
   def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
     def scan_constraint_match():
+      # Convert strings to Revision objects for apples-to-apples comparison.
+      max_version = cls._parse_java_version("maximum_version", maximum_version)
+      min_version = cls._parse_java_version("minimum_version", minimum_version)
+
       for dist in cls._CACHE.values():
-        if minimum_version and dist.version < minimum_version:
+        if min_version and dist.version < min_version:
           continue
-        if maximum_version and dist.version > maximum_version:
+        if max_version and dist.version > max_version:
           continue
         if jdk and not dist.jdk:
           continue
         return dist
 
-    key = (minimum_version, jdk)
+    key = (minimum_version, maximum_version, jdk)
     dist = cls._CACHE.get(key)
     if not dist:
       dist = scan_constraint_match()
@@ -72,7 +76,8 @@ class Distribution(object):
 
     for path in filter(None, search_path()):
       try:
-        dist = cls(path, minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
+        dist = cls(bin_path=path, minimum_version=minimum_version,
+                   maximum_version=maximum_version, jdk=jdk)
         dist.validate()
         log.debug('Located %s for constraints: minimum_version'
                   ' %s, maximum_version %s, jdk %s' % (dist, minimum_version, maximum_version, jdk))
@@ -89,7 +94,7 @@ class Distribution(object):
     #  http://www.oracle.com/technetwork/java/javase/versioning-naming-139433.html
     # These version strings comply with semver except that the traditional pre-release semver
     # slot (the 4th) can be delimited by an _ in the case of update releases of the jdk.
-    # We accomodate that difference here.
+    # We accommodate that difference here.
     if isinstance(version, Compatibility.string):
       version = Revision.semver(version.replace('_', '-'))
     if version and not isinstance(version, Revision):
@@ -122,8 +127,6 @@ class Distribution(object):
     self._system_properties = None
     self._version = None
     self._validated_binaries = {}
-
-
 
   @property
   def jdk(self):

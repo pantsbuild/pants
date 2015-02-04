@@ -78,13 +78,8 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
         rmtree(path)
 
     with self._handle_bundles(names) as (paths, jars):
-      pants_run = self.run_pants(['goal', 'bundle',] + args, config=config)
-      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                        "goal bundle expected success, got {0}\n"
-                        "got stderr:\n{1}\n"
-                        "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                    pants_run.stderr_data,
-                                                    pants_run.stdout_data))
+      pants_run = self.run_pants(['bundle'] + args, config=config)
+      self.assert_success(pants_run)
       for path, jar, expected in zip(paths, jars, outputs):
         java_run = subprocess.Popen(['java', '-jar', jar],
                                     stdout=subprocess.PIPE,
@@ -141,6 +136,7 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
         set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.once_upon_a_time,]),
     )
 
+
 class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the exclude_specs option in pants.ini ."""
 
@@ -151,11 +147,11 @@ class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
 
     tempdir = tempfile.mkdtemp()
     tmp_output = os.path.join(tempdir, 'minimize-output1.txt')
-    run_result = self.run_pants(
-      ['goal', 'minimize', 'testprojects::', '--quiet',
-       '--minimize-output-file={0}'.format(tmp_output)])
-    self.assertEquals(0, run_result.returncode,
-                      msg="failed with output: {0}".format(run_result.stdout_data))
+    run_result = self.run_pants(['minimize',
+                                 'testprojects::',
+                                 '--quiet',
+                                 '--minimize-output-file={0}'.format(tmp_output)])
+    self.assert_success(run_result)
     results = output_to_list(tmp_output)
     self.assertIn('testprojects/src/java/com/pants/testproject/phrases:ten-thousand',
                   results)
@@ -168,15 +164,18 @@ class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
 
     tmp_output = os.path.join(tempdir, 'minimize-output2.txt')
 
-    run_result = self.run_pants(['goal', 'minimize', 'testprojects::', '--quiet',
+    run_result = self.run_pants(['minimize',
+                                 'testprojects::',
+                                 '--quiet',
                                  '--minimize-output-file={0}'.format(tmp_output)],
                                 config={
-                                  'DEFAULT' : {'spec_excludes' : [
-                                    'testprojects/src/java/com/pants/testproject/phrases'
-                                  ]}
-    })
-    self.assertEquals(0, run_result.returncode,
-                      msg="failed with output: {0}".format(run_result.stdout_data))
+                                    'DEFAULT': {
+                                        'spec_excludes': [
+                                            'testprojects/src/java/com/pants/testproject/phrases'
+                                        ]
+                                    }
+                                })
+    self.assert_success(run_result)
     results = output_to_list(tmp_output)
     self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:ten-thousand',
                      results)

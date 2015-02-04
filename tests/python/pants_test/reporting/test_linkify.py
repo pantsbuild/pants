@@ -8,13 +8,14 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import shutil
 import tempfile
-import unittest2 as unittest
+import unittest
 
 from pants.reporting.linkify import linkify
 
 
 def ensure_dir_exists(path):
   os.makedirs(path)
+
 
 def ensure_file_exists(path):
   ensure_dir_exists(os.path.dirname(path))

@@ -22,9 +22,6 @@
 .factorypath
 .python
 .pydevproject
-3rdparty/android/authentication/keys/release/*
-# allow only the readme under 'release'
-!3rdparty/android/authentication/keys/release/readme.txt
 build/
 codegen/classes/
 htmlcov/
@@ -34,6 +31,7 @@ out/
 /build-support/*.pex
 /build-support/*.venv
 /build-support/virtualenv-*
+/build-support/virtualenv.dist/
 /build-support/phab/
 /dist/
 /lib/

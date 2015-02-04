@@ -7,6 +7,7 @@ target(
     ':contextutil',
     ':dirutil',
     ':strutil',
+    ':fileutil',
   ]
 )
 
@@ -34,5 +35,14 @@ python_tests(
   sources = ['test_strutil.py'],
   dependencies = [
     'src/python/pants/util:strutil',
+  ]
+)
+
+python_tests(
+  name = 'fileutil',
+  sources = ['test_fileutil.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
   ]
 )

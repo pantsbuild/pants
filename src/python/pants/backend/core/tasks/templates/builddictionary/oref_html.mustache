@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<head>
+  <title>Pants Options Reference</title>
+</head>
+<body>
+
+<h1>Options Reference</h1>
+
+<p>
+This page documents Pants options: command-line options, options in a <tt>pants.ini</tt> file.
+These options are organized by <em>goal</em>. Goals are actions that can be taken on build targets.
+A goal identifies some high-level goal that you wish to accomplish, such as compiling your code.
+
+<p>
+Some goals have sub-goals, or <em>tasks</em>. For example, the <tt>compile.jvm</tt> task compiles
+Java code, and is installed in the <tt>compile</tt> goal.
+
+<p><b>Goals and Tasks summary</b>
+
+<ul>
+{{#goals}}
+  <li> <a href="#{{goal.name}}">{{goal.name}}</a> - {{goal.description}}
+{{/goals}}
+</ul>
+
+<style>
+div.oref_goal_section {
+  margin-left: 2%;
+}
+div.oref_goal_section h2 {
+  border-top: 4px solid #9bf;
+  margin-left: -2%;
+}
+div.oref_ogroup_section {
+  margin-left: 2%;
+}
+div.oref_ogroup_section h3 {
+  border-top: 1px dotted #bcd;
+  margin-left: -2%;
+}
+</style>
+
+{{#goals}}
+<div class="oref_goal_section">
+
+<a pantsmark="oref_goal_{{goal.name}}"> </a>
+
+<h2 id="{{goal.name}}">{{goal.name}}</h2>
+
+{{#goal.description}}
+<p>{{goal.description}}
+{{/goal.description}}
+
+{{#tasks}}
+
+{{#ogroup}}
+<div class="oref_ogroup_section">
+<a pantsmark="oref_cli_{{ogroup.pantsref}}"> </a>
+
+<h3 id="group_{{ogroup.pantsref}}">{{ogroup.title}}</h3>
+{{/ogroup}}
+
+<p>Implemented by <code>{{impl}}</code>
+
+{{#doc_html}}
+<div>
+{{{doc_html}}}
+</div>
+{{/doc_html}}
+
+{{#ogroup}}
+<ul>
+{{#options}}
+<li><code>{{st}}</code>
+{{#typ}}
+    <code>{{typ}}</code>
+{{/typ}}
+{{#default}}
+      (Default: <code>{{default}}</code>)
+{{/default}}
+
+{{hlp}}
+
+{{/options}}
+</ul>
+</div>
+{{/ogroup}}
+
+{{/tasks}}
+
+
+<p><b>Other command-line options:</b><br>
+<a href="#Common">Common</a>
+{{#leftover_ogs}}
+<a href="#group_{{pantsref}}">{{title}}</a>
+{{/leftover_ogs}}
+
+</div>
+{{/goals}}
+
+
+<h2 id="Common">Common</h2>
+
+<p>
+These command-line flags are available with all Pants goals.
+
+<ul>
+{{#glopts}}
+{{#options}}
+<li><code>{{st}}</code>
+{{#typ}}
+    <code>{{typ}}</code>
+{{/typ}}
+{{#default}}
+      (Default: <code>{{default}}</code>)
+{{/default}}
+
+{{hlp}}
+
+{{/options}}
+{{/glopts}}
+</ul>

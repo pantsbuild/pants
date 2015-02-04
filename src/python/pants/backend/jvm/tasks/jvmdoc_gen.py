@@ -28,10 +28,6 @@ class JvmdocGen(JvmTask):
     raise NotImplementedError()
 
   @classmethod
-  def product_types(cls):
-    return [cls.jvmdoc().product_type]
-
-  @classmethod
   def register_options(cls, register):
     super(JvmdocGen, cls).register_options(register)
     tool_name = cls.jvmdoc().tool_name
@@ -61,6 +57,20 @@ class JvmdocGen(JvmTask):
     register('--skip', default=False, action='store_true',
              help='Skip {0} generation.'.format(tool_name))
 
+  @classmethod
+  def product_types(cls):
+    return [cls.jvmdoc().product_type]
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JvmdocGen, cls).prepare(options, round_manager)
+
+    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
+    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
+    # and depend on that.
+    # See: https://github.com/pantsbuild/pants/issues/310
+    round_manager.require_data('classes_by_target')
+
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
 
@@ -75,13 +85,6 @@ class JvmdocGen(JvmTask):
     self.combined = self.open or options.combined
     self.ignore_failure = options.ignore_failure
     self.skip = options.skip
-
-  def prepare(self, round_manager):
-    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
-    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
-    # and depend on that.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('classes_by_target')
 
   def generate_doc(self, language_predicate, create_jvmdoc_command):
     """
@@ -106,8 +109,7 @@ class JvmdocGen(JvmTask):
     targets = self.context.targets()
     with self.invalidated(filter(docable, targets)) as invalidation_check:
       safe_mkdir(self.workdir)
-      exclusives_classpath = self.get_base_classpath_for_target(targets[0])
-      classpath = self.classpath(confs=self.confs, exclusives_classpath=exclusives_classpath)
+      classpath = self.classpath(confs=self.confs)
 
       def find_jvmdoc_targets():
         invalid_targets = set()

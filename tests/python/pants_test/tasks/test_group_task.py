@@ -7,7 +7,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import itertools, uuid
 
-from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.group_task import GroupMember, GroupIterator, GroupTask
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -15,7 +14,6 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.target import Target
 from pants.engine.round_manager import RoundManager
-
 from pants_test.base_test import BaseTest
 
 
@@ -66,7 +64,7 @@ class GroupIteratorSingleTest(GroupIteratorTestBase):
 
     group_member, targets = chunks[0]
     self.assertEqual(self.red, type(group_member))
-    self.assertEqual(set([a_red, b_red, c_red, d_red]), set(targets))
+    self.assertEqual({a_red, b_red, c_red, d_red}, set(targets))
 
 
 class GroupIteratorMultipleTest(GroupIteratorTestBase):
@@ -83,19 +81,19 @@ class GroupIteratorMultipleTest(GroupIteratorTestBase):
 
     group_member, targets = chunks[0]
     self.assertEqual(self.red, type(group_member))
-    self.assertEqual(set([a_red]), set(targets))
+    self.assertEqual({a_red}, set(targets))
 
     group_member, targets = chunks[1]
     self.assertEqual(self.blue, type(group_member))
-    self.assertEqual(set([a_blue]), set(targets))
+    self.assertEqual({a_blue}, set(targets))
 
     group_member, targets = chunks[2]
     self.assertEqual(self.green, type(group_member))
-    self.assertEqual(set([a_green]), set(targets))
+    self.assertEqual({a_green}, set(targets))
 
     group_member, targets = chunks[3]
     self.assertEqual(self.red, type(group_member))
-    self.assertEqual(set([b_red, c_red]), set(targets))
+    self.assertEqual({b_red, c_red}, set(targets))
 
 
 class BaseGroupTaskTest(BaseTest):
@@ -104,11 +102,12 @@ class BaseGroupTaskTest(BaseTest):
 
   def setUp(self):
     super(BaseGroupTaskTest, self).setUp()
+
+    self.maxDiff = None
+
     self._context = self.context(target_roots=self.create_targets())
 
-    exclusives_mapping = ExclusivesMapping(self._context)
-    exclusives_mapping._populate_target_maps(self._context.targets())
-    self._context.products.safe_create_data('exclusives_groups', lambda: exclusives_mapping)
+    self.populate_compile_classpath(self._context)
 
     self.recorded_actions = []
     # NB: GroupTask has a cache of tasks by name... use a distinct name
@@ -118,15 +117,16 @@ class BaseGroupTaskTest(BaseTest):
     self.group_task.add_member(self.group_member('javac', lambda t: t.is_java))
     self.group_task.add_member(self.group_member('scalac', lambda t: t.is_scala))
 
-    self.task = self.group_task(self._context, workdir='/not/real')
-    self.task.prepare(round_manager=RoundManager(self._context))
-    self.task.execute()
+    self.group_task._prepare(self.options, round_manager=RoundManager(self._context))
 
-  def construct_action(self, tag):
-    return 'construct', tag, self._context
+    self.task = self.group_task(self._context, workdir='/not/real')
+    self.task.execute()
 
   def prepare_action(self, tag):
     return 'prepare', tag, self._context
+
+  def construct_action(self, tag):
+    return 'construct', tag, self._context
 
   def prepare_execute_action(self, tag, chunks):
     return 'prepare_execute', tag, chunks
@@ -142,12 +142,13 @@ class BaseGroupTaskTest(BaseTest):
 
   def group_member(self, name, selector):
     class RecordingGroupMember(GroupMember):
+      @classmethod
+      def prepare(cls, options, round_manager):
+        self.recorded_actions.append(self.prepare_action(name))
+
       def __init__(me, *args, **kwargs):
         super(RecordingGroupMember, me).__init__(*args, **kwargs)
         self.recorded_actions.append(self.construct_action(name))
-
-      def prepare(me, round_manager):
-        self.recorded_actions.append(self.prepare_action(name))
 
       def select(me, target):
         return selector(target)
@@ -180,9 +181,7 @@ class GroupTaskTest(BaseGroupTaskTest):
   def test_groups(self):
     # These items will be executed by GroupTask in order.
     expected_prepare_actions = [
-        self.construct_action('javac'),
         self.prepare_action('javac'),
-        self.construct_action('scalac'),
         self.prepare_action('scalac')]
 
     # The ordering of the execution of these items isn't guaranteed:
@@ -191,6 +190,8 @@ class GroupTaskTest(BaseGroupTaskTest):
     #
     # So we store these separately, to do a special comparison later on.
     expected_prepare_execute_actions = [
+        self.construct_action('javac'),
+        self.construct_action('scalac'),
         self.pre_execute_action('javac'),
         self.pre_execute_action('scalac'),
         self.prepare_execute_action('javac', [[self.a], [self.c], [self.e]]),
@@ -233,13 +234,13 @@ class EmptyGroupTaskTest(BaseGroupTaskTest):
   def test_groups(self):
     # These items will be executed by GroupTask in order.
     expected_prepare_actions = [
-        self.construct_action('javac'),
         self.prepare_action('javac'),
-        self.construct_action('scalac'),
         self.prepare_action('scalac')]
 
     # The ordering of the execution of these items isn't guaranteed.
     expected_prepare_execute_actions = [
+        self.construct_action('javac'),
+        self.construct_action('scalac'),
         self.pre_execute_action('javac'),
         self.pre_execute_action('scalac'),
         self.post_execute_action('javac'),
@@ -271,6 +272,6 @@ class TransitiveGroupTaskTest(BaseGroupTaskTest):
 
     recorded = self.recorded_actions
 
-    # expecting construct/prepare for java/scalac, then pre-execute/prepare_execute for
+    # expecting prepare/construct for java/scalac, then pre-execute/prepare_execute for
     # javac/scalac: ignore 8 Finally, compare the remaining items.
     self.assertEqual(expected_execute_actions, recorded[8:])

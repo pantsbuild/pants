@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import os
-import unittest2 as unittest
+import unittest
 
 from pants.fs.archive import archiver
 from pants.util.contextutil import temporary_dir
@@ -70,5 +70,5 @@ class ArchiveTest(unittest.TestCase):
       with temporary_dir() as archivedir:
         archive = archiver('zip').create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
-          archiver('zip').extract(archive, todir, filter=do_filter)
+          archiver('zip').extract(archive, todir, filter_func=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))

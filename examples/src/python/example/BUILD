@@ -2,6 +2,7 @@ page(
   name='readme',
   source='readme.md',
   links=[
+    ':3rdparty_py',
     ':python_old',
     'src/docs:first_concepts',
   ]

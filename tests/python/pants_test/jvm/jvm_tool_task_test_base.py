@@ -10,6 +10,7 @@ import os
 import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
@@ -25,6 +26,15 @@ class JvmToolTaskTestBase(TaskTestBase):
   def setUp(self):
     real_config = self.config()
     super(JvmToolTaskTestBase, self).setUp()
+
+    # Use a synthetic subclass for bootstrapping within the test, to isolate this from
+    # any bootstrapping the pants run executing the test might need.
+    self.bootstrap_task_type, bootstrap_scope = self.synthesize_task_subtype(BootstrapJvmTools)
+    # TODO: We assume that no added jvm_options are necessary to bootstrap successfully in a test.
+    # This may not be true forever.  But getting the 'real' value here is tricky, as we have no
+    # access to the enclosing pants run's options here.
+    self.set_options_for_scope(bootstrap_scope, jvm_options=[])
+    JvmToolTaskMixin.reset_registered_tools()
 
     def link_or_copy(src, dest):
       try:
@@ -82,7 +92,8 @@ class JvmToolTaskTestBase(TaskTestBase):
     # instead it should probably just be using an Engine.
     task = self.create_task(context, workdir)
     task.invalidate()
-    BootstrapJvmTools(context, workdir).execute()
+    bootstrap_workdir = os.path.join(workdir, '_bootstrap_jvm_tools')
+    self.bootstrap_task_type(context, bootstrap_workdir).execute()
     return task
 
   def execute(self, context):

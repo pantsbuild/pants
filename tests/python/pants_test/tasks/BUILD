@@ -25,7 +25,6 @@ python_test_suite(
     ':builddict',
     ':bundle_create',
     ':cache_manager',
-    ':check_exclusives',
     ':check_published_deps',
     ':config',
     ':console_task',
@@ -140,6 +139,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'changed_target_integration',
+  sources = ['test_changed_target_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'junit_tests_integration',
   sources = ['test_junit_tests_integration.py'],
   dependencies = [
@@ -162,8 +170,6 @@ python_tests(
   name = 'jvm_run_integration',
   sources = ['test_jvm_run_integration.py'],
   dependencies = [
-    'src/python/pants/fs',
-    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
 )
@@ -198,18 +204,6 @@ python_tests(
     'tests/python/pants_test/testutils',
     'src/python/pants/base:build_invalidator',
     'src/python/pants/base:cache_manager',
-  ]
-)
-
-python_tests(
-  name = 'check_exclusives',
-  sources = ['test_check_exclusives.py'],
-  dependencies = [
-    'src/python/pants/base:config',
-    'src/python/pants/goal:context',
-    'src/python/pants/backend/core/tasks:check_exclusives',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -493,6 +487,7 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:listtargets',
+    'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_file_aliases',
@@ -668,7 +663,6 @@ python_tests(
   name = 'group_task',
   sources = ['test_group_task.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
@@ -695,7 +689,6 @@ python_tests(
   name = 'jvm_task',
   sources = ['test_jvm_task.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:task_test_base',
@@ -706,7 +699,6 @@ python_tests(
   name = 'jvmdoc_gen',
   sources = ['test_jvmdoc_gen.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:check_exclusives',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:task_test_base',

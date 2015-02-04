@@ -26,22 +26,11 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     # TODO: Get rid of this in favor of the inherited global color flag.
     register('--color', action='store_true', default=True,
              help='Emit test result with ANSI terminal color codes.')
+    cls.register_jvm_tool(register, 'specs', default=['//:scala-specs'])
 
-  def __init__(self, *args, **kwargs):
-    super(SpecsRun, self).__init__(*args, **kwargs)
-
-    self._specs_bootstrap_key = 'specs'
-    self.register_jvm_tool_from_config(self._specs_bootstrap_key, self.context.config,
-                                       ini_section='specs-run',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:scala-specs-2.9.3'])
-
-    self.skip = self.get_options().skip
-    self.color = self.get_options().color
-    self.tests = self.get_options().test
-
-  def prepare(self, round_manager):
-    super(SpecsRun, self).prepare(round_manager)
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(SpecsRun, cls).prepare(options, round_manager)
 
     # TODO(John Sirois): these are fake requirements in order to force compile run before this
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
@@ -49,6 +38,12 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     # See: https://github.com/pantsbuild/pants/issues/310
     round_manager.require_data('resources_by_target')
     round_manager.require_data('classes_by_target')
+
+  def __init__(self, *args, **kwargs):
+    super(SpecsRun, self).__init__(*args, **kwargs)
+    self.skip = self.get_options().skip
+    self.color = self.get_options().color
+    self.tests = self.get_options().test
 
   def execute(self):
     if not self.skip:
@@ -59,11 +54,8 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
         args.append('--specs=%s' % ','.join(tests))
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
-        bootstrapped_cp = self.tool_classpath(self._specs_bootstrap_key)
-        classpath = self.classpath(
-            bootstrapped_cp,
-            confs=self.confs,
-            exclusives_classpath=self.get_base_classpath_for_target(targets[0]))
+        bootstrapped_cp = self.tool_classpath('specs')
+        classpath = self.classpath(bootstrapped_cp, confs=self.confs)
 
         result = execute_java(
           classpath=classpath,

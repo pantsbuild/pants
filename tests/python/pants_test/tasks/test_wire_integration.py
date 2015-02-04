@@ -16,10 +16,12 @@ class WireIntegrationTest(PantsRunIntegrationTest):
 
   def test_good(self):
     # wire example should compile without warnings with correct wire files.
-    cmd = ['goal',
-           'compile',
-           'examples/src/java/com/pants/examples/wire/temperature']
-    pants_run = self.run_pants(cmd)
+
+    # force a compile to happen, we count on compile output in this test
+    self.assert_success(self.run_pants(['clean-all']))
+
+    pants_run = self.run_pants(['compile',
+                                'examples/src/java/com/pants/examples/wire/temperature'])
     self.assert_success(pants_run)
 
     expected_outputs = [
@@ -29,18 +31,13 @@ class WireIntegrationTest(PantsRunIntegrationTest):
       '/gen/wire/gen-java/com/pants/examples/temperature/Temperature.java',
     ]
     for expected_output in expected_outputs:
-      self.assertTrue(expected_output in pants_run.stdout_data)
+      self.assertIn(expected_output, pants_run.stdout_data)
 
   def test_bundle_wire_normal(self):
-    pants_run = self.run_pants(
-      ['goal', 'bundle', 'examples/src/java/com/pants/examples/wire/temperature',
-       '--bundle-deployjar', '--print-exception-stacktrace',])
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal bundle run expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
+    pants_run = self.run_pants(['bundle',
+                                '--deployjar',
+                                'examples/src/java/com/pants/examples/wire/temperature'])
+    self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-temperature-example-bundle')
 
     java_run = subprocess.Popen(['java', '-cp', 'wire-temperature-example.jar',
@@ -50,18 +47,13 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     java_retcode = java_run.wait()
     java_out = java_run.stdout.read()
     self.assertEquals(java_retcode, 0)
-    self.assertTrue('19 degrees celsius' in java_out)
+    self.assertIn('19 degrees celsius', java_out)
 
   def test_bundle_wire_dependent_targets(self):
-    pants_run = self.run_pants(
-      ['goal', 'bundle', 'examples/src/java/com/pants/examples/wire/element',
-       '--bundle-deployjar', '--print-exception-stacktrace',])
-    self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                      "goal bundle run expected success, got {0}\n"
-                      "got stderr:\n{1}\n"
-                      "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                  pants_run.stderr_data,
-                                                  pants_run.stdout_data))
+    pants_run = self.run_pants(['bundle',
+                                '--deployjar',
+                                'examples/src/java/com/pants/examples/wire/element'])
+    self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-element-example-bundle')
 
     java_run = subprocess.Popen(['java', '-cp', 'wire-element-example.jar',
@@ -71,6 +63,6 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     java_retcode = java_run.wait()
     java_out = java_run.stdout.read()
     self.assertEquals(java_retcode, 0)
-    self.assertTrue('Element{symbol=Hg, name=Mercury, atomic_number=80, '
-                    'melting_point=Temperature{unit=celsius, number=-39}, '
-                    'boiling_point=Temperature{unit=celsius, number=357}}' in java_out)
+    self.assertIn('Element{symbol=Hg, name=Mercury, atomic_number=80, '
+                  'melting_point=Temperature{unit=celsius, number=-39}, '
+                  'boiling_point=Temperature{unit=celsius, number=357}}', java_out)

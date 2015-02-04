@@ -30,7 +30,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
-    self.set_new_options(compressed=False)
+    self.set_options(compressed=False)
 
 
 class JarCreateMiscTest(JarCreateTestBase):

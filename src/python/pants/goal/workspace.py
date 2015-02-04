@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from twitter.common.lang import AbstractClass
 
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot
 from pants.scm.scm import Scm
 
 
@@ -23,6 +23,10 @@ class Workspace(AbstractClass):
   def touched_files(self, parent):
     """Returns the paths modified between the parent state and the current workspace state."""
 
+  @abstractmethod
+  def changes_in(self, rev_or_range):
+    """Returns the paths modified by some revision, revision range or other identifier."""
+
 
 class ScmWorkspace(Workspace):
   """A workspace that uses an Scm to determine the touched files."""
@@ -30,11 +34,10 @@ class ScmWorkspace(Workspace):
   def __init__(self, scm):
     super(ScmWorkspace, self).__init__()
 
-    self._scm = scm or get_scm()
-
-    if self._scm is None:
+    if scm is None:
       raise self.WorkspaceError('Cannot figure out what changed without a configured '
                                 'source-control system.')
+    self._scm = scm
 
   def touched_files(self, parent):
     try:
@@ -43,3 +46,9 @@ class ScmWorkspace(Workspace):
                                      relative_to=get_buildroot())
     except Scm.ScmException as e:
       raise self.WorkspaceError("Problem detecting changed files.", e)
+
+  def changes_in(self, rev_or_range):
+    try:
+      return self._scm.changes_in(rev_or_range, relative_to=get_buildroot())
+    except Scm.ScmException as e:
+      raise self.WorkspaceError("Problem detecting changes in {}.".format(rev_or_range), e)

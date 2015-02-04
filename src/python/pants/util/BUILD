@@ -25,3 +25,11 @@ python_library(
     '3rdparty/python:six',
   ],
 )
+
+python_library(
+  name = 'fileutil',
+  sources = ['fileutil.py'],
+  dependencies = [
+    ':contextutil',
+  ],
+)

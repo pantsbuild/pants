@@ -6,7 +6,6 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 import functools
-import keyword
 import os
 import re
 import shutil
@@ -64,7 +63,7 @@ class PythonThriftBuilder(CodeGenerator):
 
       safe_mkdir(os.path.dirname(copied_source))
       shutil.copyfile(abs_source, copied_source)
-      copied_sources.add(self._modify_thrift(copied_source))
+      copied_sources.add(copied_source)
 
     for src in copied_sources:
       if not self._run_thrift(src):
@@ -89,33 +88,6 @@ class PythonThriftBuilder(CodeGenerator):
       print('STDERR', file=sys.stderr)
       print(comm[1], file=sys.stderr)
     return rv == 0
-
-  def _modify_thrift(self, source):
-    """
-    Replaces the python keywords in the thrift file
-
-    Find all python keywords in each thrift file and appends a trailing underscore.
-    For example, 'from' will be converted to 'from_'.
-    """
-    rewrites = []
-    # Use binary strings here as data read from files is binary, and mixing
-    # binary and text can cause problems
-    renames = dict((ensure_binary(kw), b'%s_' % kw) for kw in keyword.kwlist)
-    token_regex = re.compile(r'\b(%s)\b' % '|'.join(renames.keys()), re.MULTILINE)
-
-    def token_replace(match):
-      return renames[match.group(1)]
-
-    def replace_tokens(contents):
-      return token_regex.sub(token_replace, contents)
-
-    rewrites.append(replace_tokens)
-    with open(source) as contents:
-      modified = functools.reduce(lambda txt, rewrite: rewrite(txt), rewrites, contents.read())
-      contents.close()
-      with open(source, 'w') as thrift:
-        thrift.write(modified)
-    return source
 
   @property
   def package_dir(self):

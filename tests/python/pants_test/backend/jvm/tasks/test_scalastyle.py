@@ -58,7 +58,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       relpath='scalastyle_excludes.txt',
       contents='\n'.join(exclude_patterns) if exclude_patterns else '')
 
-  def _create_context(self, config=None, options=None):
+  def _create_context(self, config=None, options=None, target_roots=None):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
     # Also by default, the task shouldn't be skipped, so use no skip option.
@@ -68,7 +68,8 @@ class ScalastyleTest(NailgunTaskTestBase):
         config: {config}
         excludes:
       '''.format(config=self._create_scalastyle_config_file())),
-      new_options=options or self._with_no_skip_option())
+      options=options or self._with_no_skip_option(),
+      target_roots=target_roots)
 
   def _create_scalastyle_task(self, config=None, options=None):
     return self.create_task(self._create_context(config, options), self.build_root)
@@ -143,23 +144,22 @@ class ScalastyleTest(NailgunTaskTestBase):
     # Create a custom context so we can manually inject multiple
     # targets of different source types and synthetic vs non-synthetic
     # to test the target filtering logic.
-    context = self._create_context()
 
     # scala_library - should remain.
     scala_target_address = BuildFileAddress(
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="s", sources=["Source.scala"])'),
       's')
-    context.build_graph.inject_address_closure(scala_target_address)
-    scala_target = context.build_graph.get_target(scala_target_address)
+    self.build_graph.inject_address_closure(scala_target_address)
+    scala_target = self.build_graph.get_target(scala_target_address)
 
     # scala_library but with java sources - should be filtered
     scala_target_java_source_address = BuildFileAddress(
       self.add_to_build_file(
         'a/scala_java/BUILD', 'scala_library(name="sj", sources=["Source.java"])'),
       'sj')
-    context.build_graph.inject_address_closure(scala_target_java_source_address)
-    scala_target_with_java_source = context.build_graph.get_target(
+    self.build_graph.inject_address_closure(scala_target_java_source_address)
+    scala_target_with_java_source = self.build_graph.get_target(
       scala_target_java_source_address)
 
     # java_library - should be filtered
@@ -167,21 +167,21 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/java/BUILD', 'java_library(name="j", sources=["Source.java"])'),
       'j')
-    context.build_graph.inject_address_closure(java_target_address)
-    java_target = context.build_graph.get_target(java_target_address)
+    self.build_graph.inject_address_closure(java_target_address)
+    java_target = self.build_graph.get_target(java_target_address)
 
     # synthetic scala_library - should be filtered
     synthetic_scala_target = self.make_target('a/synthetic_scala:ss', ScalaLibrary)
 
-    # add all these targets to context.
-    context.replace_targets([
-      java_target,
-      scala_target,
-      scala_target_with_java_source,
-      synthetic_scala_target
-    ])
+    context = self._create_context(
+      target_roots=[
+        java_target,
+        scala_target,
+        scala_target_with_java_source,
+        synthetic_scala_target
+      ])
 
-    # scala_library would bring in 'scala-library-2.9.3 defined in BUILD.tools
+    # scala_library would bring in 'scala-library defined in BUILD.tools
     # so we have an extra target here.
     self.assertEqual(5, len(context.targets()))
 
@@ -211,8 +211,8 @@ class ScalastyleTest(NailgunTaskTestBase):
         'a/scala_1/BUILD',
         'scala_library(name="s1", sources=["Source1.java", "Source1.scala"])'),
       's1')
-    context.build_graph.inject_address_closure(scala_target_address_1)
-    scala_target_1 = context.build_graph.get_target(scala_target_address_1)
+    self.build_graph.inject_address_closure(scala_target_address_1)
+    scala_target_1 = self.build_graph.get_target(scala_target_address_1)
 
     # this scala target has single *.scala source but will be excluded out
     # by the [scalastyle].[excludes] setting.
@@ -220,14 +220,20 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala_2/BUILD', 'scala_library(name="s2", sources=["Source2.scala"])'),
       's2')
-    context.build_graph.inject_address_closure(scala_target_address_2)
-    scala_target_2 = context.build_graph.get_target(scala_target_address_2)
+    self.build_graph.inject_address_closure(scala_target_address_2)
+    scala_target_2 = self.build_graph.get_target(scala_target_address_2)
 
-    # add all these targets to context.
-    context.replace_targets([
-      scala_target_1,
-      scala_target_2
-    ])
+    context = self._create_context(
+      config=dedent('''
+        [scalastyle]
+        config: {config}
+        excludes: {excludes}
+      '''.format(config=self._create_scalastyle_config_file(),
+                 excludes=self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']))),
+      target_roots=[
+        scala_target_1,
+        scala_target_2
+      ])
 
     # Remember, we have the extra 'scala-library-2.9.3' dep target.
     self.assertEqual(3, len(context.targets()))
@@ -243,7 +249,6 @@ class ScalastyleTest(NailgunTaskTestBase):
 
   def test_end_to_end_pass(self):
     # Default scalastyle config (import grouping rule) and no excludes.
-    context = self._create_context()
 
     # Create a scala source that would PASS ImportGroupingChecker rule.
     self.create_file(
@@ -260,15 +265,15 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="pass", sources=["pass.scala"])'),
       'pass')
-    context.build_graph.inject_address_closure(scala_target_address)
-    scala_target = context.build_graph.get_target(scala_target_address)
-    context.replace_targets([scala_target])
+    self.build_graph.inject_address_closure(scala_target_address)
+    scala_target = self.build_graph.get_target(scala_target_address)
+
+    context = self._create_context(target_roots=[scala_target])
 
     self.execute(context)
 
   def test_fail(self):
     # Default scalastyle config (import grouping rule) and no excludes.
-    context = self._create_context()
 
     # Create a scala source that would FAIL ImportGroupingChecker rule.
     self.create_file(
@@ -286,9 +291,10 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="fail", sources=["fail.scala"])'),
       'fail')
-    context.build_graph.inject_address_closure(scala_target_address)
-    scala_target = context.build_graph.get_target(scala_target_address)
-    context.replace_targets([scala_target])
+    self.build_graph.inject_address_closure(scala_target_address)
+    scala_target = self.build_graph.get_target(scala_target_address)
+
+    context = self._create_context(target_roots=[scala_target])
 
     with self.assertRaises(TaskError):
       self.execute(context)

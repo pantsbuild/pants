@@ -5,101 +5,162 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
-import os
+import re
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
+from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
-from pants.goal.workspace import Workspace
+from pants.base.lazy_source_mapper import LazySourceMapper
+from pants.goal.workspace import ScmWorkspace
 
 
-class WhatChanged(ConsoleTask):
+class ChangeCalculator(object):
+  """A utility for calculating changed files or changed target addresses."""
+
+  def __init__(self,
+               scm,
+               workspace,
+               address_mapper,
+               build_graph,
+               fast=False,
+               changes_since=None,
+               diffspec=None,
+               include_dependees=None,
+               exclude_target_regexp=None):
+
+    self._scm = scm
+    self._workspace = workspace
+    self._address_mapper = address_mapper
+    self._build_graph = build_graph
+
+    self._fast = fast
+    self._changes_since = changes_since
+    self._diffspec = diffspec
+    self._include_dependees = include_dependees
+    self._exclude_target_regexp = exclude_target_regexp
+
+    self._mapper_cache = None
+
+  @property
+  def _mapper(self):
+    if self._mapper_cache is None:
+      self._mapper_cache = LazySourceMapper(self._address_mapper, self._build_graph, self._fast)
+    return self._mapper_cache
+
+  def changed_files(self):
+    """Determines the files changed according to SCM/workspace and options."""
+    if self._diffspec:
+      return self._workspace.changes_in(self._diffspec)
+    else:
+      since = self._changes_since or self._scm.current_rev_identifier()
+      return self._workspace.touched_files(since)
+
+  def _directly_changed_targets(self):
+    # Internal helper to find target addresses containing SCM changes.
+    targets_for_source = self._mapper.target_addresses_for_source
+    return set(addr for src in self.changed_files() for addr in targets_for_source(src))
+
+  def _find_changed_targets(self):
+    # Internal helper to find changed targets, optionally including their dependees.
+    changed = self._directly_changed_targets()
+
+    # Skip loading the graph or doing any further work if no directly changed targets found.
+    if not changed:
+      return changed
+
+    if self._include_dependees is None:
+      return changed
+
+    # Load the whole build graph since we need it for dependee finding in either remaining case.
+    for address in self._address_mapper.scan_addresses():
+      self._build_graph.inject_address_closure(address)
+
+    if self._include_dependees == 'direct':
+      return changed.union(*[self._build_graph.dependents_of(addr) for addr in changed])
+
+    if self._include_dependees == 'transitive':
+      return set(t.address for t in self._build_graph.transitive_dependees_of_addresses(changed))
+
+    # Should never get here.
+    raise ValueError('Unknown dependee inclusion: "{}"'.format(self._include_dependees))
+
+  def changed_target_addresses(self):
+    """Find changed targets, according to SCM.
+
+    This is the intended entry point for finding changed targets unless callers have a specific
+    reason to call one of the above internal helpers. It will find changed targets and:
+      - Optionally find changes in a given diffspec (commit, branch, tag, range, etc).
+      - Optionally include direct or transitive dependees.
+      - Optionally filter targets matching exclude_target_regexp.
+
+    :returns: A set of target addresses.
+    """
+    # Find changed targets (and maybe their dependees).
+    changed = self._find_changed_targets()
+
+    # Remove any that match the exclude_target_regexp list.
+    excludes = [re.compile(pattern) for pattern in self._exclude_target_regexp]
+    return set([
+      t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
+    ])
+
+
+class ChangedFileTaskMixin(object):
+  """A mixin for tasks which require the set of targets (or files) changed according to SCM.
+
+  Changes are calculated relative to a ref/tree-ish (defaults to HEAD), and changed files are then
+  mapped to targets using LazySourceMapper. LazySourceMapper can optionally be used in "fast" mode,
+  which stops searching for additional owners for a given source once a one is found.
+  """
+  @classmethod
+  def register_change_file_options(cls, register):
+    register('--fast', action='store_true', default=False,
+             help='Stop searching for owners once a source is mapped to at least owning target.')
+    register('--changes-since', '--parent',
+             help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
+    register('--diffspec',
+             help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
+    register('--include-dependees', choices=['direct', 'transitive'], default=None,
+             help='Include direct or transitive dependees of changed targets.')
+
+  @classmethod
+  def change_calculator(cls, options, address_mapper, build_graph, scm=None, workspace=None):
+    scm = scm or get_scm()
+    if scm is None:
+      raise TaskError('No SCM available.')
+    workspace = workspace or ScmWorkspace(scm)
+
+    return ChangeCalculator(scm,
+                            workspace,
+                            address_mapper,
+                            build_graph,
+                            fast=options.fast,
+                            changes_since=options.changes_since,
+                            diffspec=options.diffspec,
+                            include_dependees=options.include_dependees,
+                            # NB: exclude_target_regexp is a global scope option registered
+                            # elsewhere
+                            exclude_target_regexp=options.exclude_target_regexp)
+
+
+class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
   """Emits the targets that have been modified since a given commit."""
   @classmethod
   def register_options(cls, register):
     super(WhatChanged, cls).register_options(register)
-    register('--parent', default='HEAD',
-             help='Calculate changes against this tree-ish.')
+    cls.register_change_file_options(register)
     register('--files', action='store_true', default=False,
              help='Show changed files instead of the targets that own them.')
 
-  def __init__(self, *args, **kwargs):
-    super(WhatChanged, self).__init__(*args, **kwargs)
-    self._parent = self.get_options().parent
-    self._show_files = self.get_options().files
-    self._workspace = self.context.workspace
-    self._filemap = {}
-    self._loaded_build_files = set()
-    self._owning_targets = defaultdict(set)
-
   def console_output(self, _):
-    if not self._workspace:
-      raise TaskError('No workspace provided.')
-
-    touched_files = self._get_touched_files()
-    if self._show_files:
-      for path in touched_files:
-        yield path
+    change_calculator = self.change_calculator(self.get_options(),
+                                               self.context.address_mapper,
+                                               self.context.build_graph,
+                                               scm=self.context.scm,
+                                               workspace=self.context.workspace)
+    if self.get_options().files:
+      for f in sorted(change_calculator.changed_files()):
+        yield f
     else:
-      touched_targets = set()
-      for path in touched_files:
-        self._load_build_files(path)
-
-      self._compute_owning_targets()
-
-      for path in touched_files:
-        for touched_target in self._owning_targets[path]:
-          if touched_target not in touched_targets:
-            touched_targets.add(touched_target)
-            yield touched_target.address.spec
-
-  def _get_touched_files(self):
-    try:
-      return self._workspace.touched_files(self._parent)
-    except Workspace.WorkspaceError as e:
-      raise TaskError(e)
-
-  def _load_build_files(self, path):
-    build_graph = self.context.build_graph
-    build_file_parser = self.context.build_file_parser
-    for build_file in self._candidate_owners(path):
-      if not build_file in self._loaded_build_files:
-        self._loaded_build_files.add(build_file)
-        address_map = build_file_parser.parse_build_file(build_file)
-        for address, _ in address_map.items():
-          build_graph.inject_address_closure(address)
-
-  def _compute_owning_targets(self):
-    build_graph = self.context.build_graph
-    for target in build_graph.targets():
-      # HACK: Python targets currently wrap old-style file resources in a synthetic
-      # resources target, but they do so lazily, when target.resources is first accessed.
-      # We force that access here, so that the targets will show up in the subsequent
-      # invocation of build_graph.targets().
-      if target.has_resources:
-        _ = target.resources
-
-    for target in build_graph.sorted_targets():
-      realtarget = target.concrete_derived_from
-      for source_file in target.sources_relative_to_buildroot():
-        self._owning_targets[source_file].add(realtarget)
-      if not target.is_synthetic:
-        self._owning_targets[target.address.build_file.relpath].add(realtarget)
-
-  def _candidate_owners(self, path):
-    build_file = BuildFile.from_cache(get_buildroot(),
-                                      relpath=os.path.dirname(path),
-                                      must_exist=False)
-    if build_file.exists():
-      yield build_file
-    for sibling in build_file.siblings():
-      yield sibling
-    for ancestor in build_file.ancestors():
-      yield ancestor
-
-  def _owns(self, target, path):
-    if target not in self._filemap:
-      self._filemap[target] = set(target.sources_relative_to_buildroot())
-    return path in self._filemap[target]
+      for addr in sorted(change_calculator.changed_target_addresses()):
+        yield addr.spec

@@ -27,6 +27,7 @@ from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
 
+INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
 
 def _copytree(from_base, to_base):
   def abort(error):
@@ -76,7 +77,7 @@ class ApacheThriftGen(CodeGen):
 
     # TODO(pl): This is broken because of how __init__.py files are generated/cached
     # for combined python thrift packages.
-    # self.setup_artifact_cache_from_config(config_section='thrift-gen')
+    # self.setup_artifact_cache()
 
   _thrift_binary = None
   @property
@@ -173,12 +174,13 @@ class ApacheThriftGen(CodeGen):
       # TODO(John Sirois): file paths should be normalized early on and uniformly, fix the need to
       # relpath here at all.
       relsource = os.path.relpath(source, get_buildroot())
+
       outdir = os.path.join(self.session_dir, '.'.join(relsource.split(os.path.sep)))
       safe_mkdir(outdir)
 
       cmd = args[:]
       cmd.extend(('-o', outdir))
-      cmd.append(source)
+      cmd.append(relsource)
       log.debug('Executing: %s' % ' '.join(cmd))
       sessions.append(self.ThriftSession(outdir, cmd, subprocess.Popen(cmd)))
 
@@ -291,7 +293,7 @@ def calculate_python_genfiles(namespace, types):
   yield path('__init__')
   if 'const' in types:
     yield path('constants')
-  if set(['enum', 'exception', 'struct', 'union']) & set(types.keys()):
+  if 'const' in types or set(['enum', 'exception', 'struct', 'union']) & set(types.keys()):
     yield path('ttypes')
   for service in types['service']:
     yield path(service)

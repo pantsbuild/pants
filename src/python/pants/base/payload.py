@@ -24,6 +24,10 @@ class Payload(object):
     self._frozen = False
     self._fingerprint_memo_map = {}
 
+  @property
+  def fields(self):
+    return self._fields.items()
+
   def freeze(self):
     """Permanently make this Payload instance immutable.
 

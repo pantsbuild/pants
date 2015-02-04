@@ -23,6 +23,10 @@ class Scm(AbstractClass):
     """Indicates a problem performing a local scm operation."""
 
   @abstractproperty
+  def current_rev_identifier(self):
+    """Identifier for the tip/head of the current branch eg. "HEAD" in git"""
+
+  @abstractproperty
   def commit_id(self):
     """Returns the id of the current commit."""
 
@@ -51,6 +55,14 @@ class Scm(AbstractClass):
 
     If relative_to is None, then the paths will be relative to the working tree of the SCM
     implementation (which might NOT match the buildroot.)
+    """
+
+  @abstractmethod
+  def changes_in(self, diffspec, relative_to=None):
+    """Returns a list of files changed by some diffspec (eg sha, range, ref, etc)
+
+    :param str diffspec: Some diffspec meaningful to the SCM.
+    :param str relative_to: a path to which results should be relative (instead of SCM root)
     """
 
   @abstractmethod

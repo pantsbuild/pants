@@ -5,10 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
 import logging
 import os
-import re
 import sys
 from pants.base.build_graph import BuildGraph
 
@@ -54,8 +52,11 @@ class GoalRunner(object):
 
     # Force config into the cache so we (and plugin/backend loading code) can use it.
     # TODO: Plumb options in explicitly.
-    options_bootstrapper.get_bootstrap_options()
+    bootstrap_options = options_bootstrapper.get_bootstrap_options()
     self.config = Config.from_cache()
+
+    # Add any extra paths to python path (eg for loading extra source backends)
+    sys.path.extend(bootstrap_options.for_global_scope().pythonpath)
 
     # Load plugins and backends.
     backend_packages = self.config.getlist('backends', 'packages', [])
@@ -70,7 +71,7 @@ class GoalRunner(object):
       known_scopes.extend(filter(None, goal.known_scopes()))
 
     # Now that we have the known scopes we can get the full options.
-    self.new_options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
+    self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
 
     self.run_tracker = RunTracker.from_config(self.config)
@@ -80,7 +81,7 @@ class GoalRunner(object):
     if url:
       self.run_tracker.log(Report.INFO, 'See a report at: %s' % url)
     else:
-      self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants goal server)')
+      self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
@@ -108,43 +109,49 @@ class GoalRunner(object):
   def get_spec_excludes(self):
     # Note: Only call after register_options() has been called.
     return [os.path.join(self.root_dir, spec_exclude)
-            for spec_exclude in self.new_options.for_global_scope().spec_excludes]
+            for spec_exclude in self.options.for_global_scope().spec_excludes]
 
   @property
   def global_options(self):
-    return self.new_options.for_global_scope()
+    return self.options.for_global_scope()
 
   def register_options(self):
     # Add a 'bootstrap' attribute to the register function, so that register_global can
     # access the bootstrap option values.
     def register_global(*args, **kwargs):
-      return self.new_options.register_global(*args, **kwargs)
-    register_global.bootstrap = self.new_options.bootstrap_option_values()
+      return self.options.register_global(*args, **kwargs)
+    register_global.bootstrap = self.options.bootstrap_option_values()
     register_global_options(register_global)
     for goal in Goal.all():
-      goal.register_options(self.new_options)
+      goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):
     logger = logging.getLogger(__name__)
 
-    goals = self.new_options.goals
-    specs = self.new_options.target_specs
-    fail_fast = self.new_options.for_global_scope().fail_fast
+    goals = self.options.goals
+    specs = self.options.target_specs
+    fail_fast = self.options.for_global_scope().fail_fast
 
     for goal in goals:
       if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.new_options.is_help:
-      self.new_options.print_help(goals=goals)
+    if self.options.is_help_all:
+      self.options.print_help(goals=[g.name for g in Goal.all()])
+      print('\nGlobal options:')
+      print(self.options.format_global_help())
+      sys.exit(0)
+    elif self.options.is_help:
+      self.options.print_help(goals=goals)
       sys.exit(0)
 
     self.requested_goals = goals
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
       spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
-                                      spec_excludes=self.get_spec_excludes())
+                                      spec_excludes=self.get_spec_excludes(),
+                                      exclude_target_regexps=self.global_options.exclude_target_regexp)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
@@ -156,7 +163,7 @@ class GoalRunner(object):
     def fail():
       self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
 
-    kill_nailguns = self.new_options.for_global_scope().kill_nailguns
+    kill_nailguns = self.options.for_global_scope().kill_nailguns
     try:
       result = self._do_run()
       if result:
@@ -185,6 +192,7 @@ class GoalRunner(object):
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
     # context/work-unit logging and standard python logging doesn't buy us anything.
 
+    # TODO(Eric Ayers) We are missing log messages. Set the log level earlier
     # Enable standard python logging for code with no handle to a context/work-unit.
     if self.global_options.level:
       LogOptions.set_stderr_log_level((self.global_options.level or 'info').upper())
@@ -215,46 +223,12 @@ class GoalRunner(object):
           return True
       return False
 
-    # Target specs are mapped to the patterns which match them, if any. This variable is a key for
-    # specs which don't match any exclusion regexes. We know it won't already be in the list of
-    # patterns, because the asterisks in its name make it an invalid regex.
-    _UNMATCHED_KEY = '** unmatched **'
-
-    def targets_by_pattern(targets, patterns):
-      mapping = defaultdict(list)
-      for target in targets:
-        matched_pattern = None
-        for pattern in patterns:
-          if re.search(pattern, target.address.spec) is not None:
-            matched_pattern = pattern
-            break
-        if matched_pattern is None:
-          mapping[_UNMATCHED_KEY].append(target)
-        else:
-          mapping[matched_pattern].append(target)
-      return mapping
-
     is_explain = self.global_options.explain
     update_reporting(self.global_options, is_quiet_task() or is_explain, self.run_tracker)
 
-    if self.global_options.exclude_target_regexp:
-      excludes = self.global_options.exclude_target_regexp
-      log.debug('excludes:\n  {excludes}'.format(excludes='\n  '.join(excludes)))
-      by_pattern = targets_by_pattern(self.targets, excludes)
-      self.targets = by_pattern[_UNMATCHED_KEY]
-      # The rest of this if-statement is just for debug logging.
-      log.debug('Targets after excludes: {targets}'.format(
-          targets=', '.join(t.address.spec for t in self.targets)))
-      excluded_count = sum(len(by_pattern[p]) for p in excludes)
-      log.debug('Excluded {count} target{plural}.'.format(count=excluded_count,
-          plural=('s' if excluded_count != 1 else '')))
-      for pattern in excludes:
-        log.debug('Targets excluded by pattern {pattern}\n  {targets}'.format(pattern=pattern,
-            targets='\n  '.join(t.address.spec for t in by_pattern[pattern])))
-
     context = Context(
       config=self.config,
-      new_options=self.new_options,
+      options=self.options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
       requested_goals=self.requested_goals,

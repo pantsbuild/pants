@@ -1,14 +1,54 @@
 About the documentation
 =======================
 
-Pants documentation is generated from markdown sources and some
-reflection code by Pants itself.
+Pants' user-facing documentation lives in markdown sources, in docstrings, and in some other
+special strings. We keep documentation close to the code it describes. If you change some code
+and wonder "should I update the docs?" the documentation that needs updating should be nearby.
+
+Docs in the Code
+----------------
+
+"Reference" information tends to live in the code. (Information for Pants developers, of course,
+lives in docstrings and comments; but some information for Pants *users* lives in the code, too.)
+
+### Goals, Tasks, and Options
+
+When a user views a goal's options by entering `./pants compile -h` or browsing the
+<a pantsref="oref_goal_compile">Pants Options Reference</a>, they see text that "lives" in the
+Pants source code. If you [develop a `Task`](dev_tasks.html), document it:
+
+**Goal description:** When registering a `Task` with a goal, call
+`with_description('yadda yadda')` to set the goal's description to "yadda yadda". More than one
+Task can register with a goal; thus another description might "clobber" the one you provide (and
+if you provide one, it might clobber another).
+
+!inc[start-at=with_description&end-at=with_description](../backend/core/register.py)
+
+**Option help** When registering a `Task` option, pass a `help` parameter to describe that option.
+
+!inc[start-at=register_options&end-at=help=](../backend/core/tasks/list_goals.py)
+
+### Targets and other `BUILD` File Things
+
+When a user views a target's parameters by entering `./pants targets --details=java_library` or
+by browsing the <a pantsref="bdict_java_library">Pants BUILD Dictionary</a>, they're mostly
+seeing information from a docstring. Pants extracts the useful information with some reflection
+code.
+
+In a few cases, the reflection code doesn't do the right thing without some "steering". E.g.,
+a Target is implemented by a Python class. *Most* of those class' methods aren't useful in
+`BUILD` files, but a few are. To reveal only the useful methods in the docs, Pants omits them
+by default, except those that have been tagged for inclusion.
+
+To "steer" the reflection, use a `@manual.builddict` annotation. See its
+[docstring](https://github.com/pantsbuild/pants/blob/master/src/python/pants/base/build_manual.py)
+for details about what it can show/hide.
 
 Generating the site
 -------------------
 
-A script encapsulates all that needs to be done. To generate and preview
-changes, just:
+To see http://pantsbuild.github.io/ site's content as it would be generated based on your local
+copy of the pants repo, enter the command
 
     :::bash
     # This publishes the docs **locally** and opens (-o) them in your browser for review
@@ -17,9 +57,11 @@ changes, just:
 Publishing the site
 -------------------
 
-Use the same script as for generating the site, but request it also be
-published. Don't worry - you'll get a chance to abort the publish just
-before its comitted remotely:
+We publish the site via [Github Pages](https://pages.github.com/). You need `pantsbuild` commit
+privilege to publish the site.
+
+Use the same script as for generating the site, but request it also be published. Don't
+worry—you'll get a chance to abort the publish just before it's committed remotely:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
@@ -27,9 +69,8 @@ before its comitted remotely:
     # proceeding to publish to http://pantsbuild.github.io
     ./build-support/bin/publish_docs.sh -op
 
-If you'd like to publish remotely for others to preview your changes
-easily, there is a -d option that will create a copy of the site in a
-subdir of <http://pantsbuild.github.io/>:
+If you'd like to publish remotely for others to preview your changes easily, the `-d` option creates
+a copy of the site in a subdir of <http://pantsbuild.github.io/>:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review

@@ -5,12 +5,12 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import itertools
 import logging
 import os
 
-from twitter.common.collections import OrderedDict, OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
@@ -31,20 +31,16 @@ logger = logging.getLogger(__name__)
 
 
 class WireGen(CodeGen, JvmToolTaskMixin):
+  @classmethod
+  def register_options(cls, register):
+    super(WireGen, cls).register_options(register)
+    cls.register_jvm_tool(register, 'wire-compiler')
+
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
     super(WireGen, self).__init__(*args, **kwargs)
-
-    self.wire_version = self.context.config.get('wire-gen', 'version',
-                                                default='1.6.0')
-
+    self.wire_version = self.context.config.get('wire-gen', 'version', default='1.6.0')
     self.java_out = os.path.join(self.workdir, 'gen-java')
-
-    self.register_jvm_tool_from_config(key='wire',
-                                       config=self.context.config,
-                                       ini_section='wire-gen',
-                                       ini_key='bootstrap-tools',
-                                       default=['//:wire-compiler'])
 
   def resolve_deps(self, key, default=None):
     default = default or []
@@ -115,7 +111,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
 
       args.extend(relative_sources)
 
-      result = util.execute_java(classpath=self.tool_classpath('wire'),
+      result = util.execute_java(classpath=self.tool_classpath('wire-compiler'),
                                  main='com.squareup.wire.WireCompiler',
                                  args=args)
       if result != 0:

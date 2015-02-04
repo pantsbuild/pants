@@ -194,6 +194,15 @@ python_library(
 )
 
 python_library(
+  name = 'lazy_source_mapper',
+  sources = ['lazy_source_mapper.py'],
+  dependencies = [
+    ':build_file',
+    ':build_environment',
+  ]
+)
+
+python_library(
   name = 'mustache',
   sources = ['mustache.py'],
   dependencies = [
@@ -275,6 +284,7 @@ python_library(
     ':build_manual',
     ':fingerprint_strategy',
     ':hash_utils',
+    ':lazy_source_mapper',
     ':payload',
     ':source_root',
     ':target_addressable',

@@ -7,10 +7,11 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from pkg_resources import resource_string
 import os
+import re
 
 from pants.backend.core.tasks.reflect import (assemble_buildsyms,
-                                              gen_goals_glopts_reference_data,
-                                              gen_tasks_goals_reference_data)
+                                              gen_glopts_reference_data,
+                                              gen_tasks_options_reference_data)
 from pants.backend.core.tasks.task import Task
 from pants.util.dirutil import safe_open
 from pants.base.generator import Generator, TemplateData
@@ -54,9 +55,6 @@ def python_sub_tocl(d):
   return sub_tocl(d, ['backend.python', 'core'], 'Python')
 
 
-
-
-
 class BuildBuildDictionary(Task):
   """Generate documentation for the Sphinx site."""
 
@@ -65,8 +63,14 @@ class BuildBuildDictionary(Task):
     self._templates_dir = os.path.join('templates', 'builddictionary')
     self._outdir = os.path.join(self.context.config.getdefault('pants_distdir'), 'builddict')
 
+  @classmethod
+  def register_options(cls, register):
+    super(BuildBuildDictionary, cls).register_options(register)
+    register('--omit-impl-re', action='append',
+             help='Omit goals who have a task matching one of these regexps.')
+
   def execute(self):
-    self._gen_goals_reference()
+    self._gen_options_reference()
     self._gen_build_dictionary()
 
   def _gen_build_dictionary(self):
@@ -94,25 +98,31 @@ class BuildBuildDictionary(Task):
                             defns=defns)
       generator.write(outfile)
 
-  def _gen_goals_reference(self):
-    """Generate the goals reference rst doc."""
-    goals = gen_tasks_goals_reference_data()
-    glopts = gen_goals_glopts_reference_data()
+  def _gen_options_reference(self):
+    """Generate the options reference rst doc."""
+    goals = gen_tasks_options_reference_data()
+    filtered_goals = []
+    omit_impl_regexps = [re.compile(r) for r in self.get_options().omit_impl_re]
+    for g in goals:
+      if any(r.match(t['impl']) for r in omit_impl_regexps for t in g.tasks):
+        continue
+      filtered_goals.append(g)
+    glopts = gen_glopts_reference_data()
 
     # generate the .rst file
     template = resource_string(__name__,
-                               os.path.join(self._templates_dir, 'goals_reference.mustache'))
-    filename = os.path.join(self._outdir, 'goals_reference.rst')
+                               os.path.join(self._templates_dir, 'options_reference.mustache'))
+    filename = os.path.join(self._outdir, 'options_reference.rst')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
-      generator = Generator(template, goals=goals, glopts=glopts)
+      generator = Generator(template, goals=filtered_goals, glopts=glopts)
       generator.write(outfile)
 
     # generate the .html file
     template = resource_string(__name__,
-                               os.path.join(self._templates_dir, 'gref_html.mustache'))
-    filename = os.path.join(self._outdir, 'goals_reference.html')
+                               os.path.join(self._templates_dir, 'oref_html.mustache'))
+    filename = os.path.join(self._outdir, 'options_reference.html')
     self.context.log.info('Generating %s' % filename)
     with safe_open(filename, 'wb') as outfile:
-      generator = Generator(template, goals=goals, glopts=glopts)
+      generator = Generator(template, goals=filtered_goals, glopts=glopts)
       generator.write(outfile)

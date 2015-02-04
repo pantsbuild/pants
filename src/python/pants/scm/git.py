@@ -70,6 +70,9 @@ class Git(Scm):
       from twitter.common import log as c_log
       self._log = c_log
 
+  def current_rev_identifier(self):
+    return 'HEAD'
+
   @property
   def commit_id(self):
     return self._check_output(['rev-parse', 'HEAD'], raise_type=Scm.LocalException)
@@ -94,6 +97,9 @@ class Git(Scm):
                                 raise_type=Scm.LocalException)
     return None if branch == 'HEAD' else branch
 
+  def fix_git_relative_path(self, worktree_path, relative_to):
+    return os.path.relpath(os.path.join(self._worktree, worktree_path), relative_to)
+
   def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
     relative_to = relative_to or self._worktree
     rel_suffix = ['--', relative_to]
@@ -114,9 +120,13 @@ class Git(Scm):
                                      raise_type=Scm.LocalException)
       files.update(untracked.split())
     # git will report changed files relative to the worktree: re-relativize to relative_to
-    def fix_git_relative_path(worktree_path):
-      return os.path.relpath(os.path.join(self._worktree, worktree_path), relative_to)
-    return set(fix_git_relative_path(f) for f in files)
+    return set(self.fix_git_relative_path(f, relative_to) for f in files)
+
+  def changes_in(self, diffspec, relative_to=None):
+    relative_to = relative_to or self._worktree
+    cmd = ['diff-tree', '--no-commit-id', '--name-only', '-r', diffspec]
+    files = self._check_output(cmd, raise_type=Scm.LocalException).split()
+    return set(self.fix_git_relative_path(f.strip(), relative_to) for f in files)
 
   def changelog(self, from_commit=None, files=None):
     args = ['whatchanged', '--stat', '--find-renames', '--find-copies']

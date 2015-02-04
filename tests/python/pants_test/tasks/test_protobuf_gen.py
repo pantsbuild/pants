@@ -7,14 +7,41 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 from textwrap import dedent
-import unittest2 as unittest
+import unittest
 
-from pants.backend.codegen.tasks.protobuf_gen import calculate_genfiles, _same_contents
+from twitter.common.collections import OrderedSet
+
+
+from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.tasks.protobuf_gen import _same_contents, calculate_genfiles, ProtobufGen
+from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.dirutil import safe_rmtree, safe_mkdir
+
+from pants_test.tasks.test_base import TaskTest
 
 
-class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):
+class ProtobufGenTest(TaskTest):
+  @classmethod
+  def task_type(cls):
+    return ProtobufGen
+
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(targets={'java_protobuf_library': JavaProtobufLibrary})
+
+
+  def setUp(self):
+    super(ProtobufGenTest, self).setUp()
+    self.task_outdir =  os.path.join(self.build_root, 'gen', 'protoc', 'gen-java')
+
+
+  def tearDown(self):
+    super(ProtobufGenTest, self).tearDown()
+    safe_rmtree(self.task_outdir)
+
   def assert_files(self, lang, rel_path, contents, expected_files):
     assert_list(expected_files)
 
@@ -22,9 +49,6 @@ class ProtobufGenCalculateGenfilesTestBase(unittest.TestCase):
       fp.write(contents)
       fp.close()
       self.assertEqual(set(expected_files), calculate_genfiles(fp.name, rel_path)[lang])
-
-
-class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
 
   def assert_java_files(self, rel_path, contents, expected_files):
     self.assert_files('java', rel_path, contents, expected_files)
@@ -199,3 +223,30 @@ class ProtobufGenCalculateJavaTest(ProtobufGenCalculateGenfilesTestBase):
             message joe_bob {}
           '''))
       self.assertFalse(_same_contents(dup1.name, dup2.name))
+
+  def test_protos_extracted_under_build_root(self):
+    """This testcase shows that you can put sources for protos outside the directory where the
+    BUILD file is defined. This will be the case for .proto files that have been extracted
+    under .pants.d.
+    """
+    # place a .proto file in a place outside of where the BUILD file is defined
+    extracted_source_path = os.path.join(self.build_root, 'extracted-source')
+    SourceRoot.register(extracted_source_path, JavaProtobufLibrary)
+    safe_mkdir(os.path.join(extracted_source_path, 'sample-package'))
+    sample_proto_path = os.path.join(extracted_source_path, 'sample-package', 'sample.proto')
+    with open(sample_proto_path, 'w') as sample_proto:
+      sample_proto.write(dedent('''
+            package com.example;
+            message sample {}
+          '''))
+    self.add_to_build_file('sample', dedent('''
+        java_protobuf_library(name='sample',
+          sources=['{sample_proto_path}'],
+        )''').format(sample_proto_path=sample_proto_path))
+    target = self.target("sample:sample")
+    task = self.prepare_task(build_graph=self.build_graph,
+                             targets=[target],
+                             build_file_parser=self.build_file_parser)
+    sources_by_base = task._calculate_sources([target])
+    self.assertEquals(['extracted-source'], sources_by_base.keys())
+    self.assertEquals(OrderedSet([sample_proto_path]), sources_by_base['extracted-source'])

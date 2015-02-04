@@ -4,11 +4,11 @@
 
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
-from contextlib import contextmanager
 
+from collections import OrderedDict
+from contextlib import contextmanager
 import os
 
-from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.tasks.jar_task import JarTask
@@ -27,16 +27,18 @@ class JvmBinaryTask(JarTask):
 
     If the binary declares a main then a 'Main-Class' manifest entry will be included.
     """
-    main = binary.main or '*** java -jar not supported, please use -cp and pick a main ***'
-    jar.main(main)
+    main = binary.main
+    if main is not None:
+      jar.main(main)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JvmBinaryTask, cls).prepare(options, round_manager)
+    round_manager.require('jar_dependencies', predicate=cls.is_binary)
 
   def __init__(self, *args, **kwargs):
     super(JvmBinaryTask, self).__init__(*args, **kwargs)
     self._jar_builder = self.prepare_jar_builder()
-
-  def prepare(self, round_manager):
-     super(JvmBinaryTask, self).prepare(round_manager)
-     round_manager.require('jar_dependencies', predicate=self.is_binary)
 
   def list_external_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.

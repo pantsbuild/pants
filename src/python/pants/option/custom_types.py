@@ -6,6 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.option.errors import ParseError
+from pants.base.config import Config
 
 
 def _parse_error(s, msg):
@@ -41,7 +42,9 @@ def _convert(val, acceptable_types):
   try:
     parsed_value = eval(val, {}, {})
   except Exception as e:
-    raise _parse_error(val, 'Value cannot be evaluated: {0}'.format(e.message))
+    raise _parse_error(val, 'Value cannot be evaluated: {msg}\n{value}'.format(
+      msg=e.message, value=Config.format_raw_value(val)))
   if not isinstance(parsed_value, acceptable_types):
-    raise _parse_error(val, 'Value is not of the acceptable types: {0}'.format(acceptable_types))
+    raise _parse_error(val, 'Value is not of the acceptable types: {msg}\n{value}'.format(
+      msg=acceptable_types, value=Config.format_raw_value(val)))
   return parsed_value

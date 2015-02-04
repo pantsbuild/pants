@@ -1,6 +1,7 @@
-Welcome to the Pants build system.
-==================================
+Pants Build
+===========
 
+**Welcome to the Pants Build System.**
 Pants is a build system for software projects in a variety of languages.
 It works particularly well for a source code repository that contains
 many distinct projects.
@@ -17,7 +18,7 @@ configure build-able things in BUILD files.
 + [[JVM Projects|pants('examples/src/java/com/pants/examples:readme')]]
 + [[Python Projects|pants('examples/src/python/example:readme')]]
 + [[README Files and Markdown|pants('examples/src/java/com/pants/examples:page')]]
-+ [[Pants Conceptual Overview|pants('src/docs:build_files')]]
++ [[BUILD Files|pants('src/docs:build_files')]]
 + [[Invoking Pants Build|pants('src/docs:invoking')]]
 + [[Troubleshooting|pants('src/docs:tshoot')]]
 
@@ -47,20 +48,21 @@ Using Pants With...
 News
 ----
 
++ [[Release History (Changelog)|pants('src/python/pants:changelog')]]
 + [[2014-09-16 Announcement|pants('src/docs:announce_201409')]]
   "Hello Pants Build"
 
 Advanced Documentation
 ----------------------
 
-+ [[Set up your Source Tree for Pants|pants('src/docs:announce_201409')]]
++ [[Set up your Source Tree for Pants|pants('src/docs:setup_repo')]]
 + [[Installing Pants|pants('src/docs:install')]]
 
 Pants Reference Documentation
 -----------------------------
 
 + <a href="build_dictionary.html">BUILD Dictionary</a>
-+ <a href="goals_reference.html">Goals Reference</a>
++ <a href="options_reference.html">Options Reference</a>
 
 Contributing to Pants
 ---------------------

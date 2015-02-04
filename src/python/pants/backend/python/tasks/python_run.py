@@ -12,6 +12,7 @@ from pex.pex import PEX
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 
 
@@ -37,6 +38,7 @@ class PythonRun(PythonTask):
       interpreter = self.select_interpreter_for_targets(self.context.targets())
       with self.temporary_pex_builder(interpreter=interpreter, pex_info=binary.pexinfo) as builder:
         chroot = PythonChroot(
+          context=self.context,
           targets=[binary],
           builder=builder,
           platforms=binary.platforms,

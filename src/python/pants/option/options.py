@@ -86,10 +86,20 @@ class Options(object):
     splitter = ArgSplitter(known_scopes)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
+
+    if bootstrap_option_values:
+      target_spec_files = bootstrap_option_values.target_spec_files
+      if target_spec_files:
+        for spec in target_spec_files:
+          with open(spec) as f:
+            self._target_specs.extend(filter(None, [line.strip() for line in f]))
+
     self._is_help = splitter.is_help
+    self._is_help_all = splitter.is_help_all
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
+    self._known_scopes = set(known_scopes)
 
   @property
   def target_specs(self):
@@ -100,6 +110,10 @@ class Options(object):
   def goals(self):
     """The requested goals, in the order specified on the cmd line."""
     return self._goals
+
+  def is_known_scope(self, scope):
+    """Whether the given scope is known by this instance."""
+    return scope in self._known_scopes
 
   def passthru_args_for_scope(self, scope):
     # Passthru args "belong" to the last scope mentioned on the command-line.
@@ -127,9 +141,15 @@ class Options(object):
     """Whether the command line indicates a request for help."""
     return self._is_help
 
+  @property
+  def is_help_all(self):
+    """Whether the command line indicates a request for all the help."""
+    return self._is_help_all
+
   def format_global_help(self):
     """Generate a help message for global options."""
-    return self.get_global_parser().format_help()
+    return (self.get_global_parser().format_help() +
+            '--help-all              Show options for all goals and exit.')
 
   def format_help(self, scope):
     """Generate a help message for options at the specified scope."""
@@ -173,6 +193,11 @@ class Options(object):
     self._values_by_scope[scope] = values
     return values
 
+  def __getitem__(self, scope):
+    # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
+    # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
+    return self.for_scope(scope)
+
   def bootstrap_option_values(self):
     """Return the option values for bootstrap options.
 
@@ -214,7 +239,7 @@ class Options(object):
       print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
       print('  ./pants help                                 Get help.')
       print('  ./pants help [goal]                          Get help for the specified goal.')
-      print('  ./pants goal goals                           List all installed goals.')
+      print('  ./pants goals                                List all installed goals.')
       print('')
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')

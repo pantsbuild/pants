@@ -33,12 +33,15 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
     else:
       return NailgunExecutor.killall(logger=logger, everywhere=everywhere)
 
+  @classmethod
+  def register_options(cls, register):
+    super(NailgunTaskBase, cls).register_options(register)
+    cls.register_jvm_tool(register, 'nailgun-server')
+
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
-    self._executor_workdir = os.path.join(self.context.new_options.for_global_scope().pants_workdir,
+    self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           'ng', self.__class__.__name__)
-    self._nailgun_bootstrap_key = 'nailgun'
-    self.register_jvm_tool(self._nailgun_bootstrap_key, ['//:nailgun-server'])
     self.set_distribution()  # Use default until told otherwise.
     # TODO: Choose default distribution based on options.
 
@@ -63,20 +66,11 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
     Call only in execute() or later. TODO: Enforce this.
     """
     if self.nailgun_is_enabled and self.get_options().ng_daemons:
-      classpath = os.pathsep.join(self.tool_classpath(self._nailgun_bootstrap_key))
+      classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       client = NailgunExecutor(self._executor_workdir, classpath, distribution=self._dist)
     else:
       client = SubprocessExecutor(self._dist)
     return client
-
-  @property
-  def jvm_args(self):
-    """Default jvm args the nailgun will be launched with.
-
-    By default no special jvm args are used.  If a value for ``jvm_args`` is specified in pants.ini
-    globally in the ``DEFAULT`` section or in the ``nailgun`` section, then that list will be used.
-    """
-    return self.context.config.getlist('nailgun', 'jvm_args', default=[])
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
               workunit_labels=None):

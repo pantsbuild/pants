@@ -13,21 +13,14 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class EclipseIntegrationTest(PantsRunIntegrationTest):
   def _eclipse_test(self, specs, project_dir=os.path.join('.pants.d', 'tmp', 'test-eclipse'),
-      project_name='project'):
+                    project_name='project'):
     """Helper method that tests eclipse generation on the input spec list."""
-
 
     if not os.path.exists(project_dir):
       os.makedirs(project_dir)
     with temporary_dir(root_dir=project_dir) as path:
-      pants_run = self.run_pants(['goal', 'eclipse',] + specs
-          + ['--no-pantsrc', '--eclipse-project-dir={dir}'.format(dir=path)])
-      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
-                        "goal eclipse expected success, got {0}\n"
-                        "got stderr:\n{1}\n"
-                        "got stdout:\n{2}\n".format(pants_run.returncode,
-                                                    pants_run.stderr_data,
-                                                    pants_run.stdout_data))
+      pants_run = self.run_pants(['eclipse', '--project-dir={dir}'.format(dir=path)] + specs)
+      self.assert_success(pants_run)
 
       expected_files = ('.classpath', '.project',)
       workdir = os.path.join(path, project_name)

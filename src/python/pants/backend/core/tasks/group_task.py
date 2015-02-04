@@ -7,15 +7,12 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
-from optparse import OptionGroup
 import os
 
-from pants.backend.core.tasks.check_exclusives import ExclusivesMapping
 from pants.backend.core.tasks.task import TaskBase, Task
 from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
 from pants.goal.goal import Goal
-from pants.goal.mkflag import Mkflag
 
 
 class GroupMember(TaskBase):
@@ -178,28 +175,6 @@ class GroupIterator(object):
     return chunks
 
 
-class ExclusivesIterator(object):
-  """Iterates over groups of compatible targets."""
-
-  def __init__(self, exclusives_mapping):
-    """Creates an iterator that yields lists of compatible targets.``.
-
-    Chunks will be returned in least exclusive to most exclusive order.
-
-    :param exclusives_mapping: An ``ExclusivesMapping`` that contains the exclusive chunked targets
-      to iterate.
-    """
-    if not isinstance(exclusives_mapping, ExclusivesMapping):
-      raise ValueError('An ExclusivesMapping is required, given %s of type %s'
-                       % (exclusives_mapping, type(exclusives_mapping)))
-    self._exclusives_mapping = exclusives_mapping
-
-  def __iter__(self):
-    sorted_excl_group_keys = self._exclusives_mapping.get_ordered_group_keys()
-    for excl_group_key in sorted_excl_group_keys:
-      yield self._exclusives_mapping.get_targets_for_group_key(excl_group_key)
-
-
 class GroupTask(Task):
   """A task that coordinates group members who all produce a single product type.
 
@@ -232,6 +207,10 @@ class GroupTask(Task):
       class SingletonGroupTask(GroupTask):
         _MEMBER_TYPES = []
 
+        @classmethod
+        def product_types(cls):
+          return product_type
+
         # We'd prefer to get the parent_options_scope from cls.options_scope,
         # but unfortunately that hasn't been set yet.
         parent_options_scope = '.'.join(flag_namespace)
@@ -248,8 +227,16 @@ class GroupTask(Task):
             member_type.register_options_on_scope(options)
 
         @classmethod
-        def product_types(cls):
-          return product_type
+        def _alternate_target_roots(cls, options, address_mapper, build_graph):
+          # We don't support groups proposing alternate roots.
+          # There is currently just the jvm compile group which does not need this and GroupTask
+          # will be removed as part of parallelizing the RoundEngine.
+          return None
+
+        @classmethod
+        def _prepare(cls, options, round_manager):
+          for member_type in cls._member_types():
+            member_type._prepare(options, round_manager)
 
         @property
         def group_name(self):
@@ -290,7 +277,8 @@ class GroupTask(Task):
   def __init__(self, *args, **kwargs):
     super(GroupTask, self).__init__(*args, **kwargs)
 
-    self._group_members = []
+    self._group_members = [member_type(self.context, os.path.join(self.workdir, member_type.name()))
+                           for member_type in self._member_types()]
 
   @abstractmethod
   def product_types(self):
@@ -300,13 +288,6 @@ class GroupTask(Task):
   def group_name(self):
     """GroupTask must be sub-classed to provide a group name."""
 
-  def prepare(self, round_manager):
-    round_manager.require_data('exclusives_groups')
-    for member_type in self._member_types():
-      group_member = member_type(self.context, os.path.join(self.workdir, member_type.name()))
-      group_member.prepare(round_manager)
-      self._group_members.append(group_member)
-
   def execute(self):
     with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):
       for group_member in self._group_members:
@@ -315,28 +296,13 @@ class GroupTask(Task):
       # TODO(John Sirois): implement group-level invalidation? This might be able to be done in
       # prepare_execute though by members.
 
-      # First, divide the set of all targets to be built into compatible chunks, based
-      # on their declared exclusives. Then, for each chunk of compatible exclusives, do
-      # further sub-chunking. At the end, we'll have a list of chunks to be built,
-      # which will go through the chunks of each exclusives-compatible group separately.
-
-      # TODO(markcc); chunks with incompatible exclusives require separate ivy resolves.
-      # Either interleave the ivy task in this group so that it runs once for each batch of
-      # chunks with compatible exclusives, or make the compilation tasks do their own ivy
-      # resolves for each batch of targets they're asked to compile.
-
+      # Chunk targets from the context by group. At the end, we'll have a list of chunks to be
+      # built.
       ordered_chunks = []
       chunks_by_member = defaultdict(list)
-
-      # TODO(John Sirois): GroupTask is currently dependent on CheckExclusives but this
-      # is wired indirectly in register.py.  Kill the dependency and push the exclusives bit
-      # into the GroupMembers that need it or else find a clean way to programatically depend
-      # on CheckExclusives.
-      exclusives = self.context.products.get_data('exclusives_groups')
-      for exclusive_chunk in ExclusivesIterator(exclusives):
-        for group_member, chunk in GroupIterator(exclusive_chunk, self._group_members):
-          ordered_chunks.append((group_member, chunk))
-          chunks_by_member[group_member].append(chunk)
+      for group_member, chunk in GroupIterator(self.context.targets(), self._group_members):
+        ordered_chunks.append((group_member, chunk))
+        chunks_by_member[group_member].append(chunk)
 
       self.context.log.debug('::: created chunks(%d)' % len(ordered_chunks))
       for i, (group_member, goal_chunk) in enumerate(ordered_chunks):

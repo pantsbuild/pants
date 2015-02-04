@@ -377,6 +377,7 @@ def render_html(dst, config, soups, precomputed, template):
                          generated=generate_generated(config, dst),
                          site_toc=generate_site_toc(config, precomputed, dst),
                          has_page_toc=bool(precomputed.page[dst].toc),
+                         page_path=dst,
                          page_toc=precomputed.page[dst].toc,
                          title=title,
                          topdots=topdots)

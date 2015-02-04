@@ -5,12 +5,9 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
+import logging
 import os
 import subprocess
-
-from twitter.common import log
-from twitter.common.collections import OrderedSet
-
 
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.aapt_task import AaptTask
@@ -21,7 +18,13 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
+
+from twitter.common.collections import OrderedSet
+
+
+logger = logging.getLogger(__name__)
 
 
 class AaptGen(AaptTask, CodeGen):
@@ -46,17 +49,6 @@ class AaptGen(AaptTask, CodeGen):
     super(AaptGen, self).__init__(*args, **kwargs)
     self._jar_library_by_sdk = {}
 
-  def prepare(self, round_manager):
-    super(AaptGen, self).prepare(round_manager)
-
-    # prepare exactly N android jar targets where N is the number of SDKs in-play
-    sdks = set(ar.target_sdk for ar in self.context.targets(predicate=self.is_gentarget))
-    for sdk in sdks:
-      jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
-      jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
-      address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
-      self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
-
   def is_gentarget(self, target):
     return isinstance(target, AndroidResources)
 
@@ -65,6 +57,15 @@ class AaptGen(AaptTask, CodeGen):
 
   def is_forced(self, lang):
     return lang == 'java'
+
+  def prepare_gen(self, targets):
+    # prepare exactly N android jar targets where N is the number of SDKs in-play
+    sdks = set(ar.target_sdk for ar in targets)
+    for sdk in sdks:
+      jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
+      jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
+      address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
+      self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
   def render_args(self, target, output_dir):
     args = []
@@ -82,18 +83,20 @@ class AaptGen(AaptTask, CodeGen):
     args.extend(['-S', target.resource_dir])
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    log.debug('Executing: {0}'.format(args))
+    logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def genlang(self, lang, targets):
     safe_mkdir(self.workdir)
     for target in targets:
       if lang != 'java':
-        raise TaskError('Unrecognized android gen lang: {0!r}'.format(lang))
-      process = subprocess.Popen(self.render_args(target, self.workdir))
-      result = process.wait()
-      if result != 0:
-        raise TaskError('Android aapt tool exited non-zero ({code})'.format(code=result))
+        raise TaskError('Unrecognized android gen lang: {0}'.format(lang))
+      args = self.render_args(target, self.workdir)
+      with self.context.new_workunit(name='aapt_gen', labels=[WorkUnit.MULTITOOL]) as workunit:
+        returncode = subprocess.call(args, stdout=workunit.output('stdout'),
+                                     stderr=workunit.output('stderr'))
+        if returncode:
+          raise TaskError('The AaptGen process exited non-zero: {0}'.format(returncode))
 
   def createtarget(self, lang, gentarget, dependees):
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))

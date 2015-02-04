@@ -388,41 +388,6 @@ A build target defined in `BUILD.foo` can't have the same `name` as a
 build target defined in the same directory's `BUILD` file; they share a
 namespace.
 
-Tag Incompatibilities with exclusives
--------------------------------------
-
-A big code workspace might contain some parts that aren't compatible
-with each other. To make sure that no target tries to use targets that
-don't work together, you can tag those targets with `exclusives`.
-
-For example, suppose that we had two java targets, jliba and jlibb.
-jliba uses `slf4j`, which includes in its jar package an implementation
-of `log4j`. jlibb uses `log4j` directly. But the version of log4j that's
-packaged inside of `slf4j` is different from the version used by jlibb.
-:
-
-    :::python
-    java_library(name='jliba',
-      dependencies = ['3rdparty/jvm/org/slf4j:slf4j-with-log4j-2.4'])
-    java_library(name='jlibb',
-      dependencies=['3rdparty/jvm/log4j:log4j-1.9'])
-    java_binary(name='javabin', dependencies=[':jliba', ':jlibb'])
-
-In this case, the binary target `javabin` depends on both `slf4j` with
-its packaged `log4j` version 2.4, and on `log4j-1.9`. Pants doesn't know
-that the slf4j and log4j `jar_dependencies` contain incompatible
-versions of the same library, and so it can't detect the error.
-
-With exclusives, the `jar_library` target for the joda libraries would
-declare exclusives tags:
-
-    :::python
-    jar_library(name='slf4j-with-log4j-2.4', exclusives={'log4j': '2.4'}, jars=[...])
-    java_library(name='jlibb', exclusives={'log4j': '1.9'}, dependencies=[...])
-
-With the exclusives declared, pants can recognize that 'javabin' has
-conflicting dependencies, and can generate an appropriate error message.
-
 <a pantsmark="build_pants_wrapper_gone"> </a>
 
 What happened to the `pants()` wrapper around targets?

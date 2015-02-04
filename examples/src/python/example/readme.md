@@ -6,7 +6,7 @@ Python environments painless. You can organize your code in the
 [[Pants way|pants('src/docs:first_concepts')]]
 with targets for binaries, libraries, and
 tests. Pants builds Python code into
-[PEXes](https://github.com/twitter/commons/blob/master/src/python/twitter/common/python/README.md).
+[PEXes](https://github.com/pantsbuild/pex/blob/master/docs/whatispex.rst).
 (A PEX is, roughly, an archive file containing a runnable Python
 environment.) Pants isn't the only PEX-generation tool out there; but if
 you have some "common code" used by more than one PEX, Pants makes it
@@ -30,10 +30,10 @@ Relevant Goals and Targets
 **Runnable Binary**
 
 > Pants can generate PEXes, executables built from Python. Invoke the
-> <a pantsref="gref_goal_binary">`binary` goal</a> on a
+> <a pantsref="oref_goal_binary">`binary`</a> goal on a
 > <a pantsref="bdict_python_binary">`python_binary`</a> target to generate a `.pex`.
 > You can also invoke the
-> <a pantsref="gref_goal_run">run goal</a> on a
+> <a pantsref="oref_goal_run">`run`</a> goal on a
 > `python_binary` to run its code "in place."
 
 **Importable Code**
@@ -51,13 +51,13 @@ Relevant Goals and Targets
 > the code. To use several several of these via a `pip`-style
 > `requirements.txt` file, use a
 > <a pantsref="bdict_python_requirements">`python_requirements`</a>.
+> For details, see [[Python 3rdparty Pattern|pants('examples/src/python/example:3rdparty_py')]].
 
 **Tests**
 
-> A <a pantsref="bdict_python_tests">`python_tests`</a> BUILD target has some
-> `pytest` tests. It normally depends on a `python_library` target so it
-> can import and test the library's code. Use the
-> <a pantsref="gref_goal_test">test goal</a> to run these tests.
+> A <a pantsref="bdict_python_tests">`python_tests`</a> BUILD target has some `pytest` tests.
+> It normally depends on a `python_library` target so it can import and test the library's code.
+> Use the <a pantsref="oref_goal_test">`test`</a> goal to run these tests.
 
 **Generated Code**
 
@@ -77,40 +77,59 @@ run the PEX:
          ...much output...
     $ ./dist/main.pex # run the generated PEX
     Hello, world!
+    $ ./dist/main.pex Whirled
+    Hello, Whirled!
     $
 
-`examples/src/python/example/hello/main/BUILD` defines a `python_binary`
-target, a build-able thing that configures a runnable program made from
+You can also run the binary "from source" with the `run` goal:
+
+    :::bash
+    $ ./pants goal run.py --args='Whirled' examples/src/python/example/hello/main
+         ...much output...
+    14:32:01 00:00     [py]
+    14:32:02 00:01       [run]
+    Hello, Whirled!
+    
+    14:32:02 00:01     [jvm]
+                   SUCCESS
+    $
+
+[`examples/src/python/example/hello/main/BUILD`](https://github.com/pantsbuild/pants/blob/master/examples/src/python/example/hello/main/BUILD)
+defines a `python_binary` target, a build-able thing that defines a runnable program made from
 Python code:
 
-!inc[start-after=Like Hello](hello/main/BUILD)
+!inc[start-at=python_binary](hello/main/BUILD)
 
-This binary has a source file with its "main". A Python binary's "main"
-can be in a depended-upon `python_library` or in the `python_binary`'s
-`source`.
+This binary has a source file, `main.py`, with its "main". A Python binary's "main" can be in a
+depended-upon `python_library` or in the `python_binary`'s `source`. (Notice that's `source`,
+not `sources`; a binary can have only one source file. If you want more, put them in a
+`python_library` and let the `python_binary` depend on that.)
 
-!inc[start-after=Apache License](hello/main/main.py)
+!inc[start-at=main](hello/main/main.py)
 
 This code imports code from another target. To make this work, the
 binary target has a dependency `examples/src/python/example/hello/greet`
-and the Python code imports `example/hello/greet`.
+and the Python code can thus import things from `example.hello.greet`.
 
 You remember that libraries configure "importable" code;
 `example/hello/greet/BUILD` has a `python_library`:
 
-!inc[start-after=Like Hello](hello/greet/BUILD)
+!inc[start-at=python_library](hello/greet/BUILD)
 
 This `python_library` pulls in `greet.py`'s Python code:
 
-!inc[start-after=Apache](hello/greet/greet.py)
+!inc[start-at=green](hello/greet/greet.py)
+
+BUILD for Tests
+---------------
 
 To test the library's code, we set up
-`examples/tests/python/example_test/hello/greet/BUILD` with a
-`python_tests` target. It depends on the library:
+[`examples/tests/python/example_test/hello/greet/BUILD`](https://github.com/pantsbuild/pants/blob/master/examples/tests/python/example_test/hello/greet/BUILD)
+with a `python_tests` target. It depends on the library:
 
-!inc[start-after=Apache](../../../tests/python/example_test/hello/greet/greet.py)
+!inc[start-at=python_tests](../../../tests/python/example_test/hello/greet/BUILD)
 
-Use `goal test` to run the tests:
+Use `goal test` to run the tests. This uses `pytest`:
 
     :::bash
     $ ./pants goal test examples/tests/python/example_test/hello/greet
@@ -142,12 +161,13 @@ Handling `python_requirement`
 -----------------------------
 
 `BUILD` files specify outside Python dependencies via
-<a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
-targets wrapping
-<a pantsref="bdict_python_requirements">`python_requirement`</a>s.
+<a pantsref="bdict_python_requirements">`python_requirements`</a> and a
+`requirements.txt` file and/or
+<a pantsref="bdict_python_requirement_library">`python_requirement_library`</a> targets wrapping
+<a pantsref="bdict_python_requirement">`python_requirement`</a>s.
 
 Pants handles these dependencies for you. It never installs anything
-globally. Instead, it builds the dependencies, caches them in .pants.d,
+globally. Instead, it builds the dependencies, caches them in `.pants.d`,
 and assembles them *a la carte* into an execution environment.
 
 PEX Contents
@@ -168,49 +188,42 @@ closure of hello/main's dependencies pulled in hello/greet and, in turn,
 hello/greet's dependencies. Pants bundles up the closed set of all
 dependencies into into the PEX.
 
-REPL and environment manipulation with pants py
------------------------------------------------
+Interactive Console with `repl` Goal
+------------------------------------
 
-Pants has a "py" command that lets you manipulate the environments
-described by `python_binary` and `python_library` targets, such as drop
-into an interpreter with the environment set up for you. Note that's
-"py", **not** "goal py".
+Use the <a pantsref="oref_goal_repl">`repl`</a> goal with a Python target to run an interactive
+Python REPL session.
+Within the session, you can `import` the target's code and the code of its dependencies.
 
-`pants py <target>`...
-
-1.  For a `python_binary` target, builds the environment and executes
-    the target.
-2.  For `python_library` targets, builds the environment that is the
-    transitive closure of all targets and drops into an interpreter.
-3.  For a combination of `python_binary` and `python_library` targets,
-    builds the transitive closure of all targets and executes the first
-    binary target.
-
-Let's drop into our library target
-`examples/src/python/example/hello/greet` with verbosity turn on to see
-what's going on in the background:
+To drop into our example library target `examples/src/python/example/hello/greet` with verbosity
+turn on to see what's going on in the background:
 
     :::bash
-    $ PANTS_VERBOSE=1 ./pants py examples/src/python/example/hello/greet
-    /Users/lhosken/workspace/pants examples/src/python/example/hello/greet
-    Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))]:
+    $ PANTS_VERBOSE=1 ./pants goal repl examples/src/python/example/hello/greet
+    
+    15:11:41 00:00 [main]
+                   (To run a reporting server: ./pants goal server)
+      ...lots of build output...
+    15:11:42 00:01   [repl]
+    15:11:42 00:01     [python-repl]Building chroot for [PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))]:
       Dumping library: PythonLibrary(BuildFileAddress(/Users/lhosken/workspace/pants/examples/src/python/example/hello/greet/BUILD, greet))
       Dumping requirement: ansicolors==1.0.2
       Dumping distribution: .../ansicolors-1.0.2-py2-none-any.whl
-    Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
+    
+    15:11:42 00:01       [run]
+    Python 2.7.5 (default, Mar  9 2014, 22:15:05) 
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
     >>>
 
-Pants loads `ansicolors` (greet's 3rdparty dependency). It would have
+Pants loads `ansicolors` (`greet`'s 3rdparty dependency). It would have
 fetched this dependency over the network if necessary. (It wasn't
-necessary to download `ansicolors`; Pants already fetched it while
+necessary to download `ansicolors`; Pants had already fetched it while
 "bootstrapping" itself.)
 
-You can convince yourself that the environment contains all the
-dependencies by inspecting sys.path and importing libraries as you
-desire:
+To convince yourself that the environment contains `greet`'s dependencies, you can inspect
+`sys.path` and import libraries:
 
     :::python
     >>> from example.hello.greet.greet import greet
@@ -223,44 +236,6 @@ desire:
 **Dependencies built by Pants are never installed globally**. These
 dependencies only exist for the duration of the Python interpreter
 forked by Pants.
-
-### `pants py --pex`
-
-You can use `./pants py --pex` to build a PEX file from `python_library`
-targets with no `python_binary` target. Since there is no entry point
-specified, the resulting `.pex` file just behaves like a Python
-interpreter, but with the sys.path bootstrapped for you:
-
-    :::bash
-    $ ./pants py --pex examples/src/python/example/hello/greet
-    /Users/lhosken/workspace/pants examples/src/python/example/hello/greet
-    Wrote /Users/lhosken/workspace/pants/dist/src.python.example.hello.greet.greet.pex
-    $
-
-If you run `dist/src.python.example.hello.greet.greet.pex`, since it has
-no entry point, it drops you into an interpreter:
-
-    :::bash
-    $ ./dist/src.python.example.hello.greet.greet.pex
-    Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
-    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
-    Type "help", "copyright", "credits" or "license" for more information.
-    (InteractiveConsole)
-    >>> from example.hello.greet.greet import greet
-    >>> greet("pex")
-    u'\x1b[32mHello, pex!\x1b[0m'
-    >>>
-
-It's like a single-file lightweight alternative to a virtualenv. We can
-even use it to run our main.py application:
-
-    :::bash
-    $ dist/src.python.example.hello.greet.greet.pex examples/src/python/example/hello/main/main.py
-    Hello, world!
-    $
-
-This can be an incredibly powerful and lightweight way to manage and
-deploy virtual environments without using virtualenv.
 
 `python_binary` `entry_point`
 ---------------------------
@@ -309,11 +284,11 @@ More About Python Tests
 -----------------------
 
 Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
-`goal test.pytest --options`. For example, to only run tests whose names match the pattern
-`*foo*`, you could run:
+`goal test.pytest --options`. For example, to only run tests whose names contain `req`,
+you could run:
 
     :::bash
-    $ ./pants goal test.pytest --options='-k foo' examples/tests/python/example_test/hello/greet
+    $ ./pants goal test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
                      platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
@@ -327,13 +302,57 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
     13:34:28 00:02     [specs]
                SUCCESS
 
-### Code Coverage
-
-To get code coverage data, set the `PANTS_PY_COVERAGE` environment
-variable:
+You can pass CLI options to `pytest` via passthrough parameters if `test.pytest` is the last goal
+and task on your command line. E.g., to run only tests whose names contain `req` via passthrough
+parameters:
 
     :::bash
-    $ PANTS_PY_COVERAGE=1 ./pants examples/tests/python/example_test/hello/greet:greet
+    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -k req
+       ...lots of build output...
+    10:43:04 00:01   [test]
+    10:43:04 00:01     [run_prep_command]
+    10:43:04 00:01       [prep_command]
+    10:43:04 00:01     [pytest]
+    10:43:04 00:01       [run]
+                         ============== test session starts ===============
+                         platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
+                         plugins: cov, timeout
+                         collected 2 items 
+                         
+                         examples/tests/python/example_test/hello/greet/greet.py .
+                         
+                         ========= 1 tests deselected by '-kreq' ==========
+                         ===== 1 passed, 1 deselected in 0.05 seconds =====
+                         
+    10:43:05 00:02     [junit]
+    10:43:05 00:02     [specs]
+                   SUCCESS
+
+...and to "unsilence" py.test (not suppress stderr and stdout), pass `-- -s`:
+
+    :::bash
+    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -s
+
+...and to remind yourself of py.test's help:
+
+    :::bash
+    $ ./pants goal test.pytest examples/tests/python/example_test/hello/greet -- -h
+
+### Code Coverage
+
+To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable. If you don't
+configured coverage data, it doesn't do much:
+
+    :::bash
+    $ PANTS_PY_COVERAGE=1 ./pants goal test examples/tests/python/example_test/hello/greet:greet
+        ...lots of build output...
+                         ============ 2 passed in 0.23 seconds ============
+                         Name    Stmts   Miss  Cover
+                         ---------------------------
+                         No data to report.
+
+    14:30:36 00:04     [junit]
+    14:30:36 00:04     [specs]
 
 This uses the `python_tests.coverage` target attribute to determine what
 modules to measure coverage against for each `python_tests` target run.
@@ -352,26 +371,96 @@ specification of package or module names to track coverage against. For
 example:
 
     :::bash
-    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants ...
+    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants goal test examples/tests/python/example_test/hello/greet:greet
+        ...lots of build output...
+                     ============ 2 passed in 0.22 seconds ============
+                     Name                                               Stmts   Miss Branch BrMiss  Cover
+                     ------------------------------------------------------------------------------------
+                     examples/src/python/example/hello/greet/__init__       0      0      0      0   100%
+                     examples/src/python/example/hello/greet/greet          4      0      0      0   100%
+                     ------------------------------------------------------------------------------------
+                     TOTAL                                                  4      0      0      0   100%
 
-This would measure coverage against all python code in the
-example.hello.greet and example.hello.main. It ignores coverage
-attributes.
+This measures coverage against all python code in `example.hello.greet` and `example.hello.main`.
+It ignores `python_library` `coverage=...` attributes.
 
 Similarly, a set of base paths can be specified containing the code for
 coverage to be measured over:
 
     :::bash
-    $ PANTS_PY_COVERAGE=paths:example/hello ./pants ...
+    $ PANTS_PY_COVERAGE=paths:example/hello ./pants goal test examples/tests/python/example_test/hello/greet:greet
+        ...lots of build output...
+                     ============ 2 passed in 0.23 seconds ============
+                     Name                                               Stmts   Miss Branch BrMiss  Cover
+                     ------------------------------------------------------------------------------------
+                     examples/src/python/example/hello/__init__             0      0      0      0   100%
+                     examples/src/python/example/hello/greet/__init__       0      0      0      0   100%
+                     examples/src/python/example/hello/greet/greet          4      0      0      0   100%
+                     ------------------------------------------------------------------------------------
+                     TOTAL                                                  4      0      0      0   100%
 
-In this case the paths should be relative to the source root housing the
-python code; for this example, examples/src/python.
+Paths are relative to the source root housing the python code; for this example,
+`examples/src/python`.
 
 ### Interactive Debugging on Test Failure
 
 You can invoke the Python debugger on a test failure by leaving out the
 `goal test` and passing `--pdb`. This can be useful for inspecting the
 state of objects especially if you are mocking interfaces.
+
+Building a `setup.py` Distutils Package
+---------------------------------------
+
+You can build Distutils packages from `python_library` targets.
+
+To make a `python_library` "setup-able", give it a `provides` parameter; this parameter's value
+should be a <a pantsref="bdict_setup_py">`setup_py`</a> call; this call's parameters will be
+passed to the `setup` function.
+
+    :::python
+    python_library(
+      name='test_infra',
+      dependencies=[
+        'tests/python/pants_test:base_test',
+        ...
+      ],
+      provides=setup_py(
+        name='pantsbuild.pants.testinfra',
+        version='0.0.24',
+        description='Test support for writing pants plugins.',
+        long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
+        url='https://github.com/pantsbuild/pants',
+        license='Apache License, Version 2.0',
+        zip_safe=True,
+        namespace_packages=['pants_test'],
+        classifiers=[
+          'Intended Audience :: Developers',
+          'License :: OSI Approved :: Apache Software License',
+          'Operating System :: MacOS :: MacOS X',
+          'Operating System :: POSIX :: Linux',
+          'Programming Language :: Python',
+          'Topic :: Software Development :: Build Tools',
+          'Topic :: Software Development :: Testing',
+        ]
+      )
+    )
+
+The <a pantsref="oref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
+
+    :::bash
+    $ ./pants goal setup-py src/python/pants:test_infra
+    10:23:06 00:00 [main]
+                   (To run a reporting server: ./pants goal server)
+    10:23:07 00:01   [bootstrap]
+    10:23:07 00:01   [setup]
+    10:23:07 00:01     [parse]
+                   Executing tasks in goals: setup-py
+    10:23:07 00:01   [setup-py]
+    10:23:07 00:01     [setup-py]
+                       Running packager against /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24
+                       Writing /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24.tar.gz
+                   SUCCESS
+
 
 Manipulating PEX behavior with environment variables
 ----------------------------------------------------

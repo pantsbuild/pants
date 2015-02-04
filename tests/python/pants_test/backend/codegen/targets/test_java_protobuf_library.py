@@ -65,7 +65,7 @@ class JavaProtobufLibraryTest(BaseTest):
       '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    with self.assertRaises(JvmTarget.WrongTargetTypeError):
+    with self.assertRaises(JarLibrary.WrongTargetTypeError):
       target.imports
 
   def test_wrong_import_type2(self):
@@ -79,7 +79,7 @@ class JavaProtobufLibraryTest(BaseTest):
       '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    with self.assertRaises(JvmTarget.ExpectedAddressError):
+    with self.assertRaises(JarLibrary.ExpectedAddressError):
       target.imports
 
   def test_traversable_specs(self):
