@@ -157,7 +157,8 @@ def open_zip64(path_or_file, allowZip64=True, *args, **kwargs):
     Passes through positional and kwargs to openZip.
   """
   kwargs['allowZip64'] = allowZip64
-  open_zip(path_or_file, args, kwargs)
+  with open_zip(path_or_file, *args, **kwargs) as zf:
+    yield zf
 
 
 @contextmanager
