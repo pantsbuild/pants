@@ -5,14 +5,14 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 import os
 import tempfile
-from zipfile import ZipFile
 
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_rmtree, touch
+from pants.util.contextutil import open_zip64
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -40,7 +40,7 @@ class DuplicateDetectorTest(TaskTestBase):
     touch(unicode_class_path)
 
     def generate_jar(path, *class_name):
-      with closing(ZipFile(generate_path(path), 'w', allowZip64=True)) as zipfile:
+      with open_zip64(generate_path(path), 'w') as zipfile:
         for clazz in class_name:
           zipfile.write(clazz)
         return zipfile.filename
