@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest2 as unittest
 
-from pants.fs.archive import TAR, TBZ2, TGZ, ZIP
+from pants.fs.archive import TAR, TBZ2, TGZ, ZIP, TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk, touch
 
@@ -33,6 +33,11 @@ class ArchiveTest(unittest.TestCase):
 
         with temporary_dir() as archivedir:
           archive = archiver.create(fromdir, archivedir, 'archive', prefix=prefix)
+
+          if isinstance(archiver, TarArchiver):
+            # can't use os.path.splitext because 'abc.tar.gz' would return '.gz'.
+            self.assertTrue(archive.endswith(archiver.extension))
+
           with temporary_dir() as todir:
             archiver.extract(archive, todir)
             fromlisting = self._listtree(fromdir, empty_dirs)

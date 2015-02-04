@@ -103,7 +103,7 @@ TGZ = TarArchiver('w:gz', 'tar.gz')
 TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
 ZIP = ZipArchiver(ZIP_DEFLATED)
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TGZ, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
+_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 
