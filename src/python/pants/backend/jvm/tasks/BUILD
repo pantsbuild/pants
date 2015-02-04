@@ -157,6 +157,7 @@ python_library(
     '3rdparty/python:pex',
     'src/python/pants/base:exceptions',
     'src/python/pants/java:jar',
+    'src/python/pants/util:contextutil',
   ],
 )
 
