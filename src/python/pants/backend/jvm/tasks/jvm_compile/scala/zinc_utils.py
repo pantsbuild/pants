@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
-from pants.util.contextutil import open_zip64 as open_jar
+from pants.util.contextutil import open_zip64
 from pants.util.dirutil import relativize_paths, safe_open
 
 
@@ -207,7 +207,7 @@ class ZincUtils(object):
     # plugin_jars is the universe of all possible plugins and their transitive deps.
     # Here we select the ones to actually use.
     for jar in self.plugin_jars():
-      with open_jar(jar, 'r') as jarfile:
+      with open_zip64(jar, 'r') as jarfile:
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
             plugin_info = ElementTree.parse(plugin_info_file).getroot()

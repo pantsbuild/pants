@@ -157,9 +157,7 @@ def open_zip64(path_or_file, *args, **kwargs):
     A with-context for zip files with allowZip64 True.
     Passes through positional and kwargs to openZip.
   """
-  allowZip64 = True
-  if 'allowZip64' in kwargs:
-     allowZip64 = kwargs.pop('allowZip64')
+  allowZip64 = kwargs.pop('allowZip64', True)
   with open_zip(path_or_file, *args, allowZip64=allowZip64, **kwargs) as zf:
     yield zf
 
