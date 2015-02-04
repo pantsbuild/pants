@@ -11,8 +11,8 @@ import subprocess
 import sys
 import unittest
 
-from pants.util.contextutil import environment_as, open_zip, open_zip64True, \
-  pushd, temporary_dir, temporary_file, Timer
+from pants.util.contextutil import (environment_as, open_zip64, pushd, temporary_dir,
+                                    temporary_file, Timer)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -138,13 +138,13 @@ class ContextutilTest(unittest.TestCase):
     self.assertLess(t.finish, clock.time())
 
   def test_open_zip64Default(self):
-    with open_zip64True('test', 'w') as zf:
+    with open_zip64('test', 'w') as zf:
       self.assertTrue(zf._allowZip64)
 
   def test_open_zip64True(self):
-    with open_zip64True('test', 'w', allowZip64=True) as zf:
+    with open_zip64('test', 'w', allowZip64=True) as zf:
       self.assertTrue(zf._allowZip64)
 
   def test_open_zip64False(self):
-    with open_zip64True('test', 'w', allowZip64=False) as zf:
+    with open_zip64('test', 'w', allowZip64=False) as zf:
       self.assertFalse(zf._allowZip64)
