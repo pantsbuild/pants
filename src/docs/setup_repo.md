@@ -257,7 +257,7 @@ contain a section for each Repository:
         # 'help': 'Configure your ~/.netrc for artifactory access.
       },
       'testing': { # this key must match the alias name above
-        'resolver': 'maven.twttr.com',
+        'resolver': 'artifactory.somedomain.com',
         'confs': ['default', 'sources', 'docs', 'changelog'],
         # 'auth': 'build-support:netrc',
         # 'help': 'Configure your ~/.netrc for artifactory access.
