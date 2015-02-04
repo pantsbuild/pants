@@ -62,6 +62,21 @@ class Bootstrapper(object):
     return cls._INSTANCE
 
   @classmethod
+  def custom_ivy(cls, bootstrap_workunit_factory=None, ivysettings=None):
+    """  Returns a oneoff Ivy instance, bootstrapped from a custom ivysettings.xml file.
+
+    By default runs ivy via a subprocess java executor.  Callers of execute() on the returned
+    Ivy instance can provide their own executor.
+
+    :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
+    :returns: an Ivy instance.
+    :raises: Bootstrapper.Error if the default ivy instance could not be bootstrapped
+    """
+    if ivysettings==None:
+      raise self.Error("Attempted to create bootstrap a custom Ivy without a config file.")
+    return cls().ivy(bootstrap_workunit_factory, ivysettings)
+
+  @classmethod
   def default_ivy(cls, bootstrap_workunit_factory=None):
     """Returns an Ivy instance using the default global bootstrapper.
 
@@ -83,14 +98,17 @@ class Bootstrapper(object):
     self._version_or_ivyxml = self._config.get('ivy', 'ivy_profile', default=self._DEFAULT_VERSION)
     self._classpath = None
 
-  def ivy(self, bootstrap_workunit_factory=None):
+  def ivy(self, bootstrap_workunit_factory=None, ivysettings=None):
     """Returns an ivy instance bootstrapped by this bootstrapper.
 
     :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
+    :param ivysettings: a string path to an 'ivysettings.xml' file.
     :raises: Bootstrapper.Error if ivy could not be bootstrapped
     """
+    if ivysettings is None:
+      ivysettings = self._ivy_settings
     return Ivy(self._get_classpath(bootstrap_workunit_factory),
-               ivy_settings=self._ivy_settings,
+               ivy_settings=ivysettings,
                ivy_cache_dir=self.ivy_cache_dir)
 
   def _get_classpath(self, workunit_factory):

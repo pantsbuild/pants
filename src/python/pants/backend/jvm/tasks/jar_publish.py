@@ -562,7 +562,11 @@ class JarPublish(JarTask, ScmPublish):
     path = repo.get('path')
 
     try:
-      ivy = Bootstrapper.default_ivy()
+      custom_config = self.context.config.get(self._CONFIG_SECTION, 'ivy_settings')
+      if custom_config:
+        ivy = Bootstrapper.custom_ivy(ivysettings=custom_config)
+      else:
+        ivy = Bootstrapper.default_ivy()
     except Bootstrapper.Error as e:
       raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))
 
