@@ -42,8 +42,8 @@ _CWD_NOT_PRESENT='CWD NOT PRESENT'
 # so it seems prefectly reasonable for them to have a reference to the task.
 # This trick just makes debugging harder, and requires extra work when a runner implementation
 # needs some new thing from the task.
-# TOMAYBENOTDO(ji): IIRC, I was carrying the reference to the Task in very early versions, and
-# jsirois suggested that I switch to the current form.
+# TODO(ji): (responding to benjy's) IIRC, I was carrying the reference to the Task in very early
+# versions, and jsirois suggested that I switch to the current form.
 _TaskExports = namedtuple('_TaskExports',
                           ['classpath',
                            'task_options',
@@ -247,7 +247,7 @@ class _JUnitRunner(object):
     if not source_products:
       # It's valid - if questionable - to have a source file with no classes when, for
       # example, the source file has all its code commented out.
-      self._context.log.warn('Source file %s generated no classes' % srcfile)
+      self._context.log.warn('Source file {0} generated no classes'.format(srcfile))
     else:
       for _, classes in source_products.rel_paths():
         for cls in classes:
@@ -288,7 +288,7 @@ class _Coverage(_JUnitRunner):
             help='Output an HTML coverage report.')
     register('--coverage-html-open', action='store_true',
              help='Open the generated HTML coverage report in a browser. Implies --coverage-html.')
-    register('--coverage-report-when-tests-fail', action='store_true',
+    register('--coverage-force', action='store_true',
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 
@@ -387,9 +387,9 @@ class Emma(_Coverage):
 
   def report(self, targets, tests, tests_failed_exception=None):
     if tests_failed_exception:
-      self._context.log.warn('Test failed: %s' % str(tests_failed_exception))
+      self._context.log.warn('Test failed: {0}'.format(str(tests_failed_exception)))
       if self._coverage_report_when_tests_fail:
-        self._context.log.warn('Generating report even though tests failed%')
+        self._context.log.warn('Generating report even though tests failed')
       else:
         return
     args = [
@@ -459,7 +459,7 @@ class Cobertura(_Coverage):
 
   def instrument(self, targets, tests, junit_classpath):
     cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
-    aux_classpath = ':'.join(relativize_paths(junit_classpath, get_buildroot()))
+    aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
     classes_by_target = self._context.products.get_data('classes_by_target')
     for target in targets:
@@ -500,7 +500,7 @@ class Cobertura(_Coverage):
         ]
       with temporary_file_path(cleanup=False) as instrumented_classes_file:
         file(instrumented_classes_file, 'w').write('\n'.join(classes) + '\n')
-        self._context.log.debug('instrumented classes in %s' % instrumented_classes_file)
+        self._context.log.debug('instrumented classes in {0}'.format(instrumented_classes_file))
         args.append('--listOfFilesToInstrument')
         args.append(instrumented_classes_file)
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
@@ -536,8 +536,8 @@ class Cobertura(_Coverage):
             if source_by_class.get(product):
               if source_by_class.get(product) != source_file:
                 self._context.log.warn(
-                  'Inconsistency finding source for class %s: already had %s, also found %s' %
-                  (product, source_by_class.get(product), source_file))
+                  'Inconsistency finding source for class {0}: already had {1}, also found {2}'
+                  .format(product, source_by_class.get(product), source_file))
             else:
               source_by_class[product] = source_file
     return source_by_class
@@ -547,9 +547,9 @@ class Cobertura(_Coverage):
       self._context.log.warn('Nothing found to instrument, skipping report...')
       return
     if tests_failed_exception:
-      self._context.log.warn('Test failed: %s' % str(tests_failed_exception))
+      self._context.log.warn('Test failed: {0}'.format(tests_failed_exception))
       if self._coverage_report_when_tests_fail:
-        self._context.log.warn('Generating report even though tests failed%')
+        self._context.log.warn('Generating report even though tests failed.')
       else:
         return
     cobertura_cp = self._task_exports.tool_classpath('cobertura-report')
@@ -589,10 +589,9 @@ class Cobertura(_Coverage):
         except OSError as e:
           # These warnings appear when source files contain multiple classes.
           self._context.log.warn(
-            'Could not symlink %s to %s: %s' %
-            (source_file, fake_source_file, e))
+            'Could not symlink {0} to {1}: {2}'.format(source_file, fake_source_file, e))
       else:
-        self._context.log.error('class %s does not exist in a source file!' % cls)
+        self._context.log.error('class {0} does not exist in a source file!'.format(cls))
     report_formats = []
     if self._coverage_report_xml:
       report_formats.append('xml')
