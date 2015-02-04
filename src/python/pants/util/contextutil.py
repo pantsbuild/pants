@@ -162,7 +162,6 @@ def open_zip64(path_or_file, *args, **kwargs):
   with open_zip(path_or_file, *args, allowZip64=allowZip64, **kwargs) as zf:
     yield zf
 
-
 @contextmanager
 def open_tar(path_or_file, *args, **kwargs):
   """
