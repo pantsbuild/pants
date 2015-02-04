@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest2 as unittest
 
-from pants.fs.archive import TAR, TBZ2, TGZ, ZIP, TarArchiver
+from pants.fs.archive import _ARCHIVER_BY_TYPE
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk, touch
 
@@ -23,7 +23,7 @@ class ArchiveTest(unittest.TestCase):
       listing.update(os.path.normpath(os.path.join(relpath, f)) for f in files)
     return listing
 
-  def round_trip(self, archiver, empty_dirs):
+  def round_trip(self, archiver, expected_ext, empty_dirs):
     def test_round_trip(prefix=None):
       with temporary_dir() as fromdir:
         safe_mkdir(os.path.join(fromdir, 'a/b/c'))
@@ -34,9 +34,8 @@ class ArchiveTest(unittest.TestCase):
         with temporary_dir() as archivedir:
           archive = archiver.create(fromdir, archivedir, 'archive', prefix=prefix)
 
-          if isinstance(archiver, TarArchiver):
-            # can't use os.path.splitext because 'abc.tar.gz' would return '.gz'.
-            self.assertTrue(archive.endswith(archiver.extension))
+          # can't use os.path.splitext because 'abc.tar.gz' would return '.gz'.
+          self.assertTrue(archive.endswith(expected_ext))
 
           with temporary_dir() as todir:
             archiver.extract(archive, todir)
@@ -51,12 +50,12 @@ class ArchiveTest(unittest.TestCase):
     test_round_trip(prefix='jake')
 
   def test_tar(self):
-    self.round_trip(TAR, empty_dirs=True)
-    self.round_trip(TGZ, empty_dirs=True)
-    self.round_trip(TBZ2, empty_dirs=True)
+    self.round_trip(_ARCHIVER_BY_TYPE['tar'], expected_ext='tar', empty_dirs=True)
+    self.round_trip(_ARCHIVER_BY_TYPE['tgz'], expected_ext='tar.gz', empty_dirs=True)
+    self.round_trip(_ARCHIVER_BY_TYPE['tbz2'], expected_ext='tar.bz2', empty_dirs=True)
 
   def test_zip(self):
-    self.round_trip(ZIP, empty_dirs=False)
+    self.round_trip(_ARCHIVER_BY_TYPE['zip'], expected_ext='zip', empty_dirs=False)
 
   def test_zip_filter(self):
     def do_filter(path):
@@ -67,7 +66,7 @@ class ArchiveTest(unittest.TestCase):
       touch(os.path.join(fromdir, 'disallowed.txt'))
 
       with temporary_dir() as archivedir:
-        archive = ZIP.create(fromdir, archivedir, 'archive')
+        archive = _ARCHIVER_BY_TYPE['zip'].create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
-          ZIP.extract(archive, todir, filter=do_filter)
+          _ARCHIVER_BY_TYPE['zip'].extract(archive, todir, filter=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))
