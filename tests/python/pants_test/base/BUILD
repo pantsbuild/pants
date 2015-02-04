@@ -44,7 +44,6 @@ python_test_suite(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
-    ':double_dag',
     ':extension_loader',
     ':fingerprint_strategy',
     ':generator',
@@ -196,17 +195,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-  ]
-)
-
-python_tests(
-  name = 'double_dag',
-  sources = ['test_double_dag.py'],
-  dependencies = [
-    'src/python/pants/base:double_dag',
-    'src/python/pants/reporting',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/testutils',
   ]
 )
 

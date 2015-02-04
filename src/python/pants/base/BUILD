@@ -162,14 +162,6 @@ python_library(
 )
 
 python_library(
-  name = 'double_dag',
-  sources = ['double_dag.py'],
-  dependencies = [
-    ':abbreviate_target_ids',
-  ]
-)
-
-python_library(
   name = 'exceptions',
   sources = ['exceptions.py'],
 )
