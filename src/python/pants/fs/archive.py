@@ -16,7 +16,7 @@ from zipfile import ZIP_DEFLATED
 from twitter.common.collections.ordereddict import OrderedDict
 from twitter.common.lang import AbstractClass
 
-from pants.util.contextutil import open_tar, open_zip
+from pants.util.contextutil import open_tar, open_zip64
 from pants.util.dirutil import safe_walk
 from pants.util.strutil import ensure_text
 
@@ -69,8 +69,8 @@ class ZipArchiver(Archiver):
     :param function filter: optional filter with the filename as the parameter.  Returns True if
       the file should be extracted.
     """
-    with open_zip(path) as zip:
-      for path in zip.namelist():
+    with open_zip64(path) as archive_file:
+      for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
         if path.startswith(b'/') or path.startswith(b'..'):
           raise ValueError('Zip file contains unsafe path: %s' % path)
@@ -85,7 +85,7 @@ class ZipArchiver(Archiver):
 
   def create(self, basedir, outdir, name, prefix=None):
     zippath = os.path.join(outdir, '%s.zip' % name)
-    with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
+    with open_zip64(zippath, 'w', compression=ZIP_DEFLATED) as zip:
       for root, _, files in safe_walk(basedir):
         root = ensure_text(root)
         for file in files:
