@@ -151,13 +151,15 @@ def open_zip(path_or_file, *args, **kwargs):
     zf.close()
 
 @contextmanager
-def open_zip64(path_or_file, allowZip64=True, *args, **kwargs):
+def open_zip64True(path_or_file, *args, **kwargs):
   """
-    A with-context for zip files with allowZip64 set to True by default.
+    A with-context for zip files with allowZip64 True.
     Passes through positional and kwargs to openZip.
   """
-  kwargs['allowZip64'] = allowZip64
-  with open_zip(path_or_file, *args, **kwargs) as zf:
+  allowZip64 = True
+  if 'allowZip64' in kwargs:
+     allowZip64 = kwargs.pop('allowZip64')
+  with open_zip(path_or_file, *args, allowZip64=allowZip64, **kwargs) as zf:
     yield zf
 
 
