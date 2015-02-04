@@ -150,6 +150,7 @@ def open_zip(path_or_file, *args, **kwargs):
   finally:
     zf.close()
 
+
 @contextmanager
 def open_zip64(path_or_file, *args, **kwargs):
   """
@@ -161,6 +162,7 @@ def open_zip64(path_or_file, *args, **kwargs):
      allowZip64 = kwargs.pop('allowZip64')
   with open_zip(path_or_file, *args, allowZip64=allowZip64, **kwargs) as zf:
     yield zf
+
 
 @contextmanager
 def open_tar(path_or_file, *args, **kwargs):
