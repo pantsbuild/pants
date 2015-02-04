@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest2 as unittest
 
-from pants.fs.archive import _ARCHIVER_BY_TYPE
+from pants.fs.archive import archiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk, touch
 
@@ -35,7 +35,9 @@ class ArchiveTest(unittest.TestCase):
           archive = archiver.create(fromdir, archivedir, 'archive', prefix=prefix)
 
           # can't use os.path.splitext because 'abc.tar.gz' would return '.gz'.
-          self.assertTrue(archive.endswith(expected_ext))
+          self.assertTrue(archive.endswith(expected_ext),
+              'archive filename {0} does not end with expected extension {1}'.format(
+                  archive, expected_ext))
 
           with temporary_dir() as todir:
             archiver.extract(archive, todir)
@@ -50,12 +52,12 @@ class ArchiveTest(unittest.TestCase):
     test_round_trip(prefix='jake')
 
   def test_tar(self):
-    self.round_trip(_ARCHIVER_BY_TYPE['tar'], expected_ext='tar', empty_dirs=True)
-    self.round_trip(_ARCHIVER_BY_TYPE['tgz'], expected_ext='tar.gz', empty_dirs=True)
-    self.round_trip(_ARCHIVER_BY_TYPE['tbz2'], expected_ext='tar.bz2', empty_dirs=True)
+    self.round_trip(archiver('tar'), expected_ext='tar', empty_dirs=True)
+    self.round_trip(archiver('tgz'), expected_ext='tar.gz', empty_dirs=True)
+    self.round_trip(archiver('tbz2'), expected_ext='tar.bz2', empty_dirs=True)
 
   def test_zip(self):
-    self.round_trip(_ARCHIVER_BY_TYPE['zip'], expected_ext='zip', empty_dirs=False)
+    self.round_trip(archiver('zip'), expected_ext='zip', empty_dirs=False)
 
   def test_zip_filter(self):
     def do_filter(path):
@@ -66,7 +68,7 @@ class ArchiveTest(unittest.TestCase):
       touch(os.path.join(fromdir, 'disallowed.txt'))
 
       with temporary_dir() as archivedir:
-        archive = _ARCHIVER_BY_TYPE['zip'].create(fromdir, archivedir, 'archive')
+        archive = archiver('zip').create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
-          _ARCHIVER_BY_TYPE['zip'].extract(archive, todir, filter=do_filter)
+          archiver('zip').extract(archive, todir, filter=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))
