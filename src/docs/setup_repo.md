@@ -264,6 +264,40 @@ contain a section for each Repository:
       },
     }
 
+Finally, you'll need to instruct Ivy on how to publish to your repository. Add a new
+`ivysettings.xml` file to your repo (for example:
+'`build-support/ivy/ivysettings_for_publishing.xml`'). Here is an example of such a file:
+
+		<?xml version="1.0"?>
+		<!-- pants.ini forces this settings file to be loaded by Ivy, but only at
+		     publish time. -->
+
+		<ivysettings>
+		  <settings defaultResolver="chain-repos"/>
+
+		  <include file="${ivy.settings.dir}/ivysettings.xml"/>
+
+		  <credentials host="artifactory.somedomain.com"
+		               realm="Artifactory Realm"
+		               username="${login}"
+		               passwd="${password}"/>
+
+		  <resolvers>
+		    <chain name="chain-repos" returnFirst="true">
+		      <_remote_resolvers name="remote-repos"/>
+		    </chain>
+
+		    <url name="artifactory.somedomain.com" m2compatible="true">
+		      <artifact pattern="https://artifactory.somedomain.com/libs-releases-local/[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"/>
+		    </url>
+		  </resolvers>
+		</ivysettings>
+
+Next, modify the `[jar-publish]` section of `pants.ini`, and tell pants to use this custom Ivy
+configuration file when publishing:
+
+    ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
+
 <a pantsmark="setup_publish_restrict_branch"> </a>
 
 ### Restricting Publish to "Release Branch"
