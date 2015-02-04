@@ -40,7 +40,7 @@ class DuplicateDetectorTest(TaskTestBase):
     touch(unicode_class_path)
 
     def generate_jar(path, *class_name):
-      with closing(ZipFile(generate_path(path), 'w')) as zipfile:
+      with closing(ZipFile(generate_path(path), 'w', allowZip64=True)) as zipfile:
         for clazz in class_name:
           zipfile.write(clazz)
         return zipfile.filename

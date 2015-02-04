@@ -26,7 +26,7 @@ from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.contextutil import open_zip64, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
 
@@ -733,7 +733,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       for cp_entry in self.find_all_bootstrap_jars() + classpath_entries:
         # Per the classloading spec, a 'jar' in this context can also be a .zip file.
         if os.path.isfile(cp_entry) and ((cp_entry.endswith('.jar') or cp_entry.endswith('.zip'))):
-          with open_zip(cp_entry, 'r') as jar:
+          with open_zip64(cp_entry, 'r') as jar:
             for cls in jar.namelist():
               # First jar with a given class wins, just like when classloading.
               if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:

@@ -106,7 +106,7 @@ class DuplicateDetector(JvmBinaryTask):
     for basedir, externaljar in  self.list_external_jar_dependencies(binary_target):
       external_dep = os.path.join(basedir, externaljar)
       self.context.log.debug('  scanning %s' % external_dep)
-      with closing(ZipFile(external_dep)) as dep_zip:
+      with closing(ZipFile(external_dep, allowZip64=True)) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
           # Zip entry names can come in any encoding and in practice we find some jars that have
           # utf-8 encoded entry names, some not.  As a result we cannot simply decode in all cases
