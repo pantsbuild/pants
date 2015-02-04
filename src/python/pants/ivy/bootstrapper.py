@@ -74,7 +74,8 @@ class Bootstrapper(object):
     """
     if ivysettings==None:
       raise self.Error("Attempted to create bootstrap a custom Ivy without a config file.")
-    return cls().ivy(bootstrap_workunit_factory=bootstrap_workunit_factory, ivysettings=ivysettings)
+    return cls().ivy(bootstrap_workunit_factory=bootstrap_workunit_factory,
+                     ivysettings=ivysettings)
 
   @classmethod
   def default_ivy(cls, bootstrap_workunit_factory=None):
