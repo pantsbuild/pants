@@ -153,7 +153,9 @@ class PythonTestBuilder(object):
       add_realpath(canonical)
       for path in alternates:
         add_realpath(path)
-      cp.set('paths', key, self._format_string_list([canonical] + list(alternates) + list(realpaths)))
+      cp.set('paths',
+             key,
+             self._format_string_list([canonical] + list(alternates) + list(realpaths)))
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:
