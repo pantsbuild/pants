@@ -14,7 +14,7 @@ Running from sources
 As pants is implemented in python it can be run directly from sources.
 
     :::bash
-    $ PANTS_DEV=1 ./pants goal goals
+    $ PANTS_DEV=1 ./pants goals
     *** running pants in dev mode from ./src/python/pants/bin/pants_exe.py ***
     <remainder of output omitted for brevity>
 
@@ -36,7 +36,7 @@ It looks something like
 
     :::bash
     $ rm pants.pex
-    $ ./pants goal my-new-feature
+    $ ./pants my-new-feature
     Building pants.pex to /Users/zundel/Src/Pants/pants.pex...
     ...
     Build operating on top level addresses: set([BuildFileAddress(/Users/pantsdev/Src/pants/src/python/pants/bin/BUILD, pants_local_binary)])
@@ -46,7 +46,7 @@ It looks something like
     AMAZING NEW FEATURE PRINTS HERE
     $ ls pants.pex # gets moved here, though originally "Wrote" to ./dist/
     pants.pex
-    $ ./pants goal my-new-feature
+    $ ./pants my-new-feature
     AMAZING NEW FEATURE PRINTS HERE
 
 Using `./pants` to launch Pants thus gives a handy workflow: generate `pants.pex`.
@@ -66,7 +66,7 @@ all platforms, not just your development environment.
 The following command will create a locally built `pants.pex` for all platforms:
 
     :::bash
-    $ ./pants goal binary src/python/pants/bin:pants
+    $ ./pants binary src/python/pants/bin:pants
     ...
     SUCCESS
 
@@ -114,13 +114,13 @@ Typically, you're not sure precisely which tests you need to run, so you run all
 To run all tests,
 
     :::bash
-    $ ./pants goal test tests::
+    $ ./pants test tests::
 
 To run just Pants' *unit* tests (skipping the can-be-slow integration tests), use the
 `tests/python/pants_test:all` target:
 
     :::bash
-    $ ./pants goal test tests/python/pants_test:all
+    $ ./pants test tests/python/pants_test:all
 
 Before [[contributing a change to Pants|pants('src/python/pants/docs:howto_contribute')]],
 make sure it passes **all** of our continuous integration (CI) tests: everything builds,

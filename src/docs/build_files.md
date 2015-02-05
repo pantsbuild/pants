@@ -28,18 +28,18 @@ Debugging a BUILD File
 If you're curious to know how Pants interprets your `BUILD` file, these
 techniques can be especially helpful:
 
-*Did I define the targets I meant to?* Use `goal list`:
+*Did I define the targets I meant to?* Use `list`:
 
     :::bash
-    $ ./pants goal list examples/src/java/com/pants/examples/hello/greet
+    $ ./pants list examples/src/java/com/pants/examples/hello/greet
     examples/src/java/com/pants/examples/hello/greet:greet
 
 *Did a change in one `BUILD` file break others?*
 List **every** target to find out:
-Use the recursive wildcard: `goal list ::`
+Use the recursive wildcard: `list ::`
 
     :::bash
-    $ ./pants goal list ::
+    $ ./pants list ::
       ...lots of output...
       File "pants/commands/command.py", line 79, in __init__
       File "pants/commands/goal_runner.py", line 144, in setup_parser
@@ -50,10 +50,10 @@ Use the recursive wildcard: `goal list ::`
       referenced from examples/src/scala/com/pants/example/hello/welcome:welcome
     $ # Instead of listing all targets, an error message. We found a problem
 
-*Do I pull in the dependencies I expect?* Use `goal depmap` (JVM languages only):
+*Do I pull in the dependencies I expect?* Use `depmap` (JVM languages only):
 
     :::bash
-    $ ./pants goal depmap examples/tests/java/com/pants/examples/hello/greet
+    $ ./pants depmap examples/tests/java/com/pants/examples/hello/greet
     internal-examples.tests.java.com.pants.examples.hello.greet.greet
       internal-3rdparty.junit
         internal-3rdparty.hamcrest-core
@@ -64,10 +64,10 @@ Use the recursive wildcard: `goal list ::`
       junit-junit-dep-4.11
       org.hamcrest-hamcrest-core-1.3
 
-*What source files do I depend on?* Use `goal filedeps`:
+*What source files do I depend on?* Use `filedeps`:
 
     :::bash
-    $ ./pants goal filedeps examples/src/java/com/pants/examples/hello/main
+    $ ./pants filedeps examples/src/java/com/pants/examples/hello/main
     ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/BUILD
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/BUILD
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/config/greetee.txt
@@ -360,7 +360,7 @@ Though your repo might contain many `BUILD` files, Pants might not
 execute all of them. If you invoke:
 
     :::bash
-    ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
+    ./pants test examples/tests/java/com/pants/examples/hello/greet:greet
 
 Pants executes the source tree's top-level `BUILD` file (executed on
 every Pants run) and

@@ -14,7 +14,7 @@ The first time you run `pants`, try it without arguments. This makes
 Pants "bootstrap" itself, downloading and compiling things it needs:
 
     :::bash
-    $ ./pants goal goals
+    $ ./pants goals
 
 Now you're ready to invoke pants for more useful things.
 
@@ -24,7 +24,7 @@ targets* to use (like
 example,
 
     :::bash
-    $ ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
+    $ ./pants test examples/tests/java/com/pants/examples/hello/greet:greet
 
 Goals (the "verbs" of Pants) produce new files from Targets (the
 "nouns").
@@ -44,7 +44,7 @@ Pants knows about goals ("verbs" like `bundle` and `test`) and targets
 invocation looks like
 
     :::bash
-    $ ./pants goal test examples/tests/java/com/pants/examples/hello/greet:greet
+    $ ./pants test examples/tests/java/com/pants/examples/hello/greet:greet
 
 Looking at the pieces of this we see
 
@@ -55,10 +55,6 @@ build has a `pants` executable in its top-level directory.
 The first time you run `./pants`, it might take a while: it will probably auto-update by
 downloading the latest version.
 
-`goal`<br>
-Magic word that you use on most Pants command lines. We hope that
-someday we won't need to use this magic word anymore.
-
 `test`<br>
 `test` is a *goal*, a "verb" that Pants knows about. The `test` goal runs tests and reports results.
 
@@ -68,7 +64,7 @@ knows that some of these goals depend on each other. E.g., in this
 example, before it run tests, it must compile the code.
 
 You can specify more than one goal on a command line. E.g., to run
-tests *and* run a binary, we could have said `./pants goal test run ...`
+tests *and* run a binary, we could have said `./pants test run ...`
 
 `examples/tests/java/com/pants/examples/hello/greet:greet`<br>
 This is a *build target*, a "build-able" thing in your source code. To
@@ -133,7 +129,7 @@ tell Pants to "fail fast" on the first `junit` test failure instead of running a
 `junit` tests like so:
 
     :::bash
-    $ ./pants goal test.junit --fail-fast examples/tests/java/com/pants/examples/hello/greet:greet
+    $ ./pants test.junit --fail-fast examples/tests/java/com/pants/examples/hello/greet:greet
 
 Here, `test` has become `test.junit`. The `test` goal is made up of parts, or *tasks*: `test.junit`,
 `test.pytest`, and `test.specs`. We want to specify a flag to the `test.junit` task, so we
@@ -146,7 +142,7 @@ for a goal or task go immediately after that goal or task.
 You can specify options for more than one part of a goal. For example,
 
     :::bash
-    $ ./pants goal test.junit --fail-fast test.pytest --options='-k seq' examples/tests::
+    $ ./pants test.junit --fail-fast test.pytest --options='-k seq' examples/tests::
 
 Here, the `--fail-fast` flag affects `test.junit` and `--options` affects `test.pytest`.
 
@@ -155,9 +151,9 @@ If you pass the global `-ldebug` flag after the word `goal` but before any parti
 task, you get verbose debug-level logging for all goals:
 
     :::bash
-    $ ./pants goal -ldebug test examples/tests/java/com/pants/examples/hello/greet:
+    $ ./pants -ldebug test examples/tests/java/com/pants/examples/hello/greet:
     09:18:53 00:00 [main]
-                   (To run a reporting server: ./pants goal server)
+                   (To run a reporting server: ./pants server)
     09:18:53 00:00   [bootstrap]
     09:18:54 00:01   [setup]
     09:18:54 00:01     [parse]DEBUG] Located Distribution(u'/Library/Java/JavaVirtualMachines/jdk1.7.0_60.jdk/Contents/Home/bin', minimum_version=None, maximum_version=None jdk=False) for constraints: minimum_version None, maximum_version None, jdk False
@@ -169,11 +165,11 @@ For details about the Pants command line, see [[Invoking Pants|pants('src/docs:i
 
 ### Help
 
-To get help about a Pants goal, invoke <tt>./pants goal *goalname* -h</tt>. This lists
+To get help about a Pants goal, invoke <tt>./pants *goalname* -h</tt>. This lists
 command-line options for that goal. E.g.,
 
     :::bash
-    $ ./pants goal test -h
+    $ ./pants test -h
 
     test: Test compiled code.
 
@@ -202,7 +198,7 @@ The `test` goal is made up of parts, or *tasks*: `test.junit`, `test.pytest`, an
 Command-line options apply to those tasks. The goal's help groups options by task. E.g., here, it
 shows the `test.spec` ` --jvm-options` option with `test.specs`.
 
-For a list of available goals, `./pants goal goals`.
+For a list of available goals, `./pants goals`.
 
 For help with things that aren't goals (global options, other kinds of help), use
 
@@ -289,12 +285,12 @@ test.
 Get the list of goals:
 
     :::bash
-    $ ./pants goal goals
+    $ ./pants goals
 
 Get help for one goal, e.g., test:
 
     :::bash
-    $ ./pants goal test -h
+    $ ./pants test -h
 
 Next
 ----
