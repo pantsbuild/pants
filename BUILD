@@ -7,6 +7,10 @@ source_root('src/python', page, python_binary, python_library, resources)
 # Pants test code
 source_root('tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
 
+# Pants own plugins for this repo's exclusive use
+source_root('pants-plugins/src/python', page, python_binary, python_library, resources)
+source_root('pants-plugins/tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
+
 # TODO(Eric Ayers) Find a way to reduce  source_root() invocations.  The declarations in
 # 'testprojects' and 'examples' are repetitive.
 

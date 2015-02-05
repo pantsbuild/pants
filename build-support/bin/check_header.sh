@@ -14,7 +14,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 EOF
 )
 
-py_files=$(find src tests -name '*.py' -not -name __init__.py)
+py_files=$(find src tests pants-plugins -name '*.py' -not -name __init__.py)
 known_bad_headers=$(cat <<EOF
 tests/python/pants_test/tasks/false.py
 tests/python/pants_test/tasks/true.py
