@@ -32,7 +32,7 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hxbsrdpci:eat" opt; do
+while getopts "hxbsrdlpci:eat" opt; do
   case ${opt} in
     h) usage ;;
     x) skip_bootstrap_clean="true" ;;
