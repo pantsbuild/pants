@@ -17,6 +17,7 @@ import xml
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -255,7 +256,7 @@ class IvyUtils(object):
 
     def collect_jars(target):
       targets_processed.add(target)
-      if target.is_jar_library:
+      if isinstance(target, JarLibrary):
         for jar in target.jar_dependencies:
           if jar.rev:
             add_jar(jar)
