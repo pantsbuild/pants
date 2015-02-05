@@ -286,6 +286,7 @@ python_library(
     ':hash_utils',
     ':lazy_source_mapper',
     ':payload',
+    ':payload_field',
     ':source_root',
     ':target_addressable',
   ],
