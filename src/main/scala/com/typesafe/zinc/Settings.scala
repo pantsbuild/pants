@@ -226,8 +226,8 @@ object Settings {
     file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
     boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
       (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = false))),
-    boolean(   "-nameHashing",                 "Enable improved (experimental) incremental compilation algorithm",
-      (s: Settings) => s.copy(incOptions = s.incOptions.copy(nameHashing = true))),
+    boolean(   "-no-name-hashing",             "Disable improved incremental compilation algorithm",
+      (s: Settings) => s.copy(incOptions = s.incOptions.copy(nameHashing = false))),
 
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
