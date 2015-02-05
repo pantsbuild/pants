@@ -35,7 +35,7 @@ class JarLibrary(Target):
       'excludes': ExcludesField([]),
     })
     super(JarLibrary, self).__init__(payload=payload, **kwargs)
-    self.add_labels('jars', 'jvm')
+    self.add_labels('jvm')
 
   @property
   def jar_dependencies(self):

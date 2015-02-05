@@ -15,6 +15,7 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -274,11 +275,11 @@ class Depmap(ConsoleTask):
       }
 
       target_libraries = set()
-      if current_target.is_jar_library:
+      if isinstance(current_target, JarLibrary):
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
         info['targets'].append(self._address(dep.address))
-        if dep.is_jar_library:
+        if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(jar)
           # Add all the jars pulled in by this jar_library
