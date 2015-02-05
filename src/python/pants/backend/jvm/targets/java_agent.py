@@ -66,6 +66,7 @@ class JavaAgent(JavaLibrary):
     self._can_retransform = can_retransform
     self._can_set_native_method_prefix = can_set_native_method_prefix
 
+    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
     self.add_labels('java_agent')
 
   @property

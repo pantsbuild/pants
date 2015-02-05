@@ -16,6 +16,7 @@ from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_binary import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -39,7 +40,7 @@ class Depmap(ConsoleTask):
 
   @staticmethod
   def _is_jvm(dep):
-    return dep.is_jvm or dep.is_jvm_app
+    return dep.is_jvm or isinstance(dep, JvmApp)
 
   @staticmethod
   def _jar_id(jar):

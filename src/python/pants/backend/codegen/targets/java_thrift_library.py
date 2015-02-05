@@ -67,6 +67,7 @@ class JavaThriftLibrary(JvmTarget):
 
     super(JavaThriftLibrary, self).__init__(**kwargs)
 
+    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
     self.add_labels('codegen')
 
     def check_value_for_arg(arg, value, values):
@@ -83,6 +84,7 @@ class JavaThriftLibrary(JvmTarget):
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   @property
   def is_thrift(self):
     return True

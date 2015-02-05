@@ -15,6 +15,7 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants import binary_util
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -196,7 +197,7 @@ class IdeGen(JvmToolTaskMixin, Task):
         target.is_codegen or
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
-        target.is_apt or
+        isinstance(target, AnnotationProcessor) or
         (self.skip_java and is_java(target)) or
         (self.skip_scala and is_scala(target)) or
         (self.intransitive and target not in self.context.target_roots)

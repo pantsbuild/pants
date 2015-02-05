@@ -130,7 +130,7 @@ def register_goals():
       return 'apt'
 
     def select(self, target):
-      return super(AptCompile, self).select(target) and target.is_apt
+      return super(AptCompile, self).select(target) and isinstance(target, AnnotationProcessor)
 
 
   jvm_compile = GroupTask.named(
