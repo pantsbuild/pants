@@ -241,6 +241,7 @@ class IvyUtils(object):
   def calculate_classpath(cls, targets):
     jars = OrderedDict()
     excludes = set()
+    targets_processed = set()
 
     # Support the ivy force concept when we sanely can for internal dep conflicts.
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
@@ -253,7 +254,8 @@ class IvyUtils(object):
       )
 
     def collect_jars(target):
-      if target.is_jvm or target.is_jar_library:
+      targets_processed.add(target)
+      if target.is_jar_library:
         for jar in target.jar_dependencies:
           if jar.rev:
             add_jar(jar)
@@ -267,7 +269,7 @@ class IvyUtils(object):
         excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     for target in targets:
-      target.walk(collect_jars)
+      target.walk(collect_jars, predicate=lambda target: not target in targets_processed)
 
     return jars.values(), excludes
 
