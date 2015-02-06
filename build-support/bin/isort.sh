@@ -2,7 +2,7 @@
 
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-source ${ROOT}/build-support/common.sh
+source "${ROOT}/build-support/common.sh"
 
 function usage() {
   echo "Checks import sort order for python files, optionally fixing incorrect"
