@@ -6,7 +6,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
                         print_function, unicode_literals)
 
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import Artifact, JarDependency
+from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jvm_binary import Bundle
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
@@ -45,6 +45,24 @@ class PayloadTest(BaseTest):
     jar2 = JarDependency('com', 'foo', '1.0.0')
 
     self.assertNotEqual(
+      JarsField([jar1]).fingerprint(),
+      JarsField([jar2]).fingerprint(),
+    )
+
+  def test_jars_field_artifacts_arg(self):
+    jar1 = JarDependency('com', 'foo', '1.0.0', artifacts=[IvyArtifact('com', 'baz')])
+    jar2 = JarDependency('com', 'foo', '1.0.0')
+
+    self.assertNotEqual(
+      JarsField([jar1]).fingerprint(),
+      JarsField([jar2]).fingerprint(),
+    )
+
+  def test_jars_field_artifacts_arg_vs_method(self):
+    jar1 = JarDependency('com', 'foo', '1.0.0', artifacts=[IvyArtifact('com', 'baz')])
+    jar2 = JarDependency('com', 'foo', '1.0.0').with_artifact('com', 'baz')
+
+    self.assertEqual(
       JarsField([jar1]).fingerprint(),
       JarsField([jar2]).fingerprint(),
     )
