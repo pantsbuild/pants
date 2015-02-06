@@ -2,30 +2,30 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
+import os
+import unittest
 from collections import defaultdict
 from contextlib import contextmanager
-import os
 from tempfile import mkdtemp
 from textwrap import dedent
-import unittest
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_configuration import BuildConfiguration
+from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.config import Config
+from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal

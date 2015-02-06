@@ -2,15 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-
-"""Support for wholesale archive creation and extraction in a uniform API across archive types."""
-
+import os
 from abc import abstractmethod
 from collections import OrderedDict
-import os
 from zipfile import ZIP_DEFLATED
 
 from twitter.common.lang import AbstractClass
@@ -18,6 +15,12 @@ from twitter.common.lang import AbstractClass
 from pants.util.contextutil import open_tar, open_zip64
 from pants.util.dirutil import safe_walk
 from pants.util.strutil import ensure_text
+
+
+"""Support for wholesale archive creation and extraction in a uniform API across archive types."""
+
+
+
 
 
 class Archiver(AbstractClass):

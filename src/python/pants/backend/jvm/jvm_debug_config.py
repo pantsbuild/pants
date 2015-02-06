@@ -2,8 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
 
 # TOOD(Eric Ayers): There is no task or goal named 'jvm' as used in the config section where these parameters are located.
 # We might need to rename these whem merging together the config and the new options system.
