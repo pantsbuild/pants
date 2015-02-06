@@ -67,6 +67,10 @@ fi
 
 banner "CI BEGINS"
 
+banner "Checking python code formatting"
+build-support/bin/check_header.sh || exit 1
+build-support/bin/isort.sh || die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
+
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
 INTERPRETER_CONSTRAINTS=(
@@ -107,9 +111,6 @@ if [ ! -z "${R}" ]; then
   echo "$R"
   exit 1
 fi
-
-build-support/bin/check_header.sh || exit 1
-build-support/bin/isort.sh || die "To fix import sort order, run `build-support/bin/isort.sh -f`"
 
 # Sanity checks
 ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
