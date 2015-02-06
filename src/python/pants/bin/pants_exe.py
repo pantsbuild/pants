@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import traceback
+import warnings
 
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.bin.goal_runner import GoalRunner
@@ -47,7 +48,16 @@ def _run():
   # Place the registration of the unhandled exception hook as early as possible in the code.
   sys.excepthook = _unhandled_exception_hook
 
+  # We want to present warnings to the user, set this up early to ensure all warnings are seen.
+  # The "default" action displays a warning for a particular file and line number exactly once.
+  # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete action
+  # list.
+  warnings.simplefilter("default")
+
   logging.basicConfig()
+  # This routes the warnings we enabled above through our loggers instead of straight to stderr raw.
+  logging.captureWarnings(True)
+
   version = pants_version()
   if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
     _do_exit(msg=version, out=sys.stdout)

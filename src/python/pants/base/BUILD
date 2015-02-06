@@ -145,6 +145,14 @@ python_library(
 )
 
 python_library(
+  name = 'deprecated',
+  sources = ['deprecated.py'],
+  dependencies = [
+    ':revision',
+  ]
+)
+
+python_library(
   name = 'extension_loader',
   sources = ['extension_loader.py'],
   dependencies = [
@@ -282,6 +290,7 @@ python_library(
     ':address',
     ':build_environment',
     ':build_manual',
+    ':deprecated',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',

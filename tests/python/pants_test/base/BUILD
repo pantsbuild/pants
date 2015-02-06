@@ -44,6 +44,7 @@ python_test_suite(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
+    ':deprecated',
     ':double_dag',
     ':extension_loader',
     ':fingerprint_strategy',
@@ -110,6 +111,15 @@ python_tests(
   sources = ['test_build_file_address_mapper.py'],
   dependencies = [
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'deprecated',
+  sources = ['test_deprecated.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants:version',
   ]
 )
 
