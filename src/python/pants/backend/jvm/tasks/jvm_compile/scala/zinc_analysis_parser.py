@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import json
 import os
@@ -11,7 +11,10 @@ import re
 from collections import defaultdict
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import APIs, Compilations, CompileSetup, Relations, SourceInfos, Stamps, ZincAnalysis
+from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import (APIs, Compilations,
+                                                                     CompileSetup, Relations,
+                                                                     SourceInfos, Stamps,
+                                                                     ZincAnalysis)
 
 
 class ZincAnalysisParser(AnalysisParser):

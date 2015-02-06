@@ -2,12 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import sys
 
+from pants.backend.core.from_target import FromTarget
 from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
@@ -28,13 +29,12 @@ from pants.backend.core.tasks.noop import NoopCompile, NoopTest
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
 from pants.backend.core.tasks.prepare_resources import PrepareResources
-from pants.backend.core.tasks.reporting_server import RunServer, KillServer
+from pants.backend.core.tasks.reporting_server import KillServer, RunServer
 from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
-from pants.backend.core.from_target import FromTarget
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases

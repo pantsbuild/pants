@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import argparse
-from collections import OrderedDict
 import inspect
 import re
+from collections import OrderedDict
 
 from docutils.core import publish_parts
 
@@ -18,9 +18,9 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
-from pants.option.options import Options
 from pants.option.global_options import register_global_options
+from pants.option.options import Options
+from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants.option.parser import Parser
 
 
