@@ -148,7 +148,7 @@ class JavaCompile(JvmCompile):
     # This is distinct from the per-target ones we create in extra_products().
     all_processors = set()
     for target in relevant_targets:
-      if target.is_apt and target.processors:
+      if isinstance(target, AnnotationProcessor) and target.processors:
         all_processors.update(target.processors)
     processor_info_file = os.path.join(self._classes_dir, JavaCompile._PROCESSOR_INFO_FILE)
     if os.path.exists(processor_info_file):
