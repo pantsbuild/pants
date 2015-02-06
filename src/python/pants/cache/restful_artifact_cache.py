@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
 import urlparse
@@ -12,9 +12,11 @@ import requests
 from requests import RequestException
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import ArtifactCache, ArtifactCacheError, NonfatalArtifactCacheError, UnreadableArtifact
+from pants.cache.artifact_cache import (ArtifactCache, ArtifactCacheError,
+                                        NonfatalArtifactCacheError, UnreadableArtifact)
 from pants.cache.local_artifact_cache import TempLocalArtifactCache
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+
 
 logger = logging.getLogger(__name__)
 

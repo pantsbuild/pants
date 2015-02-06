@@ -2,18 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from contextlib import contextmanager
 import os
 import subprocess
 import textwrap
 import unittest
+from contextlib import contextmanager
 
 from pants.java.distribution.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
-from pants.util.contextutil import temporary_dir, environment_as
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 
 

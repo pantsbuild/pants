@@ -2,24 +2,24 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from abc import abstractmethod
-from contextlib import contextmanager
 import itertools
 import os
 import sys
 import threading
+from abc import abstractmethod
+from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
+from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
-from pants.cache.artifact_cache import call_insert, call_use_cached_files, UnreadableArtifact
+from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element

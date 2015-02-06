@@ -2,10 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict, OrderedDict
 import functools
 import getpass
 import hashlib
@@ -15,12 +14,12 @@ import pkgutil
 import shutil
 import sys
 import traceback
+from collections import OrderedDict, defaultdict
 
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 from twitter.common.log.options import LogOptions
 
-from pants.scm.scm import Scm
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
@@ -37,6 +36,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
+from pants.scm.scm import Scm
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
