@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from pants.backend.core.tasks import reflect
 from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.core.tasks import reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal

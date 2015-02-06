@@ -2,14 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
-from textwrap import dedent
 import xml.etree.ElementTree as ET
+from textwrap import dedent
 
 from mock import Mock
+
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm

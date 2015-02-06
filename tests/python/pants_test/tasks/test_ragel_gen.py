@@ -2,25 +2,25 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
-import pytest
 from textwrap import dedent
 
+import pytest
 from mock import MagicMock
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
-from pants.backend.codegen.tasks.ragel_gen import calculate_genfile, RagelGen
+from pants.backend.codegen.tasks.ragel_gen import RagelGen, calculate_genfile
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.contextutil import temporary_file
-from pants_test.tasks.test_base import TaskTest, is_exe
 from pants.util.dirutil import safe_rmtree
+from pants_test.tasks.test_base import TaskTest, is_exe
 
 
 ragel_file_contents = dedent("""
@@ -127,4 +127,3 @@ class RagelGenTest(TaskTest):
       fp.write(ragel_file_contents)
       fp.flush()
       self.assertEquals(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')
-

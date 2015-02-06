@@ -2,12 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 from textwrap import dedent
 
+import pytest
+from mock import MagicMock, patch
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
@@ -19,11 +21,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
-
 from pants_test.tasks.test_base import TaskTest
-
-import pytest
-from mock import MagicMock, patch
 
 
 # TODO (tdesai) Issue-240: Use JvmToolTaskTestBase for ScroogeGenTest
