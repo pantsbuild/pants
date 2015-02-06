@@ -74,5 +74,5 @@ function activate_isort() {
 
 activate_isort
 
-isort ${isort_args[@]} --recursive src tests pants-plugins
+isort ${isort_args[@]} --recursive src tests pants-plugins examples
 
