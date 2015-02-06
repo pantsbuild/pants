@@ -5,9 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from example.pants_publish_plugin.extra_test_jar_example import ExtraTestJarExample
-
 from pants.goal.task_registrar import TaskRegistrar as task
+
+from example.pants_publish_plugin.extra_test_jar_example import ExtraTestJarExample
 
 
 # Register this custom task on the 'jar' phase. When the RoundEngine reaches this phase, it will
