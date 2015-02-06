@@ -105,13 +105,15 @@ class JarDependency(object):
     self.apidocs = apidocs
     self.mutable = mutable
     self._classifier = classifier
+    self.artifacts = tuple(artifacts or ())
 
-    if artifacts:
-      self.artifacts = tuple(artifacts)
-    else:
-      self.artifacts = tuple()
     if ext or url or type_ or classifier:
-      self._with_artifact(name=name, type_=type_, ext=ext, url=url, classifier=classifier)
+      artifact = IvyArtifact(name or self.name,
+                             type_=type_,
+                             ext=ext,
+                             url=url,
+                             classifier=classifier)
+      self.artifacts += (artifact,)
 
     self.id = "%s-%s-%s" % (self.org, self.name, self.rev)
     self._configurations = ('default',)
@@ -189,7 +191,7 @@ class JarDependency(object):
     """
     print(dedent("""
     jar(...).with_artifact(...) is deprecated. Instead, use:
-    jar(..., with_artifact=[ivy_artifact(...), ...]).  You'll need to supply a name= argument
+    jar(..., artifacts=[ivy_artifact(...), ...]).  You'll need to supply a name= argument
     to ivy_artifact.""").strip(),
           file=sys.stderr)
     return self._with_artifact(name=name, type_=type_, ext=ext, url=url, configuration=configuration,
