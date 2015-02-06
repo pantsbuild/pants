@@ -21,12 +21,16 @@ FUTURE_VERSION = '9999.9.9'
 @contextmanager
 def _test_deprecation():
   with warnings.catch_warnings(record=True) as seen_warnings:
+    def assert_deprecation_warning():
+      assert len(seen_warnings) == 1
+      warning = seen_warnings[0]
+      assert isinstance(warning.message, DeprecationWarning)
+      return warning.message
+
     warnings.simplefilter("always")
     assert len(seen_warnings) == 0
-    yield seen_warnings
-    assert len(seen_warnings) == 1
-    warning = seen_warnings[0]
-    assert isinstance(warning.message, DeprecationWarning)
+    yield assert_deprecation_warning
+    assert_deprecation_warning()
 
 
 def test_deprecated_function():
@@ -53,7 +57,7 @@ def test_deprecated_method():
 
 
 def test_deprecated_property():
-  expected_return = 'deprecated_method'
+  expected_return = 'deprecated_property'
 
   class Test(object):
     @property
@@ -73,12 +77,9 @@ def test_deprecation_hint():
   def deprecated_function():
     return expected_return
 
-  with _test_deprecation() as seen_warnings:
+  with _test_deprecation() as extract_deprecation_warning:
     assert expected_return == deprecated_function()
-    assert len(seen_warnings) == 1
-    warning = seen_warnings[0]
-    assert isinstance(warning.message, DeprecationWarning)
-    assert hint_message in str(warning.message)
+    assert hint_message in str(extract_deprecation_warning())
 
 
 def test_removal_version_required():
