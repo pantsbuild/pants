@@ -17,7 +17,7 @@ function usage() {
   else
     exit 0
   fi
-} 
+}
 
 isort_args=(
   --check-only
@@ -29,7 +29,7 @@ do
     h) usage ;;
     f) isort_args=() ;;
     *) usage "Invalid option: -${OPTARG}" ;;
-  esac 
+  esac
 done
 
 REQUIREMENTS=(
@@ -49,7 +49,7 @@ function activate_venv() {
 function create_venv() {
   rm -rf "${VENV_DIR}"
   "${ROOT}/build-support/virtualenv" "${VENV_DIR}"
-} 
+}
 
 function activate_isort() {
   for req in ${REQUIREMENTS[@]}
