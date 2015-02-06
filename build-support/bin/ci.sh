@@ -109,7 +109,7 @@ if [ ! -z "${R}" ]; then
 fi
 
 build-support/bin/check_header.sh || exit 1
-build-support/bin/isort.sh || exit 1
+build-support/bin/isort.sh || die "To fix import sort order, run `build-support/bin/isort.sh -f`"
 
 # Sanity checks
 ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
