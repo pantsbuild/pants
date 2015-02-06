@@ -2,19 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import namedtuple
-from operator import eq, ne
 import os
 import subprocess
 import unittest
+from collections import namedtuple
+from operator import eq, ne
 
-from pants.fs.archive import ZIP
 from pants.base.build_environment import get_buildroot
+from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open, safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_open
 
 
 PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data', 'stderr_data'])

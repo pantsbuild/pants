@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import glob
 import os
-from textwrap import dedent
 import xml.dom.minidom as DOM
+from textwrap import dedent
 
 import coverage
 from pex.interpreter import PythonInterpreter
@@ -18,7 +18,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.test_builder import PythonTestBuilder
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.util.contextutil import pushd, environment_as
+from pants.util.contextutil import environment_as, pushd
 from pants_test.base_test import BaseTest
 
 

@@ -2,18 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import functools
 import inspect
 import sys
-from textwrap import dedent
 import traceback
+from textwrap import dedent
 
+from pants.backend.core.tasks.task import Task
 from pants.goal.error import GoalError
 from pants.goal.goal import Goal
-from pants.backend.core.tasks.task import Task
 
 
 class TaskRegistrar(object):

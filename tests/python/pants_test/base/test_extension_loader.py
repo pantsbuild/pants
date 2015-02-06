@@ -2,34 +2,26 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from contextlib import contextmanager
-import uuid
 import sys
 import types
 import unittest
+import uuid
+from contextlib import contextmanager
 
-from pkg_resources import (
-    yield_lines,
-    working_set,
-    Distribution,
-    WorkingSet,
-    EmptyProvider,
-    VersionConflict)
+from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
+                           yield_lines)
 
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.extension_loader import (
-    load_backend,
-    load_plugins,
-    PluginNotFound,
-    PluginLoadOrderError)
 from pants.base.exceptions import BuildConfigurationError
+from pants.base.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
+                                         load_plugins)
 from pants.base.target import Target
-from pants.goal.task_registrar import TaskRegistrar
 from pants.goal.goal import Goal
+from pants.goal.task_registrar import TaskRegistrar
 
 
 class MockMetadata(EmptyProvider):
@@ -238,4 +230,3 @@ class LoaderTest(unittest.TestCase):
     registered_aliases = self.build_configuration.registered_aliases()
     self.assertEqual(Target, registered_aliases.targets['pluginalias'])
     self.assertEqual(100, registered_aliases.objects['FROMPLUGIN'])
-
