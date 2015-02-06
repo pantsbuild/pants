@@ -66,11 +66,6 @@ class AbstractTarget(object):
     return self.has_label('codegen')
 
   @property
-  def is_jar_library(self):
-    """Returns True if the target is an external jar library."""
-    return self.has_label('jars')
-
-  @property
   def is_java(self):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')
