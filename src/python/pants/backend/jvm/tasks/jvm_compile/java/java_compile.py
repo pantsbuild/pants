@@ -7,6 +7,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 
 import os
 
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
@@ -91,7 +92,7 @@ class JavaCompile(JvmCompile):
 
   def extra_products(self, target):
     ret = []
-    if target.is_apt and target.processors:
+    if isinstance(target, AnnotationProcessor) and target.processors:
       root = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
       processor_info_file = os.path.join(root, JavaCompile._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
