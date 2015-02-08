@@ -19,53 +19,64 @@ _VERSION_OPTION = '--version'
 _PRINT_EXCEPTION_STACKTRACE = '--print-exception-stacktrace'
 
 
-def _do_exit(result=0, msg=None, out=sys.stderr):
-  if msg:
-    print(msg, file=out)
-  if _LOG_EXIT_OPTION in sys.argv and result == 0:
-    print("\nSUCCESS\n")
-  sys.exit(result)
+class _Exiter(object):
+  def __init__(self):
+    # Since we have some exit paths that run via the sys.excepthook,
+    # symbols we use can become garbage collected before we use them; ie:
+    # we can find `sys` and `traceback` are `None`.  As a result we capture
+    # all symbols we need here to ensure we function in excepthook context.
+    # See: http://stackoverflow.com/questions/2572172/referencing-other-modules-in-atexit
+    self._exit = sys.exit
+    self._format_tb = traceback.format_tb
+    self._is_log_exit = _LOG_EXIT_OPTION in sys.argv
+    self._is_print_backtrace = _PRINT_EXCEPTION_STACKTRACE in sys.argv
+
+  def do_exit(self, result=0, msg=None, out=sys.stderr):
+    if msg:
+      print(msg, file=out)
+    if self._is_log_exit and result == 0:
+      print("\nSUCCESS\n")
+    self._exit(result)
+
+  def exit_and_fail(self, msg=None):
+    self.do_exit(result=1, msg=msg)
+
+  def unhandled_exception_hook(self, exception_class, exception, tb):
+    msg = ''
+    if self._is_print_backtrace:
+      msg = '\nException caught:\n' + ''.join(self._format_tb(tb))
+    if str(exception):
+      msg += '\nException message: %s\n' % str(exception)
+    else:
+      msg += '\nNo specific exception message.\n'
+    # TODO(Jin Feng) Always output the unhandled exception details into a log file.
+    self.exit_and_fail(msg)
 
 
-def _exit_and_fail(msg=None):
-  _do_exit(result=1, msg=msg)
-
-
-def _unhandled_exception_hook(exception_class, exception, tb):
-  msg = ''
-  if _PRINT_EXCEPTION_STACKTRACE in sys.argv:
-    msg = '\nException caught:\n' + ''.join(traceback.format_tb(tb))
-  if str(exception):
-    msg += '\nException message: %s\n' % str(exception)
-  else:
-    msg += '\nNo specific exception message.\n'
-  # TODO(Jin Feng) Always output the unhandled exception details into a log file.
-  _exit_and_fail(msg)
-
-
-def _run():
+def _run(exiter):
   # Place the registration of the unhandled exception hook as early as possible in the code.
-  sys.excepthook = _unhandled_exception_hook
+  sys.excepthook = exiter.unhandled_exception_hook
 
   logging.basicConfig()
   version = pants_version()
   if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
-    _do_exit(msg=version, out=sys.stdout)
+    exiter.do_exit(msg=version, out=sys.stdout)
 
   root_dir = get_buildroot()
   if not os.path.exists(root_dir):
-    _exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
+    exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
 
   goal_runner = GoalRunner(root_dir)
   goal_runner.setup()
   result = goal_runner.run()
-  _do_exit(result)
+  exiter.do_exit(result)
 
 def main():
+  exiter = _Exiter()
   try:
-    _run()
+    _run(exiter)
   except KeyboardInterrupt:
-    _exit_and_fail('Interrupted by user.')
+    exiter.exit_and_fail('Interrupted by user.')
 
 if __name__ == '__main__':
   main()
