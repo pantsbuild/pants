@@ -146,7 +146,6 @@ class _JUnitRunner(object):
 
       def _do_report(exception=None):
         self.report(targets, tests, tests_failed_exception=exception)
-
       try:
         self.run(tests, junit_classpath, cwd=working_dir)
         _do_report(exception=None)
@@ -312,7 +311,7 @@ class _Coverage(_JUnitRunner):
     self._coverage_report_html_open = options.coverage_html_open
     self._coverage_report_html = self._coverage_report_html_open or options.coverage_html
     self._coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
-    self._coverage_report_when_tests_fail = options.coverage_report_when_tests_fail
+    self._coverage_force = options.coverage_force
 
   @abstractmethod
   def instrument(self, targets, tests, junit_classpath):
@@ -388,7 +387,7 @@ class Emma(_Coverage):
   def report(self, targets, tests, tests_failed_exception=None):
     if tests_failed_exception:
       self._context.log.warn('Test failed: {0}'.format(str(tests_failed_exception)))
-      if self._coverage_report_when_tests_fail:
+      if self._coverage_force:
         self._context.log.warn('Generating report even though tests failed')
       else:
         return
@@ -499,7 +498,8 @@ class Cobertura(_Coverage):
         aux_classpath,
         ]
       with temporary_file_path(cleanup=False) as instrumented_classes_file:
-        file(instrumented_classes_file, 'w').write('\n'.join(classes) + '\n')
+        with file(instrumented_classes_file, 'wb') as icf:
+          icf.write(('\n'.join(classes) + '\n').encode('utf-8'))
         self._context.log.debug('instrumented classes in {0}'.format(instrumented_classes_file))
         args.append('--listOfFilesToInstrument')
         args.append(instrumented_classes_file)
@@ -548,7 +548,7 @@ class Cobertura(_Coverage):
       return
     if tests_failed_exception:
       self._context.log.warn('Test failed: {0}'.format(tests_failed_exception))
-      if self._coverage_report_when_tests_fail:
+      if self._coverage_force:
         self._context.log.warn('Generating report even though tests failed.')
       else:
         return
