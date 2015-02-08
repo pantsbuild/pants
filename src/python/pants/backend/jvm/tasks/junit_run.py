@@ -215,7 +215,7 @@ class _JUnitRunner(object):
         if result != 0 and self._fail_fast:
           break
     if result != 0:
-      raise TaskError('java %s ... exited non-zero (%i)' % (main, result))
+      raise TaskError('java {0} ... exited non-zero ({1})'.format(main, result))
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
@@ -375,8 +375,8 @@ class Emma(_Coverage):
                             workunit_factory=self._context.new_workunit,
                             workunit_name='emma-instrument')
       if result != 0:
-        raise TaskError("java %s ... exited non-zero (%i)"
-                        " 'failed to instrument'" % (main, result))
+        raise TaskError("java {0} ... exited non-zero ({1})"
+                        " 'failed to instrument'".format(main, result))
 
   def run(self, tests, junit_classpath, cwd=None):
     self._run_tests(tests,
@@ -411,12 +411,12 @@ class Emma(_Coverage):
     sorting = ['-Dreport.sort', '+name,+class,+method,+block']
     if self._coverage_report_console:
       args.extend(['-r', 'txt',
-                   '-Dreport.txt.out.file=%s' % self._coverage_console_file] + sorting)
+                   '-Dreport.txt.out.file={0}'.format(self._coverage_console_file)] + sorting)
     if self._coverage_report_xml:
-      args.extend(['-r', 'xml', '-Dreport.xml.out.file=%s' % self._coverage_xml_file])
+      args.extend(['-r', 'xml', '-Dreport.xml.out.file={0}'.format(self._coverage_xml_file)])
     if self._coverage_report_html:
       args.extend(['-r', 'html',
-                   '-Dreport.html.out.file=%s' % self._coverage_html_file,
+                   '-Dreport.html.out.file={0}'.format(self._coverage_html_file),
                    '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
@@ -424,8 +424,8 @@ class Emma(_Coverage):
                           workunit_factory=self._context.new_workunit,
                           workunit_name='emma-report')
     if result != 0:
-      raise TaskError("java %s ... exited non-zero (%i)"
-                      " 'failed to generate code coverage reports'" % (main, result))
+      raise TaskError("java {0} ... exited non-zero ({1})"
+                      " 'failed to generate code coverage reports'".format(main, result))
 
     if self._coverage_report_console:
       with safe_open(self._coverage_console_file) as console_report:
@@ -510,8 +510,8 @@ class Cobertura(_Coverage):
                               workunit_factory=self._context.new_workunit,
                               workunit_name='cobertura-instrument')
       if result != 0:
-        raise TaskError("java %s ... exited non-zero (%i)"
-                        " 'failed to instrument'" % (main, result))
+        raise TaskError("java {0} ... exited non-zero ({1})"
+                        " 'failed to instrument'".format(main, result))
 
   def run(self, tests, junit_classpath, cwd=None):
     if self._nothing_to_instrument:
@@ -616,8 +616,8 @@ class Cobertura(_Coverage):
                             workunit_factory=self._context.new_workunit,
                             workunit_name='cobertura-report-' + report_format)
       if result != 0:
-        raise TaskError("java %s ... exited non-zero (%i)"
-                        " 'failed to report'" % (main, result))
+        raise TaskError("java {0} ... exited non-zero ({1})"
+                        " 'failed to report'".format(main, result))
 
 
 class JUnitRun(JvmTask, JvmToolTaskMixin):
@@ -661,7 +661,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
       elif coverage_processor == 'cobertura':
         self._runner = Cobertura(task_exports, self.context)
       else:
-        raise TaskError('unknown coverage processor %s' % coverage_processor)
+        raise TaskError('unknown coverage processor {0}'.format(coverage_processor))
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
 
