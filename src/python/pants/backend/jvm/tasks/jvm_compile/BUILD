@@ -46,7 +46,7 @@ python_library(
     ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
@@ -59,15 +59,17 @@ python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py', 'resource_mapping.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jvm_dependency_analyzer',
     ':jvm_fingerprint_strategy',
     'src/python/pants/backend/core/tasks:group_task',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/goal:products',
+    'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -94,16 +96,17 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/jvm/targets:scala',
   ],
 )
 
 python_library(
   name = 'scala',
-  sources = globs('scala/*.py') - ['anonymize.py'],
+  sources = globs('scala/*.py'),
   dependencies = [
     ':analysis',
     ':analysis_parser',
@@ -124,7 +127,7 @@ python_library(
 
 python_binary(
   name = 'anonymize_zinc_analysis',
-  entry_point = 'pants.tasks.jvm_compile.scala.anonymize_analysis:main',
+  source = 'scala/bin/anonymize_analysis.py',
   dependencies = [
     ':anonymizer',
     ':scala',
