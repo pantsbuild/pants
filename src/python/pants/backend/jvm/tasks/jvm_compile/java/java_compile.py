@@ -73,8 +73,8 @@ class JavaCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
-    register('--source', help='Provide source compatibility with this release.')
-    register('--target', help='Generate class files for this JVM version.')
+    register('--source', help='Provide source compatibility with this release.', advanced=True)
+    register('--target', help='Generate class files for this JVM version.', advanced=True)
     cls.register_jvm_tool(register, 'jmake')
     cls.register_jvm_tool(register, 'java-compiler')
 

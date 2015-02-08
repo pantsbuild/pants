@@ -30,6 +30,7 @@ from pants.goal.goal import Goal
 from pants.goal.initialize_reporting import initial_reporting, update_reporting
 from pants.goal.run_tracker import RunTracker
 from pants.option.global_options import register_global_options
+from pants.option.help_formatter import PantsHelpFormatter
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdir
@@ -73,6 +74,8 @@ class GoalRunner(object):
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
+
+    PantsHelpFormatter.show_advanced_output(visible=bootstrap_options.is_help_advanced)
 
     self.run_tracker = RunTracker.from_config(self.config)
     report = initial_reporting(self.config, self.run_tracker)

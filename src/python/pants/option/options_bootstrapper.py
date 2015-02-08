@@ -40,11 +40,13 @@ def register_bootstrap_options(register, buildroot=None):
            help='Use pantsrc files.')
   register('--pantsrc-files', action='append', metavar='<path>',
            default=['/etc/pantsrc', '~/.pants.rc'],
-           help='Override config with values from these files. Later files override eariler ones.')
+           help='Override config with values from these files. Later files override earlier ones.')
   register('--pythonpath', action='append',
            help='Add these directories to PYTHONPATH to search for plugins.')
   register('--target-spec-file', action='append', dest='target_spec_files',
            help='Read additional specs from this file, one per line')
+  register('--help-advanced', action='store_true',
+           help='Display advanced options in help output.')
 
 
 class OptionsBootstrapper(object):
