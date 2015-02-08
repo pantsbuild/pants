@@ -39,7 +39,7 @@ class KeystoreResolver(object):
                                    "keystore definitions.".format(cls._CONFIG_SECTION))
     parser = SingleFileConfig(config_file, config)
     key_names = config.sections()
-    keys = []
+    keys = {}
 
     def create_key(key_name):
       """Instantiate Keystore objects."""
@@ -53,7 +53,7 @@ class KeystoreResolver(object):
 
     for name in key_names:
       try:
-        keys.append(create_key(name))
+        keys[name] = create_key(name)
       except Config.ConfigError as e:
         raise KeystoreResolver.Error(e)
     return keys
