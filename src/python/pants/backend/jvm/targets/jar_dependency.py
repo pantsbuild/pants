@@ -2,20 +2,21 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import sys
-
 from collections import defaultdict
+from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_manual import manual
+from pants.base.payload_field import PayloadField, stable_json_sha1
 
 
-class Artifact(object):
+class IvyArtifact(PayloadField):
   """
   Specification for an Ivy Artifact for this jar dependency.
 
@@ -40,11 +41,19 @@ class Artifact(object):
     self.url = url
     self.classifier = classifier
 
+  def _compute_fingerprint(self):
+    return stable_json_sha1(dict(name=self.name,
+                                 type_=self.type_,
+                                 ext=self.ext,
+                                 conf=self.conf,
+                                 url=self.url,
+                                 classifier=self.classifier))
+
   def cache_key(self):
     return ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
 
   def __repr__(self):
-    return ('Artifact(%r, type_=%r, ext=%r, conf=%r, url=%r, classifier=%r)'
+    return ('IvyArtifact(%r, type_=%r, ext=%r, conf=%r, url=%r, classifier=%r)'
             % (self.name, self.type_, self.ext, self.conf, self.url, self.classifier))
 
 
@@ -64,7 +73,7 @@ class JarDependency(object):
   )
 
   def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-               type_=None, classifier=None, mutable=None):
+               type_=None, classifier=None, mutable=None, artifacts=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -84,6 +93,7 @@ class JarDependency(object):
       but with different classifiers.
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.
+    :param list artifacts: A list of additional IvyArtifacts
     """
     self.org = org
     self.name = name
@@ -94,10 +104,15 @@ class JarDependency(object):
     self.apidocs = apidocs
     self.mutable = mutable
     self._classifier = classifier
+    self.artifacts = tuple(artifacts or ())
 
-    self.artifacts = tuple()
     if ext or url or type_ or classifier:
-      self.with_artifact(name=name, type_=type_, ext=ext, url=url, classifier=classifier)
+      artifact = IvyArtifact(name or self.name,
+                             type_=type_,
+                             ext=ext,
+                             url=url,
+                             classifier=classifier)
+      self.artifacts += (artifact,)
 
     self.id = "%s-%s-%s" % (self.org, self.name, self.rev)
     self._configurations = ('default',)
@@ -173,12 +188,22 @@ class JarDependency(object):
       be used to designate all public configurations.
     :param classifier: The maven classifier of this artifact.
     """
-    artifact = Artifact(name or self.name,
-                        type_=type_,
-                        ext=ext,
-                        url=url,
-                        conf=configuration,
-                        classifier=classifier)
+    print(dedent("""
+    jar(...).with_artifact(...) is deprecated. Instead, use:
+    jar(..., artifacts=[ivy_artifact(...), ...]).  You'll need to supply a name= argument
+    to ivy_artifact.""").strip(),
+          file=sys.stderr)
+    return self._with_artifact(name=name, type_=type_, ext=ext, url=url, configuration=configuration,
+                               classifier=classifier)
+
+  def _with_artifact(self, name=None, type_=None, ext=None, url=None, configuration=None,
+                    classifier=None):
+    artifact = IvyArtifact(name or self.name,
+                           type_=type_,
+                           ext=ext,
+                           url=url,
+                           conf=configuration,
+                           classifier=classifier)
     self.artifacts += (artifact,)
     return self
 

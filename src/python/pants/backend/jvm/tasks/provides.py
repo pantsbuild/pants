@@ -2,18 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import sys
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
-from pants.util.contextutil import open_zip as open_jar
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.util.contextutil import open_zip64
 from pants.util.dirutil import safe_mkdir
 
 
@@ -89,7 +90,7 @@ class Provides(Task):
 
   def get_jar_paths(self, ivy_info, target, conf):
     jar_paths = OrderedSet()
-    if target.is_jar_library:
+    if isinstance(target, JarLibrary):
       # Jar library proxies jar dependencies or jvm targets, so the jars are just those of the
       # dependencies.
       for paths in [self.get_jar_paths(ivy_info, dep, conf) for dep in target.dependencies]:
@@ -117,5 +118,5 @@ class Provides(Task):
       return create_collection(ref)
 
   def list_jar(self, path):
-    with open_jar(path, 'r') as jar:
+    with open_zip64(path, 'r') as jar:
       return jar.namelist()

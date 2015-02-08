@@ -2,16 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.payload import Payload
 from pants.base.payload_field import ConfigurationsField, ExcludesField
 from pants.base.target import Target
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.jarable import Jarable
 
 
 class JvmTarget(Target, Jarable):
@@ -101,5 +101,3 @@ class JvmTarget(Target, Jarable):
   @property
   def excludes(self):
     return self.payload.excludes
-
-

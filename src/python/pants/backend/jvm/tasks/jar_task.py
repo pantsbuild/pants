@@ -2,18 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from abc import abstractmethod, abstractproperty
-from contextlib import contextmanager
 import os
 import tempfile
+from abc import abstractmethod, abstractproperty
+from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
 from twitter.common.lang import AbstractClass, Compatibility
 
-from pants.backend.jvm.targets.jvm_binary import Duplicate, Skip, JarRules
+from pants.backend.jvm.targets.java_agent import JavaAgent
+from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -346,7 +347,7 @@ class JarTask(NailgunTask):
           for resources_target in target_resources:
             add_products(resources_target)
 
-          if tgt.is_java_agent:
+          if isinstance(tgt, JavaAgent):
             self._write_agent_manifest(tgt, jar)
 
       if recursive:

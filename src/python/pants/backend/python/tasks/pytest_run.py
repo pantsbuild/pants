@@ -2,16 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 
-from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
-from pants.backend.python.test_builder import PythonTestBuilder
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.backend.python.test_builder import PythonTestBuilder
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 from pants.util.contextutil import environment_as
 from pants.util.strutil import safe_shlex_split
 

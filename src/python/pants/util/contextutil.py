@@ -2,10 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from contextlib import closing, contextmanager
 import os
 import shutil
 import tarfile
@@ -13,6 +12,7 @@ import tempfile
 import time
 import uuid
 import zipfile
+from contextlib import closing, contextmanager
 
 from twitter.common.lang import Compatibility
 
@@ -149,6 +149,17 @@ def open_zip(path_or_file, *args, **kwargs):
     yield zf
   finally:
     zf.close()
+
+
+@contextmanager
+def open_zip64(path_or_file, *args, **kwargs):
+  """
+    A with-context for zip files with allowZip64 True.
+    Passes through positional and kwargs to openZip.
+  """
+  allowZip64 = kwargs.pop('allowZip64', True)
+  with open_zip(path_or_file, *args, allowZip64=allowZip64, **kwargs) as zf:
+    yield zf
 
 
 @contextmanager

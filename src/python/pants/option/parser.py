@@ -2,12 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
+import copy
 from argparse import ArgumentParser, _HelpAction
 from collections import namedtuple
-import copy
+
 import six
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -109,6 +110,7 @@ class Parser(object):
     # registered on it too, which would create unnecessarily repetitive help messages.
     self._help_argparser = CustomArgumentParser(conflict_handler='resolve',
                                                 formatter_class=PantsHelpFormatter)
+    self._help_argparser_group = self._help_argparser.add_argument_group(title=scope)
 
     # If True, we have at least one option to show help for.
     self._has_help_options = False
@@ -180,7 +182,7 @@ class Parser(object):
     # default may be overridden in inner scopes.
     raw_default = self._compute_default(dest, is_invertible, kwargs).value
     kwargs_with_default = dict(kwargs, default=raw_default)
-    self._help_argparser.add_argument(*help_args, **kwargs_with_default)
+    self._help_argparser_group.add_argument(*help_args, **kwargs_with_default)
     self._has_help_options = True
 
     # Register the option for the purpose of parsing, on this and all enclosed scopes.

@@ -1,12 +1,17 @@
+# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Illustrate using Thrift-generated code from Python.
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import unittest
 
 from com.pants.examples.distance.ttypes import Distance
 from com.pants.examples.precipitation.ttypes import Precipitation
+
+
+# Illustrate using Thrift-generated code from Python.
 
 
 class UseThriftTest(unittest.TestCase):

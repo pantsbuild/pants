@@ -2,11 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from hashlib import sha1
 import os
+import sys
+from hashlib import sha1
 
 from twitter.common.lang import Compatibility
 
@@ -35,71 +36,109 @@ class AbstractTarget(object):
     # TODO(John Sirois): fixup predicate dipping down into details here.
     return self.has_label('exportable') and self.provides
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on JarDependency
   @property
   def is_jar(self):
     """Returns True if the target is a jar."""
+    print('The `Target.is_jar` property is deprecated and will be removed after 0.0.29.',
+          file=sys.stderr)
     return False
 
+  # DEPRECATED to be removed after 0.0.29
+  # Do not use this method, use an isinstance check on JavaAgent
   @property
   def is_java_agent(self):
     """Returns `True` if the target is a java agent."""
+    print('The `Target.is_java_agent` property is deprecated and will be removed after 0.0.29.',
+          file=sys.stderr)
     return self.has_label('java_agent')
 
+  # DEPRECATED  to be removed after 0.0.29
+  # do not use this method, use an isinstance check on JvmApp
   @property
   def is_jvm_app(self):
     """Returns True if the target produces a java application with bundled auxiliary files."""
+    print('The `Target.is_jvm_app` property is deprecated and will be removed after 0.0.29.',
+          file=sys.stderr)
     return False
 
+  # DEPRECATED  to be removed after 0.0.29
+  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
   @property
   def is_thrift(self):
     """Returns True if the target has thrift IDL sources."""
     return False
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_jvm(self):
     """Returns True if the target produces jvm bytecode."""
     return self.has_label('jvm')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_codegen(self):
     """Returns True if the target is a codegen target."""
     return self.has_label('codegen')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on JarLibrary
   @property
   def is_jar_library(self):
     """Returns True if the target is an external jar library."""
+    print('The `Target.is_jar_library` property is deprecated and will be removed after 0.0.29.',
+          file=sys.stderr)
     return self.has_label('jars')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_java(self):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on AnnotationProcessor
   @property
   def is_apt(self):
     """Returns True if the target exports an annotation processor."""
+    print('The `Target.is_apt` property is deprecated and will be removed after 0.0.29.',
+          file=sys.stderr)
     return self.has_label('apt')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_python(self):
     """Returns True if the target has python sources."""
     return self.has_label('python')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_scala(self):
     """Returns True if the target has scala sources."""
     return self.has_label('scala')
 
+  # DEPRECATED to be removed after 0.0.29
+  #  do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_scalac_plugin(self):
     """Returns True if the target builds a scalac plugin."""
     return self.has_label('scalac_plugin')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_test(self):
     """Returns True if the target is comprised of tests."""
     return self.has_label('tests')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_android(self):
     """Returns True if the target is an android target."""
@@ -428,12 +467,15 @@ class Target(AbstractTarget):
     self.description = description
     return self
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):
     self.labels.update(label)
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def remove_label(self, label):
     self.labels.remove(label)
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def has_label(self, label):
     return label in self.labels
 

@@ -2,12 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import re
-# python documentation says xml parsing is insecure, but this should be safe usage because we're
 # just running it on code in our repositories, not on externally acquired data.
 from xml.dom.minidom import parse
 
@@ -20,6 +19,10 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
+
+
+# python documentation says xml parsing is insecure, but this should be safe usage because we're
+
 
 
 class JaxbGen(CodeGen, NailgunTask):

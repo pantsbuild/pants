@@ -2,19 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict
-from contextlib import closing
 import os
-from zipfile import ZipFile
+from collections import defaultdict
 
 from pex.compatibility import to_bytes
 
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
+from pants.util.contextutil import open_zip64
 
 
 EXCLUDED_FILES = ['dependencies,license,notice,.DS_Store,notice.txt,cmdline.arg.info.txt.1,'
@@ -106,7 +105,7 @@ class DuplicateDetector(JvmBinaryTask):
     for basedir, externaljar in  self.list_external_jar_dependencies(binary_target):
       external_dep = os.path.join(basedir, externaljar)
       self.context.log.debug('  scanning %s' % external_dep)
-      with closing(ZipFile(external_dep)) as dep_zip:
+      with open_zip64(external_dep) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
           # Zip entry names can come in any encoding and in practice we find some jars that have
           # utf-8 encoded entry names, some not.  As a result we cannot simply decode in all cases

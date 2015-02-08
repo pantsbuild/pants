@@ -2,19 +2,20 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict
 import json
 import os
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
+from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_binary import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -38,7 +39,7 @@ class Depmap(ConsoleTask):
 
   @staticmethod
   def _is_jvm(dep):
-    return dep.is_jvm or dep.is_jvm_app
+    return dep.is_jvm or isinstance(dep, JvmApp)
 
   @staticmethod
   def _jar_id(jar):
@@ -77,6 +78,8 @@ class Depmap(ConsoleTask):
     register('--separator', default='-',
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
+    register('--path-to',
+             help='Show only items on the path to the given target.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -96,6 +99,7 @@ class Depmap(ConsoleTask):
 
     self.is_minimal = self.get_options().minimal
     self.is_graph = self.get_options().graph
+    self.path_to = self.get_options().path_to
     self.separator = self.get_options().separator
     self.project_info = self.get_options().project_info
     self.format = self.get_options().project_info_formatted
@@ -112,17 +116,12 @@ class Depmap(ConsoleTask):
         yield line
       return
     for target in self.context.target_roots:
-      if self._is_jvm(target) or isinstance(target, Dependencies):
-        if self.is_graph:
-          for line in self._output_digraph(target):
-            yield line
-        else:
-          for line in self._output_dependency_tree(target):
-            yield line
-      elif target.is_python:
-        raise TaskError('Unsupported for Python targets')
+      if self.is_graph:
+        for line in self._output_digraph(target):
+          yield line
       else:
-        raise TaskError('Unsupported for target {target}'.format(target=target))
+        for line in self._output_dependency_tree(target):
+          yield line
 
   def _dep_id(self, dependency):
     """Returns a tuple of dependency_id , is_internal_dep."""
@@ -142,6 +141,13 @@ class Depmap(ConsoleTask):
     def output_dep(dep, indent):
       return "%s%s" % (indent * "  ", dep)
 
+    def check_path_to(jar_dep_id):
+      """
+      Check that jar_dep_id is the dep we are looking for with path_to
+      (or that path_to is not enabled)
+      """
+      return jar_dep_id == self.path_to or not self.path_to
+
     def output_deps(dep, indent=0, outputted=set()):
       dep_id, _ = self._dep_id(dep)
       if dep_id in outputted:
@@ -149,14 +155,9 @@ class Depmap(ConsoleTask):
       else:
         output = []
         if not self.is_external_only:
-          output += [output_dep(dep_id, indent)]
-          outputted.add(dep_id)
           indent += 1
 
-        if self._is_jvm(dep) or isinstance(dep, Dependencies):
-          for internal_dep in dep.dependencies:
-            output += output_deps(internal_dep, indent, outputted)
-
+        jar_output = []
         if not self.is_internal_only:
           if self._is_jvm(dep):
             for jar_dep in dep.jar_dependencies:
@@ -164,8 +165,23 @@ class Depmap(ConsoleTask):
               if not internal:
                 if jar_dep_id not in outputted or (not self.is_minimal
                                                    and not self.is_external_only):
-                  output += [output_dep(jar_dep_id, indent)]
+                  if check_path_to(jar_dep_id):
+                    jar_output.append(output_dep(jar_dep_id, indent))
                   outputted.add(jar_dep_id)
+
+        dep_output = []
+        for internal_dep in dep.dependencies:
+          dep_output.extend(output_deps(internal_dep, indent, outputted))
+
+        if not check_path_to(dep_id) and not (jar_output or dep_output):
+          return []
+
+        if not self.is_external_only:
+          output.append(output_dep(dep_id, indent - 1))
+          outputted.add(dep_id)
+
+        output.extend(dep_output)
+        output.extend(jar_output)
         return output
     return output_deps(target)
 
@@ -274,11 +290,11 @@ class Depmap(ConsoleTask):
       }
 
       target_libraries = set()
-      if current_target.is_jar_library:
+      if isinstance(current_target, JarLibrary):
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
         info['targets'].append(self._address(dep.address))
-        if dep.is_jar_library:
+        if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(jar)
           # Add all the jars pulled in by this jar_library

@@ -2,12 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
 import os
 import subprocess
+
+from twitter.common.collections import OrderedSet
 
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.aapt_task import AaptTask
@@ -20,8 +22,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
-
-from twitter.common.collections import OrderedSet
 
 
 logger = logging.getLogger(__name__)

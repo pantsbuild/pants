@@ -2,27 +2,28 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
+import os
 import SimpleHTTPServer
 import SocketServer
-from contextlib import contextmanager
-import os
-from threading import Thread
 import unittest
+from contextlib import contextmanager
+from threading import Thread
 
 from pants.base.build_invalidator import CacheKey
-from pants.cache.artifact_cache import call_use_cached_files, call_insert
-from pants.cache.cache_setup import (create_artifact_cache, select_best_url, EmptyCacheSpecError,
-                                     LocalCacheSpecRequiredError, CacheSpecFormatError,
-                                     InvalidCacheSpecError, RemoteCacheSpecRequiredError)
+from pants.cache.artifact_cache import call_insert, call_use_cached_files
+from pants.cache.cache_setup import (CacheSpecFormatError, EmptyCacheSpecError,
+                                     InvalidCacheSpecError, LocalCacheSpecRequiredError,
+                                     RemoteCacheSpecRequiredError, create_artifact_cache,
+                                     select_best_url)
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants_test.testutils.mock_logger import MockLogger
 from pants_test.base.context_utils import create_context
+from pants_test.testutils.mock_logger import MockLogger
 
 
 class MockPinger(object):

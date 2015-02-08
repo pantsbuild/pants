@@ -96,7 +96,7 @@ Open the "Run -\> Edit Configurations..." dialog box.
     `src/python/pants/bin/pants_exe.py` file (example:
     `/home/jsirois/dev-pants/src/python/pants/bin/pants_exe.py`)
 -   Set the "Script parameters" to your pants command-line args, such as
-    goal goals.
+    goals.
 -   Set the "Working directory" to where you want to run pants from.
     Note this could be an entirely different repo from where the pants
     source code lives. This is very useful for making a pants change and
