@@ -47,7 +47,7 @@ class SignApkTask(Task):
 
   @classmethod
   def product_types(cls):
-    return ['release_apk', 'debug_apk']
+    return ['release_apk']
 
   def __init__(self, *args, **kwargs):
     super(SignApkTask, self).__init__(*args, **kwargs)
@@ -164,5 +164,5 @@ class SignApkTask(Task):
       # If it is a release build, it goes to the workdir for zipalign to operate upon.
       return os.path.join(self.workdir, target.name, build_type)
     elif build_type == 'debug':
-      # Debug builds have completed all needed tasks so these products can go straight to dist.
+      # Debug builds have completed all needed tasks so it can go straight to dist.
       return os.path.join(self._distdir, target.name)

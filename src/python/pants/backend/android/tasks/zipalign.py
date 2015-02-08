@@ -25,7 +25,6 @@ class Zipalign(AndroidTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(Zipalign, cls).prepare(options, round_manager)
-    # Zipalign no-ops on 'debug_apk' but requires both to bundle their tasks into 'binary' goal.
     round_manager.require_data('release_apk')
 
   @staticmethod
