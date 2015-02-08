@@ -25,6 +25,7 @@ class TestAndroidBase(TaskTest):
     """Subclasses must return the type of the Task subclass under test."""
     return AndroidTask
 
+  @contextmanager
   def android_binary(self):
     """Represent an android_binary target, providing a mock version of the required manifest."""
     with temporary_file() as fp:
@@ -42,7 +43,7 @@ class TestAndroidBase(TaskTest):
       target = self.make_target(spec=':binary',
                                 target_type=AndroidBinary,
                                 manifest=path)
-      return target
+      yield target
 
   @contextmanager
   def distribution(self,

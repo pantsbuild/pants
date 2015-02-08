@@ -146,18 +146,13 @@ class SignApkTask(Task):
                 raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
                                 .format(returncode))
 
-    # Keystores and targets have no concept of each other and keys only exist in this execute scope.
-    # We look at the products themselves in order to plug into the invalidation framework.
     for target in targets:
       release_path = self.sign_apk_out(target, 'release')
-      debug_path = self.sign_apk_out(target, 'debug')
       release_apk = self.package_name(target, 'release')
-      debug_apk = self.package_name(target, 'debug')
 
       if os.path.isfile(os.path.join(release_path, release_apk)):
         self.context.products.get('release_apk').add(target, release_path).append(release_apk)
-      elif os.path.isfile(os.path.join(debug_path, debug_apk)):
-        self.context.products.get('debug_apk').add(target, debug_path).append(debug_apk)
+
 
   def package_name(self, target, build_type):
     """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""

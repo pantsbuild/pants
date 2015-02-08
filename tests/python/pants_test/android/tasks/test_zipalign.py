@@ -26,29 +26,32 @@ class TestZipalign(TestAndroidBase):
 
   def test_zipalign_binary(self):
     with self.distribution() as dist:
-      task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      target = self.android_binary()
-      self.assertEqual(task.zipalign_binary(target),
-                       os.path.join(dist, 'build-tools', target.build_tools_version, 'zipalign'))
+      with self.android_binary() as android_binary:
+        task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
+                                   build_graph=self.build_graph,
+                                   build_file_parser=self.build_file_parser)
+        target = android_binary
+        self.assertEqual(task.zipalign_binary(target),
+                         os.path.join(dist, 'build-tools', target.build_tools_version, 'zipalign'))
 
   def test_zipalign_out(self):
     with self.distribution() as dist:
-      task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      target = self.android_binary()
-      self.assertEqual(task.zipalign_out(target), os.path.join(task._distdir, target.name))
+      with self.android_binary() as android_binary:
+        task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
+                                 build_graph=self.build_graph,
+                                 build_file_parser=self.build_file_parser)
+        target = android_binary
+        self.assertEqual(task.zipalign_out(target), os.path.join(task._distdir, target.name))
 
   def test_render_args(self):
     with self.distribution() as dist:
-      task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      target = self.android_binary()
-      expected_args = [os.path.join(dist, 'build-tools/', target.build_tools_version, 'zipalign'),
-                        '-f', '4', 'package/path',
-                        os.path.join(task._distdir, target.name,
-                                     '{0}.signed.apk'.format(target.name))]
-      self.assertEqual(task._render_args('package/path', target), expected_args)
+      with self.android_binary() as android_binary:
+        task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
+                                 build_graph=self.build_graph,
+                                 build_file_parser=self.build_file_parser)
+        target = android_binary
+        expected_args = [os.path.join(dist, 'build-tools', target.build_tools_version, 'zipalign'),
+                          '-f', '4', 'package/path',
+                          os.path.join(task._distdir, target.name,
+                                       '{0}.signed.apk'.format(target.name))]
+        self.assertEqual(task._render_args('package/path', target), expected_args)

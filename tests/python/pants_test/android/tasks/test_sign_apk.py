@@ -101,20 +101,21 @@ class SignApkTest(TestAndroidBase):
 
   def test_render_args(self):
     with temporary_dir() as temp:
-      task = self.prepare_task(config=self._get_config(),
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-    target = self.android_binary()
-    fake_key = self.FakeKeystore()
-    task._dist = self.FakeDistribution()
-    expected_args = ['path/to/jarsigner',
-                     '-sigalg', 'SHA1withRSA', '-digestalg', 'SHA1',
-                     '-keystore', '/path/to/key',
-                     '-storepass', 'keystore_password',
-                     '-keypass', 'key_password',
-                     '-signedjar']
-    expected_args.extend(['{0}/{1}.{2}.signed.apk'.format(temp, target.app_name,
-                                                          fake_key.build_type)])
-    expected_args.extend(['unsigned_apk_product', 'key_alias'])
-    self.assertEquals(expected_args, task._render_args(target, fake_key, 'unsigned_apk_product',
-                                                      temp))
+      with self.android_binary() as android_binary:
+        task = self.prepare_task(config=self._get_config(),
+                                   build_graph=self.build_graph,
+                                   build_file_parser=self.build_file_parser)
+        target = android_binary
+        fake_key = self.FakeKeystore()
+        task._dist = self.FakeDistribution()
+        expected_args = ['path/to/jarsigner',
+                         '-sigalg', 'SHA1withRSA', '-digestalg', 'SHA1',
+                         '-keystore', '/path/to/key',
+                         '-storepass', 'keystore_password',
+                         '-keypass', 'key_password',
+                         '-signedjar']
+        expected_args.extend(['{0}/{1}.{2}.signed.apk'.format(temp, target.app_name,
+                                                              fake_key.build_type)])
+        expected_args.extend(['unsigned_apk_product', 'key_alias'])
+        self.assertEquals(expected_args, task._render_args(target, fake_key, 'unsigned_apk_product',
+                                                           temp))
