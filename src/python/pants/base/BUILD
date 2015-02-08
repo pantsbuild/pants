@@ -175,6 +175,9 @@ python_library(
 python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+  ]
 )
 
 python_library(
