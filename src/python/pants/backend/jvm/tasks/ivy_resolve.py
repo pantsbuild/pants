@@ -180,7 +180,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
     tool_classpath = self.tool_classpath('xalan')
 
-    reports = []
+    report = None
     org, name = IvyUtils.identify(targets)
     xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
 
@@ -195,15 +195,25 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         make_empty_report(xml, org, name, conf)
       out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
       args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
+
+      # The ivy-report.xsl genrates tab links to files with extension 'xml' by default, we
+      # override that to point to the html files we generate.
+      args.extend(['-param', 'extension', 'html'])
+
       if 0 != self.runjava(classpath=tool_classpath, main='org.apache.xalan.xslt.Process',
                            args=args, workunit_name='report'):
         raise IvyResolve.Error('Failed to create html report from xml ivy report.')
-      reports.append(out)
+
+      # The ivy-report.xsl is already smart enough to generate an html page with tab links to all
+      # confs for a given report coordinate (org, name).  We need only display 1 of the generated
+      # htmls and the user can then navigate to the others via the tab links.
+      if report is None:
+        report = out
 
     css = os.path.join(self._outdir, 'ivy-report.css')
     if os.path.exists(css):
       os.unlink(css)
     shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
 
-    if self._open:
-      binary_util.ui_open(*reports)
+    if self._open and report:
+      binary_util.ui_open(report)
