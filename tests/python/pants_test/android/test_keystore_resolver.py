@@ -59,12 +59,12 @@ class TestKeystoreResolver(unittest.TestCase):
       self.assertEquals(keystores['test-release'].build_type, 'release')
 
   def test_resolve_mixed_case(self):
-    with self.config_file(build_type="ReleASE") as config:
+    with self.config_file(build_type='ReleASE') as config:
       keystores = KeystoreResolver.resolve(config)
       self.assertEquals(keystores['test-release'].build_type, 'release')
 
   def test_bad_build_type(self):
-    with self.config_file(build_type="bad-build-type") as config:
+    with self.config_file(build_type='bad-build-type') as config:
       keystores = KeystoreResolver.resolve(config)
       with self.assertRaises(ValueError):
         keystores['default-debug'].build_type
@@ -76,7 +76,7 @@ class TestKeystoreResolver(unittest.TestCase):
         self.assertEqual(keystores['default-debug'].keystore_location, temp_location.name)
 
   def test_expanding_path(self):
-    with self.config_file(keystore_location="~/dir") as config:
+    with self.config_file(keystore_location='~/dir') as config:
       keystores = KeystoreResolver.resolve(config)
       self.assertEqual(keystores['default-debug'].keystore_location, os.path.expandvars('~/dir'))
 
