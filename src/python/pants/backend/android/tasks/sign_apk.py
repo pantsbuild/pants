@@ -155,10 +155,8 @@ class SignApkTask(Task):
       debug_apk = self.package_name(target, 'debug')
 
       if os.path.isfile(os.path.join(release_path, release_apk)):
-        # If it is a release build, it goes to the workdir for zipalign to operate upon.
         self.context.products.get('release_apk').add(target, release_path).append(release_apk)
       elif os.path.isfile(os.path.join(debug_path, debug_apk)):
-        # Debug builds have completed all needed tasks so these products can go straight to dist.
         self.context.products.get('debug_apk').add(target, debug_path).append(debug_apk)
 
   def package_name(self, target, build_type):
@@ -168,6 +166,8 @@ class SignApkTask(Task):
   def sign_apk_out(self, target, build_type):
     """Compute the outdir for a target."""
     if build_type == 'release':
+      # If it is a release build, it goes to the workdir for zipalign to operate upon.
       return os.path.join(self.workdir, target.name, build_type)
     elif build_type == 'debug':
+      # Debug builds have completed all needed tasks so these products can go straight to dist.
       return os.path.join(self._distdir, target.name)
