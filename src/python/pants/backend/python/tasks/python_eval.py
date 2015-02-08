@@ -6,13 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from pants.backend.python.targets.python_target import PythonTarget
 
 from pex.pex import PEX
 from pex.pex_info import PexInfo
 
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
