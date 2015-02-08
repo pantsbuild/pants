@@ -47,17 +47,17 @@ class TestAndroidBase(TaskTest):
 
   @contextmanager
   def distribution(self,
-                   installed_sdks=['18', '19'],
-                   installed_build_tools=['19.1.0'],
-                   files=['android.jar'],
-                   executables=['aapt', 'zipalign']):
+                   installed_sdks=('18', '19'),
+                   installed_build_tools=('19.1.0',),
+                   files=('android.jar',),
+                   executables=('aapt', 'zipalign')):
     """Mock Android SDK Distribution.
 
-    :param list[strings] installed_sdks: SDK versions of the files being mocked.
-    :param list[strings] installed_build_tools: Build tools version of any tools.
-    :param list[strings] files: The files are to mock non-executables and one will be created for
+    :param tuple[strings] installed_sdks: SDK versions of the files being mocked.
+    :param tuple[strings] installed_build_tools: Build tools version of any tools.
+    :param tuple[strings] files: The files are to mock non-executables and one will be created for
       each installed_sdks version.
-    :param list[strings] executables: Executables are any required tools and one is created for each
+    :param tuple[strings] executables: Executables are any required tools and one is created for each
       installed_build_tools version.
     """
     with temporary_dir() as sdk:
@@ -67,7 +67,6 @@ class TestAndroidBase(TaskTest):
       for version in installed_build_tools:
         for exe in maybe_list(executables or ()):
           path = os.path.join(sdk, 'build-tools', version, exe)
-          with safe_open(path, 'w') as fp:
-            fp.write('')
+          touch(path)
           chmod_plus_x(path)
       yield sdk
