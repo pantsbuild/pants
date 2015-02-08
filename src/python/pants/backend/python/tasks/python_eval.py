@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from pants.backend.python.targets.python_target import PythonTarget
 
 from pex.pex import PEX
 from pex.pex_info import PexInfo
@@ -21,7 +22,8 @@ from pants.util.contextutil import temporary_file
 class PythonEval(PythonTask):
   def execute(self):
     for target in self.context.target_roots:
-      self.compile_target(target)
+      if isinstance(target, PythonTarget):
+        self.compile_target(target)
 
   def compile_target(self, target):
     interpreter = self.select_interpreter_for_targets([target])
@@ -62,7 +64,7 @@ class PythonEval(PythonTask):
           imports_file.write('if __name__ == "__main__":\n')
           for module in imports:
             imports_file.write('  import {}\n'.format(module))
-          imports_file.write('\n  print("eval success")\n')
+          imports_file.write('\n  print("eval success for {}")\n'.format(target.address.spec))
           imports_file.close()
 
           builder.set_executable(imports_file.name, '__pants_python_eval__.py')
@@ -72,4 +74,4 @@ class PythonEval(PythonTask):
           with self.context.new_workunit(name='eval', labels=[WorkUnit.COMPILER]) as workunit:
             result = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
             if result != 0:
-              raise TaskError('Compile of {} failed.'.format(target.address.spec))
+              raise TaskError('Eval of {} failed.'.format(target.address.spec))
