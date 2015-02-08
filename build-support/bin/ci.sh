@@ -164,7 +164,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex test ${PANTS_ARGS[@]} \
+      ./pants.pex compile.python-eval --fail-slow test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants filter --filter-type=python_tests | \
             grep -v integration)
@@ -200,14 +200,16 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   banner "Running tests in testprojects/ "
   (
-    ./pants.pex test testprojects:: $daemons $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
+    ./pants.pex compile.python-eval --fail-slow test testprojects:: \
+      $daemons $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
   ) || die "test failure in testprojects/"
 fi
 
 if [[ "${skip_examples:-false}" == "false" ]]; then
   banner "Running example tests"
   (
-    ./pants.pex test examples:: $daemons $android_test_opts ${PANTS_ARGS[@]}
+    ./pants.pex compile.python-eval --fail-slow test examples:: \
+      $daemons $android_test_opts ${PANTS_ARGS[@]}
   ) || die "Examples test failure"
 fi
 
@@ -219,7 +221,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex test ${PANTS_ARGS[@]} \
+      ./pants.pex compile.python-eval --fail-slow test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants filter --filter-type=python_tests | \
             grep integration | \

@@ -64,10 +64,8 @@ python_library(
   name = 'binary_create',
   sources = ['binary_create.py'],
   dependencies = [
-    ':common',
     ':jvm_binary_task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/java:jar',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -89,12 +87,10 @@ python_library(
   sources = ['bundle_create.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':common',
     ':jvm_binary_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
-    'src/python/pants/java:jar',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -151,7 +147,6 @@ python_library(
   name = 'detect_duplicates',
   sources = ['detect_duplicates.py'],
   dependencies = [
-    ':common',
     ':jvm_binary_task',
     # TODO(pl): Use twitter.common.lang instead, but for the to_bytes helper, twitter.commons
     # needs to be updated so the standard compatibility helpers act like the ones in pex
@@ -328,10 +323,10 @@ python_library(
     ':nailgun_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:jar',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -365,7 +360,6 @@ python_library(
   name = 'jvm_binary_task',
   sources = ['jvm_binary_task.py'],
   dependencies = [
-    ':common',
     ':jar_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
