@@ -8,6 +8,7 @@ cache:
   directories:
     - $HOME/.pants.d
     - $HOME/.ivy2
+    - build-support/isort.venv
     - build-support/pants_dev_deps.venv
     - build-support/virtualenv.dist
 
