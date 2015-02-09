@@ -20,10 +20,32 @@ from pants.util.contextutil import temporary_file
 
 
 class PythonEval(PythonTask):
+  @classmethod
+  def register_options(cls, register):
+    super(PythonEval, cls).register_options(register)
+    register('--fail-slow', action='store_true', default=False,
+             help='Compile all targets and present the full list of errors.')
+    register('--closure', action='store_true', default=False,
+             help='Eval all targets in the closure individually instead of just the targets '
+                  'specified on the command line.')
+
   def execute(self):
-    for target in self.context.target_roots:
-      if isinstance(target, PythonTarget):
-        self.compile_target(target)
+    targets = self.context.targets() if self.get_options().closure else self.context.target_roots
+    failures = []
+    with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
+      for target in targets:
+        if isinstance(target, PythonTarget):
+          returncode  = self.compile_target(target)
+          if returncode != 0:
+            if self.get_options().fail_slow:
+              failures.append(target)
+            else:
+              raise TaskError('Failed to eval {}'.format(target.address.spec))
+      if failures:
+        msg = 'Failed to evaluate {} targets:\n  {}'.format(
+            len(failures),
+            '\n  '.join(t.address.spec for t in failures))
+        raise TaskError(msg)
 
   def compile_target(self, target):
     interpreter = self.select_interpreter_for_targets([target])
@@ -61,17 +83,23 @@ class PythonEval(PythonTask):
 
       if imports:
         with temporary_file() as imports_file:
+          imports_file.write('import sys\n\n')
           imports_file.write('if __name__ == "__main__":\n')
           for module in imports:
             imports_file.write('  import {}\n'.format(module))
-          imports_file.write('\n  print("eval success for {}")\n'.format(target.address.spec))
+          imports_file.write('\n  sys.exit(0)\n')
           imports_file.close()
 
           builder.set_executable(imports_file.name, '__pants_python_eval__.py')
 
           builder.freeze()
           pex = PEX(builder.path(), interpreter=interpreter)
-          with self.context.new_workunit(name='eval', labels=[WorkUnit.COMPILER]) as workunit:
-            result = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-            if result != 0:
-              raise TaskError('Eval of {} failed.'.format(target.address.spec))
+
+          with self.context.new_workunit(name=target.address.spec,
+                                         labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
+                                         cmd=' '.join(pex.cmdline())) as workunit:
+            returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+            workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
+            if returncode != 0:
+              self.context.log.error('Failed to eval {}'.format(target.address.spec))
+            return returncode

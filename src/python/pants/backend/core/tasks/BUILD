@@ -253,6 +253,7 @@ python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
+    '3rdparty/python:docutils',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:config',
     'src/python/pants/base:generator',
