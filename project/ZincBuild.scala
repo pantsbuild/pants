@@ -6,13 +6,13 @@ import sbt._
 import sbt.Keys._
 
 object ZincBuild extends Build {
-  val sbtVersion = "0.13.6"
+  val sbtVersion = "0.13.7"
 
   val resolveSbtLocally = settingKey[Boolean]("resolve-sbt-locally")
 
   lazy val buildSettings = Seq(
     organization := "com.typesafe.zinc",
-    version := "0.3.6-SNAPSHOT",
+    version := "0.3.7",
     scalaVersion := "2.10.4",
     crossPaths := false
   )
