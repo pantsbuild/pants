@@ -143,16 +143,16 @@ Authenticating to the Artifact Repository
 -----------------------------------------
 
 Your artifact repository probably doesn't accept anonymous uploads; you probably need to
-authenticate to it (prove that you are really you). Depending on how the artifact repository set
-up, Pants might need to interact the authentication system. (Or it might not. E.g., if your system
-uses Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets should work
-automatically).
+authenticate to it (prove that you are really you). Depending on how the artifact repository is
+configured, Pants might need to interact with an authentication system. (Or it might not. E.g., if
+your system uses Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets should
+work automatically).
 
-Your Pants administator will handle configuring Pants to to submit credentails to the artifact
+Your Pants administator will handle configuring Pants to submit credentails to the artifact
 repository. As a user, if Pants needs to provide your username and password, you can enable this
 via Pants' `.netrc` support. Pants can parse [.netrc
-files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html) to get a
-user's username and password on an artifact repository machine. Here is an example file:
+files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html) to get your
+username and password to an artifact repository server. Here is an example file:
 
     machine maven.example.com
       login sandy
