@@ -146,7 +146,6 @@ python_library(
     'src/python/pants/base:address',
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants:thrift_util',
     'src/python/pants/util:dirutil',
