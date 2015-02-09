@@ -14,11 +14,25 @@ Build
 
 Zinc is built using sbt 0.13. To create the full distribution:
 
-    sbt dist/create
+    sbt universal:packageZipTarball
 
-Previously published distributions can be found in the [zinc repo].
+Previously published distributions up to 0.3.1-M1 relase can be found in the [old zinc repo].
+Newer distributions are hosted under [Typesafe downloads].
 
-[zinc repo]: http://repo.typesafe.com/typesafe/zinc/com/typesafe/zinc/dist/
+[old zinc repo]: http://repo.typesafe.com/typesafe/zinc/com/typesafe/zinc/dist/
+[Typesafe downloads]: http://downloads.typesafe.com/zinc/
+
+Here's the table of final releases in 0.3.x series:
+
+| zinc version | sbt version | Download                                                                        |
+|--------------|-------------|---------------------------------------------------------------------------------|
+| 0.3.0        | 0.13.0      | [zinc-0.3.0.tgz](http://downloads.typesafe.com/zinc/0.3.0/zinc-0.3.0.tgz)       |
+| 0.3.1        | 0.13.1      | [zinc-0.3.1.tgz](http://downloads.typesafe.com/zinc/0.3.1/zinc-0.3.1.tgz)       |
+| 0.3.2        | 0.13.2      | [zinc-0.3.2.tgz](http://downloads.typesafe.com/zinc/0.3.1/zinc-0.3.2.tgz)       |
+| 0.3.5        | 0.13.5      | [zinc-0.3.5.tgz](http://downloads.typesafe.com/zinc/0.3.5/zinc-0.3.5.tgz)       |
+| 0.3.5.1      | 0.13.5      | [zinc-0.3.5.1.tgz](http://downloads.typesafe.com/zinc/0.3.5.1/zinc-0.3.5.1.tgz) |
+| 0.3.5.2      | 0.13.5      | [zinc-0.3.5.2.tgz](http://downloads.typesafe.com/zinc/0.3.5.2/zinc-0.3.5.2.tgz) |
+| 0.3.5.3      | 0.13.5      | [zinc-0.3.5.3.tgz](http://downloads.typesafe.com/zinc/0.3.5.3/zinc-0.3.5.3.tgz) |
 
 
 Options
