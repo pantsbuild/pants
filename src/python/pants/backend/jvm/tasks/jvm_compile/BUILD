@@ -46,7 +46,7 @@ python_library(
     ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
