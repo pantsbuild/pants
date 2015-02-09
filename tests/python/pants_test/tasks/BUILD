@@ -536,6 +536,7 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/backend/codegen/tasks:protobuf_gen',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/util:contextutil',
   ],
 )
