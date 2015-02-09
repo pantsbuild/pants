@@ -56,10 +56,8 @@ python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
-    '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    ':address_lookup_error',
+    'src/python/pants/util:dirutil',
   ]
 )
 
