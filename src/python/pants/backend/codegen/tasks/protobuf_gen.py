@@ -39,7 +39,7 @@ _PROTOBUF_GEN_SUPPORTDIR_DEFAULT='bin/protobuf'
 _PROTOBUF_VERSION_DEFAULT='2.4.1'
 
 # Override with protobuf-gen -> javadeps (Accepts a list)
-_PROTOBUF_GEN_JAVADEPS_DEFAULT='3rdparty:protobuf-{version}'
+_PROTOBUF_GEN_JAVADEPS_DEFAULT=['3rdparty:protobuf-java']
 
 # Override with in protobuf-gen -> pythondeps (Accepts a list)
 _PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
@@ -52,6 +52,26 @@ class ProtobufGen(CodeGen):
     super(ProtobufGen, cls).register_options(register)
     register('--lang', action='append', choices=['python', 'java'],
              help='Force generation of protobuf code for these languages.')
+    register('--version', advanced=True,
+             help='Version of protoc to download in the bootstrapping step from repo declared'
+                  'in pants_support_baseurls. When changing this parameter you may also need to '
+                  'update --javadeps.',
+             default=_PROTOBUF_VERSION_DEFAULT)
+    register('--plugins', advanced=True, action='append',
+             help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
+                  'named protoc-gen-$NAME on PATH.',
+             default=[])
+    register('--supportdir', advanced=True,
+             help='This directory will be created under pants_bootstrapdir for the protoc binary.',
+             default=_PROTOBUF_GEN_SUPPORTDIR_DEFAULT)
+    register('--javadeps', advanced=True, action='append',
+             help='Dependencies to bootstrap this task for generating java code.  When changing '
+                  'this parameter you may also need to update --version.',
+             default=_PROTOBUF_GEN_JAVADEPS_DEFAULT)
+    register('--pythondeps', advanced=True, action='append',
+             help='Dependencies to bootstrap this task for generating python code.  When changing '
+                  'this parameter, you may also need to update --version',
+             default=_PROTOBUF_GEN_PYTHONDEPS_DEFAULT)
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
@@ -65,11 +85,9 @@ class ProtobufGen(CodeGen):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
 
-    self.protoc_supportdir = self.context.config.get('protobuf-gen', 'supportdir',
-                                                     default=_PROTOBUF_GEN_SUPPORTDIR_DEFAULT)
-    self.protoc_version = self.context.config.get('protobuf-gen', 'version',
-                                                  default=_PROTOBUF_VERSION_DEFAULT)
-    self.plugins = self.context.config.getlist('protobuf-gen', 'plugins', default=[])
+    self.protoc_supportdir = self.get_options().supportdir
+    self.protoc_version = self.get_options().version
+    self.plugins = self.get_options().plugins
 
     self.java_out = os.path.join(self.workdir, 'gen-java')
     self.py_out = os.path.join(self.workdir, 'gen-py')
@@ -85,25 +103,23 @@ class ProtobufGen(CodeGen):
       'protoc'
     )
 
-  def resolve_deps(self, key, default=None):
-    default = default or []
+  def resolve_deps(self, deps_list, key):
     deps = OrderedSet()
-    for dep in self.context.config.getlist('protobuf-gen', key, default=maybe_list(default)):
+    for dep in deps_list:
       try:
         deps.update(self.context.resolve(dep))
       except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
-                                  .format(message=e, section='protobuf-gen', key=key))
+        raise self.DepLookupError("{message}\n  referenced from --{key} option."
+                                  .format(message=e, key=key))
     return deps
 
   @property
   def javadeps(self):
-    return self.resolve_deps('javadeps',
-                             default=_PROTOBUF_GEN_JAVADEPS_DEFAULT
-                             .format(version=self.protoc_version))
+    self.resolve_deps(self.get_options().javadeps, 'javadeps')
+
   @property
   def pythondeps(self):
-    return self.resolve_deps('pythondeps', default=_PROTOBUF_GEN_PYTHONDEPS_DEFAULT)
+    self.resolve_deps(self.get_options().pythondeps, 'pythondeps')
 
   def invalidate_for_files(self):
     return [self.protobuf_binary]
@@ -170,7 +186,7 @@ class ProtobufGen(CodeGen):
       for plugin in self.plugins:
         # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is
         # acceptable for all plugins?
-        args.append("--{0}_protobuf_out={1}".format(plugin, output_dir))
+        args.append("--{0}_out={1}".format(plugin, output_dir))
 
     for base in bases:
       args.append('--proto_path={0}'.format(base))
