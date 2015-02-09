@@ -27,5 +27,6 @@ class AndroidResources(AndroidTarget):
     try:
       self.resource_dir = os.path.join(address.spec_path, resource_dir)
     except AttributeError:
-      raise TargetDefinitionException(self, 'An android_resources target must specify a \'resource_dir\' that contains '
-             'the target\'s resource files.')
+      raise TargetDefinitionException(self, 'An android_resources target must specify a '
+                                            '\'resource_dir\' that contains the target\'s '
+                                            'resource files.')
