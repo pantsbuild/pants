@@ -51,6 +51,7 @@ class ArgSplitter(object):
     self._known_scopes = set(known_scopes + ['help'])
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._is_help = False  # True if the user asked for help.
+    self._is_help_advanced = False # True if the user asked for --help-advanced
     self._is_help_all = False  # True if the user asked for --help-all.
 
     # For historical reasons we allow --scope-flag-name anywhere on the cmd line,
@@ -64,6 +65,10 @@ class ArgSplitter(object):
   @property
   def is_help(self):
     return self._is_help
+
+  @property
+  def is_help_advanced(self):
+    return self._is_help_advanced
 
   @property
   def is_help_all(self):
@@ -111,6 +116,8 @@ class ArgSplitter(object):
       assign_flag_to_scope(flag, GLOBAL_SCOPE)
     if '--help-all' in global_flags:
       self._is_help_all = True
+    if '--help-advanced' in global_flags:
+      self._is_help_advanced = True
     scope, flags = self._consume_scope()
     while scope:
       if scope.lower() == 'help':

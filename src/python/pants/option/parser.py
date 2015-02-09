@@ -110,7 +110,13 @@ class Parser(object):
     # registered on it too, which would create unnecessarily repetitive help messages.
     self._help_argparser = CustomArgumentParser(conflict_handler='resolve',
                                                 formatter_class=PantsHelpFormatter)
+
+    # Options are registered in two groups.  The first group will always be displayed in the help
+    # output.  The second group is for advanced options are not normally displayed because they
+    # are complex or may impact the compiler output.
     self._help_argparser_group = self._help_argparser.add_argument_group(title=scope)
+    self._help_argparser_advanced_group = \
+      self._help_argparser.add_argument_group(title='*{0}'.format(scope))
 
     # If True, we have at least one option to show help for.
     self._has_help_options = False
@@ -155,7 +161,11 @@ class Parser(object):
     return self._help_argparser.format_help() if self._has_help_options else ''
 
   def register(self, *args, **kwargs):
-    """Register an option, using argparse params."""
+    """Register an option, using argparse params.
+
+    Custom extensions to argparse params:
+    :param advanced: if True, the option will be usually be suppressed when displaying help.
+    """
     if self._frozen:
       raise RegistrationError('Cannot register option {0} in scope {1} after registering options '
                               'in any of its inner scopes.'.format(args[0], self._scope))
@@ -165,6 +175,9 @@ class Parser(object):
     while ancestor:
       ancestor._freeze()
       ancestor = ancestor._parent_parser
+
+    # Pull out our custom arguments, they aren't valid for argparse.
+    advanced = kwargs.pop('advanced', False)
 
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
@@ -182,7 +195,13 @@ class Parser(object):
     # default may be overridden in inner scopes.
     raw_default = self._compute_default(dest, is_invertible, kwargs).value
     kwargs_with_default = dict(kwargs, default=raw_default)
-    self._help_argparser_group.add_argument(*help_args, **kwargs_with_default)
+
+    if advanced:
+      arg_group = self._help_argparser_advanced_group
+    else:
+      arg_group = self._help_argparser_group
+    arg_group.add_argument(*help_args, **kwargs_with_default)
+
     self._has_help_options = True
 
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
