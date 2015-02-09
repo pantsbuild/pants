@@ -29,11 +29,10 @@ object Dist {
     },
     artifact in packageZipTarball in Universal :=  Artifact("zinc", "tgz", "tgz"),
     publishMavenStyle := true,
-    publishArtifact in makePom := false,
-    publishArtifact := false,
+    publishArtifact in Universal := false,
     publishTo := Some("zinc repo" at "http://typesafe.artifactoryonline.com/typesafe/zinc"),
     credentials += Credentials(Path.userHome / ".ivy2" / "artifactory-credentials")
-  ) ++ addArtifact(artifact in packageZipTarball in Universal, packageZipTarball in Universal)
+  )
 
   lazy val s3PublishSettings: Seq[Setting[_]] = s3Settings ++ Seq(
     mappings in S3.upload := {
