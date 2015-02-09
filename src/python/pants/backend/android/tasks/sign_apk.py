@@ -124,9 +124,9 @@ class SignApkTask(Task):
         def get_products_path(target):
           """Get path of target's unsigned apks as created by AaptBuilder."""
           unsigned_apks = self.context.products.get('apk')
-          if unsigned_apks.get(target):
-            # This allows for multiple apks but we expect only one per target.
-            for tgts, products in unsigned_apks.get(target).items():
+          packages = unsigned_apks.get(target)
+          if packages:
+            for tgts, products in packages.items():
               for prod in products:
                 yield os.path.join(tgts, prod)
 

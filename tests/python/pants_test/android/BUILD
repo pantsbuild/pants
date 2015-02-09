@@ -8,7 +8,7 @@ python_test_suite(
     ':android_config_util',
     ':android_distribution',
     ':keystore_resolver',
-    'tests/python/pants_test/android/tasks:tasks',
+    'tests/python/pants_test/android/tasks',
   ]
 )
 

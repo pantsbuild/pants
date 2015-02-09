@@ -46,10 +46,9 @@ class Zipalign(AndroidTask):
     #   : '-f' is to force overwrite of existing outfile.
     #   :  '4' is the mandated byte-alignment boundaries. If not 4, zipalign doesn't do anything.
     #   :   Final two args are infile, outfile.
-    args = [self.zipalign_binary(target)]
-    args.extend(['-f', '4', ])
-    args.extend([package, os.path.join(self.zipalign_out(target),
-                                       '{0}.signed.apk'.format(target.app_name))])
+
+    outfile = os.path.join(self.zipalign_out(target), '{0}.signed.apk'.format(target.app_name))
+    args = [self.zipalign_binary(target), '-f', '4', package, outfile]
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
@@ -60,8 +59,9 @@ class Zipalign(AndroidTask):
       def get_products_path(target):
         """Get path of target's apks that are signed with release keystores by SignApk task."""
         apks = self.context.products.get('release_apk')
-        if apks.get(target):
-          for tgts, products in apks.get(target).items():
+        packages = apks.get(target)
+        if packages:
+          for tgts, products in packages.items():
             for prod in products:
               yield os.path.join(tgts, prod)
 
