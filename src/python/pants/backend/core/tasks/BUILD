@@ -335,9 +335,10 @@ python_library(
   sources = ['what_changed.py'],
   dependencies = [
     ':console_task',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:lazy_source_mapper',
-    'src/python/pants/base:target',
+    'src/python/pants/goal:workspace',
   ],
 )
 
@@ -345,7 +346,6 @@ python_library(
   name='changed_target_goals',
   sources=['changed_target_goals.py'],
   dependencies=[
-    ':common',
     ':noop',
     ':what_changed',
   ],

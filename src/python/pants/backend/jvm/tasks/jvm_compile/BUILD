@@ -106,7 +106,7 @@ python_library(
 
 python_library(
   name = 'scala',
-  sources = globs('scala/*.py') - ['anonymize.py'],
+  sources = globs('scala/*.py'),
   dependencies = [
     ':analysis',
     ':analysis_parser',
@@ -127,7 +127,7 @@ python_library(
 
 python_binary(
   name = 'anonymize_zinc_analysis',
-  entry_point = 'pants.tasks.jvm_compile.scala.anonymize_analysis:main',
+  source = 'scala/bin/anonymize_analysis.py',
   dependencies = [
     ':anonymizer',
     ':scala',
