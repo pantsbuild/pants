@@ -937,15 +937,22 @@ class JarPublish(JarTask, ScmPublish):
     return ensure_text(self.scm.changelog(from_commit=sha,
                                           files=target.sources_relative_to_buildroot()))
 
+  def fetch_ivysettings(self, ivy):
+    custom_config = self.context.config.get(self._CONFIG_SECTION, 'ivy_settings')
+    if custom_config:
+      return custom_config
+    elif ivy.ivy_settings is None:
+      raise TaskError('An ivysettings.xml with writeable resolvers is required for publishing, '
+                      'but none was configured.')
+    else:
+      return ivy.ivy_settings
+
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
-    if ivy.ivy_settings is None:
-      raise TaskError('A custom ivysettings.xml with writeable resolvers is required for '
-                      'publishing, but none was configured.')
     template_relpath = os.path.join('templates', 'jar_publish', 'ivysettings.mustache')
     template = pkgutil.get_data(__name__, template_relpath)
     with safe_open(os.path.join(self.workdir, 'ivysettings.xml'), 'w') as wrapper:
       generator = Generator(template,
-                            ivysettings=ivy.ivy_settings,
+                            ivysettings=self.fetch_ivysettings(ivy),
                             dir=self.workdir,
                             cachedir=self.cachedir,
                             published=[TemplateData(org=jar.org, name=jar.name)
