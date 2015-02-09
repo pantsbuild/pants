@@ -225,8 +225,8 @@ There are some special things to set up to enable and customize publishing.
 To tell Pants which artifact repsitory to publish to, [[Create a
 plugin|pants('src/python/pants/docs:howto_plugin')]] if you haven't already. Register it with Pants.
 
-In the plugin, define and register a `Repository` in a `BUILD` file alias
-as shown in
+In the plugin, define and register at least one `Repository` object in a `BUILD` file alias as
+shown in
 [`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
 
 `BUILD` targets can use this Repository's alias as the `repo` parameter to an <a
@@ -240,17 +240,18 @@ If you get an error that the repo name (here, `public`) isn't defined, your plug
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
 In your config file (usually `pants.ini`), set up a `[jar-publish]` section. In that section,
-create a `dict` called `repos`. It should contain a section for each Repository:
+create a `dict` called `repos`. It should contain a section for each `Repository` object that you
+defined in your plugin:
 
     repos: {
-      'public': {  # must match the alias above
-        'resolver': 'maven.example.com', # must match URL above and <url> name
-                                       # in ivysettings.xml
+      'public': {  # must match the name of the `Repository` object that you defined in your plugin.
+        'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
+                                         # in your custom ivysettings.xml.
         'confs': ['default', 'sources', 'docs', 'changelog'],
-        'auth': 'build-support:netrc',
+        'auth': 'build-support:netrc',   # Pointer to BUILD file containing a 'credentials()' object.
         'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
-      'testing': { # this key must match the alias name above
+      'testing': {
         'resolver': 'artifactory.example.com',
         'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',
@@ -258,11 +259,16 @@ create a `dict` called `repos`. It should contain a section for each Repository:
       },
     }
 
-If your repository requires authentication, add a `~/.netrc` file:
+If your repository requires authentication, add a `~/.netrc` file. Here is a sample file, that
+matches the `repos` specified above:
+
+    machine maven.example.com
+      login someuser
+      password password123
 
     machine artifactory.example.com
       login someuser
-      password password123
+      password someotherpassword123
 
 And place the following in a `BUILD` file somewhere in your repository (`build-support/BUILD` is a
 good place):
@@ -275,8 +281,8 @@ good place):
       password=netrc.getpassword)
 
 Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
-(for example: '`build-support/ivy/ivysettings_for_publishing.xml`'). Here is an example of such a
-file:
+(for example: '`build-support/ivy/ivysettings_for_publishing.xml`'). Here is an example file to get
+you started:
 
 		<?xml version="1.0"?>
 		<!-- pants.ini forces this settings file to be loaded by Ivy, but only at
@@ -307,8 +313,8 @@ file:
 		  </resolvers>
 		</ivysettings>
 
-With this file in place, modify the `[jar-publish]` section of `pants.ini`, and tell pants to use
-it when publishing:
+With this file in place, add a `[publish]` section to `pants.ini`, and tell pants to use
+the custom Ivy settings when publishing:
 
     ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
 

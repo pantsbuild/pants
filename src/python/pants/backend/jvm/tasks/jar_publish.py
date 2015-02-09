@@ -401,6 +401,10 @@ class JarPublish(JarTask, ScmPublish):
                   'maven coordinate [org]#[name] or target. '
                   'For example: --restart-at=com.twitter.common#quantity '
                   'Or: --restart-at=src/java/com/twitter/common/base')
+    # TODO(areitz): When Eric's advanced options change lands, set it for this option. See
+    # https://rbcommons.com/s/twitter/r/1739/
+    register('--ivy_settings', default=None,
+             help='Specify a custom ivysettings.xml file to be used when publishing.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -938,9 +942,8 @@ class JarPublish(JarTask, ScmPublish):
                                           files=target.sources_relative_to_buildroot()))
 
   def fetch_ivysettings(self, ivy):
-    custom_config = self.context.config.get(self._CONFIG_SECTION, 'ivy_settings')
-    if custom_config:
-      return custom_config
+    if self.get_options().ivy_settings:
+      return self.get_options().ivy_settings
     elif ivy.ivy_settings is None:
       raise TaskError('An ivysettings.xml with writeable resolvers is required for publishing, '
                       'but none was configured.')
