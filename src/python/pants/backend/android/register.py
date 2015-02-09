@@ -26,7 +26,7 @@ def build_file_aliases():
 
 def register_goals():
   task(name='aapt', action=AaptGen).install('gen')
-  task(name='dex', action=DxCompile).install('compile')
+  task(name='dex', action=DxCompile).install('binary')
   task(name='apk', action=AaptBuilder).install()
   task(name='sign', action=SignApkTask).install()
-  task(name='zipalign', action=Zipalign).install('binary')
+  task(name='zipalign', action=Zipalign).install('bundle')
