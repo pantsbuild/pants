@@ -401,9 +401,7 @@ class JarPublish(JarTask, ScmPublish):
                   'maven coordinate [org]#[name] or target. '
                   'For example: --restart-at=com.twitter.common#quantity '
                   'Or: --restart-at=src/java/com/twitter/common/base')
-    # TODO(areitz): When Eric's advanced options change lands, set it for this option. See
-    # https://rbcommons.com/s/twitter/r/1739/
-    register('--ivy_settings', default=None,
+    register('--ivy_settings', default=None, advanced=True,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
 
   @classmethod

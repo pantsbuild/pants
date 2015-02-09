@@ -4,7 +4,7 @@ Publishing Artifacts
 A library owner/maintainer can *publish* versioned artifacts that folks
 elsewhere can fetch and import. In the JVM world, these are jars (with
 poms) on a server that Maven (or Ivy) looks for. (In the Python world,
-these are eggs; but as of early 2015, Pants doesn't help publish these.)
+these are eggs; but as of early 2014, Pants doesn't help publish these.)
 
 This page talks about publishing artifacts. We assume you already know
 enough about Pants to *build* the library that underlies an artifact. To
