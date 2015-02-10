@@ -148,7 +148,7 @@ configured, Pants might need to interact with an authentication system. (Or it m
 your system uses Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets should
 work automatically).
 
-Your Pants administator will handle configuring Pants to submit credentails to the artifact
+Your Pants administrator will handle configuring Pants to submit credentials to the artifact
 repository. As a user, if Pants needs to provide your username and password, you can enable this
 via Pants' `.netrc` support. Pants can parse [.netrc
 files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html) to get your

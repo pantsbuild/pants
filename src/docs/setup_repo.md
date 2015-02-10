@@ -222,7 +222,7 @@ There are some special things to set up to enable and customize publishing.
 
 ### Tell Pants about your Artifact Repository
 
-To tell Pants which artifact repsitory to publish to, [[Create a
+To tell Pants which artifact repository to publish to, [[Create a
 plugin|pants('src/python/pants/docs:howto_plugin')]] if you haven't already. Register it with Pants.
 
 In the plugin, define and register at least one `Repository` object in a `BUILD` file alias as
@@ -248,7 +248,7 @@ defined in your plugin:
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
                                          # in your custom ivysettings.xml.
         'confs': ['default', 'sources', 'docs', 'changelog'],
-        'auth': 'build-support:netrc',   # Pointer to BUILD file containing a 'credentials()' object.
+        'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' object.
         'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
       'testing': {
@@ -271,7 +271,7 @@ matches the `repos` specified above:
       password someotherpassword123
 
 And place the following in a `BUILD` file somewhere in your repository (`build-support/BUILD` is a
-good place):
+good place, and is used in the example above):
 
     netrc = netrc()
 
