@@ -50,7 +50,7 @@ class PythonEval(PythonTask):
     with self.context.new_workunit(name=target.address.spec):
       modules = []
       if isinstance(target, PythonBinary):
-        module, _ = target.entry_point.rsplit(':', 1)
+        module = target.entry_point.rsplit(':', 1)[0]
         modules.append(module)
       else:
         for path in target.sources_relative_to_source_root():
