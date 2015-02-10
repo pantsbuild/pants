@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import copy
 import sys
@@ -11,7 +11,7 @@ import sys
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
 from pants.option import custom_types
-from pants.option.arg_splitter import ArgSplitter, GLOBAL_SCOPE
+from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
 
@@ -96,6 +96,7 @@ class Options(object):
 
     self._is_help = splitter.is_help
     self._is_help_all = splitter.is_help_all
+    self._is_help_advanced = splitter.is_help_advanced
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
@@ -140,6 +141,11 @@ class Options(object):
   def is_help(self):
     """Whether the command line indicates a request for help."""
     return self._is_help
+
+  @property
+  def is_help_advanced(self):
+    """Whether the command line indicates a request for advanced help."""
+    return self._is_help_advanced
 
   @property
   def is_help_all(self):

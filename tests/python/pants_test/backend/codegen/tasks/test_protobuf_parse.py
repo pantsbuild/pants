@@ -2,17 +2,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
-import pytest
-from textwrap import dedent
 import unittest
+from textwrap import dedent
 
-from pants.backend.codegen.tasks.protobuf_parse import (MESSAGE_PARSER, ProtobufParse,
-                                                        camelcase, get_outer_class_name,
-                                                        update_type_list)
+import pytest
+
+from pants.backend.codegen.tasks.protobuf_parse import (MESSAGE_PARSER, ProtobufParse, camelcase,
+                                                        get_outer_class_name, update_type_list)
 from pants.util.contextutil import temporary_dir
 
 

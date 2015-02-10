@@ -5,7 +5,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-xbsrdpcieat)"
+  echo "Usage: $0 (-h|-xbsrdlpcieat)"
   echo " -h           print out this help message"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
   echo "              fresh clone)"
@@ -13,6 +13,7 @@ function usage() {
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -d           if running jvm tests, don't use nailgun daemons"
+  echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
   echo " -c           skip pants integration tests"
   echo " -i TOTAL_SHARDS:SHARD_NUMBER"
@@ -31,7 +32,7 @@ function usage() {
 
 daemons="--ng-daemons"
 
-while getopts "hxbsrdpci:eat" opt; do
+while getopts "hxbsrdlpci:eat" opt; do
   case ${opt} in
     h) usage ;;
     x) skip_bootstrap_clean="true" ;;
@@ -39,6 +40,7 @@ while getopts "hxbsrdpci:eat" opt; do
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
     d) daemons="--no-ng-daemons" ;;
+    l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     c) skip_integration="true" ;;
     i)
@@ -64,6 +66,10 @@ else
 fi
 
 banner "CI BEGINS"
+
+banner "Checking python code formatting"
+build-support/bin/check_header.sh || exit 1
+build-support/bin/isort.sh || die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
@@ -98,14 +104,13 @@ fi
 
 # We don't allow code in our __init.py__ files. Reject changes that allow
 # this to creep back in.
-R=`find src tests -name __init__.py -not -empty|grep -v src/python/pants/__init__.py`
+R=$(find src tests pants-plugins -name __init__.py -not -empty | \
+    grep -v src/python/pants/__init__.py)
 if [ ! -z "${R}" ]; then
   echo "ERROR: All '__init__.py' files should be empty, but the following contain code:"
   echo "$R"
   exit 1
 fi
-
-build-support/bin/check_header.sh || exit 1
 
 # Sanity checks
 ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
@@ -143,10 +148,21 @@ if [[ "${skip_docs:-false}" == "false" ]]; then
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
 fi
 
+if [[ "${skip_internal_backends:-false}" == "false" ]]; then
+  banner "Running internal backend python tests"
+  (
+    PANTS_PYTHON_TEST_FAILSOFT=1 \
+      ./pants.pex test ${PANTS_ARGS[@]} \
+        $(./pants.pex list pants-plugins/tests/python:: | \
+            xargs ./pants filter --filter-type=python_tests | \
+            grep -v integration)
+  ) || die "Internal backend python test failure"
+fi
+
 if [[ "${skip_python:-false}" == "false" ]]; then
   banner "Running core python tests"
   (
-    PANTS_PY_COVERAGE=paths:pants/,internal_backend/ \
+    PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \

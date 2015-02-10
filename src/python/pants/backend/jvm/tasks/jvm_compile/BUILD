@@ -37,6 +37,7 @@ python_library(
   ]
 )
 
+# TODO(Eric Ayers) Create a BUILD file in the java/ subdirectory?
 python_library(
   name = 'java',
   sources = globs('java/*.py'),
@@ -45,6 +46,7 @@ python_library(
     ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',

@@ -2,21 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-try:
-  import configparser
-except ImportError:
-  import ConfigParser as configparser
-
-from contextlib import contextmanager
 import itertools
 import logging
 import os
 import shutil
-from textwrap import dedent
 import traceback
+from contextlib import contextmanager
+from textwrap import dedent
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -28,8 +23,17 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.config import Config
 from pants.base.target import Target
-from pants.util.contextutil import temporary_file, temporary_dir, environment_as
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open
+
+
+try:
+  import configparser
+except ImportError:
+  import ConfigParser as configparser
+
+
+
 
 
 # Initialize logging, since tests do not run via pants_exe (where it is usually done)
@@ -153,7 +157,9 @@ class PythonTestBuilder(object):
       add_realpath(canonical)
       for path in alternates:
         add_realpath(path)
-      cp.set('paths', key, self._format_string_list([canonical] + list(alternates) + list(realpaths)))
+      cp.set('paths',
+             key,
+             self._format_string_list([canonical] + list(alternates) + list(realpaths)))
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:

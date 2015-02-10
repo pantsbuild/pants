@@ -2,29 +2,29 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import codecs
 import os
 import re
 
-from docutils.core import publish_parts
 import markdown
+from docutils.core import publish_parts
 from pkg_resources import resource_string
 from pygments import highlight
 from pygments.formatters.html import HtmlFormatter
-from pygments.lexers import guess_lexer_for_filename, PythonLexer, TextLexer
+from pygments.lexers import PythonLexer, TextLexer, guess_lexer_for_filename
 from pygments.styles import get_all_styles
 from pygments.util import ClassNotFound
 
 from pants import binary_util
+from pants.backend.core.targets.doc import Page
+from pants.backend.core.tasks.task import Task
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
-from pants.backend.core.targets.doc import Page
-from pants.backend.core.tasks.task import Task
 from pants.util.dirutil import safe_mkdir, safe_open
 
 

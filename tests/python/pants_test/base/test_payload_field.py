@@ -2,20 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import Artifact, JarDependency
+from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jvm_binary import Bundle
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
-from pants.base.payload_field import (BundleField,
-                                      ExcludesField,
-                                      JarsField,
-                                      PrimitiveField,
-                                      PythonRequirementsField,
-                                      SourcesField)
+from pants.base.payload_field import (BundleField, ExcludesField, JarsField, PrimitiveField,
+                                      PythonRequirementsField, SourcesField)
 from pants_test.base_test import BaseTest
 
 
@@ -45,6 +41,24 @@ class PayloadTest(BaseTest):
     jar2 = JarDependency('com', 'foo', '1.0.0')
 
     self.assertNotEqual(
+      JarsField([jar1]).fingerprint(),
+      JarsField([jar2]).fingerprint(),
+    )
+
+  def test_jars_field_artifacts_arg(self):
+    jar1 = JarDependency('com', 'foo', '1.0.0', artifacts=[IvyArtifact('com', 'baz')])
+    jar2 = JarDependency('com', 'foo', '1.0.0')
+
+    self.assertNotEqual(
+      JarsField([jar1]).fingerprint(),
+      JarsField([jar2]).fingerprint(),
+    )
+
+  def test_jars_field_artifacts_arg_vs_method(self):
+    jar1 = JarDependency('com', 'foo', '1.0.0', artifacts=[IvyArtifact('com', 'baz')])
+    jar2 = JarDependency('com', 'foo', '1.0.0').with_artifact('com', 'baz')
+
+    self.assertEqual(
       JarsField([jar1]).fingerprint(),
       JarsField([jar2]).fingerprint(),
     )

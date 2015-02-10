@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 
@@ -14,10 +14,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class AndroidIntegrationTest(PantsRunIntegrationTest):
   """Ensure a base SDK to run any Android integration tests.
 
-  The Android SDK is modular, finding an SDK on the PATH is no guarantee that there is
-  a dx.jar anywhere on disk. In this test we look for a set of default tools that will get the
-  job done or the test is skipped. The TARGET_SDK version must match the targetSDK value in the
-  AndroidManifest.xml of the target while the BUILD_TOOLS version is arbitrary.
+  The Android SDK is modular, finding an SDK on the PATH is no guarantee that any certain
+  tool is on disk. For integration tests we define a set of default tools and
+  if they cannot be found the integration test is skipped.
   """
   BUILD_TOOLS = '19.1.0'
   TARGET_SDK = '19'

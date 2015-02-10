@@ -16,5 +16,5 @@ To generate ensime project file for `src/java/com/archie/path/to:target`
 one just need to run this command:
 
     :::bash
-    $ ./pants goal ensime src/java/com/archie/path/to:target
+    $ ./pants ensime src/java/com/archie/path/to:target
 

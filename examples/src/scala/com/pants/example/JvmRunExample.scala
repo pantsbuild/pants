@@ -4,8 +4,9 @@
 package com.pants.example
 
 // A simple jvm binary to test the jvm_run task on. Try, e.g.,
-// ./pants run examples/src/scala/com/pants/example:jvm-run-example \\
-//   -ldebug --run-jvm-jvm-options=-Dfoo=bar --run-jvm-args="Foo Bar"
+// ./pants -ldebug run --run-jvm-jvm-options='-Dfoo=bar' --run-jvm-args="Foo Bar" \\
+//   examples/src/scala/com/pants/example:jvm-run-example
+
 
 object JvmRunExample {
   def main(args: Array[String]) {

@@ -4,6 +4,6 @@
 target(
   name='all',
   dependencies=[
-    'tests/python/internal_backend_test/sitegen',
+    'pants-plugins/tests/python/internal_backend_test/sitegen',
   ]
 )

@@ -66,7 +66,7 @@ helps here. Instead of building something, it echoes a summary of the goals and 
 *would* use to build something. For example, you can find out what happens on a `compile`:
 
     :::bash
-    $./pants goal --explain compile
+    $./pants --explain compile
     Goal Execution Order:
 
     bootstrap -> imports -> gen -> resolve -> compile
