@@ -96,7 +96,8 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
     PANTS_DEV=1 PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 \
-      ./pants ${PANTS_ARGS[@]} binary src/python/pants/bin:pants_local_binary && \
+      ./pants ${PANTS_ARGS[@]} compile.python-eval --closure --fail-slow binary \
+        src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex ./pants.pex && \
     ./pants.pex goals ${PANTS_ARGS[@]}
   ) || die "Failed to bootstrap pants."
@@ -133,7 +134,8 @@ packages: [
   ]
 EOF
     ) && \
-    ./pants.pex binary ${INTERPRETER_ARGS[@]} --config-override=${config} \
+    ./pants.pex compile.python-eval --closure --fail-slow binary ${INTERPRETER_ARGS[@]} \
+      --config-override=${config} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
     ./dist/self.pex binary --config-override=${config} ${INTERPRETER_ARGS[@]} \
@@ -164,7 +166,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex compile.python-eval --fail-slow test ${PANTS_ARGS[@]} \
+      ./pants.pex test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants filter --filter-type=python_tests | \
             grep -v integration)
@@ -200,7 +202,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   banner "Running tests in testprojects/ "
   (
-    ./pants.pex compile.python-eval --fail-slow test testprojects:: \
+    ./pants.pex test testprojects:: \
       $daemons $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
   ) || die "test failure in testprojects/"
 fi
@@ -208,7 +210,7 @@ fi
 if [[ "${skip_examples:-false}" == "false" ]]; then
   banner "Running example tests"
   (
-    ./pants.pex compile.python-eval --fail-slow test examples:: \
+    ./pants.pex compile.python-eval --closure --fail-slow test examples:: \
       $daemons $android_test_opts ${PANTS_ARGS[@]}
   ) || die "Examples test failure"
 fi
@@ -221,7 +223,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex compile.python-eval --fail-slow test ${PANTS_ARGS[@]} \
+      ./pants.pex test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants filter --filter-type=python_tests | \
             grep integration | \
