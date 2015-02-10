@@ -142,55 +142,23 @@ maintain extra-carefully. You can
 Authenticating to the Artifact Repository
 -----------------------------------------
 
-Your artifact repository probably doesn't accept anonymous uploads; you
-probably need to authenticate (prove that you are really you). Depending
-on how the artifact repository set up, Pants might need to interact the
-authentication system. (Or it might not. E.g., if your system uses
-Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets
-should work automatically.)
+Your artifact repository probably doesn't accept anonymous uploads; you probably need to
+authenticate to it (prove that you are really you). Depending on how the artifact repository is
+configured, Pants might need to interact with an authentication system. (Or it might not. E.g., if
+your system uses Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets should
+work automatically).
 
-If Pants needs to provide your username and password, you can enable
-this via Pants' `.netrc` support. Pants can parse [.netrc
-files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html)
-to get a user's username and password on an artifact repository machine.
-To make this work:
+Your Pants administrator will handle configuring Pants to submit credentials to the artifact
+repository. As a user, if Pants needs to provide your username and password, you can enable this
+via Pants' `.netrc` support. Pants can parse [.netrc
+files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html) to get your
+username and password to an artifact repository server. Here is an example file:
 
--   Each user needs a `~/.netrc` file with a section that looks like:
+    machine maven.example.com
+      login sandy
+      password myamazingpa$sword
 
-        machine maven.twttr.com
-          login sandy
-          password myamazingpa$sword
-
--   One of your `BUILD` files needs a target that represents `netrc`
-    auth:
-
-        netrc = netrc()
-
-        credentials(
-          name = 'netrc',
-          username=netrc.getusername,
-          password=netrc.getpassword)
-
--   Your `'auth'` section for that repository should refer to that
-    target:
-
-        [jar-publish]
-        workdir: %(pants_workdir)s/publish
-        repos: {
-            'public': {
-              # ivysettings.xml resolver to use for publishing
-              # this resolver's address should match root of ivysettings resolver
-              'resolver': 'maven.twttr.com',
-              'confs': ['default', 'sources', 'docs', 'changelog'],
-              'auth': 'build-support:netrc',
-              'help': 'Configure your ~/.netrc for artifact repo access!'
-            },
-        }
-
-If you need to implement some other kind of authentication, you might
-look at [the Netrc
-implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/authentication/netrc_util.py)
-and the <a pantsref="bdict_credentials">`credentials`</a> target type for inspiration.
+Check with your Pants administrator for the proper hostname to use for the "machine" entry.
 
 Troubleshooting
 ---------------

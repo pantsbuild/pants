@@ -217,79 +217,126 @@ repository.
 Enabling Pants Publish
 ----------------------
 
-Pants can ease
-[["publishing"|pants('src/docs:publish')]]: uploading versioned compiled
-artifacts. There are some special things to set up to enable and
-customize publishing.
+Pants can ease [["publishing"|pants('src/docs:publish')]]: uploading versioned compiled artifacts.
+There are some special things to set up to enable and customize publishing.
 
 ### Tell Pants about your Artifact Repository
 
-To tell Pants which artifact repsitory to publish to,
+To tell Pants which artifact repository to publish to, [[Create a
+plugin|pants('src/python/pants/docs:howto_plugin')]] if you haven't already. Register it with Pants.
 
-[[Create a plugin|pants('src/python/pants/docs:howto_plugin')]]
-if you haven't already. Register it with Pants.
-
-In the plugin, define and register a `Repository` in a `BUILD` file alias
-as shown in
+In the plugin, define and register at least one `Repository` object in a `BUILD` file alias as
+shown in
 [`src/python/internal_backend/repositories/register.py`](https://github.com/pantsbuild/pants/blob/master/src/python/internal_backend/repositories/register.py).
 
-`BUILD` targets can use this Repository's alias as the `repo` parameter
-to an <a pantsref="bdict_artifact">`artifact`</a>. For example,
+`BUILD` targets can use this Repository's alias as the `repo` parameter to an <a
+pantsref="bdict_artifact">`artifact`</a>. For example,
 [examples/src/java/com/pants/examples/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/greet/BUILD)
 refers to the `public` repository defined above. (Notice it's a Python object, not a string.)
 
 !inc[start-at=java_library](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
 
-If you get an error that the repo name (here, `public`) isn't defined,
-your plugin didn't register with Pants successfully. Make sure you
-bootstrap Pants in a way that loads your `register.py`.
+If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
+with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
-In your config file (usually `pants.ini`), set up a `[jar-publish]`
-section. In that section, create a `dict` called `repos`. It should
-contain a section for each Repository:
+In your config file (usually `pants.ini`), set up a `[jar-publish]` section. In that section,
+create a `dict` called `repos`. It should contain a section for each `Repository` object that you
+defined in your plugin:
 
     repos: {
-      'public': {  # must match the alias above
-        'resolver': 'maven.twttr.com', # must match URL above and <url> name
-                                       # in ivysettings.xml
+      'public': {  # must match the name of the `Repository` object that you defined in your plugin.
+        'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
+                                         # in your custom ivysettings.xml.
         'confs': ['default', 'sources', 'docs', 'changelog'],
-        # 'auth': 'build-support:netrc',
-        # 'help': 'Configure your ~/.netrc for artifactory access.
+        'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' object.
+        'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
-      'testing': { # this key must match the alias name above
-        'resolver': 'maven.twttr.com',
+      'testing': {
+        'resolver': 'artifactory.example.com',
         'confs': ['default', 'sources', 'docs', 'changelog'],
-        # 'auth': 'build-support:netrc',
-        # 'help': 'Configure your ~/.netrc for artifactory access.
+        'auth': 'build-support:netrc',
+        'help': 'Configure your ~/.netrc for artifactory.example.com access.'
       },
     }
+
+If your repository requires authentication, add a `~/.netrc` file. Here is a sample file, that
+matches the `repos` specified above:
+
+    machine maven.example.com
+      login someuser
+      password password123
+
+    machine artifactory.example.com
+      login someuser
+      password someotherpassword123
+
+And place the following in a `BUILD` file somewhere in your repository (`build-support/BUILD` is a
+good place, and is used in the example above):
+
+    netrc = netrc()
+
+    credentials(
+      name = 'netrc',
+      username=netrc.getusername,
+      password=netrc.getpassword)
+
+Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
+(for example: '`build-support/ivy/ivysettings_for_publishing.xml`'). Here is an example file to get
+you started:
+
+		<?xml version="1.0"?>
+		<!-- pants.ini forces this settings file to be loaded by Ivy, but only at
+		     publish time. -->
+
+		<ivysettings>
+		  <settings defaultResolver="chain-repos"/>
+
+		  <include file="${ivy.settings.dir}/ivysettings.xml"/>
+
+		  <credentials host="artifactory.example.com"
+		               realm="Artifactory Realm"
+                   <!-- These values come from a credentials() object, which is fed by '~/.netrc'.
+                        There must be a '~/.netrc' machine entry which matches a resolver in the
+                        "repos" object in 'pants.ini', which also matches the 'host' in this XML
+                        block. -->
+		               username="${login}"
+		               passwd="${password}"/>
+
+		  <resolvers>
+		    <chain name="chain-repos" returnFirst="true">
+		      <_remote_resolvers name="remote-repos"/>
+		    </chain>
+
+		    <url name="artifactory.example.com" m2compatible="true">
+		      <artifact pattern="https://artifactory.example.com/libs-releases-local/[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"/>
+		    </url>
+		  </resolvers>
+		</ivysettings>
+
+With this file in place, add a `[publish]` section to `pants.ini`, and tell pants to use
+the custom Ivy settings when publishing:
+
+    ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
 
 <a pantsmark="setup_publish_restrict_branch"> </a>
 
 ### Restricting Publish to "Release Branch"
 
-Your organization might have a notion of a special "release branch": you
-want
-[[artifact publishing|pants('src/docs:publish')]]
-to happen on this source control
-branch, which you maintain extra-carefully. You can set this branch
-using the `restrict_push_branches` option of the `[jar-publish]` section
-of your config file (usually `pants.ini`).
+Your organization might have a notion of a special "release branch": you want [[artifact
+publishing|pants('src/docs:publish')]] to happen on this source control branch, which you maintain
+extra-carefully. You can set this branch using the `restrict_push_branches` option of the
+`[jar-publish]` section of your config file (usually `pants.ini`).
 
 ### Task to Publish "Extra" Artifacts
 
-Pants supports "publish plugins", which allow end-users to add
-additional, arbitrary files to be published along with the primary
-artifact. For example, let's say that along with publishing your jar
-full of class files, you would also like to publish a companion file
-that contains some metadata -- code coverage info, source git
-repository, java version that created the jar, etc. By
-[[developing a task|pants('src/python/pants/docs:dev_tasks')]]
-in a [[plugin|pants('src/python/pants/docs:howto_plugin')]],
-you give Pants a new ability.
-[[Develop a Task to Publish "Extra" Artifacts|pants('src/python/pants/docs:dev_tasks_publish_extras')]]
-to find out how to
-develop a special Task to include "extra" data with published artifacts.
+Pants supports "publish plugins", which allow end-users to add additional, arbitrary files to be
+published along with the primary artifact. For example, let's say that along with publishing your
+jar full of class files, you would also like to publish a companion file that contains some
+metadata -- code coverage info, source git repository, java version that created the jar, etc. By
+[[developing a task|pants('src/python/pants/docs:dev_tasks')]] in a
+[[plugin|pants('src/python/pants/docs:howto_plugin')]], you give Pants a new ability. [[Develop a
+Task to Publish "Extra" Artifacts|pants('src/python/pants/docs:dev_tasks_publish_extras')]] to find
+out how to develop a special Task to include "extra" data with published artifacts.
 
 Outside Caches
 --------------
