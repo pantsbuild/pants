@@ -8,11 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pex.pex import PEX
-from pex.pex_info import PexInfo
 
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -34,7 +33,7 @@ class PythonEval(PythonTask):
     failures = []
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
       for target in targets:
-        if isinstance(target, PythonTarget):
+        if isinstance(target, (PythonLibrary, PythonBinary)):
           returncode = self.compile_target(target)
           if returncode != 0:
             if self.get_options().fail_slow:
@@ -48,61 +47,60 @@ class PythonEval(PythonTask):
         raise TaskError(msg)
 
   def compile_target(self, target):
-    interpreter = self.select_interpreter_for_targets([target])
-
-    if isinstance(target, PythonBinary):
-      pexinfo, platforms = target.pexinfo, target.platforms
-    else:
-      pexinfo, platforms = PexInfo(), None
-
-    with self.temporary_pex_builder(interpreter=interpreter, pex_info=pexinfo) as builder:
-      chroot = PythonChroot(
-          context=self.context,
-          targets=[target],
-          builder=builder,
-          platforms=platforms,
-          interpreter=interpreter)
-
-      chroot.dump()
-
-      # TODO(John Sirois): XXX switch to collecting files from a target walk instead - '.deps/'
-      # knowledge is too coupled to pex internals.
+    with self.context.new_workunit(name=target.address.spec):
       modules = []
-      for path, dirs, files in os.walk(chroot.path()):
-        if os.path.realpath(path) == chroot.path():
-          for i, d in enumerate(dirs):
-            if d == pexinfo.internal_cache:
-              del dirs[i]  # don't traverse into the .deps/ dir of the pex.
-
-        relpath = os.path.relpath(path, chroot.path())
-        for python_file in filter(lambda f: f.endswith('.py'), files):
-          if python_file == '__init__.py':
-            modules.append(relpath.replace(os.path.sep, '.'))
-          else:
-            modules.append(os.path.join(relpath, python_file[:-3]).replace(os.path.sep, '.'))
+      if isinstance(target, PythonBinary):
+        module, _ = target.entry_point.rsplit(':', 1)
+        modules.append(module)
+      else:
+        for path in target.sources_relative_to_source_root():
+          if path.endswith('.py'):
+            if os.path.basename(path) == '__init__.py':
+              module_path = os.path.dirname(path)
+            else:
+              module_path, _ = os.path.splitext(path)
+            modules.append(module_path.replace(os.path.sep, '.'))
 
       if not modules:
         # Nothing to eval, so a trivial compile success.
         return 0
 
-      with temporary_file() as imports_file:
-        imports_file.write('import sys\n\n')
-        imports_file.write('if __name__ == "__main__":\n')
-        for module in modules:
-          imports_file.write('  import {}\n'.format(module))
-        imports_file.write('\n  sys.exit(0)\n')
-        imports_file.close()
+      interpreter = self.select_interpreter_for_targets([target])
 
-        builder.set_executable(imports_file.name, '__pants_python_eval__.py')
+      if isinstance(target, PythonBinary):
+        pexinfo, platforms = target.pexinfo, target.platforms
+      else:
+        pexinfo, platforms = None, None
 
-        builder.freeze()
-        pex = PEX(builder.path(), interpreter=interpreter)
+      with self.temporary_pex_builder(interpreter=interpreter, pex_info=pexinfo) as builder:
+        with self.context.new_workunit(name='resolve'):
+          chroot = PythonChroot(
+              context=self.context,
+              targets=[target],
+              builder=builder,
+              platforms=platforms,
+              interpreter=interpreter)
 
-        with self.context.new_workunit(name=target.address.spec,
-                                       labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
-                                       cmd=' '.join(pex.cmdline())) as workunit:
-          returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-          workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
-          if returncode != 0:
-            self.context.log.error('Failed to eval {}'.format(target.address.spec))
-          return returncode
+          chroot.dump()
+
+        with temporary_file() as imports_file:
+          imports_file.write('import sys\n\n')
+          imports_file.write('if __name__ == "__main__":\n')
+          for module in modules:
+            imports_file.write('  import {}\n'.format(module))
+          imports_file.write('\n  sys.exit(0)\n')
+          imports_file.close()
+
+          builder.set_executable(imports_file.name, '__pants_python_eval__.py')
+
+          builder.freeze()
+          pex = PEX(builder.path(), interpreter=interpreter)
+
+          with self.context.new_workunit(name='eval',
+                                         labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
+                                         cmd=' '.join(pex.cmdline())) as workunit:
+            returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+            workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
+            if returncode != 0:
+              self.context.log.error('Failed to eval {}'.format(target.address.spec))
+            return returncode
