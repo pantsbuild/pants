@@ -12,19 +12,23 @@ from pants.option.help_formatter import PantsAdvancedHelpFormatter, PantsBasicHe
 
 
 class OptionHelpFormatterTest(unittest.TestCase):
-  def test_suppress_advanced(self):
-    argparser = ArgumentParser(formatter_class=PantsBasicHelpFormatter)
+
+  def _create_argparser(self, formatter_class):
+    argparser = ArgumentParser(formatter_class=formatter_class)
     group = argparser.add_argument_group(title='foo')
     advanced_group = argparser.add_argument_group(title='*foo')
     group.add_argument('--bar', help='help for argument bar')
     advanced_group.add_argument('--baz', help='help for argument baz')
+    return argparser
 
+  def test_suppress_advanced(self):
+    argparser = self._create_argparser(PantsBasicHelpFormatter)
     help_output = argparser.format_help()
     self.assertIn('--bar', help_output)
     self.assertNotIn('(ADVANCED)', help_output)
     self.assertNotIn('--baz', help_output)
 
-    argparser = ArgumentParser(formatter_class=PantsAdvancedHelpFormatter)
+    argparser = self._create_argparser(PantsAdvancedHelpFormatter)
     help_output = argparser.format_help()
     self.assertIn('--bar', help_output)
     self.assertIn('(ADVANCED)', help_output)
