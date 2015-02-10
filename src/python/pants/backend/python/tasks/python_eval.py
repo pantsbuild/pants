@@ -35,7 +35,7 @@ class PythonEval(PythonTask):
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
       for target in targets:
         if isinstance(target, PythonTarget):
-          returncode  = self.compile_target(target)
+          returncode = self.compile_target(target)
           if returncode != 0:
             if self.get_options().fail_slow:
               failures.append(target)
@@ -67,7 +67,7 @@ class PythonEval(PythonTask):
 
       # TODO(John Sirois): XXX switch to collecting files from a target walk instead - '.deps/'
       # knowledge is too coupled to pex internals.
-      imports = []
+      modules = []
       for path, dirs, files in os.walk(chroot.path()):
         if os.path.realpath(path) == chroot.path():
           for i, d in enumerate(dirs):
@@ -77,29 +77,32 @@ class PythonEval(PythonTask):
         relpath = os.path.relpath(path, chroot.path())
         for python_file in filter(lambda f: f.endswith('.py'), files):
           if python_file == '__init__.py':
-            imports.append(relpath.replace(os.path.sep, '.'))
+            modules.append(relpath.replace(os.path.sep, '.'))
           else:
-            imports.append(os.path.join(relpath, python_file[:-3]).replace(os.path.sep, '.'))
+            modules.append(os.path.join(relpath, python_file[:-3]).replace(os.path.sep, '.'))
 
-      if imports:
-        with temporary_file() as imports_file:
-          imports_file.write('import sys\n\n')
-          imports_file.write('if __name__ == "__main__":\n')
-          for module in imports:
-            imports_file.write('  import {}\n'.format(module))
-          imports_file.write('\n  sys.exit(0)\n')
-          imports_file.close()
+      if not modules:
+        # Nothing to eval, so a trivial compile success.
+        return 0
 
-          builder.set_executable(imports_file.name, '__pants_python_eval__.py')
+      with temporary_file() as imports_file:
+        imports_file.write('import sys\n\n')
+        imports_file.write('if __name__ == "__main__":\n')
+        for module in modules:
+          imports_file.write('  import {}\n'.format(module))
+        imports_file.write('\n  sys.exit(0)\n')
+        imports_file.close()
 
-          builder.freeze()
-          pex = PEX(builder.path(), interpreter=interpreter)
+        builder.set_executable(imports_file.name, '__pants_python_eval__.py')
 
-          with self.context.new_workunit(name=target.address.spec,
-                                         labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
-                                         cmd=' '.join(pex.cmdline())) as workunit:
-            returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-            workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
-            if returncode != 0:
-              self.context.log.error('Failed to eval {}'.format(target.address.spec))
-            return returncode
+        builder.freeze()
+        pex = PEX(builder.path(), interpreter=interpreter)
+
+        with self.context.new_workunit(name=target.address.spec,
+                                       labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
+                                       cmd=' '.join(pex.cmdline())) as workunit:
+          returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+          workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
+          if returncode != 0:
+            self.context.log.error('Failed to eval {}'.format(target.address.spec))
+          return returncode
