@@ -94,9 +94,7 @@ class Options(object):
           with open(spec) as f:
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
-    self._is_help = splitter.is_help
-    self._is_help_all = splitter.is_help_all
-    self._is_help_advanced = splitter.is_help_advanced
+    self._help_request = splitter.help_request
     self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
@@ -138,19 +136,19 @@ class Options(object):
       return []
 
   @property
-  def is_help(self):
+  def show_help(self):
     """Whether the command line indicates a request for help."""
-    return self._is_help
+    return self._help_request is not None
 
   @property
-  def is_help_advanced(self):
+  def show_advanced_help(self):
     """Whether the command line indicates a request for advanced help."""
-    return self._is_help_advanced
+    return self._help_request is not None and self._help_request.advanced
 
   @property
-  def is_help_all(self):
+  def show_help_for_all_scopes(self):
     """Whether the command line indicates a request for all the help."""
-    return self._is_help_all
+    return self._help_request is not None and self._help_request.all_scopes
 
   def format_global_help(self):
     """Generate a help message for global options."""

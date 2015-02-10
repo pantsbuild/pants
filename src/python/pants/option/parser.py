@@ -80,9 +80,6 @@ class Parser(object):
       >>> def print_flags(flags):
       ...   print('\n'.join(map(str, flags)))
       ...
-      >>> print_flags(Parser.expand_flags('-h', '--help', help='Display command line help.'))
-      Flag(name='-h', inverse_name=None, help_arg='-h')
-      Flag(name='--help', inverse_name=None, help_arg='--help')
       >>> print_flags(Parser.expand_flags('-q', '--quiet', action='store_true',
       ...                                 help='Squelches all console output apart from errors.'))
       Flag(name='-q', inverse_name=None, help_arg='-q')

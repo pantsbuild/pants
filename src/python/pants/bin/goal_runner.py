@@ -75,7 +75,7 @@ class GoalRunner(object):
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
 
-    PantsHelpFormatter.show_advanced_output(visible=bootstrap_options.is_help_advanced)
+    PantsHelpFormatter.show_advanced_output(visible=self.options.show_advanced_help)
 
     self.run_tracker = RunTracker.from_config(self.config)
     report = initial_reporting(self.config, self.run_tracker)
@@ -140,12 +140,12 @@ class GoalRunner(object):
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.is_help_all:
+    if self.options.show_help_for_all_scopes:
       self.options.print_help(goals=[g.name for g in Goal.all()])
       print('\nGlobal options:')
       print(self.options.format_global_help())
       sys.exit(0)
-    elif self.options.is_help:
+    elif self.options.show_help:
       self.options.print_help(goals=goals)
       sys.exit(0)
 
