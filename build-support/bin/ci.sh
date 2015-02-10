@@ -95,9 +95,8 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    PANTS_DEV=1 PANTS_VERBOSE=1 PEX_VERBOSE=1 PYTHON_VERBOSE=1 \
-      ./pants ${PANTS_ARGS[@]} compile.python-eval --closure --fail-slow binary \
-        src/python/pants/bin:pants_local_binary && \
+    ./pants ${PANTS_ARGS[@]} compile.python-eval --closure --fail-slow binary \
+      src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex ./pants.pex && \
     ./pants.pex goals ${PANTS_ARGS[@]}
   ) || die "Failed to bootstrap pants."
@@ -202,8 +201,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   banner "Running tests in testprojects/ "
   (
-    ./pants.pex test testprojects:: \
-      $daemons $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
+    ./pants.pex test testprojects:: $daemons $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
   ) || die "test failure in testprojects/"
 fi
 
