@@ -6,13 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen, _same_contents, calculate_genfiles
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
@@ -28,7 +28,10 @@ class ProtobufGenTest(TaskTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_protobuf_library': JavaProtobufLibrary})
+    return BuildFileAliases.create(targets={
+      'java_protobuf_library': JavaProtobufLibrary,
+      'target': Dependencies},
+    )
 
 
   def setUp(self):
@@ -248,3 +251,26 @@ class ProtobufGenTest(TaskTest):
     sources_by_base = task._calculate_sources([target])
     self.assertEquals(['extracted-source'], sources_by_base.keys())
     self.assertEquals(OrderedSet([sample_proto_path]), sources_by_base['extracted-source'])
+
+  def test_default_javadeps(self):
+    self.create_file(relpath='test_proto/test.proto', contents=dedent('''
+      package com.example.test_proto;
+      enum Foo { foo=1;}
+      message Bar {}
+    '''))
+
+    self.add_to_build_file('test_proto', dedent("""
+      java_protobuf_library(name='proto',
+        sources=['test.proto'],
+        dependencies=[]
+      )
+    """))
+    self.add_to_build_file('3rdparty', dedent("""
+      target(name='protobuf-java')
+    """))
+    task = self.prepare_task(build_graph=self.build_graph,
+                             targets=[self.target('test_proto:proto')],
+                             build_file_parser=self.build_file_parser)
+    javadeps = task.javadeps
+    self.assertEquals(len(javadeps), 1)
+    self.assertEquals('protobuf-java', javadeps.pop().name)
