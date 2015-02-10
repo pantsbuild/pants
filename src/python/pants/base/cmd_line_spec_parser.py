@@ -52,8 +52,9 @@ class CmdLineSpecParser(object):
   class BadSpecError(Exception):
     """Indicates an invalid command line address selector."""
 
-  def __init__(self, root_dir, address_mapper, spec_excludes=None, exclude_target_regexps=None):
+  def __init__(self, root_dir, address_mapper, spec_excludes=None, exclude_target_regexps=None, cwd=None):
     self._root_dir = os.path.realpath(root_dir)
+    self._cwd = cwd or os.getcwdu()
     self._address_mapper = address_mapper
     self._spec_excludes = spec_excludes
     self._exclude_target_regexps = exclude_target_regexps or []
@@ -114,9 +115,14 @@ class CmdLineSpecParser(object):
           raise self.BadSpecError('Absolute address path {0} does not share build root {1}'
                                   .format(path, self._root_dir))
       else:
+        base_dir = self._cwd
+        if os.path.commonprefix([self._root_dir, base_dir]) != self._root_dir:
+          base_dir = self._root_dir
+
         if path.startswith('//'):
-          path = path[2:]
-        path = os.path.join(self._root_dir, path)
+          path = os.path.join(self._root_dir, path[2:])
+        else:
+          path = os.path.join(base_dir, path)
 
       normalized = os.path.relpath(path, self._root_dir)
       if normalized == '.':
