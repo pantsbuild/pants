@@ -249,7 +249,9 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
+    ':address_lookup_error',
     ':build_file',
   ],
 )

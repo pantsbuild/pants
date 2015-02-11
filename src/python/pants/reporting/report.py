@@ -13,6 +13,7 @@ from twitter.common.threading import PeriodicThread
 class ReportingError(Exception):
   pass
 
+
 class Report(object):
   """A report of a pants run."""
 

@@ -30,6 +30,7 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 
 INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
 
+
 def _copytree(from_base, to_base):
   def abort(error):
     raise TaskError('Failed to copy from %s to %s: %s' % (from_base, to_base, error))

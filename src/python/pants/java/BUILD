@@ -44,6 +44,7 @@ python_library(
   name = 'nailgun_executor',
   sources = ['nailgun_executor.py'],
   dependencies = [
+    ':executor',
     ':nailgun_client',
     '3rdparty/python:psutil',
     '3rdparty/python/twitter/commons:twitter.common.collections',
