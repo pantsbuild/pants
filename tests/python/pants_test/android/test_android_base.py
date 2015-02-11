@@ -21,10 +21,6 @@ from pants_test.tasks.test_base import TaskTest
 class TestAndroidBase(TaskTest):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
-  def task_type(cls):
-    """Subclasses must return the type of the Task subclass under test."""
-    return AndroidTask
-
   @contextmanager
   def android_binary(self):
     """Represent an android_binary target, providing a mock version of the required manifest."""
