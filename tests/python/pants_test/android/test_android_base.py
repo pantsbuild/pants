@@ -12,9 +12,8 @@ from contextlib import contextmanager
 from twitter.common.collections import maybe_list
 
 from pants.backend.android.targets.android_binary import AndroidBinary
-from pants.backend.android.tasks.android_task import AndroidTask
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import chmod_plus_x, safe_open, touch
+from pants.util.dirutil import chmod_plus_x, touch
 from pants_test.tasks.test_base import TaskTest
 
 

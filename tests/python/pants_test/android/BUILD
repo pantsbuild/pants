@@ -30,14 +30,14 @@ python_tests(
   ],
 )
 
-python_tests(
+python_library(
   name = 'android_base',
   sources = [
     'test_android_base.py',
   ],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/android/targets:android',
-    'src/python/pants/backend/android/tasks:all',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:base'
