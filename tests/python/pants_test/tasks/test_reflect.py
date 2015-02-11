@@ -40,7 +40,7 @@ class BuildsymsSanityTests(BaseTest):
 class OptionsDataTest(BaseTest):
   def test_gen_tasks_options_reference_data(self):
     # can we run our reflection-y goal code without crashing? would be nice
-    options = Options()
+    options = Options({}, {}, [], [])
     Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
     Goal.by_name('jack').register_options(options)
     oref_data = reflect.get_option_template_data(options)
