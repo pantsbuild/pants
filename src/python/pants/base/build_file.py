@@ -228,7 +228,7 @@ class BuildFile(object):
   def code(self):
     """Returns the code object for this BUILD file."""
     with open(self.full_path, 'rb') as source:
-      return compile(source.read(), '<string>', 'exec', flags=0, dont_inherit=True)
+      return compile(source.read(), self.full_path, 'exec', flags=0, dont_inherit=True)
 
   def __eq__(self, other):
     result = other and (

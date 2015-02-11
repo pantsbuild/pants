@@ -99,8 +99,8 @@ python_tests(
   sources = ['test_build_file.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:build_file',
-    'tests/python/pants_test:base_test',
     'src/python/pants/util:dirutil',
   ]
 )
