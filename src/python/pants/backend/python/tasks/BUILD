@@ -1,6 +1,7 @@
 python_library(
   name = 'python',
   sources = globs('*.py'),
+  resources = globs('templates/python_eval/*.mustache'),
   dependencies = [
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
