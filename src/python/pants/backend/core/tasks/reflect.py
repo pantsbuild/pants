@@ -474,17 +474,20 @@ def get_option_template_data(options):
       doc_rst = ''
       doc_html = ''
       impl = None
-      if len(scope_parts) > 1:
-        try:
-          task_type = goal.task_type_by_name(scope_parts[1])
-          doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
-          doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-          for authored_task_type in task_type.mro():
-            if authored_task_type.__module__ != 'abc':
-              break
-          impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
-        except KeyError:
-          pass  # maybe there's no task with the scope's name
+      if len(scope_parts) == 1:
+        scope_name = scope_parts[0]
+      else:
+        scope_name = scope_parts[1]
+      try:
+        task_type = goal.task_type_by_name(scope_name)
+        doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
+        doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
+        for authored_task_type in task_type.mro():
+          if authored_task_type.__module__ != 'abc':
+            break
+        impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
+      except KeyError:
+        pass  # maybe there's no task with the scope's name
       spantsref = ''.join([c for c in scope if c.isalnum()])
       option_l = get_option_template_data_from_options(options_in_scope)
       scope_l.append(TemplateData(impl=impl, doc_html=doc_html, doc_rst=doc_rst,
