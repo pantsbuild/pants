@@ -11,6 +11,7 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
+from pants.option.options import Options
 from pants_test.tasks.test_base import BaseTest
 
 
@@ -35,11 +36,12 @@ class BuildsymsSanityTests(BaseTest):
     self.assertIn('dependencies', jl_text)
     self.assertIn('sources', jl_text)
 
-
 class GoalDataTest(BaseTest):
   def test_gen_tasks_options_reference_data(self):
     # can we run our reflection-y goal code without crashing? would be nice
+    options = Options()
     Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
-    oref_data = reflect.gen_tasks_options_reference_data()
+    Goal.by_name('jack').register_options(options)
+    oref_data = reflect.get_option_template_data(options)
     self.assertTrue(len(oref_data) > 0,
                     'Tried to generate data for options reference, got emptiness')

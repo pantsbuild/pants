@@ -432,78 +432,67 @@ def bootstrap_option_values():
     Config.reset_default_bootstrap_option_values()
 
 
-def gen_glopts_reference_data():
-  option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
-  def register(*args, **kwargs):
-    option_parser.register(*args, **kwargs)
-  register.bootstrap = bootstrap_option_values()
-  register_bootstrap_options(register, buildroot='<buildroot>')
-  register_global_options(register)
-  argparser = option_parser._help_argparser
-  return oref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
-
-
-def oref_template_data_from_options(scope, argparser):
-  """Get data for the Options Reference from a CustomArgumentParser instance."""
-  if not argparser: return None
-  title = scope or ''
-  pantsref = ''.join([c for c in title if c.isalnum()])
-  option_l = []
-  for o in argparser.walk_actions():
-    st = '/'.join(o.option_strings)
-    # Argparse elides the type in various circumstances, so we have to reverse that logic here.
-    typ = o.type or (type(o.const) if isinstance(o, argparse._StoreConstAction) else str)
-    default = None
-    if o.default and not str(o.default).startswith("('NO',"):
-      default = o.default
-    hlp = None
-    if o.help:
-      hlp = indent_docstring_by_n(o.help, 6)
-    option_l.append(TemplateData(
-        st=st,
-        default=default,
-        hlp=hlp,
-        typ=typ.__name__))
+def gen_glopts_reference_data(options):
   return TemplateData(
-    title=title,
-    options=option_l,
-    pantsref=pantsref)
+    title=None, pantsref='GLOBAL_SCOPE',
+    options=get_option_template_data_from_options(options.doc_data[Options.GLOBAL_SCOPE]))
 
 
-def gen_tasks_options_reference_data():
-  """Generate the template data for the options reference rst doc."""
-  goal_dict = {}
-  goal_names = []
+def get_option_template_data_from_options(options_in_scope):
+  option_l = []
+  for option in sorted(options_in_scope.keys(),
+                       key=lambda(tuple): ''.join([c for c in tuple[0] if c.isalpha()])):
+    data = options_in_scope[option]
+    if 'help' in data:
+      hlp = indent_docstring_by_n(data['help'], 6)
+    else:
+      hlp = None
+    if data.get('type'):
+      typ = data.get('type').__name__
+    else:
+      typ = None
+    if data.get('default'):
+      default = str(data.get('default'))
+    else:
+      default = None
+    option_l.append(TemplateData(
+      st='/'.join(option),
+      default=default,
+      hlp=hlp,
+      typ=typ))
+  return option_l
+
+def get_option_template_data(options):
+  retval = []
   for goal in Goal.all():
-    tasks = []
-    for task_name in goal.ordered_task_names():
-      task_type = goal.task_type_by_name(task_name)
-      doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
-      doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-      option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
-      def register(*args, **kwargs):
-        option_parser.register(*args, **kwargs)
-      register.bootstrap = bootstrap_option_values()
-      task_type.register_options(register)
-      argparser = option_parser._help_argparser
-      scope = Goal.scope(goal.name, task_name)
-      # task_type may actually be a synthetic subclass of the authored class from the source code.
-      # We want to display the authored class's name in the docs (but note that we must use the
-      # subclass for registering options above)
-      for authored_task_type in task_type.mro():
-        if authored_task_type.__module__ != 'abc':
-          break
-      impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
-      tasks.append(TemplateData(
-          impl=impl,
-          doc_html=doc_html,
-          doc_rst=doc_rst,
-          ogroup=oref_template_data_from_options(scope, argparser)))
-    goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
-    goal_names.append(goal.name)
-
-  goals = [goal_dict[name] for name in sorted(goal_names, key=lambda x: x.lower())]
-  return goals
+    gpantsref = ''.join([c for c in goal.name if c.isalnum()])
+    scope_l = []
+    for scope, options_in_scope in options.doc_data.items():
+      scope_parts = scope.split('.')
+      if not scope_parts[0] == goal.name:
+        continue
+      doc_rst = ''
+      doc_html = ''
+      impl = None
+      if len(scope_parts) > 1:
+        try:
+          task_type = goal.task_type_by_name(scope_parts[1])
+          doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
+          doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
+          for authored_task_type in task_type.mro():
+            if authored_task_type.__module__ != 'abc':
+              break
+          impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
+        except KeyError:
+          pass # maybe there's no task with the scope's name
+      spantsref = ''.join([c for c in scope if c.isalnum()])
+      option_l = get_option_template_data_from_options(options_in_scope)
+      scope_l.append(TemplateData(impl=impl, doc_html=doc_html, doc_rst=doc_rst,
+                                  ogroup=TemplateData(title=scope,
+                                                      options=option_l,
+                                                      pantsref=spantsref)))
+    retval.append(TemplateData(goal=goal, tasks=scope_l, pantsref=gpantsref))
+  return retval
 
 
 def assemble_buildsyms(predefs=PREDEFS, build_file_parser=None):

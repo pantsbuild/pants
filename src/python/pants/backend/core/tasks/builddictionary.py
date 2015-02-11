@@ -11,7 +11,7 @@ import re
 from pkg_resources import resource_string
 
 from pants.backend.core.tasks.reflect import (assemble_buildsyms, gen_glopts_reference_data,
-                                              gen_tasks_options_reference_data)
+                                              get_option_template_data)
 from pants.backend.core.tasks.task import Task
 from pants.base.generator import Generator, TemplateData
 from pants.util.dirutil import safe_open
@@ -100,14 +100,14 @@ class BuildBuildDictionary(Task):
 
   def _gen_options_reference(self):
     """Generate the options reference rst doc."""
-    goals = gen_tasks_options_reference_data()
+    goals = get_option_template_data(self.context.options)
     filtered_goals = []
     omit_impl_regexps = [re.compile(r) for r in self.get_options().omit_impl_re]
     for g in goals:
       if any(r.match(t['impl']) for r in omit_impl_regexps for t in g.tasks):
         continue
       filtered_goals.append(g)
-    glopts = gen_glopts_reference_data()
+    glopts = gen_glopts_reference_data(self.context.options)
 
     # generate the .rst file
     template = resource_string(__name__,
