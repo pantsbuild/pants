@@ -72,12 +72,12 @@ class ZipArchiver(Archiver):
     with open_zip64(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
-        if path.startswith(b'/') or path.startswith(b'..'):
+        if name.startswith(b'/') or name.startswith(b'..'):
           raise ValueError('Zip file contains unsafe path: %s' % path)
         # Ignore directories. extract() will create parent dirs as needed.
-        if not path.endswith(b'/'):
-          if (not filter or filter(path)):
-            zip.extract(path, outdir)
+        if not name.endswith(b'/'):
+          if (not filter or filter(name)):
+            archive_file.extract(name, outdir)
 
   def __init__(self, compression):
     Archiver.__init__(self)
