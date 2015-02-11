@@ -8,7 +8,7 @@ from __future__ import (nested_scopes, generators, division, absolute_import, wi
 import os
 import unittest2 as unittest
 
-from pants.fs.archive import archiver
+from pants.fs.archive import archiver, ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk, touch
 
@@ -70,5 +70,5 @@ class ArchiveTest(unittest.TestCase):
       with temporary_dir() as archivedir:
         archive = archiver('zip').create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
-          archiver('zip').extract(archive, todir, filter_func=do_filter)
+          ZIP.extract(archive, todir, filter=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))
