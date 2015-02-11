@@ -35,11 +35,11 @@ class KeystoreResolver(object):
       with open(config_file, 'rb') as keystore_config:
         config.readfp(keystore_config)
     except IOError:
-      raise KeystoreResolver.Error('The \'--{0}\' option must point at a valid .ini file holding '
-                                   'keystore definitions.'.format(cls._CONFIG_SECTION))
+      raise KeystoreResolver.Error("The \'--{0}\' option must point at a valid .ini file holding "
+                                   "keystore definitions.".format(cls._CONFIG_SECTION))
     parser = SingleFileConfig(config_file, config)
     key_names = config.sections()
-    keys = {}
+    keys = []
 
     def create_key(key_name):
       """Instantiate Keystore objects."""
@@ -53,7 +53,7 @@ class KeystoreResolver(object):
 
     for name in key_names:
       try:
-        keys[name] = create_key(name)
+        keys.append(create_key(name))
       except Config.ConfigError as e:
         raise KeystoreResolver.Error(e)
     return keys
@@ -95,8 +95,8 @@ class Keystore(object):
     if self._type is None:
       keystore_type = self._build_type.lower()
       if keystore_type not in ('release', 'debug'):
-        raise ValueError(self, 'The build_type must be one of (debug, release) '
-                               'instead of: {0}.'.format(self._build_type))
+        raise ValueError(self, "The 'build_type' must be one of (debug, release)"
+                               " instead of: '{0}'.".format(self._build_type))
       else:
         self._type = keystore_type
     return self._type

@@ -11,7 +11,6 @@ python_library(
     ':aapt_task',
     ':dx_compile',
     ':sign_apk',
-    ':zipalign',
   ],
 )
 
@@ -89,18 +88,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:distribution',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'zipalign',
-  sources = ['zipalign.py'],
-  dependencies = [
-    'src/python/pants/backend/android/targets:android',
-    'src/python/pants/backend/android/tasks:android_task',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
   ],
 )

@@ -6,16 +6,35 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from contextlib import contextmanager
 
 import pytest
+from twitter.common.collections import maybe_list
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
-from pants.util.contextutil import environment_as
-from pants_test.android.test_android_base import TestAndroidBase
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
 
-class TestAndroidDistribution(TestAndroidBase):
+class TestAndroidDistribution(unittest.TestCase):
+
+  @contextmanager
+  # default for testing purposes being sdk 18 and 19, with latest build-tools 19.1.0
+  def distribution(self, installed_sdks=('18', '19'),
+                   installed_build_tools=('19.1.0', ),
+                   files='android.jar',
+                   executables='aapt'):
+    with temporary_dir() as sdk:
+      for sdks in installed_sdks:
+        touch(os.path.join(sdk, 'platforms', 'android-' + sdks, files))
+      for build in installed_build_tools:
+        for exe in maybe_list(executables or ()):
+          path = os.path.join(sdk, 'build-tools', build, exe)
+          with safe_open(path, 'w') as fp:
+            fp.write('')
+          chmod_plus_x(path)
+      yield sdk
 
   def test_tool_registration(self):
     with self.distribution() as sdk:
