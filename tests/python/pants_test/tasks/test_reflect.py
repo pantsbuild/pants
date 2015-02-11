@@ -36,7 +36,8 @@ class BuildsymsSanityTests(BaseTest):
     self.assertIn('dependencies', jl_text)
     self.assertIn('sources', jl_text)
 
-class GoalDataTest(BaseTest):
+
+class OptionsDataTest(BaseTest):
   def test_gen_tasks_options_reference_data(self):
     # can we run our reflection-y goal code without crashing? would be nice
     options = Options()

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import argparse
 import inspect
 import re
 from collections import OrderedDict
@@ -18,10 +17,8 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.option.global_options import register_global_options
 from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
-from pants.option.parser import Parser
+from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 # Our CLI help and doc-website-gen use this to get useful help text.
@@ -317,6 +314,7 @@ def info_for_target_class(cls):
   paramdocs = param_docshards_to_template_datas(funcdoc_shards)
   return(argspec, funcdoc_rst, paramdocs)
 
+
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
@@ -462,7 +460,9 @@ def get_option_template_data_from_options(options_in_scope):
       typ=typ))
   return option_l
 
+
 def get_option_template_data(options):
+  """Pull data useful for Options Reference web page out of Options object."""
   retval = []
   for goal in Goal.all():
     gpantsref = ''.join([c for c in goal.name if c.isalnum()])
@@ -484,7 +484,7 @@ def get_option_template_data(options):
               break
           impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
         except KeyError:
-          pass # maybe there's no task with the scope's name
+          pass  # maybe there's no task with the scope's name
       spantsref = ''.join([c for c in scope if c.isalnum()])
       option_l = get_option_template_data_from_options(options_in_scope)
       scope_l.append(TemplateData(impl=impl, doc_html=doc_html, doc_rst=doc_rst,

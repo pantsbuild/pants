@@ -99,7 +99,7 @@ class BuildBuildDictionary(Task):
       generator.write(outfile)
 
   def _gen_options_reference(self):
-    """Generate the options reference rst doc."""
+    """Generate the options reference doc."""
     goals = get_option_template_data(self.context.options)
     filtered_goals = []
     omit_impl_regexps = [re.compile(r) for r in self.get_options().omit_impl_re]
