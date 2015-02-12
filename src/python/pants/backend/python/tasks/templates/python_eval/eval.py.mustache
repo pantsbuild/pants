@@ -29,6 +29,7 @@ def log(message=''):
 
 
 if __name__ == '__main__':
+  # TODO(John Sirois): Consider collecting all import errors before exiting non-zero.
   {{#modules}}
   try:
     import {{module}}
