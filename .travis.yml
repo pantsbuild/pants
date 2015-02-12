@@ -30,19 +30,19 @@ env:
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
   matrix:
-    # Format checks, self compile check, self distribution check, doc gen check, examples and
-    # testprojects
+    # Format checks, self compile check, sanity checks, self distribution check, doc gen check,
+    # examples and testprojects
     - CI_FLAGS="-clp"
     # Just pants python unit tests (lp)
-    - CI_FLAGS="-fksrcet"
+    - CI_FLAGS="-fkmsrcet"
     # Just ITs (c)
     # 6 shards gets them finishing faster than units for now.
-    - CI_FLAGS="-fksrlpet -i 6:0"
-    - CI_FLAGS="-fksrlpet -i 6:1"
-    - CI_FLAGS="-fksrlpet -i 6:2"
-    - CI_FLAGS="-fksrlpet -i 6:3"
-    - CI_FLAGS="-fksrlpet -i 6:4"
-    - CI_FLAGS="-fksrlpet -i 6:5"
+    - CI_FLAGS="-fkmsrlpet -i 6:0"
+    - CI_FLAGS="-fkmsrlpet -i 6:1"
+    - CI_FLAGS="-fkmsrlpet -i 6:2"
+    - CI_FLAGS="-fkmsrlpet -i 6:3"
+    - CI_FLAGS="-fkmsrlpet -i 6:4"
+    - CI_FLAGS="-fkmsrlpet -i 6:5"
 
 before_script: |
   ./build-support/bin/ci-sync.sh
