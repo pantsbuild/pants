@@ -9,6 +9,7 @@ import os
 import pkgutil
 
 from pex.pex import PEX
+from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -34,20 +35,27 @@ class PythonEval(PythonTask):
 
   def execute(self):
     targets = self.context.targets() if self.get_options().closure else self.context.target_roots
+    with self.invalidated(targets, topological_order=True) as invalidation_check:
+      self._compile_targets(invalidation_check.invalid_vts)
+
+  def _compile_targets(self, invalid_vts):
     failures = []
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
-      for target in targets:
-        if isinstance(target, (PythonLibrary, PythonBinary)):
-          returncode = self._compile_target(target)
-          if returncode != 0:
-            if self.get_options().fail_slow:
-              failures.append(target)
+      for vts in invalid_vts:
+        for target in vts.targets:
+          if isinstance(target, (PythonLibrary, PythonBinary)):
+            returncode = self._compile_target(target)
+            if returncode == 0:
+              vts.update()  # Ensure partial progress is marked valid
             else:
-              raise TaskError('Failed to eval {}'.format(target.address.spec))
+              if self.get_options().fail_slow:
+                failures.append(target)
+              else:
+                raise TaskError('Failed to eval {}'.format(target.address.spec))
       if failures:
         msg = 'Failed to evaluate {} targets:\n  {}'.format(
-            len(failures),
-            '\n  '.join(t.address.spec for t in failures))
+          len(failures),
+          '\n  '.join(t.address.spec for t in failures))
         raise TaskError(msg)
 
   def _compile_target(self, target):
