@@ -94,10 +94,8 @@ class Options(object):
           with open(spec) as f:
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
-    self._is_help = splitter.is_help
-    self._is_help_all = splitter.is_help_all
-    self._is_help_advanced = splitter.is_help_advanced
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes)
+    self._help_request = splitter.help_request
+    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, self._help_request)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scopes = set(known_scopes)
@@ -136,30 +134,6 @@ class Options(object):
       return self._passthru
     else:
       return []
-
-  @property
-  def is_help(self):
-    """Whether the command line indicates a request for help."""
-    return self._is_help
-
-  @property
-  def is_help_advanced(self):
-    """Whether the command line indicates a request for advanced help."""
-    return self._is_help_advanced
-
-  @property
-  def is_help_all(self):
-    """Whether the command line indicates a request for all the help."""
-    return self._is_help_all
-
-  def format_global_help(self):
-    """Generate a help message for global options."""
-    return (self.get_global_parser().format_help() +
-            '--help-all              Show options for all goals and exit.')
-
-  def format_help(self, scope):
-    """Generate a help message for options at the specified scope."""
-    return self.get_parser(scope).format_help()
 
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope, using argparse params."""
@@ -216,25 +190,36 @@ class Options(object):
     """Return the option values for the global scope."""
     return self.for_scope(GLOBAL_SCOPE)
 
-  def print_help(self, msg=None, goals=None):
+  def print_help_if_requested(self):
+    """If help was requested, print it and return True.
+
+    Otherwise return False.
+    """
+    if self._help_request:
+      self._print_help()
+      return True
+    else:
+      return False
+
+  def _print_help(self):
     """Print a help screen, followed by an optional message.
 
     Note: Ony useful if called after options have been registered.
     """
     def _maybe_help(scope):
-      s = self.format_help(scope)
+      s = self._format_help_for_scope(scope)
       if s != '':  # Avoid printing scope name for scope with empty options.
         print(scope)
         for line in s.split('\n'):
           if line != '':  # Avoid superfluous blank lines for empty strings.
             print('  {0}'.format(line))
 
-    goals = goals or self.goals
+    show_all_help = self._help_request and self._help_request.all_scopes
+    goals = (Goal.all() if show_all_help else [Goal.by_name(goal_name) for goal_name in self.goals])
     if goals:
-      for goal_name in goals:
-        goal = Goal.by_name(goal_name)
+      for goal in goals:
         if not goal.ordered_task_names():
-          print('\nUnknown goal: %s' % goal_name)
+          print('\nUnknown goal: %s' % goal.name)
         else:
           print('\n{0}: {1}\n'.format(goal.name, goal.description))
           for scope in goal.known_scopes():
@@ -245,16 +230,18 @@ class Options(object):
       print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
       print('  ./pants help                                 Get help.')
       print('  ./pants help [goal]                          Get help for the specified goal.')
+      print('  ./pants help-all                             Get help for all goals.')
       print('  ./pants goals                                List all installed goals.')
       print('')
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')
       print('    dir:: to include all targets found recursively under the directory.')
-
       print('\nFriendly docs:\n  http://pantsbuild.github.io/')
 
+    if show_all_help or not goals:
       print('\nGlobal options:')
-      print(self.format_global_help())
+      print(self.get_global_parser().format_help())
 
-    if msg is not None:
-      print(msg)
+  def _format_help_for_scope(self, scope):
+    """Generate a help message for options at the specified scope."""
+    return self.get_parser(scope).format_help()
