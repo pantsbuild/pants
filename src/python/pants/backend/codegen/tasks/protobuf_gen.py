@@ -61,6 +61,10 @@ class ProtobufGen(CodeGen):
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
              default=[])
+    register('--extra_path', advanced=True, action='append',
+             help='Prepend this path onto PATH in the environment before executing protoc. '
+                  'Intended to help protoc find its plugins.',
+             default=None)
     register('--supportdir', advanced=True,
              help='This directory will be created under pants_bootstrapdir for the protoc binary.',
              default=_PROTOBUF_GEN_SUPPORTDIR_DEFAULT)
@@ -88,6 +92,7 @@ class ProtobufGen(CodeGen):
     self.protoc_supportdir = self.get_options().supportdir
     self.protoc_version = self.get_options().version
     self.plugins = self.get_options().plugins
+    self._extra_paths = self.get_options().extra_path
 
     self.java_out = os.path.join(self.workdir, 'gen-java')
     self.py_out = os.path.join(self.workdir, 'gen-py')
@@ -192,8 +197,15 @@ class ProtobufGen(CodeGen):
       args.append('--proto_path={0}'.format(base))
 
     args.extend(sources)
+
+    # Tack on extra path entries. These can be used to find protoc plugins
+    protoc_environ = os.environ.copy()
+    if self._extra_paths:
+      protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
+                                               + protoc_environ['PATH'].split(os.pathsep))
+
     log.debug('Executing: {0}'.format('\\\n  '.join(args)))
-    process = subprocess.Popen(args)
+    process = subprocess.Popen(args, env=protoc_environ)
     result = process.wait()
     if result != 0:
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
