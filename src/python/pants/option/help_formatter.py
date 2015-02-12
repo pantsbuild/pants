@@ -15,15 +15,11 @@ class PantsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
   we format those ourselves.  Leaves just the actual flag help.
   """
 
-  _show_advanced_output = False
-
-  @staticmethod
-  def show_advanced_output(visible=True):
-    PantsHelpFormatter._show_advanced_output = visible
-
-  def __init__(self, *args, **kwargs):
+  def __init__(self, show_advanced_output, *args, **kwargs):
     super(PantsHelpFormatter, self).__init__(*args, **kwargs)
     self._in_advanced_section = False
+    self._pants_scope = None
+    self._show_advanced_output = show_advanced_output
 
   def add_usage(self, usage, actions, groups, prefix=None):
     pass
@@ -68,7 +64,7 @@ class PantsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     Also, add the fully-qualified flag to the help output.
     """
 
-    if not self._in_advanced_section or PantsHelpFormatter._show_advanced_output:
+    if not self._in_advanced_section or self._show_advanced_output:
       # NB: This uses _add_item() which is a private implementation detail of the
       # ArgParse.HelpFormatter class.  It is subject to change in future releases of argparse.
       if self._in_advanced_section:
@@ -77,3 +73,13 @@ class PantsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         self._add_item(advanced_prefix_helper, [])
       self._add_item(self._pants_arg_long_format_helper, [action])
       super(PantsHelpFormatter, self).add_argument(action)
+
+
+class PantsBasicHelpFormatter(PantsHelpFormatter):
+  def __init__(self, *args, **kwargs):
+    super(PantsBasicHelpFormatter, self).__init__(False, *args, **kwargs)
+
+
+class PantsAdvancedHelpFormatter(PantsHelpFormatter):
+  def __init__(self, *args, **kwargs):
+    super(PantsAdvancedHelpFormatter, self).__init__(True, *args, **kwargs)

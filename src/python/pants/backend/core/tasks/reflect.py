@@ -465,6 +465,7 @@ def get_option_template_data(options):
   # foreach goal, foreach scope in that goal, get data
   option_template_data = []
   for goal in Goal.all():
+<<<<<<< HEAD
     scope_option_template_data = []
     for scope, options_in_scope in options.doc_data.items():
       # scopes can look like "compile.java"; instead of "compile.compile" we say "compile".
@@ -498,6 +499,37 @@ def get_option_template_data(options):
     option_template_data.append(TemplateData(goal=goal,
                                              tasks=scope_option_template_data, pantsref=gpantsref))
   return option_template_data
+=======
+    tasks = []
+    for task_name in goal.ordered_task_names():
+      task_type = goal.task_type_by_name(task_name)
+      doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
+      doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
+      option_parser = Parser(env={}, config={}, scope='', help_request=None, parent_parser=None)
+      def register(*args, **kwargs):
+        option_parser.register(*args, **kwargs)
+      register.bootstrap = bootstrap_option_values()
+      task_type.register_options(register)
+      argparser = option_parser._help_argparser
+      scope = Goal.scope(goal.name, task_name)
+      # task_type may actually be a synthetic subclass of the authored class from the source code.
+      # We want to display the authored class's name in the docs (but note that we must use the
+      # subclass for registering options above)
+      for authored_task_type in task_type.mro():
+        if authored_task_type.__module__ != 'abc':
+          break
+      impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
+      tasks.append(TemplateData(
+          impl=impl,
+          doc_html=doc_html,
+          doc_rst=doc_rst,
+          ogroup=oref_template_data_from_options(scope, argparser)))
+    goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
+    goal_names.append(goal.name)
+
+  goals = [goal_dict[name] for name in sorted(goal_names, key=lambda x: x.lower())]
+  return goals
+>>>>>>> master
 
 
 def assemble_buildsyms(predefs=PREDEFS, build_file_parser=None):
