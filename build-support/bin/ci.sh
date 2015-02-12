@@ -107,7 +107,7 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants ${PANTS_ARGS[@]} compile.python-eval --closure --fail-slow binary \
+    ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex ./pants.pex && \
     ./pants.pex goals ${PANTS_ARGS[@]}
@@ -145,9 +145,9 @@ packages: [
   ]
 EOF
     ) && \
-    ./pants.pex ${bootstrap_compile_args[@]} binary ${INTERPRETER_ARGS[@]} \
+    ./pants.pex compile.python-eval --closure --fail-slow binary ${INTERPRETER_ARGS[@]} \
       --config-override=${config} \
-      src/python/pants:_pants_transitional_publishable_binary_ && \
+        src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
     ./dist/self.pex binary --config-override=${config} ${INTERPRETER_ARGS[@]} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
