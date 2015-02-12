@@ -5,11 +5,13 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    ':python_artifact',
+    ':python_requirement',
+    ':python_requirements',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/goal:task_registrar',
-    ':all_utils',
   ]
 )
 

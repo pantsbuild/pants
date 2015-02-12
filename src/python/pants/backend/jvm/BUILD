@@ -18,15 +18,14 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    ':artifact',
+    ':repository',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-    ':artifact',
-    ':ivy_utils',
-    ':repository',
   ],
 )
 
