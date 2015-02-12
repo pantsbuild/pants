@@ -18,16 +18,30 @@ class UnionProducts(object):
     # a map of target to OrderedSet of product members
     self._products_by_target = defaultdict(OrderedSet)
 
-  def put_target(self, target, products):
-    """Sets the products for a particular target, overwriting an existing entry."""
-    self._products_by_target[target] = OrderedSet(products)
+  def add_for_target(self, target, products):
+    """Updates the products for a particular target, adding to existing entries."""
+    self._products_by_target[target].update(products)
 
-  def get_target(self, target, predicate=None):
+  def add_for_targets(self, targets, products):
+    """Updates the products for the given targets, adding to existing entries."""
+    # FIXME: This is a temporary helper for use until the classpath has been split.
+    for target in targets:
+      self.add_for_target(target, products)
+
+  def get_target(self, target):
     """Gets the transitive product deps for the given target."""
+    return self.get_for_targets([target])
+
+  def get_for_targets(self, targets):
+    """Gets the transitive product deps for the given targets, in order."""
     products = OrderedSet()
+    visited = set()
     # walk the targets transitively to collect products
-    for dep in target.closure():
-      products.add(self._products_by_target[target])
+    for target in targets:
+      for dep in target.closure():
+        if not dep in visited:
+          products.update(self._products_by_target[dep])
+          visited.add(dep)
     return products
 
 

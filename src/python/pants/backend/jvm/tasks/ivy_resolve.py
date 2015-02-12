@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
+from pants.goal.products import UnionProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
@@ -112,7 +113,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     targets = self.context.targets()
     self.context.products.safe_create_data('ivy_cache_dir', lambda: self._cachedir)
     compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       lambda: OrderedSet())
+                                                       lambda: UnionProducts())
 
     # After running ivy, we need to take the resulting classpath, and load it into
     # the build products.
@@ -127,7 +128,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     for conf in self.confs:
       # It's important we add the full classpath as an (ordered) unit for code that is classpath
       # order sensitive
-      compile_classpath.update(map(lambda entry: (conf, entry), ivy_classpath))
+      compile_classpath.add_for_targets(targets, map(lambda entry: (conf, entry), ivy_classpath))
 
     if self._report:
       self._generate_ivy_report(relevant_targets)
