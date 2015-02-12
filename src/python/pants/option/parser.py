@@ -13,7 +13,7 @@ import six
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
-from pants.option.help_formatter import PantsHelpFormatter
+from pants.option.help_formatter import PantsAdvancedHelpFormatter, PantsBasicHelpFormatter
 from pants.option.ranked_value import RankedValue
 
 
@@ -80,9 +80,6 @@ class Parser(object):
       >>> def print_flags(flags):
       ...   print('\n'.join(map(str, flags)))
       ...
-      >>> print_flags(Parser.expand_flags('-h', '--help', help='Display command line help.'))
-      Flag(name='-h', inverse_name=None, help_arg='-h')
-      Flag(name='--help', inverse_name=None, help_arg='--help')
       >>> print_flags(Parser.expand_flags('-q', '--quiet', action='store_true',
       ...                                 help='Squelches all console output apart from errors.'))
       Flag(name='-q', inverse_name=None, help_arg='-q')
@@ -94,10 +91,11 @@ class Parser(object):
     """
     return [cls.Flag._create(flag, **kwargs) for flag in args]
 
-  def __init__(self, env, config, scope, parent_parser):
+  def __init__(self, env, config, scope, help_request, parent_parser):
     self._env = env
     self._config = config
     self._scope = scope
+    self._help_request = help_request
 
     # If True, no more registration is allowed on this parser.
     self._frozen = False
@@ -108,12 +106,14 @@ class Parser(object):
     # The argparser we use for formatting help messages.
     # We don't use self._argparser for this as it will have all options from enclosing scopes
     # registered on it too, which would create unnecessarily repetitive help messages.
+    formatter_class = (PantsAdvancedHelpFormatter if help_request and help_request.advanced
+                       else PantsBasicHelpFormatter)
     self._help_argparser = CustomArgumentParser(conflict_handler='resolve',
-                                                formatter_class=PantsHelpFormatter)
+                                                formatter_class=formatter_class)
 
     # Options are registered in two groups.  The first group will always be displayed in the help
-    # output.  The second group is for advanced options are not normally displayed because they
-    # are complex or may impact the compiler output.
+    # output.  The second group is for advanced options that are not normally displayed, because
+    # they're intended as sitewide config and should not typically be modified by individual users.
     self._help_argparser_group = self._help_argparser.add_argument_group(title=scope)
     self._help_argparser_advanced_group = \
       self._help_argparser.add_argument_group(title='*{0}'.format(scope))
