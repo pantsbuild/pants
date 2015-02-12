@@ -38,6 +38,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:all',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:base'
@@ -51,6 +52,17 @@ python_tests(
   ],
   dependencies = [
     'src/python/pants/backend/android:android_config_util',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'android_manifest_parser',
+  sources = [
+    'test_android_manifest_parser.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android:android_manifest_parser',
     'src/python/pants/util:contextutil',
   ]
 )

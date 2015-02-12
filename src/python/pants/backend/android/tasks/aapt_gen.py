@@ -101,7 +101,7 @@ class AaptGen(AaptTask, CodeGen):
   def createtarget(self, lang, gentarget, dependees):
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
-    aapt_gen_file = self._calculate_genfile(gentarget.package)
+    aapt_gen_file = self._calculate_genfile(gentarget.package_name)
     deps = OrderedSet([self._jar_library_by_sdk[gentarget.target_sdk]])
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,

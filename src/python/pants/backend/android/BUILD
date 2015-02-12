@@ -33,3 +33,8 @@ python_library(
     'src/python/pants/base:config',
   ]
 )
+
+python_library(
+  name = 'android_manifest_parser',
+  sources =['android_manifest_parser.py'],
+)
