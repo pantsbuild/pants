@@ -61,6 +61,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         'compile_classpath',
         'ivy_cache_dir',
         'ivy_jar_products',
+        'ivy_resolve_symlink_map',
         'jar_dependencies',
         'jar_map_default',
         'jar_map_sources',
