@@ -13,7 +13,7 @@ from pants.base.workunit import WorkUnit
 
 class ThriftLintError(Exception):
   """Raised on a lint failure."""
-  pass
+
 
 class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   """Print linter warnings for thrift files.
@@ -77,7 +77,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return self._to_bool(self.context.config.get(self._CONFIG_SECTION, 'strict',
                                                  default=ThriftLinter.STRICT_DEFAULT))
 
-  def lint(self, target):
+  def _lint(self, target):
     self.context.log.debug('Linting {0}'.format(target.address.spec))
 
     classpath = self.tool_classpath('scrooge-linter')
@@ -110,9 +110,9 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
       errors = []
       for vt in invalidation_check.invalid_vts:
         try:
-          self.lint(vt.target)
+          self._lint(vt.target)
         except ThriftLintError as e:
-          errors.append(e.message)
+          errors.append(str(e))
         else:
           vt.update()
       if errors:
