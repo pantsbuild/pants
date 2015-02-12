@@ -175,6 +175,13 @@ jar_library(name='util-core',
             ]
            )
 
+jar_library(
+  name='autovalue',
+  jars=[
+    jar(org='com.google.auto.value', name='auto-value', rev='1.0'),
+  ],
+)
+
 
 ###############
 # Test support
