@@ -9,7 +9,6 @@ import os
 import pkgutil
 
 from pex.pex import PEX
-from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
