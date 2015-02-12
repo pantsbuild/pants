@@ -463,9 +463,9 @@ def get_option_template_data_from_options(options_in_scope):
 def get_option_template_data(options):
   """Pull data useful for Options Reference web page out of Options object."""
   # foreach goal, foreach scope in that goal, get data
-  option_template_data = []
+  all_template_data = []
   for goal in Goal.all():
-    scope_option_template_data = []
+    scope_template_data = []
     for scope, options_in_scope in options.doc_data.items():
       # scopes can look like "compile.java"; instead of "compile.compile" we say "compile".
       scope_parts = scope.split('.')
@@ -488,16 +488,16 @@ def get_option_template_data(options):
         doc_rst = ''
         doc_html = ''
       spantsref = ''.join([c for c in scope if c.isalnum()])
-      scope_option_template_data.append(
+      scope_template_data.append(
         TemplateData(impl=impl, doc_html=doc_html, doc_rst=doc_rst,
                      ogroup=TemplateData(title=scope,
                                          options=get_option_template_data_from_options(
                                            options_in_scope),
                                          pantsref=spantsref)))
     gpantsref = ''.join([c for c in goal.name if c.isalnum()])
-    option_template_data.append(TemplateData(goal=goal,
-                                             tasks=scope_option_template_data, pantsref=gpantsref))
-  return option_template_data
+    all_template_data.append(TemplateData(goal=goal,
+                                          scopes=scope_template_data, pantsref=gpantsref))
+  return all_template_data
 
 
 def assemble_buildsyms(predefs=PREDEFS, build_file_parser=None):

@@ -104,7 +104,7 @@ class BuildBuildDictionary(Task):
     filtered_goals = []
     omit_impl_regexps = [re.compile(r) for r in self.get_options().omit_impl_re]
     for g in goals:
-      if any(r.match(t.get('impl') or '') for r in omit_impl_regexps for t in g.tasks):
+      if any(r.match(t.get('impl') or '') for r in omit_impl_regexps for t in g.scopes):
         continue
       filtered_goals.append(g)
     glopts = gen_glopts_reference_data(self.context.options)
