@@ -110,7 +110,12 @@ class Options(object):
 
   @property
   def doc_data(self):
-    """Options register data we save away to build the Options Reference web page."""
+    """Options register data we save away to build the Options Reference web page.
+
+    Organized as a dict of dicts. E.g., If 'test.intercal' scope has a flag '-f/--foo'
+    registered ('-f', '--foo', help='Do not use', advanced=True), then
+    doc_data['test.intercal']['-f/--foo'] = { 'help': 'Do not use', 'advanced': True }
+    """
     return self._doc_data
 
   @property

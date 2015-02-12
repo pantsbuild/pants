@@ -464,11 +464,13 @@ def get_option_template_data_from_options(options_in_scope):
 
 def get_option_template_data(options):
   """Pull data useful for Options Reference web page out of Options object."""
+  # foreach goal, foreach scope in that goal, get data
   retval = []
   for goal in Goal.all():
     gpantsref = ''.join([c for c in goal.name if c.isalnum()])
     scope_l = []
     for scope, options_in_scope in options.doc_data.items():
+      # scopes can look like "compile.java"; instead of "compile.compile" we say "compile", tho
       scope_parts = scope.split('.')
       if not scope_parts[0] == goal.name:
         continue
