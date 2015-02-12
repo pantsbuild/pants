@@ -59,7 +59,6 @@ class TestAndroidManifestParser(unittest.TestCase):
         self.assertEqual(AndroidManifestParser.get_package_name(manifest),
                          'com.pants.examples.hello')
 
-
   # Test AndroidManifestParser.get_package_name.
   def test_get_package_name(self):
     with self.android_manifest() as manifest:
