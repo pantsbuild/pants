@@ -38,6 +38,9 @@ div.oref_ogroup_section h3 {
   border-top: 1px dotted #bcd;
   margin-left: -2%;
 }
+.advanced {
+  color: red; font-size: small; font-style: italic;
+}
 </style>
 
 {{#goals}}
@@ -80,6 +83,9 @@ div.oref_ogroup_section h3 {
 {{#default}}
       (Default: <code>{{default}}</code>)
 {{/default}}
+{{#is_advanced}}
+<span class='advanced'>Advanced Option: Use only with caution.</span>
+{{/is_advanced}}
 
 {{hlp}}
 

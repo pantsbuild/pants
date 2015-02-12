@@ -457,7 +457,8 @@ def get_option_template_data_from_options(options_in_scope):
       st='/'.join(option),
       default=default,
       hlp=hlp,
-      typ=typ))
+      typ=typ,
+      is_advanced=data.get('advanced')))
   return option_l
 
 
