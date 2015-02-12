@@ -449,10 +449,8 @@ def get_option_template_data_from_options(options_in_scope):
       typ = data.get('type').__name__
     else:
       typ = None
-    if data.get('default'):
-      default = str(data.get('default'))
-    else:
-      default = None
+    # formet makes sure default is not-a-list, lest the template show it N times:
+    default = '{0}'.format(data.get('default', ''))
     option_l.append(TemplateData(
       st='/'.join(option),
       default=default,
@@ -465,17 +463,14 @@ def get_option_template_data_from_options(options_in_scope):
 def get_option_template_data(options):
   """Pull data useful for Options Reference web page out of Options object."""
   # foreach goal, foreach scope in that goal, get data
-  retval = []
+  option_template_data = []
   for goal in Goal.all():
-    gpantsref = ''.join([c for c in goal.name if c.isalnum()])
-    scope_l = []
+    scope_option_template_data = []
     for scope, options_in_scope in options.doc_data.items():
-      # scopes can look like "compile.java"; instead of "compile.compile" we say "compile", tho
+      # scopes can look like "compile.java"; instead of "compile.compile" we say "compile".
       scope_parts = scope.split('.')
       if not scope_parts[0] == goal.name:
         continue
-      doc_rst = ''
-      doc_html = ''
       impl = None
       if len(scope_parts) == 1:
         scope_name = scope_parts[0]
@@ -489,16 +484,20 @@ def get_option_template_data(options):
           if authored_task_type.__module__ != 'abc':
             break
         impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
-      except KeyError:
-        pass  # maybe there's no task with the scope's name
+      except KeyError: # can be no task with the scope's name
+        doc_rst = ''
+        doc_html = ''
       spantsref = ''.join([c for c in scope if c.isalnum()])
-      option_l = get_option_template_data_from_options(options_in_scope)
-      scope_l.append(TemplateData(impl=impl, doc_html=doc_html, doc_rst=doc_rst,
-                                  ogroup=TemplateData(title=scope,
-                                                      options=option_l,
-                                                      pantsref=spantsref)))
-    retval.append(TemplateData(goal=goal, tasks=scope_l, pantsref=gpantsref))
-  return retval
+      scope_option_template_data.append(
+        TemplateData(impl=impl, doc_html=doc_html, doc_rst=doc_rst,
+                     ogroup=TemplateData(title=scope,
+                                         options=get_option_template_data_from_options(
+                                           options_in_scope),
+                                         pantsref=spantsref)))
+    gpantsref = ''.join([c for c in goal.name if c.isalnum()])
+    option_template_data.append(TemplateData(goal=goal,
+                                             tasks=scope_option_template_data, pantsref=gpantsref))
+  return option_template_data
 
 
 def assemble_buildsyms(predefs=PREDEFS, build_file_parser=None):
@@ -509,12 +508,12 @@ def assemble_buildsyms(predefs=PREDEFS, build_file_parser=None):
     for this run of Pants; hopefully knows ~the same symbols defined for a
     "typical" run of Pants.
   """
-  retval = {}
+  buildsyms = {}
   for nom in predefs:
     val = predefs[nom]
     if 'suppress' in val and val['suppress']:
       continue
-    retval[nom] = val
+    buildsyms[nom] = val
   if build_file_parser:
     symbol_hash = get_syms(build_file_parser)
     for nom in symbol_hash:
@@ -522,5 +521,5 @@ def assemble_buildsyms(predefs=PREDEFS, build_file_parser=None):
       bdi = get_builddict_info(v)
       if bdi and 'suppress' in bdi and bdi['suppress']:
         continue
-      retval[nom] = {'defn': entry_for_one(nom, v)}
-  return retval
+      buildsyms[nom] = {'defn': entry_for_one(nom, v)}
+  return buildsyms
