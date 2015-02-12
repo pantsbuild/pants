@@ -334,14 +334,9 @@ class TaskBase(AbstractClass):
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
 
-      payloads = [t.payload for t in targets]
-
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
-        if len(payloads) > 0:
-          msg_elements.append(' containing ')
-          msg_elements.append(items_to_report_element(payloads, 'payload file'))
         if num_invalid_partitions > 1:
           msg_elements.append(' in %d target partitions' % num_invalid_partitions)
         msg_elements.append('.')
