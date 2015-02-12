@@ -39,19 +39,23 @@ class PythonEval(PythonTask):
       self._compile_targets(invalidation_check.invalid_vts)
 
   def _compile_targets(self, invalid_vts):
-    failures = []
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
+      failures = []
       for vts in invalid_vts:
+        vts_failues = []
         for target in vts.targets:
           if isinstance(target, (PythonLibrary, PythonBinary)):
             returncode = self._compile_target(target)
-            if returncode == 0:
-              vts.update()  # Ensure partial progress is marked valid
-            else:
+            if returncode != 0:
               if self.get_options().fail_slow:
-                failures.append(target)
+                vts_failues.append(target)
               else:
                 raise TaskError('Failed to eval {}'.format(target.address.spec))
+        if vts_failues:
+          failures.extend(vts_failues)
+        else:
+          vts.update()  # Ensure partial progress is marked valid
+
       if failures:
         msg = 'Failed to evaluate {} targets:\n  {}'.format(
           len(failures),
