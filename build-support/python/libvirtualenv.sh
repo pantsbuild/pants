@@ -15,7 +15,7 @@ function setup_virtualenv() {
     rm -fr "${VENV_DIR}"
     "$HERE/../virtualenv" "${VENV_DIR}"
     source "${VENV_DIR}/bin/activate"
-    pip install ${pip_install_opts} "${requirements}"
+    pip install --quiet ${pip_install_opts} "${requirements}"
     touch "${BOOTSTRAPPED_FILE}"
   else
     source "${VENV_DIR}/bin/activate"
