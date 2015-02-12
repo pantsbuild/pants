@@ -68,6 +68,7 @@ python_library(
     ':address',
     ':address_lookup_error',
     ':build_file',
+    ':build_file_parser',
     ':build_environment',
   ]
 )

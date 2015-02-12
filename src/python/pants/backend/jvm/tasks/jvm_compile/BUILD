@@ -80,8 +80,9 @@ python_library(
   name = 'jvm_fingerprint_strategy',
   sources = ['jvm_fingerprint_strategy.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:hash_utils',
-    'src/python/pants/base:target',
   ],
 )
 
