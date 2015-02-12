@@ -68,6 +68,7 @@ while getopts "hfxbkmsrdlpci:eat" opt; do
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
+shift $((${OPTIND} - 1))
 
 # Android testing requires the SDK to be installed and configured in Pants.
 # Skip if ANDROID_HOME isn't configured in the environment
@@ -77,7 +78,11 @@ else
   android_test_opts=""
 fi
 
-banner "CI BEGINS"
+if [[ $# > 0 ]]; then
+  banner "CI BEGINS: $@"
+else
+  banner "CI BEGINS"
+fi
 
 if [[ "${skip_formatting_checks:-false}" == "false" ]]; then
   banner "Checking python code formatting"
