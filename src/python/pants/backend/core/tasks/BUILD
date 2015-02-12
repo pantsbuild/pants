@@ -320,6 +320,7 @@ python_library(
     'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
+    'src/python/pants/base:payload_field',
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/cache',
