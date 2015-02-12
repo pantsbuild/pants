@@ -36,6 +36,7 @@ python_library(
   resources = globs('tasks/templates/ivy_resolve/*.mustache'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
