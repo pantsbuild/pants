@@ -11,8 +11,28 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 
+class UnionProducts(object):
+  """A set of products where the product of a target is the ordered union of the products
+  for its transitive deps."""
+  def __init__(self):
+    # a map of target to OrderedSet of product members
+    self._products_by_target = defaultdict(OrderedSet)
+
+  def put_target(self, target, products):
+    """Sets the products for a particular target, overwriting an existing entry."""
+    self._products_by_target[target] = OrderedSet(products)
+
+  def get_target(self, target, predicate=None):
+    """Gets the transitive product deps for the given target."""
+    products = OrderedSet()
+    # walk the targets transitively to collect products
+    for dep in target.closure():
+      products.add(self._products_by_target[target])
+    return products
+
+
 class RootedProducts(object):
-  """Products of a build that have a concept of a 'root' directory.
+  """File products of a build that have a concept of a 'root' directory.
 
   E.g., classfiles, under a root package directory."""
   def __init__(self, root):
@@ -40,7 +60,7 @@ class RootedProducts(object):
 
 
 class MultipleRootedProducts(object):
-  """A product consisting of multiple roots, with associated products."""
+  """A product consisting of multiple roots, with associated file products."""
   def __init__(self):
     self._rooted_products_by_root = {}
 
