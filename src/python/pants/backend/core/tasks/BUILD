@@ -278,8 +278,9 @@ python_library(
   name = 'run_prep_command',
   sources = ['run_prep_command.py'],
   dependencies = [
-    ':common',
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
   ],
 )
 
