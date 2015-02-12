@@ -5,11 +5,13 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-xbsrdlpcieat)"
+  echo "Usage: $0 (-h|-fxbksrdlpcieat)"
   echo " -h           print out this help message"
+  echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
   echo "              fresh clone)"
   echo " -b           skip bootstraping pants from local sources"
+  echo " -k           skip bootstrapped pants self compile check"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -d           if running jvm tests, don't use nailgun daemons"
@@ -31,12 +33,19 @@ function usage() {
 }
 
 daemons="--ng-daemons"
+bootstrap_compile_args=(
+  compile.python-eval
+  --closure
+  --fail-slow
+)
 
-while getopts "hxbsrdlpci:eat" opt; do
+while getopts "hfxbksrdlpci:eat" opt; do
   case ${opt} in
     h) usage ;;
+    f) skip_formatting_checks="true" ;;
     x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
+    k) bootstrap_compile_args=() ;;
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
     d) daemons="--no-ng-daemons" ;;
@@ -67,9 +76,12 @@ fi
 
 banner "CI BEGINS"
 
-banner "Checking python code formatting"
-build-support/bin/check_header.sh || exit 1
-build-support/bin/isort.sh || die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
+if [[ "${skip_formatting_checks:-false}" == "false" ]]; then
+  banner "Checking python code formatting"
+  build-support/bin/check_header.sh || exit 1
+  build-support/bin/isort.sh || \
+    die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
+fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
@@ -133,7 +145,7 @@ packages: [
   ]
 EOF
     ) && \
-    ./pants.pex compile.python-eval --closure --fail-slow binary ${INTERPRETER_ARGS[@]} \
+    ./pants.pex ${bootstrap_compile_args[@]} binary ${INTERPRETER_ARGS[@]} \
       --config-override=${config} \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
