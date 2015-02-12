@@ -23,6 +23,10 @@ from pants.util.contextutil import temporary_file
 class PythonEval(PythonTask):
   _EVAL_TEMPLATE_PATH = os.path.join('templates', 'python_eval', 'eval.py.mustache')
 
+  @staticmethod
+  def _is_evalable(target):
+    return isinstance(target, (PythonLibrary, PythonBinary))
+
   @classmethod
   def register_options(cls, register):
     super(PythonEval, cls).register_options(register)
@@ -34,7 +38,8 @@ class PythonEval(PythonTask):
 
   def execute(self):
     targets = self.context.targets() if self.get_options().closure else self.context.target_roots
-    with self.invalidated(targets, topological_order=True) as invalidation_check:
+    with self.invalidated(filter(self._is_evalable, targets),
+                          topological_order=True) as invalidation_check:
       self._compile_targets(invalidation_check.invalid_vts)
 
   def _compile_targets(self, invalid_vts):
@@ -42,15 +47,14 @@ class PythonEval(PythonTask):
       failures = []
       for vt in invalid_vts:
         target = vt.target
-        if isinstance(target, (PythonLibrary, PythonBinary)):
-          returncode = self._compile_target(target)
-          if returncode == 0:
-            vt.update()  # Ensure partial progress is marked valid
+        returncode = self._compile_target(target)
+        if returncode == 0:
+          vt.update()  # Ensure partial progress is marked valid
+        else:
+          if self.get_options().fail_slow:
+            failures.append(target)
           else:
-            if self.get_options().fail_slow:
-              failures.append(target)
-            else:
-              raise TaskError('Failed to eval {}'.format(target.address.spec))
+            raise TaskError('Failed to eval {}'.format(target.address.spec))
 
       if failures:
         msg = 'Failed to evaluate {} targets:\n  {}'.format(
