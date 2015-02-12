@@ -11,6 +11,10 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 
 
+class ThriftLintError(Exception):
+  """Raised on a lint failure."""
+  pass
+
 class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   """Print linter warnings for thrift files.
   """
@@ -94,7 +98,8 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                               workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
-      raise TaskError('Lint errors in {0}.'.format(paths))
+      raise ThriftLintError(
+        'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
   def execute(self):
     if self.get_options().skip:
@@ -102,12 +107,13 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
 
     thrift_targets = self.context.targets(self._is_thrift)
     with self.invalidated(thrift_targets) as invalidation_check:
-      for vts in invalidation_check.invalid_vts_partitioned:
-        invalid_targets = vts.targets
-        for target in invalid_targets:
-          try:
-            self.lint(target)
-          except TaskError:
-            # if the target has a lint error, be sure to display it on the next run.
-            vts.force_invalidate()
-            raise
+      errors = []
+      for vt in invalidation_check.invalid_vts:
+        try:
+          self.lint(vt.target)
+        except ThriftLintError as e:
+          errors.append(e.message)
+        else:
+          vt.update()
+      if errors:
+        raise TaskError('\n'.join(errors))
