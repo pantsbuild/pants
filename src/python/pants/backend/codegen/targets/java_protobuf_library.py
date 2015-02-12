@@ -28,6 +28,8 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
       targets which contain .proto definitions.
     """
     payload = payload or Payload()
+    # TODO(Eric Ayers): The target needs to incorporate the settings of --gen-protoc-version
+    # and --gen-protoc-plugins into the fingerprint.
     payload.add_fields({
       'raw_imports': PrimitiveField(imports or ())
     })
