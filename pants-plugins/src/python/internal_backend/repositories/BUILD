@@ -6,6 +6,7 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:build_manual',
     'src/python/pants/backend/jvm:repository',
   ]
 )
