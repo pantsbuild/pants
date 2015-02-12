@@ -18,6 +18,7 @@ from twitter.common.lang import AbstractClass
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
+from pants.base.payload_field import SourcesField
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
@@ -334,14 +335,18 @@ class TaskBase(AbstractClass):
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
 
-      payloads = [t.payload for t in targets]
+      payload_files = OrderedSet()
+      for target in targets:
+        for _, field in target.payload.fields:
+          if isinstance(field, SourcesField):
+            payload_files.update(field.relative_to_buildroot())
 
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
-        if len(payloads) > 0:
+        if len(payload_files) > 0:
           msg_elements.append(' containing ')
-          msg_elements.append(items_to_report_element(payloads, 'payload file'))
+          msg_elements.append(items_to_report_element(payload_files, 'payload file'))
         if num_invalid_partitions > 1:
           msg_elements.append(' in %d target partitions' % num_invalid_partitions)
         msg_elements.append('.')
