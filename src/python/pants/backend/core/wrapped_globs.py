@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from twitter.common.dirutil.fileset import Fileset
+from twitter.common.lang import Compatibility
 
 from pants.base.build_environment import get_buildroot
 
@@ -19,11 +20,21 @@ class FilesetRelPathWrapper(object):
   def __call__(self, *args, **kwargs):
     root = os.path.join(get_buildroot(), self.rel_path)
 
+    excludes = kwargs.pop('exclude', [])
+
     for glob in args:
       if(self._is_glob_dir_outside_root(glob, root)):
         raise ValueError('Invalid glob %s, points outside BUILD file root dir %s' % (glob, root))
 
-    return self.wrapped_fn(root=root, *args, **kwargs)
+    result = self.wrapped_fn(root=root, *args, **kwargs)
+    if isinstance(excludes, Compatibility.string):
+        raise ValueError("Expected exclude parameter to be a list of globs or lists, not a string")
+
+    for exclude in excludes:
+      if isinstance(exclude, Compatibility.string):
+        raise ValueError("Exclude parameter must contain lists or globs, not strings")
+      result -= exclude
+    return result
 
   def _is_glob_dir_outside_root(self, glob, root):
     # The assumption is that a correct glob starts with the root,
