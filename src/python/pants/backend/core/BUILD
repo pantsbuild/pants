@@ -21,8 +21,8 @@ python_library(
     'wrapped_globs.py',
   ],
   dependencies = [
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:address',

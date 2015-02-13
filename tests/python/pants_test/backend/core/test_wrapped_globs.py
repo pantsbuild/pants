@@ -44,13 +44,12 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def test_glob_exclude_not_string(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude="fleem.java"))')
-    with self.assertRaises(AddressLookupError):
+    with self.assertRaisesRegexp(AddressLookupError, 'Expected exclude parameter.*'):
       self.context().scan(self.build_root)
 
-  def test_glob_exclude_no_string_in_list(self):
+  def test_glob_exclude_string_in_list(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude=["fleem.java"]))')
-    with self.assertRaises(AddressLookupError):
-      self.context().scan(self.build_root)
+    self.context().scan(self.build_root)
 
   def test_subdir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("dir/*.scala"))')
