@@ -5,6 +5,7 @@ python_test_suite(
   name = 'all',
   dependencies = [
     ':python',
+    'tests/python/pants_test/python/tasks:all'
   ],
 )
 
