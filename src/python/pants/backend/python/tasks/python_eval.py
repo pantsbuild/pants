@@ -52,7 +52,7 @@ class PythonEval(PythonTask):
         returncode = self._compile_target(target)
         if returncode == 0:
           vt.update()  # Ensure partial progress is marked valid
-          compiled.apend(target)
+          compiled.append(target)
         else:
           if self.get_options().fail_slow:
             failures.append(target)
