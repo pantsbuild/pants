@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
