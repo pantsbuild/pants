@@ -433,7 +433,7 @@ def bootstrap_option_values():
 
 
 def gen_glopts_reference_data():
-  option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
+  option_parser = Parser(env={}, config={}, scope='', help_request=None, parent_parser=None)
   def register(*args, **kwargs):
     option_parser.register(*args, **kwargs)
   register.bootstrap = bootstrap_option_values()
@@ -480,7 +480,7 @@ def gen_tasks_options_reference_data():
       task_type = goal.task_type_by_name(task_name)
       doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
       doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-      option_parser = Parser(env={}, config={}, scope='', parent_parser=None)
+      option_parser = Parser(env={}, config={}, scope='', help_request=None, parent_parser=None)
       def register(*args, **kwargs):
         option_parser.register(*args, **kwargs)
       register.bootstrap = bootstrap_option_values()
