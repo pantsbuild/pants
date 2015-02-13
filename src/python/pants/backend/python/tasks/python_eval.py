@@ -40,16 +40,19 @@ class PythonEval(PythonTask):
     targets = self.context.targets() if self.get_options().closure else self.context.target_roots
     with self.invalidated(filter(self._is_evalable, targets),
                           topological_order=True) as invalidation_check:
-      self._compile_targets(invalidation_check.invalid_vts)
+      compiled = self._compile_targets(invalidation_check.invalid_vts)
+      return compiled  # Collected and returned for tests
 
   def _compile_targets(self, invalid_vts):
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
+      compiled = []
       failures = []
       for vt in invalid_vts:
         target = vt.target
         returncode = self._compile_target(target)
         if returncode == 0:
           vt.update()  # Ensure partial progress is marked valid
+          compiled.apend(target)
         else:
           if self.get_options().fail_slow:
             failures.append(target)
@@ -61,6 +64,8 @@ class PythonEval(PythonTask):
           len(failures),
           '\n  '.join(t.address.spec for t in failures))
         raise TaskError(msg)
+
+      return compiled
 
   def _compile_target(self, target):
     with self.context.new_workunit(name=target.address.spec):
