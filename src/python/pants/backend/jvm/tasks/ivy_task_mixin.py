@@ -119,7 +119,7 @@ class IvyTaskMixin(object):
           raise TaskError('Ivy failed to create classpath file at %s'
                           % raw_target_classpath_file_tmp)
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
-        logger.debug('Copied ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
+        logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])
