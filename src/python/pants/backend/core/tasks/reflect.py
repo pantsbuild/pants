@@ -449,7 +449,7 @@ def get_option_template_data_from_options(options_in_scope):
       typ = data.get('type').__name__
     else:
       typ = None
-    # formet makes sure default is not-a-list, lest the template show it N times:
+    # format makes sure default is not-a-list, lest the template show it N times:
     default = '{0}'.format(data.get('default', ''))
     option_l.append(TemplateData(
       st='/'.join(option),
