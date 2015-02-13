@@ -18,7 +18,7 @@ python:
   - "2.7"
 
 install:
-  - pip install coveralls
+  - pip --quiet install coveralls
 
 env:
   global:
