@@ -58,7 +58,7 @@ if [ ! -z "${PANTS_PROFILE}" ]; then
   export PEX_PROFILE=${PANTS_PROFILE}
 fi
 
-PANTS_BINARY=src/python/pants/bin:pants_local_binary
+PANTS_BINARY=//src/python/pants/bin:pants_local_binary
 PANTS_PEX="${HERE}/pants.pex"
 FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
 

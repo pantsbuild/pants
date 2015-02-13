@@ -32,6 +32,7 @@ from pants.goal.run_tracker import RunTracker
 from pants.option.global_options import register_global_options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
+from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdir
 
 
@@ -90,21 +91,26 @@ class GoalRunner(object):
     self.build_graph = BuildGraph(run_tracker=self.run_tracker,
                                   address_mapper=self.address_mapper)
 
+    cwd = os.getcwdu() if self.global_options.cli_relative_targets else self.root_dir
+    self.spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
+                                         spec_excludes=self.get_spec_excludes(),
+                                         exclude_target_regexps=self.global_options.exclude_target_regexp,
+                                         cwd=cwd)
+
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
       for path in self.config.getlist('goals', 'bootstrap_buildfiles', default=[]):
-        build_file = BuildFile.from_cache(root_dir=self.root_dir, relpath=path)
-        # TODO(pl): This is an unfortunate interface leak, but I don't think
-        # in the long run that we should be relying on "bootstrap" BUILD files
-        # that do nothing except modify global state.  That type of behavior
-        # (e.g. source roots, goal registration) should instead happen in
-        # project plugins, or specialized configuration files.
-        self.build_file_parser.parse_build_file_family(build_file)
+        with pushd(self.root_dir):
+          build_file = BuildFile.from_cache(root_dir=self.root_dir, relpath=path)
+          # TODO(pl): This is an unfortunate interface leak, but I don't think
+          # in the long run that we should be relying on "bootstrap" BUILD files
+          # that do nothing except modify global state.  That type of behavior
+          # (e.g. source roots, goal registration) should instead happen in
+          # project plugins, or specialized configuration files.
+          self.build_file_parser.parse_build_file_family(build_file)
 
     # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
     self.run_tracker.run_info.add_scm_info()
-
-    self._expand_goals_and_specs()
 
   def get_spec_excludes(self):
     # Note: Only call after register_options() has been called.
@@ -125,43 +131,16 @@ class GoalRunner(object):
     for goal in Goal.all():
       goal.register_options(self.options)
 
-  def _expand_goals_and_specs(self):
-    logger = logging.getLogger(__name__)
-
-    goals = self.options.goals
-    specs = self.options.target_specs
-    fail_fast = self.options.for_global_scope().fail_fast
-
-    for goal in goals:
-      if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
-        logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
-                       "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
-
-    if self.options.print_help_if_requested():
-      sys.exit(0)
-
-    self.requested_goals = goals
-
-    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
-      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
-                                      spec_excludes=self.get_spec_excludes(),
-                                      exclude_target_regexps=self.global_options.exclude_target_regexp)
-      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
-        for spec in specs:
-          for address in spec_parser.parse_addresses(spec, fail_fast):
-            self.build_graph.inject_address_closure(address)
-            self.targets.append(self.build_graph.get_target(address))
-    self.goals = [Goal.by_name(goal) for goal in goals]
-
   def run(self):
     def fail():
       self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
 
     kill_nailguns = self.options.for_global_scope().kill_nailguns
     try:
-      result = self._do_run()
-      if result:
-        fail()
+      with pushd(self.root_dir):
+        result = self._do_run()
+        if result:
+          fail()
     except KeyboardInterrupt:
       fail()
       # On ctrl-c we always kill nailguns, otherwise they might keep running
@@ -182,7 +161,34 @@ class GoalRunner(object):
         NailgunTask.killall(log.info)
     return result
 
+  def _expand_goals_and_specs(self):
+    logger = logging.getLogger(__name__)
+
+    goals = self.options.goals
+    specs = self.options.target_specs
+    fail_fast = self.options.for_global_scope().fail_fast
+
+    for goal in goals:
+      if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
+        logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
+                       "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
+
+    if self.options.print_help_if_requested():
+      sys.exit(0)
+
+    self.requested_goals = goals
+
+    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
+      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+        for spec in specs:
+          for address in self.spec_parser.parse_addresses(spec, fail_fast):
+            self.build_graph.inject_address_closure(address)
+            self.targets.append(self.build_graph.get_target(address))
+    self.goals = [Goal.by_name(goal) for goal in goals]
+
   def _do_run(self):
+    self._expand_goals_and_specs()
+
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
     # context/work-unit logging and standard python logging doesn't buy us anything.
 

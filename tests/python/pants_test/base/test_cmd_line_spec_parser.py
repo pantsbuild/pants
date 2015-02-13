@@ -101,6 +101,11 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed(cmdline_spec='./a/b/:b', expected=['a/b'])
     self.assert_parsed(cmdline_spec=os.path.join(self.build_root, './a/b/:b'), expected=['a/b'])
 
+    self.spec_parser._cwd = os.path.join(self.build_root, 'a')
+    self.assert_parsed(cmdline_spec='b', expected=['a/b'])
+    self.assert_parsed(cmdline_spec='::', expected=['a', 'a:b', 'a/b', 'a/b:c'])
+    self.assert_parsed(cmdline_spec='//::', expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
+
   def test_cmd_line_spec_list(self):
     self.assert_parsed_list(cmdline_spec_list=['a', 'a/b'], expected=['a', 'a/b'])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])

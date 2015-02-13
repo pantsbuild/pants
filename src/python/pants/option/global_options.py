@@ -37,6 +37,9 @@ def register_global_options(register):
            help="Don't attempt to grab the global lock. This lock prevents two concurrent pants "
                 "instances from stomping on each others data, so only use this if you know what "
                 "you're doing.")
+  register('--cli-relative-targets', action='store_true', default=False,
+           help="(CLI Only) Makes underspecified target spec (i.e. non-// or absolute paths) lookup "
+                "relative to the current directory, assuming the directory is under the build root.")
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
            help='Exclude these paths when computing the command-line target specs.')
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',
