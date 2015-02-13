@@ -18,6 +18,14 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertFalse('Lint errors found!' in pants_run.stdout_data)
 
+  def test_skip_skips_execution(self):
+    cmd = ['thrift-linter',
+           '--skip',
+           'testprojects/src/thrift/com/pants/thrift_linter:bad-thrift-strict']
+    pants_run = self.run_pants(cmd)
+    self.assert_success(pants_run)
+    self.assertFalse('Lint errors found!' in pants_run.stdout_data)
+
   def test_bad_default(self):
     # thrift-linter fails on linter errors.
     cmd = ['thrift-linter',
