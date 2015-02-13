@@ -7,8 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from hashlib import sha1
 
-import six
-from twitter.common.lang import Compatibility
+from six import string_types
 
 from pants.backend.jvm.repository import Repository
 from pants.base.payload_field import PayloadField, stable_json_sha1
@@ -27,16 +26,16 @@ class Artifact(PayloadField):
     :param repo: The ``repo`` this artifact is published to.
     :param string description: Description of this artifact.
     """
-    if not isinstance(org, Compatibility.string):
-      raise ValueError("org must be %s but was %s" % (Compatibility.string, org))
-    if not isinstance(name, Compatibility.string):
-      raise ValueError("name must be %s but was %s" % (Compatibility.string, name))
+    if not isinstance(org, string_types):
+      raise ValueError("org must be %s but was %s" % (string_types, org))
+    if not isinstance(name, string_types):
+      raise ValueError("name must be %s but was %s" % (string_types, name))
     if not isinstance(repo, Repository):
       raise ValueError("repo must be an instance of Repository")
 
-    if description is not None and not isinstance(description, Compatibility.string):
+    if description is not None and not isinstance(description, string_types):
       raise ValueError("description must be None or %s but was %s"
-                       % (Compatibility.string, description))
+                       % (string_types, description))
 
     self.org = org
     self.name = name

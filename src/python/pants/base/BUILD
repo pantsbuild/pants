@@ -275,8 +275,8 @@ python_library(
   name = 'target',
   sources = ['target.py'],
   dependencies = [
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     ':address',
     ':build_environment',
     ':build_manual',
@@ -294,7 +294,7 @@ python_library(
   name = 'target_addressable',
   sources = ['target_addressable.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     ':addressable',
     ':exceptions',
   ],
@@ -321,6 +321,7 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
   ],

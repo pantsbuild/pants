@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.python.python_artifact import PythonArtifact

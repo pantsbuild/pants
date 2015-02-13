@@ -5,8 +5,8 @@ python_library(
   name = 'net',
   sources = rglobs('*.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python:requests',
+    '3rdparty/python:six',
     'src/python/pants/util:dirutil',
   ],
 )

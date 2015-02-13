@@ -23,6 +23,7 @@ python_library(
     'jvm_target.py',
   ],
   dependencies = [
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python/twitter/commons:twitter.common.lang',
