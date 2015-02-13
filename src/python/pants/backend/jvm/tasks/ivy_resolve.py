@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 
 from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -117,6 +118,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
     # After running ivy, we need to take the resulting classpath, and load it into
     # the build products.
+    # FIXME: ivy_classpath is now ignored
     ivy_classpath, relevant_targets = self.ivy_resolve(
       targets,
       executor=executor,
@@ -125,15 +127,28 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       custom_args=self._args,
     )
 
+    # Record the ordered subset of jars that each jar_library/leaf depends on.
+    ivy_jar_products = self._generate_ivy_jar_products(targets)
     for conf in self.confs:
-      # It's important we add the full classpath as an (ordered) unit for code that is classpath
-      # order sensitive
-      compile_classpath.add_for_targets(targets, map(lambda entry: (conf, entry), ivy_classpath))
+      ivy_jar_memo = {}
+      ivy_info = ivy_jar_products[conf]
+      if not ivy_info:
+        continue
+      # TODO: refactor ivy_jar_products to remove list
+      ivy_info = ivy_info[0]
+      for target in targets:
+        if not isinstance(target, JarLibrary):
+          continue
+        # add the artifacts from each module
+        artifacts = list()
+        for module in ivy_info.get_modules_for_jar_library(target, memo=ivy_jar_memo):
+          artifact_paths = map(lambda a: a.path, module.artifacts)
+          compile_classpath.add_for_target(target, map(lambda entry: (conf, entry), artifacts))
 
     if self._report:
       self._generate_ivy_report(relevant_targets)
     if self.context.products.is_required_data('ivy_jar_products'):
-      self._populate_ivy_jar_products(relevant_targets)
+      self._populate_ivy_jar_products(relevant_targets, ivy_jar_products)
 
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
@@ -147,15 +162,21 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
     return [global_vts]
 
-  def _populate_ivy_jar_products(self, targets):
-    """Populate the build products with an IvyInfo object for each generated ivy report."""
-    ivy_products = self.context.products.get_data('ivy_jar_products') or defaultdict(list)
+  def _generate_ivy_jar_products(self, targets):
+    """Based on the ivy report, compute a map of conf to lists of IvyInfo objects."""
+    ivy_products = defaultdict(list)
     for conf in self.confs:
       ivyinfo = IvyUtils.parse_xml_report(targets, conf)
       if ivyinfo:
         # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
         ivy_products[conf].append(ivyinfo)
-    self.context.products.safe_create_data('ivy_jar_products', lambda: ivy_products)
+    return ivy_products
+
+  def _populate_ivy_jar_products(self, targets, new_ivy_products):
+    """Merge the given info into the ivy_jar_products product."""
+    ivy_products = self.context.products.get_data('ivy_jar_products', lambda: defaultdict(list))
+    for conf, new_ivyinfos in new_ivy_products.items():
+      ivy_products[conf] += new_ivyinfos
 
   def _generate_ivy_report(self, targets):
     def make_empty_report(report, organisation, module, conf):

@@ -79,10 +79,26 @@ class IvyInfo(object):
     memo[ref] = acc
     return acc
 
+  def get_modules_for_jar_library(self, jar_library, memo=None):
+    """Collects artifact paths for the passed jar_library.
+
+    This method is transitive in terms of the library's jar_dependencies, but will NOT
+    walk into its non-jar dependencies.
+
+    :param jar_library A JarLibrary to collect the transitive artifacts for.
+    :param memo see `traverse_dependency_graph`
+    """
+    modules = OrderedDict()
+    for jar in jar_library.jar_dependencies:
+      for module_ref in self.get_jars_for_ivy_module(jar, memo=memo):
+        mbr = self.modules_by_ref[module_ref]
+        modules[mbr.ref] = mbr
+    return modules.values()
+
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar
     :param jar an IvyModuleRef for a third party dependency.
-    :param memo a dict of ref -> set that memoizes dependencies for each ref as they are resolved.
+    :param memo see `traverse_dependency_graph`
     """
 
     ref = jar
