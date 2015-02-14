@@ -80,11 +80,17 @@ class VersionedTarget(VersionedTargetSet):
     self.id = target.id
 
 
-# The result of calling check() on a CacheManager.
-# Each member is a list of VersionedTargetSet objects in topological order.
-# Tasks may need to perform no, some or all operations on either of these, depending on how they
-# are implemented.
+
 class InvalidationCheck(object):
+  """The result of calling check() on a CacheManager.
+
+  Each member is a list of VersionedTargetSet objects.  Sorting of the targets depends
+  on how you order the InvalidationCheck from the InvalidationCacheManager.
+
+  Tasks may need to perform no, some or all operations on either of these, depending on how they
+  are implemented.
+  """
+
   @classmethod
   def _partition_versioned_targets(cls, versioned_targets, partition_size_hint, vt_colors=None):
     """Groups versioned targets so that each group has roughly the same number of sources.
