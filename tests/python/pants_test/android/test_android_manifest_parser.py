@@ -78,7 +78,7 @@ class TestAndroidManifestParser(unittest.TestCase):
                          'com.pants.examples.hello')
 
   def test_weird_package_name(self):
-      # Should accept unexpected package names, the info gets verified in classes that consume it.
+    # Should accept unexpected package names, the info gets verified in classes that consume it.
     with self.android_manifest(package_value='cola') as manifest:
       self.assertEqual(AndroidManifestParser.get_package_name(manifest), 'cola')
 

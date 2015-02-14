@@ -22,12 +22,12 @@ class AndroidManifestParser(object):
     try:
       manifest_element = parse(manifest).getElementsByTagName('manifest')
       if not manifest_element:
-        raise cls.BadManifestError('There is no \'manifest\' element in '
-                                   'manifest at: {0}'.format(manifest))
+        raise cls.BadManifestError("There is no 'manifest' element in "
+                                   "manifest at: {0}".format(manifest))
       package_name = manifest_element[0].getAttribute('package')
       if not package_name:
-        raise cls.BadManifestError('There is no \'package\' attribute in manifest '
-                                   'at: {0}'.format(manifest))
+        raise cls.BadManifestError("There is no 'package' attribute in manifest "
+                                   "at: {0}".format(manifest))
     except ExpatError as e:
       raise cls.BadManifestError("AndroidManifest at {0}: {1}".format(manifest, e))
     return package_name
@@ -38,26 +38,26 @@ class AndroidManifestParser(object):
     try:
       sdk_element = parse(manifest).getElementsByTagName('uses-sdk')
       if not sdk_element:
-        raise cls.BadManifestError('There is no \'uses-sdk\' element in '
-                                   'manifest at: {0}'.format(manifest))
+        raise cls.BadManifestError("There is no 'uses-sdk' element in "
+                                   "manifest at: {0}".format(manifest))
       target_sdk = sdk_element[0].getAttribute('android:targetSdkVersion')
       # 'android:bad_value' returns an empty string so that must be explicitly checked.
-      if target_sdk in (None, ''):
-        raise cls.BadManifestError('There is no \'android:targetSdkVersion\' attribute in '
-                                   'manifest at: {0}'.format(manifest))
+      if not target_sdk:
+        raise cls.BadManifestError("There is no 'android:targetSdkVersion' attribute in "
+                                   "manifest at: {0}".format(manifest))
     except ExpatError as e:
-      raise cls.BadManifestError(" Problem with AndroidManifest at {0}: {1}".format(manifest, e))
+      raise cls.BadManifestError('Problem with AndroidManifest at {0}: {1}'.format(manifest, e))
     return target_sdk
 
   @classmethod
   def get_app_name(cls, manifest):
     """Return a string with the application name of the package or return None on failure."""
-    # This is used to provide a folder name. Failure returns None and is handled by the consumer.
+    # Failure returns None and is handled by the consumer.
     try:
       activity_element = parse(manifest).getElementsByTagName('activity')
       package_name = activity_element[0].getAttribute('android:name')
       # The parser returns an empty string if it locates 'android' but cannot find 'name'.
-      if package_name not in (None, ''):
+      if package_name:
         return package_name.split(".")[-1]
       return None
     # We can swallow exceptions since this method has a fallback value.
