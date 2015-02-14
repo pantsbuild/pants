@@ -91,8 +91,7 @@ class IvyInfo(object):
     modules = OrderedDict()
     for jar in jar_library.jar_dependencies:
       for module_ref in self.get_jars_for_ivy_module(jar, memo=memo):
-        mbr = self.modules_by_ref[module_ref]
-        modules[mbr.ref] = mbr
+        modules[module_ref] = self.modules_by_ref[module_ref]
     return modules.values()
 
   def get_jars_for_ivy_module(self, jar, memo=None):

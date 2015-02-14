@@ -128,7 +128,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     )
 
     # Record the ordered subset of jars that each jar_library/leaf depends on.
-    ivy_jar_products = self._generate_ivy_jar_products(targets)
+    ivy_jar_products = self._generate_ivy_jar_products(relevant_targets)
     for conf in self.confs:
       ivy_jar_memo = {}
       ivy_info = ivy_jar_products[conf]
@@ -136,14 +136,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         continue
       # TODO: refactor ivy_jar_products to remove list
       ivy_info = ivy_info[0]
-      for target in targets:
+      for target in relevant_targets:
         if not isinstance(target, JarLibrary):
           continue
         # add the artifacts from each module
-        artifacts = list()
+        artifact_paths = list()
         for module in ivy_info.get_modules_for_jar_library(target, memo=ivy_jar_memo):
-          artifact_paths = map(lambda a: a.path, module.artifacts)
-          compile_classpath.add_for_target(target, map(lambda entry: (conf, entry), artifacts))
+          artifact_paths += map(lambda a: a.path, module.artifacts)
+        compile_classpath.add_for_target(target, map(lambda entry: (conf, entry), artifact_paths))
 
     if self._report:
       self._generate_ivy_report(relevant_targets)
