@@ -9,5 +9,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/goal',
   ],
 )

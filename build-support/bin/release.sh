@@ -24,7 +24,7 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
+  pip install --quiet ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
   execute_packaged_pants_with_internal_backends list src:: && \
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
      == "$(local_version)" ]]
@@ -37,7 +37,7 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) \
+  pip install --quiet ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) \
     --allow-external antlr-python-runtime --allow-unverified antlr-python-runtime && \
   python -c "import pants_test"
 }
@@ -63,7 +63,7 @@ function run_local_pants() {
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
 function execute_packaged_pants_with_internal_backends() {
-  pip install --ignore-installed \
+  pip --quiet install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   pants "$@"
 }
