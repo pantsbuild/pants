@@ -306,9 +306,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     all_targets = list(itertools.chain(*chunks))
 
     # Update the classpath for us and for downstream tasks.
-    compile_classpath = self.context.products.get_data('compile_classpath')
+    compile_classpaths = self.context.products.get_data('compile_classpath')
     for conf in self._confs:
-      compile_classpath.add_for_targets(all_targets, [(conf, self._classes_dir), (conf, self._resources_dir)])
+      compile_classpaths.add_for_targets(all_targets, [(conf, self._classes_dir), (conf, self._resources_dir)])
 
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
@@ -368,7 +368,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       for conf in self._confs:
         for jar in self.extra_compile_time_classpath_elements():
            yield (conf, jar)
-    # TODO: similar helper for getting an aggregate?
     compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
     compile_classpath = OrderedSet(list(extra_compile_classpath_iter()) + list(compile_classpath))
 

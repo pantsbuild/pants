@@ -118,8 +118,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
     # After running ivy, we need to take the resulting classpath, and load it into
     # the build products.
-    # FIXME: ivy_classpath is now ignored
-    ivy_classpath, relevant_targets = self.ivy_resolve(
+    # FIXME: 2) not using stable symlinks for artifacts.
+    _, relevant_targets = self.ivy_resolve(
       targets,
       executor=executor,
       workunit_name='ivy-resolve',

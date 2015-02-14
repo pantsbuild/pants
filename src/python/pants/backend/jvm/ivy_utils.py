@@ -80,17 +80,19 @@ class IvyInfo(object):
     return acc
 
   def get_modules_for_jar_library(self, jar_library, memo=None):
-    """Collects artifact paths for the passed jar_library.
+    """Collects IvyModule instances for the passed jar_library.
 
-    This method is transitive in terms of the library's jar_dependencies, but will NOT
+    This method is transitive within the library's jar_dependencies, but will NOT
     walk into its non-jar dependencies.
 
-    :param jar_library A JarLibrary to collect the transitive artifacts for.
+    :param jar_library A JarLibrary to collect the transitive modules for.
     :param memo see `traverse_dependency_graph`
     """
     modules = OrderedDict()
+    def create_collection(dep):
+      return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      for module_ref in self.get_jars_for_ivy_module(jar, memo=memo):
+      for module_ref in self.traverse_dependency_graph(jar, create_collection, memo):
         modules[module_ref] = self.modules_by_ref[module_ref]
     return modules.values()
 
