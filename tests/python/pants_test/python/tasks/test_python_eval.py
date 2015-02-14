@@ -16,7 +16,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.util.dirutil import safe_mkdir, touch
+from pants.util.dirutil import safe_mkdir
 from pants_test.tasks.test_base import TaskTest
 
 
@@ -71,7 +71,7 @@ class PythonEvalTest(TaskTest):
 
     SourceRoot.register('src', PythonBinary, PythonLibrary)
 
-    self.a = self.create_python_library('src/foo', 'a', 'a.py', dedent("""
+    self.foo_library = self.create_python_library('src/foo', 'a', 'a.py', dedent("""
     import inspect
 
 
@@ -81,7 +81,7 @@ class PythonEvalTest(TaskTest):
       return cls
     """))
 
-    self.b = self.create_python_library('src/bar', 'b', 'b.py', dedent("""
+    self.bar_library = self.create_python_library('src/bar', 'b', 'b.py', dedent("""
     from foo.a import compile_time_check_decorator
 
 
@@ -90,7 +90,7 @@ class PythonEvalTest(TaskTest):
       pass
     """))
 
-    self.c = self.create_python_library('src/baz', 'c', 'c.py', dedent("""
+    self.baz_library = self.create_python_library('src/baz', 'c', 'c.py', dedent("""
     from foo.a import compile_time_check_decorator
 
 
@@ -110,7 +110,7 @@ class PythonEvalTest(TaskTest):
       """))
     self.fix_c_source = fix_c_source
 
-    self.d = self.create_python_library('src/egg', 'd', 'd.py', dedent("""
+    self.egg_library = self.create_python_library('src/egg', 'd', 'd.py', dedent("""
     from foo.a import compile_time_check_decorator
 
 
@@ -119,12 +119,15 @@ class PythonEvalTest(TaskTest):
       pass
     """), dependencies=['//src/foo:a'])
 
-    self.e = self.create_python_binary('src/spam', 'e', 'foo.a', dependencies=['//src/foo:a'])
-    self.f = self.create_python_binary('src/tang', 'f', 'foo.a:compile_time_check_decorator',
-                                       dependencies=['//src/foo:a'])
-    self.g = self.create_python_binary('src/elderberries', 'g', 'foo.a:does_not_exist',
-                                       dependencies=['//src/foo:a'])
-    self.h = self.create_python_binary('src/poprockz', 'h', 'foo.a')
+    self.spam_binary = self.create_python_binary('src/spam', 'e', 'foo.a',
+                                                 dependencies=['//src/foo:a'])
+    self.tang_binary = self.create_python_binary('src/tang', 'f',
+                                                 'foo.a:compile_time_check_decorator',
+                                                 dependencies=['//src/foo:a'])
+    self.elerberries_binary = self.create_python_binary('src/elderberries', 'g',
+                                                        'foo.a:does_not_exist',
+                                                        dependencies=['//src/foo:a'])
+    self.poprockz_binary = self.create_python_binary('src/poprockz', 'h', 'foo.a')
 
   def tearDown(self):
     SourceRoot.reset()
@@ -137,20 +140,20 @@ class PythonEvalTest(TaskTest):
     self.assertEqual([], compiled)
 
   def test_compile(self):
-    python_eval = self.prepare_task(targets=[self.a],
+    python_eval = self.prepare_task(targets=[self.foo_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
     compiled = python_eval.execute()
-    self.assertEqual([self.a], compiled)
+    self.assertEqual([self.foo_library], compiled)
 
   def test_compile_incremental(self):
-    python_eval = self.prepare_task(targets=[self.a],
+    python_eval = self.prepare_task(targets=[self.foo_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
     compiled = python_eval.execute()
-    self.assertEqual([self.a], compiled)
+    self.assertEqual([self.foo_library], compiled)
 
-    python_eval = self.prepare_task(targets=[self.a],
+    python_eval = self.prepare_task(targets=[self.foo_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
     compiled = python_eval.execute()
@@ -158,106 +161,106 @@ class PythonEvalTest(TaskTest):
 
   def test_compile_closure(self):
     python_eval = self.prepare_task(args=['--test-closure'],
-                                    targets=[self.d],
+                                    targets=[self.egg_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
     compiled = python_eval.execute()
-    self.assertEqual({self.d, self.a}, set(compiled))
+    self.assertEqual({self.egg_library, self.foo_library}, set(compiled))
 
   def test_compile_fail_closure(self):
     python_eval = self.prepare_task(args=['--test-closure'],
-                                    targets=[self.c],
+                                    targets=[self.baz_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(TaskError) as e:
       python_eval.execute()
-    self.assertEqual([self.a], e.exception.compiled)
-    self.assertEqual([self.c], e.exception.failed)
+    self.assertEqual([self.foo_library], e.exception.compiled)
+    self.assertEqual([self.baz_library], e.exception.failed)
 
   def test_compile_incremental_progress(self):
     python_eval = self.prepare_task(args=['--test-closure'],
-                                    targets=[self.c],
+                                    targets=[self.baz_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(TaskError) as e:
       python_eval.execute()
-    self.assertEqual([self.a], e.exception.compiled)
-    self.assertEqual([self.c], e.exception.failed)
+    self.assertEqual([self.foo_library], e.exception.compiled)
+    self.assertEqual([self.baz_library], e.exception.failed)
 
     self.fix_c_source()
     python_eval = self.prepare_task(args=['--test-closure'],
-                                    targets=[self.c],
+                                    targets=[self.baz_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     compiled = python_eval.execute()
-    self.assertEqual([self.c], compiled)
+    self.assertEqual([self.baz_library], compiled)
 
   def test_compile_fail_missing_build_dep(self):
-    python_eval = self.prepare_task(targets=[self.b],
+    python_eval = self.prepare_task(targets=[self.bar_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(python_eval.Error) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
-    self.assertEqual([self.b], e.exception.failed)
+    self.assertEqual([self.bar_library], e.exception.failed)
 
   def test_compile_fail_compile_time_check_decorator(self):
-    python_eval = self.prepare_task(targets=[self.c],
+    python_eval = self.prepare_task(targets=[self.baz_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(TaskError) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
-    self.assertEqual([self.c], e.exception.failed)
+    self.assertEqual([self.baz_library], e.exception.failed)
 
   def test_compile_failslow(self):
     python_eval = self.prepare_task(args=['--test-fail-slow'],
-                                    targets=[self.a, self.c, self.d],
+                                    targets=[self.foo_library, self.baz_library, self.egg_library],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(TaskError) as e:
       python_eval.execute()
-    self.assertEqual({self.a, self.d}, set(e.exception.compiled))
-    self.assertEqual([self.c], e.exception.failed)
+    self.assertEqual({self.foo_library, self.egg_library}, set(e.exception.compiled))
+    self.assertEqual([self.baz_library], e.exception.failed)
 
   def test_entry_point_module(self):
-    python_eval = self.prepare_task(targets=[self.e],
+    python_eval = self.prepare_task(targets=[self.spam_binary],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     compiled = python_eval.execute()
-    self.assertEqual([self.e], compiled)
+    self.assertEqual([self.spam_binary], compiled)
 
   def test_entry_point_function(self):
-    python_eval = self.prepare_task(targets=[self.f],
+    python_eval = self.prepare_task(targets=[self.tang_binary],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     compiled = python_eval.execute()
-    self.assertEqual([self.f], compiled)
+    self.assertEqual([self.tang_binary], compiled)
 
   def test_entry_point_does_not_exist(self):
-    python_eval = self.prepare_task(targets=[self.g],
+    python_eval = self.prepare_task(targets=[self.elerberries_binary],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(TaskError) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
-    self.assertEqual([self.g], e.exception.failed)
+    self.assertEqual([self.elerberries_binary], e.exception.failed)
 
   def test_entry_point_missing_build_dep(self):
-    python_eval = self.prepare_task(targets=[self.h],
+    python_eval = self.prepare_task(targets=[self.poprockz_binary],
                                     build_graph=self.build_graph,
                                     build_file_parser=self.build_file_parser)
 
     with self.assertRaises(TaskError) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
-    self.assertEqual([self.h], e.exception.failed)
+    self.assertEqual([self.poprockz_binary], e.exception.failed)
