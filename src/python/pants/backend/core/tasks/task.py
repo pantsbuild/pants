@@ -287,6 +287,7 @@ class TaskBase(AbstractClass):
     :returns: Yields an InvalidationCheck object reflecting the (partitioned) targets.
     :rtype: InvalidationCheck
     """
+
     # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
@@ -341,10 +342,6 @@ class TaskBase(AbstractClass):
         if num_invalid_partitions > 1:
           msg_elements.append(' in %d target partitions' % num_invalid_partitions)
         msg_elements.append('.')
-        if self.context.options.for_global_scope().show_invalid_targets:
-          msg_elements.append('\n')
-          for t in targets:
-            msg_elements.append("  {0}\n".format(t.address.spec))
         self.context.log.info(*msg_elements)
 
     # Yield the result, and then mark the targets as up to date.
