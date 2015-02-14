@@ -340,6 +340,12 @@ class TaskBase(AbstractClass):
         if num_invalid_partitions > 1:
           msg_elements.append(' in %d target partitions' % num_invalid_partitions)
         msg_elements.append('.')
+        global_options = self.context.options.for_global_scope()
+        if 'show_invalid_targets' in global_options:  # not True when running tests
+          if global_options.show_invalid_targets:
+            msg_elements.append('\n')
+            for t in targets:
+              msg_elements.append("  {0}\n".format(t.address.spec))
         self.context.log.info(*msg_elements)
 
     # Yield the result, and then mark the targets as up to date.

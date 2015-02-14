@@ -36,6 +36,8 @@ def create_options(options):
           self.__dict__ = options[scope]
         def __getitem__(self, key):
           return getattr(self, key)
+        def __contains__(self, key):
+          return key in options[scope]
       return TestOptionValues()
 
     def for_global_scope(self):
@@ -43,6 +45,7 @@ def create_options(options):
 
     def __getitem__(self, key):
       return self.for_scope(key)
+
   return TestOptions()
 
 
