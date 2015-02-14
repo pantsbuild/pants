@@ -21,6 +21,16 @@ from pants.util.contextutil import temporary_file
 
 
 class PythonEval(PythonTask):
+  class Error(TaskError):
+    """A richer failure exception type useful for tests."""
+
+    def __init__(self, *args, **kwargs):
+      compiled = kwargs.pop('compiled')
+      failed = kwargs.pop('failed')
+      super(PythonEval.Error, self).__init__(*args, **kwargs)
+      self.compiled = compiled
+      self.failed = failed
+
   _EVAL_TEMPLATE_PATH = os.path.join('templates', 'python_eval', 'eval.py.mustache')
 
   @staticmethod
@@ -46,7 +56,7 @@ class PythonEval(PythonTask):
   def _compile_targets(self, invalid_vts):
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
       compiled = []
-      failures = []
+      failed = []
       for vt in invalid_vts:
         target = vt.target
         returncode = self._compile_target(target)
@@ -55,15 +65,17 @@ class PythonEval(PythonTask):
           compiled.append(target)
         else:
           if self.get_options().fail_slow:
-            failures.append(target)
+            failed.append(target)
           else:
-            raise TaskError('Failed to eval {}'.format(target.address.spec))
+            raise self.Error('Failed to eval {}'.format(target.address.spec),
+                             compiled=compiled,
+                             failed=[target])
 
-      if failures:
+      if failed:
         msg = 'Failed to evaluate {} targets:\n  {}'.format(
-          len(failures),
-          '\n  '.join(t.address.spec for t in failures))
-        raise TaskError(msg)
+          len(failed),
+          '\n  '.join(t.address.spec for t in failed))
+        raise self.Error(msg, compiled=compiled, failed=failed)
 
       return compiled
 
@@ -72,8 +84,15 @@ class PythonEval(PythonTask):
       modules = []
       if isinstance(target, PythonBinary):
         source = 'entrypoint {}'.format(target.entry_point)
-        module = target.entry_point.rsplit(':', 1)[0]
-        modules.append(TemplateData(source=source, module=module))
+        components = target.entry_point.rsplit(':', 1)
+        module = components[0]
+        if len(components) == 2:
+          function = components[1]
+          data = TemplateData(source=source,
+                              import_statement='from {} import {}'.format(module, function))
+        else:
+          data = TemplateData(source=source, import_statement='import {}'.format(module))
+        modules.append(data)
       else:
         for path in target.sources_relative_to_source_root():
           if path.endswith('.py'):
@@ -83,7 +102,8 @@ class PythonEval(PythonTask):
               module_path, _ = os.path.splitext(path)
             source = 'file {}'.format(os.path.join(target.target_base, path))
             module = module_path.replace(os.path.sep, '.')
-            modules.append(TemplateData(source=source, module=module))
+            data = TemplateData(source=source, import_statement='import {}'.format(module))
+            modules.append(data)
 
       if not modules:
         # Nothing to eval, so a trivial compile success.

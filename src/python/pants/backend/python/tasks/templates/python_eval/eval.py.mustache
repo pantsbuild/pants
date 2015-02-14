@@ -32,7 +32,7 @@ if __name__ == '__main__':
   # TODO(John Sirois): Consider collecting all import errors before exiting non-zero.
   {{#modules}}
   try:
-    import {{module}}
+    {{import_statement}}
   except ImportError as e:
     log()
     log("Failed to eval '{{source}}':")
