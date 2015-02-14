@@ -65,3 +65,5 @@ def register_global_options(register):
            default=10 * 365 * 86400,  # 10 years.
            help='the time in seconds before we consider re-resolving an open-ended '
                 'requirement, e.g. "flask>=0.2" if a matching distribution is available on disk.')
+  register('--show-invalid-targets', action='store_true',
+           help='When targets are invalidated by the cache manager, print them to the console.')
