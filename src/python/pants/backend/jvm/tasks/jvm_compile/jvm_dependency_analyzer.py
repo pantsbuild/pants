@@ -28,15 +28,17 @@ class JvmDependencyAnalyzer(object):
                target_whitelist):
 
     self._context = context
-    self._context.products.require_data('classes_by_target')
-    self._context.products.require_data('ivy_jar_products')
-
     self._check_missing_deps = check_missing_deps
     self._check_missing_direct_deps = check_missing_direct_deps
     self._check_unnecessary_deps = check_unnecessary_deps
 
     # These targets we will not report as having any dependency issues even if they do.
     self._target_whitelist = OrderedSet(target_whitelist)
+
+  @classmethod
+  def prepare(clsc, options, round_manager):
+    round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('ivy_resolve_symlink_map')
 
   def _compute_targets_by_file(self):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
@@ -79,7 +81,7 @@ class JvmDependencyAnalyzer(object):
     # Compute jar -> target.
     with self._context.new_workunit(name='map_jars'):
       with IvyTaskMixin.symlink_map_lock:
-        all_symlinks_map = self._context.products.get_data('symlink_map').copy()
+        all_symlinks_map = self._context.products.get_data('ivy_resolve_symlink_map').copy()
         # We make a copy, so it's safe to use outside the lock.
 
       def register_transitive_jars_for_ref(ivyinfo, ref):
