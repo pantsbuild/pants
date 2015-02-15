@@ -47,6 +47,13 @@ def deprecated(removal_version, hint_message=None):
   A removal version must be supplied and it must be greater than the current 'pantsbuild.pants'
   version.
 
+  When choosing a removal version there is a natural tension between the code-base, which benefits
+  from short deprecation cycles, and the user-base which may prefer to deal with deprecations less
+  frequently.  As a rule of thumb, if the hint message can fully convey corrective action
+  succinctly and you judge the impact to be on the small side (effects custom tasks as opposed to
+  effecting BUILD files), lean towards the next release version as the removal version; otherwise,
+  consider initiating a discussion to win consensus on a reasonable removal version.
+
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated
                               function.
   :param str hint_message: An optional hint pointing to alternatives to the deprecation.
