@@ -19,7 +19,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir([
           'compile', 'testprojects/src/java/com/pants/testproject/cycle1'], workdir)
       self.assert_failure(pants_run)
-      self.assertTrue('CycleException' in pants_run.stderr_data)
+      self.assertIn('Cycle detected', pants_run.stderr_data)
 
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
@@ -52,7 +52,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
         'examples/src/scala::'
     ])
     self.assert_failure(pants_run)
-    self.assertTrue('Unrecognized option: -blablabla' in pants_run.stdout_data)
+    self.assertIn('Unrecognized option: -blablabla', pants_run.stdout_data)
 
   def test_ivy_confs_success(self):
     pants_run = self.run_pants([
