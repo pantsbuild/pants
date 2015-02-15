@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import json
 import os
 from collections import defaultdict
 
@@ -39,10 +38,6 @@ class ZincAnalysisElement(object):
 
   # The section names for the sections in this element. Subclasses override.
   headers = ()
-
-  @classmethod
-  def from_json_obj(cls, obj):
-    return cls([obj[header] for header in cls.headers])
 
   def __init__(self, args):
     # self.args is a list of maps from key to list of values. Each map corresponds to a
@@ -136,7 +131,7 @@ class ZincAnalysis(Analysis):
 
   # Implementation of class method required by Analysis.
 
-  FORMAT_VERSION_LINE = 'format version: 4\n'
+  FORMAT_VERSION_LINE = 'format version: 5\n'
 
   @staticmethod
   def merge_dicts(dicts):
@@ -152,6 +147,10 @@ class ZincAnalysis(Analysis):
   @classmethod
   def merge(cls, analyses):
     # Note: correctly handles "internalizing" external deps that must be internal post-merge.
+
+    # "Merge" compile setup. We assume that all merged analyses have the same setup, so we just take the
+    # setup of the first analysis. TODO: Validate that all analyses have the same setup.
+    compile_setup = analyses[0].compile_setup if len(analyses) > 0 else CompileSetup((defaultdict(list), ))
 
     # Merge relations.
     src_prod = ZincAnalysis.merge_dicts([a.relations.src_prod for a in analyses])
@@ -235,38 +234,37 @@ class ZincAnalysis(Analysis):
       compilations_dict['%03d' % i] = [v]
     compilations = Compilations((compilations_dict, ))
 
-    compile_setup = analyses[0].compile_setup if len(analyses) > 0 else CompileSetup((defaultdict(list), ))
-    return ZincAnalysis(relations, stamps, apis, source_infos, compilations, compile_setup)
+    return ZincAnalysis(compile_setup, relations, stamps, apis, source_infos, compilations)
 
-  def __init__(self, relations, stamps, apis, source_infos, compilations, compile_setup):
-    (self.relations, self.stamps, self.apis, self.source_infos, self.compilations, self.compile_setup) = \
-      (relations, stamps, apis, source_infos, compilations, compile_setup)
+  def __init__(self, compile_setup, relations, stamps, apis, source_infos, compilations):
+    (self.compile_setup, self.relations, self.stamps, self.apis, self.source_infos, self.compilations) = \
+      (compile_setup, relations, stamps, apis, source_infos, compilations)
 
   def diff(self, other):
     """Returns a list of element diffs, one per element where self and other differ."""
     element_diffs = []
     for self_elem, other_elem in zip(
-            (self.relations, self.stamps, self.apis, self.source_infos,
-             self.compilations, self.compile_setup),
-            (other.relations, other.stamps, other.apis, other.source_infos,
-             other.compilations, other.compile_setup)):
+            (self.compile_setup, self.relations, self.stamps, self.apis,
+             self.source_infos, self.compilations),
+            (other.compile_setup, other.relations, other.stamps, other.apis,
+             other.source_infos, other.compilations)):
       element_diff = self_elem.diff(other_elem)
       if element_diff.is_different():
         element_diffs.append(element_diff)
     return element_diffs
 
   def __eq__(self, other):
-    return (self.relations, self.stamps, self.apis, self.source_infos,
-            self.compilations, self.compile_setup) == \
-           (other.relations, other.stamps, other.apis, other.source_infos,
-            other.compilations, other.compile_setup)
+    return ((self.compile_setup, self.relations, self.stamps, self.apis,
+             self.source_infos, self.compilations) ==
+            (other.compile_setup, other.relations, other.stamps, other.apis,
+             other.source_infos, other.compilations))
 
   def __ne__(self, other):
     return not self.__eq__(other)
 
   def __hash__(self):
-    return hash((self.relations, self.stamps, self.apis, self.source_infos,
-                 self.compilations, self.compile_setup))
+    return hash((self.compile_setup, self.relations, self.stamps, self.apis,
+                 self.source_infos, self.compilations))
 
   # Implementation of methods required by Analysis.
 
@@ -373,18 +371,18 @@ class ZincAnalysis(Analysis):
 
     analyses = []
     for relations, stamps, apis, source_infos in zip(relations_splits, stamps_splits, apis_splits, source_info_splits):
-      analyses.append(ZincAnalysis(relations, stamps, apis, source_infos, self.compilations, self.compile_setup))
+      analyses.append(ZincAnalysis(self.compile_setup, relations, stamps, apis, source_infos, self.compilations))
 
     return analyses
 
   def write(self, outfile, rebasings=None):
     outfile.write(ZincAnalysis.FORMAT_VERSION_LINE)
+    self.compile_setup.write(outfile, inline_vals=True, rebasings=rebasings)
     self.relations.write(outfile, rebasings=rebasings)
     self.stamps.write(outfile, rebasings=rebasings)
     self.apis.write(outfile, inline_vals=False, rebasings=rebasings)
     self.source_infos.write(outfile, inline_vals=False, rebasings=rebasings)
     self.compilations.write(outfile, inline_vals=True, rebasings=rebasings)
-    self.compile_setup.write(outfile, inline_vals=True, rebasings=rebasings)
 
   # Extra methods on this class only.
 
@@ -393,19 +391,9 @@ class ZincAnalysis(Analysis):
   # will be replaced with random base64 strings. So these are useful for testing analysis parsing,
   # splitting and merging, but not for actually reading into Zinc.
   def anonymize(self, anonymizer):
-    for element in [self.relations, self.stamps, self.apis, self.source_infos,
-                    self.compilations, self.compile_setup]:
+    for element in [self.compile_setup, self.relations, self.stamps, self.apis,
+                    self.source_infos, self.compilations]:
       element.anonymize(anonymizer)
-
-  # Write this analysis to JSON.
-  def write_json_to_path(self, outfile_path):
-    with open(outfile_path, 'w') as outfile:
-      self.write_json(outfile)
-
-  def write_json(self, outfile):
-    obj = dict(zip(('relations', 'stamps', 'apis', 'source_infos', 'compilations', 'compile_setup'),
-                     (self.relations, self.stamps, self.apis, self.source_infos, self.compilations, self.compile_setup)))
-    json.dump(obj, outfile, cls=ZincAnalysisJSONEncoder, sort_keys=True, indent=2)
 
   def _split_dict(self, d, splits):
     """Split a dict by its keys.
@@ -421,6 +409,24 @@ class ZincAnalysis(Analysis):
           dict_split[f] = d[f]
       ret.append(dict_split)
     return ret
+
+
+class CompileSetup(ZincAnalysisElement):
+  headers = ('output mode', 'output directories','compile options','javac options',
+             'compiler version', 'compile order', 'name hashing')
+
+  def __init__(self, args):
+    super(CompileSetup, self).__init__(args)
+    (self.output_mode, self.output_dirs, self.compile_options, self.javac_options,
+     self.compiler_version, self.compile_order, self.name_hashing) = self.args
+
+  def anonymize(self, anonymizer):
+    self.anonymize_values(anonymizer, self.output_dirs)
+    for k, vs in list(self.compile_options.items()):  # Make a copy, so we can del as we go.
+      # Remove mentions of custom plugins.
+      for v in vs:
+        if v.startswith('-Xplugin') or v.startswith('-P'):
+          del self.compile_options[k]
 
 
 class Relations(ZincAnalysisElement):
@@ -513,37 +519,3 @@ class Compilations(ZincAnalysisElement):
 
   def anonymize(self, anonymizer):
     pass
-
-
-class CompileSetup(ZincAnalysisElement):
-  headers = ('output mode', 'output directories','compile options','javac options',
-             'compiler version', 'compile order')
-
-  def __init__(self, args):
-    super(CompileSetup, self).__init__(args)
-    (self.output_mode, self.output_dirs, self.compile_options, self.javac_options,
-     self.compiler_version, self.compile_order) = self.args
-
-  def anonymize(self, anonymizer):
-    self.anonymize_values(anonymizer, self.output_dirs)
-    for k, vs in list(self.compile_options.items()):  # Make a copy, so we can del as we go.
-      # Remove mentions of custom plugins.
-      for v in vs:
-        if v.startswith('-Xplugin') or v.startswith('-P'):
-          del self.compile_options[k]
-
-
-class ZincAnalysisJSONEncoder(json.JSONEncoder):
-  """A custom encoder for writing analysis elements as JSON.
-
-  Not currently used, but might be useful in the future, e.g., for creating javascript-y
-  analysis browsing tools.
-  """
-  def default(self, obj):
-    if isinstance(obj, ZincAnalysisElement):
-      ret = {}
-      for h, a in zip(type(obj).headers, obj.args):
-        ret[h] = a
-      return ret
-    else:
-      super(ZincAnalysisJSONEncoder, self).default(obj)

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
 import os
 import re
 from collections import defaultdict
@@ -30,13 +29,13 @@ class ZincAnalysisParser(AnalysisParser):
       return cls(parsed_sections)
 
     self._verify_version(infile)
+    compile_setup = parse_element(CompileSetup)
     relations = parse_element(Relations)
     stamps = parse_element(Stamps)
     apis = parse_element(APIs)
     source_infos = parse_element(SourceInfos)
     compilations = parse_element(Compilations)
-    compile_setup = parse_element(CompileSetup)
-    return ZincAnalysis(relations, stamps, apis, source_infos, compilations, compile_setup)
+    return ZincAnalysis(compile_setup, relations, stamps, apis, source_infos, compilations)
 
   def parse_products(self, infile):
     """An efficient parser of just the products section."""
@@ -66,24 +65,6 @@ class ZincAnalysisParser(AnalysisParser):
     for d in [filtered_bin_deps, src_deps, transformed_ext_deps]:
       ret.update(d)
     return ret
-
-  # Extra zinc-specific methods re json.
-
-  def parse_json_from_path(self, infile_path):
-    """Parse a ZincAnalysis instance from a JSON file."""
-    with open(infile_path, 'r') as infile:
-      return self.parse_from_json(infile)
-
-  def parse_from_json(self, infile):
-    """Parse a ZincAnalysis instance from an open JSON file."""
-    obj = json.load(infile)
-    relations = Relations.from_json_obj(obj['relations'])
-    stamps = Stamps.from_json_obj(obj['stamps'])
-    apis = APIs.from_json_obj(obj['apis'])
-    source_infos = SourceInfos.from_json_obj(obj['source infos'])
-    compilations = Compilations.from_json_obj(obj['compilations'])
-    compile_setup = Compilations.from_json_obj(obj['compile setup'])
-    return ZincAnalysis(relations, stamps, apis, source_infos, compilations, compile_setup)
 
   def _find_repeated_at_header(self, lines_iter, header):
     header_line = header + ':\n'
