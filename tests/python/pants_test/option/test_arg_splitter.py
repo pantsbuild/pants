@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import shlex
 import unittest
@@ -15,7 +15,8 @@ class ArgSplitterTest(unittest.TestCase):
   _known_scopes = ['compile', 'compile.java', 'compile.scala', 'test', 'test.junit']
 
   def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
-             expected_passthru=None, expected_passthru_owner=None, expected_is_help=False):
+             expected_passthru=None, expected_passthru_owner=None,
+             expected_is_help=False, expected_help_advanced=False, expected_help_all=False):
     expected_passthru = expected_passthru or []
     splitter = ArgSplitter(ArgSplitterTest._known_scopes)
     args = shlex.split(str(args_str))
@@ -25,12 +26,19 @@ class ArgSplitterTest(unittest.TestCase):
     self.assertEquals(expected_target_specs, target_specs)
     self.assertEquals(expected_passthru, passthru)
     self.assertEquals(expected_passthru_owner, passthru_owner)
-    self.assertEquals(expected_is_help, splitter.is_help)
+    self.assertEquals(expected_is_help, splitter.help_request is not None)
+    self.assertEquals(expected_help_advanced,
+                      splitter.help_request is not None and splitter.help_request.advanced)
+    self.assertEquals(expected_help_all,
+                      splitter.help_request is not None and splitter.help_request.all_scopes)
 
   def _split_help(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
-                  expected_passthru=None, expected_passthru_owner=None):
+                  expected_help_advanced=False, expected_help_all=False):
     self._split(args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
-                expected_passthru, expected_passthru_owner, expected_is_help=True)
+                expected_passthru=None, expected_passthru_owner=None,
+                expected_is_help=True,
+                expected_help_advanced=expected_help_advanced,
+                expected_help_all=expected_help_all)
 
   def test_arg_splitting(self):
     # Various flag combos.
@@ -102,19 +110,36 @@ class ArgSplitterTest(unittest.TestCase):
     self._split_help('./pants goal', [], {'': []}, [])
     self._split_help('./pants -f', [], {'': ['-f']}, [])
     self._split_help('./pants goal -f', [], {'': ['-f']}, [])
-    self._split_help('./pants help', [], {'': []}, [], [])
-    self._split_help('./pants goal help', [], {'': []}, [], [])
-    self._split_help('./pants -h', [], {'': []}, [], [])
-    self._split_help('./pants goal -h', [], {'': []}, [], [])
-    self._split_help('./pants --help', [], {'': []}, [], [])
-    self._split_help('./pants goal --help', [], {'': []}, [], [])
+    self._split_help('./pants help', [], {'': []}, [])
+    self._split_help('./pants goal help', [], {'': []}, [])
+    self._split_help('./pants -h', [], {'': []}, [])
+    self._split_help('./pants goal -h', [], {'': []}, [])
+    self._split_help('./pants --help', [], {'': []}, [])
+    self._split_help('./pants goal --help', [], {'': []}, [])
     self._split_help('./pants help compile -x', ['compile'],
-                {'': [], 'compile': ['-x']}, [], [])
+                {'': [], 'compile': ['-x']}, [])
     self._split_help('./pants help compile -x', ['compile'],
-                {'': [], 'compile': ['-x']}, [], [])
+                {'': [], 'compile': ['-x']}, [])
     self._split_help('./pants compile -h', ['compile'],
-                {'': [], 'compile': []}, [], [])
+                {'': [], 'compile': []}, [])
     self._split_help('./pants compile --help test', ['compile', 'test'],
-                {'': [], 'compile': [], 'test': []}, [], [])
+                {'': [], 'compile': [], 'test': []}, [])
     self._split_help('./pants test src/foo/bar:baz -h', ['test'],
-                {'': [], 'test': []}, ['src/foo/bar:baz'], [])
+                {'': [], 'test': []}, ['src/foo/bar:baz'])
+
+    self._split_help('./pants help-advanced', [], {'': []}, [], True, False)
+    self._split_help('./pants help-all', [], {'': []}, [], False, True)
+    self._split_help('./pants --help-advanced', [], {'': []}, [], True, False)
+    self._split_help('./pants --help-all', [], {'': []}, [], False, True)
+    self._split_help('./pants --help --help-advanced', [], {'': []}, [], True, False)
+    self._split_help('./pants --help-advanced --help', [], {'': []}, [], True, False)
+    self._split_help('./pants --help --help-all', [], {'': []}, [], False, True)
+    self._split_help('./pants --help-all --help --help-advanced', [], {'': []}, [], True, True)
+    self._split_help('./pants help --help-advanced', [], {'': []}, [], True, False)
+    self._split_help('./pants help-advanced --help-all', [], {'': []}, [], True, True)
+    self._split_help('./pants compile --help-advanced test', ['compile', 'test'],
+                     {'': [], 'compile': [], 'test': []}, [], True, False)
+    self._split_help('./pants help-advanced compile', ['compile'],
+                     {'': [], 'compile': []}, [], True, False)
+    self._split_help('./pants compile help-all test --help', ['compile', 'test'],
+                     {'': [], 'compile': [], 'test': []}, [], False, True)

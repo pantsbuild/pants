@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import tempfile
@@ -12,9 +12,9 @@ import time
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 
-from pants.base.config import Config
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.base.config import Config
 
 
 class PythonBinaryBuilder(object):

@@ -2,19 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from pkg_resources import resource_string
 import os
 import re
 
-from pants.backend.core.tasks.reflect import (assemble_buildsyms,
-                                              gen_glopts_reference_data,
+from pkg_resources import resource_string
+
+from pants.backend.core.tasks.reflect import (assemble_buildsyms, gen_glopts_reference_data,
                                               gen_tasks_options_reference_data)
 from pants.backend.core.tasks.task import Task
-from pants.util.dirutil import safe_open
 from pants.base.generator import Generator, TemplateData
+from pants.util.dirutil import safe_open
 
 
 # x may be a str or a unicode, so don't hard-code str.lower or unicode.lower.

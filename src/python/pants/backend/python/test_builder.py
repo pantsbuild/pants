@@ -2,21 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-try:
-  import configparser
-except ImportError:
-  import ConfigParser as configparser
-
-from contextlib import contextmanager
 import itertools
 import logging
 import os
 import shutil
-from textwrap import dedent
 import traceback
+from contextlib import contextmanager
+from textwrap import dedent
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -28,8 +23,17 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.config import Config
 from pants.base.target import Target
-from pants.util.contextutil import temporary_file, temporary_dir, environment_as
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open
+
+
+try:
+  import configparser
+except ImportError:
+  import ConfigParser as configparser
+
+
+
 
 
 # Initialize logging, since tests do not run via pants_exe (where it is usually done)
@@ -285,6 +289,9 @@ class PythonTestBuilder(object):
           target_dir = os.path.join(pants_distdir, 'coverage', relpath)
           safe_mkdir(target_dir)
           pex.run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir],
+                  stdout=stdout, stderr=stderr)
+          coverage_xml = os.path.join(target_dir, 'coverage.xml')
+          pex.run(args=['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml],
                   stdout=stdout, stderr=stderr)
 
   @contextmanager

@@ -2,15 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict
 import itertools
 import os
 import shutil
 import sys
 import uuid
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -99,8 +99,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def prepare(cls, options, round_manager):
     super(JvmCompile, cls).prepare(options, round_manager)
 
+    # This task uses JvmDependencyAnalyzer as a helper, get its product needs
+    JvmDependencyAnalyzer.prepare(options, round_manager)
+
     round_manager.require_data('compile_classpath')
     round_manager.require_data('ivy_cache_dir')
+    round_manager.require_data('ivy_resolve_symlink_map')
 
     # Require codegen we care about
     # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
@@ -431,10 +435,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
             self._analysis_tools.split_to_paths(self._invalid_analysis_file, splits)
 
         # Now compile partitions one by one.
-        for partition in partitions:
+        for partition_index, partition in enumerate(partitions):
           (vts, sources, analysis_file) = partition
           cp_entries = [entry for conf, entry in compile_classpath if conf in self._confs]
-          self._process_target_partition(partition, cp_entries)
+
+          progress_message = '{} of {}'.format(partition_index + 1, len(partitions))
+          self._process_target_partition(partition, cp_entries, progress_message)
+
           # No exception was thrown, therefore the compile succeded and analysis_file is now valid.
           if os.path.exists(analysis_file):  # The compilation created an analysis.
             # Merge the newly-valid analysis with our global valid analysis.
@@ -487,7 +494,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     self.post_process(relevant_targets)
 
-  def _process_target_partition(self, partition, classpath):
+  def _process_target_partition(self, partition, classpath, progress_message):
     """Needs invoking only on invalid targets.
 
     partition - a triple (vts, sources_by_target, analysis_file).
@@ -509,7 +516,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         'Compiling a partition containing ',
         items_to_report_element(sources, 'source'),
         ' in ',
-        items_to_report_element([t.address.reference() for t in vts.targets], 'target'), '.')
+        items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
+        ' (partition ',
+        progress_message,
+        ').')
       with self.context.new_workunit('compile'):
         # The compiler may delete classfiles, then later exit on a compilation error. Then if the
         # change triggering the error is reverted, we won't rebuild to restore the missing
@@ -809,12 +819,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     make_products = lambda: defaultdict(MultipleRootedProducts)
     if self.context.products.is_required_data('classes_by_source'):
       self.context.products.safe_create_data('classes_by_source', make_products)
-    if self.context.products.is_required_data('classes_by_target'):
-      self.context.products.safe_create_data('classes_by_target', make_products)
 
     # Whether or not anything else requires resources_by_target, this task
     # uses it internally.
     self.context.products.safe_create_data('resources_by_target', make_products)
+
+    # JvmDependencyAnalyzer uses classes_by_target within this run
+    self.context.products.safe_create_data('classes_by_target', make_products)
 
   def _resources_by_class_file(self, class_file_name, resource_mapping):
     assert class_file_name.endswith(".class")

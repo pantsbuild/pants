@@ -45,7 +45,6 @@ python_test_suite(
     ':build_root',
     ':cmd_line_spec_parser',
     ':deprecated',
-    ':double_dag',
     ':extension_loader',
     ':fingerprint_strategy',
     ':generator',
@@ -100,8 +99,8 @@ python_tests(
   sources = ['test_build_file.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:build_file',
-    'tests/python/pants_test:base_test',
     'src/python/pants/util:dirutil',
   ]
 )
@@ -206,17 +205,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-  ]
-)
-
-python_tests(
-  name = 'double_dag',
-  sources = ['test_double_dag.py'],
-  dependencies = [
-    'src/python/pants/base:double_dag',
-    'src/python/pants/reporting',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/testutils',
   ]
 )
 

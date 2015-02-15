@@ -8,13 +8,13 @@ expected_header=$(cat <<EOF
 # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 EOF
 )
 
-py_files=$(find src tests pants-plugins -name '*.py' -not -name __init__.py)
+py_files=$(find src tests pants-plugins examples -name '*.py' -not -name __init__.py)
 known_bad_headers=$(cat <<EOF
 tests/python/pants_test/tasks/false.py
 tests/python/pants_test/tasks/true.py

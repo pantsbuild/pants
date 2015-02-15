@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.lazy_source_mapper import LazySourceMapper
 from pants_test.base_test import BaseTest
 
@@ -87,4 +87,3 @@ class LazySourceMapperTest(BaseTest):
     self.owner(['a/b:b'], 'a/b/bar.py')
     self.owner([':top'], 'foo.py')
     self.owner([':top', 'a/b:b'], 'a/b/bar.py')
-

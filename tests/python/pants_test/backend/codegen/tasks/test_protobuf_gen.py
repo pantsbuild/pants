@@ -2,24 +2,22 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 from textwrap import dedent
-import unittest
 
 from twitter.common.collections import OrderedSet
 
-
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.tasks.protobuf_gen import _same_contents, calculate_genfiles, ProtobufGen
+from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen, _same_contents, calculate_genfiles
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import safe_rmtree, safe_mkdir
-
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants_test.tasks.test_base import TaskTest
 
 
@@ -30,7 +28,10 @@ class ProtobufGenTest(TaskTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_protobuf_library': JavaProtobufLibrary})
+    return BuildFileAliases.create(targets={
+      'java_protobuf_library': JavaProtobufLibrary,
+      'target': Dependencies},
+    )
 
 
   def setUp(self):
@@ -250,3 +251,26 @@ class ProtobufGenTest(TaskTest):
     sources_by_base = task._calculate_sources([target])
     self.assertEquals(['extracted-source'], sources_by_base.keys())
     self.assertEquals(OrderedSet([sample_proto_path]), sources_by_base['extracted-source'])
+
+  def test_default_javadeps(self):
+    self.create_file(relpath='test_proto/test.proto', contents=dedent('''
+      package com.example.test_proto;
+      enum Foo { foo=1;}
+      message Bar {}
+    '''))
+
+    self.add_to_build_file('test_proto', dedent("""
+      java_protobuf_library(name='proto',
+        sources=['test.proto'],
+        dependencies=[]
+      )
+    """))
+    self.add_to_build_file('3rdparty', dedent("""
+      target(name='protobuf-java')
+    """))
+    task = self.prepare_task(build_graph=self.build_graph,
+                             targets=[self.target('test_proto:proto')],
+                             build_file_parser=self.build_file_parser)
+    javadeps = task.javadeps
+    self.assertEquals(len(javadeps), 1)
+    self.assertEquals('protobuf-java', javadeps.pop().name)

@@ -56,10 +56,8 @@ python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
-    '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    ':address_lookup_error',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -166,14 +164,6 @@ python_library(
     'src/python/pants/backend/maven_layout:plugin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:build_configuration',
-  ]
-)
-
-python_library(
-  name = 'double_dag',
-  sources = ['double_dag.py'],
-  dependencies = [
-    ':abbreviate_target_ids',
   ]
 )
 

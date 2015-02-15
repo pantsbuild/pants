@@ -2,18 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict
 import os
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
@@ -28,15 +28,17 @@ class JvmDependencyAnalyzer(object):
                target_whitelist):
 
     self._context = context
-    self._context.products.require_data('classes_by_target')
-    self._context.products.require_data('ivy_jar_products')
-
     self._check_missing_deps = check_missing_deps
     self._check_missing_direct_deps = check_missing_direct_deps
     self._check_unnecessary_deps = check_unnecessary_deps
 
     # These targets we will not report as having any dependency issues even if they do.
     self._target_whitelist = OrderedSet(target_whitelist)
+
+  @classmethod
+  def prepare(clsc, options, round_manager):
+    round_manager.require_data('ivy_jar_products')
+    round_manager.require_data('ivy_resolve_symlink_map')
 
   def _compute_targets_by_file(self):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
@@ -79,7 +81,7 @@ class JvmDependencyAnalyzer(object):
     # Compute jar -> target.
     with self._context.new_workunit(name='map_jars'):
       with IvyTaskMixin.symlink_map_lock:
-        all_symlinks_map = self._context.products.get_data('symlink_map').copy()
+        all_symlinks_map = self._context.products.get_data('ivy_resolve_symlink_map').copy()
         # We make a copy, so it's safe to use outside the lock.
 
       def register_transitive_jars_for_ref(ivyinfo, ref):

@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 
@@ -26,7 +26,7 @@ class DxCompile(AndroidTask, NailgunTask):
 
   @staticmethod
   def is_dextarget(target):
-    """Return true if target has class files to be compiled into dex"""
+    """Return True if target has class files to be compiled into dex."""
     return isinstance(target, AndroidBinary)
 
   @classmethod
@@ -58,8 +58,8 @@ class DxCompile(AndroidTask, NailgunTask):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  def _render_args(self, out, classes):
-    dex_file = os.path.join(out, self.DEX_NAME)
+  def _render_args(self, outdir, classes):
+    dex_file = os.path.join(outdir, self.DEX_NAME)
     args = []
     # Glossary of dx.jar flags.
     #   : '--dex' to create a Dalvik executable.
@@ -67,7 +67,7 @@ class DxCompile(AndroidTask, NailgunTask):
     #            pass a list of classes as opposed to a top-level dir.
     #   : '--output' tells the dx.jar where to put and what to name the created file.
     #            See comment on self.classes_dex for restrictions.
-    args.extend(['--dex', '--no-strict', '--output=' + dex_file])
+    args.extend(['--dex', '--no-strict', '--output={0}'.format(dex_file)])
 
     # classes is a list of class files to be included in the created dex file.
     args.extend(classes)
@@ -92,8 +92,8 @@ class DxCompile(AndroidTask, NailgunTask):
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
-          out_dir = self.dx_out(target)
-          safe_mkdir(out_dir)
+          outdir = self.dx_out(target)
+          safe_mkdir(outdir)
           classes_by_target = self.context.products.get_data('classes_by_target')
           classes = []
 
@@ -102,7 +102,7 @@ class DxCompile(AndroidTask, NailgunTask):
             if target_classes:
 
               def add_classes(target_products):
-                for root, products in target_products.abs_paths():
+                for _, products in target_products.abs_paths():
                   for prod in products:
                     classes.append(prod)
 
@@ -111,7 +111,7 @@ class DxCompile(AndroidTask, NailgunTask):
           target.walk(add_to_dex)
           if not classes:
             raise TaskError("No classes were found for {0!r}.".format(target))
-          args = self._render_args(out_dir, classes)
+          args = self._render_args(outdir, classes)
           self._compile_dex(args, target.build_tools_version)
       for target in targets:
         self.context.products.get('dex').add(target, self.dx_out(target)).append(self.DEX_NAME)
@@ -125,4 +125,5 @@ class DxCompile(AndroidTask, NailgunTask):
     return self._android_dist.register_android_tool(dx_jar)
 
   def dx_out(self, target):
+    """Return the outdir for the DxCompile task."""
     return os.path.join(self.workdir, target.id)

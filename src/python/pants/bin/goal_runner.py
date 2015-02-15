@@ -2,13 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
 import os
 import sys
-from pants.base.build_graph import BuildGraph
 
 from twitter.common import log
 from twitter.common.lang import Compatibility
@@ -20,17 +19,18 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
+from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.workunit import WorkUnit
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
-from pants.goal.initialize_reporting import update_reporting, initial_reporting
 from pants.goal.goal import Goal
+from pants.goal.initialize_reporting import initial_reporting, update_reporting
 from pants.goal.run_tracker import RunTracker
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.global_options import register_global_options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdir
 
@@ -137,13 +137,7 @@ class GoalRunner(object):
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.is_help_all:
-      self.options.print_help(goals=[g.name for g in Goal.all()])
-      print('\nGlobal options:')
-      print(self.options.format_global_help())
-      sys.exit(0)
-    elif self.options.is_help:
-      self.options.print_help(goals=goals)
+    if self.options.print_help_if_requested():
       sys.exit(0)
 
     self.requested_goals = goals

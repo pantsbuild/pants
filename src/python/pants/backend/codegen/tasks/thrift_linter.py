@@ -2,13 +2,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
+
+
+class ThriftLintError(Exception):
+  """Raised on a lint failure."""
 
 
 class ThriftLinter(NailgunTask, JvmToolTaskMixin):
@@ -26,6 +30,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
+    register('--skip', action='store_true', help='Skip thrift linting.')
     register('--strict', default=None, action='store_true',
              help='Fail the goal if thrift linter errors are found.')
     cls.register_jvm_tool(register, 'scrooge-linter')
@@ -50,16 +55,16 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # Converts boolean and string values to boolean.
     return str(value) == 'True'
 
-  def is_strict(self, target):
+  def _is_strict(self, target):
     # TODO: the new options parsing doesn't support this. This task wants the target in the BUILD
     # file to be able to override a value in the pants.ini file. Finally, command-line overrides
     # that. But parsing of options combines the command-line values and pants.ini values in a single
     # "merged" view, into which there's no opportunity to inject an override from the BUILD target.
 
     # The strict value is read from the following, in order:
-    # 1. command line, --[no-]thrift-linter-strict
+    # 1. command line, --[no-]strict
     # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
-    # 3. pants.ini, [scrooge-linter] section, strict field.
+    # 3. pants.ini, [thrift-linter] section, strict field.
     # 4. default = False
     cmdline_strict = self.get_options().strict
 
@@ -72,15 +77,18 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     return self._to_bool(self.context.config.get(self._CONFIG_SECTION, 'strict',
                                                  default=ThriftLinter.STRICT_DEFAULT))
 
-  def lint(self, target, path):
-    self.context.log.debug('Linting %s' % path)
+  def _lint(self, target):
+    self.context.log.debug('Linting {0}'.format(target.address.spec))
 
     classpath = self.tool_classpath('scrooge-linter')
+
     config_args = self.context.config.getlist(self._CONFIG_SECTION, 'linter_args', default=[])
-    if not self.is_strict(target):
+    if not self._is_strict(target):
       config_args.append('--ignore-errors')
 
-    args = config_args + [path]
+    paths = target.sources_relative_to_buildroot()
+
+    args = config_args + paths
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.
@@ -90,10 +98,22 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                               workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
-      raise TaskError('Lint errors in %s.' % path)
+      raise ThriftLintError(
+        'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
   def execute(self):
+    if self.get_options().skip:
+      return
+
     thrift_targets = self.context.targets(self._is_thrift)
-    for target in thrift_targets:
-      for path in target.sources_relative_to_buildroot():
-        self.lint(target, path)
+    with self.invalidated(thrift_targets) as invalidation_check:
+      errors = []
+      for vt in invalidation_check.invalid_vts:
+        try:
+          self._lint(vt.target)
+        except ThriftLintError as e:
+          errors.append(str(e))
+        else:
+          vt.update()
+      if errors:
+        raise TaskError('\n'.join(errors))

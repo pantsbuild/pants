@@ -2,29 +2,28 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import subprocess
 from contextlib import closing
-
 from StringIO import StringIO
 
 from twitter.common.collections import maybe_list
 
-from pants.backend.core.tasks.task import Task
-
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.task import Task
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.option.global_options import register_global_options
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants.option.options import Options
-from pants_test.base_test import BaseTest
+from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants_test.base.context_utils import create_config, create_run_tracker
+from pants_test.base_test import BaseTest
+
 
 def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
