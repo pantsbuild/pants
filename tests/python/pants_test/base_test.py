@@ -127,6 +127,11 @@ class BaseTest(unittest.TestCase):
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
+  def reset_build_graph(self):
+    """Start over with a fresh build graph with no targets in it."""
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+    self.build_graph = BuildGraph(address_mapper=self.address_mapper)
+
   def config(self, overrides=''):
     """Returns a config valid for the test build root."""
     ini_file = os.path.join(get_buildroot(), 'pants.ini')
