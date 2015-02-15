@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
@@ -301,12 +302,11 @@ python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
-    ':base',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
