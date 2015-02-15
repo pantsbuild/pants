@@ -80,6 +80,24 @@ class PythonEval(PythonTask):
       return compiled
 
   def _compile_target(self, target):
+    # "Compiles" a target by forming an isolated chroot of its sources and transitive deps and then
+    # attempting to import each of the target's sources in the case of a python library or else the
+    # entry point in the case of a python binary.
+    #
+    # For a library with sources lib/core.py and lib/util.py a "compiler" main file would look like:
+    #
+    #   if __name__ == '__main__':
+    #     import lib.core
+    #     import lib.util
+    #
+    # For a binary with entry point lib.bin:main the "compiler" main file would look like:
+    #
+    #   if __name__ == '__main__':
+    #     from lib.bin import main
+    #
+    # In either case the main file is executed within the target chroot to reveal missing BUILD
+    # dependencies.
+
     with self.context.new_workunit(name=target.address.spec):
       modules = []
       if isinstance(target, PythonBinary):
