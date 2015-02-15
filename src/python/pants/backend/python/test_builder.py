@@ -290,6 +290,9 @@ class PythonTestBuilder(object):
           safe_mkdir(target_dir)
           pex.run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir],
                   stdout=stdout, stderr=stderr)
+          coverage_xml = os.path.join(target_dir, 'coverage.xml')
+          pex.run(args=['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml],
+                  stdout=stdout, stderr=stderr)
 
   @contextmanager
   def _test_runner(self, targets, stdout, stderr):
