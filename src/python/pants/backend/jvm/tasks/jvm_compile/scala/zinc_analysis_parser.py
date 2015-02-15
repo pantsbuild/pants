@@ -11,16 +11,13 @@ from collections import defaultdict
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import (APIs, Compilations,
-                                                                     CompileSetup, Relations,
-                                                                     SourceInfos, Stamps,
-                                                                     ZincAnalysis)
+    CompileSetup, Relations, SourceInfos, Stamps, ZincAnalysis)
 
 
 class ZincAnalysisParser(AnalysisParser):
   """Parses a zinc analysis file."""
 
-  def empty_prefix(self):
-    return 'products:\n0 items\n'
+  empty_test_header = 'products'
 
   def parse(self, infile):
     """Parse a ZincAnalysis instance from an open text file."""
@@ -77,23 +74,13 @@ class ZincAnalysisParser(AnalysisParser):
     if version_line != ZincAnalysis.FORMAT_VERSION_LINE:
       raise ParseError('Unrecognized version line: ' + version_line)
 
-  _num_items_re = re.compile(r'(\d+) items\n')
-
-  def _parse_num_items(self, lines_iter):
-    """Parse a line of the form '<num> items' and returns <num> as an int."""
-    line = lines_iter.next()
-    matchobj = self._num_items_re.match(line)
-    if not matchobj:
-      raise ParseError('Expected: "<num> items". Found: "%s"' % line)
-    return int(matchobj.group(1))
-
   def _parse_section(self, lines_iter, expected_header=None):
     """Parse a single section."""
     if expected_header:
       line = lines_iter.next()
       if expected_header + ':\n' != line:
         raise ParseError('Expected: "%s:". Found: "%s"' % (expected_header, line))
-    n = self._parse_num_items(lines_iter)
+    n = self.parse_num_items(lines_iter.next())
     relation = defaultdict(list)  # Values are lists, to accommodate relations.
     for i in xrange(n):
       k, _, v = lines_iter.next().partition(' -> ')

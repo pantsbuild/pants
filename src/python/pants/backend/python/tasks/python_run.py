@@ -14,6 +14,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.util.strutil import safe_shlex_split
 
 
 class PythonRun(PythonTask):
@@ -49,7 +50,10 @@ class PythonRun(PythonTask):
         pex = PEX(builder.path(), interpreter=interpreter)
         self.context.release_lock()
         with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
-          args = self.get_options().args + self.get_passthru_args()
+          args = []
+          for arg in self.get_options().args:
+            args.extend(safe_shlex_split(arg))
+          args += self.get_passthru_args()
           po = pex.run(blocking=False, args=args)
           try:
             result = po.wait()

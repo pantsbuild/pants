@@ -24,6 +24,17 @@ def main():
 
   ./pants run src/python/pants/backend/jvm/tasks/jvm_compile:anonymize_zinc_analysis -- \
     <wordfile> <classes dir in analysis files> <analysis file glob 1> <analysis file glob 2> ...
+
+  Output will be in a directory called 'anon' under the directory of each input analysis file.
+
+  An easy way to generate a wordfile is to download SCOWL (http://wordlist.aspell.net/) and look
+  at final/english-words.*.  A good wordfile can be had thus:
+
+  for f in english-words.*; do cat $f >> wordfile; done
+  egrep '^[a-z]{4}[a-z]*$' wordfile > wordfile.filtered
+
+  Note that the larger the number at the end of the filename the rarer the words in it, so if you want
+  to avoid rare words, manually cat the lowest few files into wordfile, until you have enough words.
   """
   word_file = sys.argv[1]
   classes_dir = sys.argv[2]

@@ -75,8 +75,9 @@ class Anonymizer(object):
   _DELIMITER_RE = re.compile(r'^%s$' % _DELIMITER)
   _BREAK_ON_RE = re.compile(r'(%s|%s)' % (_DELIMITER, _UPPER))  # Capture what we broke on.
 
-  # Valid replacement words must be all lower-case letters, with no apostrophes etc.
-  _WORD_RE = re.compile(r'^[a-z]+$')
+  # Valid replacement words must be all lower-case ASCII letters, with no apostrophes etc, and must be
+  # at least 5 characters.
+  _WORD_RE = re.compile(r'^[a-z]{5}[a-z]*$')
 
   def __init__(self, word_list, word_map=None, keep=None, strict=False):
     self._translations = {}
