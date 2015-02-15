@@ -9,6 +9,8 @@ import inspect
 import warnings
 from functools import wraps
 
+import six
+
 from pants.base.revision import Revision
 from pants.version import VERSION
 
@@ -42,7 +44,7 @@ class BadDecoratorNestingError(DeprecationApplicationError):
 def deprecated(removal_version, hint_message=None):
   """Marks a function or method as deprecated.
 
-  A removal version must be supplied and it must be greater than the current 'pantsbuild.pants
+  A removal version must be supplied and it must be greater than the current 'pantsbuild.pants'
   version.
 
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated
@@ -52,6 +54,9 @@ def deprecated(removal_version, hint_message=None):
   """
   if removal_version is None:
     raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
+
+  if not isinstance(removal_version, six.string_types):
+    raise BadRemovalVersionError('The removal_version must be a semver version string.')
 
   try:
     removal_semver = Revision.semver(removal_version)

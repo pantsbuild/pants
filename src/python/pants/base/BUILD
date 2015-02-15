@@ -146,7 +146,9 @@ python_library(
   name = 'deprecated',
   sources = ['deprecated.py'],
   dependencies = [
+    '3rdparty/python:six',
     ':revision',
+    'src/python/pants:version',
   ]
 )
 
