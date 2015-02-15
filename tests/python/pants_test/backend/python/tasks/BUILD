@@ -1,0 +1,21 @@
+target(
+  name='tasks',
+  dependencies=[
+    ':python_eval'
+  ]
+)
+
+python_tests(
+  name='python_eval',
+  sources=['test_python_eval.py'],
+  dependencies=[
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:base'
+  ]
+)
