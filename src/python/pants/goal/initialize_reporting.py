@@ -11,7 +11,6 @@ import sys
 
 from twitter.common.lang import Compatibility
 
-from pants.base.config import Config
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.quiet_reporter import QuietReporter

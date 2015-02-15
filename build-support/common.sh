@@ -21,8 +21,19 @@ function die() {
   exit 1
 }
 
+# Initialization for elapsed()
+if [ -z "$elapsed_start_time" ] ; then
+  export elapsed_start_time=$(date +'%s')
+fi
+
+function elapsed() {
+  now=$(date '+%s')
+  elapsed_secs=$(($now - $elapsed_start_time))
+  echo $elapsed_secs | awk '{printf "%02d:%02d\n",int($1/60), int($1%60)}'
+}
+
 function banner() {
   echo
-  echo "[== $@ ==]"
+  echo "[== $(elapsed) $@ ==]"
   echo
 }

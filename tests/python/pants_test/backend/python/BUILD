@@ -6,6 +6,7 @@ target(
   dependencies=[
     ':test_builder',
     ':test_python_requirement_list',
+    'tests/python/pants_test/backend/python/tasks'
   ]
 )
 

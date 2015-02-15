@@ -64,10 +64,8 @@ python_library(
   name = 'binary_create',
   sources = ['binary_create.py'],
   dependencies = [
-    ':common',
     ':jvm_binary_task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/java:jar',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -89,12 +87,10 @@ python_library(
   sources = ['bundle_create.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':common',
     ':jvm_binary_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
-    'src/python/pants/java:jar',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -140,10 +136,13 @@ python_library(
   name = 'depmap',
   sources = ['depmap.py'],
   dependencies = [
-    ':common',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
   ],
 )
 
@@ -151,7 +150,6 @@ python_library(
   name = 'detect_duplicates',
   sources = ['detect_duplicates.py'],
   dependencies = [
-    ':common',
     ':jvm_binary_task',
     # TODO(pl): Use twitter.common.lang instead, but for the to_bytes helper, twitter.commons
     # needs to be updated so the standard compatibility helpers act like the ones in pex
@@ -167,7 +165,6 @@ python_library(
   sources = ['eclipse_gen.py'],
   resources = globs('templates/eclipse/*.mustache', 'templates/eclipse/*.prefs'),
   dependencies = [
-    ':common',
     ':ide_gen',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
@@ -181,12 +178,11 @@ python_library(
   sources = ['ensime_gen.py'],
   resources = globs('templates/ensime/*.mustache'),
   dependencies = [
-    ':common',
     ':ide_gen',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -212,13 +208,13 @@ python_library(
   dependencies = [
     ':jvm_tool_task_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm:jvm_debug_config',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/backend/jvm:jvm_debug_config',
-    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
   ],
@@ -272,8 +268,13 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:cache_manager',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/ivy',
+    'src/python/pants/java:util',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -299,25 +300,27 @@ python_library(
   sources = ['jar_publish.py'],
   resources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
   dependencies = [
+    ':jar_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
     '3rdparty/python/twitter/commons:twitter.common.log',
-    ':common',
-    ':jar_task',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:scm_publish',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:address',
+    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file',
+    'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/ivy',
+    'src/python/pants/scm',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -328,10 +331,10 @@ python_library(
     ':nailgun_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:jar',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -365,7 +368,6 @@ python_library(
   name = 'jvm_binary_task',
   sources = ['jvm_binary_task.py'],
   dependencies = [
-    ':common',
     ':jar_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
