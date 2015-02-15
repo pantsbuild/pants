@@ -26,8 +26,6 @@ from pants.util.dirutil import safe_open
 #  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
 
 
-
-
 class NailgunExecutor(Executor):
   """Executes java programs by launching them in nailgun server.
 

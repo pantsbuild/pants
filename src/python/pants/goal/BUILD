@@ -34,17 +34,16 @@ python_library(
   dependencies = [
     ':products',
     ':workspace',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python/twitter/commons:twitter.common.process',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:source_root',
     'src/python/pants/base:build_graph',
+    'src/python/pants/base:source_root',
     'src/python/pants/base:target', # XXX(fixme)
+    'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/java:distribution',  # XXX(fixme)
     'src/python/pants/process',
-    'src/python/pants/reporting',
+    'src/python/pants/reporting:report',
   ],
 )
 
@@ -59,6 +58,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/reporting',
+    'src/python/pants/reporting:report',
     'src/python/pants/util:dirutil',
   ],
 )
