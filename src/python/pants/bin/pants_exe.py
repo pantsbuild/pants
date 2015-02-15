@@ -81,6 +81,7 @@ def _run(exiter):
   result = goal_runner.run()
   exiter.do_exit(result)
 
+
 def main():
   exiter = _Exiter()
   try:
