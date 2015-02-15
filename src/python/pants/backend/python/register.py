@@ -15,6 +15,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks.python_eval import PythonEval
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.python_setup import PythonSetup
@@ -43,6 +44,7 @@ def build_file_aliases():
 
 
 def register_goals():
+  task(name='python-eval', action=PythonEval).install('compile')
   task(name='python-binary-create', action=PythonBinaryCreate).install('binary')
   task(name='pytest', action=PytestRun).install('test')
   task(name='py', action=PythonRun).install('run')
