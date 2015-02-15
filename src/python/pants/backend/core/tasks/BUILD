@@ -146,11 +146,12 @@ python_library(
   name = 'group_task',
   sources = ['group_task.py'],
   dependencies = [
-    ':task',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    ':task',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
+    'src/python/pants/goal',
   ],
 )
 
@@ -246,6 +247,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
     'src/python/pants/reporting',
+    'src/python/pants:binary_util',
   ],
 )
 
@@ -253,6 +255,7 @@ python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
+    '3rdparty/python:docutils',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:config',
     'src/python/pants/base:generator',
@@ -275,8 +278,9 @@ python_library(
   name = 'run_prep_command',
   sources = ['run_prep_command.py'],
   dependencies = [
-    ':common',
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
   ],
 )
 
@@ -334,9 +338,10 @@ python_library(
   sources = ['what_changed.py'],
   dependencies = [
     ':console_task',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:lazy_source_mapper',
-    'src/python/pants/base:target',
+    'src/python/pants/goal:workspace',
   ],
 )
 
@@ -344,7 +349,6 @@ python_library(
   name='changed_target_goals',
   sources=['changed_target_goals.py'],
   dependencies=[
-    ':common',
     ':noop',
     ':what_changed',
   ],
