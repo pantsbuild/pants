@@ -282,9 +282,7 @@ class ZincAnalysis(Analysis):
     binary_dep_splits = self._split_dict(self.relations.binary_dep, splits)
     classes_splits = self._split_dict(self.relations.classes, splits)
 
-    # For historical reasons, external deps are specified as src->class while internal deps are
-    # specified as src->src. So we pick a representative class for each src.
-    representatives = dict((k, min(vs)) for k, vs in self.relations.classes.items())
+    representatives = dict((k, self.representative(k, vs)) for k, vs in self.relations.classes.items())
 
     def split_dependencies(all_internal, all_external):
       internals = []
@@ -409,6 +407,23 @@ class ZincAnalysis(Analysis):
           dict_split[f] = d[f]
       ret.append(dict_split)
     return ret
+
+  def representative(self, src, classes):
+    """Pick a representative class for each src.
+
+    For historical reasons, external deps are specified as src->class while internal deps are
+    specified as src->src.  So when splitting we need to pick a representative.  We must pick
+    consistently.
+    """
+    primary_class_name = os.path.splitext(os.path.basename(src))[0]
+    if primary_class_name in classes:
+      # For consistency and ease of debugging, pick the class with the same name as the source
+      # file, if it exists.  Note that this helps when generating anonymized analysis files for
+      # use as test data, as the anonymization won't preserve dictionary order.
+      return primary_class_name
+    else:
+      # Pick the class that sorts lowest in dictionary order.
+      return min(classes)
 
 
 class CompileSetup(ZincAnalysisElement):
