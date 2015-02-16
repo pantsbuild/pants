@@ -53,6 +53,7 @@ Contrib plugins should generally follow 3 basic setup steps:
        "pants.contrib.scrooge",
        "pants.contrib.example",
      ]
+   ```
 
 3. When you're ready for your plugin to be distributed, add a `provides` `setup_py` descriptor to
    your main plugin BUILD target and register the plugin with the release script.
