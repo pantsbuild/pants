@@ -416,14 +416,14 @@ class ZincAnalysis(Analysis):
     consistently.
     """
     primary_class_name = os.path.splitext(os.path.basename(src))[0]
-    if primary_class_name in classes:
-      # For consistency and ease of debugging, pick the class with the same name as the source
-      # file, if it exists.  Note that this helps when generating anonymized analysis files for
-      # use as test data, as the anonymization won't preserve dictionary order.
-      return primary_class_name
-    else:
-      # Pick the class that sorts lowest in dictionary order.
-      return min(classes)
+    for fqcn in classes:
+      if fqcn.rsplit('.')[-1] == primary_class_name:
+        # For ease of debugging, pick the class with the same name as the source file, if it exists.
+        # Note that this is important when generating anonymized analysis files for use as test data,
+        # as the anonymization won't preserve dictionary order.
+        return primary_class_name
+    # Pick the class that sorts lowest in dictionary order.
+    return min(classes)
 
 
 class CompileSetup(ZincAnalysisElement):
