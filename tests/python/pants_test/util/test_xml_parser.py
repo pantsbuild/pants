@@ -2,17 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import textwrap
 import unittest
 from contextlib import contextmanager
 from xml.dom.minidom import Document
 
-from pants.util.xml_parser import XmlParser
 from pants.util.contextutil import temporary_file
+from pants.util.xml_parser import XmlParser
 
 
 class TestXmlParser(unittest.TestCase):
