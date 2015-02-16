@@ -116,9 +116,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     compile_classpath = self.context.products.get_data('compile_classpath',
                                                        lambda: UnionProducts())
 
-    # After running ivy, we need to take the resulting classpath, and load it into
-    # the build products.
-    # FIXME: 2) not using stable symlinks for artifacts.
+    # After running ivy, we parse the resulting report, and record the dependencies for
+    # all relevant targets (ie: those that have directory dependencies).
     _, relevant_targets = self.ivy_resolve(
       targets,
       executor=executor,
@@ -127,8 +126,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       custom_args=self._args,
     )
 
-    # Record the ordered subset of jars that each jar_library/leaf depends on.
+    # Record the ordered subset of jars that each jar_library/leaf depends on using
+    # stable symlinks within the working copy.
     ivy_jar_products = self._generate_ivy_jar_products(relevant_targets)
+    symlink_map = self.context.products.get_data('symlink_map')
     for conf in self.confs:
       ivy_jar_memo = {}
       ivy_info = ivy_jar_products[conf]
@@ -139,10 +140,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       for target in relevant_targets:
         if not isinstance(target, JarLibrary):
           continue
-        # add the artifacts from each module
+        # Add the artifacts from each dependency module.
         artifact_paths = list()
         for module in ivy_info.get_modules_for_jar_library(target, memo=ivy_jar_memo):
-          artifact_paths += map(lambda a: a.path, module.artifacts)
+          artifact_paths += map(lambda a: symlink_map[a.path][0], module.artifacts)
         compile_classpath.add_for_target(target, map(lambda entry: (conf, entry), artifact_paths))
 
     if self._report:
