@@ -75,17 +75,20 @@ class Anonymizer(object):
   _DELIMITER_RE = re.compile(r'^%s$' % _DELIMITER)
   _BREAK_ON_RE = re.compile(r'(%s|%s)' % (_DELIMITER, _UPPER))  # Capture what we broke on.
 
-  # Valid replacement words must be all lower-case letters, with no apostrophes etc.
-  _WORD_RE = re.compile(r'^[a-z]+$')
+  # Valid replacement words must be all lower-case ASCII letters, with no apostrophes etc, and must be
+  # at least 5 characters.
+  _WORD_RE = re.compile(r'^[a-z]{5}[a-z]*$')
 
   def __init__(self, word_list, word_map=None, keep=None, strict=False):
     self._translations = {}
     self._reverse_translations = {}
+    self._word_map = _default_word_map if word_map is None else word_map
+    self._keep = _default_keep_words if keep is None else keep
 
     # Init from args.
-    for k, v in (_default_word_map if word_map is None else word_map).items():
+    for k, v in self._word_map.items():
       self._add_translation(k, v)
-    for w in _default_keep_words if keep is None else keep:
+    for w in self._keep:
       self._add_translation(w, w)
 
     # Prepare list of candidate translations.
@@ -160,3 +163,34 @@ class Anonymizer(object):
       raise Exception('Translation target already used: %s -> %s' % (self._reverse_translations[to], to))
     self._translations[frm] = to
     self._reverse_translations[to] = frm
+
+
+class TranslationCapturer(Anonymizer):
+  def convert(self, s):
+    super(TranslationCapturer, self).convert(s)  # Create the translation in the parent.
+    return s  # But don't actually return it.  Use the original string instead.
+
+  def convert_base64_string(self, s):
+    # Don't bother to convert these yet.  They don't need to be captured.
+    return s
+
+  def get_order_preserving_anonymizer(self):
+    # Look only at translations we generated, ignoring the ones passed in to our ctor.
+    generated_translations = dict(self._translations)
+    for k in self._word_map.keys():
+      del generated_translations[k]
+    for k in self._keep:
+      del generated_translations[k]
+
+    # Reassign keys to values so that dictionary order is preserved.
+    sorted_keys = sorted(generated_translations.keys())
+    sorted_values = sorted(generated_translations.values())
+    ordered_translations = dict(zip(sorted_keys, sorted_values))
+
+    # Add the preset translations back in.
+    for k, v in self._word_map.items():
+      ordered_translations[k] = v
+
+    # This anonymizer should only be used on the exact same objects the capture was run on, and
+    # it already contains translations for all those, so it needs no wordlist.
+    return Anonymizer([], ordered_translations, self._keep, self._strict)
