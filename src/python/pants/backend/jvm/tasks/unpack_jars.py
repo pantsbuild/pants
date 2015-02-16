@@ -30,7 +30,7 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
     """
     if isinstance(target, UnpackedJars):
       hasher = sha1()
-      for jar_import in sorted(target.imports, key=lambda t: t.id):
+      for jar_import in sorted(target.imported_jars, key=lambda t: t.id):
         hasher.update(jar_import.cache_key())
       hasher.update(target.payload.fingerprint())
       return hasher.hexdigest()
