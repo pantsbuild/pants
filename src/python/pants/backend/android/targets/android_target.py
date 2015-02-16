@@ -53,7 +53,7 @@ class AndroidTarget(JvmTarget):
       manifest = os.path.join(self._spec_path, self._manifest)
       if not os.path.isfile(manifest):
         raise TargetDefinitionException(self, "There is no AndroidManifest.xml at path {0}. Please "
-                                              "declare a 'manifest' field with the relative "
+                                              "declare a 'manifest' field with its relative "
                                               "path.".format(manifest))
       self._manifest_path = AndroidManifestParser.parse_manifest(manifest)
     return self._manifest_path
