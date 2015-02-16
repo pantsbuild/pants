@@ -37,17 +37,16 @@ class IvyResolveTest(JvmToolTaskTestBase):
   #
 
   def test_resolve_specific(self):
-    # jar_library with a single dep
+    # Create a jar_library with a single dep.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
     jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
     scala_lib = self.make_target('//:b', ScalaLibrary)
-    # confirm that the deps were added to the appropriate targets
+    # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
 
   def test_resolve_no_deps(self):
-    # resolve for a library with no deps, and confirm that an empty product was created
+    # Resolve a library with no deps, and confirm that an empty product was created.
     target = self.make_target('//:a', ScalaLibrary)
-    # confirm that an empty product was created
     assert self.resolve([target])

@@ -15,7 +15,7 @@ class UnionProducts(object):
   """A set of products where the product of a target is the ordered union of the products
   for its transitive deps."""
   def __init__(self):
-    # a map of target to OrderedSet of product members
+    # A map of target to OrderedSet of product members.
     self._products_by_target = defaultdict(OrderedSet)
 
   def add_for_target(self, target, products):
@@ -36,7 +36,7 @@ class UnionProducts(object):
     """Gets the transitive product deps for the given targets, in order."""
     products = OrderedSet()
     visited = set()
-    # walk the targets transitively to collect products
+    # Walk the targets transitively to aggregate their products.
     for target in targets:
       for dep in target.closure():
         if not dep in visited:
