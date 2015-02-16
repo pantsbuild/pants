@@ -142,9 +142,9 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         if not isinstance(target, JarLibrary):
           continue
         # Add the artifacts from each dependency module.
-        artifact_paths = list()
-        for module in ivy_info.get_modules_for_jar_library(target, memo=ivy_jar_memo):
-          artifact_paths += map(lambda a: symlink_map[a.path][0], module.artifacts)
+        artifact_paths = []
+        for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
+          artifact_paths.append(symlink_map[artifact.path][0])
         compile_classpath.add_for_target(target, map(lambda entry: (conf, entry), artifact_paths))
 
     if self._report:

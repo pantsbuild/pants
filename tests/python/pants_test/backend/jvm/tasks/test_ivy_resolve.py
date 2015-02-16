@@ -37,7 +37,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   #
 
   def test_resolve_specific(self):
-    # Create a jar_library with a single dep.
+    # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
     jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
     scala_lib = self.make_target('//:b', ScalaLibrary)
@@ -46,7 +46,22 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
 
+  def test_resolve_conflicted(self):
+    # Create jar_libraries with different versions of the same dep: this will cause
+    # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
+    # due to an ivy eviction where the declared version loses to a transitive version.
+    losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
+    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
+    losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
+    winning_lib = self.make_target('//:b', JarLibrary, jars=[winning_dep])
+    # Confirm that the same artifact was added to each target.
+    compile_classpath = self.resolve([losing_lib, winning_lib])
+    losing_cp = compile_classpath.get_for_target(losing_lib)
+    winning_cp = compile_classpath.get_for_target(winning_lib)
+    self.assertEquals(losing_cp, winning_cp)
+    self.assertEquals(1, len(winning_cp))
+
   def test_resolve_no_deps(self):
-    # Resolve a library with no deps, and confirm that an empty product was created.
+    # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', ScalaLibrary)
     assert self.resolve([target])

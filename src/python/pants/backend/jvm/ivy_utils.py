@@ -40,11 +40,16 @@ class IvyInfo(object):
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.
     self._deps_by_caller = defaultdict(OrderedSet)
+    # Map from _unversioned_ ref to OrderedSet of IvyArtifact instances.
+    self._artifacts_by_ref = defaultdict(OrderedSet)
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
     for caller in module.callers:
       self._deps_by_caller[caller].add(module.ref)
+    # Strip the version from the ref before recording artifacts.
+    unversioned_ref = IvyModuleRef(module.ref.org, module.ref.name, "")
+    self._artifacts_by_ref[unversioned_ref].update(module.artifacts)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
@@ -79,22 +84,26 @@ class IvyInfo(object):
     memo[ref] = acc
     return acc
 
-  def get_modules_for_jar_library(self, jar_library, memo=None):
-    """Collects IvyModule instances for the passed jar_library.
+  def get_artifacts_for_jar_library(self, jar_library, memo=None):
+    """Collects IvyArtifact instances for the passed jar_library.
+
+    Because artifacts are only fetched for the "winning" version of a module, the artifacts
+    will not always represent the version originally declared by the library.
 
     This method is transitive within the library's jar_dependencies, but will NOT
     walk into its non-jar dependencies.
 
-    :param jar_library A JarLibrary to collect the transitive modules for.
+    :param jar_library A JarLibrary to collect the transitive artifacts for.
     :param memo see `traverse_dependency_graph`
     """
-    modules = OrderedDict()
+    modules = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
       for module_ref in self.traverse_dependency_graph(jar, create_collection, memo):
-        modules[module_ref] = self.modules_by_ref[module_ref]
-    return modules.values()
+        unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
+        modules.update(self._artifacts_by_ref[unversioned_ref])
+    return modules
 
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar
@@ -109,7 +118,6 @@ class IvyInfo(object):
         s.add(dep)
       return s
     return self.traverse_dependency_graph(jar, create_collection, memo)
-
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
