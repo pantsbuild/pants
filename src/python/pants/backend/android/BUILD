@@ -37,4 +37,7 @@ python_library(
 python_library(
   name = 'android_manifest_parser',
   sources =['android_manifest_parser.py'],
+  dependencies = [
+    'src/python/pants/util:xml_parser',
+  ]
 )
