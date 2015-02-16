@@ -28,7 +28,7 @@ class UnionProducts(object):
     for target in targets:
       self.add_for_target(target, products)
 
-  def get_target(self, target):
+  def get_for_target(self, target):
     """Gets the transitive product deps for the given target."""
     return self.get_for_targets([target])
 
