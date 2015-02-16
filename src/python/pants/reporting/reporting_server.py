@@ -26,7 +26,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 # Google Prettyprint plugin files.
-PPP_RE=re.compile("""^lang-.*\.js$""")
+PPP_RE = re.compile("""^lang-.*\.js$""")
 
 
 class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):

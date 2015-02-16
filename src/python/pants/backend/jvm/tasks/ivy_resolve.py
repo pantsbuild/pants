@@ -63,6 +63,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         'compile_classpath',
         'ivy_cache_dir',
         'ivy_jar_products',
+        'ivy_resolve_symlink_map',
         'jar_dependencies',
         'jar_map_default',
         'jar_map_sources',
@@ -129,7 +130,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
     ivy_jar_products = self._generate_ivy_jar_products(relevant_targets)
-    symlink_map = self.context.products.get_data('symlink_map')
+    symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
     for conf in self.confs:
       ivy_jar_memo = {}
       ivy_info = ivy_jar_products[conf]

@@ -54,9 +54,12 @@ class PythonRun(PythonTask):
           try:
             result = po.wait()
             if result != 0:
-              raise TaskError('python {args} ... exited non-zero ({code})' %
-                              dict(args=args, code=result),
-                              exit_code=result)
+              msg = '{interpreter} {entry_point} {args} ... exited non-zero ({code})'.format(
+                        interpreter=interpreter.binary,
+                        entry_point=binary.entry_point,
+                        args=' '.join(args),
+                        code=result)
+              raise TaskError(msg, exit_code=result)
           except KeyboardInterrupt:
             po.send_signal(signal.SIGINT)
             raise

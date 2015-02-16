@@ -68,6 +68,7 @@ python_library(
     ':address',
     ':address_lookup_error',
     ':build_file',
+    ':build_file_parser',
     ':build_environment',
   ]
 )
@@ -167,6 +168,9 @@ python_library(
 python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+  ]
 )
 
 python_library(
@@ -246,7 +250,9 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
+    ':address_lookup_error',
     ':build_file',
   ],
 )
