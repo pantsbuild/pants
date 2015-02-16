@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+cd ${REPO_ROOT}
+
 source build-support/common.sh
 
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrdlpcieat)"
+  echo "Usage: $0 (-h|-fxbkmsrdlpncieat)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -19,6 +22,7 @@ function usage() {
   echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
+  echo " -n           skip contrib python tests"
   echo " -c           skip pants integration tests"
   echo " -i TOTAL_SHARDS:SHARD_NUMBER"
   echo "              if running integration tests, divide them into"
@@ -41,7 +45,7 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrdlpci:eat" opt; do
+while getopts "hfxbkmsrdlpnci:eat" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_formatting_checks="true" ;;
@@ -54,6 +58,7 @@ while getopts "hfxbkmsrdlpci:eat" opt; do
     d) daemons="--no-ng-daemons" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
+    n) skip_contrib="true" ;;
     c) skip_integration="true" ;;
     i)
       if [[ "valid" != "$(echo ${OPTARG} | sed -E 's|[0-9]+:[0-9]+|valid|')" ]]; then
@@ -87,20 +92,10 @@ fi
 if [[ "${skip_formatting_checks:-false}" == "false" ]]; then
   banner "Checking python code formatting"
 
-  build-support/bin/check_header.sh || exit 1
-
-  build-support/bin/isort.sh || \
+  ./build-support/bin/check_packages.sh || exit 1
+  ./build-support/bin/check_header.sh || exit 1
+  ./build-support/bin/isort.sh || \
     die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
-
-  # We don't allow code in our __init.py__ files. Reject changes that allow
-  # this to creep back in.
-  R=$(find src tests pants-plugins -name __init__.py -not -empty | \
-      grep -v src/python/pants/__init__.py)
-  if [ ! -z "${R}" ]; then
-    echo "ERROR: All '__init__.py' files should be empty, but the following contain code:"
-    echo "$R"
-    exit 1
-  fi
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
@@ -129,7 +124,7 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     fi
     ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
-    mv dist/pants_local_binary.pex ./pants.pex && \
+    mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex --version
   ) || die "Failed to bootstrap pants."
 fi
@@ -154,6 +149,7 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
 [backends]
 packages: [
     # TODO(John Sirois): When we have fine grained plugins, include the python backend here
+    "internal_backend.utilities",
   ]
 EOF
     ) && \
@@ -169,7 +165,7 @@ fi
 
 if [[ "${skip_docs:-false}" == "false" ]]; then
   banner "Running site doc generation test"
-  ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
+  ./build-support//bin/publish_docs.sh || die "Failed to generate site docs."
 fi
 
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
@@ -178,7 +174,7 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex test ${PANTS_ARGS[@]} \
         $(./pants.pex list pants-plugins/tests/python:: | \
-            xargs ./pants filter --filter-type=python_tests | \
+            xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
   ) || die "Internal backend python test failure"
 fi
@@ -190,9 +186,19 @@ if [[ "${skip_python:-false}" == "false" ]]; then
       PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \
-            xargs ./pants filter --filter-type=python_tests | \
+            xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
   ) || die "Core python test failure"
+fi
+
+if [[ "${skip_contrib:-false}" == "false" ]]; then
+  banner "Running contrib python tests"
+  (
+    PANTS_PYTHON_TEST_FAILSOFT=1 \
+      ./pants.pex test ${PANTS_ARGS[@]} \
+        $(./pants.pex list contrib:: | \
+            xargs ./pants.pex filter --filter-type=python_tests)
+  ) || die "Contrib python test failure"
 fi
 
 if [[ "${skip_testprojects:-false}" == "false" ]]; then
@@ -246,7 +252,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex test ${PANTS_ARGS[@]} \
         $(./pants.pex list tests/python:: | \
-            xargs ./pants filter --filter-type=python_tests | \
+            xargs ./pants.pex filter --filter-type=python_tests | \
             grep integration | \
             sort | \
             awk "NR%${TOTAL_SHARDS:-1}==${SHARD_NUMBER:-0}")

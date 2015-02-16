@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+cd ${REPO_ROOT}
 
-source "${ROOT}/build-support/common.sh"
+source "${REPO_ROOT}/build-support/common.sh"
 
 function usage() {
   echo "Checks import sort order for python files, optionally fixing incorrect"
@@ -36,7 +37,7 @@ REQUIREMENTS=(
   "isort==3.9.5"
 )
 
-VENV_DIR="${ROOT}/build-support/isort.venv"
+VENV_DIR="${REPO_ROOT}/build-support/isort.venv"
 
 function fingerprint_data() {
   openssl md5 | cut -d' ' -f2
@@ -48,7 +49,7 @@ function activate_venv() {
 
 function create_venv() {
   rm -rf "${VENV_DIR}"
-  "${ROOT}/build-support/virtualenv" "${VENV_DIR}"
+  "${REPO_ROOT}/build-support/virtualenv" "${VENV_DIR}"
 }
 
 function activate_isort() {
@@ -74,5 +75,5 @@ function activate_isort() {
 
 activate_isort
 
-isort ${isort_args[@]} --recursive src tests pants-plugins examples
+isort ${isort_args[@]} --recursive src tests pants-plugins examples contrib
 
