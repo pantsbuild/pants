@@ -10,6 +10,14 @@ from abc import abstractmethod
 from twitter.common.lang import AbstractClass
 
 
+class DefaultFingerprintHashingMixin(object):
+
+  def __hash__(self):
+    return hash(type(self))
+
+  def __eq__(self, other):
+    return type(self) == type(other)
+
 class FingerprintStrategy(AbstractClass):
   """A helper object for doing per-task, finer grained invalidation of Targets."""
 
@@ -34,14 +42,8 @@ class FingerprintStrategy(AbstractClass):
     """Subclasses must implement an equality check so computed fingerprints can be safely memoized."""
 
 
-class DefaultFingerprintStrategy(FingerprintStrategy):
+class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
   """The default FingerprintStrategy, which delegates to target.payload.invalidation_hash()."""
 
   def compute_fingerprint(self, target):
     return target.payload.fingerprint()
-
-  def __hash__(self):
-    return hash(type(self))
-
-  def __eq__(self, other):
-    return type(self) == type(other)
