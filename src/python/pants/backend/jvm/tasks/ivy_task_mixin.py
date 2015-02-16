@@ -19,7 +19,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
@@ -28,24 +28,16 @@ from pants.util.dirutil import safe_mkdir
 logger = logging.getLogger(__name__)
 
 
-class IvyResolveFingerprintStrategy(FingerprintStrategy):
+class IvyResolveFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):
     if isinstance(target, JarLibrary):
       return target.payload.fingerprint()
-    elif isinstance(target, JvmTarget):
+    if isinstance(target, JvmTarget):
       if target.payload.excludes or target.payload.configurations:
         return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
-      else:
-        return None
-    else:
-      return None
+    return None
 
-  def __hash__(self):
-    return hash(type(self))
-
-  def __eq__(self, other):
-    return type(self) == type(other)
 
 
 class IvyTaskMixin(object):
