@@ -165,7 +165,7 @@ fi
 
 if [[ "${skip_docs:-false}" == "false" ]]; then
   banner "Running site doc generation test"
-  ./build-support//bin/publish_docs.sh || die "Failed to generate site docs."
+  ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
 fi
 
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
