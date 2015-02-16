@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from mock import patch
-
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 from pants_test.base_test import BaseTest
 

@@ -6,5 +6,6 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     'pants-plugins/src/python/internal_backend/sitegen/tasks:all',
+    'src/python/pants/goal:task_registrar',
   ]
 )

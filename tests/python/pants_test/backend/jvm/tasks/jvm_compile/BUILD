@@ -23,7 +23,6 @@ python_tests(
   name = 'zinc_utils',
   sources = ['test_zinc_utils.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/backend/jvm/tasks/jvm_compile:scala',
     'tests/python/pants_test:base_test',
   ]

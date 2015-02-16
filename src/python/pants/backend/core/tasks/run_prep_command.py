@@ -12,8 +12,6 @@ from collections import namedtuple
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.goal.products import MultipleRootedProducts
-from pants.util.dirutil import safe_mkdir
 
 
 class RunPrepCommand(Task):

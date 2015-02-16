@@ -5,11 +5,13 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    ':python_artifact',
+    ':python_requirement',
+    ':python_requirements',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/goal:task_registrar',
-    ':all_utils',
   ]
 )
 
@@ -54,6 +56,8 @@ python_library(
   dependencies = [
     ':code_generator',
     '3rdparty/python:antlr-3.1.3',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/ivy',
     'src/python/pants/util:dirutil',
   ]
@@ -96,7 +100,10 @@ python_library(
 python_library(
   name = 'python_artifact',
   sources = ['python_artifact.py'],
-  dependencies = [],
+  dependencies = [
+    'src/python/pants/base:build_manual',
+    'src/python/pants/base:payload_field',
+  ],
 )
 
 python_library(

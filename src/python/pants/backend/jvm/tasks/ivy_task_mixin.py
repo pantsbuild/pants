@@ -29,12 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
-  @classmethod
-  def product_types(cls):
-    # TODO(pl): This is almost certainly supposed to be on IvyTaskMixin,
-    # but it might mess up MRO linearization.
-    # It seems to be completely unused right now.
-    return ['symlink_map']
 
   def compute_fingerprint(self, target):
     if isinstance(target, JarLibrary):
@@ -71,6 +65,8 @@ class IvyTaskMixin(object):
                   workunit_name=None,
                   confs=None,
                   custom_args=None):
+    """Populates the product 'ivy_resolve_symlink_map' from the specified targets."""
+
     if not targets:
       return ([], set())
 
@@ -130,10 +126,12 @@ class IvyTaskMixin(object):
     symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
                                              symlink_dir, target_classpath_file)
     with IvyTaskMixin.symlink_map_lock:
-      all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
+      products = self.context.products
+      all_symlinks_map = products.get_data('ivy_resolve_symlink_map') or defaultdict(list)
       for path, symlink in symlink_map.items():
         all_symlinks_map[os.path.realpath(path)].append(symlink)
-      self.context.products.safe_create_data('symlink_map', lambda: all_symlinks_map)
+      products.safe_create_data('ivy_resolve_symlink_map',
+                                lambda: all_symlinks_map)
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
