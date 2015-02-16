@@ -11,14 +11,13 @@ from xml.dom.minidom import parse
 class XmlParser(object):
   """Parse .xml files."""
 
-  class BadXmlException(Exception):
+  class XmlError(Exception):
     """Raise when parsing the xml results in error."""
 
   @classmethod
   def _parse(cls, xml_path):
-    """Parse .xml file.
+    """Parse .xml file and return parsed text as a DOM Document.
 
-    Use this class method to create XmlParser instances.
     :param string xml_path: File path of xml file to be parsed.
     :returns xml.dom.minidom.Document parsed_xml: Document instance containing parsed xml.
     """
@@ -26,7 +25,7 @@ class XmlParser(object):
       parsed_xml = parse(xml_path)
     # Minidom is a frontend for various parsers, only Exception covers ill-formed .xml for them all.
     except Exception as e:
-      raise cls.BadXmlException('Error parsing xml: {}'.format(e))
+      raise cls.XmlError('Error parsing xml file at {0}: {1}'.format(xml_path, e))
     return parsed_xml
 
   @classmethod
@@ -43,3 +42,21 @@ class XmlParser(object):
     """
     self.xml_path = xml_path
     self.parsed = parsed_xml
+
+  def get_attribute(self, element, attribute):
+    """Retrieve the value of an attribute that is contained by the tag element.
+
+    :param string element: Name of an xml element.
+    :param string attribute: Name of the attribute that is to be returned.
+    :return: Desired attribute value.
+    :rtype: string
+    """
+    parsed_element = self.parsed.getElementsByTagName(element)
+    if not parsed_element:
+      raise self.XmlError("There is no '{0}' element in "
+                          "xml file at: {1}".format(element, self.xml_path))
+    parsed_attribute = parsed_element[0].getAttribute(attribute)
+    if not parsed_attribute:
+      raise self.XmlError("There is no '{0}' attribute in "
+                          "xml at: {1}".format(attribute, self.xml_path))
+    return parsed_attribute
