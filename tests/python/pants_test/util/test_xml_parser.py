@@ -15,7 +15,7 @@ from pants.util.xml_parser import XmlParser
 
 
 class TestXmlBase(unittest.TestCase):
-  """Test the XmlParser class."""
+  """Base class for tests that parse xml."""
 
   @contextmanager
   def xml_file(self,
@@ -55,6 +55,7 @@ class TestXmlBase(unittest.TestCase):
 
 
 class TestXmlParser(TestXmlBase):
+  """Test the XmlParser class."""
 
   def test_from_file(self):
     with self.xml_file() as xml:
