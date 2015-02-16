@@ -39,7 +39,7 @@ class UnionProducts(object):
     # Walk the targets transitively to aggregate their products.
     for target in targets:
       for dep in target.closure():
-        if not dep in visited:
+        if dep not in visited:
           products.update(self._products_by_target[dep])
           visited.add(dep)
     return products

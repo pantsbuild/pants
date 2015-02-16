@@ -118,7 +118,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
                                                        lambda: UnionProducts())
 
     # After running ivy, we parse the resulting report, and record the dependencies for
-    # all relevant targets (ie: those that have directory dependencies).
+    # all relevant targets (ie: those that have direct dependencies).
     _, relevant_targets = self.ivy_resolve(
       targets,
       executor=executor,
@@ -133,11 +133,15 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
     for conf in self.confs:
       ivy_jar_memo = {}
-      ivy_info = ivy_jar_products[conf]
-      if not ivy_info:
+      ivy_info_list = ivy_jar_products[conf]
+      if not ivy_info_list:
         continue
       # TODO: refactor ivy_jar_products to remove list
-      ivy_info = ivy_info[0]
+      assert len(ivy_info_list) == 1, (
+        'The values in ivy_jar_products should always be length 1,'
+        ' since we no longer have exclusives groups.'
+      )
+      ivy_info = ivy_info_list[0]
       for target in relevant_targets:
         if not isinstance(target, JarLibrary):
           continue
@@ -145,7 +149,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         artifact_paths = []
         for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
           artifact_paths.append(symlink_map[artifact.path][0])
-        compile_classpath.add_for_target(target, map(lambda entry: (conf, entry), artifact_paths))
+        compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
 
     if self._report:
       self._generate_ivy_report(relevant_targets)
