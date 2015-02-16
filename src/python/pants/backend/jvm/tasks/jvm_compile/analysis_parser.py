@@ -33,7 +33,7 @@ class AnalysisParser(object):
     with open(path, 'r') as infile:
       while infile.next() != '{0}:\n'.format(self.empty_test_header):
         pass
-      return self.parse_num_items(infile) > 0
+      return self.parse_num_items(infile.next()) > 0
 
   def empty_prefix(self):
     """Returns a prefix indicating a trivial analysis file.
