@@ -10,7 +10,7 @@ import itertools
 import os
 import sys
 
-from pants.backend.jvm.tasks.jvm_compile.anonymizer import Anonymizer
+from pants.backend.jvm.tasks.jvm_compile.anonymizer import TranslationCapturer
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.dirutil import safe_mkdir
 
@@ -42,7 +42,17 @@ def main():
 
   with open(word_file, 'r') as infile:
     word_list = infile.read().split()
-  anonymizer = Anonymizer(word_list)
+
+  # First pass: Capture all words that need translating.
+  translation_capturer = TranslationCapturer(word_list)
+  for analysis_file in analysis_files:
+    analysis = ZincAnalysisParser(classes_dir).parse_from_path(analysis_file)
+    analysis.anonymize(translation_capturer)
+    translation_capturer.convert(os.path.basename(analysis_file))
+  translation_capturer.check_for_comprehensiveness()
+
+  # Second pass: Actually translate, in order-preserving fashion.
+  anonymizer = translation_capturer.get_order_preserving_anonymizer()
   for analysis_file in analysis_files:
     analysis = ZincAnalysisParser(classes_dir).parse_from_path(analysis_file)
     analysis.anonymize(anonymizer)
