@@ -273,10 +273,12 @@ class Depmap(ConsoleTask):
             return Depmap.SourceRootTypes.SOURCE
 
       def get_transitive_jars(jar_lib):
-        jars = []
-        if ivy_info:
-          jars = map(lambda m: m.ref, ivy_info.get_modules_for_jar_library(jar_lib, memo=ivy_jar_memo))
-        return OrderedSet(jars)
+        if not ivy_info:
+          return OrderedSet()
+        transitive_jars = OrderedSet()
+        for jar in jar_lib.jar_dependencies:
+          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar, memo=ivy_jar_memo))
+        return transitive_jars
 
       info = {
         'targets': [],
