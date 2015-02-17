@@ -31,7 +31,10 @@ class XmlParser(object):
   @classmethod
   def from_file(cls, xml_path):
     """Parse .xml file and create a XmlParser object."""
-    parsed_xml = cls._parse(xml_path)
+    try:
+      parsed_xml = cls._parse(xml_path)
+    except OSError:
+      raise XmlParser.XmlError("Problem locating xml file at {}".format(xml_path))
     return cls(xml_path, parsed_xml)
 
   def __init__(self, xml_path, parsed_xml):

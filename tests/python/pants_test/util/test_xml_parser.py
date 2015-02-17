@@ -62,6 +62,11 @@ class TestXmlParser(TestXmlBase):
       parser = XmlParser.from_file(xml)
       self.assertEqual(isinstance(parser, XmlParser), True)
 
+  def test_bad_path(self):
+    with self.assertRaises(XmlParser.XmlError):
+      xml = '/no/file/here'
+      XmlParser.from_file(xml)
+
   def test_parsed(self):
     with self.xml_file() as xml:
       parser = XmlParser.from_file(xml)

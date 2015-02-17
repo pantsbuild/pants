@@ -64,7 +64,7 @@ python_tests(
   ],
   dependencies = [
     'src/python/pants/backend/android:android_manifest_parser',
-    'src/python/pants/util:contextutil',
+    'src/python/pants/util:xml_parser',
   ]
 )
 
