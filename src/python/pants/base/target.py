@@ -9,7 +9,7 @@ import os
 import sys
 from hashlib import sha1
 
-from twitter.common.lang import Compatibility
+from six import string_types
 
 from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
@@ -247,7 +247,7 @@ class Target(AbstractTarget):
   def num_chunking_units(self):
     return max(1, len(self.sources_relative_to_buildroot()))
 
-  def assert_list(self, maybe_list, expected_type=Compatibility.string):
+  def assert_list(self, maybe_list, expected_type=string_types):
     return assert_list(maybe_list, expected_type,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 

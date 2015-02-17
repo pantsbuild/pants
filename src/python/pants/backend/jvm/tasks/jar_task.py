@@ -10,8 +10,9 @@ import tempfile
 from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 
+from six import binary_type, string_types
 from twitter.common.collections import maybe_list
-from twitter.common.lang import AbstractClass, Compatibility
+from twitter.common.lang import AbstractClass
 
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
@@ -91,7 +92,7 @@ class Jar(object):
 
     :param string main: a fully qualified class name
     """
-    if not main or not isinstance(main, Compatibility.string):
+    if not main or not isinstance(main, string_types):
       raise ValueError('The main entry must be a non-empty string')
     self._main = main
 
@@ -114,10 +115,10 @@ class Jar(object):
     :param string src: the path to the pre-existing source file or directory
     :param string dest: the path the source file or directory should have in this jar
     """
-    if not src or not isinstance(src, Compatibility.string):
+    if not src or not isinstance(src, string_types):
       raise ValueError('The src path must be a non-empty string, got %s of type %s.'
                        % (src, type(src)))
-    if dest and not isinstance(dest, Compatibility.string):
+    if dest and not isinstance(dest, string_types):
       raise ValueError('The dest entry path must be a non-empty string, got %s of type %s.'
                        % (dest, type(dest)))
     if not os.path.isdir(src) and not dest:
@@ -131,10 +132,10 @@ class Jar(object):
     :param string path: the path to write the contents to in this jar
     :param string contents: the raw byte contents of the file to write to ``path``
     """
-    if not path or not isinstance(path, Compatibility.string):
+    if not path or not isinstance(path, string_types):
       raise ValueError('The path must be a non-empty string')
 
-    if contents is None or not isinstance(contents, Compatibility.bytes):
+    if contents is None or not isinstance(contents, binary_type):
       raise ValueError('The contents must be a sequence of bytes')
 
     self._add_entry(self.MemoryEntry(path, contents))
@@ -150,7 +151,7 @@ class Jar(object):
 
     :param string jar: the path to the pre-existing jar to graft into this jar
     """
-    if not jar or not isinstance(jar, Compatibility.string):
+    if not jar or not isinstance(jar, string_types):
       raise ValueError('The jar path must be a non-empty string')
 
     self._jars.append(jar)

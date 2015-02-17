@@ -5,7 +5,7 @@ python_library(
    name = 'contextutil',
    sources = ['contextutil.py'],
    dependencies = [
-     '3rdparty/python/twitter/commons:twitter.common.lang',
+     '3rdparty/python:six',
      ':dirutil',
    ],
 )
