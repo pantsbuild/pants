@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.android.android_manifest_parser import AndroidManifestParser, AndroidManifest
+from pants.backend.android.android_manifest_parser import AndroidManifest, AndroidManifestParser
 from pants_test.util.test_xml_parser import TestXmlBase
 
 
