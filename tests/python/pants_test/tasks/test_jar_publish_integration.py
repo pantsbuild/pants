@@ -153,7 +153,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                                artifact_name='hello-greet-0.0.1-SNAPSHOT.jar',
                                success_expected=False)
 
-
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True):
     """Tests that publishing the given target results in the expected output.
@@ -179,12 +178,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       if success_expected:
         self.assert_success(pants_run, "'pants goal publish' expected success, but failed instead.")
       else:
-        self.assert_failure(pants_run, "'pants goal publish' expected failure, but succeeded instead.")
+        self.assert_failure(pants_run,
+                            "'pants goal publish' expected failure, but succeeded instead.")
         return
 
       # New pushdb directory should be created for all artifacts.
       for pushdb_file in pushdb_files:
-        self.assertTrue(os.path.exists(os.path.dirname(os.path.join(self.pushdb_root, pushdb_file))))
+        pushdb_dir = os.path.dirname(os.path.join(self.pushdb_root, pushdb_file))
+        self.assertTrue(os.path.exists(pushdb_dir))
 
       # But because we are doing local publishes, no pushdb files are created
       for pushdb_file in pushdb_files:
