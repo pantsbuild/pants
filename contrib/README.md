@@ -70,7 +70,7 @@ Contrib plugins should generally follow 3 basic setup steps:
      execute_packaged_pants_with_internal_backends goals | grep "example-goal" &> /dev/null
    }
 
-   # Once individual (new) package is declared above, insert it into the array below)
+   # Once an individual (new) package is declared above, insert it into the array below)
    CONTRIB_PACKAGES=(
      PKG_SCROOGE
      PKG_EXAMPLE
