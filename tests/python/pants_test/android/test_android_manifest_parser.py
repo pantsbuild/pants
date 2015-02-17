@@ -103,12 +103,12 @@ class TestAndroidManifestParser(TestXmlBase):
   # Test AndroidManifest().
   def test_android_manifest(self):
     with self.xml_file() as xml:
-      test = AndroidManifest(xml, '19', 'com.foo.bar', 'com.foo.bar.HelloBar')
+      test = AndroidManifest(xml, '19', 'com.foo.bar', app_name='com.foo.bar.HelloBar')
       self.assertEqual(test.path, xml)
 
   def test_app_name_none(self):
     with self.xml_file() as xml:
-      test = AndroidManifest(xml, '19', 'com.foo.bar', None)
+      test = AndroidManifest(xml, '19', 'com.foo.bar', app_name=None)
       self.assertEqual(test.path, xml)
 
   def test_no_app_name(self):

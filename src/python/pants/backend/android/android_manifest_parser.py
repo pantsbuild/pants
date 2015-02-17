@@ -33,7 +33,7 @@ class AndroidManifestParser(object):
       raise cls.BadManifestError("AndroidManifest.xml parsing error: {}".format(e))
     app_name = manifest.get_optional_attribute('activity', 'android:name')
 
-    return AndroidManifest(manifest.xml_path, target_sdk, package_name, app_name)
+    return AndroidManifest(manifest.xml_path, target_sdk, package_name, app_name=app_name)
 
 
 class AndroidManifest(object):
