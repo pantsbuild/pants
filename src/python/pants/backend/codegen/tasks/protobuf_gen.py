@@ -77,13 +77,11 @@ class ProtobufGen(CodeGen):
                   'this parameter, you may also need to update --version',
              default=_PROTOBUF_GEN_PYTHONDEPS_DEFAULT)
 
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
   def prepare(cls, options, round_manager):
     super(ProtobufGen, cls).prepare(options, round_manager)
     round_manager.require_data('ivy_imports')
     round_manager.require_data('deferred_sources')
-  # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
