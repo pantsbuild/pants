@@ -256,7 +256,7 @@ class ProtobufGen(CodeGen):
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
     deps = OrderedSet(self.javadeps)
-    import_jars = target.imports
+    import_jars = target.imported_jars
     jars_tgt = self.context.add_new_target(SyntheticAddress(spec_path, target.id+str('-rjars')),
                                            JarLibrary,
                                            jars=import_jars,

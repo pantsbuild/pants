@@ -7,10 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-import six
-
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
@@ -18,7 +16,7 @@ from pants.base.payload_field import PrimitiveField
 logger = logging.getLogger(__name__)
 
 
-class JavaProtobufLibrary(ExportableJvmLibrary):
+class JavaProtobufLibrary(ImportJarsMixin, ExportableJvmLibrary):
   """Generates a stub Java library from protobuf IDL files."""
 
   def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
@@ -29,9 +27,10 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
     """
     payload = payload or Payload()
     # TODO(Eric Ayers): The target needs to incorporate the settings of --gen-protoc-version
-    # and --gen-protoc-plugins into the fingerprint.
+    # and --gen-protoc-plugins into the fingerprint.  Consider adding a custom FingeprintStrategy
+    # into ProtobufGen to get it.
     payload.add_fields({
-      'raw_imports': PrimitiveField(imports or ())
+      'import_specs': PrimitiveField(imports or ())
     })
     super(JavaProtobufLibrary, self).__init__(payload=payload, **kwargs)
     if buildflags is not None:
@@ -39,25 +38,11 @@ class JavaProtobufLibrary(ExportableJvmLibrary):
                   "ignored and will be removed in a future release"
                   .format(address=self.address.spec))
     self.add_labels('codegen')
-    if imports:
-      self.add_labels('has_imports')
-    self._imports = None
 
   @property
-  def traversable_specs(self):
-    for spec in super(JavaProtobufLibrary, self).traversable_specs:
-      yield spec
-    if self.payload.raw_imports:
-      for spec  in self.payload.raw_imports:
-        # This simply skips over non-strings, but we catch them with a WrongTargetType below.
-        if isinstance(spec, six.string_types):
-          yield spec
+  def imported_jar_library_specs(self):
+    """List of JarLibrary specs to import.
 
-  @property
-  def imports(self):
-    """Returns the set of JarDependency instances to be included when compiling this target."""
-    if self._imports is None:
-      self._imports = JarLibrary.to_jar_dependencies(self.address,
-                                                     self.payload.raw_imports,
-                                                     self._build_graph)
-    return self._imports
+    Required to implement the ImportJarsMixin.
+    """
+    return self.payload.import_specs
