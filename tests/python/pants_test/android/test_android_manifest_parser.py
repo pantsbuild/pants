@@ -66,30 +66,30 @@ class TestAndroidManifestParser(TestXmlBase):
         parsed = AndroidManifestParser.parse_manifest(manifest)
         self.assertEqual(parsed.target_sdk, '19')
 
-  # Test AndroidManifestParser.application_name.
+  # Test AndroidManifestParser.app_name.
   def test_application_name(self):
     with self.xml_file() as manifest:
       parsed = AndroidManifestParser.parse_manifest(manifest)
-      self.assertEqual(parsed.application_name, 'HelloWorld')
+      self.assertEqual(parsed.app_name, 'com.pants.examples.hello.HelloWorld')
 
   def test_get_weird_app_name(self):
     with self.xml_file(application_name_value='no_periods') as manifest:
       parsed = AndroidManifestParser.parse_manifest(manifest)
-      self.assertEqual(parsed.application_name, 'no_periods')
+      self.assertEqual(parsed.app_name, 'no_periods')
 
-  # These last tests show AndroidManifestParser.application_name fails silently and returns None.
+  # These last tests show AndroidManifestParser.app_name fails silently and returns None.
   def test_no_activity_element(self):
     with self.xml_file(activity_element='root_beer') as manifest:
       parsed = AndroidManifestParser.parse_manifest(manifest)
-      self.assertEqual(parsed.application_name, None)
+      self.assertEqual(parsed.app_name, None)
 
   def test_no_android_name_attribute(self):
     with self.xml_file(android_name_attribute='android:grape') as manifest:
       parsed = AndroidManifestParser.parse_manifest(manifest)
-      self.assertEqual(parsed.application_name, None)
+      self.assertEqual(parsed.app_name, None)
 
   def test_no_attribute_tag_match(self):
     # With attribute:value, the attribute must be declared. We declare unrelated on ln 3 of the xml.
     with self.xml_file(android_name_attribute='unrelated:match') as manifest:
       parsed = AndroidManifestParser.parse_manifest(manifest)
-      self.assertEqual(parsed.application_name, None)
+      self.assertEqual(parsed.app_name, None)

@@ -55,7 +55,7 @@ class AaptBuilder(AaptTask):
     #   : additional positional arguments are treated as input directories to gather files from.
     args.extend([self.aapt_tool(target.build_tools_version)])
     args.extend(['package', '-f'])
-    args.extend(['-M', target.manifest.xml_path])
+    args.extend(['-M', target.manifest.path])
     args.extend(['-S'])
     args.extend(resource_dir)
     args.extend(['-I', self.android_jar_tool(target.manifest.target_sdk)])

@@ -80,7 +80,7 @@ class AaptGen(AaptTask, CodeGen):
     #   : '-I' packages to add to base "include" set, here it is the android.jar of the target-sdk.
     args.extend([self.aapt_tool(target.build_tools_version)])
     args.extend(['package', '-m', '-J', output_dir])
-    args.extend(['-M', target.manifest.xml_path])
+    args.extend(['-M', target.manifest.path])
     args.extend(['-S', target.resource_dir])
     args.extend(['-I', self.android_jar_tool(target.manifest.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])

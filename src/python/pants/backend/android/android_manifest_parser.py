@@ -9,9 +9,9 @@ from pants.util.xml_parser import XmlParser
 
 
 class AndroidManifestParser(XmlParser):
-  """Parse AndroidManifest.xml and store needed values.
+  """Parse AndroidManifest.xml and instantiate an AndroidManifest object to hold useful attributes.
 
-  This class does not validate values, that is left to the consumers.
+  This class does not validate if the values are correct or useful, that is left to the consumers.
   """
 
   class BadManifestError(Exception):
@@ -23,65 +23,26 @@ class AndroidManifestParser(XmlParser):
 
     :param string manifest_path: File path that points to an xml file.
     :return: Object created from the parsed xml.
-    :rtype: AndroidManifestParser
+    :rtype: AndroidManifest
     """
-    manifest = cls._parse(manifest_path)
-    return cls(manifest_path, manifest)
-
-  def __init__(self, manifest_path, parsed_manifest):
-    super(AndroidManifestParser, self).__init__(manifest_path, parsed_manifest)
-    self._target_sdk = None
-    self._package_name = None
-    self._app_name = None
-
-  @property
-  def package_name(self,):
-    """Return the package name of the Android target as a string.
-
-    :return: Package name from the AndroidManifest.xml.
-    :rtype: string
-    """
-    if self._package_name is None:
-      self._package_name = self.get_android_attribute('manifest', 'package')
-    return self._package_name
-
-  @property
-  def target_sdk(self):
-    """Return a string with the Android package's target SDK.
-
-    :return: Target SDK version number from the AndroidManifest.xml.
-    :rtype: string
-    """
-    if self._target_sdk is None:
-      self._target_sdk = self.get_android_attribute('uses-sdk', 'android:targetSdkVersion')
-    return self._target_sdk
-
-  @property
-  def application_name(self):
-    """Return a string with the application name of the package or return None on failure.
-
-    :return: Application name ('name' from foo.bar.name) or None if name not found.
-    :rtype: string or None
-    """
-    # Use android.target.app_name to get the application name, it provides a fallback value.
-    if self._app_name is None:
-      try:
-        app_name = self.get_android_attribute('activity', 'android:name')
-        self._app_name = app_name.split(".")[-1]
-      except self.BadManifestError:
-        self._app_name = None
-    return self._app_name
-
-  def get_android_attribute(self, element, attribute):
-    """Get attribute from parsed xml and raise self.BadManifestError upon failure.
-
-    :param element: The xml element that surrounds the required attribute.
-    :param attribute: The xml attribute that is returned by the method.
-    :return: Value of the attribute from the xml.
-    :rtype: string
-    """
+    manifest = cls.from_file(manifest_path)
     try:
-      attribute = self.get_attribute(element, attribute)
+      target_sdk = manifest.get_attribute('uses-sdk', 'android:targetSdkVersion')
+      package_name = manifest.get_attribute('manifest', 'package')
     except XmlParser.XmlError as e:
-      raise self.BadManifestError("AndroidManifest.xml parsing error: {}".format(e))
-    return attribute
+      raise cls.BadManifestError("AndroidManifest.xml parsing error: {}".format(e))
+    app_name = manifest.get_optional_attribute('activity', 'android:name')
+
+    return AndroidManifest(path=manifest.xml_path, target_sdk=target_sdk, package_name=package_name,
+                           app_name=app_name)
+
+
+class AndroidManifest(object):
+  """Object to represent an Android manifest."""
+
+  def __init__(self, path=None, target_sdk=None, package_name=None, app_name=None):
+    self.target_sdk = target_sdk
+    self.package_name = package_name
+    self.path = path
+    # Can be None, so tasks should use target.app_name which checks this but has a backup value.
+    self.app_name = app_name

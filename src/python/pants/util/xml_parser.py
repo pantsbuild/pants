@@ -60,3 +60,10 @@ class XmlParser(object):
       raise self.XmlError("There is no '{0}' attribute in "
                           "xml at: {1}".format(attribute, self.xml_path))
     return parsed_attribute
+
+  def get_optional_attribute(self, element, attribute):
+    """Attempt to retrieve an optional attribute from the xml and return None on failure."""
+    try:
+      return self.get_attribute(element, attribute)
+    except self.XmlError:
+      return None

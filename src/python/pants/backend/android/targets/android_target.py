@@ -35,32 +35,32 @@ class AndroidTarget(JvmTarget):
     self.build_tools_version = build_tools_version
     self._spec_path = address.spec_path
 
-    self._manifest_path = None
-    self._manifest = manifest
+    self._manifest_path = manifest
+    self._manifest = None
     self._app_name = None
 
   @property
   def manifest(self):
-    """Return an AndroidManifestParser object made from AndroidManifest.xml."""
+    """Return an AndroidManifest object made from a manifest by AndroidManifestParser."""
 
     # For both gradle and ant layouts, AndroidManifest is conventionally at top-level.
-    # As the file name is required by the tooling, I think providing that as a default is natural.
-    # Still, I would recommend users explicitly define a 'manifest' in android BUILD files.
-    if self._manifest_path is None:
+    # I would recommend users still explicitly define a 'manifest' in android BUILD files.
+    if self._manifest is None:
       # If there was no 'manifest' field in the BUILD file, try to find one with the default value.
-      if self._manifest is None:
-        self._manifest = 'AndroidManifest.xml'
-      manifest = os.path.join(self._spec_path, self._manifest)
+      if self._manifest_path is None:
+        self._manifest_path = 'AndroidManifest.xml'
+      manifest = os.path.join(self._spec_path, self._manifest_path)
       if not os.path.isfile(manifest):
         raise TargetDefinitionException(self, "There is no AndroidManifest.xml at path {0}. Please "
                                               "declare a 'manifest' field with its relative "
                                               "path.".format(manifest))
-      self._manifest_path = AndroidManifestParser.parse_manifest(manifest)
-    return self._manifest_path
+      self._manifest = AndroidManifestParser.parse_manifest(manifest)
+    return self._manifest
 
   @property
   def app_name(self):
     """Return application name from the target's manifest or target.name if that cannot be found."""
     if self._app_name is None:
-      self._app_name = self.manifest.application_name or self.name
+      app_name = self.manifest.app_name or self.name
+      self._app_name = app_name.split(".")[-1]
     return self._app_name
