@@ -12,26 +12,23 @@ from pants_test.util.test_xml_parser import TestXmlBase
 class TestAndroidManifestParser(TestXmlBase):
   """Test the AndroidManifestParser class."""
 
-  # Test AndroidManifestParser.get_package_name.
+  # Test AndroidManifestParser.package_name.
   def test_package_name(self):
     with self.xml_file() as manifest:
       parsed = AndroidManifestParser.parse_manifest(manifest)
-      self.assertEqual(parsed.package_name,
-                       'com.pants.examples.hello')
+      self.assertEqual(parsed.package_name, 'com.pants.examples.hello')
 
   def test_missing_manifest_element(self):
     with self.assertRaises(AndroidManifestParser.BadManifestError):
       with self.xml_file(manifest_element='grape_soda') as manifest:
         parsed = AndroidManifestParser.parse_manifest(manifest)
-        self.assertEqual(parsed.package_name,
-                         'com.pants.examples.hello')
+        self.assertEqual(parsed.package_name, 'com.pants.examples.hello')
 
   def test_missing_package_attribute(self):
     with self.assertRaises(AndroidManifestParser.BadManifestError):
       with self.xml_file(package_attribute='bad_value') as manifest:
         parsed = AndroidManifestParser.parse_manifest(manifest)
-        self.assertEqual(parsed.package_name,
-                         'com.pants.examples.hello')
+        self.assertEqual(parsed.package_name, 'com.pants.examples.hello')
 
   def test_weird_package_name(self):
     # Should accept unexpected package names, the info gets verified in classes that consume it.

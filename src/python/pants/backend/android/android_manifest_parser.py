@@ -9,7 +9,7 @@ from pants.util.xml_parser import XmlParser
 
 
 class AndroidManifestParser(XmlParser):
-  """Parse AndroidManifest.xml and retrieve various elements and attributes.
+  """Parse AndroidManifest.xml and store needed values.
 
   This class does not validate values, that is left to the consumers.
   """
