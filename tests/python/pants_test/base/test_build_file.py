@@ -198,7 +198,8 @@ class BuildFileTest(unittest.TestCase):
       fp.write('lib = java_library(name="jake", age=42)')
     build_file = self.create_buildfile('BUILD.code')
 
-    parsed_locals = six.exec_(build_file.code(), {'java_library': dict})
+    parsed_locals = {}
+    six.exec_(build_file.code(), {'java_library': dict}, parsed_locals)
     lib = parsed_locals.pop('lib', None)
     self.assertEqual(dict(name='jake', age=42), lib)
 
