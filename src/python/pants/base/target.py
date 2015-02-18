@@ -199,7 +199,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -213,6 +213,7 @@ class Target(AbstractTarget):
         by downstream/custom tasks for reasoning about build graph. NOT included in payloads
         and thus not used in fingerprinting, thus not suitable for anything that affects how
         a particular target is built.
+    :param string description: Human-readable description of this target.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
     self.payload = payload or Payload()
@@ -221,7 +222,7 @@ class Target(AbstractTarget):
     self.address = address
     self._tags = set(tags or [])
     self._build_graph = build_graph
-    self.description = None
+    self.description = description
     self.labels = set()
 
     self._cached_fingerprint_map = {}
@@ -448,6 +449,7 @@ class Target(AbstractTarget):
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   @manual.builddict()
+  @deprecated('0.0.30', hint_message='Use the description parameter of target() instead')
   def with_description(self, description):
     """Set a human-readable description of this target.
 

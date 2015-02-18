@@ -38,7 +38,6 @@ class TargetAddressable(Addressable):
 
     self.kwargs = kwargs
     self.name = kwargs['name']
-    self.description = None
     self.dependency_specs = self.kwargs.pop('dependencies', [])
 
     for dep_spec in self.dependency_specs:
@@ -49,7 +48,7 @@ class TargetAddressable(Addressable):
         raise TargetDefinitionException(target=self, msg=msg)
 
   def with_description(self, description):
-    self.description = description
+    self.kwargs['description'] = description
 
   def __str__(self):
     format_str = 'TargetAddressable(target_type={target_type}, name={name}, **kwargs=...)'

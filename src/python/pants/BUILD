@@ -6,7 +6,8 @@ target(
   dependencies = [
     'src/python/pants/bin:pants',
   ],
-).with_description('An alias for the pants binary target.')
+  description = 'An alias for the pants binary target.',
+)
 
 python_library(
   name = 'pants-packaged',
