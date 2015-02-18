@@ -788,7 +788,7 @@ class JarPublish(JarTask, ScmPublish):
             message = '\nChanges for {} since {} @ {}:\n\n{}\n'.format(
                 coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
             # The stdout encoding can be detected as None when running without a tty (common in
-            # tests), in which case we want to force encoding with a unicode-supporting chodec.
+            # tests), in which case we want to force encoding with a unicode-supporting codec.
             encoding = sys.stdout.encoding or 'utf-8'
             sys.stdout.write(message.encode(encoding))
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
