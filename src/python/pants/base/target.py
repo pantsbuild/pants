@@ -213,7 +213,7 @@ class Target(AbstractTarget):
         by downstream/custom tasks for reasoning about build graph. NOT included in payloads
         and thus not used in fingerprinting, thus not suitable for anything that affects how
         a particular target is built.
-    :param string description Set a human-readable description of this target.
+    :param string description Human-readable description of this target.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
     self.payload = payload or Payload()
@@ -449,16 +449,13 @@ class Target(AbstractTarget):
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   @manual.builddict()
-  @deprecated('0.0.30')
+  @deprecated('0.0.30', hint_message='Use the description parameter of target() instead')
   def with_description(self, description):
     """Set a human-readable description of this target.
 
     :param description: Descriptive string"""
-    self.set_description(description)
-    return self
-
-  def set_description(self, description):
     self.description = description
+    return self
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):
