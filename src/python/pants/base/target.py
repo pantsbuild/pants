@@ -5,15 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
-import sys
 from hashlib import sha1
 
-from twitter.common.lang import Compatibility
+from six import string_types
 
 from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -25,6 +26,8 @@ from pants.base.validation import assert_list
 
 
 class AbstractTarget(object):
+  _deprecated_predicate = functools.partial(deprecated, '0.0.30')
+
   @property
   def has_resources(self):
     """Returns True if the target has an associated set of Resources."""
@@ -36,31 +39,22 @@ class AbstractTarget(object):
     # TODO(John Sirois): fixup predicate dipping down into details here.
     return self.has_label('exportable') and self.provides
 
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on JarDependency
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JarDependency.')
   def is_jar(self):
     """Returns True if the target is a jar."""
-    print('The `Target.is_jar` property is deprecated and will be removed after 0.0.29.',
-          file=sys.stderr)
     return False
 
-  # DEPRECATED to be removed after 0.0.29
-  # Do not use this method, use an isinstance check on JavaAgent
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JavaAgent.')
   def is_java_agent(self):
     """Returns `True` if the target is a java agent."""
-    print('The `Target.is_java_agent` property is deprecated and will be removed after 0.0.29.',
-          file=sys.stderr)
     return self.has_label('java_agent')
 
-  # DEPRECATED  to be removed after 0.0.29
-  # do not use this method, use an isinstance check on JvmApp
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JvmApp.')
   def is_jvm_app(self):
     """Returns True if the target produces a java application with bundled auxiliary files."""
-    print('The `Target.is_jvm_app` property is deprecated and will be removed after 0.0.29.',
-          file=sys.stderr)
     return False
 
   # DEPRECATED  to be removed after 0.0.29
@@ -84,13 +78,10 @@ class AbstractTarget(object):
     """Returns True if the target is a codegen target."""
     return self.has_label('codegen')
 
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on JarLibrary
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JarLibrary.')
   def is_jar_library(self):
     """Returns True if the target is an external jar library."""
-    print('The `Target.is_jar_library` property is deprecated and will be removed after 0.0.29.',
-          file=sys.stderr)
     return self.has_label('jars')
 
   # DEPRECATED to be removed after 0.0.29
@@ -100,13 +91,10 @@ class AbstractTarget(object):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')
 
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on AnnotationProcessor
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on AnnotationProcessor.')
   def is_apt(self):
     """Returns True if the target exports an annotation processor."""
-    print('The `Target.is_apt` property is deprecated and will be removed after 0.0.29.',
-          file=sys.stderr)
     return self.has_label('apt')
 
   # DEPRECATED to be removed after 0.0.29
@@ -247,7 +235,7 @@ class Target(AbstractTarget):
   def num_chunking_units(self):
     return max(1, len(self.sources_relative_to_buildroot()))
 
-  def assert_list(self, maybe_list, expected_type=Compatibility.string):
+  def assert_list(self, maybe_list, expected_type=string_types):
     return assert_list(maybe_list, expected_type,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 

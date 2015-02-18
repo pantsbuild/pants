@@ -138,13 +138,16 @@ class ContextutilTest(unittest.TestCase):
     self.assertLess(t.finish, clock.time())
 
   def test_open_zip64Default(self):
-    with open_zip64('test', 'w') as zf:
-      self.assertTrue(zf._allowZip64)
+    with temporary_dir() as tempdir:
+      with open_zip64(os.path.join(tempdir, 'test'), 'w') as zf:
+        self.assertTrue(zf._allowZip64)
 
   def test_open_zip64True(self):
-    with open_zip64('test', 'w', allowZip64=True) as zf:
-      self.assertTrue(zf._allowZip64)
+    with temporary_dir() as tempdir:
+      with open_zip64(os.path.join(tempdir, 'test'), 'w', allowZip64=True) as zf:
+        self.assertTrue(zf._allowZip64)
 
   def test_open_zip64False(self):
-    with open_zip64('test', 'w', allowZip64=False) as zf:
-      self.assertFalse(zf._allowZip64)
+    with temporary_dir() as tempdir:
+      with open_zip64(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
+        self.assertFalse(zf._allowZip64)

@@ -5,8 +5,8 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
@@ -44,6 +44,7 @@ python_test_suite(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
+    ':deprecated',
     ':extension_loader',
     ':fingerprint_strategy',
     ':generator',
@@ -109,6 +110,15 @@ python_tests(
   sources = ['test_build_file_address_mapper.py'],
   dependencies = [
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'deprecated',
+  sources = ['test_deprecated.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants:version',
   ]
 )
 

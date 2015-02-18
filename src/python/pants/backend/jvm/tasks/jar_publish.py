@@ -780,9 +780,17 @@ class JarPublish(JarTask, ScmPublish):
           if no_changes:
             print(changelog)
           else:
-            print('\nChanges for %s since %s @ %s:\n\n%s' % (
-              coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog
-            ))
+            # The changelog may contain non-ascii text, but the print function can, under certain
+            # circumstances, incorrectly detect the output encoding to be ascii and thus blow up on
+            # non-ascii changelog characters.  Here we explicitly control the encoding to avoid
+            # the print function's mis-interpretation.
+            # TODO(John Sirois): Consider introducing a pants/util `print_safe` helper for this.
+            message = '\nChanges for {} since {} @ {}:\n\n{}\n'.format(
+                coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
+            # The stdout encoding can be detected as None when running without a tty (common in
+            # tests), in which case we want to force encoding with a unicode-supporting codec.
+            encoding = sys.stdout.encoding or 'utf-8'
+            sys.stdout.write(message.encode(encoding))
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
             raise TaskError('User aborted push')
 
