@@ -69,7 +69,7 @@ def initial_reporting(config, run_tracker):
 
   # Add some useful RunInfo.
   run_tracker.run_info.add_info('default_report', html_reporter.report_path())
-  port = ReportingServerManager.get_current_server_port()
+  (_, port) = ReportingServerManager.get_current_server_pid_and_port()
   if port:
     run_tracker.run_info.add_info('report_url', 'http://localhost:%d/run/%s' % (port, run_id))
 

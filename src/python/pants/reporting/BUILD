@@ -8,6 +8,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.threading',
     '3rdparty/python:ansicolors',
+    '3rdparty/python:psutil',
     '3rdparty/python:pystache',
     ':report',
     'src/python/pants/base:build_environment',
