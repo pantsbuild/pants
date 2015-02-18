@@ -8,9 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import BaseHTTPServer
 import itertools
 import json
+import logging
 import mimetypes
 import os
 import pkgutil
+import psutil
 import re
 import urllib
 import urlparse
@@ -22,8 +24,10 @@ import pystache
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_delete
 
+
+logger = logging.getLogger(__name__)
 
 # Google Prettyprint plugin files.
 PPP_RE = re.compile("""^lang-.*\.js$""")
@@ -359,26 +363,41 @@ class ReportingServerManager(object):
   def save_current_server_port(port):
     """Save the port of the currently-running server, so we can find it across pants runs."""
     # We don't put the pidfile in .pants.d, because we want to find it even after a clean.
-    # NOTE: If changing this dir/file name, also change get_current_server_pidfiles_and_ports
+    # NOTE: If changing this dir/file name, also change get_current_server_info
     # appropriately.
     # TODO: Generalize the pidfile idiom into some central library.
     pidfile_dir = ReportingServerManager._get_pidfile_dir()
     safe_mkdir(pidfile_dir)
-    pidfile = os.path.join(pidfile_dir, 'port_%d.pid' % port)
+    pidfile = os.path.join(pidfile_dir, 'port_{0}.pid'.format(port))
     with open(pidfile, 'w') as outfile:
       outfile.write(str(os.getpid()))
 
   @staticmethod
-  def get_current_server_port():
-    """Returns the port of the currently-running server, or None if no server is detected."""
-    pidfiles_and_ports = ReportingServerManager.get_current_server_pidfiles_and_ports()
+  def get_current_server_pid_and_port():
+    """Returns the (pid, port) of the currently-running server, or (None, None) if no server is detected."""
+    info = ReportingServerManager.get_current_server_info()
     # There should only be one pidfile, but in case there are many due to error,
     # pick the first one.
-    return pidfiles_and_ports[0][1] if pidfiles_and_ports else None
+    return (info[0][1], info[0][2]) if info else (None, None)
 
   @staticmethod
-  def get_current_server_pidfiles_and_ports():
-    """Returns a list of pairs (pidfile, port) of all found pidfiles."""
+  def get_current_server_info():
+    """Returns a list of tuples (pidfile, pid, port) of all found pidfiles."""
+
+    def pid_from_pidfile(pid_filename):
+      with open(pid_filename) as pidfile:
+        pid = pidfile.readline().strip()
+        return int(pid)
+
+    def is_active_pidfile(pid_filename):
+      pid = pid_from_pidfile(pid_filename)
+      if not psutil.pid_exists(pid):
+        logger.info("Pid {pid} not active. Deleting stale pidfile: {pid_filename}"
+                    .format(pid=pid, pid_filename=pid_filename))
+        safe_delete(pid_filename)
+        return False
+      return True
+
     pidfile_dir = ReportingServerManager._get_pidfile_dir()
     # There should only be one pidfile, but there may be errors/race conditions where
     # there are multiple of them.
@@ -387,5 +406,8 @@ class ReportingServerManager(object):
     for pidfile_name in pidfile_names:
       m = re.match(r'port_(\d+)\.pid', pidfile_name)
       if m is not None:
-        ret.append((os.path.join(pidfile_dir, pidfile_name), int(m.group(1))))
+        pid_filename = os.path.join(pidfile_dir, pidfile_name)
+        port = int(m.group(1))
+        if is_active_pidfile(pid_filename):
+          ret.append((pid_filename, pid_from_pidfile(pid_filename), port))
     return ret
