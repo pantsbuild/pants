@@ -136,7 +136,7 @@ function post_install() {
 }
 
 function install_and_test_packages() {
-  PIP_ARGS="$@"
+  PIP_ARGS="$@ --quiet"
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
