@@ -781,9 +781,9 @@ class JarPublish(JarTask, ScmPublish):
             print(changelog)
           else:
             # The changelog may contain non-ascii text, but the print function can, under certain
-            # circumstances, detect the correct output encoding to be ascii and thus blow up on
+            # circumstances, incorrectly detect the output encoding to be ascii and thus blow up on
             # non-ascii changelog characters.  Here we explicitly control the encoding to avoid
-            # print mis-interpretation.
+            # the print function's mis-interpretation.
             # TODO(John Sirois): Consider introducing a pants/util `print_safe` helper for this.
             message = '\nChanges for {} since {} @ {}:\n\n{}\n'.format(
                 coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
