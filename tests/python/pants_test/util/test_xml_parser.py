@@ -82,7 +82,7 @@ class TestXmlParser(TestXmlBase):
       parser = XmlParser.from_file(xml)
       self.assertEqual('manifest', parser.parsed.documentElement.tagName)
 
-  #Test XmlParser.get_attribute().
+  # Test XmlParser.get_attribute().
   def test_get_attribute(self):
     with self.xml_file() as xml:
       parser = XmlParser.from_file(xml)

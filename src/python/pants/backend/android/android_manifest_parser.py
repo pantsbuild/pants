@@ -15,7 +15,7 @@ class AndroidManifestParser(object):
   """
 
   class BadManifestError(Exception):
-    """Indicates an invalid android manifest due to missing elements."""
+    """Indicates an invalid android manifest."""
 
   @classmethod
   def parse_manifest(cls, manifest_path):

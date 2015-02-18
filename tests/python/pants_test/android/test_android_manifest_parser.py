@@ -23,7 +23,7 @@ class TestAndroidManifestParser(TestXmlBase):
       xml = '/no/file/here'
       AndroidManifestParser.parse_manifest(xml)
 
-# Test AndroidManifest.package_name.
+  # Test AndroidManifest.package_name.
   def test_package_name(self):
     with self.xml_file() as xml:
       manifest = AndroidManifestParser.parse_manifest(xml)
