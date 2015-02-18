@@ -38,7 +38,6 @@ class TargetAddressable(Addressable):
 
     self.kwargs = kwargs
     self.name = kwargs['name']
-    self.description = None
     self.dependency_specs = self.kwargs.pop('dependencies', [])
 
     for dep_spec in self.dependency_specs:
