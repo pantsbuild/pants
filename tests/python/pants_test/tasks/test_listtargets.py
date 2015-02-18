@@ -79,11 +79,12 @@ class ListTargetsTest(BaseListTargetsTest):
           dependencies=[
             'a/b/c:c3',
             'a/b/d:d',
-          ]
-        ).with_description("""
+          ],
+          description = """
         Exercises alias resolution.
         Further description.
-        """)
+          """,
+        )
         '''))
 
   def test_list_path(self):

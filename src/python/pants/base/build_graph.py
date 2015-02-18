@@ -371,7 +371,7 @@ class BuildGraph(object):
       target = addressable.get_target_type()(build_graph=self,
                                              address=address,
                                              **addressable.kwargs)
-      target.with_description(addressable.description)
+      target.set_description(addressable.description)
       return target
     except Exception:
       traceback.print_exc()
