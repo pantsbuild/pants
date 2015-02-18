@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import BundleField
@@ -317,7 +318,7 @@ class Bundle(object):
   and ``scripts`` directories: ::
 
     bundles=[
-      bundle().add(rglobs('config/*', 'scripts/*')),
+      bundle(fileset=[rglobs('config/*', 'scripts/*'), 'my.cfg']),
     ]
 
   To include files relative to some path component use the ``relative_to`` parameter.
@@ -325,8 +326,9 @@ class Bundle(object):
   in the bundle. ::
 
     bundles=[
-      bundle(relative_to='common').add(globs('common/config/*'))
+      bundle(relative_to='common', fileset=globs('common/config/*'))
     ]
+
   """
 
   @classmethod
@@ -338,7 +340,7 @@ class Bundle(object):
     bundle.__doc__ = Bundle.__init__.__doc__
     return bundle
 
-  def __init__(self, parse_context, rel_path=None, mapper=None, relative_to=None):
+  def __init__(self, parse_context, rel_path=None, mapper=None, relative_to=None, fileset=None):
     """
     :param rel_path: Base path of the "source" file paths. By default, path of the
       BUILD file. Useful for assets that don't live in the source code repo.
@@ -362,13 +364,25 @@ class Bundle(object):
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
+    if fileset is not None:
+      self._add(fileset)
+
   @manual.builddict()
+  @deprecated(removal_version='0.0.30')
   def add(self, *filesets):
-    """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
+    """Deprecated: Use the fileset= parameter to bundle() instead.
+
+    Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
     Note this is a variable length param and may be specified any number of times.
     """
+    return self._add(filesets)
+
+  def _add(self, filesets):
+    if isinstance(filesets, string_types):
+      filesets = [filesets]
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
+                        else [fileset] if isinstance(fileset, string_types) \
                         else fileset if hasattr(fileset, '__iter__') \
                         else [fileset]
       for path in paths:

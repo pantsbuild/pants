@@ -175,7 +175,7 @@ class FileDepsTest(ConsoleTaskTest):
                       name='app',
                       binary='src/java/bin',
                       bundles=[
-                        bundle().add(['config/app.yaml'])
+                        bundle(fileset=['config/app.yaml'])
                       ]
                     )
                   '''),
