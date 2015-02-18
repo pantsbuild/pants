@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from twitter.common.lang import Compatibility
+import six
 
 from pants.base.build_file import BuildFile
 
@@ -137,7 +137,7 @@ class BuildFileParser(object):
 
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
-      Compatibility.exec_function(build_file_code, parse_state.parse_globals)
+      six.exec_(build_file_code, parse_state.parse_globals)
     except Exception as e:
       raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
                               .format(message=e, build_file=build_file))
