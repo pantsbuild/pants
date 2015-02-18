@@ -383,7 +383,6 @@ class Bundle(object):
   def _add(self, filesets):
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
-                        else [fileset] if isinstance(fileset, string_types) \
                         else fileset if hasattr(fileset, '__iter__') \
                         else [fileset]
       for path in paths:
