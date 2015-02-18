@@ -2,6 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+source ${REPO_ROOT}/contrib/release_packages.sh
 
 #
 # List of packages to be released
@@ -42,8 +44,12 @@ function pkg_pants_testinfra_install_test() {
   python -c "import pants_test"
 }
 
-# Once individual (new) package is declared above, insert it into the array below)
-RELEASE_PACKAGES=(PKG_PANTS PKG_PANTS_TESTINFRA)
+# Once an individual (new) package is declared above, insert it into the array below)
+RELEASE_PACKAGES=(
+  PKG_PANTS
+  PKG_PANTS_TESTINFRA
+  ${CONTRIB_PACKAGES[*]}
+)
 #
 # End of package declarations.
 #

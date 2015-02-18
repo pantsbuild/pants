@@ -10,10 +10,7 @@ from textwrap import dedent
 
 import pytest
 from mock import MagicMock, patch
-from twitter.common.collections import OrderedSet
-
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.tasks.scrooge_gen import ScroogeGen
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
@@ -22,6 +19,9 @@ from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.test_base import TaskTest
+from twitter.common.collections import OrderedSet
+
+from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen
 
 
 # TODO (tdesai) Issue-240: Use JvmToolTaskTestBase for ScroogeGenTest
@@ -97,7 +97,7 @@ class ScroogeGenTest(TaskTest):
                              targets=[target],
                              build_file_parser=self.build_file_parser)
 
-    with patch('pants.backend.codegen.tasks.scrooge_gen.calculate_services'):
+    with patch('pants.contrib.scrooge.tasks.scrooge_gen.calculate_services'):
       task._outdir = MagicMock()
       task._outdir.return_value = self.task_outdir
 

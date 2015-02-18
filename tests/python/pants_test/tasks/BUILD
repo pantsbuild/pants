@@ -72,7 +72,6 @@ python_test_suite(
     ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
-    ':thrift_linter_integration',
     ':wire_integration',
     'tests/python/pants_test/tasks/jvm_compile/java:integration',
   ],
@@ -562,17 +561,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:targets_help',
-  ],
-)
-
-python_tests(
-  name = 'thrift_linter_integration',
-  sources = ['test_thrift_linter_integration.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/codegen/tasks:scrooge_gen',
-    'tests/python/pants_test:int-test',
   ],
 )
 

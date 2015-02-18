@@ -10,8 +10,6 @@ python_library(
     ':protobuf_gen',
     ':protobuf_parse',
     ':ragel_gen',
-    ':scrooge_gen',
-    ':thrift_linter',
     ':jaxb_gen',
     ':wire_gen',
   ],
@@ -137,43 +135,6 @@ python_library(
     'src/python/pants/java:distribution',
     'src/python/pants/base:exceptions',
     'src/python/pants:binary_util',
-  ],
-)
-
-python_library(
-  name = 'scrooge_gen',
-  sources = ['scrooge_gen.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':common',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/base:address',
-    'src/python/pants/base:address_lookup_error',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants:thrift_util',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'thrift_linter',
-  sources = ['thrift_linter.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':common',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants:thrift_util',
-    'src/python/pants/util:dirutil',
   ],
 )
 
