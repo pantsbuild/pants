@@ -348,6 +348,8 @@ class Bundle(object):
       the source tree, returns a path to use in the resulting bundle. By default, an identity
       mapper.
     :param string relative_to: Set up a simple mapping from source path to bundle path.
+    :param fileset: The set of files to include in the bundle.  A string filename, or list of
+      filenames, or a Fileset object (e.g. globs()).
       E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
     """
     if mapper and relative_to:
@@ -365,21 +367,20 @@ class Bundle(object):
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
     if fileset is not None:
-      self._add(fileset)
+      self._add([fileset])
 
   @manual.builddict()
-  @deprecated(removal_version='0.0.30')
+  @deprecated(removal_version='0.0.30',
+              hint_message='Use the fileset= parameter to bundle() instead')
   def add(self, *filesets):
     """Deprecated: Use the fileset= parameter to bundle() instead.
 
     Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
-    Note this is a variable length param and may be specified any number of times.
+    add() may be specified any number of times.
     """
     return self._add(filesets)
 
   def _add(self, filesets):
-    if isinstance(filesets, string_types):
-      filesets = [filesets]
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
                         else [fileset] if isinstance(fileset, string_types) \
