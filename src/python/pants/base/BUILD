@@ -82,7 +82,7 @@ python_library(
   name = 'build_file_parser',
   sources = ['build_file_parser.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     ':address',
     ':build_environment',
     ':build_file',
