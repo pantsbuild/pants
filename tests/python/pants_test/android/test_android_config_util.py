@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import textwrap
 import unittest
 
@@ -45,4 +46,6 @@ class TestAndroidConfigUtil(unittest.TestCase):
 
   def test_no_permission_keystore_config(self):
     with self.assertRaises(AndroidConfigUtil.AndroidConfigError):
-      AndroidConfigUtil.setup_keystore_config('/outside/home/directory')
+      with temporary_file() as temp:
+        os.chmod(temp.name, 0o400)
+        AndroidConfigUtil.setup_keystore_config(temp.name)
