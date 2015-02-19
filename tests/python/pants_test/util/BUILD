@@ -8,6 +8,7 @@ target(
     ':dirutil',
     ':strutil',
     ':fileutil',
+    ':xml_parser',
   ]
 )
 
@@ -44,5 +45,14 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
+  ]
+)
+
+python_tests(
+  name = 'xml_parser',
+  sources = ['test_xml_parser.py'],
+  dependencies = [
+    'src/python/pants/util:xml_parser',
+    'src/python/pants/util:contextutil',
   ]
 )

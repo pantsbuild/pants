@@ -33,3 +33,8 @@ python_library(
     ':contextutil',
   ],
 )
+
+python_library(
+  name = 'xml_parser',
+  sources = ['xml_parser.py'],
+)

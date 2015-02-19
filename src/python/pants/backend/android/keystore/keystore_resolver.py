@@ -90,8 +90,10 @@ class Keystore(object):
 
   @property
   def build_type(self):
-    """Return the build type of the keystore. Required to be either 'debug' or 'release'."""
-    # The build_type does not get validated until this property is called.
+    """Return the build type of the keystore.
+
+    Required to be either 'debug' or 'release'.
+    """
     if self._type is None:
       keystore_type = self._build_type.lower()
       if keystore_type not in ('release', 'debug'):

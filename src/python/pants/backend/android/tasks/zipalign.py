@@ -29,6 +29,7 @@ class Zipalign(AndroidTask):
 
   @staticmethod
   def is_zipaligntarget(target):
+    """Determine whether the target is a candidate for the zipalign task."""
     return isinstance(target, AndroidBinary)
 
   def __init__(self, *args, **kwargs):
@@ -39,9 +40,9 @@ class Zipalign(AndroidTask):
   def _render_args(self, package, target):
     """Create arg list for the zipalign process.
 
-     :param string package: Location of a signed apk product from the SignApk task.
-     :param AndroidBinary target: Target to be zipaligned.
-     """
+    :param string package: Location of a signed apk product from the SignApk task.
+    :param AndroidBinary target: Target to be zipaligned.
+    """
     # Glossary of used zipalign flags:
     #   : '-f' is to force overwrite of existing outfile.
     #   :  '4' is the mandated byte-alignment boundaries. If not 4, zipalign doesn't do anything.
@@ -73,8 +74,7 @@ class Zipalign(AndroidTask):
           returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                        stderr=workunit.output('stderr'))
           if returncode:
-            raise TaskError('The zipalign process exited non-zero: {0}'
-                            .format(returncode))
+            raise TaskError('The zipalign process exited non-zero: {0}'.format(returncode))
 
   def zipalign_binary(self, target):
     """Return the appropriate zipalign binary."""
