@@ -331,6 +331,7 @@ python_library(
     'src/python/pants/java:jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:contextutil',
+    'src/python/pants:binary_util',
   ],
 )
 

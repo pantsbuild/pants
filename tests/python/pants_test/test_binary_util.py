@@ -5,7 +5,8 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.binary_util import BinaryUtil
+from pants.binary_util import BinaryUtil, create_argfile
+from pants.util.contextutil import temporary_file
 from pants_test.base_test import BaseTest
 
 
@@ -143,3 +144,34 @@ class BinaryUtilTest(BaseTest):
       fake_url(binaries, bases[2], 'ivy'): 'UNSEEN IVY 2',
     })
     self._seens_test(binaries, bases, reader)
+
+  def test_create_argfile(self):
+    def assert_argfile(expected_argfile_content, args, delimiter=None, quoter=None):
+      with temporary_file() as tmp_file:
+        # Use is not None to tell the difference between None and empty string.
+        if delimiter is not None and quoter:
+          quoted_filename = create_argfile(
+            args=args, argfile=tmp_file, delimiter=delimiter, quoter=quoter)
+        elif delimiter is not None:
+          quoted_filename = create_argfile(
+            args=args, argfile=tmp_file, delimiter=delimiter)
+        elif quoter:
+          quoted_filename = create_argfile(
+            args=args, argfile=tmp_file, quoter=quoter)
+        else:
+          quoted_filename = create_argfile(
+            args=args, argfile=tmp_file)
+
+        self.assertEqual(
+          quoter(tmp_file.name) if quoter else '@{}'.format(tmp_file.name), quoted_filename)
+
+        with open(tmp_file.name, 'r') as fp:
+          self.assertEquals(expected_argfile_content, fp.read())
+
+    assert_argfile(expected_argfile_content='', args=[])
+    assert_argfile(expected_argfile_content='a\nb', args=['a', 'b'])
+    assert_argfile(expected_argfile_content='a,b', args=['a', 'b'], delimiter=',')
+    assert_argfile(expected_argfile_content='a#b', args=['a', 'b'], delimiter='#')
+    assert_argfile(expected_argfile_content='a', args=['a'], quoter=lambda f: '{}#'.format(f))
+    assert_argfile(expected_argfile_content='ab', args=['a', 'b'],
+                   delimiter='', quoter=lambda f: '${}'.format(f))

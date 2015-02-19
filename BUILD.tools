@@ -126,7 +126,7 @@ jar_library(name = 'scrooge-linter',
 
 jar_library(name = 'jar-tool',
             jars = [
-              jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.7')
+              jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.9')
             ])
 
 jar_library(name = 'wire-runtime',

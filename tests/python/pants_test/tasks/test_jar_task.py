@@ -11,6 +11,8 @@ import os
 import re
 from textwrap import dedent
 
+from twitter.common.collections import maybe_list
+
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
@@ -132,6 +134,60 @@ class JarTaskTest(BaseJarTaskTest):
         self.assert_listing(jar, 'README')
         self.assertEquals('42', jar.read('README'))
         self.assertEquals(contents, jar.read('META-INF/MANIFEST.MF'))
+
+  def test_classpath(self):
+    def manifest_content(classpath):
+      return (b'Manifest-Version: 1.0\r\n' +
+              b'Class-Path: {}\r\n' +
+              b'Created-By: com.twitter.common.jar.tool.JarBuilder\r\n\r\n').format(
+                ' '.join(maybe_list(classpath)))
+
+    def assert_classpath(classpath):
+      with self.jarfile() as existing_jarfile:
+        # Note for -classpath, there is no update, it's already overwriting.
+        # To verify this, first add a random classpath, and verify it's overwritten by
+        # the supplied classpath value.
+        with self.jar_task.open_jar(existing_jarfile) as jar:
+          jar.classpath('something_should_be_overwritten.jar')
+
+        with self.jar_task.open_jar(existing_jarfile) as jar:
+          jar.classpath(classpath)
+
+        with open_zip(existing_jarfile) as jar:
+          self.assertEqual(manifest_content(classpath), jar.read('META-INF/MANIFEST.MF'))
+
+    assert_classpath('a.jar')
+    assert_classpath(['a.jar', 'b.jar'])
+
+  def test_update_jars(self):
+    with self.jarfile() as main_jar:
+      with self.jarfile() as included_jar:
+        with self.jar_task.open_jar(main_jar) as jar:
+          jar.writestr('a/b', b'c')
+
+        with self.jar_task.open_jar(included_jar) as jar:
+          jar.writestr('e/f', b'g')
+
+        with self.jar_task.open_jar(main_jar) as jar:
+          jar.writejar(included_jar)
+
+        with open_zip(main_jar) as jar:
+          self.assert_listing(jar, 'a/', 'a/b', 'e/', 'e/f')
+
+  def test_overwrite_jars(self):
+    with self.jarfile() as main_jar:
+      with self.jarfile() as included_jar:
+        with self.jar_task.open_jar(main_jar) as jar:
+          jar.writestr('a/b', b'c')
+
+        with self.jar_task.open_jar(included_jar) as jar:
+          jar.writestr('e/f', b'g')
+
+        with self.jar_task.open_jar(main_jar, overwrite=True) as jar:
+          jar.writejar(included_jar)
+
+        with open_zip(main_jar) as jar:
+          self.assert_listing(jar, 'e/', 'e/f')
 
 
 class JarBuilderTest(BaseJarTaskTest):
