@@ -38,8 +38,8 @@ class Git(Scm):
     return process, out
 
   @classmethod
-  def _cleanse(cls, output):
-    return output.strip().decode('utf-8')
+  def _cleanse(cls, output, errors='strict'):
+    return output.strip().decode('utf-8', errors=errors)
 
   @classmethod
   def _check_result(cls, cmd, result, failure_msg=None, raise_type=Scm.ScmException):
@@ -56,7 +56,7 @@ class Git(Scm):
     branch:    The default remote branch to use.
     log:       A log object that supports debug, info, and warn methods.
     """
-    Scm.__init__(self)
+    super(Scm, self).__init__()
 
     self._gitcmd = binary
     self._worktree = os.path.realpath(worktree or os.getcwd())
@@ -129,13 +129,20 @@ class Git(Scm):
     return set(self.fix_git_relative_path(f.strip(), relative_to) for f in files)
 
   def changelog(self, from_commit=None, files=None):
-    args = ['log', '--no-merges', '--stat', '--find-renames', '--find-copies']
+    # We force the log output encoding to be UTF-8 here since the user may have a git config that
+    # overrides the git UTF-8 default log output encoding.
+    args = ['log', '--encoding=UTF-8', '--no-merges', '--stat', '--find-renames', '--find-copies']
     if from_commit:
       args.append(from_commit + '..HEAD')
     if files:
       args.append('--')
       args.extend(files)
-    return self._check_output(args, raise_type=Scm.LocalException)
+
+    # There are various circumstances that can lead to git logs that are not transcodeable to utf-8,
+    # for example: http://comments.gmane.org/gmane.comp.version-control.git/262685
+    # Git will not error in these cases and we do not wish to either.  Here we direct byte sequences
+    # that can not be utf-8 decoded to be replaced with the utf-8 replacement character.
+    return self._check_output(args, raise_type=Scm.LocalException, errors='replace')
 
   def merge_base(self, left='master', right='HEAD'):
     """Returns the merge-base of master and HEAD in bash: `git merge-base left right`"""
@@ -204,14 +211,14 @@ class Git(Scm):
     result = subprocess.call(cmd)
     self._check_result(cmd, result, failure_msg, raise_type)
 
-  def _check_output(self, args, failure_msg=None, raise_type=None):
+  def _check_output(self, args, failure_msg=None, raise_type=None, errors='strict'):
     cmd = self._create_git_cmdline(args)
     self._log_call(cmd)
 
     process, out = self._invoke(cmd)
 
     self._check_result(cmd, process.returncode, failure_msg, raise_type)
-    return self._cleanse(out)
+    return self._cleanse(out, errors=errors)
 
   def _create_git_cmdline(self, args):
     return [self._gitcmd, '--git-dir=' + self._gitdir, '--work-tree=' + self._worktree] + args

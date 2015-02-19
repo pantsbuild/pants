@@ -11,6 +11,7 @@ import subprocess
 import unittest
 from contextlib import contextmanager
 from itertools import izip_longest
+from textwrap import dedent
 
 import pytest
 
@@ -296,9 +297,22 @@ class GitTest(unittest.TestCase):
 
         return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
 
+      # Mix in a non-UTF-8 author to all commits to exercise the corner described here does not
+      # adversely impact the ability to render the changelog (even if rendering for certain
+      # characters is incorrect): http://comments.gmane.org/gmane.comp.version-control.git/262685
+      non_utf8_config = dedent("""
+      [user]
+        name = Noralf Trønnes
+      """).encode('iso-8859-1')
+
+      with open(os.path.join(self.gitdir, 'config'), 'wb') as fp:
+        fp.write(non_utf8_config)
+
+      # Note the copyright symbol is used as the non-ascii character in the next 3 commits
       commit_contents_to_files('START1 © END', 'iso-8859-1', '1', 'foo')
       commit_contents_to_files('START2 © END', 'latin1', '1', 'bar')
       commit_contents_to_files('START3 © END', 'utf-8', '1', 'baz')
+
       commit_contents_to_files('START4 ~ END', 'us-ascii', '1', 'bip')
 
       # Prove our non-utf-8 encodings were stored in the commit metadata.
@@ -307,6 +321,18 @@ class GitTest(unittest.TestCase):
 
       # And show that the git log successfully transcodes all the commits none-the-less to utf-8
       changelog = self.git.changelog()
+
+      # The ascii commit should combine with the iso-8859-1 author an fail to transcode the
+      # o-with-stroke character, and so it should be replaced with the utf-8 replacement character
+      # \uFFF or �.
+      self.assertIn('Noralf Tr�nnes', changelog)
+      self.assertIn('Noralf Tr\uFFFDnnes', changelog)
+
+      # For the other 3 commits, each of iso-8859-1, latin1 and utf-8 have an encoding for the
+      # o-with-stroke character - \u00F8 or ø - so we should find it;
+      self.assertIn('Noralf Trønnes', changelog)
+      self.assertIn('Noralf Tr\u00F8nnes', changelog)
+
       self.assertIn('START1 © END', changelog)
       self.assertIn('START2 © END', changelog)
       self.assertIn('START3 © END', changelog)
