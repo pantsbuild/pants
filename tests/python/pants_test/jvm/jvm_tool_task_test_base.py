@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import errno
 import os
@@ -11,6 +11,7 @@ import shutil
 
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.task_test_base import TaskTestBase
@@ -24,7 +25,10 @@ class JvmToolTaskTestBase(TaskTestBase):
     return load_plugins_and_backends().registered_aliases()
 
   def setUp(self):
+    # Ensure we get a read of the real pants.ini config
+    Config.reset_default_bootstrap_option_values()
     real_config = self.config()
+
     super(JvmToolTaskTestBase, self).setUp()
 
     # Use a synthetic subclass for bootstrapping within the test, to isolate this from

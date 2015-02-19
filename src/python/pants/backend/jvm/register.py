@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.artifact import Artifact
@@ -12,23 +12,17 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.jvm_binary import (
-    Bundle,
-    DirectoryReMapper,
-    Duplicate,
-    JvmApp,
-    JvmBinary,
-    JarRules,
-    Skip)
+from pants.backend.jvm.targets.jvm_binary import (Bundle, DirectoryReMapper, Duplicate, JarRules,
+                                                  JvmApp, JvmBinary, Skip)
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -57,8 +51,8 @@ from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.task_registrar import TaskRegistrar as task
 from pants.goal.goal import Goal
+from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
@@ -85,6 +79,7 @@ def build_file_aliases():
       'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
+      'ivy_artifact': IvyArtifact,
       'jar': JarDependency,
       'jar_rules': JarRules,
       'Repository': Repository,
@@ -130,7 +125,7 @@ def register_goals():
       return 'apt'
 
     def select(self, target):
-      return super(AptCompile, self).select(target) and target.is_apt
+      return super(AptCompile, self).select(target) and isinstance(target, AnnotationProcessor)
 
 
   jvm_compile = GroupTask.named(

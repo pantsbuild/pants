@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
+from six import string_types
 from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
 
 from pants.java import util
 from pants.java.executor import Executor, SubprocessExecutor
@@ -24,12 +24,12 @@ class Ivy(object):
     """Configures an ivy wrapper for the ivy distribution at the given classpath."""
     self._classpath = maybe_list(classpath)
     self._ivy_settings = ivy_settings
-    if self._ivy_settings and not isinstance(self._ivy_settings, Compatibility.string):
+    if self._ivy_settings and not isinstance(self._ivy_settings, string_types):
       raise ValueError('ivy_settings must be a string, given %s of type %s'
                        % (self._ivy_settings, type(self._ivy_settings)))
 
     self._ivy_cache_dir = ivy_cache_dir
-    if self._ivy_cache_dir and not isinstance(self._ivy_cache_dir, Compatibility.string):
+    if self._ivy_cache_dir and not isinstance(self._ivy_cache_dir, string_types):
       raise ValueError('ivy_cache_dir must be a string, given %s of type %s'
                        % (self._ivy_cache_dir, type(self._ivy_cache_dir)))
 

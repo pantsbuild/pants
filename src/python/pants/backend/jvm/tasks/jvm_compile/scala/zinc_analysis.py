@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import itertools
 import json
@@ -12,9 +12,9 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_environment import get_buildroot
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_diff import ZincAnalysisElementDiff
+from pants.base.build_environment import get_buildroot
 
 
 class ZincAnalysisElement(object):
@@ -110,20 +110,20 @@ class ZincAnalysisElement(object):
       outfile.write(item)
       outfile.write('\n')
 
-  def anonymize_keys(self, anonymizer, arg):
+  def translate_keys(self, token_translator, arg):
     old_keys = list(arg.keys())
     for k in old_keys:
       vals = arg[k]
       del arg[k]
-      arg[anonymizer.convert(k)] = vals
+      arg[token_translator.convert(k)] = vals
 
-  def anonymize_values(self, anonymizer, arg):
+  def translate_values(self, token_translator, arg):
     for k, vals in arg.iteritems():
-      arg[k] = [anonymizer.convert(v) for v in vals]
+      arg[k] = [token_translator.convert(v) for v in vals]
 
-  def anonymize_base64_values(self, anonymizer, arg):
+  def translate_base64_values(self, token_translator, arg):
     for k, vals in arg.iteritems():
-      arg[k] = [anonymizer.convert_base64_string(v) for v in vals]
+      arg[k] = [token_translator.convert_base64_string(v) for v in vals]
 
 
 class ZincAnalysis(Analysis):
@@ -392,10 +392,10 @@ class ZincAnalysis(Analysis):
   # Note that the resulting file is not a valid analysis, as the base64-encoded serialized objects
   # will be replaced with random base64 strings. So these are useful for testing analysis parsing,
   # splitting and merging, but not for actually reading into Zinc.
-  def anonymize(self, anonymizer):
+  def translate(self, token_translator):
     for element in [self.relations, self.stamps, self.apis, self.source_infos,
                     self.compilations, self.compile_setup]:
-      element.anonymize(anonymizer)
+      element.translate(token_translator)
 
   # Write this analysis to JSON.
   def write_json_to_path(self, outfile_path):
@@ -442,10 +442,10 @@ class Relations(ZincAnalysisElement):
      self.inheritance_internal_dep, self.inheritance_external_dep,
      self.classes, self.used) = self.args
 
-  def anonymize(self, anonymizer):
+  def translate(self, token_translator):
     for a in self.args:
-      self.anonymize_values(anonymizer, a)
-      self.anonymize_keys(anonymizer, a)
+      self.translate_values(token_translator, a)
+      self.translate_keys(token_translator, a)
 
 
 class Stamps(ZincAnalysisElement):
@@ -455,10 +455,10 @@ class Stamps(ZincAnalysisElement):
     super(Stamps, self).__init__(args)
     (self.products, self.sources, self.binaries, self.classnames) = self.args
 
-  def anonymize(self, anonymizer):
+  def translate(self, token_translator):
     for a in self.args:
-      self.anonymize_keys(anonymizer, a)
-    self.anonymize_values(anonymizer, self.classnames)
+      self.translate_keys(token_translator, a)
+    self.translate_values(token_translator, self.classnames)
 
   # We make equality ignore the values in classnames: classnames is a map from
   # jar file to one representative class in that jar, and the representative can change.
@@ -482,10 +482,10 @@ class APIs(ZincAnalysisElement):
     super(APIs, self).__init__(args)
     (self.internal, self.external) = self.args
 
-  def anonymize(self, anonymizer):
+  def translate(self, token_translator):
     for a in self.args:
-      self.anonymize_base64_values(anonymizer, a)
-      self.anonymize_keys(anonymizer, a)
+      self.translate_base64_values(token_translator, a)
+      self.translate_keys(token_translator, a)
 
 
 class SourceInfos(ZincAnalysisElement):
@@ -495,10 +495,10 @@ class SourceInfos(ZincAnalysisElement):
     super(SourceInfos, self).__init__(args)
     (self.source_infos, ) = self.args
 
-  def anonymize(self, anonymizer):
+  def translate(self, token_translator):
     for a in self.args:
-      self.anonymize_base64_values(anonymizer, a)
-      self.anonymize_keys(anonymizer, a)
+      self.translate_base64_values(token_translator, a)
+      self.translate_keys(token_translator, a)
 
 
 class Compilations(ZincAnalysisElement):
@@ -511,7 +511,7 @@ class Compilations(ZincAnalysisElement):
     # We clear them here to prevent them propagating through splits/merges.
     self.compilations.clear()
 
-  def anonymize(self, anonymizer):
+  def translate(self, token_translator):
     pass
 
 
@@ -524,8 +524,8 @@ class CompileSetup(ZincAnalysisElement):
     (self.output_mode, self.output_dirs, self.compile_options, self.javac_options,
      self.compiler_version, self.compile_order) = self.args
 
-  def anonymize(self, anonymizer):
-    self.anonymize_values(anonymizer, self.output_dirs)
+  def translate(self, token_translator):
+    self.translate_values(token_translator, self.output_dirs)
     for k, vs in list(self.compile_options.items()):  # Make a copy, so we can del as we go.
       # Remove mentions of custom plugins.
       for v in vs:

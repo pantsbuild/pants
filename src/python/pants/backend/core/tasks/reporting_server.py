@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import multiprocessing
 import os
@@ -42,18 +42,20 @@ class RunServer(Task, QuietTaskMixin):
 
     def maybe_open(port):
       if self.get_options().open:
-        binary_util.ui_open('http://localhost:%d' % port)
+        binary_util.ui_open('http://localhost:{port}'.format(port=port))
 
-    port = ReportingServerManager.get_current_server_port()
+    (pid, port) = ReportingServerManager.get_current_server_pid_and_port()
     if port:
       maybe_open(port)
-      print('Server already running at http://localhost:%d' % port, file=sys.stderr)
+      print('Server already running with pid {pid} at http://localhost:{port}'
+            .format(port=port, pid=pid), file=sys.stderr)
       return
 
     def run_server(reporting_queue):
       def report_launch(actual_port):
         reporting_queue.put(
-          'Launching server with pid %d at http://localhost:%d' % (os.getpid(), actual_port))
+          'Launching server with pid {pid} at http://localhost:{port}'
+          .format(pid=os.getpid(), port=actual_port))
 
       def done_reporting():
         reporting_queue.put(DONE)
@@ -95,7 +97,7 @@ class RunServer(Task, QuietTaskMixin):
       print(s, file=sys.stderr)
       s = reporting_queue.get()
     # The child process is done reporting, and is now in the server loop, so we can proceed.
-    server_port = ReportingServerManager.get_current_server_port()
+    (_, server_port) = ReportingServerManager.get_current_server_pid_and_port()
     maybe_open(server_port)
 
 
@@ -105,17 +107,18 @@ class KillServer(Task, QuietTaskMixin):
   pidfile_re = re.compile(r'port_(\d+)\.pid')
 
   def execute(self):
-    pidfiles_and_ports = ReportingServerManager.get_current_server_pidfiles_and_ports()
-    if not pidfiles_and_ports:
+    info = ReportingServerManager.get_current_server_info()
+    if not info:
       print('No server found.', file=sys.stderr)
     # There should only be one pidfile, but in case there are many, we kill them all here.
-    for pidfile, port in pidfiles_and_ports:
+    for pidfile, pid, port in info:
       with open(pidfile, 'r') as infile:
         pidstr = infile.read()
       try:
         os.unlink(pidfile)
         pid = int(pidstr)
         os.kill(pid, signal.SIGKILL)
-        print('Killed server with pid %d at http://localhost:%d' % (pid, port), file=sys.stderr)
+        print('Killed server with {pid} at http://localhost:{port}'.format(pid=pid, port=port),
+              file=sys.stderr)
       except (ValueError, OSError):
         pass

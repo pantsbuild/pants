@@ -92,7 +92,7 @@ Things can go wrong; you can recover:
     merge conflicts can happen, and folks don't always recover from them
     correctly.
 
-    In this situation, you probably want to pass `goal publish --overrride=<version>` to specify a
+    In this situation, you probably want to pass `publish --overrride=<version>` to specify a
     version to use instead of the automatically-computed already-existing version. Choose a version
     that's not already on the server. Pants records this version in the pushdb, so hopefully the
     next publisher won't have the same problem.
@@ -126,7 +126,7 @@ How To
     to-be-published artifact. See
     <a pantsref="publish_local_test">Test with a Fake Local "Publish"</a>.
 -   Start the publish:
-    `./pants goal publish --no-dryrun [target]` Don't wander
+    `./pants publish --no-dryrun [target]` Don't wander
     off; Pants will ask for confirmation as it goes (making sure you
     aren't publishing artifact[s] you didn't mean to).
 
@@ -142,55 +142,23 @@ maintain extra-carefully. You can
 Authenticating to the Artifact Repository
 -----------------------------------------
 
-Your artifact repository probably doesn't accept anonymous uploads; you
-probably need to authenticate (prove that you are really you). Depending
-on how the artifact repository set up, Pants might need to interact the
-authentication system. (Or it might not. E.g., if your system uses
-Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets
-should work automatically.)
+Your artifact repository probably doesn't accept anonymous uploads; you probably need to
+authenticate to it (prove that you are really you). Depending on how the artifact repository is
+configured, Pants might need to interact with an authentication system. (Or it might not. E.g., if
+your system uses Kerberos, when Pants invokes artifact-upload commands, Kerberos tickets should
+work automatically).
 
-If Pants needs to provide your username and password, you can enable
-this via Pants' `.netrc` support. Pants can parse [.netrc
-files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html)
-to get a user's username and password on an artifact repository machine.
-To make this work:
+Your Pants administrator will handle configuring Pants to submit credentials to the artifact
+repository. As a user, if Pants needs to provide your username and password, you can enable this
+via Pants' `.netrc` support. Pants can parse [.netrc
+files](http://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-File.html) to get your
+username and password to an artifact repository server. Here is an example file:
 
--   Each user needs a `~/.netrc` file with a section that looks like:
+    machine maven.example.com
+      login sandy
+      password myamazingpa$sword
 
-        machine maven.twttr.com
-          login sandy
-          password myamazingpa$sword
-
--   One of your `BUILD` files needs a target that represents `netrc`
-    auth:
-
-        netrc = netrc()
-
-        credentials(
-          name = 'netrc',
-          username=netrc.getusername,
-          password=netrc.getpassword)
-
--   Your `'auth'` section for that repository should refer to that
-    target:
-
-        [jar-publish]
-        workdir: %(pants_workdir)s/publish
-        repos: {
-            'public': {
-              # ivysettings.xml resolver to use for publishing
-              # this resolver's address should match root of ivysettings resolver
-              'resolver': 'maven.twttr.com',
-              'confs': ['default', 'sources', 'docs', 'changelog'],
-              'auth': 'build-support:netrc',
-              'help': 'Configure your ~/.netrc for artifact repo access!'
-            },
-        }
-
-If you need to implement some other kind of authentication, you might
-look at [the Netrc
-implementation](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/authentication/netrc_util.py)
-and the <a pantsref="bdict_credentials">`credentials`</a> target type for inspiration.
+Check with your Pants administrator for the proper hostname to use for the "machine" entry.
 
 Troubleshooting
 ---------------
@@ -216,7 +184,7 @@ Try publishing again, but pass `--override` to specify the version number to use
 incrementing the version number from the pushdb. Be sure to use a version number that has not
 already been published this time. For example, to override the default publish version number for
 the `org.archie` buoyancy artifact, you might pass
-`goal publish --override=org.archie#buoyancy=2.5.8`.
+`publish --override=org.archie#buoyancy=2.5.8`.
 
 <a pantsmark="publish_pushdb_push"></a>
 
@@ -253,7 +221,7 @@ In git, this might mean:
 
     git reset origin/master # (if ``master`` is your release branch)
     git pull origin master
-    ./pants goal publish <your previous args>
+    ./pants publish <your previous args>
 
 Since you uploaded new versioned artifacts but the reset pushdb doesn't "remember" that, you might
 get "Versioned Artifact Already Exists" errors: see the section above and use `--override` to
@@ -306,7 +274,7 @@ automatically prompts you to also publish depended-upon libraries whose
 source code changed. However, Pants does *not* automatically publish
 dependees of a depended-upon library. If you know you're about to
 publish a low-level library (perhaps via a "dry run" publish), you can
-use Pants' `goal dependees` to find other things to publish.
+use Pants' `dependees` to find other things to publish.
 
 For example, suppose your new library `high-level` depends on another
 library, `util`. If you tested `high-level` with `util` version 1.2, you
@@ -336,7 +304,7 @@ Maven configured to use `~/.m2/repository` as a local repo. You can make
 pants publish to that local repo with:
 
     :::bash
-    ./pants goal publish --no-dryrun --local=~/.m2/repository
+    ./pants publish --no-dryrun --local=~/.m2/repository
 
 In the other codebase, change the dependencies to pull in the new
 artifact.

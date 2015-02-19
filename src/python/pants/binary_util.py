@@ -2,14 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from contextlib import closing, contextmanager
 import os
-import subprocess
-
 import posixpath
+import subprocess
+from contextlib import closing, contextmanager
+
 from twitter.common import log
 from twitter.common.collections import OrderedSet
 from twitter.common.lang import Compatibility
@@ -18,6 +18,7 @@ from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
+
 
 if Compatibility.PY3:
   import urllib.request as urllib_request

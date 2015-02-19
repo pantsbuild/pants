@@ -2,13 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import io
 import sys
+
+from six import string_types
 from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
 
 from pants.base.config import Config, SingleFileConfig
 from pants.base.target import Target
@@ -50,7 +51,7 @@ def create_config(sample_ini=''):
 
   :param string sample_ini: The contents of the ini file containing the config values.
   """
-  if not isinstance(sample_ini, Compatibility.string):
+  if not isinstance(sample_ini, string_types):
     raise ValueError('The sample_ini supplied must be a string, given: %s' % sample_ini)
 
   parser = Config.create_parser()

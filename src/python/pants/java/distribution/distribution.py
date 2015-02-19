@@ -2,16 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import pkgutil
 import subprocess
 from contextlib import contextmanager
 
+from six import string_types
 from twitter.common import log
-from twitter.common.lang import Compatibility
 
 from pants.base.revision import Revision
 from pants.util.contextutil import temporary_dir
@@ -95,7 +95,7 @@ class Distribution(object):
     # These version strings comply with semver except that the traditional pre-release semver
     # slot (the 4th) can be delimited by an _ in the case of update releases of the jdk.
     # We accommodate that difference here.
-    if isinstance(version, Compatibility.string):
+    if isinstance(version, string_types):
       version = Revision.semver(version.replace('_', '-'))
     if version and not isinstance(version, Revision):
       raise ValueError('%s must be a string or a Revision object, given: %s' % (name, version))
@@ -173,7 +173,7 @@ class Distribution(object):
 
     If this distribution has no valid command of the given name raises Distribution.Error.
     """
-    if not isinstance(name, Compatibility.string):
+    if not isinstance(name, string_types):
       raise ValueError('name must be a binary name, given %s of type %s' % (name, type(name)))
     self.validate()
     return self._validated_executable(name)

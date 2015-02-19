@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict, OrderedDict
 import logging
 import traceback
+from collections import OrderedDict, defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -371,7 +371,6 @@ class BuildGraph(object):
       target = addressable.get_target_type()(build_graph=self,
                                              address=address,
                                              **addressable.kwargs)
-      target.with_description(addressable.description)
       return target
     except Exception:
       traceback.print_exc()

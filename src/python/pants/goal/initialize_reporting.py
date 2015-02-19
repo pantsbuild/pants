@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import errno
 import os
@@ -11,7 +11,6 @@ import sys
 
 from twitter.common.lang import Compatibility
 
-from pants.base.config import Config
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.plaintext_reporter import PlainTextReporter
 from pants.reporting.quiet_reporter import QuietReporter
@@ -70,7 +69,7 @@ def initial_reporting(config, run_tracker):
 
   # Add some useful RunInfo.
   run_tracker.run_info.add_info('default_report', html_reporter.report_path())
-  port = ReportingServerManager.get_current_server_port()
+  (_, port) = ReportingServerManager.get_current_server_pid_and_port()
   if port:
     run_tracker.run_info.add_info('report_url', 'http://localhost:%d/run/%s' % (port, run_id))
 

@@ -2,6 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+source ${REPO_ROOT}/contrib/release_packages.sh
 
 #
 # List of packages to be released
@@ -21,20 +23,20 @@ PKG_PANTS=(
   "pantsbuild.pants"
   "//src/python/pants:pants-packaged"
   "pkg_pants_install_test"
-  )
+)
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
-  execute_packaged_pants_without_internal_backends list src:: && \
-  [[ "$(execute_packaged_pants_without_internal_backends --version 2>/dev/null)" \
-    == "$(local_version)" ]]
+  execute_packaged_pants_with_internal_backends list src:: && \
+  [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
+     == "$(local_version)" ]]
 }
 
 PKG_PANTS_TESTINFRA=(
   "pantsbuild.pants.testinfra"
   "//src/python/pants:test_infra"
   "pkg_pants_testinfra_install_test"
-  )
+)
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) \
@@ -42,8 +44,12 @@ function pkg_pants_testinfra_install_test() {
   python -c "import pants_test"
 }
 
-# Once individual (new) package is declared above, insert it into the array below)
-RELEASE_PACKAGES=(PKG_PANTS PKG_PANTS_TESTINFRA)
+# Once an individual (new) package is declared above, insert it into the array below)
+RELEASE_PACKAGES=(
+  PKG_PANTS
+  PKG_PANTS_TESTINFRA
+  ${CONTRIB_PACKAGES[*]}
+)
 #
 # End of package declarations.
 #
@@ -59,11 +65,13 @@ function run_local_pants() {
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
 # at the repo build root, the root pants.ini will ask it load
-# internal backend packages, which it doesn't have, and it'll fail.
-# To solve that problem, we override pants.ini with an empty list of
-# additional backends option.
-function execute_packaged_pants_without_internal_backends() {
-  pants --config-override=pants.no.internal.backend.ini "$@"
+# internal backend packages and their dependencies which it doesn't have,
+# and it'll fail. To solve that problem, we load the internal backend package
+# dependencies into the pantsbuild.pants venv.
+function execute_packaged_pants_with_internal_backends() {
+  pip install --ignore-installed \
+    -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
+  pants "$@"
 }
 
 function pkg_name() {
@@ -111,7 +119,7 @@ function publish_packages() {
 
     # TODO(Jin Feng) Note --recursive option would cause some of the packages being
     # uploaded multiple times because of dependencies. No harms, but not efficient.
-    run_local_pants setup-py --run="sdist upload" --recursive ${BUILD_TARGET} || \
+    run_local_pants setup-py --run="register sdist upload" --recursive ${BUILD_TARGET} || \
     die "Failed to publish package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
   done
 }
@@ -128,7 +136,7 @@ function post_install() {
 }
 
 function install_and_test_packages() {
-  PIP_ARGS="$@"
+  PIP_ARGS="$@ --quiet"
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do

@@ -2,27 +2,52 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+import os
+from contextlib import contextmanager
+from textwrap import dedent
+
+from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprintStrategy
+from pants.base.build_file_aliases import BuildFileAliases
+from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.dirutil import safe_walk
+from pants_test.tasks.test_base import TaskTest
 
 
-from pants.backend.jvm.tasks.unpack_jars import UnpackJars
-from pants.engine.round_manager import RoundManager
-from pants.util.contextutil import temporary_dir
-from pants_test.task_test_base import TaskTestBase
-
-
-class UnpackJarsTest(TaskTestBase):
+class UnpackJarsTest(TaskTest):
 
   @classmethod
   def task_type(cls):
     return UnpackJars
 
-  def test_simple(self):
-    with temporary_dir() as workdir:
-      unpack_task = self.create_task(self.context(), workdir)
-      round_manager = RoundManager(self.context())
-      unpack_task.prepare(self.options, round_manager)
+  @property
+  def alias_groups(self):
+    return BuildFileAliases.create(
+      targets={
+        'unpacked_jars': UnpackedJars,
+        'jar_library': JarLibrary,
+        'target': Dependencies
+      },
+      objects={
+        'jar': JarDependency,
+      },
+    )
+
+  @contextmanager
+  def sample_jarfile(self):
+    """Create a jar file with a/b/c/data.txt and a/b/c/foo.proto"""
+    with temporary_dir() as temp_dir:
+      jar_name = os.path.join(temp_dir, 'foo.jar')
+      with open_zip(jar_name, 'w') as proto_jarfile:
+        proto_jarfile.writestr('a/b/c/data.txt', 'Foo text')
+        proto_jarfile.writestr('a/b/c/foo.proto', 'message Foo {}')
+      yield jar_name
 
   def test_invalid_pattern(self):
     with self.assertRaises(UnpackJars.InvalidPatternError):
@@ -49,3 +74,96 @@ class UnpackJarsTest(TaskTestBase):
     self.assertFalse(run_filter("foo/bar.java",
                                 include_patterns=["**/*/java"],
                                 exclude_patterns=["**/bar.*"]))
+
+  def _make_jar_library(self, version):
+    build_path = os.path.join(self.build_root, 'unpack', 'jars', 'BUILD')
+    if os.path.exists(build_path):
+      os.remove(build_path)
+    self.add_to_build_file('unpack/jars', dedent('''
+      jar_library(name='foo-jars',
+        jars=[
+          jar(org='com.example', name='bar', rev='0.0.{version}', url='file:///foo.jar'),
+        ],
+      )
+    '''.format(version=version)))
+
+  def test_unpack_jar_fingerprint_strategy(self):
+    fingerprint_strategy = UnpackJarsFingerprintStrategy()
+
+    self.add_to_build_file('unpack', dedent('''
+      unpacked_jars(name='foo',
+        libraries=['unpack/jars:foo-jars'],
+        include_patterns=[
+          'bar',
+        ],
+       )
+       '''))
+
+    self._make_jar_library('0.0.1')
+
+    target = self.target("unpack:foo")
+    fingerprint1 = fingerprint_strategy.compute_fingerprint(target)
+
+    # Now, replace the build file with a different version
+    self.reset_build_graph()
+    self._make_jar_library('0.0.2')
+    target = self.target("unpack:foo")
+    fingerprint2 = fingerprint_strategy.compute_fingerprint(target)
+    self.assertNotEqual(fingerprint1, fingerprint2)
+
+    # Go back to the original library
+    self.reset_build_graph()
+    self._make_jar_library('0.0.1')
+    target = self.target("unpack:foo")
+    fingerprint3 = fingerprint_strategy.compute_fingerprint(target)
+
+    self.assertEqual(fingerprint1, fingerprint3)
+
+  def test_incremental(self):
+    with self.sample_jarfile() as jar_filename:
+      self.add_to_build_file('unpack', dedent('''
+        unpacked_jars(name='foo',
+          libraries=['unpack/jars:foo-jars'],
+          include_patterns=[
+            'a/b/c/*.proto',
+          ],
+         )
+        '''.format(jar_filename=jar_filename)))
+      self._make_jar_library('0.0.1')
+      foo_target = self.target('unpack:foo')
+
+      # The first time through, the target should be unpacked.
+      unpack_task = self.prepare_task(targets=[foo_target],
+                                      build_graph=self.build_graph,
+                                      build_file_parser=self.build_file_parser)
+
+      # Dummy up ivy_imports product:
+      ivy_imports_product = unpack_task.context.products.get('ivy_imports')
+      ivy_imports_product.add(foo_target, os.path.dirname(jar_filename),
+                              [os.path.basename(jar_filename)])
+
+
+      unpacked_targets = unpack_task.execute()
+      self.assertEquals([foo_target], unpacked_targets)
+      unpack_dir = unpack_task._unpack_dir(foo_target)
+      files = []
+      for _, dirname, filenames in safe_walk(unpack_dir):
+        files += filenames
+      self.assertEquals(['foo.proto'], files)
+
+      # Calling the task a second time should not need to unpack any targets
+      unpack_task = self.prepare_task(targets=[foo_target],
+                                      build_graph=self.build_graph,
+                                      build_file_parser=self.build_file_parser)
+      unpacked_targets = unpack_task.execute()
+      self.assertEquals([], unpacked_targets)
+
+      # Change the library version and the target should be unpacked again.
+      self._make_jar_library('0.0.2')
+      self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
+      foo_target = self.target('unpack:foo') # Re-inject the target
+      unpack_task = self.prepare_task(targets=[foo_target],
+                                      build_graph=self.build_graph,
+                                      build_file_parser=self.build_file_parser)
+      unpacked_targets = unpack_task.execute()
+      self.assertEquals([foo_target], unpacked_targets)

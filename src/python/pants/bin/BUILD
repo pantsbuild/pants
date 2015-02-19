@@ -7,8 +7,8 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.log',
+    '3rdparty/python:setuptools',
 
-    'src/python/internal_backend/repositories:plugin',
     'src/python/pants/backend/android:plugin',
     'src/python/pants/backend/authentication:authentication',
     'src/python/pants/backend/codegen:plugin',
@@ -78,6 +78,6 @@ python_binary(
   entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
     ':bin',
-    'src/python/internal_backend:plugins',
+    'pants-plugins/src/python/internal_backend:plugins',
   ],
 )

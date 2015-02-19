@@ -23,7 +23,7 @@ To render the page as HTML, use the
 your browser,
 
     :::bash
-    $ ./pants goal markdown --open examples/src/java/com/pants/examples/hello/main:readme
+    $ ./pants markdown --open examples/src/java/com/pants/examples/hello/main:readme
 
 Pants generates the HTML files in the `dist/markdown/` directory tree.
 
@@ -137,7 +137,7 @@ Once you've done this, you can publish the page by invoking the goal
 the goal was set up with the name "confluence", you invoke:
 
     :::bash
-    $ ./pants goal confluence examples/src/java/com/pants/examples/hello/main:readme
+    $ ./pants confluence examples/src/java/com/pants/examples/hello/main:readme
 
 To specify that a page should be published to a Confluence wiki page,
 set its `provides` to something like:

@@ -2,21 +2,24 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
+
 import six
 
+from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField, DeferredSourcesField
+from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
+
 
 logger = logging.getLogger(__name__)
 
 
-class UnpackedJars(Target):
+class UnpackedJars(ImportJarsMixin, Target):
   """Describes a set of sources that are extracted from jar artifacts."""
 
   class ExpectedLibrariesError(Exception):
@@ -34,7 +37,7 @@ class UnpackedJars(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'raw_libraries': PrimitiveField(libraries or ())
+      'library_specs': PrimitiveField(libraries or ())
     })
     super(UnpackedJars, self).__init__(payload=payload, **kwargs)
 
@@ -45,33 +48,11 @@ class UnpackedJars(Target):
     if not libraries:
       raise  self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
                                          .format(spec=self.address.spec))
-    self._libraries = None
-
-    # Make sure the ivy-imports task
-    self.add_labels('has_imports')
 
   @property
-  def traversable_specs(self):
-    for spec in super(UnpackedJars, self).traversable_specs:
-      yield spec
-    if self.payload.raw_libraries:
-      for spec  in self.payload.raw_libraries:
-        if not isinstance(spec, six.string_types):
-          raise JarLibrary.ExpectedAddressError(
-            "{address}: expected imports to contain string addresses, got {found_class}."
-            .format(address=self.address.spec,
-                    found_class=type(spec).__name__))
-        yield spec
+  def imported_jar_library_specs(self):
+    """List of JarLibrary specs to import.
 
-  @property
-  def imports(self):
-    """Expected by the IvyImports tasks.
-
-    :returns: the set of JarDependency instances to be included when compiling this target.
+    Required to implement the ImportJarsMixin.
     """
-    if self._libraries is None:
-      self._libraries = JarLibrary.to_jar_dependencies(self.address,
-                                                       self.payload.raw_libraries,
-                                                       self._build_graph)
-    return self._libraries
-
+    return self.payload.library_specs

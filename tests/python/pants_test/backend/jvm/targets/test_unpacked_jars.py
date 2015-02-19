@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from textwrap import dedent
 
@@ -12,7 +12,6 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.base.address import BuildFileAddress
-
 from pants_test.base_test import BaseTest
 
 
@@ -48,6 +47,6 @@ class UnpackedJarsTest(BaseTest):
     self.assertIsInstance(target, UnpackedJars)
     traversable_specs = [spec for spec in target.traversable_specs]
     self.assertSequenceEqual([':import_jars'], traversable_specs)
-    self.assertEquals(1, len(target.imports))
-    import_jar_dep = target.imports[0]
+    self.assertEquals(1, len(target.imported_jars))
+    import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)

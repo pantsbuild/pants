@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import shutil
@@ -11,7 +11,8 @@ import subprocess
 import sys
 import unittest
 
-from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file, Timer
+from pants.util.contextutil import (Timer, environment_as, open_zip64, pushd, temporary_dir,
+                                    temporary_file)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -135,3 +136,18 @@ class ContextutilTest(unittest.TestCase):
       self.assertTrue(t.finish is None)
     self.assertGreater(t.elapsed, 0.2)
     self.assertLess(t.finish, clock.time())
+
+  def test_open_zip64Default(self):
+    with temporary_dir() as tempdir:
+      with open_zip64(os.path.join(tempdir, 'test'), 'w') as zf:
+        self.assertTrue(zf._allowZip64)
+
+  def test_open_zip64True(self):
+    with temporary_dir() as tempdir:
+      with open_zip64(os.path.join(tempdir, 'test'), 'w', allowZip64=True) as zf:
+        self.assertTrue(zf._allowZip64)
+
+  def test_open_zip64False(self):
+    with temporary_dir() as tempdir:
+      with open_zip64(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
+        self.assertFalse(zf._allowZip64)

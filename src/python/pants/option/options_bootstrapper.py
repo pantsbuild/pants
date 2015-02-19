@@ -2,15 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 import sys
 
+from pants.base.build_environment import get_buildroot
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.base.build_environment import get_buildroot
 from pants.option.options import Options
 from pants.option.parser import Parser
 
@@ -40,7 +40,7 @@ def register_bootstrap_options(register, buildroot=None):
            help='Use pantsrc files.')
   register('--pantsrc-files', action='append', metavar='<path>',
            default=['/etc/pantsrc', '~/.pants.rc'],
-           help='Override config with values from these files. Later files override eariler ones.')
+           help='Override config with values from these files. Later files override earlier ones.')
   register('--pythonpath', action='append',
            help='Add these directories to PYTHONPATH to search for plugins.')
   register('--target-spec-file', action='append', dest='target_spec_files',

@@ -2,18 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from contextlib import closing, contextmanager
 import hashlib
 import os
 import sys
 import tempfile
 import time
+from contextlib import closing, contextmanager
 
 import requests
-from twitter.common.lang import Compatibility
+import six
 
 from pants.util.dirutil import safe_open
 
@@ -38,7 +38,7 @@ class Fetcher(object):
     """
     def __init__(self, value=None, response_code=None):
       super(Fetcher.PermanentError, self).__init__(value)
-      if response_code and not isinstance(response_code, Compatibility.integer):
+      if response_code and not isinstance(response_code, six.integer_types):
         raise ValueError('response_code must be an integer, got %s' % response_code)
       self._response_code = response_code
 
@@ -152,7 +152,7 @@ class Fetcher(object):
       :param chunk_size_bytes: The size of data chunks to note progress for, 10 KB by default.
       """
       self._width = width or 50
-      if not isinstance(self._width, Compatibility.integer):
+      if not isinstance(self._width, six.integer_types):
         raise ValueError('The width must be an integer, given %s' % self._width)
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
       self._start = time.time()
@@ -251,7 +251,7 @@ class Fetcher(object):
     """
     @contextmanager
     def download_fp(_path_or_fd):
-      if _path_or_fd and not isinstance(_path_or_fd, Compatibility.string):
+      if _path_or_fd and not isinstance(_path_or_fd, six.string_types):
         yield _path_or_fd, _path_or_fd.name
       else:
         if not _path_or_fd:

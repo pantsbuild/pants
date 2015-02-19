@@ -2,14 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict, namedtuple
 import errno
 import os
 import re
 import subprocess
+from collections import defaultdict, namedtuple
 
 from twitter.common import log
 from twitter.common.collections import OrderedSet
@@ -27,7 +27,9 @@ from pants.base.target import Target
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
 
+
 INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
+
 
 def _copytree(from_base, to_base):
   def abort(error):

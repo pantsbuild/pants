@@ -24,4 +24,4 @@ To generate an IDEA project for the code in `src/java/com/archie/path/to:target`
 `src/java/com/archie/another:target`, use the <a pantsref="oref_goal_idea">idea goal</a>:
 
     :::bash
-    $ ./pants goal idea src/java/com/archie/path/to:target src/java/com/archie/another:target
+    $ ./pants idea src/java/com/archie/path/to:target src/java/com/archie/another:target

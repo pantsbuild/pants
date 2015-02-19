@@ -2,8 +2,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
 import os
@@ -47,13 +47,13 @@ class SignApkTask(Task):
 
   @classmethod
   def product_types(cls):
-    return ['signed_apk']
+    return ['release_apk']
 
   def __init__(self, *args, **kwargs):
     super(SignApkTask, self).__init__(*args, **kwargs)
-    self._distdir = self.get_options().pants_distdir
     self._config_file = self.get_options().keystore_config_location
     self._dist = None
+    self._distdir = self.get_options().pants_distdir
 
   @property
   def config_file(self):
@@ -77,7 +77,7 @@ class SignApkTask(Task):
                                        jdk=True)
     return self._dist
 
-  def render_args(self, target, key, unsigned_apk, outdir):
+  def _render_args(self, target, key, unsigned_apk, outdir):
     """Create arg list for the jarsigner process.
 
     :param AndroidBinary target: Target to be signed.
@@ -90,9 +90,7 @@ class SignApkTask(Task):
     # is needed before passing a -tsa flag indiscriminately.
     # http://bugs.java.com/view_bug.do?bug_id=8023338
 
-    args = []
-    args.append(self.distribution.binary('jarsigner'))
-
+    args = [self.distribution.binary('jarsigner')]
     # These first two params are required flags for JDK 7+
     args.extend(['-sigalg', 'SHA1withRSA'])
     args.extend(['-digestalg', 'SHA1'])
@@ -100,8 +98,7 @@ class SignApkTask(Task):
     args.extend(['-keystore', key.keystore_location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
-    args.extend(['-signedjar', (os.path.join(outdir, target.app_name + '.' +
-                                             key.build_type + '.signed.apk'))])
+    args.extend(['-signedjar', os.path.join(outdir, self.package_name(target, key.build_type))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
     logger.debug('Executing: {0}'.format(' '.join(args)))
@@ -127,9 +124,9 @@ class SignApkTask(Task):
         def get_products_path(target):
           """Get path of target's unsigned apks as created by AaptBuilder."""
           unsigned_apks = self.context.products.get('apk')
-          if unsigned_apks.get(target):
-            # This allows for multiple apks but we expect only one per target.
-            for tgts, products in unsigned_apks.get(target).items():
+          packages = unsigned_apks.get(target)
+          if packages:
+            for tgts, products in packages.items():
               for prod in products:
                 yield os.path.join(tgts, prod)
 
@@ -137,9 +134,10 @@ class SignApkTask(Task):
         for unsigned_apk in packages:
           keystores = KeystoreResolver.resolve(self.config_file)
           for key in keystores:
-            outdir = (self.sign_apk_out(target, key.keystore_name))
+
+            outdir = self.sign_apk_out(target, keystores[key].build_type)
             safe_mkdir(outdir)
-            args = self.render_args(target, key, unsigned_apk, outdir)
+            args = self._render_args(target, keystores[key], unsigned_apk, outdir)
             with self.context.new_workunit(name='sign_apk',
                                            labels=[WorkUnit.MULTITOOL]) as workunit:
               returncode = subprocess.call(args, stdout=workunit.output('stdout'),
@@ -147,8 +145,24 @@ class SignApkTask(Task):
               if returncode:
                 raise TaskError('The SignApk jarsigner process exited non-zero: {0}'
                                 .format(returncode))
-              # I will handle the output products with the next CR for the final build step.
 
-  def sign_apk_out(self, target, key_name):
-    """Compute the outdir for a target, one outdir per keystore."""
-    return os.path.join(self._distdir, target.app_name, key_name)
+    for target in targets:
+      release_path = self.sign_apk_out(target, 'release')
+      release_apk = self.package_name(target, 'release')
+
+      if os.path.isfile(os.path.join(release_path, release_apk)):
+        self.context.products.get('release_apk').add(target, release_path).append(release_apk)
+
+
+  def package_name(self, target, build_type):
+    """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""
+    return '{0}.{1}.signed.apk'.format(target.app_name, build_type)
+
+  def sign_apk_out(self, target, build_type):
+    """Compute the outdir for a target."""
+    if build_type == 'release':
+      # If it is a release build, it goes to the workdir for zipalign to operate upon.
+      return os.path.join(self.workdir, target.name, build_type)
+    elif build_type == 'debug':
+      # Debug builds have completed all needed tasks so they can go straight to dist.
+      return os.path.join(self._distdir, target.name)

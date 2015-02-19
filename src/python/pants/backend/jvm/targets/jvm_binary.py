@@ -2,15 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from hashlib import sha1
 import os
 import re
+from hashlib import sha1
 
+from six import string_types
 from twitter.common.dirutil import Fileset
-from twitter.common.lang import AbstractClass, Compatibility
+from twitter.common.lang import AbstractClass
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -25,7 +26,7 @@ from pants.base.validation import assert_list
 
 class JarRule(AbstractClass):
   def __init__(self, apply_pattern):
-    if not isinstance(apply_pattern, Compatibility.string):
+    if not isinstance(apply_pattern, string_types):
       raise ValueError('The supplied apply_pattern is not a string, given: %s' % apply_pattern)
     try:
       self._apply_pattern = re.compile(apply_pattern)
@@ -53,7 +54,7 @@ class Duplicate(JarRule):
 
       :param str path: The path of the duplicate entry.
       """
-      assert path and isinstance(path, Compatibility.string), 'A non-empty path must be supplied.'
+      assert path and isinstance(path, string_types), 'A non-empty path must be supplied.'
       super(Duplicate.Error, self).__init__('Duplicate entry encountered for path %s' % path)
       self._path = path
 
@@ -242,10 +243,10 @@ class JvmBinary(JvmTarget):
     sources = [source] if source else None
     super(JvmBinary, self).__init__(sources=self.assert_list(sources), **kwargs)
 
-    if main and not isinstance(main, Compatibility.string):
+    if main and not isinstance(main, string_types):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
 
-    if source and not isinstance(source, Compatibility.string):
+    if source and not isinstance(source, string_types):
       raise TargetDefinitionException(self, 'source must be a single relative file path')
 
     # Consider an alias mechanism (target) that acts like JarLibrary but points to a single item

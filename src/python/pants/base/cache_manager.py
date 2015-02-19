@@ -2,19 +2,21 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import sys
+
+from pants.base.build_graph import sort_targets
+from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.target import Target
+
 
 try:
   import cPickle as pickle
 except ImportError:
   import pickle
 
-from pants.base.build_graph import sort_targets
-from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.target import Target
 
 
 class VersionedTargetSet(object):
@@ -78,11 +80,17 @@ class VersionedTarget(VersionedTargetSet):
     self.id = target.id
 
 
-# The result of calling check() on a CacheManager.
-# Each member is a list of VersionedTargetSet objects in topological order.
-# Tasks may need to perform no, some or all operations on either of these, depending on how they
-# are implemented.
+
 class InvalidationCheck(object):
+  """The result of calling check() on a CacheManager.
+
+  Each member is a list of VersionedTargetSet objects.  Sorting of the targets depends
+  on how you order the InvalidationCheck from the InvalidationCacheManager.
+
+  Tasks may need to perform no, some or all operations on either of these, depending on how they
+  are implemented.
+  """
+
   @classmethod
   def _partition_versioned_targets(cls, versioned_targets, partition_size_hint, vt_colors=None):
     """Groups versioned targets so that each group has roughly the same number of sources.

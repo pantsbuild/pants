@@ -2,29 +2,28 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import hashlib
 import os
 import re
 import time
-
 from collections import namedtuple
 
 import psutil
-
-# TODO: Once we integrate standard logging into our reporting framework, we  can consider making
-#  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
-
+from six import string_types
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
 
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.util.dirutil import safe_open
+
+
+# TODO: Once we integrate standard logging into our reporting framework, we  can consider making
+#  some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
 
 
 class NailgunExecutor(Executor):
@@ -156,7 +155,7 @@ class NailgunExecutor(Executor):
     super(NailgunExecutor, self).__init__(distribution=distribution)
 
     self._nailgun_classpath = maybe_list(nailgun_classpath)
-    if not isinstance(workdir, Compatibility.string):
+    if not isinstance(workdir, string_types):
       raise ValueError('Workdir must be a path string, given {workdir}'.format(workdir=workdir))
 
     self._workdir = workdir

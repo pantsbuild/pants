@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
@@ -20,7 +21,6 @@ python_library(
 python_test_suite(
   name = 'tasks',
   dependencies = [
-    ':antlr_gen',
     ':binary_create',
     ':builddict',
     ':bundle_create',
@@ -40,7 +40,6 @@ python_test_suite(
     ':jar_create',
     ':jar_publish',
     ':jar_task',
-    ':jaxb_gen',
     ':jvm_run',
     ':jvm_task',
     ':jvmdoc_gen',
@@ -48,11 +47,8 @@ python_test_suite(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
-    ':protobuf_gen',
-    ':ragel_gen',
     ':reflect',
     ':roots',
-    ':scrooge_gen',
     ':sorttargets',
     ':targets_help',
     ':what_changed',
@@ -76,21 +72,8 @@ python_test_suite(
     ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
-    ':thrift_linter_integration',
     ':wire_integration',
     'tests/python/pants_test/tasks/jvm_compile/java:integration',
-  ],
-)
-
-python_tests(
-  name = 'antlr_gen',
-  sources = ['test_antlr_gen.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    ':base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:antlr_gen',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
 )
 
@@ -318,11 +301,11 @@ python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
-    ':base',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -530,16 +513,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'protobuf_gen',
-  sources = ['test_protobuf_gen.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/codegen/tasks:protobuf_gen',
-    'src/python/pants/util:contextutil',
-  ],
-)
-
-python_tests(
   name = 'protobuf_integration',
   sources = ['test_protobuf_integration.py'],
   dependencies = [
@@ -557,17 +530,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'jaxb_gen',
-  sources = ['test_jaxb_gen.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/codegen/tasks:jaxb_gen',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/util:contextutil',
-  ],
-)
-
-python_tests(
   name = 'roots',
   sources = ['test_roots.py'],
   dependencies = [
@@ -576,20 +538,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:roots',
-  ],
-)
-
-python_tests(
-  name = 'scrooge_gen',
-  sources = ['test_scrooge_gen.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    ':base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:scrooge_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:exceptions',
   ],
 )
 
@@ -613,17 +561,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:targets_help',
-  ],
-)
-
-python_tests(
-  name = 'thrift_linter_integration',
-  sources = ['test_thrift_linter_integration.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/codegen/tasks:scrooge_gen',
-    'tests/python/pants_test:int-test',
   ],
 )
 
@@ -705,18 +642,3 @@ python_tests(
   ]
 )
 
-python_tests(
-  name = 'ragel_gen',
-  sources = ['test_ragel_gen.py'],
-  dependencies = [
-    ':base',
-    '3rdparty/python:mock',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:ragel_gen',
-    'src/python/pants/base:address',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/goal:context',
-    'src/python/pants/util:contextutil',
-  ],
-)

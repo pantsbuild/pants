@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import sys
 
@@ -107,6 +107,12 @@ migrations = {
   ('java-compile', 'write_artifact_caches'): ('compile.java', 'write_artifact_caches'),
   ('scala-compile', 'write_artifact_caches'): ('compile.scala', 'write_artifact_caches'),
 
+  ('protobuf-gen', 'version'): ('gen.protoc', 'version'),
+  ('protobuf-gen', 'supportdir'): ('gen.protoc', 'supportdir'),
+  ('protobuf-gen', 'plugins'): ('gen.protoc', 'plugins'),
+  ('protobuf-gen', 'javadeps'): ('gen.protoc', 'javadeps'),
+  ('protobuf-gen', 'pythondeps'): ('gen.protoc', 'pythondeps'),
+
   ('backend', 'python-path'): ('DEFAULT', 'pythonpath')
 }
 
@@ -121,7 +127,16 @@ notes = {
                                'bootstrap.bootstrap-jvm-tools and imports.ivy-imports '
                                '(as jvm_options). Easiest way to do this is to define '
                                'ivy_jvm_options in DEFAULT and then interpolate it: '
-                               'jvm_options: %(ivy_jvm_options)s'
+                               'jvm_options: %(ivy_jvm_options)s',
+  ('protobuf-gen', 'version'): 'The behavior of the "version" and "javadeps" parameters '
+                               'have changed.\n  '
+                               'The old behavior to was to append the  "version" paraemter to the '
+                               'target name \'protobuf-\' as the default for "javadeps".  Now '
+                               '"javadeps" defaults to the value \'protobuf-java\'.',
+  ('protobuf-gen', 'plugins'): 'The behavior of the "plugins" parameter has changed. '
+                               'The old behavior was to unconditionally append "_protobuf" to the '
+                               'end of the plugin name.  This will not work for plugins that have '
+                               'a name that does not end in "_protobuf".',
 }
 
 

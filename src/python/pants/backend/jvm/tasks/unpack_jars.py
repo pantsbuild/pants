@@ -2,23 +2,39 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import logging
 import os
 import re
 import shutil
+from hashlib import sha1
+
+from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.base.build_environment import get_buildroot
+from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.fs.archive import ZIP
-
-from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
 
 logger = logging.getLogger(__name__)
+
+class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
+
+  def compute_fingerprint(self, target):
+    """UnpackedJars targets need to be re-unpacked if any of its configuration changes or
+       any of the jars they import have changed.
+    """
+    if isinstance(target, UnpackedJars):
+      hasher = sha1()
+      for jar_import in sorted(target.imported_jars, key=lambda t: t.id):
+        hasher.update(jar_import.cache_key())
+      hasher.update(target.payload.fingerprint())
+      return hasher.hexdigest()
+    return None
 
 
 class UnpackJars(Task):
@@ -29,7 +45,10 @@ class UnpackJars(Task):
   """
 
   class InvalidPatternError(Exception):
-    """Thrown if a pattern can't be compiled for including or excluding args"""
+    """Raised if a pattern can't be compiled for including or excluding args"""
+
+  class MissingUnpackedDirsError(Exception):
+    """Raised if a directory that is expected to be unpacked doesn't exist."""
 
   @classmethod
   def product_types(cls):
@@ -38,10 +57,6 @@ class UnpackJars(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data('ivy_imports')
-
-  def __init__(self, *args, **kwargs):
-    super(UnpackJars, self).__init__(*args, **kwargs)
-    self._buildroot = get_buildroot()
 
   def _unpack_dir(self, unpacked_jars):
     return os.path.normpath(os.path.join(self._workdir, unpacked_jars.id))
@@ -106,15 +121,31 @@ class UnpackJars(Task):
   def execute(self):
     addresses = [target.address for target in self.context.targets()]
     unpacked_jars_list = [t for t in self.context.build_graph.transitive_subgraph_of_addresses(addresses)
-                     if isinstance(t, UnpackedJars)]
+                          if isinstance(t, UnpackedJars)]
+
+    unpacked_targets = []
+    with self.invalidated(unpacked_jars_list,
+                          fingerprint_strategy=UnpackJarsFingerprintStrategy(),
+                          invalidate_dependents=True) as invalidation_check:
+      if invalidation_check.invalid_vts:
+        unpacked_targets.extend([vt.target for vt in invalidation_check.invalid_vts])
+        for target in unpacked_targets:
+          self._unpack(target)
+
     for unpacked_jars_target in unpacked_jars_list:
-      self._unpack(unpacked_jars_target)
       unpack_dir = self._unpack_dir(unpacked_jars_target)
+      if not (os.path.exists(unpack_dir) and os.path.isdir(unpack_dir)):
+        raise self.MissingUnpackedDirsError(
+          "Expected {unpack_dir} to exist containing unpacked files for {target}"
+          .format(unpack_dir=unpack_dir, target=unpacked_jars_target.address.spec))
       found_files = []
       for root, dirs, files in os.walk(unpack_dir):
         for f in files:
           relpath = os.path.relpath(os.path.join(root, f), unpack_dir)
           found_files.append(relpath)
-      rel_unpack_dir = os.path.relpath(unpack_dir, self._buildroot)
+      rel_unpack_dir = os.path.relpath(unpack_dir, get_buildroot())
       unpacked_sources_product = self.context.products.get_data('unpacked_archives', lambda: {})
       unpacked_sources_product[unpacked_jars_target] = [found_files, rel_unpack_dir]
+
+    # Returning the list of compiled targets for testing purposes
+    return unpacked_targets

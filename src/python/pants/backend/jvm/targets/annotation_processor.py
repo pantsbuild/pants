@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 
@@ -23,4 +23,6 @@ class AnnotationProcessor(ExportableJvmLibrary):
     super(AnnotationProcessor, self).__init__(*args, **kwargs)
 
     self.processors = processors
+
+    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
     self.add_labels('java', 'apt')

@@ -2,15 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict
 import copy
 import logging
 import os
 import shutil
 import threading
+from collections import defaultdict
 
 from twitter.common.collections import maybe_list
 
@@ -19,7 +19,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
@@ -28,30 +28,16 @@ from pants.util.dirutil import safe_mkdir
 logger = logging.getLogger(__name__)
 
 
-class IvyResolveFingerprintStrategy(FingerprintStrategy):
-  @classmethod
-  def product_types(cls):
-    # TODO(pl): This is almost certainly supposed to be on IvyTaskMixin,
-    # but it might mess up MRO linearization.
-    # It seems to be completely unused right now.
-    return ['symlink_map']
+class IvyResolveFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):
     if isinstance(target, JarLibrary):
       return target.payload.fingerprint()
-    elif isinstance(target, JvmTarget):
+    if isinstance(target, JvmTarget):
       if target.payload.excludes or target.payload.configurations:
         return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
-      else:
-        return None
-    else:
-      return None
+    return None
 
-  def __hash__(self):
-    return hash(type(self))
-
-  def __eq__(self, other):
-    return type(self) == type(other)
 
 
 class IvyTaskMixin(object):
@@ -71,6 +57,8 @@ class IvyTaskMixin(object):
                   workunit_name=None,
                   confs=None,
                   custom_args=None):
+    """Populates the product 'ivy_resolve_symlink_map' from the specified targets."""
+
     if not targets:
       return ([], set())
 
@@ -130,10 +118,12 @@ class IvyTaskMixin(object):
     symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
                                              symlink_dir, target_classpath_file)
     with IvyTaskMixin.symlink_map_lock:
-      all_symlinks_map = self.context.products.get_data('symlink_map') or defaultdict(list)
+      products = self.context.products
+      all_symlinks_map = products.get_data('ivy_resolve_symlink_map') or defaultdict(list)
       for path, symlink in symlink_map.items():
         all_symlinks_map[os.path.realpath(path)].append(symlink)
-      self.context.products.safe_create_data('symlink_map', lambda: all_symlinks_map)
+      products.safe_create_data('ivy_resolve_symlink_map',
+                                lambda: all_symlinks_map)
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]

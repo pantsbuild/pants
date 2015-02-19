@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 from textwrap import dedent
@@ -79,12 +79,24 @@ class ListTargetsTest(BaseListTargetsTest):
           dependencies=[
             'a/b/c:c3',
             'a/b/d:d',
-          ]
-        ).with_description("""
+          ],
+          description = """
         Exercises alias resolution.
         Further description.
-        """)
+          """,
+        )
         '''))
+
+    # TODO: Remove this once with_description has been removed
+    self.add_to_build_file('g', dedent('''
+        target(
+          name='g',
+          dependencies=[
+            'a',
+          ],
+        ).with_description("""the description"""),
+        '''))
+
 
   def test_list_path(self):
     self.assert_console_output('a/b:b', targets=[self.target('a/b')])
@@ -116,7 +128,8 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/c:c3',
         'a/b/d:d',
         'a/b/e:e1',
-        'f:alias')
+        'f:alias',
+        'g:g')
 
     self.assert_entries(', ',
         'a:a',
@@ -127,6 +140,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
+        'g:g',
         args=['--test-sep=, '])
 
     self.assert_console_output(
@@ -137,7 +151,8 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/c:c3',
         'a/b/d:d',
         'a/b/e:e1',
-        'f:alias')
+        'f:alias',
+        'g:g')
 
   def test_list_provides(self):
     self.assert_console_output(
@@ -177,6 +192,10 @@ class ListTargetsTest(BaseListTargetsTest):
       f:alias
         Exercises alias resolution.
         Further description.
+      ''').strip(),
+      dedent('''
+      g:g
+        the description
       ''').strip(),
       args=['--test-documented']
     )

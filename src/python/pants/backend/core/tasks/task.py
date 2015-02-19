@@ -2,24 +2,24 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from abc import abstractmethod
-from contextlib import contextmanager
 import itertools
 import os
 import sys
 import threading
+from abc import abstractmethod
+from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
 from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.cache_manager import (InvalidationCacheManager, InvalidationCheck)
+from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
-from pants.cache.artifact_cache import call_insert, call_use_cached_files, UnreadableArtifact
+from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element
@@ -264,31 +264,33 @@ class TaskBase(AbstractClass):
                   fingerprint_strategy=None,
                   topological_order=False):
     """Checks targets for invalidation, first checking the artifact cache.
+
     Subclasses call this to figure out what to work on.
 
-    targets:                 The targets to check for changes.
-    invalidate_dependents:   If True then any targets depending on changed targets are invalidated.
-    partition_size_hint:     Each VersionedTargetSet in the yielded list will represent targets
-                             containing roughly this number of source files, if possible. Set to
-                             sys.maxint for a single VersionedTargetSet. Set to 0 for one
-                             VersionedTargetSet per target. It is up to the caller to do the right
-                             thing with whatever partitioning it asks for.
-    locally_changed_targets: Targets that we've edited locally. If specified, and there aren't too
-                             many of them, we keep these in separate partitions from other targets,
-                             as these are more likely to have build errors, and so to be rebuilt over
-                             and over, and partitioning them separately is a performance win.
-    fingerprint_strategy:    A FingerprintStrategy instance, which can do per task, finer grained
-                             fingerprinting of a given Target.
-
-    Yields an InvalidationCheck object reflecting the (partitioned) targets.
+    :param targets:               The targets to check for changes.
+    :param invalidate_dependents: If True then any targets depending on changed targets are invalidated.
+    :param partition_size_hint:   Each VersionedTargetSet in the yielded list will represent targets
+                                  containing roughly this number of source files, if possible. Set to
+                                  sys.maxint for a single VersionedTargetSet. Set to 0 for one
+                                  VersionedTargetSet per target. It is up to the caller to do the right
+                                  thing with whatever partitioning it asks for.
+    :param locally_changed_targets: Targets that we've edited locally. If specified, and there aren't too
+                                  many of them, we keep these in separate partitions from other targets,
+                                  as these are more likely to have build errors, and so to be rebuilt over
+                                  and over, and partitioning them separately is a performance win.
+    :param fingerprint_strategy:   A FingerprintStrategy instance, which can do per task, finer grained
+                                  fingerprinting of a given Target.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
+
+    :returns: Yields an InvalidationCheck object reflecting the (partitioned) targets.
+    :rtype: InvalidationCheck
     """
+
     # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
-
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
 
@@ -334,14 +336,9 @@ class TaskBase(AbstractClass):
       for vt in invalidation_check.invalid_vts_partitioned:
         targets.extend(vt.targets)
 
-      payloads = [t.payload for t in targets]
-
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
-        if len(payloads) > 0:
-          msg_elements.append(' containing ')
-          msg_elements.append(items_to_report_element(payloads, 'payload file'))
         if num_invalid_partitions > 1:
           msg_elements.append(' in %d target partitions' % num_invalid_partitions)
         msg_elements.append('.')

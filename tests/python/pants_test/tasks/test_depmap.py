@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import json
 import os
@@ -137,6 +137,24 @@ class DepmapTest(BaseDepmapTest):
       )
     '''))
 
+    # It makes no sense whatsoever to have a java_library that depends
+    # on a Python library, but we want to ensure that depmap handles
+    # cases like this anyway because there might be other cases which
+    # do make sense (e.g. things that generate generic resources)
+    self.add_to_build_file('src/java/java_depends_on_python', dedent('''
+      java_library(
+        name='java_depends_on_python',
+        dependencies=['common/d:d']
+      )
+    '''))
+
+  def test_java_depends_on_python(self):
+    self.assert_console_output_ordered(
+      'internal-src.java.java_depends_on_python.java_depends_on_python',
+      '  internal-common.d.d',
+      targets=[self.target('src/java/java_depends_on_python')]
+    )
+
   def test_empty(self):
     self.assert_console_output_ordered(
       'internal-common.a.a',
@@ -156,14 +174,14 @@ class DepmapTest(BaseDepmapTest):
     )
 
   def test_python_library(self):
-    self.assert_console_raises(
-      TaskError,
+    self.assert_console_output_ordered(
+      'internal-common.d.d',
       targets=[self.target('common/d')]
     )
 
   def test_python_binary(self):
-    self.assert_console_raises(
-      TaskError,
+    self.assert_console_output_ordered(
+      'internal-common.e.e',
       targets=[self.target('common/e')]
     )
 
@@ -240,6 +258,16 @@ class DepmapTest(BaseDepmapTest):
       '  internal-common.g.g',
       '    internal-common.f.f',
       targets=[self.target('common/g'), self.target('common/h'), self.target('common/i')]
+    )
+
+  def test_path_to(self):
+    self.assert_console_output_ordered(
+      'internal-overlaps.two',
+      '  internal-overlaps.one',
+      '    internal-common.i.i',
+      '      internal-common.g.g',
+      targets=[self.target('overlaps:two')],
+      args=['--test-path-to=internal-common.g.g'],
     )
 
   def test_resources(self):

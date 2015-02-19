@@ -5,7 +5,9 @@
 python_test_suite(
   name = 'android',
   dependencies = [
+    ':android_config_util',
     ':android_distribution',
+    ':android_manifest_parser',
     ':keystore_resolver',
     'tests/python/pants_test/android/tasks',
   ]
@@ -29,6 +31,21 @@ python_tests(
   ],
 )
 
+python_library(
+  name = 'android_base',
+  sources = [
+    'test_android_base.py',
+  ],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:all',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:base'
+  ]
+)
+
 python_tests(
   name = 'android_config_util',
   sources = [
@@ -41,15 +58,25 @@ python_tests(
 )
 
 python_tests(
+  name = 'android_manifest_parser',
+  sources = [
+    'test_android_manifest_parser.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android:android_manifest_parser',
+    'src/python/pants/util:xml_parser',
+  ]
+)
+
+python_tests(
   name = 'android_distribution',
   sources = [
     'test_android_distribution.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/android:android_distribution',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/android:android_base',
   ]
 )
 

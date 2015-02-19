@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -26,6 +26,8 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def setUp(self):
     super(FilesetRelPathWrapperTest, self).setUp()
+    self.create_file('y/morx.java')
+    self.create_file('y/fleem.java')
 
   def test_no_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
@@ -33,6 +35,20 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   def test_no_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("?"))')
+    self.context().scan(self.build_root)
+
+  def test_glob_exclude(self):
+    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude=[["fleem.java"]]))')
+    graph = self.context().scan(self.build_root)
+    assert ['morx.java'] == list(graph.get_target_from_spec('y').sources_relative_to_source_root())
+
+  def test_glob_exclude_not_string(self):
+    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude="fleem.java"))')
+    with self.assertRaisesRegexp(AddressLookupError, 'Expected exclude parameter.*'):
+      self.context().scan(self.build_root)
+
+  def test_glob_exclude_string_in_list(self):
+    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude=["fleem.java"]))')
     self.context().scan(self.build_root)
 
   def test_subdir_glob(self):

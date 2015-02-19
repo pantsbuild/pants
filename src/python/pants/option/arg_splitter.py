@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import namedtuple
 import sys
+from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
@@ -33,6 +33,17 @@ class SplitArgs(namedtuple('SplitArgs',
   pass
 
 
+class HelpRequest(namedtuple('HelpRequest', ['advanced', 'all_scopes'])):
+  """A help request from the user.
+
+  advanced: Did the user ask for advanced help (e.g., using --help-advanced).
+  all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
+  """
+  @classmethod
+  def basic(cls):
+    return cls(advanced=False, all_scopes=False)
+
+
 class ArgSplitter(object):
   """Splits a command-line into scoped sets of flags, and a set of targets.
 
@@ -43,15 +54,17 @@ class ArgSplitter(object):
   ./pants -x compile target1 target2 --compile-java-flag
   ./pants -x --compile-java-flag compile target1 target2
 
-  Handles help flags (-h, --help and the scope 'help') specially.
+  Handles help args (-h, --help-* flags and the scope 'help') specially.
   """
-  _HELP_FLAGS = ('-h', '--help')
+  _HELP_BASIC_ARGS = ('-h', '--help', 'help')
+  _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
+  _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
+  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS
 
   def __init__(self, known_scopes):
-    self._known_scopes = set(known_scopes + ['help'])
+    self._known_scopes = set(known_scopes + ['help', 'help-advanced', 'help-all'])
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
-    self._is_help = False  # True if the user asked for help.
-    self._is_help_all = False  # True if the user asked for --help-all.
+    self._help_request = None  # Will be set if we encounter any help flags.
 
     # For historical reasons we allow --scope-flag-name anywhere on the cmd line,
     # as an alternative to ... scope --flag-name. This makes the transition to
@@ -62,12 +75,20 @@ class ArgSplitter(object):
                                     for scope in filter(None, sorted(self._known_scopes, reverse=True))]
 
   @property
-  def is_help(self):
-    return self._is_help
+  def help_request(self):
+    return self._help_request
 
-  @property
-  def is_help_all(self):
-    return self._is_help_all
+  def _check_for_help_request(self, arg):
+    if not arg in self._HELP_ARGS:
+      return False
+    # First ensure that we have a basic HelpRequest.
+    if not self._help_request:
+      self._help_request = HelpRequest.basic()
+    # Now see if we need to enhance it.
+    advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
+    all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
+    self._help_request = HelpRequest(advanced, all_scopes)
+    return True
 
   def split_args(self, args=None):
     """Split the specified arg list (or sys.argv if unspecified).
@@ -109,13 +130,9 @@ class ArgSplitter(object):
     add_scope(GLOBAL_SCOPE)
     for flag in global_flags:
       assign_flag_to_scope(flag, GLOBAL_SCOPE)
-    if '--help-all' in global_flags:
-      self._is_help_all = True
     scope, flags = self._consume_scope()
     while scope:
-      if scope.lower() == 'help':
-        self._is_help = True
-      else:
+      if not self._check_for_help_request(scope.lower()):
         add_scope(scope)
         goals.add(scope.partition('.')[0])
         passthru_owner = scope
@@ -127,9 +144,7 @@ class ArgSplitter(object):
       arg = self._unconsumed_args.pop()
       if arg.startswith(b'-'):
         # We assume any args here are in global scope.
-        if arg in self._HELP_FLAGS:
-          self._is_help = True
-        else:
+        if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
       else:
         targets.append(arg)
@@ -138,8 +153,8 @@ class ArgSplitter(object):
       self._unconsumed_args.pop()
       passthru = list(reversed(self._unconsumed_args))
 
-    if not goals:
-      self._is_help = True
+    if not goals and not self._help_request:
+      self._help_request = HelpRequest.basic()
     return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
 
   def _consume_scope(self):
@@ -165,9 +180,7 @@ class ArgSplitter(object):
     flags = []
     while self._at_flag():
       flag = self._unconsumed_args.pop()
-      if flag in self._HELP_FLAGS:
-        self._is_help = True
-      else:
+      if not self._check_for_help_request(flag):
         flags.append(flag)
     return flags
 

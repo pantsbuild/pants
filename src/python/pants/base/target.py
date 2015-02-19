@@ -2,17 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from hashlib import sha1
+import functools
 import os
+from hashlib import sha1
 
-from twitter.common.lang import Compatibility
+from six import string_types
 
 from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -24,6 +26,8 @@ from pants.base.validation import assert_list
 
 
 class AbstractTarget(object):
+  _deprecated_predicate = functools.partial(deprecated, '0.0.30')
+
   @property
   def has_resources(self):
     """Returns True if the target has an associated set of Resources."""
@@ -36,70 +40,93 @@ class AbstractTarget(object):
     return self.has_label('exportable') and self.provides
 
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JarDependency.')
   def is_jar(self):
     """Returns True if the target is a jar."""
     return False
 
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JavaAgent.')
   def is_java_agent(self):
     """Returns `True` if the target is a java agent."""
     return self.has_label('java_agent')
 
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JvmApp.')
   def is_jvm_app(self):
     """Returns True if the target produces a java application with bundled auxiliary files."""
     return False
 
+  # DEPRECATED  to be removed after 0.0.29
+  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
   @property
   def is_thrift(self):
     """Returns True if the target has thrift IDL sources."""
     return False
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_jvm(self):
     """Returns True if the target produces jvm bytecode."""
     return self.has_label('jvm')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_codegen(self):
     """Returns True if the target is a codegen target."""
     return self.has_label('codegen')
 
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on JarLibrary.')
   def is_jar_library(self):
     """Returns True if the target is an external jar library."""
     return self.has_label('jars')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_java(self):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')
 
   @property
+  @_deprecated_predicate('Do not use this method, use an isinstance check on AnnotationProcessor.')
   def is_apt(self):
     """Returns True if the target exports an annotation processor."""
     return self.has_label('apt')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_python(self):
     """Returns True if the target has python sources."""
     return self.has_label('python')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_scala(self):
     """Returns True if the target has scala sources."""
     return self.has_label('scala')
 
+  # DEPRECATED to be removed after 0.0.29
+  #  do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_scalac_plugin(self):
     """Returns True if the target builds a scalac plugin."""
     return self.has_label('scalac_plugin')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_test(self):
     """Returns True if the target is comprised of tests."""
     return self.has_label('tests')
 
+  # DEPRECATED to be removed after 0.0.29
+  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_android(self):
     """Returns True if the target is an android target."""
@@ -172,7 +199,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -186,6 +213,7 @@ class Target(AbstractTarget):
         by downstream/custom tasks for reasoning about build graph. NOT included in payloads
         and thus not used in fingerprinting, thus not suitable for anything that affects how
         a particular target is built.
+    :param string description: Human-readable description of this target.
     """
     # dependencies is listed above; implementation hides in TargetAddressable
     self.payload = payload or Payload()
@@ -194,7 +222,7 @@ class Target(AbstractTarget):
     self.address = address
     self._tags = set(tags or [])
     self._build_graph = build_graph
-    self.description = None
+    self.description = description
     self.labels = set()
 
     self._cached_fingerprint_map = {}
@@ -208,7 +236,7 @@ class Target(AbstractTarget):
   def num_chunking_units(self):
     return max(1, len(self.sources_relative_to_buildroot()))
 
-  def assert_list(self, maybe_list, expected_type=Compatibility.string):
+  def assert_list(self, maybe_list, expected_type=string_types):
     return assert_list(maybe_list, expected_type,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 
@@ -421,6 +449,7 @@ class Target(AbstractTarget):
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   @manual.builddict()
+  @deprecated('0.0.30', hint_message='Use the description parameter of target() instead')
   def with_description(self, description):
     """Set a human-readable description of this target.
 
@@ -428,12 +457,15 @@ class Target(AbstractTarget):
     self.description = description
     return self
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):
     self.labels.update(label)
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def remove_label(self, label):
     self.labels.remove(label)
 
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def has_label(self, label):
     return label in self.labels
 

@@ -6,7 +6,7 @@ python_library(
   sources = globs('distribution/*.py'),
   resources = globs('distribution/*.class'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/base:revision',
     'src/python/pants/util:contextutil',
@@ -18,6 +18,7 @@ python_library(
   sources = ['executor.py'],
   dependencies = [
     ':distribution',
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.log',
@@ -44,10 +45,11 @@ python_library(
   name = 'nailgun_executor',
   sources = ['nailgun_executor.py'],
   dependencies = [
+    ':executor',
     ':nailgun_client',
     '3rdparty/python:psutil',
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',

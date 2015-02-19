@@ -6,17 +6,8 @@ target(
   dependencies = [
     'src/python/pants/bin:pants',
   ],
-).with_description('An alias for the pants binary target.')
-
-
-# TODO(John Sirois): Move this to an exposed function - consider
-# whether to introduce an un-exported pants-internal backend for
-# helpers like this if we don't want to export it to the world.
-def read_contents(path):
-  import os
-  with open(os.path.join(buildfile_path(), path)) as fp:
-    return fp.read()
-
+  description = 'An alias for the pants binary target.',
+)
 
 python_library(
   name = 'pants-packaged',

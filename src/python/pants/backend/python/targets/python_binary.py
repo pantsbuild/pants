@@ -2,14 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import os
 
 from pex.pex_info import PexInfo
+from six import string_types
 from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
@@ -72,7 +72,7 @@ class PythonBinary(PythonTarget):
       raise TargetDefinitionException(self,
           'A python binary target must specify either source or entry_point.')
 
-    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, Compatibility.string):
+    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
       raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
     # TODO(pl): Most if not all of these should live in payload fields

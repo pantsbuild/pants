@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 from textwrap import dedent
 
@@ -30,7 +30,7 @@ class JavaProtobufLibraryTest(BaseTest):
     )'''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertSequenceEqual([], target.imports)
+    self.assertSequenceEqual([], target.imported_jars)
     traversable_specs = [seq for seq in target.traversable_specs]
     self.assertSequenceEqual([], traversable_specs)
 
@@ -48,8 +48,8 @@ class JavaProtobufLibraryTest(BaseTest):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertEquals(1, len(target.imports))
-    import_jar_dep = target.imports[0]
+    self.assertEquals(1, len(target.imported_jars))
+    import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
 
   def test_wrong_import_type1(self):
@@ -66,7 +66,7 @@ class JavaProtobufLibraryTest(BaseTest):
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JarLibrary.WrongTargetTypeError):
-      target.imports
+      target.imported_jars
 
   def test_wrong_import_type2(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -80,7 +80,7 @@ class JavaProtobufLibraryTest(BaseTest):
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JarLibrary.ExpectedAddressError):
-      target.imports
+      target.imported_jars
 
   def test_traversable_specs(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -105,5 +105,3 @@ class JavaProtobufLibraryTest(BaseTest):
     self.assertIsInstance(target, JavaProtobufLibrary)
     traversable_specs = [spec for spec in target.traversable_specs]
     self.assertSequenceEqual([':import_jars'], traversable_specs)
-
-

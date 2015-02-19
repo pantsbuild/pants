@@ -56,10 +56,8 @@ python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
-    '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    ':address_lookup_error',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -70,6 +68,7 @@ python_library(
     ':address',
     ':address_lookup_error',
     ':build_file',
+    ':build_file_parser',
     ':build_environment',
   ]
 )
@@ -83,7 +82,7 @@ python_library(
   name = 'build_file_parser',
   sources = ['build_file_parser.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     ':address',
     ':build_environment',
     ':build_file',
@@ -145,6 +144,16 @@ python_library(
 )
 
 python_library(
+  name = 'deprecated',
+  sources = ['deprecated.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    ':revision',
+    'src/python/pants:version',
+  ]
+)
+
+python_library(
   name = 'extension_loader',
   sources = ['extension_loader.py'],
   dependencies = [
@@ -162,14 +171,6 @@ python_library(
 )
 
 python_library(
-  name = 'double_dag',
-  sources = ['double_dag.py'],
-  dependencies = [
-    ':abbreviate_target_ids',
-  ]
-)
-
-python_library(
   name = 'exceptions',
   sources = ['exceptions.py'],
 )
@@ -177,6 +178,9 @@ python_library(
 python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+  ]
 )
 
 python_library(
@@ -256,7 +260,9 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
+    ':address_lookup_error',
     ':build_file',
   ],
 )
@@ -277,15 +283,17 @@ python_library(
   name = 'target',
   sources = ['target.py'],
   dependencies = [
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     ':address',
     ':build_environment',
     ':build_manual',
+    ':deprecated',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',
     ':payload',
+    ':payload_field',
     ':source_root',
     ':target_addressable',
   ],
@@ -295,7 +303,7 @@ python_library(
   name = 'target_addressable',
   sources = ['target_addressable.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     ':addressable',
     ':exceptions',
   ],
@@ -322,6 +330,7 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
   ],

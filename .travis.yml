@@ -8,6 +8,7 @@ cache:
   directories:
     - $HOME/.pants.d
     - $HOME/.ivy2
+    - build-support/isort.venv
     - build-support/pants_dev_deps.venv
     - build-support/virtualenv.dist
 
@@ -17,7 +18,7 @@ python:
   - "2.7"
 
 install:
-  - pip install coveralls
+  - pip --quiet install coveralls
 
 env:
   global:
@@ -29,14 +30,18 @@ env:
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
   matrix:
-    # Everything except ITs
-    - CI_FLAGS="-c"
-    # Just ITs
-    # 4 shards gets them finishing faster than units for now.
-    - CI_FLAGS="-srpeat -i 4:0"
-    - CI_FLAGS="-srpeat -i 4:1"
-    - CI_FLAGS="-srpeat -i 4:2"
-    - CI_FLAGS="-srpeat -i 4:3"
+    - CI_FLAGS="-clpnet 'Various pants self checks'"  # (fkmsr)
+    - CI_FLAGS="-fkmsrclpn 'Test examples and testprojects'"  # (et)
+    - CI_FLAGS="-fkmsrcnet 'Python unit tests for pants and pants-plugins'"  # (lp)
+    - CI_FLAGS="-fkmsrclpet 'Python contrib tests'"  # (n)
+    - CI_FLAGS="-fkmsrlpnet -i 8:0 'Python integration tests for pants - shard 1'"  # (c)
+    - CI_FLAGS="-fkmsrlpnet -i 8:1 'Python integration tests for pants - shard 2'"
+    - CI_FLAGS="-fkmsrlpnet -i 8:2 'Python integration tests for pants - shard 3'"
+    - CI_FLAGS="-fkmsrlpnet -i 8:3 'Python integration tests for pants - shard 4'"
+    - CI_FLAGS="-fkmsrlpnet -i 8:4 'Python integration tests for pants - shard 5'"
+    - CI_FLAGS="-fkmsrlpnet -i 8:5 'Python integration tests for pants - shard 6'"
+    - CI_FLAGS="-fkmsrlpnet -i 8:6 'Python integration tests for pants - shard 7'"
+    - CI_FLAGS="-fkmsrlpnet -i 8:7 'Python integration tests for pants - shard 8'"
 
 before_script: |
   ./build-support/bin/ci-sync.sh

@@ -2,17 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from abc import abstractmethod, abstractproperty
-from contextlib import contextmanager
 import os
 import subprocess
+from abc import abstractmethod, abstractproperty
+from contextlib import contextmanager
 
+from six import string_types
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.lang import AbstractClass, Compatibility
+from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import Distribution
@@ -26,7 +27,7 @@ class Executor(AbstractClass):
   @staticmethod
   def _scrub_args(classpath, main, jvm_options, args, cwd):
     classpath = maybe_list(classpath)
-    if not isinstance(main, Compatibility.string) or not main:
+    if not isinstance(main, string_types) or not main:
       raise ValueError('A non-empty main classname is required, given: %s' % main)
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())

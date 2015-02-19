@@ -2,8 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import signal
 
@@ -54,9 +54,12 @@ class PythonRun(PythonTask):
           try:
             result = po.wait()
             if result != 0:
-              raise TaskError('python {args} ... exited non-zero ({code})' %
-                              dict(args=args, code=result),
-                              exit_code=result)
+              msg = '{interpreter} {entry_point} {args} ... exited non-zero ({code})'.format(
+                        interpreter=interpreter.binary,
+                        entry_point=binary.entry_point,
+                        args=' '.join(args),
+                        code=result)
+              raise TaskError(msg, exit_code=result)
           except KeyboardInterrupt:
             po.send_signal(signal.SIGINT)
             raise

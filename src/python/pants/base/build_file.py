@@ -2,19 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
-                        print_function, unicode_literals)
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
-from collections import defaultdict
-from glob import glob1
 import logging
-import marshal
 import os
 import re
+from collections import defaultdict
+from glob import glob1
 
-from pex.interpreter import PythonIdentity
-from pants.util.dirutil import safe_walk
 from twitter.common.collections import OrderedSet
+
+from pants.util.dirutil import safe_walk
 
 
 logger = logging.getLogger(__name__)
@@ -165,10 +164,6 @@ class BuildFile(object):
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
 
-    self._bytecode_path = os.path.join(self.parent_path,
-                                       '.{name}.{ident}.pyc'.format(name=self.name,
-                                                                    ident=PythonIdentity.get()))
-
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
 
@@ -232,21 +227,8 @@ class BuildFile(object):
 
   def code(self):
     """Returns the code object for this BUILD file."""
-    if (os.path.exists(self._bytecode_path) and
-        os.path.getmtime(self.full_path) <= os.path.getmtime(self._bytecode_path)):
-      with open(self._bytecode_path, 'rb') as bytecode:
-        try:
-          return marshal.load(bytecode)
-        except Exception as e:
-          logger.warn('Failed to marshall BUILD file bytecode at {_bytecode_path}.'
-                      ' Exception was: {e}'
-                      .format(_bytecode_path=self._bytecode_path, e=e))
-
     with open(self.full_path, 'rb') as source:
-      code = compile(source.read(), '<string>', 'exec', flags=0, dont_inherit=True)
-      with open(self._bytecode_path, 'wb') as bytecode:
-        marshal.dump(code, bytecode)
-      return code
+      return compile(source.read(), self.full_path, 'exec', flags=0, dont_inherit=True)
 
   def __eq__(self, other):
     result = other and (
