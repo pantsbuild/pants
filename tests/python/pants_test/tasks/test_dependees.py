@@ -241,3 +241,21 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'src/java/a:a_java',
        targets=[self.target('resources/a:a_resources')]
     )
+
+  def test_with_spec_excludes(self):
+    self.assert_console_output(
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
+      targets=[self.target('common/a')]
+    )
+
+    self.assert_console_output(
+      targets=[self.target('common/a')],
+      config=dedent('''
+      [DEFAULT]
+      spec_excludes: [
+          "overlaps"
+        ]
+      '''),
+    )
