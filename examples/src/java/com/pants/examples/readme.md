@@ -150,7 +150,7 @@ The `BUILD` files in `3rdparty/` have targets like:
 
 Those <a pantsref="bdict_jar">`jar()` things</a> are references to public jars.
 You can read more about
-[[JVM 3rdpart dependencies|pants('examples/src/java/com/pants/examples:3rdparty_jvm')]].
+[[JVM 3rdparty dependencies|pants('examples/src/java/com/pants/examples:3rdparty_jvm')]].
 
 The Usual Commands: JVM
 -----------------------
