@@ -148,6 +148,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         # Add the artifacts from each dependency module.
         artifact_paths = []
         for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
+          assert len(symlink_map[artifact.path]) == 1, (
+            'The values in ivy_resolve_symlink_map should always be length 1,'
+            ' since it doesn`t make sense to have redundant symlinks.'
+          )
           artifact_paths.append(symlink_map[artifact.path][0])
         compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
 
