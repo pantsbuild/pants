@@ -101,8 +101,8 @@ python_library(
   name = 'workspace',
   sources = ['workspace.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/base:build_environment',
     'src/python/pants/scm',
+    'src/python/pants/util:meta',
   ],
 )

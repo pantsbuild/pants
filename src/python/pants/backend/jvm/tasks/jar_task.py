@@ -12,7 +12,6 @@ from contextlib import contextmanager
 
 from six import binary_type, string_types
 from twitter.common.collections import maybe_list
-from twitter.common.lang import AbstractClass
 
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
@@ -21,6 +20,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import temporary_dir
+from pants.util.meta import AbstractClass
 
 
 class Jar(object):
