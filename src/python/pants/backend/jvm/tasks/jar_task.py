@@ -178,21 +178,21 @@ class Jar(object):
             if self._main:
               args.append('-main=%s' % self._main)
 
-            if classpath:
+            if classpath_args:
               # In case the # of classpath exceeds max_args defined in
               # safe_args(), classpath returned by safe_args() is a list
               # of one string that is '@argfile'. Then ','.join on one
               # element returns exactly the same value.
-              args.append('-classpath={}'.format(','.join(classpath)))
+              args.append('-classpath={}'.format(','.join(classpath_args)))
 
             if self._manifest:
               args.append('-manifest=%s' % self._manifest.materialize(manifest_stage_dir))
 
-            if files:
-              args.append('-files={}'.format(','.join(files)))
+            if files_args:
+              args.append('-files={}'.format(','.join(files_args)))
 
-            if jars:
-              args.append('-jars={}'.format(','.join(jars)))
+            if jars_args:
+              args.append('-jars={}'.format(','.join(jars_args)))
 
             yield args
 
