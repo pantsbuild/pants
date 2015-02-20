@@ -22,6 +22,5 @@ python_library(
   sources = ['git.py'],
   dependencies = [
     ':scm',
-    '3rdparty/python/twitter/commons:twitter.common.log',
   ],
 )

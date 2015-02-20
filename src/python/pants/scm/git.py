@@ -35,16 +35,16 @@ class Git(Scm):
     """
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     out, _ = process.communicate()
-    return (process, out)
+    return process, out
 
   @classmethod
-  def _cleanse(cls, output):
-    return output.strip().decode('utf-8')
+  def _cleanse(cls, output, errors='strict'):
+    return output.strip().decode('utf-8', errors=errors)
 
   @classmethod
   def _check_result(cls, cmd, result, failure_msg=None, raise_type=Scm.ScmException):
     if result != 0:
-      raise raise_type(failure_msg or '%s failed with exit code %d' % (' '.join(cmd), result))
+      raise raise_type(failure_msg or '{} failed with exit code {}'.format(' '.join(cmd), result))
 
   def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None, log=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
@@ -56,7 +56,7 @@ class Git(Scm):
     branch:    The default remote branch to use.
     log:       A log object that supports debug, info, and warn methods.
     """
-    Scm.__init__(self)
+    super(Scm, self).__init__()
 
     self._gitcmd = binary
     self._worktree = os.path.realpath(worktree or os.getcwd())
@@ -67,8 +67,8 @@ class Git(Scm):
     if log:
       self._log = log
     else:
-      from twitter.common import log as c_log
-      self._log = c_log
+      import logging
+      self._log = logging.getLogger(__name__)
 
   def current_rev_identifier(self):
     return 'HEAD'
@@ -110,7 +110,7 @@ class Git(Scm):
     if from_commit:
       # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
       # the changes that have occurred on the current branch.
-      committed_cmd = ['diff', '--name-only', '%s...HEAD' % from_commit] + rel_suffix
+      committed_cmd = ['diff', '--name-only', from_commit + '...HEAD'] + rel_suffix
       committed_changes = self._check_output(committed_cmd,
                                              raise_type=Scm.LocalException)
       files.update(committed_changes.split())
@@ -129,13 +129,20 @@ class Git(Scm):
     return set(self.fix_git_relative_path(f.strip(), relative_to) for f in files)
 
   def changelog(self, from_commit=None, files=None):
-    args = ['whatchanged', '--stat', '--find-renames', '--find-copies']
+    # We force the log output encoding to be UTF-8 here since the user may have a git config that
+    # overrides the git UTF-8 default log output encoding.
+    args = ['log', '--encoding=UTF-8', '--no-merges', '--stat', '--find-renames', '--find-copies']
     if from_commit:
-      args.append('%s..HEAD' % from_commit)
+      args.append(from_commit + '..HEAD')
     if files:
       args.append('--')
       args.extend(files)
-    return self._check_output(args, raise_type=Scm.LocalException)
+
+    # There are various circumstances that can lead to git logs that are not transcodeable to utf-8,
+    # for example: http://comments.gmane.org/gmane.comp.version-control.git/262685
+    # Git will not error in these cases and we do not wish to either.  Here we direct byte sequences
+    # that can not be utf-8 decoded to be replaced with the utf-8 replacement character.
+    return self._check_output(args, raise_type=Scm.LocalException, errors='replace')
 
   def merge_base(self, left='master', right='HEAD'):
     """Returns the merge-base of master and HEAD in bash: `git merge-base left right`"""
@@ -167,12 +174,12 @@ class Git(Scm):
     # We use -a here instead of --annotate to maintain maximum git compatibility.
     # --annotate was only introduced in 1.7.8 via:
     #   https://github.com/git/git/commit/c97eff5a95d57a9561b7c7429e7fcc5d0e3a7f5d
-    self._check_call(['tag', '-a', '--message=%s' % (message or ''), name],
+    self._check_call(['tag', '-a', '--message=' + (message or ''), name],
                      raise_type=Scm.LocalException)
-    self.push('refs/tags/%s' % name)
+    self.push('refs/tags/' + name)
 
   def commit(self, message):
-    self._check_call(['commit', '--all', '--message=%s' % message], raise_type=Scm.LocalException)
+    self._check_call(['commit', '--all', '--message=' + message], raise_type=Scm.LocalException)
 
   def commit_date(self, commit_reference):
     return self._check_output(['log', '-1', '--pretty=tformat:%ci', commit_reference],
@@ -194,8 +201,8 @@ class Git(Scm):
                                    raise_type=Scm.LocalException)
         return value.strip()
 
-      self._remote = self._remote or get_local_config('branch.%s.remote' % branch)
-      self._branch = self._branch or get_local_config('branch.%s.merge' % branch)
+      self._remote = self._remote or get_local_config('branch.{}.remote'.format(branch))
+      self._branch = self._branch or get_local_config('branch.{}.merge'.format(branch))
     return self._remote, self._branch
 
   def _check_call(self, args, failure_msg=None, raise_type=None):
@@ -204,17 +211,17 @@ class Git(Scm):
     result = subprocess.call(cmd)
     self._check_result(cmd, result, failure_msg, raise_type)
 
-  def _check_output(self, args, failure_msg=None, raise_type=None):
+  def _check_output(self, args, failure_msg=None, raise_type=None, errors='strict'):
     cmd = self._create_git_cmdline(args)
     self._log_call(cmd)
 
     process, out = self._invoke(cmd)
 
     self._check_result(cmd, process.returncode, failure_msg, raise_type)
-    return self._cleanse(out)
+    return self._cleanse(out, errors=errors)
 
   def _create_git_cmdline(self, args):
-    return [self._gitcmd, '--git-dir=%s' % self._gitdir, '--work-tree=%s' % self._worktree] + args
+    return [self._gitcmd, '--git-dir=' + self._gitdir, '--work-tree=' + self._worktree] + args
 
   def _log_call(self, cmd):
-    self._log.debug('Executing: %s' % ' '.join(cmd))
+    self._log.debug('Executing: ' + ' '.join(cmd))
