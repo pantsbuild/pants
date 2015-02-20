@@ -174,24 +174,6 @@ class BinaryUtil(object):
     return bootstrapped_binary_path
 
 
-def create_argfile(args,
-                   argfile,
-                   delimiter='\n',
-                   quoter=None):
-  """ Writes args into argfile using the given delimiter and returns the argfile name quoted
-  properly for cmdline consumption.
-
-  :param args: The args to work with.
-  :param argfile: The file to write args into. The file must be opened before calling.
-  :param delimiter: The delimiter to insert between args written to the argfile, defaults to '\n'
-  :param quoter: A function that can take the argfile path and return a single argument value;
-    defaults to: <code>lambda f: '@' + f<code>
-  """
-  argfile.write(delimiter.join(args))
-  argfile.close()
-  return quoter(argfile.name) if quoter else '@{}'.format(argfile.name)
-
-
 @contextmanager
 def safe_args(args,
               max_args=None,
@@ -218,16 +200,21 @@ def safe_args(args,
   """
   max_args = max_args or (config or Config.from_cache()).getdefault('max_subprocess_args', int, 100)
   if len(args) > max_args:
+    def create_argfile(fp):
+      fp.write(delimiter.join(args))
+      fp.close()
+      return [quoter(fp.name) if quoter else '@%s' % fp.name]
+
     if argfile:
       try:
         with safe_open(argfile, 'w') as fp:
-          yield [create_argfile(args, argfile=fp, delimiter=delimiter, quoter=quoter)]
+          yield create_argfile(fp)
       finally:
         if delete and os.path.exists(argfile):
           os.unlink(argfile)
     else:
       with temporary_file(cleanup=delete) as fp:
-        yield [create_argfile(args, argfile=fp, delimiter=delimiter, quoter=quoter)]
+        yield create_argfile(fp)
   else:
     yield args
 

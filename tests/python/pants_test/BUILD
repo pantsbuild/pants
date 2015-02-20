@@ -47,12 +47,11 @@ python_library(
 
 python_tests(
   name = 'test_binary_util',
-  sources = ['test_binary_util.py'],
+  sources = ['test_binary_util.py',],
   dependencies = [
     ':base_test',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:contextutil',
     'src/python/pants:binary_util',
+    'src/python/pants/base:exceptions'
   ]
 )
 
