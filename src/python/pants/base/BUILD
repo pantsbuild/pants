@@ -10,8 +10,8 @@ python_library(
   name = 'address',
   sources = ['address.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     ':build_file',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -24,8 +24,8 @@ python_library(
   name = 'addressable',
   sources = ['addressable.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     ':address',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -120,7 +120,7 @@ python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/util:meta',
   ],
 )
 
@@ -179,7 +179,7 @@ python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -235,10 +235,9 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    '3rdparty/python:six',
     ':build_environment',
     ':validation',
+    'src/python/pants/util:meta',
   ]
 )
 
