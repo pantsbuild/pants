@@ -113,7 +113,16 @@ migrations = {
   ('protobuf-gen', 'javadeps'): ('gen.protoc', 'javadeps'),
   ('protobuf-gen', 'pythondeps'): ('gen.protoc', 'pythondeps'),
 
-  ('backend', 'python-path'): ('DEFAULT', 'pythonpath')
+  ('backend', 'python-path'): ('DEFAULT', 'pythonpath'),
+
+  # Three changes are pertinent to migrate 'ide' to both idea and & eclipse. I tried to capture
+  # that in notes
+  ('ide', 'python_source_paths'): ('idea', 'python_source_path'),
+  ('ide', 'python_lib_paths'): ('idea', 'python_lib_path'),
+  ('ide', 'python_test_paths'): ('idea', 'python_test_path'),
+  ('ide', 'extra_jvm_source_paths'): ('idea', 'extra_jvm_source_paths'),
+  ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
+  ('ide', 'debug_port'): ('idea', 'debug_port'),
 }
 
 notes = {
@@ -137,6 +146,19 @@ notes = {
                                'The old behavior was to unconditionally append "_protobuf" to the '
                                'end of the plugin name.  This will not work for plugins that have '
                                'a name that does not end in "_protobuf".',
+  ('ide', 'python_source_path'): 'python_source_path now must be specified separately for idea and '
+                                 'eclipse goals.',
+  ('ide', 'python_lib_paths'): 'python_lib_path now must be specified separately for idea and '
+                              'eclipse goals.',
+  ('ide', 'python_test_paths'): 'python_test_path now must be specified separately for idea and '
+                               'eclipse goals.',
+  ('ide', 'extra_jvm_source_paths'): 'extra_jvm_source_paths now must be specified separately for '
+                                     'idea and eclipse goals.',
+  ('ide', 'extra_jvm_test_paths'): 'extra_jvm_test_paths now must be specified separately for '
+                                   'idea and eclipse goals.',
+  ('ide', 'debug_port'):       'debug_port now must be specified separately for idea and eclipse '
+                               'goals.  Also, IDE goals now use their own debug setting and do not '
+                               'inherit from jvm configuration.'
 }
 
 
