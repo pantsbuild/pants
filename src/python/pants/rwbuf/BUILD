@@ -5,6 +5,6 @@ python_library(
   name = 'rwbuf',
   sources = globs('*.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
   ]
 )

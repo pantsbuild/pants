@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import pprint
 
 import pystache
-from twitter.common.lang import Compatibility
+import six
 
 from pants.base.mustache import MustacheRenderer
 
@@ -47,7 +47,7 @@ class Generator(object):
   def __init__(self, template_text, **template_data):
     # pystache does a typecheck for unicode in python 2.x but rewrites its sources to deal unicode
     # via str in python 3.x.
-    if Compatibility.PY2:
+    if six.PY2:
       template_text = unicode(template_text)
     self._template = pystache.parse(template_text)
     self.template_data = template_data
