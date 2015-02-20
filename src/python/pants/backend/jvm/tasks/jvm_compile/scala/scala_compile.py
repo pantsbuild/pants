@@ -42,7 +42,7 @@ class ScalaCompile(JvmCompile):
     super(ScalaCompile, self).__init__(*args, **kwargs)
 
     # Set up the zinc utils.
-    color = not self.get_options().no_colors
+    color = self.get_options().colors
     self._zinc_utils = ZincUtils(context=self.context,
                                  nailgun_task=self,
                                  jvm_options=self._jvm_options,
