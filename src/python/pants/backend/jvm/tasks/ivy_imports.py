@@ -19,8 +19,6 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   containing .proto files.
   """
 
-  _CONFIG_SECTION = 'ivy-imports'
-
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types start
   @classmethod
   def product_types(cls):
@@ -31,10 +29,6 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   def prepare(cls, options, round_manager):
     super(IvyImports, cls).prepare(options, round_manager)
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def _str_jar(self, jar):
     return 'jar' + str((jar.org, jar.name, jar.rev))

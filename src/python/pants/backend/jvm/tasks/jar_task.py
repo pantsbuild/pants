@@ -275,6 +275,9 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
+        # TODO(Eric Ayers): This needs to be migrated with some thought behind it.  Consider
+        # that The jar-tool nailgun instance is shared between tasks and doesn't necessarily
+        # need the same JVM args as its parent.
         jvm_options = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
         self.runjava(self.tool_classpath('jar-tool'),
                      'com.twitter.common.jar.tool.Main',
