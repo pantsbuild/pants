@@ -6,8 +6,9 @@ target(
   dependencies = [
     ':contextutil',
     ':dirutil',
-    ':strutil',
     ':fileutil',
+    ':meta',
+    ':strutil',
     ':xml_parser',
   ]
 )
@@ -32,10 +33,10 @@ python_tests(
 )
 
 python_tests(
-  name = 'strutil',
-  sources = ['test_strutil.py'],
+  name = 'meta',
+  sources = ['test_meta.py'],
   dependencies = [
-    'src/python/pants/util:strutil',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -45,6 +46,14 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
+  ]
+)
+
+python_tests(
+  name = 'strutil',
+  sources = ['test_strutil.py'],
+  dependencies = [
+    'src/python/pants/util:strutil',
   ]
 )
 
