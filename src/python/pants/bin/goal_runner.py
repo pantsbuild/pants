@@ -6,12 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import logging.config
 import os
 import sys
 
 import pkg_resources
-from twitter.common import log
-from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
@@ -33,6 +32,9 @@ from pants.option.global_options import register_global_options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdir
+
+
+logger = logging.getLogger(__name__)
 
 
 class GoalRunner(object):
@@ -72,6 +74,10 @@ class GoalRunner(object):
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
+
+    # TODO(Eric Ayers) We are missing log messages. Set the log level earlier
+    # Enable standard python logging for code with no handle to a context/work-unit.
+    self._setup_logging()  # NB: self.options are needed for this call.
 
     self.run_tracker = RunTracker.from_config(self.config)
     report = initial_reporting(self.config, self.run_tracker)
@@ -125,8 +131,6 @@ class GoalRunner(object):
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):
-    logger = logging.getLogger(__name__)
-
     goals = self.options.goals
     specs = self.options.target_specs
     fail_fast = self.options.for_global_scope().fail_fast
@@ -178,37 +182,10 @@ class GoalRunner(object):
         # TODO: This is JVM-specific and really doesn't belong here.
         # TODO: Make this more selective? Only kill nailguns that affect state?
         # E.g., checkstyle may not need to be killed.
-        NailgunTask.killall(log.info)
+        NailgunTask.killall()
     return result
 
   def _do_run(self):
-    # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
-    # context/work-unit logging and standard python logging doesn't buy us anything.
-
-    # TODO(Eric Ayers) We are missing log messages. Set the log level earlier
-    # Enable standard python logging for code with no handle to a context/work-unit.
-    if self.global_options.level:
-      LogOptions.set_stderr_log_level((self.global_options.level or 'info').upper())
-      logdir = self.global_options.logdir or self.config.get('goals', 'logdir', default=None)
-      if logdir:
-        safe_mkdir(logdir)
-        LogOptions.set_log_dir(logdir)
-
-        prev_log_level = None
-        # If quiet, temporarily change stderr log level to kill init's output.
-        if self.global_options.quiet:
-          prev_log_level = LogOptions.loglevel_name(LogOptions.stderr_log_level())
-          # loglevel_name can fail, so only change level if we were able to get the current one.
-          if prev_log_level is not None:
-            LogOptions.set_stderr_log_level(LogOptions._LOG_LEVEL_NONE_KEY)
-
-        log.init('goals')
-
-        if prev_log_level is not None:
-          LogOptions.set_stderr_log_level(prev_log_level)
-      else:
-        log.init()
-
     # Update the reporting settings, now that we have flags etc.
     def is_quiet_task():
       for goal in self.goals:
@@ -242,3 +219,46 @@ class GoalRunner(object):
 
     engine = RoundEngine()
     return engine.execute(context, self.goals)
+
+  def _setup_logging(self):
+    # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
+    # context/work-unit logging and standard python logging doesn't buy us anything.
+
+    # TODO(John Sirois): Support logging.config.fileConfig so a site can setup fine-grained
+    # logging control and we don't need to be the middleman plumbing an option for each python
+    # standard logging knob.
+
+    # NB: quiet help says 'Squelches all console output apart from errors'.
+    level = 'ERROR' if self.global_options.quiet else self.global_options.level.upper()
+
+    logging_config = {'version': 1,  # required and there is only a version 1 format so far.
+                      'disable_existing_loggers': False}
+
+    formatters_config = {'brief': {'format': '%(levelname)s] %(message)s'}}
+    handlers_config = {'console': {'class': 'logging.StreamHandler',
+                                   'formatter': 'brief',  # defined above
+                                   'level': level}}
+
+    log_dir = self.global_options.logdir
+    if log_dir:
+      safe_mkdir(log_dir)
+
+      # This is close to but not quite glog format.  Namely the leading levelname is not a single
+      # character and the fractional second is only to millis precision and not micros.
+      glog_date_format = '%m%d %H:%M:%S'
+      glog_format = ('%(levelname)s %(asctime)s.%(msecs)d %(process)d %(filename)s:%(lineno)d] '
+                     '%(message)s')
+
+      formatters_config['glog'] = {'format': glog_format, 'datefmt': glog_date_format}
+      handlers_config['file'] = {'class': 'logging.handlers.RotatingFileHandler',
+                                 'formatter': 'glog',  # defined above
+                                 'level': level,
+                                 'filename': os.path.join(log_dir, 'pants.log'),
+                                 'maxBytes': 10 * 1024 * 1024,
+                                 'backupCount': 4}
+
+    logging_config['formatters'] = formatters_config
+    logging_config['handlers'] = handlers_config
+    logging_config['root'] = {'level': level, 'handlers': handlers_config.keys()}
+
+    logging.config.dictConfig(logging_config)

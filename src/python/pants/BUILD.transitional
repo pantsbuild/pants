@@ -41,7 +41,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.config',
     '3rdparty/python/twitter/commons:twitter.common.confluence',
     '3rdparty/python/twitter/commons:twitter.common.decorators',
-    '3rdparty/python/twitter/commons:twitter.common.log',
     '3rdparty/python/twitter/commons:twitter.common.process',
     '3rdparty/python/twitter/commons:twitter.common.threading',
     '3rdparty/python/twitter/commons:twitter.common.util',
