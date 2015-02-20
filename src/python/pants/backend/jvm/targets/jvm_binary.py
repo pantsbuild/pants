@@ -7,11 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-from hashlib import sha1
 
 from six import string_types
 from twitter.common.dirutil import Fileset
-from twitter.common.lang import AbstractClass
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -22,6 +20,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import BundleField
 from pants.base.target import Target
 from pants.base.validation import assert_list
+from pants.util.meta import AbstractClass
 
 
 class JarRule(AbstractClass):

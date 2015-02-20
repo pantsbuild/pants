@@ -5,11 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.validation import assert_list
 
 
 class JavaTests(JvmTarget):

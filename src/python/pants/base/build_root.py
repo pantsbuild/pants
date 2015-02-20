@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from twitter.common.lang import Singleton
+from pants.util.meta import Singleton
 
 
 # TODO: Even this should probably just be a new-style option?

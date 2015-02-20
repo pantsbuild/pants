@@ -331,12 +331,12 @@ python_library(
     ':nailgun_task',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:jar',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:meta',
   ],
 )
 

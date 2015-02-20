@@ -10,17 +10,13 @@ from abc import abstractmethod
 from collections import OrderedDict
 from zipfile import ZIP_DEFLATED
 
-from twitter.common.lang import AbstractClass
-
 from pants.util.contextutil import open_tar, open_zip64
 from pants.util.dirutil import safe_walk
+from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_text
 
 
 """Support for wholesale archive creation and extraction in a uniform API across archive types."""
-
-
-
 
 
 class Archiver(AbstractClass):

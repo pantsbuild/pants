@@ -19,18 +19,23 @@ python_library(
 )
 
 python_library(
-  name = 'strutil',
-  sources = ['strutil.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
-)
-
-python_library(
   name = 'fileutil',
   sources = ['fileutil.py'],
   dependencies = [
     ':contextutil',
+  ],
+)
+
+python_library(
+  name = 'meta',
+  sources = ['meta.py'],
+)
+
+python_library(
+  name = 'strutil',
+  sources = ['strutil.py'],
+  dependencies = [
+    '3rdparty/python:six',
   ],
 )
 

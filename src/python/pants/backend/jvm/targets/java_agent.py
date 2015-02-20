@@ -9,7 +9,6 @@ from six import string_types
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.validation import assert_list
 
 
 class JavaAgent(JavaLibrary):
