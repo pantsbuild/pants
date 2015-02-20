@@ -146,8 +146,6 @@ python_library(
   name = 'group_task',
   sources = ['group_task.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     ':task',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
@@ -220,12 +218,8 @@ python_library(
   name = 'paths',
   sources = ['paths.py'],
   dependencies = [
-    ':common',
     ':console_task',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:address',
-    'src/python/pants/base:target',
+    'src/python/pants/base:exceptions',
   ],
 )
 

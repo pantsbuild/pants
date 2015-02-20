@@ -17,8 +17,8 @@ class SingletonMetaclass(type):
 
 
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
-Singleton = SingletonMetaclass('Singleton', (object,), {})
+Singleton = SingletonMetaclass(str('Singleton'), (object,), {})
 
 
 # Abstract base classes w/o __metaclass__ or meta =, just extend AbstractClass.
-AbstractClass = ABCMeta('AbstractClass', (object,), {})
+AbstractClass = ABCMeta(str('AbstractClass'), (object,), {})

@@ -50,10 +50,8 @@ python_library(
   ],
   dependencies = [
     ':jvm',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    'src/python/pants/base:config',
-    'src/python/pants/base:target',
+    '3rdparty/python:six',
+    'src/python/pants/base:exceptions',
   ],
 )
 
