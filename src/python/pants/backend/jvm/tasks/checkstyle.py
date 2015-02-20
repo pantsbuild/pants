@@ -22,8 +22,6 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
   _CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 
-  _CONFIG_SECTION = 'checkstyle'
-
   _JAVA_SOURCE_EXTENSION = '.java'
 
   _CHECKSTYLE_BOOTSTRAP_KEY = "checkstyle"
@@ -44,10 +42,6 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
   def prepare(cls, options, round_manager):
     super(Checkstyle, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def _is_checked(self, target):
     return (isinstance(target, Target) and
