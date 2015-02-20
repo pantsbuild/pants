@@ -182,7 +182,8 @@ class IdeGen(JvmToolTaskMixin, Task):
                       debug_port,
                       jvm_targets,
                       not self.intransitive,
-                      self.TargetUtil(self.context))
+                      self.TargetUtil(self.context),
+                      self.context.options.for_global_scope().spec_excludes)
 
     if self.python:
       python_source_paths = self.get_options().python_source_paths
@@ -433,7 +434,7 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, targets, transitive, target_util):
+               debug_port, targets, transitive, target_util, spec_excludes):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
 
@@ -459,6 +460,7 @@ class Project(object):
 
     self.internal_jars = OrderedSet()
     self.external_jars = OrderedSet()
+    self.spec_excludes = spec_excludes
 
   def configure_python(self, source_roots, test_roots, lib_roots):
     self.py_sources.extend(SourceSet(get_buildroot(), root, None, False) for root in source_roots)
@@ -547,7 +549,7 @@ class Project(object):
           candidates.update(self.target_util.get_all_addresses(ancestor))
         for sibling in target.address.build_file.siblings():
           candidates.update(self.target_util.get_all_addresses(sibling))
-        for descendant in target.address.build_file.descendants():
+        for descendant in target.address.build_file.descendants(spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
         def is_sibling(target):
           return source_target(target) and target_dirset.intersection(find_source_basedirs(target))

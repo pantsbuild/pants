@@ -105,10 +105,10 @@ class GoalRunner(object):
 
     self._expand_goals_and_specs()
 
-  def get_spec_excludes(self):
+  @property
+  def spec_excludes(self):
     # Note: Only call after register_options() has been called.
-    return [os.path.join(self.root_dir, spec_exclude)
-            for spec_exclude in self.options.for_global_scope().spec_excludes]
+    return self.options.for_global_scope().spec_excludes
 
   @property
   def global_options(self):
@@ -143,7 +143,7 @@ class GoalRunner(object):
 
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
       spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
-                                      spec_excludes=self.get_spec_excludes(),
+                                      spec_excludes=self.spec_excludes,
                                       exclude_target_regexps=self.global_options.exclude_target_regexp)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
         for spec in specs:
@@ -228,7 +228,7 @@ class GoalRunner(object):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
-      spec_excludes=self.get_spec_excludes()
+      spec_excludes=self.spec_excludes
     )
 
     unknown = []
