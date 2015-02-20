@@ -9,8 +9,8 @@ import logging
 import os
 import sys
 
+import pkg_resources
 from twitter.common import log
-from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.task import QuietTaskMixin
@@ -35,9 +35,6 @@ from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdir
 
 
-StringIO = Compatibility.StringIO
-
-
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
@@ -56,7 +53,9 @@ class GoalRunner(object):
     self.config = Config.from_cache()
 
     # Add any extra paths to python path (eg for loading extra source backends)
-    sys.path.extend(bootstrap_options.for_global_scope().pythonpath)
+    for path in bootstrap_options.for_global_scope().pythonpath:
+      sys.path.append(path)
+      pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
     backend_packages = self.config.getlist('backends', 'packages', [])

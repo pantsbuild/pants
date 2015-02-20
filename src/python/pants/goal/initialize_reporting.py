@@ -9,7 +9,7 @@ import errno
 import os
 import sys
 
-from twitter.common.lang import Compatibility
+from six import StringIO
 
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.plaintext_reporter import PlainTextReporter
@@ -17,9 +17,6 @@ from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report, ReportingError
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.util.dirutil import safe_mkdir, safe_rmtree
-
-
-StringIO = Compatibility.StringIO
 
 
 def initial_reporting(config, run_tracker):
@@ -69,7 +66,7 @@ def initial_reporting(config, run_tracker):
 
   # Add some useful RunInfo.
   run_tracker.run_info.add_info('default_report', html_reporter.report_path())
-  port = ReportingServerManager.get_current_server_port()
+  (_, port) = ReportingServerManager.get_current_server_pid_and_port()
   if port:
     run_tracker.run_info.add_info('report_url', 'http://localhost:%d/run/%s' % (port, run_id))
 

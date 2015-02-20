@@ -82,7 +82,7 @@ python_library(
   name = 'build_file_parser',
   sources = ['build_file_parser.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     ':address',
     ':build_environment',
     ':build_file',
@@ -144,6 +144,16 @@ python_library(
 )
 
 python_library(
+  name = 'deprecated',
+  sources = ['deprecated.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    ':revision',
+    'src/python/pants:version',
+  ]
+)
+
+python_library(
   name = 'extension_loader',
   sources = ['extension_loader.py'],
   dependencies = [
@@ -178,7 +188,7 @@ python_library(
   sources = ['generator.py'],
   dependencies = [
     ':mustache',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
   ]
 )
 
@@ -273,11 +283,12 @@ python_library(
   name = 'target',
   sources = ['target.py'],
   dependencies = [
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     ':address',
     ':build_environment',
     ':build_manual',
+    ':deprecated',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',
@@ -292,7 +303,7 @@ python_library(
   name = 'target_addressable',
   sources = ['target_addressable.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     ':addressable',
     ':exceptions',
   ],
@@ -319,6 +330,7 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
+    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
   ],

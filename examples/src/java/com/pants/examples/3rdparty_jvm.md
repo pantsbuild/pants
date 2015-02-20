@@ -142,13 +142,13 @@ target, you can depend on a `jar` that specifies a version and sets
 
 **If you notice that one "foreign" dependency pulls in mostly wrong
 things,** tell Pants not to pull in its dependencies. In your
-`3rdparty/.../BUILD` file, call the `jar`'s `intransitive` method; then
+`3rdparty/.../BUILD` file, use `jar`'s `intransitive` argument; then
 carefully add hand-picked versions:
 
     :::python
     jar_library(name="retro-naming-factory",
       jars=[
-        jar(org='retro', name='retro-factory', rev='5.0.18').intransitive(),
+	jar(org='retro', name='retro-factory', rev='5.0.18', intransitive=True),
       ],
       dependencies=[
         # Don't use retro's expected (old, incompatible) common-logging

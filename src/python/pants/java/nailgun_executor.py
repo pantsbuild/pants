@@ -12,9 +12,9 @@ import time
 from collections import namedtuple
 
 import psutil
+from six import string_types
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.lang import Compatibility
 
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
@@ -155,7 +155,7 @@ class NailgunExecutor(Executor):
     super(NailgunExecutor, self).__init__(distribution=distribution)
 
     self._nailgun_classpath = maybe_list(nailgun_classpath)
-    if not isinstance(workdir, Compatibility.string):
+    if not isinstance(workdir, string_types):
       raise ValueError('Workdir must be a path string, given {workdir}'.format(workdir=workdir))
 
     self._workdir = workdir

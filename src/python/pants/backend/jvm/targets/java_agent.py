@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from twitter.common.lang import Compatibility
+from six import string_types
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
@@ -51,11 +51,11 @@ class JavaAgent(JavaLibrary):
     if not (premain or agent_class):
       raise TargetDefinitionException(self, "Must have at least one of 'premain' or 'agent_class' "
                                             "defined.")
-    if premain and not isinstance(premain, Compatibility.string):
+    if premain and not isinstance(premain, string_types):
       raise TargetDefinitionException(self, 'The premain must be a fully qualified class name, '
                                             'given %s of type %s' % (premain, type(premain)))
 
-    if agent_class and not isinstance(agent_class, Compatibility.string):
+    if agent_class and not isinstance(agent_class, string_types):
       raise TargetDefinitionException(self,
                                       'The agent_class must be a fully qualified class name, given '
                                       '%s of type %s' % (agent_class, type(agent_class)))

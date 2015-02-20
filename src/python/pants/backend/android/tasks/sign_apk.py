@@ -112,7 +112,7 @@ class SignApkTask(Task):
     if not os.path.isfile(config_file):
       try:
         AndroidConfigUtil.setup_keystore_config(config_file)
-      except OSError as e:
+      except AndroidConfigUtil.AndroidConfigError as e:
         raise TaskError('Failed to setup keystore config: {0}'.format(e))
 
     with self.invalidated(targets) as invalidation_check:

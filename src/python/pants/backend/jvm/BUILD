@@ -6,7 +6,6 @@ python_library(
   name = 'artifact',
   sources = ['artifact.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python:six',
     ':jvm_debug_config',
     ':repository',

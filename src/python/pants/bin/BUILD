@@ -5,8 +5,8 @@ python_library(
   name = 'bin',
   sources = ['goal_runner.py', 'pants_exe.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     '3rdparty/python/twitter/commons:twitter.common.log',
+    '3rdparty/python:setuptools',
 
     'src/python/pants/backend/android:plugin',
     'src/python/pants/backend/authentication:authentication',

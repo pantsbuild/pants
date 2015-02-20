@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from six import string_types
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.fileset import Fileset
-from twitter.common.lang import Compatibility
 
 
-def assert_list(obj, expected_type=Compatibility.string, can_be_none=True, default=(),
+def assert_list(obj, expected_type=string_types, can_be_none=True, default=(),
     allowable=(list, Fileset, OrderedSet, set, tuple), raise_type=ValueError):
   """
   This function is used to ensure that parameters set by users in BUILD files are of acceptable types.

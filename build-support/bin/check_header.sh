@@ -3,6 +3,9 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+cd ${REPO_ROOT}
+
 expected_header=$(cat <<EOF
 # coding=utf-8
 # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
@@ -14,7 +17,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 EOF
 )
 
-py_files=$(find src tests pants-plugins examples -name '*.py' -not -name __init__.py)
+py_files=$(find src tests pants-plugins examples contrib -name '*.py' -not -name __init__.py)
 known_bad_headers=$(cat <<EOF
 tests/python/pants_test/tasks/false.py
 tests/python/pants_test/tasks/true.py

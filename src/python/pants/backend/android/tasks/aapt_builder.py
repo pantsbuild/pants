@@ -55,12 +55,13 @@ class AaptBuilder(AaptTask):
     #   : additional positional arguments are treated as input directories to gather files from.
     args.extend([self.aapt_tool(target.build_tools_version)])
     args.extend(['package', '-f'])
-    args.extend(['-M', target.manifest])
+    args.extend(['-M', target.manifest.path])
     args.extend(['-S'])
     args.extend(resource_dir)
-    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
+    args.extend(['-I', self.android_jar_tool(target.manifest.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    args.extend(['-F', os.path.join(self.workdir, '{0}.unsigned.apk'.format(target.app_name))])
+    args.extend(['-F', os.path.join(self.workdir,
+                                    '{0}.unsigned.apk'.format(target.app_name))])
     args.extend(inputs)
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
@@ -94,5 +95,5 @@ class AaptBuilder(AaptTask):
           if returncode:
             raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
     for target in targets:
-      self.context.products.get('apk').add(target, self.workdir).append('{0}.unsigned.apk'
-                                                                        .format(target.app_name))
+      apk_name = '{0}.unsigned.apk'.format(target.app_name)
+      self.context.products.get('apk').add(target, self.workdir).append(apk_name)

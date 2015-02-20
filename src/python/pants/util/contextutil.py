@@ -14,7 +14,7 @@ import uuid
 import zipfile
 from contextlib import closing, contextmanager
 
-from twitter.common.lang import Compatibility
+from six import string_types
 
 from pants.util.dirutil import safe_delete
 
@@ -169,7 +169,7 @@ def open_tar(path_or_file, *args, **kwargs):
 
     If path_or_file is a file, caller must close it separately.
   """
-  (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, Compatibility.string)
+  (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
                      else (None, path_or_file))
   with closing(tarfile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar

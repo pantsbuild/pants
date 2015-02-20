@@ -9,7 +9,6 @@ python_test_suite(
     ':protobuf_gen',
     ':protobuf_parse',
     ':ragel_gen',
-    ':scrooge_gen',
     ':wire_gen',
   ],
 )
@@ -71,20 +70,6 @@ python_tests(
     'src/python/pants/goal:context',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:base',
-  ],
-)
-
-python_tests(
-  name = 'scrooge_gen',
-  sources = ['test_scrooge_gen.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'tests/python/pants_test/tasks:base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:scrooge_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:exceptions',
   ],
 )
 

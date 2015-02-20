@@ -21,7 +21,7 @@ class AndroidConfigUtil(object):
   def setup_keystore_config(cls, config):
     """Create a config file for Android keystores and seed with the default keystore.
 
-    :param string config: Desired location for the new .ini config file.
+    :param string config: Full path to the new .ini config file.
     """
 
     # Unless the config file in ~/.pants.d/android is deleted, this method should only run once,
@@ -54,5 +54,6 @@ class AndroidConfigUtil(object):
     try:
       with safe_open(config, 'w') as config_file:
         config_file.write(ini)
-    except OSError as e:
-      raise cls.AndroidConfigError("Problem creating Android keystore config file: {0}".format(e))
+    # OSError if no permission to make directories, IOError if there are no write perms for file.
+    except (IOError, OSError) as e:
+      raise cls.AndroidConfigError("Problem creating Android keystore config file: {}".format(e))
