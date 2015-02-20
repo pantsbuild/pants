@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from twitter.common.collections import OrderedSet
+
 from pants.goal.products import UnionProducts
 from pants_test.base_test import BaseTest
-
-from twitter.common.collections import OrderedSet
 
 
 class UnionProductsTest(BaseTest):
