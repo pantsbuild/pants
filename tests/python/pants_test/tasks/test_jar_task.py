@@ -56,10 +56,16 @@ class BaseJarTaskTest(JarTaskTestBase):
 
 
 class JarTaskTest(BaseJarTaskTest):
+  MAX_SUBPROC_ARGS = 50
+
   def setUp(self):
     super(JarTaskTest, self).setUp()
 
-    self.jar_task = self.prepare_jar_task(self.context())
+    self.jar_task = self.prepare_jar_task(
+      self.context(config=dedent('''
+        [DEFAULT]
+        max_subprocess_args: {}
+        '''.format(self.MAX_SUBPROC_ARGS))))
 
   def test_update_write(self):
     with temporary_dir() as chroot:
@@ -187,7 +193,7 @@ class JarTaskTest(BaseJarTaskTest):
         # so the -jars argument to jar-tool will exceed max_args limit thus
         # switch to @argfile calling style.
         with self.jar_task.open_jar(main_jar, overwrite=True) as jar:
-          for i in xrange(1000):
+          for i in xrange(self.MAX_SUBPROC_ARGS + 1):
             jar.writejar(included_jar)
 
         with open_zip(main_jar) as jar:
