@@ -42,8 +42,9 @@ jar_library(name = 'cobertura-run',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05').intransitive()
-            ])
+                rev = '2.1.0-twitter-05',
+                intransitive = True,
+            )])
 
 # The reporting phase does not need asm.
 jar_library(name = 'cobertura-report',
@@ -68,9 +69,9 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
               jar(
                 org = 'com.google.code.java-allocation-instrumenter',
                 name = 'java-allocation-instrumenter',
-                rev = '2.1'
-              ).intransitive()
-            ])
+                rev = '2.1',
+                intransitive = True,
+              )])
 
 jar_library(name = 'zinc',
             jars = [
@@ -103,7 +104,7 @@ jar_library(name = 'scala-specs',
 
 jar_library(name = 'scala-repl',
             jars = [
-              jar(org = 'org.scala-lang', name = 'jline', rev = SCALA_REV).intransitive(),
+              jar(org = 'org.scala-lang', name = 'jline', rev = SCALA_REV, intransitive = True),
             ],
             dependencies = [
               ':scala-compiler',

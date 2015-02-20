@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.payload_field import PayloadField, stable_json_sha1
 
 
@@ -73,7 +74,7 @@ class JarDependency(object):
   )
 
   def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-               type_=None, classifier=None, mutable=None, artifacts=None):
+               type_=None, classifier=None, mutable=None, artifacts=None, intransitive=False):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -94,13 +95,15 @@ class JarDependency(object):
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.
     :param list artifacts: A list of additional IvyArtifacts
+    :param boolean intransitive: Declares this Dependency intransitive, indicating only the jar for
+    the dependency itself should be downloaded and placed on the classpath
     """
     self.org = org
     self.name = name
     self.rev = rev
     self.force = force
     self.excludes = tuple()
-    self.transitive = True
+    self.transitive = not intransitive
     self.apidocs = apidocs
     self.mutable = mutable
     self._classifier = classifier
@@ -146,6 +149,7 @@ class JarDependency(object):
     return self
 
   @manual.builddict()
+  @deprecated('0.0.30', hint_message='Use jar(..., intransitive=True) instead')
   def intransitive(self):
     """Declares this Dependency intransitive, indicating only the jar for the dependency itself
     should be downloaded and placed on the classpath"""
