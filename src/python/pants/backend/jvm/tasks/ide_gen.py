@@ -160,7 +160,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     )
 
     self.intransitive = self.get_options().intransitive
-    self.debug_port = self.get_options().debug_port()
+    self.debug_port = self.get_options().debug_port
 
   def _prepare_project(self):
     targets, self._project = self.configure_project(
