@@ -183,8 +183,9 @@ class JarTaskTest(BaseJarTaskTest):
         with self.jar_task.open_jar(included_jar) as jar:
           jar.writestr('e/f', b'g')
 
-        # Make the lots of included jars (even if they're all the same)
-        # to test out the @argfile calling style in jar-tool.
+        # Create lots of included jars (even though they're all the same)
+        # so the -jars argument to jar-tool will exceed max_args limit thus
+        # switch to @argfile calling style.
         with self.jar_task.open_jar(main_jar, overwrite=True) as jar:
           for i in xrange(1000):
             jar.writejar(included_jar)
