@@ -93,9 +93,9 @@ if [[ "${skip_formatting_checks:-false}" == "false" ]]; then
   banner "Checking python code formatting"
 
   ./build-support/bin/check_packages.sh || exit 1
-  ./build-support/bin/check_header.sh || exit 1
   ./build-support/bin/isort.sh || \
     die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
+  ./build-support/bin/check_header.sh || exit 1
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
