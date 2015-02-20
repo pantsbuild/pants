@@ -11,7 +11,6 @@ import sys
 
 import pkg_resources
 from twitter.common import log
-from twitter.common.lang import Compatibility
 from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.task import QuietTaskMixin
@@ -34,9 +33,6 @@ from pants.option.global_options import register_global_options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdir
-
-
-StringIO = Compatibility.StringIO
 
 
 class GoalRunner(object):

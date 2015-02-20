@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import OrderedDict
 
-from twitter.common.lang import Compatibility
+import six
 
 
 # TODO(benjy): Move to a util package?
@@ -46,7 +46,7 @@ class DictDiff(object):
     return '\n'.join(parts)
 
   def __str__(self):
-    if Compatibility.PY3:
+    if six.PY3:
       return self.__unicode__()
     else:
       return self.__unicode__().encode('utf-8')
@@ -76,7 +76,7 @@ class ZincAnalysisElementDiff(object):
     return ''.join(parts)  # '' is a unicode, so the entire result will be.
 
   def __str__(self):
-    if Compatibility.PY3:
+    if six.PY3:
       return self.__unicode__()
     else:
       return self.__unicode__().encode('utf-8')
