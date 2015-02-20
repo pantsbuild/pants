@@ -6,5 +6,6 @@ python_tests(
   sources=globs('*.py'),
   dependencies=[
     'src/python/pants/goal:products',
+    'tests/python/pants_test:base_test',
   ]
 )

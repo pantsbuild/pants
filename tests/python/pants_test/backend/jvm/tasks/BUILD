@@ -80,6 +80,7 @@ python_tests(
   name = 'ivy_resolve',
   sources = ['test_ivy_resolve.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
     'tests/python/pants_test/jvm:nailgun_task_test_base',

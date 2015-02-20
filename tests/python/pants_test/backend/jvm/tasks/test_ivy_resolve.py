@@ -64,4 +64,4 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', ScalaLibrary)
-    assert self.resolve([target])
+    self.assertTrue(self.resolve([target]))

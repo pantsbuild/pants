@@ -12,8 +12,7 @@ from twitter.common.collections import OrderedSet
 
 
 class UnionProducts(object):
-  """A set of products where the product of a target is the ordered union of the products
-  for its transitive deps."""
+  """Here, products for a target are the ordered union of the products for its transitive deps."""
   def __init__(self):
     # A map of target to OrderedSet of product members.
     self._products_by_target = defaultdict(OrderedSet)
