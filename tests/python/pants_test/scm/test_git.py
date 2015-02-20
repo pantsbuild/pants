@@ -11,6 +11,7 @@ import subprocess
 import unittest
 from contextlib import contextmanager
 from itertools import izip_longest
+from textwrap import dedent
 
 import pytest
 
@@ -53,7 +54,7 @@ class VersionTest(unittest.TestCase):
 
 
 def git_version():
-  '''Get a Version() based on installed command-line git's version'''
+  """Get a Version() based on installed command-line git's version"""
   process = subprocess.Popen(['git', '--version'], stdout=subprocess.PIPE)
   (stdout, stderr) = process.communicate()
   assert process.returncode == 0, "Failed to determine git version."
@@ -71,7 +72,6 @@ class GitTest(unittest.TestCase):
     subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
     subprocess.check_call(['git', 'remote', 'add', remote_name, remote])
 
-  @classmethod
   def setUp(self):
     self.origin = safe_mkdtemp()
     with pushd(self.origin):
@@ -108,9 +108,8 @@ class GitTest(unittest.TestCase):
 
     self.git = Git(gitdir=self.gitdir, worktree=self.worktree)
 
-  @staticmethod
   @contextmanager
-  def mkremote(remote_name):
+  def mkremote(self, remote_name):
     with temporary_dir() as remote_uri:
       subprocess.check_call(['git', 'remote', 'add', remote_name, remote_uri])
       try:
@@ -118,7 +117,6 @@ class GitTest(unittest.TestCase):
       finally:
         subprocess.check_call(['git', 'remote', 'remove', remote_name])
 
-  @classmethod
   def tearDown(self):
     safe_rmtree(self.origin)
     safe_rmtree(self.gitdir)
@@ -127,7 +125,7 @@ class GitTest(unittest.TestCase):
 
   def test_integration(self):
     self.assertEqual(set(), self.git.changed_files())
-    self.assertEqual(set(['README']), self.git.changed_files(from_commit='HEAD^'))
+    self.assertEqual({'README'}, self.git.changed_files(from_commit='HEAD^'))
 
     tip_sha = self.git.commit_id
     self.assertTrue(tip_sha)
@@ -139,7 +137,7 @@ class GitTest(unittest.TestCase):
 
     self.assertTrue(merge_base in self.git.changelog())
 
-    with pytest.raises(Scm.LocalException):
+    with self.assertRaises(Scm.LocalException):
       self.git.server_url
 
     with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
@@ -151,14 +149,14 @@ class GitTest(unittest.TestCase):
     self.assertEqual('master', self.git.branch_name)
 
     def edit_readme():
-      with open(self.readme_file, 'a') as readme:
-        readme.write('More data.')
+      with open(self.readme_file, 'a') as fp:
+        fp.write('More data.')
 
     edit_readme()
     with open(os.path.join(self.worktree, 'INSTALL'), 'w') as untracked:
       untracked.write('make install')
-    self.assertEqual(set(['README']), self.git.changed_files())
-    self.assertEqual(set(['README', 'INSTALL']), self.git.changed_files(include_untracked=True))
+    self.assertEqual({'README'}, self.git.changed_files())
+    self.assertEqual({'README', 'INSTALL'}, self.git.changed_files(include_untracked=True))
 
     # confirm that files outside of a given relative_to path are ignored
     self.assertEqual(set(), self.git.changed_files(relative_to='non-existent'))
@@ -195,7 +193,7 @@ class GitTest(unittest.TestCase):
         with safe_open(os.path.realpath('CHANGES'), 'w') as changes:
           changes.write('none')
         subprocess.check_call(['git', 'add', 'CHANGES'])
-        self.assertEqual(set(['README', 'CHANGES']), git.changed_files(from_commit='first'))
+        self.assertEqual({'README', 'CHANGES'}, git.changed_files(from_commit='first'))
 
         self.assertEqual('master', git.branch_name)
         self.assertEqual('second', git.tag_name, msg='annotated tags should be found')
@@ -209,7 +207,7 @@ class GitTest(unittest.TestCase):
         subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
 
         def worktree_relative_to(cwd, expected):
-          """Given a cwd relative to the worktree, tests that the worktree is detected as 'expected'."""
+          # Given a cwd relative to the worktree, tests that the worktree is detected as 'expected'.
           orig_cwd = os.getcwd()
           try:
             abs_cwd = os.path.join(clone, cwd)
@@ -227,7 +225,8 @@ class GitTest(unittest.TestCase):
         worktree_relative_to('is/a', clone)
         worktree_relative_to('is/a/dir', clone)
 
-  def test_diffspec(self):
+  @property
+  def test_changes_in(self):
     """Test finding changes in a diffspecs
 
     To some extent this is just testing functionality of git not pants, since all pants says
@@ -240,52 +239,110 @@ class GitTest(unittest.TestCase):
           with safe_open(os.path.join(self.worktree, path), 'w') as fp:
             fp.write(content)
         subprocess.check_call(['git', 'add', '.'])
-        subprocess.check_call(['git', 'commit', '-m', 'change '+path])
+        subprocess.check_call(['git', 'commit', '-m', 'change {}'.format(files)])
         return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
 
       # We can get changes in HEAD or by SHA
       c1 = commit_contents_to_files('1', 'foo')
-      self.assertEqual(set(['foo']), self.git.changes_in('HEAD'))
-      self.assertEqual(set(['foo']), self.git.changes_in(c1))
+      self.assertEqual({'foo'}, self.git.changes_in('HEAD'))
+      self.assertEqual({'foo'}, self.git.changes_in(c1))
 
       # Changes in new HEAD, from old-to-new HEAD, in old HEAD, or from old-old-head to new.
-      c2 = commit_contents_to_files('2', 'bar')
-      self.assertEqual(set(['bar']), self.git.changes_in('HEAD'))
-      self.assertEqual(set(['bar']), self.git.changes_in('HEAD^..HEAD'))
-      self.assertEqual(set(['foo']), self.git.changes_in('HEAD^'))
-      self.assertEqual(set(['foo']), self.git.changes_in('HEAD~1'))
-      self.assertEqual(set(['foo', 'bar']), self.git.changes_in('HEAD^^..HEAD'))
+      commit_contents_to_files('2', 'bar')
+      self.assertEqual({'bar'}, self.git.changes_in('HEAD'))
+      self.assertEqual({'bar'}, self.git.changes_in('HEAD^..HEAD'))
+      self.assertEqual({'foo'}, self.git.changes_in('HEAD^'))
+      self.assertEqual({'foo'}, self.git.changes_in('HEAD~1'))
+      self.assertEqual({'foo', 'bar'}, self.git.changes_in('HEAD^^..HEAD'))
 
       # New commit doesn't change results-by-sha
-      self.assertEqual(set(['foo']), self.git.changes_in(c1))
+      self.assertEqual({'foo'}, self.git.changes_in(c1))
 
       # Files changed in multiple diffs within a range
       c3 = commit_contents_to_files('3', 'foo')
-      self.assertEqual(set(['foo', 'bar']), self.git.changes_in('{}..{}'.format(c1, c3)))
+      self.assertEqual({'foo', 'bar'}, self.git.changes_in('{}..{}'.format(c1, c3)))
 
       # Changes in a tag
       subprocess.check_call(['git', 'tag', 'v1'])
-      self.assertEqual(set(['foo']), self.git.changes_in('v1'))
+      self.assertEqual({'foo'}, self.git.changes_in('v1'))
 
       # Introduce a new filename
       c4 = commit_contents_to_files('4', 'baz')
-      self.assertEqual(set(['baz']), self.git.changes_in('HEAD'))
+      self.assertEqual({'baz'}, self.git.changes_in('HEAD'))
 
       # Tag-to-sha
-      self.assertEqual(set(['baz']), self.git.changes_in('{}..{}'.format('v1', c4)))
+      self.assertEqual({'baz'}, self.git.changes_in('{}..{}'.format('v1', c4)))
 
       # We can get multiple changes from one ref
-      c5 = commit_contents_to_files('5', 'foo', 'bar')
-      self.assertEqual(set(['foo', 'bar']), self.git.changes_in('HEAD'))
-      self.assertEqual(set(['foo', 'bar', 'baz']), self.git.changes_in('HEAD~4..HEAD'))
-      self.assertEqual(set(['foo', 'bar', 'baz']), self.git.changes_in('{}..HEAD'.format(c1)))
-      self.assertEqual(set(['foo', 'bar', 'baz']), self.git.changes_in('{}..{}'.format(c1, c4)))
+      commit_contents_to_files('5', 'foo', 'bar')
+      self.assertEqual({'foo', 'bar'}, self.git.changes_in('HEAD'))
+      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in('HEAD~4..HEAD'))
+      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in('{}..HEAD'.format(c1)))
+      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in('{}..{}'.format(c1, c4)))
+
+  def test_changelog_utf8(self):
+    with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
+      def commit_contents_to_files(message, encoding, content, *files):
+        for path in files:
+          with safe_open(os.path.join(self.worktree, path), 'w') as fp:
+            fp.write(content)
+        subprocess.check_call(['git', 'add', '.'])
+
+        subprocess.check_call(['git', 'config', '--local', '--add', 'i18n.commitencoding',
+                               encoding])
+        try:
+          subprocess.check_call(['git', 'commit', '-m', message.encode(encoding)])
+        finally:
+          subprocess.check_call(['git', 'config', '--local', '--unset-all', 'i18n.commitencoding'])
+
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
+
+      # Mix in a non-UTF-8 author to all commits to exercise the corner described here does not
+      # adversely impact the ability to render the changelog (even if rendering for certain
+      # characters is incorrect): http://comments.gmane.org/gmane.comp.version-control.git/262685
+      non_utf8_config = dedent("""
+      [user]
+        name = Noralf Trønnes
+      """).encode('iso-8859-1')
+
+      with open(os.path.join(self.gitdir, 'config'), 'wb') as fp:
+        fp.write(non_utf8_config)
+
+      # Note the copyright symbol is used as the non-ascii character in the next 3 commits
+      commit_contents_to_files('START1 © END', 'iso-8859-1', '1', 'foo')
+      commit_contents_to_files('START2 © END', 'latin1', '1', 'bar')
+      commit_contents_to_files('START3 © END', 'utf-8', '1', 'baz')
+
+      commit_contents_to_files('START4 ~ END', 'us-ascii', '1', 'bip')
+
+      # Prove our non-utf-8 encodings were stored in the commit metadata.
+      log = subprocess.check_output(['git', 'log', '--format=%e'])
+      self.assertEqual(['us-ascii', 'latin1', 'iso-8859-1'], filter(None, log.strip().splitlines()))
+
+      # And show that the git log successfully transcodes all the commits none-the-less to utf-8
+      changelog = self.git.changelog()
+
+      # The ascii commit should combine with the iso-8859-1 author an fail to transcode the
+      # o-with-stroke character, and so it should be replaced with the utf-8 replacement character
+      # \uFFF or �.
+      self.assertIn('Noralf Tr�nnes', changelog)
+      self.assertIn('Noralf Tr\uFFFDnnes', changelog)
+
+      # For the other 3 commits, each of iso-8859-1, latin1 and utf-8 have an encoding for the
+      # o-with-stroke character - \u00F8 or ø - so we should find it;
+      self.assertIn('Noralf Trønnes', changelog)
+      self.assertIn('Noralf Tr\u00F8nnes', changelog)
+
+      self.assertIn('START1 © END', changelog)
+      self.assertIn('START2 © END', changelog)
+      self.assertIn('START3 © END', changelog)
+      self.assertIn('START4 ~ END', changelog)
 
   def test_refresh_with_conflict(self):
     with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
       self.assertEqual(set(), self.git.changed_files())
-      self.assertEqual(set(['README']), self.git.changed_files(from_commit='HEAD^'))
-      self.assertEqual(set(['README']), self.git.changes_in('HEAD'))
+      self.assertEqual({'README'}, self.git.changed_files(from_commit='HEAD^'))
+      self.assertEqual({'README'}, self.git.changes_in('HEAD'))
 
       # Create a change on this branch that is incompatible with the change to master
       with open(self.readme_file, 'w') as readme:
@@ -297,7 +354,8 @@ class GitTest(unittest.TestCase):
       with self.assertRaises(Scm.LocalException):
         self.git.refresh(leave_clean=False)
       # The repo is dirty
-      self.assertEquals(set(['README']), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+      self.assertEquals({'README'},
+                        self.git.changed_files(include_untracked=True, from_commit='HEAD'))
 
       with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
         subprocess.check_call(['git', 'reset', '--hard', 'HEAD'])

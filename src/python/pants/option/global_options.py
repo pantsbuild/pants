@@ -32,11 +32,8 @@ def register_global_options(register):
            help="Constrain what Python interpreters to use.  Uses Requirement format from "
                 "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                 "are used.  Multiple constraints may be added.  They will be ORed together.")
-  register('--no-colors', action='store_true', help='Do not colorize log messages.')
-  register('--no-lock', action='store_true',
-           help="Don't attempt to grab the global lock. This lock prevents two concurrent pants "
-                "instances from stomping on each others data, so only use this if you know what "
-                "you're doing.")
+  register('--colors', action='store_true', default=True,
+           help='Set whether log messages are displayed in color.')
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
            help='Exclude these paths when computing the command-line target specs.')
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',

@@ -10,6 +10,7 @@ python_library(
     '3rdparty/python:ansicolors',
     '3rdparty/python:psutil',
     '3rdparty/python:pystache',
+    '3rdparty/python:six',
     ':report',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',

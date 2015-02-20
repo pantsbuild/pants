@@ -56,7 +56,7 @@ python_library(
   name = 'initialize_reporting',  # XXX shouldn't this be in reporting?!
   sources = ['initialize_reporting.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     'src/python/pants/reporting',
     'src/python/pants/reporting:report',
     'src/python/pants/util:dirutil',

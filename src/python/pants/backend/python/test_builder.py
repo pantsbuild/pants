@@ -16,7 +16,8 @@ from textwrap import dedent
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
-from twitter.common.lang import Compatibility
+from six import StringIO
+from six.moves import configparser
 
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
@@ -25,15 +26,6 @@ from pants.base.config import Config
 from pants.base.target import Target
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open
-
-
-try:
-  import configparser
-except ImportError:
-  import ConfigParser as configparser
-
-
-
 
 
 # Initialize logging, since tests do not run via pants_exe (where it is usually done)
@@ -145,7 +137,7 @@ class PythonTestBuilder(object):
         realpaths.add(realpath)
 
     cp = configparser.SafeConfigParser()
-    cp.readfp(Compatibility.StringIO(self.DEFAULT_COVERAGE_CONFIG))
+    cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
     # We use the source_mappings to setup the `combine` coverage command to transform paths in
     # coverage data files into canonical form.

@@ -129,8 +129,13 @@ class JavaCompile(JvmCompile):
       raise TaskError("Set the source Java version with the 'source' option, not in 'args'.")
     if '-C-target' in self._args:
       raise TaskError("Set the target JVM version with the 'target' option, not in 'args'.")
-    args.extend(self._args)
 
+    if not self.get_options().colors:
+      filtered_args = filter(lambda arg: not arg == '-C-Tcolor', self._args)
+    else:
+      filtered_args = self._args
+
+    args.extend(filtered_args)
     args.extend(sources)
     result = self.runjava(classpath=jmake_classpath,
                           main=JavaCompile._JMAKE_MAIN,

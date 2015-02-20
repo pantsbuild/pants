@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import namedtuple
 
+import six
 from colors import cyan, green, red, yellow
 
 from pants.base.workunit import WorkUnit
@@ -109,10 +110,11 @@ class PlainTextReporter(Reporter):
 
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
-    elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
+    elements = [e if isinstance(e, six.string_types) else e[0] for e in msg_elements]
     msg = b'\n' + b''.join(elements)
     if self.settings.color:
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
+
     self.emit(self._prefix(workunit, msg))
     self.flush()
 
@@ -145,7 +147,6 @@ class PlainTextReporter(Reporter):
   def _show_output_unindented(self, workunit):
     # Indenting looks weird in these cases.
     return workunit.has_label(WorkUnit.REPL) or workunit.has_label(WorkUnit.RUN)
-
 
   def _format_aggregated_timings(self, aggregated_timings):
     return b'\n'.join([b'%(timing).3f %(label)s' % x for x in aggregated_timings.get_all()])

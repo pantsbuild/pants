@@ -7,10 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from contextlib import closing
 
-from twitter.common.lang import Compatibility
-
-
-StringIO = Compatibility.StringIO
+from six import StringIO
 
 
 class Manifest(object):

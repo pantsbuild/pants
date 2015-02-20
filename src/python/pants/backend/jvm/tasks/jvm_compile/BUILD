@@ -114,7 +114,7 @@ python_library(
     ':analysis_tools',
     ':jvm_compile',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
