@@ -32,7 +32,7 @@ python_library(
   name = 'jar',
   sources = globs('jar/manifest.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
   ]
 )
 

@@ -5,27 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import posixpath
 import subprocess
 from contextlib import closing, contextmanager
 
-from twitter.common import log
+import six.moves.urllib.error as urllib_error
+import six.moves.urllib.request as urllib_request
 from twitter.common.collections import OrderedSet
-from twitter.common.lang import Compatibility
 
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
-
-
-if Compatibility.PY3:
-  import urllib.request as urllib_request
-  import urllib.error as urllib_error
-else:
-  import urllib2 as urllib_request
-  import urllib2 as urllib_error
 
 
 _ID_BY_OS = {
@@ -45,6 +38,9 @@ _PATH_BY_ID = {
   ('darwin', '13'):     ['mac', '10.9'],
   ('darwin', '14'):     ['mac', '10.10'],
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 class BinaryUtil(object):
@@ -135,10 +131,10 @@ class BinaryUtil(object):
     accumulated_errors = []
     for baseurl in OrderedSet(baseurls): # Wrap in OrderedSet because duplicates are wasteful.
       url = posixpath.join(baseurl, binary_path)
-      log.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
+      logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with url_opener(url) as binary:
-          log.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
+          logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
           downloaded_successfully = True
           yield lambda: binary.read()
           break
@@ -169,8 +165,8 @@ class BinaryUtil(object):
       finally:
         safe_delete(downloadpath)
 
-    log.debug('Selected {binary} binary bootstrapped to: {path}'
-              .format(binary=name, path=bootstrapped_binary_path))
+    logger.debug('Selected {binary} binary bootstrapped to: {path}'
+                 .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
 
 

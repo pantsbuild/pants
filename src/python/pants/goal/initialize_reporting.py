@@ -9,7 +9,7 @@ import errno
 import os
 import sys
 
-from twitter.common.lang import Compatibility
+from six import StringIO
 
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.plaintext_reporter import PlainTextReporter
@@ -17,9 +17,6 @@ from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report, ReportingError
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.util.dirutil import safe_mkdir, safe_rmtree
-
-
-StringIO = Compatibility.StringIO
 
 
 def initial_reporting(config, run_tracker):
@@ -87,7 +84,7 @@ def update_reporting(options, is_quiet_task, run_tracker):
   log_level = Report.log_level_from_string(options.level or 'info')
   # Ideally, we'd use terminfo or somesuch to discover whether a
   # terminal truly supports color, but most that don't set TERM=dumb.
-  color = (not options.no_colors) and (os.getenv('TERM') != 'dumb')
+  color = (options.colors) and (os.getenv('TERM') != 'dumb')
   timing = options.time
   cache_stats = options.time  # TODO: Separate flag for this?
 

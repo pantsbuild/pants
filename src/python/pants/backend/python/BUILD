@@ -167,7 +167,7 @@ python_library(
     '3rdparty/python:pex',
     '3rdparty/python:pytest',
     '3rdparty/python:pytest-cov',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:config',
     'src/python/pants/base:target',

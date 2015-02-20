@@ -69,7 +69,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script,
-                     '--no-lock',
                      '--kill-nailguns',
                      '--no-pantsrc',
                      '--config-override={0}'.format(ini_file_name),
@@ -89,10 +88,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
-
-    IMPORTANT NOTE: The subprocess will be run with --no-lock, so that it doesn't deadlock waiting
-    for this process to release the workspace lock. It's the caller's responsibility to ensure
-    that the invoked pants doesn't interact badly with this one.
     """
 
     with temporary_dir(root_dir=self.workdir_root()) as workdir:

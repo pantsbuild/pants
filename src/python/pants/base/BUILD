@@ -188,7 +188,7 @@ python_library(
   sources = ['generator.py'],
   dependencies = [
     ':mustache',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
   ]
 )
 

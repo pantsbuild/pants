@@ -11,7 +11,7 @@ from contextlib import closing
 import mox
 import pytest
 import requests
-from twitter.common.lang import Compatibility
+from six import StringIO
 
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_file
@@ -81,7 +81,7 @@ class FetcherTest(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    with closing(Compatibility.StringIO()) as fp:
+    with closing(StringIO()) as fp:
       self.fetcher.fetch('http://foo',
                          Fetcher.DownloadListener(fp).wrap(self.listener),
                          chunk_size_bytes=1024 * 1024,

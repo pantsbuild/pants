@@ -7,7 +7,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mox',
     '3rdparty/python:requests',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python:six',
     'src/python/pants/net',
     'src/python/pants/util:contextutil',
   ]

@@ -63,8 +63,10 @@ class Parser(object):
     """
     @classmethod
     def _create(cls, flag, **kwargs):
-      if (kwargs.get('action') in ('store_false', 'store_true') and
-          flag.startswith('--') and not flag.startswith('--no-')):
+      if kwargs.get('action') in ('store_false', 'store_true') and flag.startswith('--'):
+        if flag.startswith('--no-'):
+          raise RegistrationError(
+            'Invalid flag name "{}". Boolean flag names cannot start with --no-'.format(flag))
         name = flag[2:]
         return cls(flag, '--no-' + name, '--[no-]' + name)
       else:

@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
+
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -23,9 +25,11 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     register('--test', action='append',
              help='Force running of just these specs.  Tests can be specified either by fully '
                   'qualified classname or full file path.')
-    # TODO: Get rid of this in favor of the inherited global color flag.
+    # TODO(Eric Ayers) Find a better way to deprecate options. See comment in
+    #   https://rbcommons.com/s/twitter/r/1799/
+    # TODO(Eric Ayers) Remove this option after pants 0.0.30
     register('--color', action='store_true', default=True,
-             help='Emit test result with ANSI terminal color codes.')
+             help='Obsolete option.  Specify --no-colors  to turn off colors on the console.')
     cls.register_jvm_tool(register, 'specs', default=['//:scala-specs'])
 
   @classmethod
@@ -42,15 +46,21 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     super(SpecsRun, self).__init__(*args, **kwargs)
     self.skip = self.get_options().skip
-    self.color = self.get_options().color
+    self.colors = self.get_options().colors
     self.tests = self.get_options().test
 
   def execute(self):
+    # TODO(Eric Ayers) Remove this logic after 0.0.30 along with the option itself.
+    if self.get_options().color is False:
+      print("--no-color is obsolete and will be removed.  Specify --no-colors instead.",
+            file=sys.stderr)
+      self.colors = self.get_options().color
+
     if not self.skip:
       targets = self.context.targets()
 
       def run_tests(tests):
-        args = ['--color'] if self.color else []
+        args = ['--color'] if self.colors else []
         args.append('--specs=%s' % ','.join(tests))
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
