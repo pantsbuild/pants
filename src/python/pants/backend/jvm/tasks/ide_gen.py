@@ -14,7 +14,6 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants import binary_util
 from pants.backend.core.tasks.task import Task
-from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -81,6 +80,20 @@ class IdeGen(JvmToolTaskMixin, Task):
                   'its sibling source_root() entries define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
                   'test paths.')
+    register('--debug_port', type=int, default=5005,
+             help='Port to use for launching tasks under the debugger.')
+
+    # Options intended to be configured primarily in pants.ini
+    register('--python_source_paths', action='append', advanced=True,
+             help='Always add these paths to the IDE as Python sources.')
+    register('--python_test_paths', action='append', advanced=True,
+             help='Always add these paths to the IDE as Python test sources.')
+    register('--python_lib_paths', action='append', advanced=True,
+             help='Always add these paths to the IDE for Python libraries.')
+    register('--extra-jvm-source-paths', action='append', advanced=True,
+             help='Always add these paths to the IDE for Java sources.')
+    register('--extra-jvm-test-paths', action='append', advanced=True,
+             help='Always add these paths to the IDE for Java test sources.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -147,11 +160,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     )
 
     self.intransitive = self.get_options().intransitive
-
-    # Everywhere else, debug_port is specified in the 'jvm' section. Use that as a default if none
-    # is specified in the 'ide' section.
-    jvm_config_debug_port = JvmDebugConfig.debug_port(self.context.config)
-    self.debug_port = self.context.config.getint('ide', 'debug_port', default=jvm_config_debug_port)
+    self.debug_port = self.get_options().debug_port()
 
   def _prepare_project(self):
     targets, self._project = self.configure_project(
@@ -176,13 +185,13 @@ class IdeGen(JvmToolTaskMixin, Task):
                       self.TargetUtil(self.context))
 
     if self.python:
-      python_source_paths = self.context.config.getlist('ide', 'python_source_paths', default=[])
-      python_test_paths = self.context.config.getlist('ide', 'python_test_paths', default=[])
-      python_lib_paths = self.context.config.getlist('ide', 'python_lib_paths', default=[])
+      python_source_paths = self.get_options().python_source_paths
+      python_test_paths = self.get_options().python_test_paths
+      python_lib_paths = self.get_options().python_lib_paths
       project.configure_python(python_source_paths, python_test_paths, python_lib_paths)
 
-    extra_source_paths = self.context.config.getlist('ide', 'extra_jvm_source_paths', default=[])
-    extra_test_paths = self.context.config.getlist('ide', 'extra_jvm_test_paths', default=[])
+    extra_source_paths = self.get_options().extra_jvm_source_paths
+    extra_test_paths = self.get_options().extra_jvm_test_paths
     all_targets = project.configure_jvm(extra_source_paths, extra_test_paths)
     return all_targets, project
 
