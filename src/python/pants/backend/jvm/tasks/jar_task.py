@@ -19,6 +19,7 @@ from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import temporary_dir
 
@@ -160,27 +161,40 @@ class Jar(object):
   def _render_jar_tool_args(self):
     args = []
 
-    if self._main:
-      args.append('-main=%s' % self._main)
+    with temporary_dir() as manifest_stage_dir:
+      classpath = self._classpath if self._classpath else []
 
-    if self._classpath:
-      args.append('-classpath=%s' % ','.join(self._classpath))
+      def as_cli_entry(entry):
+        src = entry.materialize(manifest_stage_dir)
+        return '%s=%s' % (src, entry.dest) if entry.dest else src
+      files = map(as_cli_entry, self._entries) if self._entries else []
 
-    with temporary_dir() as stage_dir:
-      if self._manifest:
-        args.append('-manifest=%s' % self._manifest.materialize(stage_dir))
+      jars = self._jars if self._jars else []
 
-      if self._entries:
-        def as_cli_entry(entry):
-          src = entry.materialize(stage_dir)
-          return '%s=%s' % (src, entry.dest) if entry.dest else src
+      with safe_args(classpath, delimiter=',') as classpath_args:
+        with safe_args(files, delimiter=',') as files_args:
+          with safe_args(jars, delimiter=',') as jars_args:
 
-        args.append('-files=%s' % ','.join(map(as_cli_entry, self._entries)))
+            if self._main:
+              args.append('-main=%s' % self._main)
 
-      if self._jars:
-        args.append('-jars=%s' % ','.join(self._jars))
+            if classpath:
+              # In case the # of classpath exceeds max_args defined in
+              # safe_args(), classpath returned by safe_args() is a list
+              # of one string that is '@argfile'. Then ','.join on one
+              # element returns exactly the same value.
+              args.append('-classpath={}'.format(','.join(classpath)))
 
-      yield args
+            if self._manifest:
+              args.append('-manifest=%s' % self._manifest.materialize(manifest_stage_dir))
+
+            if files:
+              args.append('-files={}'.format(','.join(files)))
+
+            if jars:
+              args.append('-jars={}'.format(','.join(jars)))
+
+            yield args
 
 
 class JarTask(NailgunTask):
