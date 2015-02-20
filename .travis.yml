@@ -42,6 +42,11 @@ env:
     - CI_FLAGS="-fkmsrlpnet -i 8:5 'Python integration tests for pants - shard 6'"
     - CI_FLAGS="-fkmsrlpnet -i 8:6 'Python integration tests for pants - shard 7'"
     - CI_FLAGS="-fkmsrlpnet -i 8:7 'Python integration tests for pants - shard 8'"
+    - CI_FLAGS="-clpnet 'DUMMY SHARD 1'"  # (fkmsr)
+    - CI_FLAGS="-clpnet 'DUMMY SHARD 2'"  # (fkmsr)
+    - CI_FLAGS="-clpnet 'DUMMY SHARD 3'"  # (fkmsr)
+    - CI_FLAGS="-clpnet 'DUMMY SHARD 4'"  # (fkmsr)
+    - CI_FLAGS="-clpnet 'DUMMY SHARD 5'"  # (fkmsr)
 
 before_script: |
   ./build-support/bin/ci-sync.sh
