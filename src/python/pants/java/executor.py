@@ -13,12 +13,12 @@ from contextlib import contextmanager
 from six import string_types
 from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import Distribution
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import relativize_paths
+from pants.util.meta import AbstractClass
 
 
 class Executor(AbstractClass):

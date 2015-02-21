@@ -13,7 +13,7 @@ python_library(
   name = 'scm',
   sources = ['scm.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'src/python/pants/util:meta',
   ],
 )
 

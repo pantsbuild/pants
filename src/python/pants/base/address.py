@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
-from twitter.common.lang import AbstractClass
+from pants.util.meta import AbstractClass
 
 
 def parse_spec(spec, relative_to=None):

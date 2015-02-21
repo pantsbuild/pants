@@ -27,7 +27,6 @@ from pants.util.strutil import safe_shlex_split
 
 
 class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
-  _CONFIG_SECTION = 'ivy-resolve'
 
   class Error(TaskError):
     """Error in IvyResolve."""
@@ -93,9 +92,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache()
 
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   @property
   def confs(self):

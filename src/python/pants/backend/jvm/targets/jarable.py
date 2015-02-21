@@ -7,9 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
-from twitter.common.lang import AbstractClass
-
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.util.meta import AbstractClass
 
 
 class Jarable(AbstractClass):

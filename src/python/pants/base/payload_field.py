@@ -10,12 +10,11 @@ import os
 from abc import abstractmethod
 from hashlib import sha1
 
-import six
 from twitter.common.collections import OrderedSet
-from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot
 from pants.base.validation import assert_list
+from pants.util.meta import AbstractClass
 
 
 def stable_json_dumps(obj):

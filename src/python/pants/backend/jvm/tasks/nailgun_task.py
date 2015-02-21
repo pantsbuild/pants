@@ -37,6 +37,8 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
     cls.register_jvm_tool(register, 'nailgun-server')
+    register('--use-nailgun', action='store_true', default=True,
+             help='Use nailgun to make repeated invocations of this task quicker.')
 
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
@@ -52,13 +54,9 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
     except Distribution.Error as e:
       raise TaskError(e)
 
-  @abstractproperty
-  def config_section(self):
-    """NailgunTask must be sub-classed to provide a config section name"""
-
   @property
   def nailgun_is_enabled(self):
-    return self.context.config.getbool(self.config_section, 'use_nailgun', default=True)
+    return self.get_options().use_nailgun
 
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.

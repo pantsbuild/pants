@@ -43,7 +43,7 @@ class PytestRun(PythonTask):
 
       debug = self.get_options().level == 'debug'
 
-      args = [] if self.get_options().no_colors else ['--color', 'yes']
+      args = ['--color', 'yes'] if self.get_options().colors else []
       for options in self.get_options().options + self.get_passthru_args():
         args.extend(safe_shlex_split(options))
       test_builder = PythonTestBuilder(context=self.context,

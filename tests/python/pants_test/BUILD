@@ -70,7 +70,6 @@ python_tests(
   sources = ['test_thrift_util.py'],
   dependencies = [
     ':base_test',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants:thrift_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
