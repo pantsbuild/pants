@@ -127,7 +127,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     # stable symlinks within the working copy.
     ivy_jar_products = self._generate_ivy_jar_products(relevant_targets)
     symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
-    print(">>> symlink map is: %s" % (str(symlink_map)))
     for conf in self.confs:
       ivy_jar_memo = {}
       ivy_info_list = ivy_jar_products[conf]
