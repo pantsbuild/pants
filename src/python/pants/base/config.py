@@ -73,7 +73,8 @@ class Config(object):
   _defaults = {
     'homedir': os.path.expanduser('~'),
     'user': getpass.getuser(),
-    'pants_bootstrapdir': os.path.expanduser('~/.pants.d'),
+    'pants_bootstrapdir': os.path.expanduser('~/.cache/pants'),
+    'pants_configdir': os.path.expanduser('~/.config/pants'),
   }
   reset_default_bootstrap_option_values(_defaults)
 
