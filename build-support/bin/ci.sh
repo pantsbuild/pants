@@ -194,8 +194,12 @@ fi
 if [[ "${skip_contrib:-false}" == "false" ]]; then
   banner "Running contrib python tests"
   (
+    # We run using --no-fast - aka test chroot per target - to work around issues with
+    # test (ie: pants_test.contrib) namespace packages.
+    # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
+    #  https://github.com/pantsbuild/pants/issues/1149
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex test ${PANTS_ARGS[@]} \
+      ./pants.pex test.pytest --no-fast ${PANTS_ARGS[@]} \
         $(./pants.pex list contrib:: | \
             xargs ./pants.pex filter --filter-type=python_tests)
   ) || die "Contrib python test failure"
