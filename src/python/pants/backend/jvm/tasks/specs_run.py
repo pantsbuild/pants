@@ -25,11 +25,10 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     register('--test', action='append',
              help='Force running of just these specs.  Tests can be specified either by fully '
                   'qualified classname or full file path.')
-    # TODO(Eric Ayers) Find a better way to deprecate options. See comment in
-    #   https://rbcommons.com/s/twitter/r/1799/
-    # TODO(Eric Ayers) Remove this option after pants 0.0.30
     register('--color', action='store_true', default=True,
-             help='Obsolete option.  Specify --no-colors  to turn off colors on the console.')
+             deprecated_version='0.0.30',
+             deprecated_hint='Use the --colors and --no-colors instead of --color and --no-color.',
+             help='Toggle displaying console messages in color.')
     cls.register_jvm_tool(register, 'specs', default=['//:scala-specs'])
 
   @classmethod
