@@ -23,7 +23,6 @@ except ImportError:
 
 def get_pants_configdir():
   xdg = os.environ.get('XDG_CONFIG_HOME')
-  print("XDG_CONFIG:          ", xdg)
   if xdg:
     return xdg
   else:
@@ -31,7 +30,6 @@ def get_pants_configdir():
 
 def get_pants_cachedir():
   xdg = os.environ.get('XDG_CACHE_HOME')
-  print("XDG_CACHE:          ", xdg)
   if xdg:
     return xdg
   else:
