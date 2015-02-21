@@ -99,8 +99,8 @@ class JvmDependencyAnalyzer(object):
 
           for jar in get_transitive_jars_by_ref(ref):
             # Register that each jarlib_target provides jar (via all its symlinks).
-            symlinks = all_symlinks_map.get(os.path.realpath(jar.path), [])
-            for symlink in symlinks:
+            symlink = all_symlinks_map.get(os.path.realpath(jar.path), None)
+            if symlink:
               for jarlib_target in jarlib_targets:
                 targets_by_file[symlink].add(jarlib_target)
 

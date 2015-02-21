@@ -145,10 +145,11 @@ class IvyUtils(object):
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   @staticmethod
-  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath):
+  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
-    Preserves all other paths. Writes the resulting paths to outpath.
+    If there is an existing symlink for a file under inpath, it is used rather than creating
+    a new symlink. Preserves all other paths. Writes the resulting paths to outpath.
     Returns a map of path -> symlink to that path.
     """
     safe_mkdir(symlink_dir)
@@ -158,6 +159,9 @@ class IvyUtils(object):
     for path in paths:
       if not path.startswith(ivy_cache_dir):
         new_paths.append(path)
+        continue
+      if path in existing_symlink_map:
+        new_paths.append(existing_symlink_map[path])
         continue
       symlink = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
       try:
