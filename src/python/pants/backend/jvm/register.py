@@ -91,7 +91,6 @@ def build_file_aliases():
   )
 
 
-# TODO https://github.com/pantsbuild/pants/issues/604 register_goals
 def register_goals():
   ng_killall = task(name='ng-killall', action=NailgunKillall)
   ng_killall.install().with_description('Kill running nailgun servers.')

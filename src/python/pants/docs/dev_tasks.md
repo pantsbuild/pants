@@ -43,7 +43,7 @@ registers goals in its `register_goals` function. Here's an excerpt from
 [Pants' own JVM
 backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/register.py):
 
-!inc[start-after=pants/issues/604 register_goals&end-before=Compilation](../backend/jvm/register.py)
+!inc[start-at=def register_goals&end-before=Compilation](../backend/jvm/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
@@ -63,12 +63,12 @@ tell Pants about these inter-task dependencies...
 The "early" task class defines a `product_types` class method that
 returns a list of strings:
 
-!inc[start-after=pants/issues/604 product_types start&end-before=pants/issues/604 product_types finish](../backend/jvm/tasks/ivy_imports.py)
+!inc[start-at=def product_types&end-at=return](../backend/jvm/tasks/ivy_imports.py)
 
 The "late" task defines a `prepare` method that calls
 `round_manager.require_data` to "require" one of those same strings:
 
-!inc[start-after=pants/issues/604 prep start&end-before=pants/issues/604 prep finish](../backend/codegen/tasks/protobuf_gen.py)
+!inc[start-at=def prepare&end-at=ivy_imports](../backend/codegen/tasks/protobuf_gen.py)
 
 Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
