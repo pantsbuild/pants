@@ -91,7 +91,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
           block.append(line)
 
     # Scraping debug statements for protoc compilation.
-    all_blocks = list(find_protoc_blocks(pants_run.stdout_data.splitlines()))
+    all_blocks = list(find_protoc_blocks(pants_run.stdout_data.split('\n')))
     self.assertEquals(len(all_blocks), 1,
         'Expected there to be exactly one protoc compilation group! (Were {count}.)\n{out}'
         .format(count=len(all_blocks), out=pants_run.stderr_data))
