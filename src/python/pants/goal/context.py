@@ -57,7 +57,7 @@ class Context(object):
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
   def __init__(self, config, options, run_tracker, target_roots,
-               requested_goals=None, log=None, target_base=None, build_graph=None,
+               requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None):
     self._config = config
@@ -66,7 +66,7 @@ class Context(object):
     self.build_file_parser = build_file_parser
     self.address_mapper = address_mapper
     self.run_tracker = run_tracker
-    self._log = log or Context.Log(run_tracker)
+    self._log = self.Log(run_tracker)
     self._target_base = target_base or Target
     self._products = Products()
     self._buildroot = get_buildroot()

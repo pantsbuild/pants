@@ -64,6 +64,7 @@ def _run(exiter):
   # list.
   warnings.simplefilter("default")
 
+  # The GoalRunner will setup final logging below in `.setup()`, but span the gap until then.
   logging.basicConfig()
   # This routes the warnings we enabled above through our loggers instead of straight to stderr raw.
   logging.captureWarnings(True)

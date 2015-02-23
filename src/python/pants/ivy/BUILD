@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants/base:config',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
