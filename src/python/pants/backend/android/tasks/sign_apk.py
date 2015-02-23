@@ -49,13 +49,23 @@ class SignApkTask(Task):
     self._config_file = self.get_options().keystore_config_location
     self._dist = None
     self._distdir = self.get_options().pants_distdir
+    self._configdir = self.context.config.getdefault('pants_bootstrapdir')
 
   @property
   def config_file(self):
     if not self._config_file:
       raise TaskError('The "[sign]: keystore_config_location" option must declare the location '
                       'of an .ini file holding keystore definitions.')
-    return self._config_file
+    return os.path.expanduser(self._config_file)
+
+  @property
+  def default_config_location(self):
+    """Return the path where pants creates the default keystore config file.
+
+    This file will hold the example keystore definition, the debug key installed along the SDK.
+    """
+    return os.path.join(self._configdir,
+                        'andrrrrrgggggrroid/keystore/default_config.ini')
 
   @property
   def distribution(self):
@@ -95,12 +105,10 @@ class SignApkTask(Task):
 
   def execute(self):
     targets = self.context.targets(self.is_signtarget)
-    # Check for Android keystore config file (where the default keystore definition is kept).
-    if not os.path.isfile(self.config_file):
-      try:
-        AndroidConfigUtil.setup_keystore_config(self.config_file)
-      except AndroidConfigUtil.AndroidConfigError as e:
-        raise TaskError('Failed to setup keystore config: {0}'.format(e))
+    # One time set-up of the default keystore config.
+    print("DEEEEFAAAUSKSKKD", self.default_config_location)
+    if not os.path.isfile(self.default_config_location):
+      self.setup_default(self.default_config_location)
 
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
@@ -140,6 +148,13 @@ class SignApkTask(Task):
       if os.path.isfile(os.path.join(release_path, release_apk)):
         self.context.products.get('release_apk').add(target, release_path).append(release_apk)
 
+
+  def setup_default(self, path):
+    """One time setup for the default keystore config file."""
+    try:
+      AndroidConfigUtil.setup_keystore_config(path)
+    except AndroidConfigUtil.AndroidConfigError as e:
+      raise TaskError('Failed to setup default keystore config: {0}'.format(e))
 
   def package_name(self, target, build_type):
     """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""
