@@ -107,7 +107,7 @@ class IvyTaskMixin(object):
           raise TaskError('Ivy failed to create classpath file at %s'
                           % raw_target_classpath_file_tmp)
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
-        logger.debug('Copied ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
+        logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])
@@ -115,15 +115,13 @@ class IvyTaskMixin(object):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
-                                             symlink_dir, target_classpath_file)
     with IvyTaskMixin.symlink_map_lock:
       products = self.context.products
-      all_symlinks_map = products.get_data('ivy_resolve_symlink_map') or defaultdict(list)
-      for path, symlink in symlink_map.items():
-        all_symlinks_map[os.path.realpath(path)].append(symlink)
-      products.safe_create_data('ivy_resolve_symlink_map',
-                                lambda: all_symlinks_map)
+      existing_symlinks_map = products.get_data('ivy_resolve_symlink_map', lambda: dict())
+      symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
+                                               symlink_dir, target_classpath_file,
+                                               existing_symlinks_map)
+      existing_symlinks_map.update(symlink_map)
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
       stripped_classpath = [path.strip() for path in classpath]
