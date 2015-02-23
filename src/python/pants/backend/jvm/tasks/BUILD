@@ -256,6 +256,7 @@ python_library(
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/ivy',
+    'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
     'src/python/pants:binary_util',
   ],
