@@ -40,11 +40,6 @@ class TestBuildEnvironment(unittest.TestCase):
     with self.env(XDG_CONFIG_HOME=''):
       self.assertEquals(os.path.expanduser('~/.cache/pants'), get_pants_cachedir())
 
-  def test_wrong_configdir(self):
-    with self.assertRaises(AssertionError):
-      with self.env():
-        self.assertEquals(os.path.expanduser('~/wrongdir/pants'), get_pants_cachedir())
-
   def test_set_configdir(self):
     with temporary_file() as temp:
       with self.env(XDG_CONFIG_HOME=temp.name):
