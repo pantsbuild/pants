@@ -22,8 +22,6 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
 
   _CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 
-  _CONFIG_SECTION = 'checkstyle'
-
   _JAVA_SOURCE_EXTENSION = '.java'
 
   _CHECKSTYLE_BOOTSTRAP_KEY = "checkstyle"
@@ -45,10 +43,6 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
     super(Checkstyle, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
 
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
-
   def _is_checked(self, target):
     return (isinstance(target, Target) and
             target.has_sources(self._JAVA_SOURCE_EXTENSION) and
@@ -64,7 +58,7 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
         invalid_targets.extend(vt.targets)
       sources = self.calculate_sources(invalid_targets)
       if sources:
-        result = self.checkstyle(sources)
+        result = self.checkstyle(targets, sources)
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
@@ -76,8 +70,9 @@ class Checkstyle(NailgunTask, JvmToolTaskMixin):
                      if source.endswith(self._JAVA_SOURCE_EXTENSION))
     return sources
 
-  def checkstyle(self, sources):
-    compile_classpath = self.context.products.get_data('compile_classpath')
+  def checkstyle(self, targets, sources):
+    compile_classpaths = self.context.products.get_data('compile_classpath')
+    compile_classpath = compile_classpaths.get_for_targets(targets)
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
     union_classpath.update(jar for conf, jar in compile_classpath if conf in self.get_options().confs)
 
