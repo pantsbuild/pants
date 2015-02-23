@@ -24,7 +24,7 @@ class SignApkTest(TestAndroidBase):
 
   @classmethod
   def _get_config(cls,
-                  section=SignApkTask._CONFIG_SECTION,
+                  section='test',
                   option='keystore_config_location',
                   location=_TEST_KEYSTORE):
     ini = textwrap.dedent("""
@@ -64,7 +64,7 @@ class SignApkTest(TestAndroidBase):
 
   def test_no_config_file_defined(self):
     with self.assertRaises(TaskError):
-      task = self.prepare_task(config=self._get_config(location=""),
+      task = self.prepare_task(config=self._get_config(location=''),
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
       task.config_file
@@ -79,14 +79,14 @@ class SignApkTest(TestAndroidBase):
 
   def test_no_section_in_pantsini(self):
     with self.assertRaises(TaskError):
-      task = self.prepare_task(config=self._get_config(location=""),
+      task = self.prepare_task(config=self._get_config(location=''),
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
       task.config_file
 
   def test_overriding_config_with_cli(self):
     with temporary_dir() as temp:
-      task = self.prepare_task(config=self._get_config(section="bad-section-header"),
+      task = self.prepare_task(config=self._get_config(section='bad-section-header'),
                                args=['--test-keystore-config-location={0}'.format(temp)],
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
@@ -103,8 +103,8 @@ class SignApkTest(TestAndroidBase):
     with temporary_dir() as temp:
       with self.android_binary() as android_binary:
         task = self.prepare_task(config=self._get_config(),
-                                   build_graph=self.build_graph,
-                                   build_file_parser=self.build_file_parser)
+                                 build_graph=self.build_graph,
+                                 build_file_parser=self.build_file_parser)
         target = android_binary
         fake_key = self.FakeKeystore()
         task._dist = self.FakeDistribution()

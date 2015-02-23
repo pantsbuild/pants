@@ -13,7 +13,6 @@ from pants.backend.android.android_config_util import AndroidConfigUtil
 from pants.backend.android.keystore.keystore_resolver import KeystoreResolver
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.core.tasks.task import Task
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
@@ -25,10 +24,6 @@ logger = logging.getLogger(__name__)
 
 class SignApkTask(Task):
   """Sign Android packages with keystores using the jarsigner tool."""
-
-  _DEFAULT_KEYSTORE_CONFIG = 'android/keystore/default_config.ini'
-  _CONFIG_SECTION = 'android-keystore-location'
-  _CONFIG_OPTION = 'keystore_config_location'
 
   @classmethod
   def register_options(cls, register):
@@ -57,15 +52,9 @@ class SignApkTask(Task):
 
   @property
   def config_file(self):
-    """Path of .ini file containing definitions for backend.android.keystore_resolver.Keystore."""
-    if self._config_file in (None, ""):
-      try:
-        self._config_file = self.context.config.get_required(self._CONFIG_SECTION,
-                                                             self._CONFIG_OPTION )
-      except Config.ConfigError:
-       raise TaskError('The "[{0}]: {1}" option must declare the location of an .ini file '
-                             'holding keystore definitions.'.format(self._CONFIG_SECTION,
-                                                                    self._CONFIG_OPTION))
+    if not self._config_file:
+      raise TaskError('The "[sign]: keystore_config_location" option must declare the location '
+                      'of an .ini file holding keystore definitions.')
     return self._config_file
 
   @property
@@ -107,11 +96,9 @@ class SignApkTask(Task):
   def execute(self):
     targets = self.context.targets(self.is_signtarget)
     # Check for Android keystore config file (where the default keystore definition is kept).
-    config_file = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
-                               self._DEFAULT_KEYSTORE_CONFIG)
-    if not os.path.isfile(config_file):
+    if not os.path.isfile(self.config_file):
       try:
-        AndroidConfigUtil.setup_keystore_config(config_file)
+        AndroidConfigUtil.setup_keystore_config(self.config_file)
       except AndroidConfigUtil.AndroidConfigError as e:
         raise TaskError('Failed to setup keystore config: {0}'.format(e))
 
@@ -133,8 +120,8 @@ class SignApkTask(Task):
         packages = list(get_products_path(target))
         for unsigned_apk in packages:
           keystores = KeystoreResolver.resolve(self.config_file)
-          for key in keystores:
 
+          for key in keystores:
             outdir = self.sign_apk_out(target, keystores[key].build_type)
             safe_mkdir(outdir)
             args = self._render_args(target, keystores[key], unsigned_apk, outdir)

@@ -22,7 +22,6 @@ class DxCompile(AndroidTask, NailgunTask):
 
   # name of output file. "Output name must end with one of: .dex .jar .zip .apk or be a directory."
   DEX_NAME = 'classes.dex'
-  _CONFIG_SECTION = 'dx-tool'
 
   @staticmethod
   def is_dextarget(target):
@@ -53,10 +52,6 @@ class DxCompile(AndroidTask, NailgunTask):
     self._forced_jvm_options = self.get_options().jvm_options
 
     self.setup_artifact_cache()
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def _render_args(self, outdir, classes):
     dex_file = os.path.join(outdir, self.DEX_NAME)
