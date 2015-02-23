@@ -35,6 +35,24 @@ def get_buildroot():
     sys.exit(1)
 
 
+def get_pants_cachedir():
+  """Return the pants global cache directory."""
+  # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+  cachedir = os.environ.get('XDG_CACHE_HOME')
+  if not cachedir:
+    cachedir = ('~/.cache/pants')
+  return os.path.expanduser(cachedir)
+
+
+def get_pants_configdir():
+  """Return the pants global config directory."""
+  # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+  configdir = os.environ.get('XDG_CONFIG_HOME')
+  if not configdir:
+    configdir = ('~/.config/pants')
+  return os.path.expanduser(configdir)
+
+
 _SCM = None
 
 
