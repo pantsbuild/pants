@@ -5,14 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import textwrap
 import unittest
+from contextlib import contextmanager
 
-from pants.base.config import Config
-from pants.util.contextutil import temporary_file
+from pants.base.config import Config, get_pants_configdir, get_pants_cachedir
+from pants.util.contextutil import environment_as, temporary_file
 
 
 class ConfigTest(unittest.TestCase):
+
+  @contextmanager
+  def env(self, **kwargs):
+    environment = dict(PATH=None)
+    environment.update(**kwargs)
+    with environment_as(**environment):
+      yield
 
   def setUp(self):
     with temporary_file() as ini1:
@@ -100,7 +109,35 @@ that.""",
     with self.assertRaises(Config.ConfigError):
       self.config.get_required('a', 'blank_section')
 
+  def test_getdefault(self):
+    self.assertEquals('foo', self.config.getdefault('name'))
+
+  def test_getdefault_explicit(self):
+    self.assertEquals('foo', self.config.getdefault('name', type=str))
+
+  def test_getdefault_not_found(self):
+    with self.assertRaises(NameError):
+      self.assertEquals('foo', self.config.getdefault('name', type=int))
+
   def _check_defaults(self, accessor, default):
     self.assertEquals(None, accessor('c', 'fast'))
     self.assertEquals(None, accessor('c', 'preempt', None))
     self.assertEquals(default, accessor('c', 'jake', default=default))
+
+  def test_get_configdir(self):
+    with self.env():
+      self.assertEquals(os.path.expanduser('~/.config/pants'), get_pants_configdir())
+
+  def test_set_cachedir(self):
+    with self.env():
+      self.assertEquals(os.path.expanduser('~/.cache/pants'), get_pants_cachedir())
+
+  def test_set_configdir(self):
+    with temporary_file() as temp:
+      with self.env(XDG_CONFIG_HOME=temp.name):
+        self.assertEquals(temp.name, get_pants_configdir())
+
+  def test_set_cachedir(self):
+    with temporary_file() as temp:
+      with self.env(XDG_CACHE_HOME=temp.name):
+        self.assertEquals(temp.name, get_pants_cachedir())

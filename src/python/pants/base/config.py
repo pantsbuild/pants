@@ -21,6 +21,20 @@ except ImportError:
 
 
 
+def get_pants_configdir():
+  xdg = os.environ.get('XDG_CONFIG_HOME')
+  if xdg:
+    return xdg
+  else:
+    return os.path.expanduser('~/.config/pants')
+
+def get_pants_cachedir():
+  xdg = os.environ.get('XDG_CACHE_HOME')
+  if xdg:
+    return xdg
+  else:
+    return os.path.expanduser('~/.cache/pants')
+
 def reset_default_bootstrap_option_values(defaults, values=None, buildroot=None):
   """Reset the bootstrap options' default values.
 
@@ -73,7 +87,8 @@ class Config(object):
   _defaults = {
     'homedir': os.path.expanduser('~'),
     'user': getpass.getuser(),
-    'pants_bootstrapdir': os.path.expanduser('~/.pants.d'),
+    'pants_bootstrapdir': get_pants_cachedir(),
+    'pants_configdir': get_pants_configdir()
   }
   reset_default_bootstrap_option_values(_defaults)
 

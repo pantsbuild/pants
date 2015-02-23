@@ -107,7 +107,7 @@ class SignApkTask(Task):
   def execute(self):
     targets = self.context.targets(self.is_signtarget)
     # Check for Android keystore config file (where the default keystore definition is kept).
-    config_file = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
+    config_file = os.path.join(self.context.config.getdefault('pants_configdir'),
                                self._DEFAULT_KEYSTORE_CONFIG)
     if not os.path.isfile(config_file):
       try:
