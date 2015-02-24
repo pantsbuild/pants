@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import hashlib
+import logging
 import os
 import re
 import time
@@ -13,13 +14,15 @@ from collections import namedtuple
 
 import psutil
 from six import string_types
-from twitter.common import log
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.util.dirutil import safe_open
+
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Once we integrate standard logging into our reporting framework, we  can consider making
@@ -92,10 +95,9 @@ class NailgunExecutor(Executor):
     return digest.hexdigest()
 
   @staticmethod
-  def _log_kill(pid, port=None, logger=None):
-    logger = logger or log.info
+  def _log_kill(pid, port=None):
     port_desc = ' port:{0}'.format(port if port else '')
-    logger('killing ng server @ pid:{pid}{port}'.format(pid=pid, port=port_desc))
+    logger.info('killing ng server @ pid:{pid}{port}'.format(pid=pid, port=port_desc))
 
   @classmethod
   def _find_ngs(cls, everywhere=False):
@@ -113,7 +115,7 @@ class NailgunExecutor(Executor):
         pass
 
   @classmethod
-  def killall(cls, logger=None, everywhere=False):
+  def killall(cls, everywhere=False):
     """Kills all nailgun servers started by pants.
 
     :param bool everywhere: If ``True`` Kills all pants-started nailguns on this machine; otherwise
@@ -122,7 +124,7 @@ class NailgunExecutor(Executor):
     success = True
     for proc in cls._find_ngs(everywhere=everywhere):
       try:
-        cls._log_kill(proc.pid, logger=logger)
+        cls._log_kill(proc.pid)
         proc.kill()
       except (psutil.AccessDenied, psutil.NoSuchProcess):
         success = False
@@ -180,7 +182,7 @@ class NailgunExecutor(Executor):
       def run(this, stdout=None, stderr=None, cwd=None):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
-          log.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
+          logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
           return nailgun(main, cwd, *args)
         except nailgun.NailgunError as e:
           self.kill()
@@ -203,7 +205,7 @@ class NailgunExecutor(Executor):
   def _get_nailgun_endpoint(self):
     endpoint = self._find(self._workdir)
     if endpoint:
-      log.debug('Found ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
+      logger.debug('Found ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
     return endpoint
 
   def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
@@ -218,8 +220,7 @@ class NailgunExecutor(Executor):
       return self._create_ngclient(endpoint.port, stdout, stderr)
     else:
       if running and updated:
-        log.debug(
-          'Killing ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
+        logger.debug('Killing ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
         self.kill()
       return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr)
 
@@ -245,13 +246,13 @@ class NailgunExecutor(Executor):
         started = ng_out.readline()
         if started.find('Listening for transport dt_socket at address:') >= 0:
           nailgun_timeout_seconds = 60
-          log.warn('Timeout extended to {timeout} seconds for debugger to attach to ng server.'
-                   .format(timeout=nailgun_timeout_seconds))
+          logger.warn('Timeout extended to {timeout} seconds for debugger to attach to ng server.'
+                      .format(timeout=nailgun_timeout_seconds))
           started = ng_out.readline()
         if started:
           port = self._parse_nailgun_port(started)
           nailgun = self._create_ngclient(port, stdout, stderr)
-          log.debug('Detected ng server up on port {port}'.format(port=port))
+          logger.debug('Detected ng server up on port {port}'.format(port=port))
         elif time.time() - port_parse_start > nailgun_timeout_seconds:
           raise NailgunClient.NailgunError(
             'Failed to read ng output after {sec} seconds.\n {desc}'
@@ -264,8 +265,8 @@ class NailgunExecutor(Executor):
         sock.close()
         endpoint = self._get_nailgun_endpoint()
         if endpoint:
-          log.debug('Connected to ng server launched with {endpoint}'
-                    .format(endpoint=repr(endpoint)))
+          logger.debug('Connected to ng server launched with {endpoint}'
+                       .format(endpoint=repr(endpoint)))
         else:
           raise NailgunClient.NailgunError('Failed to connect to ng server.')
         return nailgun
@@ -273,15 +274,15 @@ class NailgunExecutor(Executor):
         raise nailgun.NailgunError('Failed to connect to ng output after {count} connect attempts'
                                    .format(count=max_socket_connect_attempts))
       attempt += 1
-      log.debug('Failed to connect on attempt {count}'.format(count=attempt))
+      logger.debug('Failed to connect on attempt {count}'.format(count=attempt))
       time.sleep(0.1)
 
   def _create_ngclient(self, port, stdout, stderr):
     return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, workdir=get_buildroot())
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
-    log.debug('No ng server found with fingerprint {fingerprint}, spawning...'
-              .format(fingerprint=fingerprint))
+    logger.debug('No ng server found with fingerprint {fingerprint}, spawning...'
+                 .format(fingerprint=fingerprint))
 
     with safe_open(self._ng_out, 'w'):
       pass  # truncate
@@ -314,8 +315,8 @@ class NailgunExecutor(Executor):
                          stderr=err_fd,
                          close_fds=True)
 
-    log.debug('Spawned ng server with fingerprint {fingerprint} @ {pid}'
-              .format(fingerprint=fingerprint, pid=process.pid))
+    logger.debug('Spawned ng server with fingerprint {fingerprint} @ {pid}'
+                 .format(fingerprint=fingerprint, pid=process.pid))
     # Prevents finally blocks and atexit handlers from being executed, unlike sys.exit(). We
     # don't want to execute finally blocks because we might, e.g., clean up tempfiles that the
     # parent still needs.

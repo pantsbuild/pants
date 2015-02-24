@@ -12,8 +12,7 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
-from twitter.common import log
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -204,7 +203,7 @@ class ProtobufGen(CodeGen):
       protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
                                                + protoc_environ['PATH'].split(os.pathsep))
 
-    log.debug('Executing: {0}'.format('\\\n  '.join(args)))
+    self.context.log.debug('Executing: {0}'.format('\\\n  '.join(args)))
     process = subprocess.Popen(args, env=protoc_environ)
     result = process.wait()
     if result != 0:

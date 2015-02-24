@@ -29,7 +29,6 @@ python_library(
   sources = ['apache_thrift_gen.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.log',
     ':code_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
@@ -97,7 +96,6 @@ python_library(
   sources = ['protobuf_gen.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.log',
     ':code_gen',
     ':common',
     ':protobuf_parse',

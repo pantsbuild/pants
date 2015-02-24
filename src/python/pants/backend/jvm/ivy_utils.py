@@ -40,11 +40,16 @@ class IvyInfo(object):
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.
     self._deps_by_caller = defaultdict(OrderedSet)
+    # Map from _unversioned_ ref to OrderedSet of IvyArtifact instances.
+    self._artifacts_by_ref = defaultdict(OrderedSet)
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
     for caller in module.callers:
       self._deps_by_caller[caller].add(module.ref)
+    # Strip the version from the ref before recording artifacts.
+    unversioned_ref = IvyModuleRef(module.ref.org, module.ref.name, "")
+    self._artifacts_by_ref[unversioned_ref].update(module.artifacts)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
@@ -79,10 +84,31 @@ class IvyInfo(object):
     memo[ref] = acc
     return acc
 
+  def get_artifacts_for_jar_library(self, jar_library, memo=None):
+    """Collects IvyArtifact instances for the passed jar_library.
+
+    Because artifacts are only fetched for the "winning" version of a module, the artifacts
+    will not always represent the version originally declared by the library.
+
+    This method is transitive within the library's jar_dependencies, but will NOT
+    walk into its non-jar dependencies.
+
+    :param jar_library A JarLibrary to collect the transitive artifacts for.
+    :param memo see `traverse_dependency_graph`
+    """
+    modules = OrderedSet()
+    def create_collection(dep):
+      return OrderedSet([dep])
+    for jar in jar_library.jar_dependencies:
+      for module_ref in self.traverse_dependency_graph(jar, create_collection, memo):
+        unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
+        modules.update(self._artifacts_by_ref[unversioned_ref])
+    return modules
+
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar
     :param jar an IvyModuleRef for a third party dependency.
-    :param memo a dict of ref -> set that memoizes dependencies for each ref as they are resolved.
+    :param memo see `traverse_dependency_graph`
     """
 
     ref = jar
@@ -92,7 +118,6 @@ class IvyInfo(object):
         s.add(dep)
       return s
     return self.traverse_dependency_graph(jar, create_collection, memo)
-
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
@@ -120,10 +145,11 @@ class IvyUtils(object):
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   @staticmethod
-  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath):
+  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
-    Preserves all other paths. Writes the resulting paths to outpath.
+    If there is an existing symlink for a file under inpath, it is used rather than creating
+    a new symlink. Preserves all other paths. Writes the resulting paths to outpath.
     Returns a map of path -> symlink to that path.
     """
     safe_mkdir(symlink_dir)
@@ -133,6 +159,9 @@ class IvyUtils(object):
     for path in paths:
       if not path.startswith(ivy_cache_dir):
         new_paths.append(path)
+        continue
+      if path in existing_symlink_map:
+        new_paths.append(existing_symlink_map[path])
         continue
       symlink = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
       try:
