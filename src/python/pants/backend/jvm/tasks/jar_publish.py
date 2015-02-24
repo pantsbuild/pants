@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import getpass
 import hashlib
-import logging
 import os
 import pkgutil
 import shutil
@@ -18,7 +17,6 @@ from collections import OrderedDict, defaultdict
 
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
-from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -580,7 +578,11 @@ class JarPublish(JarTask, ScmPublish):
       '-m2compatible',
     ]
 
-    if LogOptions.stderr_log_level() == logging.DEBUG:
+    # TODO(John Sirois): global logging options should be hidden behind some sort of log manager
+    # that we can:
+    # a.) obtain a handle to (dependency injection or manual plumbing)
+    # b.) query for log detail, ie: `if log_manager.is_verbose:`
+    if self.get_options().level == 'debug':
       args.append('-verbose')
 
     if self.local_snapshot:

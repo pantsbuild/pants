@@ -39,6 +39,8 @@ class ReverseDepmap(ConsoleTask):
     self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
     self._dependees_type = self.get_options().type
+    self._spec_excludes = self.context.options.for_global_scope().spec_excludes
+
 
   def console_output(self, _):
     buildfiles = OrderedSet()
@@ -62,13 +64,13 @@ class ReverseDepmap(ConsoleTask):
                         '\n\tsource_root(\'<src-folder>\', %s)' % ', '.join(self._dependees_type))
       for base_path in base_paths:
         buildfiles.update(BuildFile.scan_buildfiles(get_buildroot(),
-                                                    os.path.join(get_buildroot(), base_path)))
+                                                    os.path.join(get_buildroot(), base_path),
+                                                    spec_excludes=self._spec_excludes))
     else:
-      buildfiles = BuildFile.scan_buildfiles(get_buildroot())
+      buildfiles = BuildFile.scan_buildfiles(get_buildroot(), spec_excludes=self._spec_excludes)
 
     build_graph = self.context.build_graph
     build_file_parser = self.context.build_file_parser
-    address_mapper = self.context.address_mapper
 
     dependees_by_target = defaultdict(set)
     for build_file in buildfiles:

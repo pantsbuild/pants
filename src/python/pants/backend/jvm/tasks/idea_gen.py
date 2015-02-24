@@ -73,6 +73,15 @@ class IdeaGen(IdeGen):
              help="Exclude 'target' directories for directories containing "
                   "pom.xml files.  These directories contain generated code and"
                   "copies of files staged for deployment.")
+    register('--exclude_folders', action='append',
+             default=[
+               '.pants.d/compile',
+               '.pants.d/ivy',
+               '.pants.d/python',
+               '.pants.d/resources',
+               ],
+             help='Adds folders to be excluded from the project configuration.')
+
 
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
@@ -171,13 +180,7 @@ class IdeaGen(IdeGen):
     if self.get_options().exclude_maven_target:
       exclude_folders += IdeaGen._maven_targets_excludes(get_buildroot())
 
-    exclude_folders += self.context.config.getlist('idea', 'exclude_folders',
-                                                   default=[
-                                                     '.pants.d/compile',
-                                                     '.pants.d/ivy',
-                                                     '.pants.d/python',
-                                                     '.pants.d/resources',
-                                                     ])
+    exclude_folders += self.get_options().exclude_folders
 
     configured_module = TemplateData(
       root_dir=get_buildroot(),

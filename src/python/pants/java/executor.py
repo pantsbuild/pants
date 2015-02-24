@@ -5,20 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import subprocess
 from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 
 from six import string_types
-from twitter.common import log
 from twitter.common.collections import maybe_list
-from twitter.common.lang import AbstractClass
 
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import Distribution
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import relativize_paths
+from pants.util.meta import AbstractClass
+
+
+logger = logging.getLogger(__name__)
 
 
 class Executor(AbstractClass):
@@ -157,7 +160,7 @@ class SubprocessExecutor(Executor):
     for env_var in cls._SCRUBBED_ENV:
       value = os.getenv(env_var)
       if value:
-        log.warn('Scrubbing {env_var}={value}'.format(env_var=env_var, value=value))
+        logger.warn('Scrubbing {env_var}={value}'.format(env_var=env_var, value=value))
     with environment_as(**cls._SCRUBBED_ENV):
       yield
 
@@ -198,8 +201,8 @@ class SubprocessExecutor(Executor):
   def _spawn(self, cmd, cwd=None, **subprocess_args):
     with self._maybe_scrubbed_env():
       cwd = cwd or self._buildroot
-      log.debug('Executing: {cmd} args={args} at cwd={cwd}'
-               .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
+      logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
+                   .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:
         return subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
       except OSError as e:

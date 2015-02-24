@@ -13,7 +13,6 @@ from abc import abstractmethod
 from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
-from twitter.common.lang import AbstractClass
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
@@ -23,6 +22,7 @@ from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.meta import AbstractClass
 
 
 class TaskBase(AbstractClass):

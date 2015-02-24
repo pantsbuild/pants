@@ -5,16 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import pkgutil
 import subprocess
 from contextlib import contextmanager
 
 from six import string_types
-from twitter.common import log
 
 from pants.base.revision import Revision
 from pants.util.contextutil import temporary_dir
+
+
+logger = logging.getLogger(__name__)
 
 
 class Distribution(object):
@@ -79,8 +82,8 @@ class Distribution(object):
         dist = cls(bin_path=path, minimum_version=minimum_version,
                    maximum_version=maximum_version, jdk=jdk)
         dist.validate()
-        log.debug('Located %s for constraints: minimum_version'
-                  ' %s, maximum_version %s, jdk %s' % (dist, minimum_version, maximum_version, jdk))
+        logger.debug('Located %s for constraints: minimum_version %s, '
+                     'maximum_version %s, jdk %s' % (dist, minimum_version, maximum_version, jdk))
         return dist
       except (ValueError, cls.Error):
         pass
