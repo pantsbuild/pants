@@ -30,7 +30,7 @@ def register_bootstrap_options(register, buildroot=None):
   """
   buildroot = buildroot or get_buildroot()
   register('--pants-bootstrapdir', metavar='<dir>', default=os.path.expanduser('~/.pants.d'),
-           help='Write global pants cache files to this dir.')
+           help='Write global cache files to this dir.')
   register('--pants-workdir', metavar='<dir>', default=os.path.join(buildroot, '.pants.d'),
            help='Write intermediate output files to this dir.')
   register('--pants-supportdir', metavar='<dir>', default=os.path.join(buildroot, 'build-support'),

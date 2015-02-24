@@ -115,7 +115,8 @@ class SignApkTask(Task):
     args.extend(['-keystore', key.keystore_location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
-    args.extend(['-signedjar', os.path.join(outdir, self.signed_package_name(target, key.build_type))])
+    args.extend(['-signedjar',
+                 os.path.join(outdir, self.signed_package_name(target, key.build_type))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
     logger.debug('Executing: {0}'.format(' '.join(args)))
