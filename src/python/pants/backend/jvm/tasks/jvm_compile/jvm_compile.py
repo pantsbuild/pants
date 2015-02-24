@@ -104,7 +104,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     JvmDependencyAnalyzer.prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
-    round_manager.require_data('ivy_cache_dir')
     round_manager.require_data('ivy_resolve_symlink_map')
 
     # Require codegen we care about
@@ -193,25 +192,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   # Common code.
   # ------------
-  @staticmethod
-  def _analysis_for_target(analysis_dir, target):
-    return os.path.join(analysis_dir, target.id + '.analysis')
-
-  @staticmethod
-  def _portable_analysis_for_target(analysis_dir, target):
-    return JvmCompile._analysis_for_target(analysis_dir, target) + '.portable'
-
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
-
-    self._strategy = JvmCompileStrategy(self.context, self.get_options(), self.workdir)
 
     # Various working directories.
     self._analysis_dir = os.path.join(self.workdir, 'analysis')
     self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
-
-    # We can't create analysis tools until after construction.
-    self._lazy_analysis_tools = None
 
     # JVM options for running the compiler.
     self._jvm_options = self.get_options().jvm_options
@@ -228,6 +214,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None
+
+    # The compile strategy to use for analysis and classfile placement.
+    self._strategy = JvmCompileStrategy(self.context,
+                                        self.get_options(),
+                                        self.workdir,
+                                        self.create_analysis_tools())
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.
@@ -266,168 +258,35 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
     
-    self._strategy.prepare_execute(cache_manager, self._sources_by_target, all_targets)
+    self._strategy.prepare_compile(cache_manager, self._sources_by_target, all_targets)
 
-  # TODO(benjy): Break this monstrosity up? Previous attempts to do so
-  #              turned out to be more trouble than it was worth.
   def execute_chunk(self, relevant_targets):
-    # TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,
-    # we can inject a dep on the scala runtime library and still have it ivy-resolve.
-
     if not relevant_targets:
       return
 
     # Target -> sources (relative to buildroot), for just this chunk's targets.
     sources_by_target = self._sources_for_targets(relevant_targets)
 
-    self._strategy.execute_chunk(sources_by_target, self._jvm_fingerprint_strategy(), relevant_targets)
+    # Invalidation check. Everything inside the with block must succeed for the
+    # invalid targets to become valid.
+    with self._strategy.invalidated_in_chunk(sources_by_target, self._jvm_fingerprint_strategy(), relevant_targets) as invalidation_check:
+      if invalidation_check.invalid_vts:
+        # Register products for all the valid targets.
+        # We register as we go, so dependency checking code can use this data.
+        valid_targets = list(set(relevant_targets) - set(invalid_targets))
+        self._strategy.register_products(valid_targets)
+
+        # Invoke the strategy to compile invalid targets
+        self._strategy.compile_chunk(invalidation_check, sources_by_target, relevant_targets)
+      else:
+        # Nothing to build. Register products for all the targets in one go.
+        self._strategy.register_products(relevant_targets)
 
     self.post_process(relevant_targets)
 
   def check_artifact_cache(self, vts):
-    # Special handling for scala analysis files. Class files are retrieved directly into their
-    # final locations in the global classes dir.
-
-    def post_process_cached_vts(cached_vts):
-      # Get all the targets whose artifacts we found in the cache.
-      cached_targets = []
-      for vt in cached_vts:
-        for target in vt.targets:
-          cached_targets.append(target)
-
-      # The current global analysis may contain old data for modified targets for
-      # which we got cache hits. We need to strip out this old analysis, to ensure
-      # that the new data incoming from the cache doesn't collide with it during the merge.
-      sources_to_strip = []
-      if os.path.exists(self._analysis_file):
-        for target in cached_targets:
-          sources_to_strip.extend(self._get_previous_sources_by_target(target))
-
-      # Localize the cached analyses.
-      analyses_to_merge = []
-      for target in cached_targets:
-        analysis_file = JvmCompile._analysis_for_target(self._analysis_tmpdir, target)
-        portable_analysis_file = JvmCompile._portable_analysis_for_target(self._analysis_tmpdir,
-                                                                          target)
-        if os.path.exists(portable_analysis_file):
-          self._analysis_tools.localize(portable_analysis_file, analysis_file)
-        if os.path.exists(analysis_file):
-          analyses_to_merge.append(analysis_file)
-
-      # Merge them into the global analysis.
-      if analyses_to_merge:
-        with temporary_dir() as tmpdir:
-          if sources_to_strip:
-            throwaway = os.path.join(tmpdir, 'throwaway')
-            trimmed_analysis = os.path.join(tmpdir, 'trimmed')
-            self._analysis_tools.split_to_paths(self._analysis_file,
-                                            [(sources_to_strip, throwaway)],
-                                            trimmed_analysis)
-          else:
-            trimmed_analysis = self._analysis_file
-          if os.path.exists(trimmed_analysis):
-            analyses_to_merge.append(trimmed_analysis)
-          tmp_analysis = os.path.join(tmpdir, 'analysis')
-          with self.context.new_workunit(name='merge_analysis'):
-            self._analysis_tools.merge_from_paths(analyses_to_merge, tmp_analysis)
-
-          sources_by_cached_target = self._sources_for_targets(cached_targets)
-
-          # Record the cached target -> sources mapping for future use.
-          for target, sources in sources_by_cached_target.items():
-            self._record_sources_by_target(target, sources)
-
-          # Everything's good so move the merged analysis to its final location.
-          if os.path.exists(tmp_analysis):
-            self.move(tmp_analysis, self._analysis_file)
-
-    self._ensure_analysis_tmpdir()
+    post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
-
-  def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
-    vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
-
-    vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
-
-    split_analysis_files = [
-        JvmCompile._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
-    portable_split_analysis_files = [
-        JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
-
-    # Set up args for splitting the analysis into per-target files.
-    splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
-    splits_args_tuples = [(analysis_file, splits)]
-
-    # Set up args for rebasing the splits.
-    relativize_args_tuples = zip(split_analysis_files, portable_split_analysis_files)
-
-    # Set up args for artifact cache updating.
-    vts_artifactfiles_pairs = []
-    classes_by_source = self._compute_classes_by_source(analysis_file)
-    resources_by_target = self.context.products.get_data('resources_by_target')
-    for target, sources in sources_by_target.items():
-      if target.has_label('no_cache'):
-        continue
-      artifacts = []
-      if resources_by_target is not None:
-        for _, paths in resources_by_target[target].abs_paths():
-          artifacts.extend(paths)
-      for source in sources:
-        classes = classes_by_source.get(source, [])
-        artifacts.extend(classes)
-
-      vt = vt_by_target.get(target)
-      if vt is not None:
-        # NOTE: analysis_file doesn't exist yet.
-        vts_artifactfiles_pairs.append(
-            (vt,
-             artifacts + [JvmCompile._portable_analysis_for_target(self._analysis_tmpdir, target)]))
-
-    update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
-    if update_artifact_cache_work:
-      work_chain = [
-        Work(self._analysis_tools.split_to_paths, splits_args_tuples, 'split'),
-        Work(self._analysis_tools.relativize, relativize_args_tuples, 'relativize'),
-        update_artifact_cache_work
-      ]
-      self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
-
-  def _compute_classes_by_source(self, analysis_file=None):
-    """Compute src->classes.
-
-    Srcs are relative to buildroot. Classes are absolute paths.
-    """
-    if analysis_file is None:
-      analysis_file = self._analysis_file
-
-    if not os.path.exists(analysis_file):
-      return {}
-    buildroot = get_buildroot()
-    products = self._analysis_parser.parse_products_from_path(analysis_file)
-    classes_by_src = {}
-    for src, classes in products.items():
-      relsrc = os.path.relpath(src, buildroot)
-      classes_by_src[relsrc] = classes
-    return classes_by_src
-
-  def _get_previous_sources_by_target(self, target):
-    """Returns the target's sources as recorded on the last successful build of target.
-
-    Returns a list of absolute paths.
-    """
-    path = os.path.join(self._target_sources_dir, target.identifier)
-    if os.path.exists(path):
-      with open(path, 'r') as infile:
-        return [s.rstrip() for s in infile.readlines()]
-    else:
-      return []
-
-  def _record_sources_by_target(self, target, sources):
-    # Record target -> source mapping for future use.
-    with open(os.path.join(self._target_sources_dir, target.identifier), 'w') as outfile:
-      for src in sources:
-        outfile.write(os.path.join(get_buildroot(), src))
-        outfile.write('\n')
 
   def _compute_current_sources_by_target(self, targets):
     """Returns map target -> list of sources (relative to buildroot)."""
@@ -451,73 +310,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         resolved_sources.extend(target.sources_relative_to_buildroot())
     return resolved_sources
 
-  def _compute_classpath_elements_by_class(self, classpath):
-    # Don't consider loose classes dirs in our classes dir. Those will be considered
-    # separately, by looking at products.
-    def non_product(path):
-      return path != self._classes_dir
-
-    if self._upstream_class_to_path is None:
-      self._upstream_class_to_path = {}
-      classpath_entries = filter(non_product, classpath)
-      for cp_entry in self.find_all_bootstrap_jars() + classpath_entries:
-        # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-        if os.path.isfile(cp_entry) and ((cp_entry.endswith('.jar') or cp_entry.endswith('.zip'))):
-          with open_zip64(cp_entry, 'r') as jar:
-            for cls in jar.namelist():
-              # First jar with a given class wins, just like when classloading.
-              if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
-                self._upstream_class_to_path[cls] = cp_entry
-        elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
-            for f in filter(lambda x: x.endswith('.class'), filenames):
-              cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
-              if not cls in self._upstream_class_to_path:
-                self._upstream_class_to_path[cls] = os.path.join(dirpath, f)
-    return self._upstream_class_to_path
-
-  def find_all_bootstrap_jars(self):
-    def get_path(key):
-      return self.context.java_sysprops.get(key, '').split(':')
-
-    def find_jars_in_dirs(dirs):
-      ret = []
-      for d in dirs:
-        if os.path.isdir(d):
-          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
-      return ret
-
-    # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
-    # TODO: Support other JVMs? Not clear if there's a standard way to do so.
-    # May include loose classes dirs.
-    boot_classpath = get_path('sun.boot.class.path')
-
-    # Note that per the specs, overrides and extensions must be in jars.
-    # Loose class files will not be found by the JVM.
-    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
-    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
-
-    # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
-    return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
-
-  @property
-  def _analysis_tools(self):
-    if self._lazy_analysis_tools is None:
-      self._lazy_analysis_tools = self.create_analysis_tools()
-    return self._lazy_analysis_tools
-
-  @property
-  def _analysis_parser(self):
-    return self._analysis_tools.parser
-
-  @property
-  def ivy_cache_dir(self):
-    ret = self.context.products.get_data('ivy_cache_dir')
-    if ret is None:
-      raise TaskError('ivy_cache_dir product accessed before it was created.')
-    return ret
-
   def _sources_for_targets(self, targets):
     """Returns a map target->sources for the specified targets."""
     if self._sources_by_target is None:
@@ -535,10 +327,3 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # JvmDependencyAnalyzer uses classes_by_target within this run
     self.context.products.safe_create_data('classes_by_target', make_products)
-
-  def _resources_by_class_file(self, class_file_name, resource_mapping):
-    assert class_file_name.endswith(".class")
-    assert class_file_name.startswith(self.workdir)
-    class_file_name = class_file_name[len(self._classes_dir) + 1:-len(".class")]
-    class_name = class_file_name.replace("/", ".")
-    return resource_mapping.get(class_name, [])

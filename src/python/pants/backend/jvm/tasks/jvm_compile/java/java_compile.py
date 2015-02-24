@@ -87,7 +87,7 @@ class JavaCompile(JvmCompile):
     self._depfile = os.path.join(self._analysis_dir, 'global_depfile')
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
+    return AnalysisTools(self.context.java_home,
                          JMakeAnalysisParser(self._classes_dir), JMakeAnalysis)
 
   def extra_products(self, target):
