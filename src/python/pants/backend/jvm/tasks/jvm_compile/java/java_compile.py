@@ -112,6 +112,7 @@ class JavaCompile(JvmCompile):
       '-d', self._classes_dir,
       '-pdb', analysis_file,
       '-pdb-text-format',
+      '-depfile', self._depfile
       ]
 
     compiler_classpath = self.tool_classpath('java-compiler')
@@ -129,13 +130,15 @@ class JavaCompile(JvmCompile):
       raise TaskError("Set the source Java version with the 'source' option, not in 'args'.")
     if '-C-target' in self._args:
       raise TaskError("Set the target JVM version with the 'target' option, not in 'args'.")
-
     if not self.get_options().colors:
       filtered_args = filter(lambda arg: not arg == '-C-Tcolor', self._args)
     else:
       filtered_args = self._args
-
     args.extend(filtered_args)
+
+    args.append('-C-Tdependencyfile')
+    args.append('-C{}'.format(self._depfile))
+
     args.extend(sources)
     result = self.runjava(classpath=jmake_classpath,
                           main=JavaCompile._JMAKE_MAIN,
