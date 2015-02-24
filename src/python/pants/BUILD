@@ -2,35 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name = 'pants',
-  dependencies = [
+  name='pants',
+  dependencies=[
     'src/python/pants/bin:pants',
   ],
-  description = 'An alias for the pants binary target.',
+  description='An alias for the pants binary target.',
 )
 
 python_library(
-  name = 'pants-packaged',
-  provides=setup_py(
+  name='pants-packaged',
+  provides=pants_setup_py(
     name='pantsbuild.pants',
-    version=pants_version(),
     description='A bottom-up build tool.',
-    long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
-    url='https://github.com/pantsbuild/pants',
-    license='Apache License, Version 2.0',
-    zip_safe=True,
     namespace_packages=['pants'],
-    classifiers=[
-      'Intended Audience :: Developers',
-      'License :: OSI Approved :: Apache Software License',
-      # We know for a fact these OSs work but, for example, know Windows
-      # does not work yet.  Take the conservative approach and only list OSs
-      # we know pants works with for now.
-      'Operating System :: MacOS :: MacOS X',
-      'Operating System :: POSIX :: Linux',
-      'Programming Language :: Python',
-      'Topic :: Software Development :: Build Tools',
-    ]
   ).with_binaries(
     # TODO(John Sirois): Switch back when target cycles have been sorted out.
     # pants='src/python/pants/bin:pants',
@@ -48,25 +32,11 @@ python_library(
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/engine:engine_test_base',
   ],
-  provides=setup_py(
+  provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
-    version=pants_version(),
     description='Test support for writing pants plugins.',
-    long_description=read_contents('ABOUT.rst') + read_contents('CHANGELOG.rst'),
-    url='https://github.com/pantsbuild/pants',
-    license='Apache License, Version 2.0',
-    zip_safe=True,
     namespace_packages=['pants_test'],
-    classifiers=[
-      'Intended Audience :: Developers',
-      'License :: OSI Approved :: Apache Software License',
-      # We know for a fact these OSs work but, for example, know Windows
-      # does not work yet.  Take the conservative approach and only list OSs
-      # we know pants works with for now.
-      'Operating System :: MacOS :: MacOS X',
-      'Operating System :: POSIX :: Linux',
-      'Programming Language :: Python',
-      'Topic :: Software Development :: Build Tools',
+    additional_classifiers=[
       'Topic :: Software Development :: Testing',
     ]
   )
@@ -78,9 +48,9 @@ page(name='readme',
 
 # XXX move into base or thrift
 python_library(
-  name = 'binary_util',
-  sources = ['binary_util.py'],
-  dependencies = [
+  name='binary_util',
+  sources=['binary_util.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:config',
@@ -91,16 +61,16 @@ python_library(
 )
 
 python_library(
-  name = 'thrift_util',
-  sources = ['thrift_util.py'],
-  dependencies = [
+  name='thrift_util',
+  sources=['thrift_util.py'],
+  dependencies=[
     ':binary_util',
   ],
 )
 
 python_library(
-  name = 'version',
-  sources = ['version.py'],
+  name='version',
+  sources=['version.py'],
 )
 
 page(
