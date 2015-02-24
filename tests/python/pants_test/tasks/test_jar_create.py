@@ -93,22 +93,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                         java_sources=['src/java/com/twitter/foo:java_foo'])
     self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
                                   resources='src/resources/com/twitter:spam')
+    self.empty_sl = self.scala_library('src/scala/com/foo', 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):
     return super(JarCreateExecuteTest, self).context(
-      target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib],
+      target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
-
-  @contextmanager
-  def add_products(self, context, product_type, target, *products):
-    product_mapping = context.products.get(product_type)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        with safe_open(os.path.join(outdir, product), mode='w') as fp:
-          fp.write(product)
-        return product
-      product_mapping.add(target, outdir, map(create_product, products))
-      yield temporary_dir
 
   @contextmanager
   def add_data(self, context, data_type, target, *products):
@@ -152,3 +142,10 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                         'b.class', 'r.txt.transformed')
               self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
                                         'java_foo.class')
+
+  def test_empty_scala_files(self):
+    context = self.context()
+    with self.add_data(context, 'classes_by_target', self.empty_sl):
+      with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
+        self.execute(context)
+        self.assertEquals(None, context.products.get('jars').get(self.empty_sl))
