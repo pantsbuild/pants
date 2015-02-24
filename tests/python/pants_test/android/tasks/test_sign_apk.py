@@ -5,11 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import textwrap
 
 from pants.backend.android.tasks.sign_apk import SignApkTask
 from pants.base.exceptions import TaskError
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants_test.android.test_android_base import TestAndroidBase
 
 
@@ -98,6 +99,23 @@ class SignApkTest(TestAndroidBase):
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
       task.config_file
+
+  def test_package_name(self):
+    with self.android_binary() as android_binary:
+      key = self.FakeKeystore()
+      target = android_binary
+      self.assertEquals(SignApkTask.signed_package_name(target, key.build_type),
+                        'binary.debug.signed.apk')
+
+  def test_setup_default_config(self):
+    with temporary_file() as temp:
+      SignApkTask.setup_default_config(temp.name)
+
+  def test_setup_default_config_no_permission(self):
+    with self.assertRaises(TaskError):
+      with temporary_file() as temp:
+        os.chmod(temp.name, 0o400)
+        SignApkTask.setup_default_config(temp.name)
 
   def test_render_args(self):
     with temporary_dir() as temp:
