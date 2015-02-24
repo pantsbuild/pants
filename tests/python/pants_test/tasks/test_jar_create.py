@@ -6,8 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
-from contextlib import closing, contextmanager
 from textwrap import dedent
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
@@ -17,9 +15,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
 from pants.base.source_root import SourceRoot
-from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_open
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
@@ -93,35 +89,13 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                         java_sources=['src/java/com/twitter/foo:java_foo'])
     self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
                                   resources='src/resources/com/twitter:spam')
+    self.empty_sl = self.scala_library('src/scala/com/foo', 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):
     return super(JarCreateExecuteTest, self).context(
-      target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib],
+      target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
 
-  @contextmanager
-  def add_products(self, context, product_type, target, *products):
-    product_mapping = context.products.get(product_type)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        with safe_open(os.path.join(outdir, product), mode='w') as fp:
-          fp.write(product)
-        return product
-      product_mapping.add(target, outdir, map(create_product, products))
-      yield temporary_dir
-
-  @contextmanager
-  def add_data(self, context, data_type, target, *products):
-    make_products = lambda: defaultdict(MultipleRootedProducts)
-    data_by_target = context.products.get_data(data_type, make_products)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        abspath = os.path.join(outdir, product)
-        with safe_open(abspath, mode='w') as fp:
-          fp.write(product)
-        return abspath
-      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
-      yield temporary_dir
 
   def assert_jar_contents(self, context, product_type, target, *contents):
     jar_mapping = context.products.get(product_type).get(target)
@@ -137,11 +111,11 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_classfile_jar_contents(self):
     context = self.context()
-    with self.add_data(context, 'classes_by_target', self.jl, 'a.class', 'b.class'):
-      with self.add_data(context, 'classes_by_target', self.sl, 'c.class'):
-        with self.add_data(context, 'classes_by_target', self.binary, 'b.class'):
-          with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
-            with self.add_data(context, 'classes_by_target', self.scala_lib, 'scala_foo.class',
+    with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
+      with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
+        with self.add_data(context.products, 'classes_by_target', self.binary, 'b.class'):
+          with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
+            with self.add_data(context.products, 'classes_by_target', self.scala_lib, 'scala_foo.class',
                                'java_foo.class'):
               self.execute(context)
 
@@ -152,3 +126,10 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                         'b.class', 'r.txt.transformed')
               self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
                                         'java_foo.class')
+
+  def test_empty_scala_files(self):
+    context = self.context()
+    with self.add_data(context.products, 'classes_by_target', self.empty_sl):
+      with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
+        self.execute(context)
+        self.assertFalse(context.products.get('jars').has(self.empty_sl))
