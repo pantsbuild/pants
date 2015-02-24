@@ -37,4 +37,4 @@ class TestBuildEnvironment(unittest.TestCase):
   def test_expand_home_configdir(self):
     with environment_as(XDG_CONFIG_HOME='~/somewhere/in/home'):
       self.assertEquals(os.path.expanduser(os.path.join('~/somewhere/in/home', 'pants')),
-                                           get_pants_configdir())
+                        get_pants_configdir())
