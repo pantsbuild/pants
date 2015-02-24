@@ -123,6 +123,8 @@ migrations = {
   ('ide', 'extra_jvm_source_paths'): ('idea', 'extra_jvm_source_paths'),
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
+
+  ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
 }
 
 notes = {
@@ -158,7 +160,9 @@ notes = {
                                    'idea and eclipse goals.',
   ('ide', 'debug_port'):       'debug_port now must be specified separately for idea and eclipse '
                                'goals.  Also, IDE goals now use their own debug setting and do not '
-                               'inherit from jvm configuration.'
+                               'inherit from jvm configuration.',
+
+  ('tasks', 'build_invalidator'): 'This is no longer configurable. The default will be used.',
 }
 
 
