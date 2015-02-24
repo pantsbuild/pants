@@ -22,12 +22,6 @@ def register_global_options(register):
   register('--ng-daemons', action='store_true', default=True,
            help='Use nailgun daemons to execute java tasks.')
 
-  register('-d', '--logdir', metavar='<dir>',
-           help='Write logs to files under this directory.')
-  register('-l', '--level', choices=['debug', 'info', 'warn'], default='info',
-           help='Set the logging level.')
-  register('-q', '--quiet', action='store_true',
-           help='Squelches all console output apart from errors.')
   register('-i', '--interpreter', default=[], action='append', metavar='<requirement>',
            help="Constrain what Python interpreters to use.  Uses Requirement format from "
                 "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
