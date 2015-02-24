@@ -148,4 +148,4 @@ class JarCreateExecuteTest(JarCreateTestBase):
     with self.add_data(context, 'classes_by_target', self.empty_sl):
       with self.add_data(context, 'resources_by_target', self.res, 'r.txt.transformed'):
         self.execute(context)
-        self.assertEquals(None, context.products.get('jars').get(self.empty_sl))
+        self.assertFalse(context.products.get('jars').has(self.empty_sl))
