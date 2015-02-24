@@ -115,6 +115,9 @@ migrations = {
 
   ('backend', 'python-path'): ('DEFAULT', 'pythonpath'),
 
+  ('python-ipython', 'entry-point'): ('repl.py', 'ipython_entry_point'),
+  ('python-ipython', 'requirements'): ('repl.py', 'ipython_requirements'),
+
   # Three changes are pertinent to migrate 'ide' to both idea and & eclipse. I tried to capture
   # that in notes
   ('ide', 'python_source_paths'): ('idea', 'python_source_path'),
