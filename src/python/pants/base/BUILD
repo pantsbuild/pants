@@ -45,7 +45,6 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.log',
     'src/python/pants:version',
     'src/python/pants/scm:all',
     ':build_root',

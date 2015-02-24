@@ -20,7 +20,7 @@ from pants.java.nailgun_executor import NailgunExecutor
 class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
 
   @staticmethod
-  def killall(logger=None, everywhere=False):
+  def killall(everywhere=False):
     """Kills all nailgun servers launched by pants in the current repo.
 
     Returns ``True`` if all nailguns were successfully killed, ``False`` otherwise.
@@ -31,7 +31,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
     if not NailgunExecutor.killall:
       return False
     else:
-      return NailgunExecutor.killall(logger=logger, everywhere=everywhere)
+      return NailgunExecutor.killall(everywhere=everywhere)
 
   @classmethod
   def register_options(cls, register):

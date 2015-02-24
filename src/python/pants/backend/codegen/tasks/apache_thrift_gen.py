@@ -11,7 +11,6 @@ import re
 import subprocess
 from collections import defaultdict, namedtuple
 
-from twitter.common import log
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
@@ -183,7 +182,7 @@ class ApacheThriftGen(CodeGen):
       cmd = args[:]
       cmd.extend(('-o', outdir))
       cmd.append(relsource)
-      log.debug('Executing: %s' % ' '.join(cmd))
+      self.context.log.debug('Executing: %s' % ' '.join(cmd))
       sessions.append(self.ThriftSession(outdir, cmd, subprocess.Popen(cmd)))
 
     result = 0

@@ -6,16 +6,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import hashlib
+import logging
 import os
 import shutil
-
-from twitter.common import log
 
 from pants.base.config import Config
 from pants.ivy.ivy import Ivy
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_delete, touch
+
+
+logger = logging.getLogger(__name__)
 
 
 class Bootstrapper(object):
@@ -169,14 +171,14 @@ class Bootstrapper(object):
         fetcher = Fetcher()
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
         try:
-          log.info('\nDownloading %s' % self._bootstrap_jar_url)
+          logger.info('\nDownloading %s' % self._bootstrap_jar_url)
           # TODO: Capture the stdout of the fetcher, instead of letting it output
           # to the console directly.
           fetcher.download(self._bootstrap_jar_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
                            timeout_secs=self._timeout_secs)
-          log.info('sha1: %s' % checksummer.checksum)
+          logger.info('sha1: %s' % checksummer.checksum)
           bootstrap_jar.close()
           touch(bootstrap_jar_path)
           shutil.move(bootstrap_jar.name, bootstrap_jar_path)
