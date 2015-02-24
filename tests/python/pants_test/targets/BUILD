@@ -8,7 +8,7 @@ python_library(
   ],
 )
 
-python_test_suite(
+target(
   name = 'targets',
   dependencies = [
     ':jar_library',
@@ -24,7 +24,7 @@ python_test_suite(
   ]
 )
 
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':scala_library_integration',

@@ -18,7 +18,7 @@ python_library(
   ]
 )
 
-python_test_suite(
+target(
   name = 'tasks',
   dependencies = [
     ':binary_create',
@@ -56,7 +56,7 @@ python_test_suite(
   ],
 )
 
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':antlr_integration',
