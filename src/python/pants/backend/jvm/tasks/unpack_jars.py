@@ -147,5 +147,5 @@ class UnpackJars(Task):
       unpacked_sources_product = self.context.products.get_data('unpacked_archives', lambda: {})
       unpacked_sources_product[unpacked_jars_target] = [found_files, rel_unpack_dir]
 
-    # Returning the list of compiled targets for testing purposes
+    # Returning the list of unpacked targets for testing purposes
     return unpacked_targets

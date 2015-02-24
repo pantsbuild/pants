@@ -7,6 +7,7 @@ python_test_suite(
     ':checkstyle',
     ':ide_gen',
     ':idea_gen',
+    ':ivy_imports',
     ':junit_run',
     ':scalastyle',
     ':unpack_jars',
@@ -47,6 +48,20 @@ python_tests(
     'src/python/pants/base:source_root',
     'tests/python/pants_test:base_test',
   ]
+)
+
+
+python_tests(
+  name = 'ivy_imports',
+  sources = ['test_ivy_imports.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:unpack_jars',
+    'src/python/pants/base:target',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/tasks:base'
+    ]
 )
 
 python_tests(
