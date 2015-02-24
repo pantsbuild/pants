@@ -47,7 +47,7 @@ def register_bootstrap_options(register, buildroot=None):
            help='Read additional specs from this file, one per line')
 
   # These logging options are registered in the bootstrap phase so that plugins can log during
-  # registration and not so that their values can be interpolated oin configs.
+  # registration and not so that their values can be interpolated in configs.
   register('-d', '--logdir', metavar='<dir>',
            help='Write logs to files under this directory.')
   register('-l', '--level', choices=['debug', 'info', 'warn'], default='info',

@@ -64,7 +64,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None):
 
       def format(self, record):
         datetime = time.strftime('%m%d %H:%M:%S', time.localtime(record.created))
-        microseconds = int(round((record.created - int(record.created)) * 1e6))
+        microseconds = int((record.created - int(record.created)) * 1e6)
         return '{levelchar}{datetime}.{microseconds} {process} {filename}:{lineno}] {msg}'.format(
             levelchar=self.LEVEL_MAP[record.levelno],
             datetime=datetime,
