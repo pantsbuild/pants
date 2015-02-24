@@ -62,10 +62,9 @@ class SignApkTask(Task):
   def default_config_location(self):
     """Return the path where pants creates the default keystore config file.
 
-    This file will hold the example keystore definition, the debug key installed along the SDK.
+    This file holds the well-known definition of the debug keystore installed along the Android SDK.
     """
-    return os.path.join(self._configdir,
-                        'andrrrrrgggggrroid/keystore/default_config.ini')
+    return os.path.join(self._configdir, 'android/keystore/default_config.ini')
 
   @property
   def distribution(self):
@@ -105,8 +104,8 @@ class SignApkTask(Task):
 
   def execute(self):
     targets = self.context.targets(self.is_signtarget)
+
     # One time set-up of the default keystore config.
-    print("DEEEEFAAAUSKSKKD", self.default_config_location)
     if not os.path.isfile(self.default_config_location):
       self.setup_default(self.default_config_location)
 
