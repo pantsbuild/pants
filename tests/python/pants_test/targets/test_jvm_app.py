@@ -40,7 +40,7 @@ class BinaryTest(BaseJvmAppTest):
       jvm_app(name='buoyancy',
         binary=':bin',
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -53,7 +53,7 @@ class BinaryTest(BaseJvmAppTest):
       jvm_app(name='buoyancy',
         dependencies=[':bin'],
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -67,7 +67,7 @@ class BinaryTest(BaseJvmAppTest):
         binary=':bin',
         dependencies=[':bin'],
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -79,7 +79,7 @@ class BinaryTest(BaseJvmAppTest):
     self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
       jvm_app(name='buoyancy',
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -93,7 +93,7 @@ class BinaryTest(BaseJvmAppTest):
         binary=':bin',
         dependencies=[':bin2'],
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -106,7 +106,7 @@ class BinaryTest(BaseJvmAppTest):
       jvm_app(name='buoyancy',
         dependencies=[':bin', ':bin2'],
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -119,7 +119,7 @@ class BinaryTest(BaseJvmAppTest):
       jvm_app(name='buoyancy',
         binary=':bin',
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -128,7 +128,7 @@ class BinaryTest(BaseJvmAppTest):
       jvm_app(name='buoyancy2',
         binary=':buoyancy',
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -148,7 +148,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='buoyancy',
         dependencies=[':unused'],
         bundles=[
-          bundle(fileset='config/densities.xml')
+          fileset(files='config/densities.xml')
         ]
       )
     '''))
@@ -168,7 +168,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='tub',
         dependencies=[':unused'],
         bundles=[
-          bundle(fileset=globs('config/*.xml'))
+          fileset(files=globs('config/*.xml'))
         ]
       )
     '''))
@@ -189,7 +189,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='crown',
         dependencies=[':unused'],
         bundles=[
-          bundle(relative_to='gold', fileset='gold/config/five.xml')
+          fileset(relative_to='gold', files='gold/config/five.xml')
         ]
       )
     '''))
@@ -210,7 +210,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='crown',
         dependencies=[':unused'],
         bundles=[
-          bundle(mapper=DirectoryReMapper('src/java/org/archimedes/crown/config', 'gold/config'), fileset='config/one.xml')
+          fileset(mapper=DirectoryReMapper('src/java/org/archimedes/crown/config', 'gold/config'), files='config/one.xml')
         ]
       )
     '''))
@@ -236,7 +236,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='crown',
         dependencies=[':unused'],
         bundles=[
-          bundle(mapper=DirectoryReMapper('src/java/org/archimedes/crown/missing', 'gold/config'), fileset='config/one.xml')
+          fileset(mapper=DirectoryReMapper('src/java/org/archimedes/crown/missing', 'gold/config'), files='config/one.xml')
         ]
       )
     '''))
@@ -256,7 +256,7 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='volume',
         dependencies=[':unused'],
         bundles=[
-          bundle(relative_to='config', fileset=['config/stone/dense.xml', 'config/metal/dense.xml'])
+          fileset(relative_to='config', files=['config/stone/dense.xml', 'config/metal/dense.xml'])
         ]
       )
     '''))
@@ -279,14 +279,14 @@ class BundleTest(BaseJvmAppTest):
       jvm_app(name='volume',
         dependencies=[':unused'],
         bundles=[
-          bundle(relative_to='config', fileset='config/stone/dense.xml')
+          fileset(relative_to='config', files='config/stone/dense.xml')
         ]
       )
 
       jvm_app(name='bathtub',
         dependencies=[':unused'],
         bundles=[
-          bundle(fileset='config/metal/dense.xml')
+          fileset(files='config/metal/dense.xml')
         ]
       )
     '''))

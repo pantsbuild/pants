@@ -26,7 +26,7 @@ class FileDepsTest(ConsoleTaskTest):
   def alias_groups(self):
     return BuildFileAliases.create(
       context_aware_object_factories={
-        'bundle': Bundle.factory,
+        'fileset': Bundle.factory,
       },
       objects={
         'jar': JarDependency,
@@ -175,7 +175,7 @@ class FileDepsTest(ConsoleTaskTest):
                       name='app',
                       binary='src/java/bin',
                       bundles=[
-                        bundle(fileset=['config/app.yaml'])
+                        fileset(files=['config/app.yaml'])
                       ]
                     )
                   '''),
