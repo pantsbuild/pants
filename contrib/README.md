@@ -55,8 +55,20 @@ Contrib plugins should generally follow 3 basic setup steps:
      ]
    ```
 
-3. When you're ready for your plugin to be distributed, add a `provides` `setup_py` descriptor to
-   your main plugin BUILD target and register the plugin with the release script.
+3. When you're ready for your plugin to be distributed, add a `provides` `contrib_setup_py`
+   descriptor to your main plugin BUILD target and register the plugin with the release script.
+   The `provides` descriptor just requires a name and decription for your plugin suitable for
+   [pypi](https://pypi.python.org/pypi):
+   ```python
+   python_library(
+      name='plugin',
+      sources=['register.py'],
+      provides=contrib_setup_py(
+        name='pantsbuild.pants.contrib.example',
+        description='An example pants contrib plugin.'
+      )
+   )
+   ```
    To register with the release script, add an entry to `contrib/release_packages.sh`:
    ```bash
    PKG_EXAMPLE=(
