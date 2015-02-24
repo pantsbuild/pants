@@ -225,10 +225,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._upstream_class_to_path = None  # Computed lazily as needed.
     self.setup_artifact_cache()
 
-    # Sources (relative to buildroot) present in the last analysis that have since been deleted.
-    # Populated in prepare_execute().
-    self._deleted_sources = None
-
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None
@@ -270,7 +266,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
     
-    self._deleted_sources = self._strategy.prepare_execute(cache_manager, self._sources_by_target, all_targets)
+    self._strategy.prepare_execute(cache_manager, self._sources_by_target, all_targets)
 
   # TODO(benjy): Break this monstrosity up? Previous attempts to do so
   #              turned out to be more trouble than it was worth.
@@ -284,42 +280,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Target -> sources (relative to buildroot), for just this chunk's targets.
     sources_by_target = self._sources_for_targets(relevant_targets)
 
-    self._strategy.execute_chunk(sources_by_target, relevant_targets)
+    self._strategy.execute_chunk(sources_by_target, self._jvm_fingerprint_strategy(), relevant_targets)
 
     self.post_process(relevant_targets)
-
-  def _process_target_partition(self, partition, classpath, progress_message):
-    """Needs invoking only on invalid targets.
-
-    partition - a triple (vts, sources_by_target, analysis_file).
-    classpath - a list of classpath entries.
-
-    May be invoked concurrently on independent target sets.
-
-    Postcondition: The individual targets in vts are up-to-date, as if each were
-                   compiled individually.
-    """
-    (vts, sources, analysis_file) = partition
-
-    if not sources:
-      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
-                            % (self._language, vts.targets))
-    else:
-      # Do some reporting.
-      self.context.log.info(
-        'Compiling a partition containing ',
-        items_to_report_element(sources, 'source'),
-        ' in ',
-        items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
-        ' (partition ',
-        progress_message,
-        ').')
-      with self.context.new_workunit('compile'):
-        # The compiler may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
-        self.compile(self._args, classpath, sources, self._classes_dir, analysis_file)
 
   def check_artifact_cache(self, vts):
     # Special handling for scala analysis files. Class files are retrieved directly into their
@@ -579,31 +542,3 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     class_file_name = class_file_name[len(self._classes_dir) + 1:-len(".class")]
     class_name = class_file_name.replace("/", ".")
     return resource_mapping.get(class_name, [])
-
-  def _register_products(self, targets, analysis_file):
-    classes_by_source = self.context.products.get_data('classes_by_source')
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    resources_by_target = self.context.products.get_data('resources_by_target')
-
-    if classes_by_source is not None or classes_by_target is not None:
-      computed_classes_by_source = self._compute_classes_by_source(analysis_file)
-      resource_mapping = ResourceMapping(self._classes_dir)
-      for target in targets:
-        target_products = classes_by_target[target] if classes_by_target is not None else None
-        for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
-          classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
-          for cls in classes:
-            resources = self._resources_by_class_file(cls, resource_mapping)
-            resources_by_target[target].add_abs_paths(self._classes_dir, resources)
-
-          if classes_by_target is not None:
-            target_products.add_abs_paths(self._classes_dir, classes)
-          if classes_by_source is not None:
-            classes_by_source[source].add_abs_paths(self._classes_dir, classes)
-
-    # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-    if resources_by_target is not None:
-      for target in targets:
-        target_resources = resources_by_target[target]
-        for root, abs_paths in self.extra_products(target):
-          target_resources.add_abs_paths(root, abs_paths)
