@@ -60,6 +60,7 @@ python_library(
   sources = ['jvm_compile.py', 'resource_mapping.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':jvm_compile_strategy',
     ':jvm_dependency_analyzer',
     ':jvm_fingerprint_strategy',
     'src/python/pants/backend/core/tasks:group_task',
@@ -73,6 +74,13 @@ python_library(
     'src/python/pants/reporting',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'jvm_compile_strategy',
+  sources = ['jvm_compile_strategy.py'],
+  dependencies = [
   ],
 )
 
