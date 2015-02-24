@@ -43,11 +43,6 @@ class UnionProducts(object):
           visited.add(dep)
     return products
 
-  def __bool__(self):
-    return self._products_by_target
-
-  __nonzero__ = __bool__
-
 
 class RootedProducts(object):
   """File products of a build that have a concept of a 'root' directory.
@@ -206,6 +201,11 @@ class Products(object):
         '%s => %s\n    %s' % (str(target), basedir, outputs)
                               for target, outputs_by_basedir in self.by_target.items()
                               for basedir, outputs in outputs_by_basedir.items()))
+
+    def __bool__(self):
+      return not self.empty()
+
+    __nonzero__ = __bool__
 
   def __init__(self):
     self.products = {}  # type -> ProductMapping instance.

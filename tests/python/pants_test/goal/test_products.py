@@ -5,13 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
 
 from pants.goal.products import Products
+from pants_test.base_test import BaseTest
 
 
-class ProductsTest(unittest.TestCase):
+class ProductsTest(BaseTest):
   def setUp(self):
+    super(ProductsTest, self).setUp()
     self.products = Products()
 
   def test_require(self):
@@ -87,3 +88,23 @@ class ProductsTest(unittest.TestCase):
     self.assertFalse(self.products.is_required_data('foo'))
     self.products.require_data('foo')
     self.assertTrue(self.products.is_required_data('foo'))
+
+  def test_empty_products(self):
+    foo_product_mapping = self.products.get('foo')
+    self.assertFalse(foo_product_mapping)
+
+  def test_non_empty_products(self):
+    target = self.make_target('c')
+    with self.add_products(self.products, 'foo', target, 'a.class'):
+      foo_product_mapping = self.products.get('foo')
+      self.assertTrue(foo_product_mapping)
+
+  def test_empty_data(self):
+    foo_product_mapping = self.products.get_data('foo')
+    self.assertFalse(foo_product_mapping)
+
+  def test_non_empty_data(self):
+    target = self.make_target('c')
+    with self.add_data(self.products, 'foo', target, 'a.class'):
+      foo_product_mapping = self.products.get_data('foo')
+      self.assertTrue(foo_product_mapping)
