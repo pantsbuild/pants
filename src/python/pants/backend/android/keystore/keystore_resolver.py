@@ -33,7 +33,7 @@ class KeystoreResolver(object):
       with open(config_file, 'rb') as keystore_config:
         config.readfp(keystore_config)
     except IOError as e:
-      raise KeystoreResolver.Error('Problem parsing the keystore config: {}'.format(e))
+      raise KeystoreResolver.Error('Problem parsing config at {}: {}'.format(config_file, e))
     parser = SingleFileConfig(config_file, config)
     key_names = config.sections()
     keys = {}
