@@ -8,5 +8,5 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import sys
 
 
-print('Exiting with status 57')
-sys.exit(57)
+print('Exiting with status 1')
+sys.exit(1)
