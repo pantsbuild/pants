@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import BundleField
@@ -317,7 +318,7 @@ class Bundle(object):
   and ``scripts`` directories: ::
 
     bundles=[
-      bundle().add(rglobs('config/*', 'scripts/*')),
+      fileset(files=[rglobs('config/*', 'scripts/*'), 'my.cfg']),
     ]
 
   To include files relative to some path component use the ``relative_to`` parameter.
@@ -325,9 +326,16 @@ class Bundle(object):
   in the bundle. ::
 
     bundles=[
-      bundle(relative_to='common').add(globs('common/config/*'))
+      fileset(relative_to='common', files=globs('common/config/*'))
     ]
+
   """
+
+  @classmethod
+  @deprecated(removal_version='0.0.30',
+              hint_message='Use fileset(files=) instead of bundle().add()')
+  def factory_deprecated(cls, parse_context):
+    return cls.factory(parse_context)
 
   @classmethod
   @manual.builddict(factory=True)
@@ -338,7 +346,7 @@ class Bundle(object):
     bundle.__doc__ = Bundle.__init__.__doc__
     return bundle
 
-  def __init__(self, parse_context, rel_path=None, mapper=None, relative_to=None):
+  def __init__(self, parse_context, rel_path=None, mapper=None, relative_to=None, files=None):
     """
     :param rel_path: Base path of the "source" file paths. By default, path of the
       BUILD file. Useful for assets that don't live in the source code repo.
@@ -346,6 +354,8 @@ class Bundle(object):
       the source tree, returns a path to use in the resulting bundle. By default, an identity
       mapper.
     :param string relative_to: Set up a simple mapping from source path to bundle path.
+    :param files: The set of files to include in the bundle.  A string filename, or list of
+      filenames, or a Fileset object (e.g. globs()).
       E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
     """
     if mapper and relative_to:
@@ -362,11 +372,21 @@ class Bundle(object):
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
 
+    if files is not None:
+      self._add([files])
+
   @manual.builddict()
+  @deprecated(removal_version='0.0.30',
+              hint_message='Use fileset(files=) instead')
   def add(self, *filesets):
-    """Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
-    Note this is a variable length param and may be specified any number of times.
+    """Deprecated: Use the files= parameter to fileset() instead.
+
+    Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
+    add() may be specified any number of times.
     """
+    return self._add(filesets)
+
+  def _add(self, filesets):
     for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
                         else fileset if hasattr(fileset, '__iter__') \

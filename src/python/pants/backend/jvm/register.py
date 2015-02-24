@@ -86,7 +86,8 @@ def build_file_aliases():
       'Skip': Skip,
     },
     context_aware_object_factories={
-      'bundle': Bundle.factory,
+      'bundle': Bundle.factory_deprecated,
+      'fileset': Bundle.factory,
     }
   )
 

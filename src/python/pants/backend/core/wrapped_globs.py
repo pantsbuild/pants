@@ -74,7 +74,7 @@ class Globs(FilesetRelPathWrapper):
 class RGlobs(FilesetRelPathWrapper):
   """Recursive ``globs``, returns Fileset matching files in this directory and its descendents.
 
-  E.g., ``bundle().add(rglobs('config/*')),`` to bundle up all files in
+  E.g., ``fileset(files=rglobs('config/*')),`` to bundle up all files in
   the config, config/foo, config/foo/bar directories.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
