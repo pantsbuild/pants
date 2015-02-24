@@ -20,12 +20,12 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_die(self):
     command = ['run',
-               'tests/python/pants_test/python:die'
+               'tests/python/pants_test/python:die',
                '--interpreter=CPython>=2.6,<3',
                '--interpreter=CPython>=3.3',
                '--quiet']
     pants_run = self.run_pants(command=command)
-    assert pants_run.returncode == 1
+    assert pants_run.returncode == 57
 
   def _maybe_run_version(self, version):
     if self.has_python_version(version):
