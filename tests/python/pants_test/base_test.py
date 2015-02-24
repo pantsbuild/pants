@@ -29,7 +29,8 @@ from pants.base.config import Config
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
+from pants.goal.products import MultipleRootedProducts
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
@@ -272,3 +273,27 @@ class BaseTest(unittest.TestCase):
     """
     compile_classpath = context.products.get_data('compile_classpath', lambda: OrderedSet())
     compile_classpath.update([('default', entry) for entry in classpath or ['none']])
+
+  @contextmanager
+  def add_data(self, context_products, data_type, target, *products):
+    make_products = lambda: defaultdict(MultipleRootedProducts)
+    data_by_target = context_products.get_data(data_type, make_products)
+    with temporary_dir() as outdir:
+      def create_product(product):
+        abspath = os.path.join(outdir, product)
+        with safe_open(abspath, mode='w') as fp:
+          fp.write(product)
+        return abspath
+      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
+      yield temporary_dir
+
+  @contextmanager
+  def add_products(self, context_products, product_type, target, *products):
+    product_mapping = context_products.get(product_type)
+    with temporary_dir() as outdir:
+      def create_product(product):
+        with safe_open(os.path.join(outdir, product), mode='w') as fp:
+          fp.write(product)
+        return product
+      product_mapping.add(target, outdir, map(create_product, products))
+      yield temporary_dir

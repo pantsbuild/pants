@@ -71,7 +71,7 @@ class JarCreate(JarTask):
         jar_name = jarname(target)
         jar_path = os.path.join(self.workdir, jar_name)
         with self.create_jar(target, jar_path) as jarfile:
-          if self._jar_builder.add_target(jarfile, target):
+          if target in self._jar_builder.add_target(jarfile, target):
             self.context.products.get('jars').add(target, self.workdir).append(jar_name)
 
   @contextmanager
