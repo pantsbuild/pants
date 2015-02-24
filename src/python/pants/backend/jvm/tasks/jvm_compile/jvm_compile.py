@@ -18,7 +18,6 @@ from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
-from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
@@ -196,7 +195,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     super(JvmCompile, self).__init__(*args, **kwargs)
 
     # Various working directories.
-    self._analysis_dir = os.path.join(self.workdir, 'analysis')
     self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
 
     # JVM options for running the compiler.
@@ -238,7 +236,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
     # would be wiped out by clean-all goal/task if it's specified.
-    self._strategy.pre_execute()
+    self._strategy.pre_compile()
     safe_mkdir(self._target_sources_dir)
 
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
@@ -269,15 +267,28 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
-    with self._strategy.invalidated_in_chunk(sources_by_target, self._jvm_fingerprint_strategy(), relevant_targets) as invalidation_check:
+    partition_size_hint, locally_changed_targets = self._strategy.invalidation_hints(sources_by_target)
+    with self.invalidated(relevant_targets,
+                          invalidate_dependents=True,
+                          partition_size_hint=partition_size_hint,
+                          locally_changed_targets=locally_changed_targets,
+                          fingerprint_strategy=self._jvm_fingerprint_strategy(),
+                          topological_order=True) as invalidation_check:
       if invalidation_check.invalid_vts:
+        # Find the invalid targets for this chunk.
+        invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
+
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
         valid_targets = list(set(relevant_targets) - set(invalid_targets))
         self._strategy.register_products(valid_targets)
 
         # Invoke the strategy to compile invalid targets
-        self._strategy.compile_chunk(invalidation_check, sources_by_target, relevant_targets)
+        self._strategy.compile_chunk(invalidation_check,
+                                     sources_by_target,
+                                     relevant_targets,
+                                     invalid_targets,
+                                     self.extra_compile_time_classpath_elements())
       else:
         # Nothing to build. Register products for all the targets in one go.
         self._strategy.register_products(relevant_targets)

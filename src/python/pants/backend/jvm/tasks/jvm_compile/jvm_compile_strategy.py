@@ -35,8 +35,9 @@ class JvmCompileStrategy(object):
     self.context = context
 
     # Various working directories.
-    self._classes_dir = os.path.join(self.workdir, 'classes')
-    self._resources_dir = os.path.join(self.workdir, 'resources')
+    self._analysis_dir = os.path.join(workdir, 'analysis')
+    self._classes_dir = os.path.join(workdir, 'classes')
+    self._resources_dir = os.path.join(workdir, 'resources')
 
     self._delete_scratch = options.delete_scratch
 
@@ -142,8 +143,8 @@ class JvmCompileStrategy(object):
     else:
       self._deleted_sources = []
 
-  def invalidated_in_chunk(self, sources_by_target, fingerprint_strategy, relevant_targets):
-    """A wrapper for the `invalidated` context manager that adds heuristics for this strategy."""
+  def invalidation_hints(self, sources_by_target):
+    """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
     # If needed, find targets that we've changed locally (as opposed to
     # changes synced in from the SCM).
     # TODO(benjy): Should locally_changed_targets be available in all Tasks?
@@ -154,18 +155,18 @@ class JvmCompileStrategy(object):
           len(locally_changed_targets) > self._changed_targets_heuristic_limit):
         locally_changed_targets = None
 
-    return self.invalidated(relevant_targets,
-                            invalidate_dependents=True,
-                            partition_size_hint=self._partition_size_hint,
-                            locally_changed_targets=locally_changed_targets,
-                            fingerprint_strategy=fingerprint_strategy,
-                            topological_order=True)
+    return (self._partition_size_hint, locally_changed_targets)
 
-  def compile_chunk(self, invalidation_check, sources_by_target, relevant_targets):
+  def compile_chunk(self,
+                    invalidation_check,
+                    sources_by_target,
+                    relevant_targets,
+                    invalid_targets,
+                    extra_compile_time_classpath_elements):
     """Compiles the invalid targets from a single chunk.
     
     Has the side effects of populating:
-    # invalid analysis file
+    # valid/invalid analysis files
     # classes_by_source product
     # classes_by_target product
     # resources_by_target product
@@ -179,7 +180,7 @@ class JvmCompileStrategy(object):
     # we can inject a dep on the scala runtime library and still have it ivy-resolve.
     def extra_compile_classpath_iter():
       for conf in self._confs:
-        for jar in self.extra_compile_time_classpath_elements():
+        for jar in extra_compile_time_classpath_elements:
           yield (conf, jar)
     compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
     compile_classpath = OrderedSet(list(extra_compile_classpath_iter()) + list(compile_classpath))
@@ -189,7 +190,6 @@ class JvmCompileStrategy(object):
     self._validate_classpath(compile_classpath)
 
     # Find the invalid sources for this chunk.
-    invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     invalid_sources_by_target = {k:v for (k,v) in sources_by_target.items() if k in invalid_targets}
 
     tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
@@ -312,7 +312,7 @@ class JvmCompileStrategy(object):
   def _validate_classpath(self, files):
     """Validates that all files are located within the working copy, to simplify relativization."""
     buildroot = get_buildroot()
-    for f in files:
+    for _,f in files:
       if os.path.relpath(f, buildroot).startswith('..'):
         raise TaskError('Classpath entry {f} is located outside the buildroot.'.format(f=f))
 
