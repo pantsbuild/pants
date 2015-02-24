@@ -416,7 +416,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:source_root',
-    'src/python/pants/goal:products',
     'src/python/pants/java:jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

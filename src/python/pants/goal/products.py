@@ -71,6 +71,11 @@ class RootedProducts(object):
     for relpath in self._rel_paths:
       yield os.path.join(self._root, relpath)
 
+  def __bool__(self):
+    return self._rel_paths
+
+  __nonzero__ = __bool__
+
 
 class MultipleRootedProducts(object):
   """A product consisting of multiple roots, with associated file products."""
@@ -93,6 +98,15 @@ class MultipleRootedProducts(object):
 
   def _get_products_for_root(self, root):
     return self._rooted_products_by_root.setdefault(root, RootedProducts(root))
+
+  def __bool__(self):
+    """Return True if any of the roots contains products"""
+    for root, products in self.rel_paths():
+      if products:
+        return True
+    return False
+
+  __nonzero__ = __bool__
 
 
 class Products(object):
@@ -187,6 +201,11 @@ class Products(object):
         '%s => %s\n    %s' % (str(target), basedir, outputs)
                               for target, outputs_by_basedir in self.by_target.items()
                               for basedir, outputs in outputs_by_basedir.items()))
+
+    def __bool__(self):
+      return not self.empty()
+
+    __nonzero__ = __bool__
 
   def __init__(self):
     self.products = {}  # type -> ProductMapping instance.
