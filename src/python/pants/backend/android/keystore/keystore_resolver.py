@@ -84,7 +84,7 @@ class Keystore(object):
 
     self.keystore_name = keystore_name
     # The os call is robust against None b/c it was validated in KeyResolver with get_required().
-    self.keystore_location = os.path.expandvars(keystore_location)
+    self.keystore_location = os.path.expanduser(keystore_location)
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_password = key_password

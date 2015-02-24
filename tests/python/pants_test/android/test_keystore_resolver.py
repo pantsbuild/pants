@@ -78,12 +78,7 @@ class TestKeystoreResolver(unittest.TestCase):
   def test_expanding_key_path(self):
     with self.config_file(keystore_location='~/dir') as config:
       keystores = KeystoreResolver.resolve(config)
-      self.assertEqual(keystores['default-debug'].keystore_location, os.path.expandvars('~/dir'))
-
-  def test_expanding_config_path(self):
-    with self.config_file(keystore_location='~/dir') as config:
-      keystores = KeystoreResolver.resolve('~/../../{}'.format(config))
-      self.assertEqual(keystores['default-debug'].keystore_location, os.path.expandvars('~/dir'))
+      self.assertEqual(keystores['default-debug'].keystore_location, os.path.expanduser('~/dir'))
 
   def test_bad_config_location(self):
     with self.assertRaises(KeystoreResolver.Error):
