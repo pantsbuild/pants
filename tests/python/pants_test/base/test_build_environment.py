@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from contextlib import contextmanager
 
 from pants.base.build_environment import get_pants_cachedir, get_pants_configdir
 from pants.util.contextutil import environment_as
@@ -17,35 +16,25 @@ from pants.util.fileutil import temporary_file
 class TestBuildEnvironment(unittest.TestCase):
   """Test class for pants.base.build_environment."""
 
-  @contextmanager
-  def env(self, **kwargs):
-    environment = dict(PATH=None)
-    environment.update(**kwargs)
-    with environment_as(**environment):
-      yield
-
   def test_get_configdir(self):
-    with self.env():
+    with environment_as(XDG_CONFIG_HOME=''):
       self.assertEquals(os.path.expanduser('~/.config/pants'), get_pants_configdir())
 
   def test_get_cachedir(self):
-    with self.env():
-      self.assertEquals(os.path.expanduser('~/.cache/pants'), get_pants_cachedir())
-
-  def test_set__empty_configdir(self):
-    with self.env(XDG_CONFIG_HOME=''):
-      self.assertEquals(os.path.expanduser('~/.config/pants'), get_pants_configdir())
-
-  def test_set__empty_cachedir(self):
-    with self.env(XDG_CONFIG_HOME=''):
+    with environment_as(XDG_CACHE_HOME=''):
       self.assertEquals(os.path.expanduser('~/.cache/pants'), get_pants_cachedir())
 
   def test_set_configdir(self):
     with temporary_file() as temp:
-      with self.env(XDG_CONFIG_HOME=temp.name):
-        self.assertEquals(temp.name, get_pants_configdir())
+      with environment_as(XDG_CONFIG_HOME=temp.name):
+        self.assertEquals(os.path.join(temp.name, 'pants'),  get_pants_configdir())
 
   def test_set_cachedir(self):
     with temporary_file() as temp:
-      with self.env(XDG_CACHE_HOME=temp.name):
-        self.assertEquals(temp.name, get_pants_cachedir())
+      with environment_as(XDG_CACHE_HOME=temp.name):
+        self.assertEquals(os.path.join(temp.name, 'pants'), get_pants_cachedir())
+
+  def test_expand_home_configdir(self):
+    with environment_as(XDG_CONFIG_HOME='~/somewhere/in/home'):
+      self.assertEquals(os.path.expanduser(os.path.join('~/somewhere/in/home', 'pants')),
+                                           get_pants_configdir())

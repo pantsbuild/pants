@@ -20,7 +20,7 @@ class TestKeystoreResolver(unittest.TestCase):
   @contextmanager
   def config_file(self,
                   build_type='debug',
-                  keystore_location='%(pants_configdir)s/.android/debug.keystore',
+                  keystore_location='%(pants_configdir)s/android/debug.keystore',
                   keystore_alias='androiddebugkey',
                   keystore_password='android',
                   key_password='android'):
