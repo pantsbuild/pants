@@ -13,6 +13,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.console import stty_utils
+from pants.option.options import Options
 
 
 class PythonRepl(PythonTask):
@@ -21,6 +22,10 @@ class PythonRepl(PythonTask):
     super(PythonRepl, cls).register_options(register)
     register('--ipython', action='store_true',
              help='Run an IPython REPL instead of the standard python one.')
+    register('--ipython-entry-point', advanced=True, default='IPython:start_ipython',
+             help='The IPython REPL entry point.')
+    register('--ipython-requirements', advanced=True, type=Options.list, default=['ipython==1.0.0'],
+             help='The IPython interpreter version to use.')
 
   def execute(self):
     (accept_predicate, reject_predicate) = Target.lang_discriminator('python')
@@ -33,11 +38,8 @@ class PythonRepl(PythonTask):
 
       extra_requirements = []
       if self.get_options().ipython:
-        entry_point = self.context.config.get('python-ipython', 'entry_point',
-                                              default='IPython:start_ipython')
-        ipython_requirements = self.context.config.getlist('python-ipython', 'requirements',
-                                                           default=['ipython==1.0.0'])
-        for req in ipython_requirements:
+        entry_point = self.get_options().ipython_entry_point
+        for req in self.get_options().ipython_requirements:
           extra_requirements.append(PythonRequirement(req))
       else:
         entry_point = 'code:interact'
