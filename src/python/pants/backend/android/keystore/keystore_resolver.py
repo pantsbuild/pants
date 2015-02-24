@@ -30,13 +30,14 @@ class KeystoreResolver(object):
   def resolve(cls, config_file):
     """Parse a keystore config file and return a list of Keystore objects."""
 
+    config_file = os.path.expanduser(config_file)
     config = Config.create_parser()
     try:
       with open(config_file, 'rb') as keystore_config:
         config.readfp(keystore_config)
-    except IOError:
-      raise KeystoreResolver.Error('The \'--{0}\' option must point at a valid .ini file holding '
-                                   'keystore definitions.'.format(cls._CONFIG_SECTION))
+    except IOError as e:
+      raise KeystoreResolver.Error('The \'--{}\' option must point at a valid .ini file holding '
+                                   'keystore definitions: {}'.format(cls._CONFIG_SECTION, e))
     parser = SingleFileConfig(config_file, config)
     key_names = config.sections()
     keys = {}
@@ -83,7 +84,7 @@ class Keystore(object):
 
     self.keystore_name = keystore_name
     # The os call is robust against None b/c it was validated in KeyResolver with get_required().
-    self.keystore_location = os.path.expandvars(keystore_location)
+    self.keystore_location = os.path.expanduser(keystore_location)
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_password = key_password

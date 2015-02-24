@@ -20,7 +20,7 @@ class TestKeystoreResolver(unittest.TestCase):
   @contextmanager
   def config_file(self,
                   build_type='debug',
-                  keystore_location='%(homedir)s/.android/debug.keystore',
+                  keystore_location='%(pants_configdir)s/android/debug.keystore',
                   keystore_alias='androiddebugkey',
                   keystore_password='android',
                   key_password='android'):
@@ -75,10 +75,10 @@ class TestKeystoreResolver(unittest.TestCase):
         keystores = KeystoreResolver.resolve(config)
         self.assertEqual(keystores['default-debug'].keystore_location, temp_location.name)
 
-  def test_expanding_path(self):
+  def test_expanding_key_path(self):
     with self.config_file(keystore_location='~/dir') as config:
       keystores = KeystoreResolver.resolve(config)
-      self.assertEqual(keystores['default-debug'].keystore_location, os.path.expandvars('~/dir'))
+      self.assertEqual(keystores['default-debug'].keystore_location, os.path.expanduser('~/dir'))
 
   def test_bad_config_location(self):
     with self.assertRaises(KeystoreResolver.Error):
