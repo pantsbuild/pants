@@ -6,8 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
-from contextlib import closing, contextmanager
 from textwrap import dedent
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
