@@ -16,7 +16,6 @@ import urllib
 from contextlib import contextmanager
 from urlparse import urlparse
 
-from pants.base.config import Config
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
@@ -51,18 +50,25 @@ class RunTracker(object):
   BACKGROUND_ROOT_NAME = 'background'
 
   @classmethod
-  def from_config(cls, config):
-    if not isinstance(config, Config):
-      raise ValueError('Expected a Config object, given %s of type %s' % (config, type(config)))
-    info_dir = RunInfo.dir(config)
-    stats_upload_url = config.getdefault('stats_upload_url', default=None)
-    stats_upload_timeout = config.getdefault('stats_upload_timeout', default=2)
-    num_foreground_workers = config.getdefault('num_foreground_workers', default=8)
-    num_background_workers = config.getdefault('num_background_workers', default=8)
+  def register_options(cls, register):
+    register('--stats-upload-url', default=None,
+             help='Upload stats to this URL on run completion.')
+    register('--stats-upload-timeout', type=int, default=2,
+             help='Wait at most this many seconds for the stats upload to complete.')
+    register('--num-foreground-workers', type=int, default=8,
+             help='Number of threads for foreground work.')
+    register('--num-background-workers', type=int, default=8,
+             help='Number of threads for background work.')
+
+  @classmethod
+  def from_options(cls, options):
+    info_dir = os.path.join(options.for_global_scope().pants_workdir, 'runs')
+    my_opts = options.for_scope('run-tracker')
     return cls(info_dir,
-               stats_upload_url=stats_upload_url,
-               num_foreground_workers=num_foreground_workers,
-               num_background_workers=num_background_workers)
+               stats_upload_url=my_opts.stats_upload_url,
+               stats_upload_timeout=my_opts.stats_upload_timeout,
+               num_foreground_workers=my_opts.num_foreground_workers,
+               num_background_workers=my_opts.num_background_workers)
 
   def __init__(self,
                info_dir,
@@ -78,34 +84,35 @@ class RunTracker(object):
     run_id = 'pants_run_%s_%d' % \
              (time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 
-    self.info_dir = os.path.join(info_dir, run_id)
-    self.run_info = RunInfo(os.path.join(self.info_dir, 'info'))
+    self.run_info_dir = os.path.join(info_dir, run_id)
+    self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
     self.run_info.add_basic_info(run_id, self.run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
     self.stats_url = stats_upload_url
     self.stats_timeout = stats_upload_timeout
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
-    link_to_latest = os.path.join(os.path.dirname(self.info_dir), 'latest')
+    link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
 
     try:
       if os.path.lexists(link_to_latest):
         os.unlink(link_to_latest)
-      os.symlink(self.info_dir, link_to_latest)
+      os.symlink(self.run_info_dir, link_to_latest)
     except OSError as e:
       # Another run may beat us to deletion or creation.
       if not (e.errno == errno.EEXIST or e.errno == errno.ENOENT):
         raise
 
     # Time spent in a workunit, including its children.
-    self.cumulative_timings = AggregatedTimings(os.path.join(self.info_dir, 'cumulative_timings'))
+    self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
+                                                             'cumulative_timings'))
 
     # Time spent in a workunit, not including its children.
-    self.self_timings = AggregatedTimings(os.path.join(self.info_dir, 'self_timings'))
+    self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, 'self_timings'))
 
     # Hit/miss stats for the artifact cache.
     self.artifact_cache_stats = \
-      ArtifactCacheStats(os.path.join(self.info_dir, 'artifact_cache_stats'))
+      ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
 
     # Number of threads for foreground work.
     self._num_foreground_workers = num_foreground_workers

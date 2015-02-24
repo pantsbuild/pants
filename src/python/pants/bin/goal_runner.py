@@ -66,7 +66,9 @@ class GoalRunner(object):
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
-    known_scopes = ['']
+    # TODO: Create a 'Subsystem' abstraction instead of special-casing run-tracker here
+    # and in register_options().
+    known_scopes = ['', 'run-tracker']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
@@ -79,7 +81,7 @@ class GoalRunner(object):
     # Enable standard python logging for code with no handle to a context/work-unit.
     self._setup_logging()  # NB: self.options are needed for this call.
 
-    self.run_tracker = RunTracker.from_config(self.config)
+    self.run_tracker = RunTracker.from_options(self.options)
     report = initial_reporting(self.config, self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
@@ -127,6 +129,11 @@ class GoalRunner(object):
       return self.options.register_global(*args, **kwargs)
     register_global.bootstrap = self.options.bootstrap_option_values()
     register_global_options(register_global)
+
+    def register_run_tracker(*args, **kwargs):
+      self.options.register('run-tracker', *args, **kwargs)
+    RunTracker.register_options(register_run_tracker)
+
     for goal in Goal.all():
       goal.register_options(self.options)
 
