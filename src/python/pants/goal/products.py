@@ -78,7 +78,7 @@ class RootedProducts(object):
 
 
 class MultipleRootedProducts(object):
-  """A product consisting of multiple roots, with associated file products."""
+  """A product consisting of multiple roots, with associated products."""
   def __init__(self):
     self._rooted_products_by_root = {}
 
