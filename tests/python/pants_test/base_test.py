@@ -280,6 +280,13 @@ class BaseTest(unittest.TestCase):
 
   @contextmanager
   def add_data(self, context_products, data_type, target, *products):
+    """
+    Add MutipleRootedProducts products to the product map in the context.
+    :param contect_products: The product map to add the products.
+    :param data_type: The product type
+    :param target: The target which generated these products.
+    :param *products: The actual products
+    """
     make_products = lambda: defaultdict(MultipleRootedProducts)
     data_by_target = context_products.get_data(data_type, make_products)
     with temporary_dir() as outdir:
@@ -293,6 +300,13 @@ class BaseTest(unittest.TestCase):
 
   @contextmanager
   def add_products(self, context_products, product_type, target, *products):
+    """
+    Add ProductMapping products to the product map in the context.
+    :param contect_products: The product map to add the products.
+    :param data_type: The product type
+    :param target: The target which generated these products.
+    :param *products: The actual products
+    """
     product_mapping = context_products.get(product_type)
     with temporary_dir() as outdir:
       def create_product(product):
