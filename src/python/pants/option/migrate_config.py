@@ -126,6 +126,12 @@ migrations = {
   ('ide', 'extra_jvm_source_paths'): ('idea', 'extra_jvm_source_paths'),
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
+
+
+  ('DEFAULT', 'stats_upload_url'): ('run-tracker', 'stats_upload_url'),
+  ('DEFAULT', 'stats_upload_timeout'): ('run-tracker', 'stats_upload_timeout'),
+  ('DEFAULT', 'num_foreground_workers'): ('run-tracker', 'num_foreground_workers'),
+  ('DEFAULT', 'num_background_workers'): ('run-tracker', 'num_background_workers'),
 }
 
 notes = {
