@@ -283,17 +283,53 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         valid_targets = list(set(relevant_targets) - set(invalid_targets))
         self._strategy.register_products(valid_targets)
 
-        # Invoke the strategy to compile invalid targets
+        # Invoke the strategy to execute compilations for invalid targets.
         self._strategy.compile_chunk(invalidation_check,
                                      sources_by_target,
                                      relevant_targets,
                                      invalid_targets,
-                                     self.extra_compile_time_classpath_elements())
+                                     self.extra_compile_time_classpath_elements(),
+                                     self._compile_vts)
       else:
         # Nothing to build. Register products for all the targets in one go.
         self._strategy.register_products(relevant_targets)
 
     self.post_process(relevant_targets)
+
+  def _compile_vts(self, vts, sources, analysis_file, classpath, outdir, progress_message):
+    """Compiles sources for the given vts into the given output dir.
+
+    vts - versioned target set
+    sources - sources for this target set
+    analysis_file - the analysis file to manipulate
+    classpath - a list of classpath entries
+    outdir - the output dir to send classes to
+
+    May be invoked concurrently on independent target sets.
+
+    Postcondition: The individual targets in vts are up-to-date, as if each were
+                   compiled individually.
+    """
+    if not sources:
+      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
+                            % (self._language, vts.targets))
+    else:
+      # Do some reporting.
+      self.context.log.info(
+        'Compiling ',
+        items_to_report_element(sources, 'source'),
+        ' in ',
+        items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
+        ' (',
+        progress_message,
+        ').')
+      with self.context.new_workunit('compile'):
+        # The compiler may delete classfiles, then later exit on a compilation error. Then if the
+        # change triggering the error is reverted, we won't rebuild to restore the missing
+        # classfiles. So we force-invalidate here, to be on the safe side.
+        vts.force_invalidate()
+        self.compile(self._args, classpath, sources, outdir, analysis_file)
+
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)

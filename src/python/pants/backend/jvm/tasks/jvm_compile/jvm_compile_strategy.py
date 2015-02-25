@@ -162,8 +162,9 @@ class JvmCompileStrategy(object):
                     sources_by_target,
                     relevant_targets,
                     invalid_targets,
-                    extra_compile_time_classpath_elements):
-    """Compiles the invalid targets from a single chunk.
+                    extra_compile_time_classpath_elements,
+                    compile_vts):
+    """A generator that returns compilation tuples for invalid targets in a single chunk.
     
     Has the side effects of populating:
     # valid/invalid analysis files
@@ -226,10 +227,10 @@ class JvmCompileStrategy(object):
       (vts, sources, analysis_file) = partition
       cp_entries = [entry for conf, entry in compile_classpath if conf in self._confs]
 
-      progress_message = '{} of {}'.format(partition_index + 1, len(partitions))
-      self._process_target_partition(partition, cp_entries, progress_message)
+      progress_message = 'partition {} of {}'.format(partition_index + 1, len(partitions))
+      compile_vts(vts, sources, analysis_file, cp_entries, self._classes_dir, progress_message)
 
-      # No exception was thrown, therefore the compile succeded and analysis_file is now valid.
+      # No exception was thrown, therefore the compile succeeded and analysis_file is now valid.
       if os.path.exists(analysis_file):  # The compilation created an analysis.
         # Merge the newly-valid analysis with our global valid analysis.
         new_valid_analysis = analysis_file + '.valid.new'
@@ -276,39 +277,6 @@ class JvmCompileStrategy(object):
       # we can safely mark the targets as valid.
       vts.update()
 
-  def _process_target_partition(self, partition, classpath, progress_message):
-    """Needs invoking only on invalid targets.
-
-    partition - a triple (vts, sources_by_target, analysis_file).
-    classpath - a list of classpath entries.
-
-    May be invoked concurrently on independent target sets.
-
-    Postcondition: The individual targets in vts are up-to-date, as if each were
-                   compiled individually.
-    """
-    (vts, sources, analysis_file) = partition
-
-    if not sources:
-      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
-                            % (self._language, vts.targets))
-    else:
-      # Do some reporting.
-      self.context.log.info(
-        'Compiling a partition containing ',
-        items_to_report_element(sources, 'source'),
-        ' in ',
-        items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
-        ' (partition ',
-        progress_message,
-        ').')
-      with self.context.new_workunit('compile'):
-        # The compiler may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
-        self.compile(self._args, classpath, sources, self._classes_dir, analysis_file)
-
   def _validate_classpath(self, files):
     """Validates that all files are located within the working copy, to simplify relativization."""
     buildroot = get_buildroot()
@@ -317,7 +285,7 @@ class JvmCompileStrategy(object):
         raise TaskError('Classpath entry {f} is located outside the buildroot.'.format(f=f))
 
   def post_process_cached_vts(self, cached_vts):
-    """Special post processing for scala analysis files.
+    """Special post processing for global scala analysis files.
     
     Class files are retrieved directly into their final locations in the global classes dir.
     """

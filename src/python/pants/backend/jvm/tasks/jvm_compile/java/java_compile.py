@@ -105,8 +105,8 @@ class JavaCompile(JvmCompile):
     relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath('jmake')
     args = [
-      '-classpath', ':'.join(relative_classpath + [self._classes_dir]),
-      '-d', self._classes_dir,
+      '-classpath', ':'.join(relative_classpath),
+      '-d', classes_output_dir,
       '-pdb', analysis_file,
       '-pdb-text-format',
       ]
