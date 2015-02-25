@@ -97,6 +97,6 @@ class ZincAnalysisTest(unittest.TestCase):
         outfile_path = os.path.join(splits_dir, os.path.basename(analysis_file))
         split_analysis.write_to_path(outfile_path)
         diffs = analysis.diff(split_analysis)
-        self.assertEquals(analysis, split_analysis, ''.join(diffs))
+        self.assertEquals(analysis, split_analysis, ''.join([str(diff) for diff in diffs]))
 
     print('Total time: %f seconds' % self.total_time)

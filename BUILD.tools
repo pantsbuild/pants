@@ -75,7 +75,7 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'com.typesafe.zinc', name = 'zinc', rev = '0.3.2-M1')
+              jar(org = 'com.typesafe.zinc', name = 'zinc', rev = '0.3.7')
                 .exclude(org = 'com.martiansoftware', name = 'nailgun-server')
                 .exclude(org = 'org.ensime', name = 'ensime-sbt-cmd')
             ])

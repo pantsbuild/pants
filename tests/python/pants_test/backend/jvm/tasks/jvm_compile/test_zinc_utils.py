@@ -19,7 +19,7 @@ class TestZincUtils(BaseTest):
     sources = ['X.scala']
 
     args = ZincUtils._get_compile_args([], classpath, sources, 'bogus output dir',
-                                        'bogus analysis file', [])
+                                      'bogus analysis file', [])
     classpath_found = False
     classpath_correct = False
     for arg in args:
