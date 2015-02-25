@@ -167,7 +167,6 @@ python_library(
     '3rdparty/python:pytest-cov',
     '3rdparty/python:six',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

@@ -61,7 +61,7 @@ class BuildBuildDictionary(Task):
   def __init__(self, *args, **kwargs):
     super(BuildBuildDictionary, self).__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'builddictionary')
-    self._outdir = os.path.join(self.context.config.getdefault('pants_distdir'), 'builddict')
+    self._outdir = os.path.join(self.get_options().pants_distdir, 'builddict')
 
   @classmethod
   def register_options(cls, register):

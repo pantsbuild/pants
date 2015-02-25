@@ -22,7 +22,6 @@ from six.moves import configparser
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.config import Config
 from pants.base.target import Target
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -64,7 +63,7 @@ class PythonTestBuilder(object):
   ]
 
   def __init__(self, context, targets, args, interpreter=None, fast=False, debug=False):
-    self.context = context
+    self._context = context
     self._targets = targets
     self._args = args
     self._interpreter = interpreter or PythonInterpreter.get()
@@ -277,7 +276,7 @@ class PythonTestBuilder(object):
           # producing just 1 console and 1 html report whether or not the tests are run in fast
           # mode.
           relpath = Target.maybe_readable_identify(targets)
-          pants_distdir = Config.from_cache().getdefault('pants_distdir')
+          pants_distdir = self._context.options.for_global_scope().pants_distdir
           target_dir = os.path.join(pants_distdir, 'coverage', relpath)
           safe_mkdir(target_dir)
           pex.run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir],
@@ -291,7 +290,7 @@ class PythonTestBuilder(object):
     builder = PEXBuilder(interpreter=self._interpreter)
     builder.info.entry_point = 'pytest'
     chroot = PythonChroot(
-      context=self.context,
+      context=self._context,
       targets=targets,
       extra_requirements=self._TESTING_TARGETS,
       builder=builder,
