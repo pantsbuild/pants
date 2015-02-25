@@ -10,7 +10,7 @@ python_library(
   ]
 )
 
-python_test_suite(
+target(
   name = 'engine',
   dependencies = [
     ':test_engine',

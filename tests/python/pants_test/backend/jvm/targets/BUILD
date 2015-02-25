@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-python_test_suite(
+target(
   name = 'targets',
   dependencies = [
     ':jvm_target',

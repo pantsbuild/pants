@@ -88,7 +88,7 @@ target(
   ]
 )
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':test_binary_util',

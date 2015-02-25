@@ -17,21 +17,21 @@ python_library(
   ]
 )
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':base',
   ]
 )
 
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':test_spec_exclude_integration',
   ]
 )
 
-python_test_suite(
+target(
   name = 'base',
   dependencies = [
     ':abbreviate_target_ids',

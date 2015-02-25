@@ -1,4 +1,4 @@
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':test_java_compile_integration',
