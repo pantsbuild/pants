@@ -8,22 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import os
 import shutil
-import sys
 import uuid
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
-from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
-from pants.goal.products import MultipleRootedProducts
-from pants.option.options import Options
-from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import open_zip64, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
@@ -284,9 +279,21 @@ class JvmCompileStrategy(object):
       if os.path.relpath(f, buildroot).startswith('..'):
         raise TaskError('Classpath entry {f} is located outside the buildroot.'.format(f=f))
 
+  def compute_resource_mapping(self, targets):
+    return ResourceMapping(self._classes_dir)
+
+  def classes_dir_for_target(self, target):
+    return self._classes_dir
+
+  def class_name_for_class_file(self, target, class_file_name):
+    assert class_file_name.endswith(".class")
+    assert class_file_name.startswith(self.workdir)
+    class_file_name = class_file_name[len(self._classes_dir) + 1:-len(".class")]
+    return class_file_name.replace("/", ".")
+
   def post_process_cached_vts(self, cached_vts):
     """Special post processing for global scala analysis files.
-    
+
     Class files are retrieved directly into their final locations in the global classes dir.
     """
     self._ensure_analysis_tmpdir()
@@ -362,7 +369,7 @@ class JvmCompileStrategy(object):
 
     # Set up args for artifact cache updating.
     vts_artifactfiles_pairs = []
-    classes_by_source = self._compute_classes_by_source(analysis_file)
+    classes_by_source = self.compute_classes_by_source(analysis_file)
     resources_by_target = self.context.products.get_data('resources_by_target')
     for target, sources in sources_by_target.items():
       if target.has_label('no_cache'):
@@ -391,7 +398,10 @@ class JvmCompileStrategy(object):
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
 
-  def _compute_classes_by_source(self, analysis_file=None):
+  def compute_classes_by_source(self):
+    return self._compute_classes_by_source(None)
+
+  def _compute_classes_by_source(self, analysis_file):
     """Compute src->classes.
 
     Srcs are relative to buildroot. Classes are absolute paths.
@@ -475,7 +485,7 @@ class JvmCompileStrategy(object):
     if self._upstream_class_to_path is None:
       self._upstream_class_to_path = {}
       classpath_entries = filter(non_product, classpath)
-      for cp_entry in self.find_all_bootstrap_jars() + classpath_entries:
+      for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
         # Per the classloading spec, a 'jar' in this context can also be a .zip file.
         if os.path.isfile(cp_entry) and ((cp_entry.endswith('.jar') or cp_entry.endswith('.zip'))):
           with open_zip64(cp_entry, 'r') as jar:
@@ -491,7 +501,7 @@ class JvmCompileStrategy(object):
                 self._upstream_class_to_path[cls] = os.path.join(dirpath, f)
     return self._upstream_class_to_path
 
-  def find_all_bootstrap_jars(self):
+  def _find_all_bootstrap_jars(self):
     def get_path(key):
       return self.context.java_sysprops.get(key, '').split(':')
 
@@ -537,41 +547,3 @@ class JvmCompileStrategy(object):
       if self._delete_scratch:
         self.context.background_worker_pool().add_shutdown_hook(
             lambda: safe_rmtree(self._analysis_tmpdir))
-
-  def _resources_by_class_file(self, class_file_name, resource_mapping):
-    assert class_file_name.endswith(".class")
-    assert class_file_name.startswith(self.workdir)
-    class_file_name = class_file_name[len(self._classes_dir) + 1:-len(".class")]
-    class_name = class_file_name.replace("/", ".")
-    return resource_mapping.get(class_name, [])
-
-  def register_products(self, targets):
-    return self._register_products(targets, self._analysis_file)
-
-  def _register_products(self, targets, analysis_file):
-    classes_by_source = self.context.products.get_data('classes_by_source')
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    resources_by_target = self.context.products.get_data('resources_by_target')
-
-    if classes_by_source is not None or classes_by_target is not None:
-      computed_classes_by_source = self._compute_classes_by_source(analysis_file)
-      resource_mapping = ResourceMapping(self._classes_dir)
-      for target in targets:
-        target_products = classes_by_target[target] if classes_by_target is not None else None
-        for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
-          classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
-          for cls in classes:
-            resources = self._resources_by_class_file(cls, resource_mapping)
-            resources_by_target[target].add_abs_paths(self._classes_dir, resources)
-
-          if classes_by_target is not None:
-            target_products.add_abs_paths(self._classes_dir, classes)
-          if classes_by_source is not None:
-            classes_by_source[source].add_abs_paths(self._classes_dir, classes)
-
-    # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-    if resources_by_target is not None:
-      for target in targets:
-        target_resources = resources_by_target[target]
-        for root, abs_paths in self.extra_products(target):
-          target_resources.add_abs_paths(root, abs_paths)

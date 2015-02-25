@@ -7,27 +7,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import os
-import shutil
 import sys
-import uuid
 from collections import defaultdict
-
-from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
-from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
-from pants.base.worker_pool import Work
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.contextutil import open_zip64, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import safe_mkdir
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -281,7 +273,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
         valid_targets = list(set(relevant_targets) - set(invalid_targets))
-        self._strategy.register_products(valid_targets)
+        self._register_products(valid_targets)
 
         # Invoke the strategy to execute compilations for invalid targets.
         self._strategy.compile_chunk(invalidation_check,
@@ -292,7 +284,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                      self._compile_vts)
       else:
         # Nothing to build. Register products for all the targets in one go.
-        self._strategy.register_products(relevant_targets)
+        self._register_products(relevant_targets)
 
     self.post_process(relevant_targets)
 
@@ -329,7 +321,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
         self.compile(self._args, classpath, sources, outdir, analysis_file)
-
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
@@ -374,3 +365,33 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # JvmDependencyAnalyzer uses classes_by_target within this run
     self.context.products.safe_create_data('classes_by_target', make_products)
+
+  def _register_products(self, targets):
+    classes_by_source = self.context.products.get_data('classes_by_source')
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    resources_by_target = self.context.products.get_data('resources_by_target')
+
+    if classes_by_source is not None or classes_by_target is not None:
+      computed_classes_by_source = self._strategy.compute_classes_by_source()
+      resource_mapping = self._strategy.compute_resource_mapping(targets)
+      for target in targets:
+        classes_dir = self._strategy._classes_dir_for_target(target)
+        target_products = classes_by_target[target] if classes_by_target is not None else None
+        for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
+          classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
+          for cls in classes:
+            clsname = self._strategy.class_name_for_class_file(target, cls)
+            resources = resource_mapping.get(clsname, [])
+            resources_by_target[target].add_abs_paths(classes_dir, resources)
+
+          if classes_by_target is not None:
+            target_products.add_abs_paths(classes_dir, classes)
+          if classes_by_source is not None:
+            classes_by_source[source].add_abs_paths(classes_dir, classes)
+
+    # TODO(pl): https://github.com/pantsbuild/pants/issues/206
+    if resources_by_target is not None:
+      for target in targets:
+        target_resources = resources_by_target[target]
+        for root, abs_paths in self.extra_products(target):
+          target_resources.add_abs_paths(root, abs_paths)
