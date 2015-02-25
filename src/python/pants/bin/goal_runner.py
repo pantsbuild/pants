@@ -130,6 +130,10 @@ class GoalRunner(object):
     register_global.bootstrap = self.options.bootstrap_option_values()
     register_global_options(register_global)
 
+    # This is the first case we have of non-task, non-global options.
+    # The current implementation special-cases RunTracker, and is temporary.
+    # In the near future it will be replaced with a 'Subsystem' abstraction.
+    # But for now this is useful for kicking the tires.
     def register_run_tracker(*args, **kwargs):
       self.options.register('run-tracker', *args, **kwargs)
     RunTracker.register_options(register_run_tracker)

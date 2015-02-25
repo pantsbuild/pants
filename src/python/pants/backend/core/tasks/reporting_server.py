@@ -35,8 +35,10 @@ class RunServer(Task, QuietTaskMixin):
                   'your source code is exposed to all allowed clients!')
     register('--open', action='store_true', default=False,
              help='Attempt to open the server web ui in a browser.')
-    register('--template-dir', help='Use templates from this dir instead of the defaults.')
-    register('--assets-dir', help='Use assets from this dir instead of the defaults.')
+    register('--template-dir', advanced=True,
+             help='Use templates from this dir instead of the defaults.')
+    register('--assets-dir', advanced=True,
+             help='Use assets from this dir instead of the defaults.')
 
   def execute(self):
     DONE = '__done_reporting'

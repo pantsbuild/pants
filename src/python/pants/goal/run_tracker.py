@@ -51,13 +51,13 @@ class RunTracker(object):
 
   @classmethod
   def register_options(cls, register):
-    register('--stats-upload-url', default=None,
+    register('--stats-upload-url', advanced=True, default=None,
              help='Upload stats to this URL on run completion.')
-    register('--stats-upload-timeout', type=int, default=2,
+    register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
-    register('--num-foreground-workers', type=int, default=8,
+    register('--num-foreground-workers', advanced=True, type=int, default=8,
              help='Number of threads for foreground work.')
-    register('--num-background-workers', type=int, default=8,
+    register('--num-background-workers', advanced=True, type=int, default=8,
              help='Number of threads for background work.')
 
   @classmethod
