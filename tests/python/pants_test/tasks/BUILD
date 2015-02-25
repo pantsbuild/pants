@@ -21,9 +21,7 @@ python_library(
 python_test_suite(
   name = 'tasks',
   dependencies = [
-    ':binary_create',
     ':builddict',
-    ':bundle_create',
     ':cache_manager',
     ':check_published_deps',
     ':config',
@@ -88,15 +86,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'binary_create',
-  sources = ['test_binary_create.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks:binary_create',
-    'tests/python/pants_test:task_test_base',
-  ]
-)
-
-python_tests(
   name = 'builddict',
   sources = ['test_builddict.py'],
   dependencies = [
@@ -108,16 +97,6 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-  ]
-)
-
-python_tests(
-  name = 'bundle_create',
-  sources = ['test_bundle_create.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks:bundle_create',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base'
   ]
 )
 
