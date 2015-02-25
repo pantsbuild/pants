@@ -128,6 +128,11 @@ migrations = {
   ('ide', 'debug_port'): ('idea', 'debug_port'),
 
   ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
+
+  ('DEFAULT', 'stats_upload_url'): ('run-tracker', 'stats_upload_url'),
+  ('DEFAULT', 'stats_upload_timeout'): ('run-tracker', 'stats_upload_timeout'),
+  ('DEFAULT', 'num_foreground_workers'): ('run-tracker', 'num_foreground_workers'),
+  ('DEFAULT', 'num_background_workers'): ('run-tracker', 'num_background_workers'),
 }
 
 notes = {
