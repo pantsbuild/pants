@@ -108,8 +108,10 @@ class SignApkTest(TestAndroidBase):
                         'binary.debug.signed.apk')
 
   def test_setup_default_config(self):
-    with temporary_file() as temp:
-      SignApkTask.setup_default_config(temp.name)
+    with temporary_dir() as temp:
+      default_config = os.path.join(temp, 'default_config.ini')
+      SignApkTask.setup_default_config(default_config)
+      self.assertTrue(os.path.isfile(default_config))
 
   def test_setup_default_config_no_permission(self):
     with self.assertRaises(TaskError):
