@@ -616,7 +616,6 @@ python_tests(
     ':base',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
-    'src/python/pants/engine',
     'src/python/pants/util:contextutil',
   ]
 )

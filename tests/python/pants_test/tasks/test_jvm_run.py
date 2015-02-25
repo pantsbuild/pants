@@ -9,25 +9,23 @@ import os
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
-from pants.engine.round_manager import RoundManager
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.tasks.test_base import TaskTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class JvmRunTest(TaskTest):
+class JvmRunTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return JvmRun
 
+  def setUp(self):
+    super(JvmRunTest, self).setUp()
+    self.set_options(only_write_cmd_line='a')
+
   def test_cmdline_only(self):
-    jvm_binary = self.make_target('src/java/com/pants:binary', JvmBinary, main="com.pants.Binary")
-    jvm_run = self.prepare_task(args=['--test-only-write-cmd-line=a'],
-                                targets=[jvm_binary],
-                                build_graph=self.build_graph)
-
-    round_manager = RoundManager(jvm_run.context)
-    jvm_run.prepare(self.options, round_manager)
-
+    jvm_binary = self.make_target('src/java/com/pants:binary', JvmBinary, main='com.pants.Binary')
+    context = self.context(target_roots=[jvm_binary])
+    jvm_run =  self.create_task(context, 'unused')
     self.populate_compile_classpath(context=jvm_run.context, classpath=['bob', 'fred'])
 
     with temporary_dir() as pwd:
