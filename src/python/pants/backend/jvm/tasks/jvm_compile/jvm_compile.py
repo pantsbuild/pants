@@ -186,9 +186,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
 
-    # Various working directories.
-    self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
-
     # JVM options for running the compiler.
     self._jvm_options = self.get_options().jvm_options
 
@@ -198,7 +195,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     else:
       self._args.extend(self.get_options().no_warning_args)
 
-    self._upstream_class_to_path = None  # Computed lazily as needed.
     self.setup_artifact_cache()
 
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
@@ -229,7 +225,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Only create these working dirs during execution phase, otherwise, they
     # would be wiped out by clean-all goal/task if it's specified.
     self._strategy.pre_compile()
-    safe_mkdir(self._target_sources_dir)
 
     # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
     # be lifted to Task infra.
@@ -244,10 +239,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_current_sources_by_target(all_targets)
 
-    # Invoke the strategy's prepare_execute to prune analysis.
+    # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
-    
     self._strategy.prepare_compile(cache_manager, self._sources_by_target, all_targets)
 
   def execute_chunk(self, relevant_targets):
@@ -273,7 +267,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
         valid_targets = list(set(relevant_targets) - set(invalid_targets))
-        self._register_products(valid_targets)
+        valid_compile_contexts = [self._strategy.compile_context(t) for t in valid_targets]
+        self._register_vts(valid_compile_contexts)
 
         # Invoke the strategy to execute compilations for invalid targets.
         self._strategy.compile_chunk(invalidation_check,
@@ -281,10 +276,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                      relevant_targets,
                                      invalid_targets,
                                      self.extra_compile_time_classpath_elements(),
-                                     self._compile_vts)
+                                     self.artifact_cache_writes_enabled(),
+                                     self._compile_vts,
+                                     self._register_vts)
       else:
         # Nothing to build. Register products for all the targets in one go.
-        self._register_products(relevant_targets)
+        self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
     self.post_process(relevant_targets)
 
@@ -366,16 +363,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # JvmDependencyAnalyzer uses classes_by_target within this run
     self.context.products.safe_create_data('classes_by_target', make_products)
 
-  def _register_products(self, targets):
+  def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
     resources_by_target = self.context.products.get_data('resources_by_target')
 
     if classes_by_source is not None or classes_by_target is not None:
-      computed_classes_by_source = self._strategy.compute_classes_by_source()
-      resource_mapping = self._strategy.compute_resource_mapping(targets)
-      for target in targets:
-        classes_dir = self._strategy._classes_dir_for_target(target)
+      computed_classes_by_source = self._strategy.compute_classes_by_source(compile_contexts)
+      resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
+      for compile_context in compile_contexts:
+        target = compile_context.target
+        target = compile_context.classes_dir
         target_products = classes_by_target[target] if classes_by_target is not None else None
         for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
           classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
@@ -391,7 +389,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # TODO(pl): https://github.com/pantsbuild/pants/issues/206
     if resources_by_target is not None:
-      for target in targets:
-        target_resources = resources_by_target[target]
-        for root, abs_paths in self.extra_products(target):
+      for compile_context in compile_contexts:
+        target_resources = resources_by_target[compile_context.target]
+        for root, abs_paths in self.extra_products(compile_context.target):
           target_resources.add_abs_paths(root, abs_paths)
