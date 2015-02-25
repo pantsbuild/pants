@@ -252,7 +252,7 @@ class JvmCompileStrategy(object):
         if self._dep_analyzer:
           # Check for missing dependencies.
           actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
-              lambda: self._compute_classpath_elements_by_class(cp_entries))
+              lambda: self._compute_classpath_elements_by_class(cp_entries), self._classes_dir)
           with self.context.new_workunit(name='find-missing-dependencies'):
             self._dep_analyzer.check(sources, actual_deps)
 
@@ -402,7 +402,7 @@ class JvmCompileStrategy(object):
     if not os.path.exists(analysis_file):
       return {}
     buildroot = get_buildroot()
-    products = self._analysis_parser.parse_products_from_path(analysis_file)
+    products = self._analysis_parser.parse_products_from_path(analysis_file, self._classes_dir)
     classes_by_src = {}
     for src, classes in products.items():
       relsrc = os.path.relpath(src, buildroot)
@@ -417,7 +417,8 @@ class JvmCompileStrategy(object):
     """
     with self.context.new_workunit('find-deleted-sources'):
       if os.path.exists(self._analysis_file):
-        products = self._analysis_parser.parse_products_from_path(self._analysis_file)
+        products = self._analysis_parser.parse_products_from_path(self._analysis_file,
+                                                                  self._classes_dir)
         buildroot = get_buildroot()
         old_srcs = products.keys()  # Absolute paths.
         return [os.path.relpath(src, buildroot) for src in old_srcs if not os.path.exists(src)]
@@ -548,7 +549,7 @@ class JvmCompileStrategy(object):
     return self._register_products(targets, self._analysis_file)
 
   def _register_products(self, targets, analysis_file):
-    classes_by_source = self.context. products.get_data('classes_by_source')
+    classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
     resources_by_target = self.context.products.get_data('resources_by_target')
 

@@ -38,12 +38,12 @@ class ZincAnalysisParser(AnalysisParser):
     compile_setup = parse_element(CompileSetup)
     return ZincAnalysis(relations, stamps, apis, source_infos, compilations, compile_setup)
 
-  def parse_products(self, infile):
+  def parse_products(self, infile, classes_dir):
     """An efficient parser of just the products section."""
     self._verify_version(infile)
     return self._find_repeated_at_header(infile, 'products')
 
-  def parse_deps(self, infile, classpath_indexer):
+  def parse_deps(self, infile, classpath_indexer, classes_dir):
     self._verify_version(infile)
     # Note: relies on the fact that these headers appear in this order in the file.
     bin_deps = self._find_repeated_at_header(infile, 'binary dependencies')
@@ -58,7 +58,7 @@ class ZincAnalysisParser(AnalysisParser):
 
     transformed_ext_deps = {}
     def fqcn_to_path(fqcn):
-      return os.path.join(self.classes_dir, fqcn.replace('.', os.sep) + '.class')
+      return os.path.join(classes_dir, fqcn.replace('.', os.sep) + '.class')
     for src, fqcns in ext_deps.items():
       transformed_ext_deps[src] = [fqcn_to_path(fqcn) for fqcn in fqcns]
 
