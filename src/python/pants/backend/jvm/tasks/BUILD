@@ -336,6 +336,7 @@ python_library(
     'src/python/pants/java:jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
+    'src/python/pants:binary_util',
   ],
 )
 
