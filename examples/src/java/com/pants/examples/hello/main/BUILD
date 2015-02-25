@@ -9,7 +9,7 @@ jvm_app(name='main',
     ':main-bin'
   ],
   bundles = [
-    bundle(relative_to='config').add(globs('config/*'))
+    bundle(relative_to='config', fileset=globs('config/*'))
   ]
 )
 

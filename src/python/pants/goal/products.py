@@ -11,8 +11,41 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 
+class UnionProducts(object):
+  """Here, products for a target are the ordered union of the products for its transitive deps."""
+  def __init__(self):
+    # A map of target to OrderedSet of product members.
+    self._products_by_target = defaultdict(OrderedSet)
+
+  def add_for_target(self, target, products):
+    """Updates the products for a particular target, adding to existing entries."""
+    self._products_by_target[target].update(products)
+
+  def add_for_targets(self, targets, products):
+    """Updates the products for the given targets, adding to existing entries."""
+    # FIXME: This is a temporary helper for use until the classpath has been split.
+    for target in targets:
+      self.add_for_target(target, products)
+
+  def get_for_target(self, target):
+    """Gets the transitive product deps for the given target."""
+    return self.get_for_targets([target])
+
+  def get_for_targets(self, targets):
+    """Gets the transitive product deps for the given targets, in order."""
+    products = OrderedSet()
+    visited = set()
+    # Walk the targets transitively to aggregate their products.
+    for target in targets:
+      for dep in target.closure():
+        if dep not in visited:
+          products.update(self._products_by_target[dep])
+          visited.add(dep)
+    return products
+
+
 class RootedProducts(object):
-  """Products of a build that have a concept of a 'root' directory.
+  """File products of a build that have a concept of a 'root' directory.
 
   E.g., classfiles, under a root package directory."""
   def __init__(self, root):
@@ -38,9 +71,14 @@ class RootedProducts(object):
     for relpath in self._rel_paths:
       yield os.path.join(self._root, relpath)
 
+  def __bool__(self):
+    return self._rel_paths
+
+  __nonzero__ = __bool__
+
 
 class MultipleRootedProducts(object):
-  """A product consisting of multiple roots, with associated products."""
+  """A product consisting of multiple roots, with associated file products."""
   def __init__(self):
     self._rooted_products_by_root = {}
 
@@ -60,6 +98,15 @@ class MultipleRootedProducts(object):
 
   def _get_products_for_root(self, root):
     return self._rooted_products_by_root.setdefault(root, RootedProducts(root))
+
+  def __bool__(self):
+    """Return True if any of the roots contains products"""
+    for root, products in self.rel_paths():
+      if products:
+        return True
+    return False
+
+  __nonzero__ = __bool__
 
 
 class Products(object):
@@ -154,6 +201,11 @@ class Products(object):
         '%s => %s\n    %s' % (str(target), basedir, outputs)
                               for target, outputs_by_basedir in self.by_target.items()
                               for basedir, outputs in outputs_by_basedir.items()))
+
+    def __bool__(self):
+      return not self.empty()
+
+    __nonzero__ = __bool__
 
   def __init__(self):
     self.products = {}  # type -> ProductMapping instance.

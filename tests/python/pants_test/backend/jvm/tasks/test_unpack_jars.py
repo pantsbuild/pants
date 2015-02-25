@@ -82,7 +82,7 @@ class UnpackJarsTest(TaskTest):
     self.add_to_build_file('unpack/jars', dedent('''
       jar_library(name='foo-jars',
         jars=[
-          jar(org='com.example', name='bar', rev='0.0.{version}', url='file:///foo.jar'),
+          jar(org='com.example', name='bar', rev='{version}', url='file:///foo.jar'),
         ],
       )
     '''.format(version=version)))
@@ -119,6 +119,11 @@ class UnpackJarsTest(TaskTest):
 
     self.assertEqual(fingerprint1, fingerprint3)
 
+  def _add_dummy_product(self, foo_target, jar_filename, unpack_task):
+    ivy_imports_product = unpack_task.context.products.get('ivy_imports')
+    ivy_imports_product.add(foo_target, os.path.dirname(jar_filename),
+                            [os.path.basename(jar_filename)])
+
   def test_incremental(self):
     with self.sample_jarfile() as jar_filename:
       self.add_to_build_file('unpack', dedent('''
@@ -128,7 +133,7 @@ class UnpackJarsTest(TaskTest):
             'a/b/c/*.proto',
           ],
          )
-        '''.format(jar_filename=jar_filename)))
+        '''))
       self._make_jar_library('0.0.1')
       foo_target = self.target('unpack:foo')
 
@@ -136,14 +141,9 @@ class UnpackJarsTest(TaskTest):
       unpack_task = self.prepare_task(targets=[foo_target],
                                       build_graph=self.build_graph,
                                       build_file_parser=self.build_file_parser)
-
-      # Dummy up ivy_imports product:
-      ivy_imports_product = unpack_task.context.products.get('ivy_imports')
-      ivy_imports_product.add(foo_target, os.path.dirname(jar_filename),
-                              [os.path.basename(jar_filename)])
-
-
+      self._add_dummy_product(foo_target, jar_filename, unpack_task)
       unpacked_targets = unpack_task.execute()
+
       self.assertEquals([foo_target], unpacked_targets)
       unpack_dir = unpack_task._unpack_dir(foo_target)
       files = []
@@ -155,15 +155,21 @@ class UnpackJarsTest(TaskTest):
       unpack_task = self.prepare_task(targets=[foo_target],
                                       build_graph=self.build_graph,
                                       build_file_parser=self.build_file_parser)
+      self._add_dummy_product(foo_target, jar_filename, unpack_task)
       unpacked_targets = unpack_task.execute()
+
       self.assertEquals([], unpacked_targets)
 
       # Change the library version and the target should be unpacked again.
       self._make_jar_library('0.0.2')
       self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
       foo_target = self.target('unpack:foo') # Re-inject the target
+      self._add_dummy_product(foo_target, jar_filename, unpack_task)
       unpack_task = self.prepare_task(targets=[foo_target],
                                       build_graph=self.build_graph,
                                       build_file_parser=self.build_file_parser)
       unpacked_targets = unpack_task.execute()
+
       self.assertEquals([foo_target], unpacked_targets)
+
+      # TODO(Eric Ayers) Check the 'unpacked_archives' product

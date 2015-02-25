@@ -7,10 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from twitter.common.lang import AbstractClass
-
 from pants.base.build_environment import get_buildroot
 from pants.scm.scm import Scm
+from pants.util.meta import AbstractClass
 
 
 class Workspace(AbstractClass):

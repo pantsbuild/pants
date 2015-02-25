@@ -58,14 +58,14 @@ class SignApkTask(Task):
   @property
   def config_file(self):
     """Path of .ini file containing definitions for backend.android.keystore_resolver.Keystore."""
-    if self._config_file in (None, ""):
+    if not self._config_file:
       try:
         self._config_file = self.context.config.get_required(self._CONFIG_SECTION,
-                                                             self._CONFIG_OPTION )
+                                                             self._CONFIG_OPTION)
       except Config.ConfigError:
-       raise TaskError('The "[{0}]: {1}" option must declare the location of an .ini file '
-                             'holding keystore definitions.'.format(self._CONFIG_SECTION,
-                                                                    self._CONFIG_OPTION))
+        raise TaskError('The "[{0}]: {1}" option must declare the location of an .ini file '
+                        'holding keystore definitions.'.format(self._CONFIG_SECTION,
+                                                               self._CONFIG_OPTION))
     return self._config_file
 
   @property
@@ -107,7 +107,7 @@ class SignApkTask(Task):
   def execute(self):
     targets = self.context.targets(self.is_signtarget)
     # Check for Android keystore config file (where the default keystore definition is kept).
-    config_file = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
+    config_file = os.path.join(self.context.config.getdefault('pants_configdir'),
                                self._DEFAULT_KEYSTORE_CONFIG)
     if not os.path.isfile(config_file):
       try:
@@ -152,7 +152,6 @@ class SignApkTask(Task):
 
       if os.path.isfile(os.path.join(release_path, release_apk)):
         self.context.products.get('release_apk').add(target, release_path).append(release_apk)
-
 
   def package_name(self, target, build_type):
     """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""

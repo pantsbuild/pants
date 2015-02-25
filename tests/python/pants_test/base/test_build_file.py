@@ -90,6 +90,13 @@ class BuildFileTest(unittest.TestCase):
         self.create_buildfile('grandparent/parent/child5'),
     ]), self.buildfile.descendants())
 
+  def test_descendants_with_spec_excludes(self):
+    self.assertEquals(OrderedSet([
+        self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
+        self.create_buildfile('grandparent/parent/child5'),
+      ]),
+      self.buildfile.descendants(spec_excludes=['grandparent/parent/child1']))
+
   def testMustExistFalse(self):
     buildfile = BuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
     self.assertEquals(OrderedSet([buildfile]), buildfile.family())
@@ -166,11 +173,26 @@ class BuildFileTest(unittest.TestCase):
 
       ]), buildfiles)
 
-  def test_scan_buildfiles_exclude(self):
+  def test_scan_buildfiles_exclude_abspath(self):
     buildfiles = BuildFile.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')
+      ])
+
+    self.assertEquals([self.create_buildfile('BUILD'),
+                       self.create_buildfile('BUILD.twitter'),
+                       self.create_buildfile('grandparent/parent/BUILD'),
+                       self.create_buildfile('grandparent/parent/BUILD.twitter'),
+                       self.create_buildfile('grandparent/parent/child5/BUILD'),
+                       ],
+                      buildfiles)
+
+  def test_scan_buildfiles_exclude_relpath(self):
+    buildfiles = BuildFile.scan_buildfiles(
+      self.root_dir, '', spec_excludes=[
+        'grandparent/parent/child1',
+        'grandparent/parent/child2'
       ])
 
     self.assertEquals([self.create_buildfile('BUILD'),

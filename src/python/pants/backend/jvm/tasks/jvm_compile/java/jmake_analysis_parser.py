@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 from collections import defaultdict
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
@@ -17,12 +16,11 @@ from pants.base.build_environment import get_buildroot
 class JMakeAnalysisParser(AnalysisParser):
   """Parse a file containing representation of an analysis for some JVM language."""
 
-  def empty_prefix(self):
-    return 'pcd entries:\n0 items\n'
+  empty_test_header = 'pcd entries'
 
   def parse(self, infile):
     self._expect_header(infile.readline(), 'pcd entries')
-    num_pcd_entries = self._parse_num_items(infile.readline())
+    num_pcd_entries = self.parse_num_items(infile.readline())
     pcd_entries = []
     for i in xrange(0, num_pcd_entries):
       line = infile.readline()
@@ -35,7 +33,7 @@ class JMakeAnalysisParser(AnalysisParser):
 
   def parse_products(self, infile):
     self._expect_header(infile.readline(), 'pcd entries')
-    num_pcd_entries = self._parse_num_items(infile.readline())
+    num_pcd_entries = self.parse_num_items(infile.readline())
     ret = defaultdict(list)
     # Parse more efficiently than above, since we only care about
     # the first two elements in the line.
@@ -52,7 +50,7 @@ class JMakeAnalysisParser(AnalysisParser):
     buildroot = get_buildroot()
     classpath_elements_by_class = classpath_indexer()
     self._expect_header(infile.readline(), 'pcd entries')
-    num_pcd_entries = self._parse_num_items(infile.readline())
+    num_pcd_entries = self.parse_num_items(infile.readline())
     for _ in xrange(0, num_pcd_entries):
       infile.readline()  # Skip these lines.
     src_to_deps = self._parse_deps_at_position(infile)
@@ -73,7 +71,7 @@ class JMakeAnalysisParser(AnalysisParser):
 
   def _parse_deps_at_position(self, infile):
     self._expect_header(infile.readline(), 'dependencies')
-    num_deps = self._parse_num_items(infile.readline())
+    num_deps = self.parse_num_items(infile.readline())
     src_to_deps = {}
     for i in xrange(0, num_deps):
       tpl = infile.readline().split('\t')
@@ -82,15 +80,6 @@ class JMakeAnalysisParser(AnalysisParser):
       deps[-1] = deps[-1][0:-1]  # Trim off the \n.
       src_to_deps[src] = deps
     return src_to_deps
-
-  num_items_re = re.compile(r'(\d+) items\n')
-
-  def _parse_num_items(self, line):
-    """Parse a line of the form '<num> items' and returns <num> as an int."""
-    matchobj = JMakeAnalysisParser.num_items_re.match(line)
-    if not matchobj:
-      raise ParseError('Expected: "<num> items". Found: "%s"' % line)
-    return int(matchobj.group(1))
 
   def _expect_header(self, line, header):
     expected = header + ':\n'

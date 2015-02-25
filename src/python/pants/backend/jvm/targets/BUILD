@@ -27,8 +27,8 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:deprecated',
@@ -37,6 +37,7 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
     'src/python/pants/base:validation',
+    'src/python/pants/util:meta',
   ],
 )
 
@@ -50,10 +51,8 @@ python_library(
   ],
   dependencies = [
     ':jvm',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.lang',
-    'src/python/pants/base:config',
-    'src/python/pants/base:target',
+    '3rdparty/python:six',
+    'src/python/pants/base:exceptions',
   ],
 )
 

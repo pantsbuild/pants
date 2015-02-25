@@ -70,7 +70,9 @@ class BuildFile(object):
     """Looks for all BUILD files
     :param root_dir: the root of the repo containing sources
     :param base_path: directory under root_dir to scan
-    :param spec_excludes: list of absolute paths to exclude from the scan"""
+    :param spec_excludes: list of paths to exclude from the scan.  These can be absolute paths
+      or paths that are relative to the root_dir.
+    """
 
     def calc_exclude_roots(root_dir, excludes):
       """Return a map of root directories to subdirectory names suitable for a quick evaluation
@@ -78,8 +80,12 @@ class BuildFile(object):
       """
       result = defaultdict(set)
       for exclude in excludes:
-        if exclude and exclude.startswith(root_dir):
-          result[os.path.dirname(exclude)].add(os.path.basename(exclude))
+        if exclude:
+          if not os.path.isabs(exclude):
+            exclude = os.path.join(root_dir, exclude)
+          if exclude.startswith(root_dir):
+            result[os.path.dirname(exclude)].add(os.path.basename(exclude))
+
       return result
 
     def find_excluded(root, dirs, exclude_roots):
@@ -171,10 +177,11 @@ class BuildFile(object):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
     return os.path.exists(self.full_path) and not os.path.isdir(self.full_path)
 
-  def descendants(self):
+  def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = BuildFile.scan_buildfiles(self.root_dir, self.parent_path)
+    descendants = BuildFile.scan_buildfiles(self.root_dir, self.parent_path,
+                                            spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants

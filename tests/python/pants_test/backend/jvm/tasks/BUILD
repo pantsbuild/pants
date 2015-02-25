@@ -7,6 +7,7 @@ python_test_suite(
     ':checkstyle',
     ':ide_gen',
     ':idea_gen',
+    ':ivy_imports',
     ':junit_run',
     ':scalastyle',
     ':unpack_jars',
@@ -49,6 +50,20 @@ python_tests(
   ]
 )
 
+
+python_tests(
+  name = 'ivy_imports',
+  sources = ['test_ivy_imports.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:unpack_jars',
+    'src/python/pants/base:target',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/tasks:base'
+    ]
+)
+
 python_tests(
   name = 'junit_run',
   sources = ['test_junit_run.py'],
@@ -72,6 +87,17 @@ python_tests(
     'src/python/pants/base:address',
     'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'ivy_resolve',
+  sources = ['test_ivy_resolve.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:ivy_resolve',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )

@@ -9,7 +9,7 @@ import getpass
 import itertools
 import os
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.strutil import is_text_or_binary
 
 
@@ -73,7 +73,8 @@ class Config(object):
   _defaults = {
     'homedir': os.path.expanduser('~'),
     'user': getpass.getuser(),
-    'pants_bootstrapdir': os.path.expanduser('~/.pants.d'),
+    'pants_bootstrapdir': get_pants_cachedir(),
+    'pants_configdir': get_pants_configdir()
   }
   reset_default_bootstrap_option_values(_defaults)
 

@@ -5,9 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from twitter.common.lang import AbstractClass
-
 from pants.base.address import BuildFileAddress
+from pants.util.meta import AbstractClass
 
 
 class AddressableCallProxy(object):

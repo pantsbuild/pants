@@ -117,7 +117,6 @@ python_library(
     ':thrift_builder',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.decorators',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:config',
     'src/python/pants/base:target',

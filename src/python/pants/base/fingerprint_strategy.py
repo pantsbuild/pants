@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from twitter.common.lang import AbstractClass
+from pants.util.meta import AbstractClass
 
 
 class DefaultFingerprintHashingMixin(object):

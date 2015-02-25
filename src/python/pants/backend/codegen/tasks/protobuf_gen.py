@@ -12,8 +12,7 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
-from twitter.common import log
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -169,6 +168,13 @@ class ProtobufGen(CodeGen):
   def genlang(self, lang, targets):
     sources_by_base = self._calculate_sources(targets)
     sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
+
+    # TODO(Eric Ayers) Push this check up to a superclass so all of codegen can share it?
+    if not sources:
+      formatted_targets = "\n".join([t.address.spec for t in targets])
+      raise TaskError("Had {count} targets but no sources?\n targets={targets}"
+                            .format(count=len(targets), targets=formatted_targets))
+
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
     check_duplicate_conflicting_protos(sources_by_base, sources, self.context.log)
@@ -204,7 +210,7 @@ class ProtobufGen(CodeGen):
       protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
                                                + protoc_environ['PATH'].split(os.pathsep))
 
-    log.debug('Executing: {0}'.format('\\\n  '.join(args)))
+    self.context.log.debug('Executing: {0}'.format('\\\n  '.join(args)))
     process = subprocess.Popen(args, env=protoc_environ)
     result = process.wait()
     if result != 0:

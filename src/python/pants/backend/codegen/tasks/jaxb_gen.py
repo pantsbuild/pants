@@ -21,14 +21,8 @@ from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
 
-# python documentation says xml parsing is insecure, but this should be safe usage because we're
-
-
-
 class JaxbGen(CodeGen, NailgunTask):
   """Generates java source files from jaxb schema (.xsd)."""
-
-  _CONFIG_SECTION = 'jaxb-gen'
 
   def __init__(self, *args, **kwargs):
     """
@@ -41,10 +35,6 @@ class JaxbGen(CodeGen, NailgunTask):
     if self.context.products.isrequired(lang):
       self.gen_langs.add(lang)
     self.jar_location = os.path.join(Distribution.cached().home, '..', 'lib', 'tools.jar')
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def _compile_schema(self, args):
     classpath = [self.jar_location]

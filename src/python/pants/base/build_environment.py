@@ -5,14 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import sys
-
-from twitter.common import log
 
 from pants.base.build_root import BuildRoot
 from pants.scm.scm import Scm
 from pants.version import VERSION as _VERSION
+
+
+logger = logging.getLogger(__name__)
 
 
 def pants_version():
@@ -35,6 +37,24 @@ def get_buildroot():
     sys.exit(1)
 
 
+def get_pants_cachedir():
+  """Return the pants global cache directory."""
+  # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+  cache_home = os.environ.get('XDG_CACHE_HOME')
+  if not cache_home:
+    cache_home = '~/.cache'
+  return os.path.expanduser(os.path.join(cache_home, 'pants'))
+
+
+def get_pants_configdir():
+  """Return the pants global config directory."""
+  # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+  config_home = os.environ.get('XDG_CONFIG_HOME')
+  if not config_home:
+    config_home = '~/.config'
+  return os.path.expanduser(os.path.join(config_home, 'pants'))
+
+
 _SCM = None
 
 
@@ -49,10 +69,10 @@ def get_scm():
     if worktree and os.path.isdir(worktree):
       git = Git(worktree=worktree)
       try:
-        log.info('Detected git repository at %s on branch %s' % (worktree, git.branch_name))
+        logger.info('Detected git repository at %s on branch %s' % (worktree, git.branch_name))
         set_scm(git)
       except git.LocalException as e:
-        log.info('Failed to load git repository at %s: %s' % (worktree, e))
+        logger.info('Failed to load git repository at %s: %s' % (worktree, e))
   return _SCM
 
 
