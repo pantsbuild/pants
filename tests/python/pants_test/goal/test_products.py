@@ -100,7 +100,7 @@ class ProductsTest(BaseTest):
 
   def test_empty_data(self):
     foo_product_mapping = self.products.get_data('foo')
-    self.assertTrue(foo_product_mapping==False)
+    self.assertFalse(foo_product_mapping)
 
   def test_non_empty_data(self):
     target = self.make_target('c')
