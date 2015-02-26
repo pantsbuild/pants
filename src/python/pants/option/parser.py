@@ -6,11 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import warnings
 from argparse import ArgumentParser, _HelpAction
 from collections import namedtuple
 
 import six
 
+from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
 from pants.option.help_formatter import PantsAdvancedHelpFormatter, PantsBasicHelpFormatter
@@ -126,7 +128,10 @@ class Parser(object):
     # Map of external to internal dest names. See docstring for _set_dest below.
     self._dest_forwardings = {}
 
-    # A Parser instance, or None for the global scope parser.
+    # Keep track of deprecated flags.  Maps flag -> (deprecated_version, deprecated_hint)
+    self._deprecated_flags = {}
+
+  # A Parser instance, or None for the global scope parser.
     self._parent_parser = parent_parser
 
     # List of Parser instances.
@@ -156,6 +161,7 @@ class Parser(object):
     namespace.add_forwardings(self._dest_forwardings)
     new_args = self._argparser.parse_args(args)
     namespace.update(vars(new_args))
+    self.deprecated_check(args)
     return namespace
 
   def format_help(self):
@@ -166,7 +172,11 @@ class Parser(object):
     """Register an option, using argparse params.
 
     Custom extensions to argparse params:
-    :param advanced: if True, the option will be usually be suppressed when displaying help.
+    :param advanced: if True, the option willally be suppressed when displaying help.
+    :param deprecated_version: Mark an option as deprecated.  The value is a semver that indicates
+       the release at which the option should be removed from the code.
+    :param deprecated_hint: A message to display to the user when displaying help for or invoking
+       a deprecated option.
     """
     if self._frozen:
       raise RegistrationError('Cannot register option {0} in scope {1} after registering options '
@@ -184,11 +194,23 @@ class Parser(object):
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
 
+    deprecated_version = kwargs.pop('deprecated_version', None)
+    deprecated_hint = kwargs.pop('deprecated_hint', '')
+
+    if deprecated_version is not None:
+      check_deprecated_semver(deprecated_version)
+      flag = '--' + dest.replace('_', '-')
+      self._deprecated_flags[flag] = (deprecated_version, deprecated_hint)
+      help = kwargs.pop('help', '')
+      kwargs['help'] = 'DEPRECATED: {}\n{}'.format(self.deprecated_message(flag), help)
+
     inverse_args = []
     help_args = []
     for flag in self.expand_flags(*args, **kwargs):
       if flag.inverse_name:
         inverse_args.append(flag.inverse_name)
+        if deprecated_version:
+          self._deprecated_flags[flag.inverse_name] = (deprecated_version, deprecated_hint)
       help_args.append(flag.help_arg)
     is_invertible = len(inverse_args) > 0
 
@@ -212,6 +234,46 @@ class Parser(object):
       self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
     else:
       self._register(dest, args, kwargs)
+
+  def is_deprecated(self, flag):
+    """Returns True if the flag has been marked as deprecated with 'deprecated_version'.
+
+    :param flag: flag to test  (if it starts with --{scope}-, or --no-{scope}, the scope will be
+    stripped out)
+    """
+    flag = flag.split('=')[0]
+    if flag.startswith('--{}-'.format(self._scope)):
+      flag = '--{}'.format(flag[3 + len(self._scope):])  # strip off the --{scope}- prefix
+    elif flag.startswith('--no-{}-'.format(self._scope)):
+      flag = '--no-{}'.format(flag[6 + len(self._scope):])  # strip off the --no-{scope}- prefix
+
+    return flag in self._deprecated_flags
+
+  def deprecated_message(self, flag):
+    """Returns the message to be displayed when a deprecated flag is invoked or asked for help.
+
+    The caller must insure that the flag has already been tagged as deprecated with the
+    is_deprecated() method.
+    :param flag: The flag being invoked, e.g. --foo
+    """
+    flag = flag.split('=')[0]
+    deprecated_version, deprecated_hint = self._deprecated_flags[flag]
+    scope = self._scope or 'DEFAULT'
+    message = 'Option {flag} in scope {scope} is deprecated and will be removed in version ' \
+              '{removal_version}'.format(flag=flag, scope=scope,
+                                         removal_version=deprecated_version)
+    hint = deprecated_hint or ''
+    return '{}. {}'.format(message, hint)
+
+  def deprecated_check(self, flags):
+    """Emit a warning message if one of these flags is marked as deprecated.
+
+    :param flags: list of string flags to check.  e.g. [ '--foo', '--no-bar', ... ]
+    """
+    for flag in flags:
+      if self.is_deprecated(flag):
+        warnings.warn('*** {}'.format(self.deprecated_message(flag)), DeprecationWarning,
+                      stacklevel=9999) # out of range stacklevel to suppress printing source line.
 
   def _register(self, dest, args, kwargs):
     """Recursively register the option for parsing."""
