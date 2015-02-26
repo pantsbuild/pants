@@ -81,5 +81,5 @@ class ScalaCompile(JvmCompile):
     # analysis for previous partitions. We use the global valid analysis for the upstream.
     upstream = ({classes_output_dir: self._analysis_file}
                 if os.path.exists(self._analysis_file) else {})
-    return self._zinc_utils.compile(args, classpath + [self._classes_dir], sources,
+    return self._zinc_utils.compile(args, classpath, sources,
                                     classes_output_dir, analysis_file, upstream)
