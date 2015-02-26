@@ -13,7 +13,6 @@ from pants.backend.android.android_config_util import AndroidConfigUtil
 from pants.backend.android.keystore.keystore_resolver import KeystoreResolver
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.core.tasks.task import Task
-from pants.base.build_environment import get_pants_configdir
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
@@ -68,7 +67,7 @@ class SignApkTask(Task):
     super(SignApkTask, self).__init__(*args, **kwargs)
     self._config_file = self.get_options().keystore_config_location
     self._distdir = self.get_options().pants_distdir
-    self._configdir = get_pants_configdir()
+    self._configdir = self.get_options().pants_configdir
     self._dist = None
 
   @property
