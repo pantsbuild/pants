@@ -36,7 +36,7 @@ def pants_setup_py(name, description, namespace_packages=None, additional_classi
   classifiers = OrderedSet(standard_classifiers + (additional_classifiers or []))
 
   def _read_contents(path):
-    with open(os.path.join(get_buildroot(), path)) as fp:
+    with open(os.path.join(get_buildroot(), path), 'rb') as fp:
       return fp.read()
 
   return PythonArtifact(

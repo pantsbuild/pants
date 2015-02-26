@@ -9,7 +9,7 @@ plugin APIs are used.
 
 Most new plugins should get their own top-level `contrib/` subdirectory although it may make sense
 to house the source code for related plugins under one top-level `contrib/` subdirectory.  The
-`contrib/scrooge` directory is an example of this and houses 2 plugin tasks that both use the same
+`contrib/scrooge` directory is an example of this and houses two plugin tasks that both use the same
 underlying [Scrooge](https://github.com/twitter/scrooge) tool.
 
 Contrib plugins should generally follow 3 basic setup steps:
@@ -57,7 +57,7 @@ Contrib plugins should generally follow 3 basic setup steps:
 
 3. When you're ready for your plugin to be distributed, add a `provides` `contrib_setup_py`
    descriptor to your main plugin BUILD target and register the plugin with the release script.
-   The `provides` descriptor just requires a name and decription for your plugin suitable for
+   The `provides` descriptor just requires a name and description for your plugin suitable for
    [pypi](https://pypi.python.org/pypi):
    ```python
    python_library(
@@ -87,4 +87,12 @@ Contrib plugins should generally follow 3 basic setup steps:
      PKG_SCROOGE
      PKG_EXAMPLE
    )
+   ```
+   NB: The act of releasing your contrib distribution is part of of the normal `pantsbuild.pants`
+   [[release process|pants('src/python/pants/docs:release')]].  You may need request a release from
+   the owners if you have a change that should be fast-tracked before the next `pantsbuild.pants`
+   release.  You can always test that your contrib distribution works though by doing a release dry
+   run:
+   ```bash
+   ./build-support/bin/release.sh -n`
    ```
