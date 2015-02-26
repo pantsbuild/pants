@@ -5,11 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import textwrap
 
 from pants.backend.android.tasks.sign_apk import SignApkTask
 from pants.base.exceptions import TaskError
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants_test.android.test_android_base import TestAndroidBase
 
 
@@ -24,7 +25,7 @@ class SignApkTest(TestAndroidBase):
 
   @classmethod
   def _get_config(cls,
-                  section=SignApkTask._CONFIG_SECTION,
+                  section='test',
                   option='keystore_config_location',
                   location=_TEST_KEYSTORE):
     ini = textwrap.dedent("""
@@ -64,7 +65,7 @@ class SignApkTest(TestAndroidBase):
 
   def test_no_config_file_defined(self):
     with self.assertRaises(TaskError):
-      task = self.prepare_task(config=self._get_config(location=""),
+      task = self.prepare_task(config=self._get_config(location=''),
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
       task.config_file
@@ -79,14 +80,14 @@ class SignApkTest(TestAndroidBase):
 
   def test_no_section_in_pantsini(self):
     with self.assertRaises(TaskError):
-      task = self.prepare_task(config=self._get_config(location=""),
+      task = self.prepare_task(config=self._get_config(location=''),
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
       task.config_file
 
   def test_overriding_config_with_cli(self):
     with temporary_dir() as temp:
-      task = self.prepare_task(config=self._get_config(section="bad-section-header"),
+      task = self.prepare_task(config=self._get_config(section='bad-section-header'),
                                args=['--test-keystore-config-location={0}'.format(temp)],
                                build_graph=self.build_graph,
                                build_file_parser=self.build_file_parser)
@@ -99,12 +100,31 @@ class SignApkTest(TestAndroidBase):
                                build_file_parser=self.build_file_parser)
       task.config_file
 
+  def test_package_name(self):
+    with self.android_binary() as android_binary:
+      key = self.FakeKeystore()
+      target = android_binary
+      self.assertEquals(SignApkTask.signed_package_name(target, key.build_type),
+                        'binary.debug.signed.apk')
+
+  def test_setup_default_config(self):
+    with temporary_dir() as temp:
+      default_config = os.path.join(temp, 'default_config.ini')
+      SignApkTask.setup_default_config(default_config)
+      self.assertTrue(os.path.isfile(default_config))
+
+  def test_setup_default_config_no_permission(self):
+    with self.assertRaises(TaskError):
+      with temporary_file() as temp:
+        os.chmod(temp.name, 0o400)
+        SignApkTask.setup_default_config(temp.name)
+
   def test_render_args(self):
     with temporary_dir() as temp:
       with self.android_binary() as android_binary:
         task = self.prepare_task(config=self._get_config(),
-                                   build_graph=self.build_graph,
-                                   build_file_parser=self.build_file_parser)
+                                 build_graph=self.build_graph,
+                                 build_file_parser=self.build_file_parser)
         target = android_binary
         fake_key = self.FakeKeystore()
         task._dist = self.FakeDistribution()

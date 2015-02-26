@@ -115,6 +115,9 @@ migrations = {
 
   ('backend', 'python-path'): ('DEFAULT', 'pythonpath'),
 
+  ('python-ipython', 'entry-point'): ('repl.py', 'ipython_entry_point'),
+  ('python-ipython', 'requirements'): ('repl.py', 'ipython_requirements'),
+
   # Three changes are pertinent to migrate 'ide' to both idea and & eclipse. I tried to capture
   # that in notes
   ('ide', 'python_source_paths'): ('idea', 'python_source_path'),
@@ -123,6 +126,13 @@ migrations = {
   ('ide', 'extra_jvm_source_paths'): ('idea', 'extra_jvm_source_paths'),
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
+
+  ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
+
+  ('DEFAULT', 'stats_upload_url'): ('run-tracker', 'stats_upload_url'),
+  ('DEFAULT', 'stats_upload_timeout'): ('run-tracker', 'stats_upload_timeout'),
+  ('DEFAULT', 'num_foreground_workers'): ('run-tracker', 'num_foreground_workers'),
+  ('DEFAULT', 'num_background_workers'): ('run-tracker', 'num_background_workers'),
 }
 
 notes = {
@@ -158,7 +168,9 @@ notes = {
                                    'idea and eclipse goals.',
   ('ide', 'debug_port'):       'debug_port now must be specified separately for idea and eclipse '
                                'goals.  Also, IDE goals now use their own debug setting and do not '
-                               'inherit from jvm configuration.'
+                               'inherit from jvm configuration.',
+
+  ('tasks', 'build_invalidator'): 'This is no longer configurable. The default will be used.',
 }
 
 

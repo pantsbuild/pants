@@ -17,26 +17,27 @@ python_library(
   ]
 )
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':base',
   ]
 )
 
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':test_spec_exclude_integration',
   ]
 )
 
-python_test_suite(
+target(
   name = 'base',
   dependencies = [
     ':abbreviate_target_ids',
     ':address',
     ':build_configuration',
+    ':build_environment',
     ':build_file',
     ':build_file_address_mapper',
     ':build_file_aliases',
@@ -91,6 +92,16 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'build_environment',
+  sources = ['test_build_environment.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
   ]
 )
 

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 
 from pants.base.exceptions import TaskError
 
@@ -16,24 +17,29 @@ class ParseError(TaskError):
 
 class AnalysisParser(object):
   """Parse a file containing representation of an analysis for some JVM language."""
+
   def __init__(self, classes_dir):
     self.classes_dir = classes_dir  # The output dir for classes in this analysis.
 
+  @property
+  def empty_test_header(self):
+    """The header of a section that will be nonempty iff the analysis is nonempty.
+
+    We look at this section to determine whether the analysis contains any useful data.
+    """
+    raise NotImplementedError('Subclasses must implement.')
+
   def is_nonempty_analysis(self, path):
-    """Returns whether an analysis at a specified path is nontrivial."""
+    """Does the specified analysis file contain information for at least one source file."""
     if not os.path.exists(path):
       return False
-    empty_prefix = self.empty_prefix()
     with open(path, 'r') as infile:
-      prefix = infile.read(len(empty_prefix))
-    return prefix != empty_prefix
-
-  def empty_prefix(self):
-    """Returns a prefix indicating a trivial analysis file.
-
-    I.e., this prefix is present at the begnning of an analysis file iff the analysis is trivial.
-    """
-    raise NotImplementedError()
+      # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
+      expected_header = '{0}:\n'.format(self.empty_test_header)
+      while infile.next() != expected_header:
+        pass
+      # Now see if this section is empty or not.
+      return self.parse_num_items(infile.next()) > 0
 
   def parse_from_path(self, infile_path):
     """Parse an analysis instance from a text file."""
@@ -82,3 +88,12 @@ class AnalysisParser(object):
     All paths are absolute.
     """
     raise NotImplementedError()
+
+  _num_items_re = re.compile(r'(\d+) items\n')
+
+  def parse_num_items(self, line):
+    """Parse a line of the form '<num> items' and returns <num> as an int."""
+    matchobj = self._num_items_re.match(line)
+    if not matchobj:
+      raise ParseError('Expected: "<num> items". Found: "{0}"'.format(line))
+    return int(matchobj.group(1))

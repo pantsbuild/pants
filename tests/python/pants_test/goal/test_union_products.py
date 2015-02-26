@@ -27,3 +27,12 @@ class UnionProductsTest(BaseTest):
     self.assertEquals(self.products.get_for_target(a), OrderedSet([1, 2, 3]))
     self.assertEquals(self.products.get_for_target(b), OrderedSet([2, 3]))
     self.assertEquals(self.products.get_for_target(c), OrderedSet([3]))
+
+  def test_empty_products(self):
+    c = self.make_target('c')
+    self.assertFalse(self.products.get_for_target(c))
+
+  def test_non_empty_products(self):
+    c = self.make_target('c')
+    self.products.add_for_target(c, [3])
+    self.assertTrue(self.products.get_for_target(c))

@@ -18,6 +18,7 @@ from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
@@ -116,13 +117,13 @@ class Jar(object):
     :param string dest: the path the source file or directory should have in this jar
     """
     if not src or not isinstance(src, string_types):
-      raise ValueError('The src path must be a non-empty string, got %s of type %s.'
-                       % (src, type(src)))
+      raise ValueError('The src path must be a non-empty string, got {} of type {}.'.format(
+        src, type(src)))
     if dest and not isinstance(dest, string_types):
-      raise ValueError('The dest entry path must be a non-empty string, got %s of type %s.'
-                       % (dest, type(dest)))
+      raise ValueError('The dest entry path must be a non-empty string, got {} of type {}.'.format(
+        dest, type(dest)))
     if not os.path.isdir(src) and not dest:
-      raise self.Error('Source file %s must have a jar destination specified' % src)
+      raise self.Error('Source file {} must have a jar destination specified'.format(src))
 
     self._add_entry(self.FileSystemEntry(src, dest))
 
@@ -160,27 +161,36 @@ class Jar(object):
   def _render_jar_tool_args(self):
     args = []
 
-    if self._main:
-      args.append('-main=%s' % self._main)
+    with temporary_dir() as manifest_stage_dir:
+      classpath = self._classpath or []
 
-    if self._classpath:
-      args.append('-classpath=%s' % ','.join(self._classpath))
+      def as_cli_entry(entry):
+        src = entry.materialize(manifest_stage_dir)
+        return '{}={}'.format(src, entry.dest) if entry.dest else src
+      files = map(as_cli_entry, self._entries) if self._entries else []
 
-    with temporary_dir() as stage_dir:
-      if self._manifest:
-        args.append('-manifest=%s' % self._manifest.materialize(stage_dir))
+      jars = self._jars or []
 
-      if self._entries:
-        def as_cli_entry(entry):
-          src = entry.materialize(stage_dir)
-          return '%s=%s' % (src, entry.dest) if entry.dest else src
+      with safe_args(classpath, delimiter=',') as classpath_args:
+        with safe_args(files, delimiter=',') as files_args:
+          with safe_args(jars, delimiter=',') as jars_args:
 
-        args.append('-files=%s' % ','.join(map(as_cli_entry, self._entries)))
+            if self._main:
+              args.append('-main={}'.format(self._main))
 
-      if self._jars:
-        args.append('-jars=%s' % ','.join(self._jars))
+            if classpath_args:
+              args.append('-classpath={}'.format(','.join(classpath_args)))
 
-      yield args
+            if self._manifest:
+              args.append('-manifest={}'.format(self._manifest.materialize(manifest_stage_dir)))
+
+            if files_args:
+              args.append('-files={}'.format(','.join(files_args)))
+
+            if jars_args:
+              args.append('-jars={}'.format(','.join(jars_args)))
+
+            yield args
 
 
 class JarTask(NailgunTask):
@@ -207,7 +217,7 @@ class JarTask(NailgunTask):
   def _action_name(cls, action):
     name = cls._DUPLICATE_ACTION_TO_NAME.get(action)
     if name is None:
-      raise ValueError('Unrecognized duplicate action: %s' % action)
+      raise ValueError('Unrecognized duplicate action: {}'.format(action))
     return name
 
   @classmethod
@@ -245,15 +255,15 @@ class JarTask(NailgunTask):
     try:
       yield jar
     except jar.Error as e:
-      raise TaskError('Failed to write to jar at %s: %s' % (path, e))
+      raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
 
     with jar._render_jar_tool_args() as args:
       if args:  # Don't build an empty jar
-        args.append('-update=%s' % self._flag(not overwrite))
-        args.append('-compress=%s' % self._flag(compressed))
+        args.append('-update={}'.format(self._flag(not overwrite)))
+        args.append('-compress={}'.format(self._flag(compressed)))
 
         jar_rules = jar_rules or JarRules.default()
-        args.append('-default_action=%s' % self._action_name(jar_rules.default_dup_action))
+        args.append('-default_action={}'.format(self._action_name(jar_rules.default_dup_action)))
 
         skip_patterns = []
         duplicate_actions = []
@@ -262,16 +272,16 @@ class JarTask(NailgunTask):
           if isinstance(rule, Skip):
             skip_patterns.append(rule.apply_pattern)
           elif isinstance(rule, Duplicate):
-            duplicate_actions.append('%s=%s' % (rule.apply_pattern.pattern,
-                                                self._action_name(rule.action)))
+            duplicate_actions.append('{}={}'.format(
+              rule.apply_pattern.pattern, self._action_name(rule.action)))
           else:
-            raise ValueError('Unrecognized rule: %s' % rule)
+            raise ValueError('Unrecognized rule: {}'.format(rule))
 
         if skip_patterns:
-          args.append('-skip=%s' % ','.join(p.pattern for p in skip_patterns))
+          args.append('-skip={}'.format(','.join(p.pattern for p in skip_patterns)))
 
         if duplicate_actions:
-          args.append('-policies=%s' % ','.join(duplicate_actions))
+          args.append('-policies={}'.format(','.join(duplicate_actions)))
 
         args.append(path)
 

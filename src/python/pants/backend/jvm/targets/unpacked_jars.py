@@ -7,10 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-import six
-
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target

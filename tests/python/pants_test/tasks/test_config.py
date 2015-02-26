@@ -100,6 +100,16 @@ that.""",
     with self.assertRaises(Config.ConfigError):
       self.config.get_required('a', 'blank_section')
 
+  def test_getdefault(self):
+    self.assertEquals('foo', self.config.getdefault('name'))
+
+  def test_getdefault_explicit(self):
+    self.assertEquals('foo', self.config.getdefault('name', type=str))
+
+  def test_getdefault_not_found(self):
+    with self.assertRaises(NameError):
+      self.assertEquals('foo', self.config.getdefault('name', type=int))
+
   def _check_defaults(self, accessor, default):
     self.assertEquals(None, accessor('c', 'fast'))
     self.assertEquals(None, accessor('c', 'preempt', None))

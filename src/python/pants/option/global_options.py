@@ -47,6 +47,9 @@ def register_global_options(register):
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',
            help='Regex pattern to exclude from the target list (useful in conjunction with ::). '
                 'Multiple patterns may be specified by setting this flag multiple times.')
+  # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
+  # options to there. When we do that, also drop the cumbersome word 'artifact' from these
+  # option names. There's only one cache concept that users care about.
   register('--read-from-artifact-cache', action='store_true', default=True,
            help='Read build artifacts from cache, if available.')
   register('--read-artifact-caches', type=Options.list,
@@ -61,6 +64,10 @@ def register_global_options(register):
                 'choose from.')
   register('--overwrite-cache-artifacts', action='store_true',
            help='If writing to build artifacts to cache, overwrite (instead of skip) existing.')
+  register('--cache-key-gen-version', advanced=True, default='200',
+           help='The cache key generation. Bump this to invalidate every artifact.')
+  register('--cache-compression', advanced=True, type=int, default=5,
+           help='The gzip compression level for created artifacts.')
   register('--print-exception-stacktrace', action='store_true',
            help='Print to console the full exception stack trace if encountered.')
   register('--fail-fast', action='store_true',
