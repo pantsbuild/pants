@@ -5,6 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
+import logging
+
 import os
 import sys
 
@@ -50,8 +53,14 @@ def register_bootstrap_options(register, buildroot=None):
   # registration and not so that their values can be interpolated in configs.
   register('-d', '--logdir', metavar='<dir>',
            help='Write logs to files under this directory.')
+
+  # Although logging supports the WARN level, its not documented and could conceivably be yanked.
+  # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
+  # setup a 'WARN' logging level name that maps to 'WARNING'.
+  logging.addLevelName(logging.WARNING, 'WARN')
   register('-l', '--level', choices=['debug', 'info', 'warn'], default='info',
            help='Set the logging level.')
+
   register('-q', '--quiet', action='store_true',
            help='Squelches all console output apart from errors.')
 
@@ -97,7 +106,9 @@ class OptionsBootstrapper(object):
         return False
 
       # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
-      bargs = filter(is_bootstrap_option, self._args)
+      # Stop before '--' since args after that are pass-through and may have duplicate names to our
+      # bootstrap options.
+      bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
 
       self._bootstrap_options = Options(env=self._env, config=self._pre_bootstrap_config,
                                         known_scopes=[GLOBAL_SCOPE], args=bargs)

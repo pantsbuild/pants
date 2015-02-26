@@ -130,3 +130,13 @@ class BootstrapOptionsTest(unittest.TestCase):
     vals = parse_options('-d/tmp/logs', '-ldebug')
     self.assertEqual('/tmp/logs', vals.logdir)
     self.assertEqual('debug', vals.level)
+
+  def test_bootstrap_options_passthrough_dup_ignored(self):
+    def parse_options(*args):
+      return OptionsBootstrapper(args=list(args)).get_bootstrap_options().for_global_scope()
+
+    vals = parse_options('main', 'args', '-d/tmp/frogs', '--', '-d/tmp/logs')
+    self.assertEqual('/tmp/frogs', vals.logdir)
+
+    vals = parse_options('main', 'args', '--', '-d/tmp/logs')
+    self.assertIsNone(vals.logdir)

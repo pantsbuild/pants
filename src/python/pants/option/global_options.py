@@ -9,6 +9,20 @@ from pants.option.options import Options
 
 
 def register_global_options(register):
+  """Register options not tied to any particular task.
+
+  It's important to note that another set of global options is registered in
+  `pants.option.options_bootstrapper:register_bootstrap_options`, but those are reserved for options
+  that other options or tasks may need to build upon directly or indirectly.  For a direct-use
+  example, a doc generation task may want to provide an option for its user-visible output location
+  that defaults to `${pants-distdir}/docs` and thus needs to interpolate the bootstrap option of
+  `pants-distdir`.  An indirect example would be logging options that are needed by pants itself to
+  setup logging prior to loading plugins so that plugin registration can log confidently to a
+  configured logging subsystem.
+
+  Global options here on the other hand are reserved for infrastructure objects (not tasks) that
+  have leaf configuration data.
+  """
   register('-t', '--timeout', type=int, metavar='<seconds>',
            help='Number of seconds to wait for http connections.')
   register('-x', '--time', action='store_true',
