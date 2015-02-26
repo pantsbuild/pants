@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import logging
-
 import os
 import sys
 
