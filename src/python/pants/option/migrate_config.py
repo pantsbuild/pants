@@ -113,6 +113,12 @@ migrations = {
   ('protobuf-gen', 'javadeps'): ('gen.protoc', 'javadeps'),
   ('protobuf-gen', 'pythondeps'): ('gen.protoc', 'pythondeps'),
 
+  ('thrift-gen', 'strict'): ('gen.thrift', 'strict'),
+  ('thrift-gen', 'supportdir'): ('gen.thrift', 'supportdir'),
+  ('thrift-gen', 'version'): ('gen.thrift', 'version'),
+  ('thrift-gen', 'java'): ('gen.thrift', 'java'),
+  ('thrift-gen', 'python'): ('gen.thrift', 'python'),
+
   ('backend', 'python-path'): ('DEFAULT', 'pythonpath'),
 
   ('python-ipython', 'entry-point'): ('repl.py', 'ipython_entry_point'),
@@ -156,6 +162,7 @@ notes = {
                                'The old behavior was to unconditionally append "_protobuf" to the '
                                'end of the plugin name.  This will not work for plugins that have '
                                'a name that does not end in "_protobuf".',
+  ('thrift-gen', 'verbose'): 'This flag is no longer supported. Use -ldebug instead.',
   ('ide', 'python_source_path'): 'python_source_path now must be specified separately for idea and '
                                  'eclipse goals.',
   ('ide', 'python_lib_paths'): 'python_lib_path now must be specified separately for idea and '

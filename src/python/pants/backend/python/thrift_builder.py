@@ -5,9 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +15,6 @@ from pants.backend.python.code_generator import CodeGenerator
 from pants.base.build_environment import get_buildroot
 from pants.thrift_util import select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants.util.strutil import ensure_binary
 
 
 class PythonThriftBuilder(CodeGenerator):
@@ -27,9 +24,9 @@ class PythonThriftBuilder(CodeGenerator):
       super(PythonThriftBuilder.UnknownPlatformException, self).__init__(
           'Unknown platform: %s!' % str(platform))
 
-  def __init__(self, target, root_dir, config, target_suffix=None):
-    super(PythonThriftBuilder, self).__init__(target, root_dir, config, target_suffix=target_suffix)
-    self._workdir = os.path.join(config.getdefault('pants_workdir'), 'thrift', 'py-thrift')
+  def __init__(self, target, root_dir, options, target_suffix=None):
+    super(PythonThriftBuilder, self).__init__(target, root_dir, options, target_suffix)
+    self._workdir = os.path.join(options.for_global_scope().pants_workdir, 'thrift', 'py-thrift')
 
   @property
   def install_requires(self):
@@ -37,7 +34,7 @@ class PythonThriftBuilder(CodeGenerator):
 
   def run_thrifts(self):
     """
-    Generate Python thrift code using thrift compiler specified in pants config.
+    Generate Python thrift code.
 
     Thrift fields conflicting with Python keywords are suffixed with a trailing
     underscore (e.g.: from_).
@@ -71,7 +68,7 @@ class PythonThriftBuilder(CodeGenerator):
 
   def _run_thrift(self, source):
     args = [
-        select_thrift_binary(self.config),
+        select_thrift_binary(self.options),
         '--gen',
         'py:new_style',
         '-o', self.codegen_root,

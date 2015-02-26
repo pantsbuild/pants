@@ -19,10 +19,10 @@ from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
+from pants.option.options import Options
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
 
@@ -58,18 +58,20 @@ class ApacheThriftGen(CodeGen):
   @classmethod
   def register_options(cls, register):
     super(ApacheThriftGen, cls).register_options(register)
-    register('--version', help='Thrift compiler version.')
     register('--lang', action='append', choices=['python', 'java'],
              help='Force generation of thrift code for these languages.')
+    register('--strict', action='store_true',
+             help='Run thrift compiler with strict warnings.')
+    register('--supportdir', advanced=True, help='Find thrift binaries under this dir.')
+    register('--version', advanced=True, help='Thrift compiler version.')
+    register('--java', advanced=True, type=Options.dict, help='GenInfo for Java.')
+    register('--python', advanced=True, type=Options.dict, help='GenInfo for Python.')
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
     self.combined_dir = os.path.join(self.workdir, 'combined')
     self.combined_relpath = os.path.relpath(self.combined_dir, get_buildroot())
     self.session_dir = os.path.join(self.workdir, 'sessions')
-
-    self.strict = self.context.config.getbool('thrift-gen', 'strict')
-    self.verbose = self.context.config.getbool('thrift-gen', 'verbose')
 
     self.gen_langs = set(self.get_options().lang)
     for lang in ('java', 'python'):
@@ -84,10 +86,7 @@ class ApacheThriftGen(CodeGen):
   @property
   def thrift_binary(self):
     if self._thrift_binary is None:
-      self._thrift_binary = select_thrift_binary(
-        self.context.config,
-        version=self.get_options().version
-      )
+      self._thrift_binary = select_thrift_binary(self.context.options)
     return self._thrift_binary
 
   _defaults = None
@@ -98,20 +97,14 @@ class ApacheThriftGen(CodeGen):
     return self._defaults
 
   def create_geninfo(self, key):
-    gen_info = self.context.config.getdict('thrift-gen', key)
+    gen_info = self.get_options()[key]
     gen = gen_info['gen']
     deps = {}
     for category, depspecs in gen_info['deps'].items():
       dependencies = OrderedSet()
       deps[category] = dependencies
       for depspec in depspecs:
-        try:
-          dependencies.update(self.context.resolve(depspec))
-        except AddressLookupError as e:
-          raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key}"
-                                    "in pants.ini" .format(message=e, section='thrift-gen',
-                                                           key="gen->deps->{category}"
-                                                           .format(category=category)))
+        dependencies.update(self.context.resolve(depspec))
     return self.GenInfo(gen, deps)
 
   _gen_java = None
@@ -160,9 +153,9 @@ class ApacheThriftGen(CodeGen):
       '-recurse',
     ]
 
-    if self.strict:
+    if self.get_options().strict:
       args.append('-strict')
-    if self.verbose:
+    if self.get_options().level == 'debug':
       args.append('-verbose')
     for base in bases:
       args.extend(('-I', base))
