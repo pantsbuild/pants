@@ -90,7 +90,6 @@ class BootstrapOptionsTest(unittest.TestCase):
 
     self._test_bootstrap_options(config={}, env={'PANTS_PANTSRC': 'False'}, args=[], pantsrc=False)
 
-
   def test_create_bootstrapped_options(self):
     # Check that we can set a bootstrap option from a cmd-line flag and have that interpolate
     # correctly into regular config.
@@ -113,3 +112,31 @@ class BootstrapOptionsTest(unittest.TestCase):
       opts.register('fruit', '--apple')
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)
     self.assertEquals('/pear/banana', opts.for_scope('fruit').apple)
+
+  def test_bootstrap_short_options(self):
+    def parse_options(*args):
+      return OptionsBootstrapper(args=list(args)).get_bootstrap_options().for_global_scope()
+
+    # No short options passed - defaults presented.
+    vals = parse_options()
+    self.assertIsNone(vals.logdir)
+    self.assertEqual('info', vals.level)
+
+    # Unrecognized short options passed and ignored - defaults presented.
+    vals = parse_options('-_UnderscoreValue', '-^')
+    self.assertIsNone(vals.logdir)
+    self.assertEqual('info', vals.level)
+
+    vals = parse_options('-d/tmp/logs', '-ldebug')
+    self.assertEqual('/tmp/logs', vals.logdir)
+    self.assertEqual('debug', vals.level)
+
+  def test_bootstrap_options_passthrough_dup_ignored(self):
+    def parse_options(*args):
+      return OptionsBootstrapper(args=list(args)).get_bootstrap_options().for_global_scope()
+
+    vals = parse_options('main', 'args', '-d/tmp/frogs', '--', '-d/tmp/logs')
+    self.assertEqual('/tmp/frogs', vals.logdir)
+
+    vals = parse_options('main', 'args', '--', '-d/tmp/logs')
+    self.assertIsNone(vals.logdir)
