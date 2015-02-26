@@ -32,7 +32,6 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.config import Config
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
@@ -63,7 +62,7 @@ class PythonChroot(object):
                platforms=None,
                interpreter=None):
     self.context = context
-    self._config = Config.from_cache()
+    self._config = context.config
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms
@@ -137,7 +136,8 @@ class PythonChroot(object):
 
   def _generate_requirement(self, library, builder_cls):
     library_key = self._key_generator.key_for_target(library)
-    builder = builder_cls(library, get_buildroot(), self._config, '-' + library_key.hash[:8])
+    builder = builder_cls(library, get_buildroot(),
+                          self.context.options, '-' + library_key.hash[:8])
 
     cache_dir = os.path.join(self._egg_cache_root, library_key.id)
     if self._build_invalidator.needs_update(library_key):

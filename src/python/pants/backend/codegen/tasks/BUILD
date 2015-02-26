@@ -30,6 +30,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':code_gen',
+    'src/python/pants:thrift_util',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/jvm/targets:java',
@@ -39,7 +40,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
-    'src/python/pants:thrift_util',
+    'src/python/pants/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
   ],
