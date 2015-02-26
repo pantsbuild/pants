@@ -8,8 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import shlex
 import tempfile
 import unittest
+import warnings
+from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.base.deprecated import PastRemovalVersionError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -17,7 +20,7 @@ from pants_test.option.fake_config import FakeConfig
 
 
 class OptionsTest(unittest.TestCase):
-  _known_scopes = ['compile', 'compile.java', 'compile.scala', 'test', 'test.junit']
+  _known_scopes = ['compile', 'compile.java', 'compile.scala', 'stale', 'test', 'test.junit']
 
   def _register(self, options):
     options.register_global('-v', '--verbose', action='store_true', help='Verbose output.')
@@ -33,7 +36,7 @@ class OptionsTest(unittest.TestCase):
     options.register_global('--store-false-def-false-flag', action='store_false', default=False)
     options.register_global('--store-false-def-true-flag', action='store_false', default=True)
 
-  # Custom types.
+    # Custom types.
     options.register_global('--dicty', type=Options.dict, default='{"a": "b"}')
     options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
 
@@ -41,12 +44,28 @@ class OptionsTest(unittest.TestCase):
     options.register_global('--a', type=int)
     options.register_global('--b', type=int)
 
+    # Deprecated global options
+    options.register_global('--global-crufty',
+                            deprecated_version='999.99.9',
+                            deprecated_hint='use a less crufty global option')
+    options.register_global('--global-crufty-boolean', action='store_true',
+                            deprecated_version='999.99.9',
+                            deprecated_hint='say no to crufty global options')
     # Override --xlong with a different type (but leave -x alone).
     options.register('test', '--xlong', type=int)
 
     # For the design doc example test.
     options.register('compile', '--c', type=int)
     options.register('compile.java', '--b', type=str, default='foo')
+
+    # Test deprecated options with a scope
+    options.register('stale', '--still-good')
+    options.register('stale', '--crufty',
+                     deprecated_version='999.99.9',
+                     deprecated_hint='use a less crufty stale scoped option')
+    options.register('stale', '--crufty-boolean', action='store_true',
+                     deprecated_version='999.99.9',
+                     deprecated_hint='say no to crufty, stale scoped options')
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
@@ -316,3 +335,88 @@ class OptionsTest(unittest.TestCase):
     })
     check_bar_baz(None, {
     })
+
+  def test_deprecated_option_past_removal(self):
+    with self.assertRaises(PastRemovalVersionError):
+      options = Options({}, FakeConfig({}), OptionsTest._known_scopes, "./pants")
+      options.register_global('--too-old-option',
+                              deprecated_version='0.0.24',
+                              deprecated_hint='The semver for this option has already passed.')
+
+  def test_is_deprecated(self):
+    options = self._parse('./pants');
+    global_parser = options.get_global_parser()
+    self.assertTrue(global_parser.is_deprecated('--global-crufty'))
+    self.assertTrue(global_parser.is_deprecated('--global-crufty=foo'))
+    self.assertTrue(global_parser.is_deprecated('--global-crufty-boolean'))
+    self.assertTrue(global_parser.is_deprecated('--no-global-crufty-boolean'))
+    self.assertFalse(global_parser.is_deprecated('--pants-foo'))
+    scope_parser = options.get_parser('stale')
+    self.assertTrue(scope_parser.is_deprecated('--crufty'))
+    self.assertTrue(scope_parser.is_deprecated('--crufty=bar'))
+    self.assertTrue(scope_parser.is_deprecated('--stale-crufty'))
+    self.assertTrue(scope_parser.is_deprecated('--stale-crufty=baz'))
+    self.assertTrue(scope_parser.is_deprecated('--crufty-boolean'))
+    self.assertTrue(scope_parser.is_deprecated('--no-crufty-boolean'))
+    self.assertTrue(scope_parser.is_deprecated('--stale-crufty-boolean'))
+    self.assertTrue(scope_parser.is_deprecated('--no-stale-crufty-boolean'))
+    self.assertFalse(scope_parser.is_deprecated('--still-good'))
+
+  @contextmanager
+  def warnings_catcher(self):
+    with warnings.catch_warnings(record=True) as w:
+      warnings.simplefilter("always")
+      yield w
+
+  def test_deprecated_options(self):
+    def assertWarning(w, option_string):
+      self.assertEquals(1, len(w))
+      self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
+      warning_message = str(w[-1].message)
+      self.assertIn("is deprecated and will be removed", warning_message)
+      self.assertIn(option_string, warning_message)
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --global-crufty=crufty1')
+      self.assertEquals('crufty1', options.for_global_scope().global_crufty)
+      assertWarning(w, '--global-crufty')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --global-crufty-boolean')
+      self.assertTrue(options.for_global_scope().global_crufty_boolean)
+      assertWarning(w, '--global-crufty-boolean')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --no-global-crufty-boolean')
+      self.assertFalse(options.for_global_scope().global_crufty_boolean)
+      assertWarning(w, '--no-global-crufty-boolean')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants stale --crufty=stale_and_crufty')
+      self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
+      assertWarning(w, '--crufty')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants stale --crufty-boolean')
+      self.assertTrue(options.for_scope('stale').crufty_boolean)
+      assertWarning(w, '--crufty-boolean')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants stale --no-crufty-boolean')
+      self.assertFalse(options.for_scope('stale').crufty_boolean)
+      assertWarning(w, '--no-crufty-boolean')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --no-stale-crufty-boolean')
+      self.assertFalse(options.for_scope('stale').crufty_boolean)
+      assertWarning(w, '--no-crufty-boolean')
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --stale-crufty-boolean')
+      self.assertTrue(options.for_scope('stale').crufty_boolean)
+      assertWarning(w, '--crufty-boolean')
+
+    # Make sure the warnings don't come out for regular options
+    with self.warnings_catcher() as w:
+      self._parse('./pants stale --pants-foo stale --still-good')
+      self.assertEquals(0, len(w))

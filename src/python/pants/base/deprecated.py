@@ -41,6 +41,27 @@ class BadDecoratorNestingError(DeprecationApplicationError):
   """Indicates the @deprecated decorator was innermost in a sequence of layered decorators."""
 
 
+def check_deprecated_semver(removal_version):
+  """Check to see if the removal version is < the current Pants version.
+   :param str removal_version: The pantsbuild.pants version which will remove the deprecated
+                              function.
+   :raises DeprecationApplicationError if the removal_version parameter is invalid or the version
+   is not an earlier version than the current release version.
+  """
+  if not isinstance(removal_version, six.string_types):
+    raise BadRemovalVersionError('The removal_version must be a semver version string.')
+
+  try:
+    removal_semver = Revision.semver(removal_version)
+  except Revision.BadRevision as e:
+    raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
+                                 '{}'.format(removal_version, e))
+
+  if removal_semver <= _PANTS_SEMVER:
+    raise PastRemovalVersionError('The removal version must be greater than the current pants '
+                                  'version of {} - given {}'.format(VERSION, removal_version))
+
+
 def deprecated(removal_version, hint_message=None):
   """Marks a function or method as deprecated.
 
@@ -62,18 +83,7 @@ def deprecated(removal_version, hint_message=None):
   if removal_version is None:
     raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
 
-  if not isinstance(removal_version, six.string_types):
-    raise BadRemovalVersionError('The removal_version must be a semver version string.')
-
-  try:
-    removal_semver = Revision.semver(removal_version)
-  except Revision.BadRevision as e:
-    raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
-                                 '{}'.format(removal_version, e))
-
-  if removal_semver <= _PANTS_SEMVER:
-    raise PastRemovalVersionError('The removal version must be greater than the current pants '
-                                  'version of {} - given {}'.format(VERSION, removal_version))
+  check_deprecated_semver(removal_version)
 
   def decorator(func):
     if not inspect.isfunction(func):
