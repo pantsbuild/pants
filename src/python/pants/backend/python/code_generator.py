@@ -19,13 +19,12 @@ class CodeGenerator(object):
   class Error(Exception): pass
   class CodeGenerationException(Error): pass
 
-  def __init__(self, target, root_dir, config, target_suffix=None):
+  def __init__(self, target, root_dir, options, target_suffix=None):
     self.target = target
-    self.config = config
+    self.options = options
     self.suffix = target_suffix or ''
     self.root = root_dir
-    distdir = self.config.getdefault('pants_distdir')
-    self.chroot = RelativeChroot(root_dir, distdir, target.name)
+    self.chroot = RelativeChroot(root_dir, options.for_global_scope().pants_distdir, target.name)
     codegen_root = tempfile.mkdtemp(dir=self.chroot.path(), prefix='codegen.')
     self.codegen_root = os.path.relpath(codegen_root, self.chroot.path())
     self.created_packages = set()

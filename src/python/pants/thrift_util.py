@@ -94,14 +94,10 @@ def calculate_compile_roots(targets, is_thrift_target):
   return basedirs, sources
 
 
-def select_thrift_binary(config, version=None):
+def select_thrift_binary(options):
   """Selects a thrift compiler binary matching the current os and architecture.
 
-  By default uses the repo default thrift compiler version specified in the pants config.
-
-  config: The pants config containing thrift thrift binary selection data.
-  version: An optional thrift compiler binary version override.
+  Defaults to the thrift compiler version specified in the gen.thrift options scope.
   """
-  thrift_supportdir = config.get('thrift-gen', 'supportdir')
-  thrift_version = version or config.get('thrift-gen', 'version')
-  return BinaryUtil(config=config).select_binary(thrift_supportdir, thrift_version, 'thrift')
+  thrift_options = options.for_scope('gen.thrift')
+  return BinaryUtil().select_binary(thrift_options.supportdir, thrift_options.version, 'thrift')
