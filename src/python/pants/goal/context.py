@@ -267,7 +267,17 @@ class Context(object):
     :return: a list of targets evaluated by the predicate in preorder (or postorder, if the
     postorder parameter is True) traversal order.
     """
-    target_root_addresses = [target.address for target in self.target_roots]
+
+    genmap = self.products.get('synthetic_targets')
+    targets = list(self.target_roots)
+    for target in self.target_roots:
+      product_mapping = genmap.get(target)
+      if product_mapping:
+        for basedir, gen_targets in product_mapping.items():
+          targets.extend(gen_targets)
+
+    target_root_addresses = [target.address for target in targets]
+
     target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses,
                                                                    postorder=postorder)
     return filter(predicate, target_set)

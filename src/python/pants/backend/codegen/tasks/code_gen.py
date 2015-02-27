@@ -137,8 +137,10 @@ class CodeGen(Task):
               vts_artifactfiles_pairs.append((invalid_vts_by_target[target], generated_sources))
             langtarget_by_gentarget[target] = syn_target
           genmap = self.context.products.get(lang)
+          synthetic_targets = self.context.products.get('synthetic_targets')
           for gentarget, langtarget in langtarget_by_gentarget.items():
             genmap.add(gentarget, get_buildroot(), [langtarget])
+            synthetic_targets.add(gentarget, get_buildroot(), [langtarget])
             # Transfer dependencies from gentarget to its synthetic counterpart.
             for dep in self.getdependencies(gentarget):
               if self.is_gentarget(dep):  # Translate the dep to its synthetic counterpart.
