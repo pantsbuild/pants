@@ -31,7 +31,7 @@ class BundleCreate(JvmBinaryTask):
 
   def __init__(self, *args, **kwargs):
     super(BundleCreate, self).__init__(*args, **kwargs)
-    self._outdir = self.context.config.getdefault('pants_distdir')
+    self._outdir = self.get_options().pants_distdir
     self._prefix = self.get_options().archive_prefix
     self._archiver_type = self.get_options().archive
     self._create_deployjar = self.get_options().deployjar
