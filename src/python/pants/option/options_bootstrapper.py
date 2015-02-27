@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options import Options
@@ -31,6 +31,10 @@ def register_bootstrap_options(register, buildroot=None):
   status as "bootstrap options" is only pertinent during option registration.
   """
   buildroot = buildroot or get_buildroot()
+  register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
+           help='Use this dir for global cache.')
+  register('--pants-configdir', advanced=True, metavar='<dir>', default=get_pants_configdir(),
+         help='Use this dir for global config files.')
   register('--pants-workdir', metavar='<dir>', default=os.path.join(buildroot, '.pants.d'),
            help='Write intermediate output files to this dir.')
   register('--pants-supportdir', metavar='<dir>', default=os.path.join(buildroot, 'build-support'),

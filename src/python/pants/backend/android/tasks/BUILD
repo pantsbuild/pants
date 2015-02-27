@@ -85,7 +85,6 @@ python_library(
     'src/python/pants/backend/android:keystore_resolver',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/core/tasks:common',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:distribution',
