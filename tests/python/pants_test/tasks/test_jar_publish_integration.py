@@ -28,7 +28,7 @@ def shared_artifacts(version, extra_jar=None):
 
 def publish_extra_config(unique_config):
   return {
-          'jar-publish': {
+          'publish': {
             'publish_extras': {
               'extra_test_jar_example': unique_config,
               },

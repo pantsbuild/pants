@@ -22,19 +22,18 @@ from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants_test.tasks.test_base import TaskTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class JarPublishTest(TaskTest):
+class JarPublishTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return JarPublish
 
   def test_smoke_publish(self):
     with temporary_dir() as publish_dir:
-      task = self.prepare_task(args=['--test-local=%s' % publish_dir],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
+      self.set_options(local=publish_dir)
+      task = self.create_task(self.context())
       task.scm = Mock()
       task.execute()
 
@@ -62,8 +61,8 @@ class JarPublishTest(TaskTest):
                                        provides="""artifact(org='com.example', name='nail', repo=internal)""")
 
     targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'],
-                                   provides="""artifact(org='com.example', name='shoe', repo=internal)""",
-                                   dependencies=['a'])
+                                       provides="""artifact(org='com.example', name='shoe', repo=internal)""",
+                                       dependencies=['a'])
 
     if with_alias:
       # add an alias target between c and b
@@ -78,16 +77,14 @@ class JarPublishTest(TaskTest):
 
     return targets.values()
 
-  def _get_config(self):
-    return """
-[jar-publish]
-repos: {
-    'internal': {
-      'resolver': 'example.com',
-      'confs': ['default', 'sources', 'docs', 'changelog'],
+  def _get_repos(self):
+    return {
+      'internal': {
+        'resolver': 'example.com',
+        'confs': ['default', 'sources', 'docs', 'changelog'],
+      }
     }
-   }
-"""
+
 
   def _prepare_mocks(self, task):
     task.scm = Mock()
@@ -101,23 +98,17 @@ repos: {
 
   def test_publish_unlisted_repo(self):
     # Note that we set a different config here, so repos:internal has no config
-    config = """
-[jar-publish]
-repos: {
-    'another-repo': {
-      'resolver': 'example.org',
-      'confs': ['default', 'sources', 'docs', 'changelog'],
+    repos = {
+      'another-repo': {
+        'resolver': 'example.org',
+        'confs': ['default', 'sources', 'docs', 'changelog'],
+      }
     }
-  }
-"""
 
     targets = self._prepare_for_publishing()
     with temporary_dir():
-      task = self.prepare_task(config=config,
-                               args=['--no-test-dryrun'],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser,
-                               targets=targets)
+      self.set_options(dryrun=False, repos=repos)
+      task = self.create_task(self.context(target_roots=targets))
       self._prepare_mocks(task)
       with self.assertRaises(TaskError):
         try:
@@ -130,10 +121,8 @@ repos: {
     targets = self._prepare_for_publishing()
 
     with temporary_dir() as publish_dir:
-      task = self.prepare_task(args=['--test-local=%s' % publish_dir],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser,
-                               targets=targets)
+      self.set_options(local=publish_dir)
+      task = self.create_task(self.context(target_roots=targets))
       self._prepare_mocks(task)
       task.execute()
 
@@ -155,11 +144,8 @@ repos: {
       targets = self._prepare_for_publishing(with_alias=with_alias)
 
       with temporary_dir() as publish_dir:
-        task = self.prepare_task(args=['--test-local=%s' % publish_dir,
-                                      '--no-test-dryrun'],
-                                build_graph=self.build_graph,
-                                build_file_parser=self.build_file_parser,
-                                targets=targets)
+        self.set_options(dryrun=False, local=publish_dir)
+        task = self.create_task(self.context(target_roots=targets))
         self._prepare_mocks(task)
         task.execute()
 
@@ -179,12 +165,8 @@ repos: {
 
   def test_publish_remote(self):
     targets = self._prepare_for_publishing()
-
-    task = self.prepare_task(config=self._get_config(),
-                             args=['--no-test-dryrun'],
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser,
-                             targets=targets)
+    self.set_options(dryrun=False, repos=self._get_repos())
+    task = self.create_task(self.context(target_roots=targets))
     self._prepare_mocks(task)
     task.execute()
 
@@ -204,13 +186,8 @@ repos: {
 
   def test_publish_retry_works(self):
     targets = self._prepare_for_publishing()
-
-    task = self.prepare_task(config=self._get_config(),
-                             args=['--no-test-dryrun',
-                                   '--test-scm-push-attempts=3'],
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser,
-                             targets=[targets[0]])
+    self.set_options(dryrun=False, scm_push_attempts=3, repos=self._get_repos())
+    task = self.create_task(self.context(target_roots=targets[0:1]))
     self._prepare_mocks(task)
 
     task.scm.push = Mock()
@@ -223,12 +200,8 @@ repos: {
     targets = self._prepare_for_publishing()
 
     #confirm that we fail if we have too many failed push attempts
-    task = self.prepare_task(config=self._get_config(),
-                             args=['--no-test-dryrun',
-                                   '--test-scm-push-attempts=3'],
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser,
-                             targets=[targets[0]])
+    self.set_options(dryrun=False, scm_push_attempts=3, repos=self._get_repos())
+    task = self.create_task(self.context(target_roots=targets[0:1]))
     self._prepare_mocks(task)
     task.scm.push = Mock()
     task.scm.push.side_effect = FailNTimes(3, Scm.RemoteException)
@@ -236,8 +209,8 @@ repos: {
       task.execute()
 
   def test_publish_local_only(self):
-    with pytest.raises(TaskError) as exc:
-      self.prepare_task()
+    with pytest.raises(TaskError):
+      self.create_task(self.context())
 
 class FailNTimes:
   def __init__(self, tries, exc_type, success=None):

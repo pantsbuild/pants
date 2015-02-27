@@ -124,6 +124,11 @@ migrations = {
   ('python-ipython', 'entry-point'): ('repl.py', 'ipython_entry_point'),
   ('python-ipython', 'requirements'): ('repl.py', 'ipython_requirements'),
 
+  ('jar-publish', 'restrict_push_branches'): ('publish', 'restrict_push_branches'),
+  ('jar-publish', 'ivy_jvmargs'): ('publish', 'jvm_options'),
+  ('jar-publish', 'repos'): ('publish', 'repos'),
+  ('jar-publish', 'publish_extras'): ('publish', 'publish_extras'),
+
   # Three changes are pertinent to migrate 'ide' to both idea and & eclipse. I tried to capture
   # that in notes
   ('ide', 'python_source_paths'): ('idea', 'python_source_path'),
