@@ -205,7 +205,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Various working directories.
     self._classes_dir = os.path.join(self.workdir, 'classes')
-    self._resources_dir = os.path.join(self.workdir, 'resources')
     self._analysis_dir = os.path.join(self.workdir, 'analysis')
     self._target_sources_dir = os.path.join(self.workdir, 'target_sources')
 
@@ -312,7 +311,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
     for conf in self._confs:
-      compile_classpaths.add_for_targets(all_targets, [(conf, self._classes_dir), (conf, self._resources_dir)])
+      compile_classpaths.add_for_targets(all_targets, [(conf, self._classes_dir)])
 
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
