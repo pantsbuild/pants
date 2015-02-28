@@ -331,7 +331,7 @@ class JarPublish(JarTask, ScmPublish):
 
   * ``--repos`` - Required dictionary of settings for repos that may be pushed to.
   * ``--jvm-options`` - Optional list of JVM command-line args when invoking Ivy.
-  * ``--restrict_push_branches`` - Optional list of branches to restrict publishing to.
+  * ``--restrict-push-branches`` - Optional list of branches to restrict publishing to.
 
   Example repos dictionary: ::
 
@@ -400,9 +400,11 @@ class JarPublish(JarTask, ScmPublish):
     register('--jvm-options', advanced=True, type=Options.list,
              help='Use these jvm options when running Ivy.')
     register('--repos', advanced=True, type=Options.dict,
-             help='Settings for repositories that can be pushed to.')
+             help='Settings for repositories that can be pushed to. See '
+                  'https://pantsbuild.github.io/publish.html for details.')
     register('--publish-extras', advanced=True, type=Options.dict,
-             help='Extra products to publish.')
+             help='Extra products to publish. See '
+                  'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
 
   @classmethod
   def prepare(cls, options, round_manager):
