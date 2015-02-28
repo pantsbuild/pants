@@ -34,6 +34,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
+from pants.option.options import Options
 from pants.scm.scm import Scm
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
@@ -326,15 +327,13 @@ class JarPublish(JarTask, ScmPublish):
   Please see ``./pants publish -h`` for a detailed description of all
   publishing options.
 
-  Publishing can be configured in ``pants.ini`` as follows.
+  Publishing can be configured with the following options:
 
-  ``jar-publish`` section:
+  * ``--repos`` - Required dictionary of settings for repos that may be pushed to.
+  * ``--jvm-options`` - Optional list of JVM command-line args when invoking Ivy.
+  * ``--restrict-push-branches`` - Optional list of branches to restrict publishing to.
 
-  * ``repos`` - Required dictionary of settings for repos that may be pushed to.
-  * ``ivy_jvmargs`` - Optional list of JVM command-line args when invoking Ivy.
-  * ``restrict_push_branches`` - Optional list of branches to restrict publishing to.
-
-  Example pants.ini jar-publish repos dictionary: ::
+  Example repos dictionary: ::
 
      repos = {
        # repository target name is paired with this key
@@ -349,12 +348,7 @@ class JarPublish(JarTask, ScmPublish):
          'help': 'Please check your credentials and try again.',
        },
      }
-
-  Additionally the ``ivy`` section ``ivy_settings`` property specifies which
-  Ivy settings file to use when publishing is required.
   """
-
-  _CONFIG_SECTION = 'jar-publish'
   _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
@@ -399,8 +393,18 @@ class JarPublish(JarTask, ScmPublish):
                   'maven coordinate [org]#[name] or target. '
                   'For example: --restart-at=com.twitter.common#quantity '
                   'Or: --restart-at=src/java/com/twitter/common/base')
-    register('--ivy_settings', default=None, advanced=True,
+    register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
+    register('--restrict-push-branches', advanced=True, type=Options.list,
+             help='Allow pushes only from one of these branches.')
+    register('--jvm-options', advanced=True, type=Options.list,
+             help='Use these jvm options when running Ivy.')
+    register('--repos', advanced=True, type=Options.dict,
+             help='Settings for repositories that can be pushed to. See '
+                  'https://pantsbuild.github.io/publish.html for details.')
+    register('--publish-extras', advanced=True, type=Options.dict,
+             help='Extra products to publish. See '
+                  'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -411,12 +415,10 @@ class JarPublish(JarTask, ScmPublish):
 
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
-    ScmPublish.__init__(self, get_scm(),
-                        self.context.config.getlist(self._CONFIG_SECTION,
-                                                    'restrict_push_branches'))
+    ScmPublish.__init__(self, get_scm(), self.get_options().restrict_push_branches)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
-    self._jvm_options = self.context.config.getlist(self._CONFIG_SECTION, 'ivy_jvmargs', default=[])
+    self._jvm_options = self.get_options().jvm_options
 
     if self.get_options().local:
       local_repo = dict(
@@ -429,7 +431,7 @@ class JarPublish(JarTask, ScmPublish):
       self.commit = False
       self.local_snapshot = self.get_options().local_snapshot
     else:
-      self.repos = self.context.config.getdict(self._CONFIG_SECTION, 'repos')
+      self.repos = self.get_options().repos
       if not self.repos:
         raise TaskError("This repo is not configured to publish externally! Please configure per\n"
                         "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
@@ -449,8 +451,6 @@ class JarPublish(JarTask, ScmPublish):
     self.named_snapshot = self.get_options().named_snapshot
     if self.named_snapshot:
       self.named_snapshot = Namedver.parse(self.named_snapshot)
-
-    self.ivycp = self.context.config.getlist('ivy', 'classpath')
 
     self.dryrun = self.get_options().dryrun
     self.transitive = self.get_options().transitive
@@ -501,10 +501,6 @@ class JarPublish(JarTask, ScmPublish):
     self.restart_at = None
     if self.get_options().restart_at:
       self.restart_at = parse_jarcoordinate(self.get_options().restart_at)
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
@@ -618,8 +614,8 @@ class JarPublish(JarTask, ScmPublish):
         try:
           repo = self.repos[tgt.provides.repo.name]
         except KeyError:
-          msg = "Repository %s has no entry in pants.ini's %s section under key 'repos'"
-          raise TaskError(msg % (tgt.provides.repo.name, self._CONFIG_SECTION))
+          raise TaskError('Repository {0} has no entry in the --repos option.'.format(
+            tgt.provides.repo.name))
         result = (db, dbfile, repo)
         pushdbs[dbfile] = result
       return result
@@ -660,10 +656,7 @@ class JarPublish(JarTask, ScmPublish):
 
       # Process any extra jars that might have been previously generated for this target, or a
       # target that it was derived from.
-      publish_extras = self.context.config.getdict(self._CONFIG_SECTION, 'publish_extras') or {}
-      for extra_product in publish_extras:
-        extra_config = publish_extras[extra_product]
-
+      for extra_product, extra_config in (self.get_options().publish_extras or {}).items():
         override_name = jar.name
         if 'override_name' in extra_config:
           # If the supplied string has a '{target_provides_name}' in it, replace it with the
