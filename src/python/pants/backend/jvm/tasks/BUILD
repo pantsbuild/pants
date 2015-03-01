@@ -298,6 +298,18 @@ python_library(
 python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
+  dependencies = [
+    ':jar_artifact_publish',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:generator',
+  ],
+)
+
+python_library(
+  name = 'jar_artifact_publish',
+  sources = ['jar_artifact_publish.py'],
   resources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
   dependencies = [
     ':jar_task',
@@ -306,23 +318,20 @@ python_library(
     'src/python/pants/backend/core/tasks:scm_publish',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:address',
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_parser',
-    'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/ivy',
     'src/python/pants/option',
     'src/python/pants/scm',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
-  ],
-)
+    ],
+  )
 
 python_library(
   name = 'jar_task',

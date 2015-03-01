@@ -16,9 +16,8 @@ import sys
 import traceback
 from collections import defaultdict
 
-from twitter.common.collections import OrderedDict, OrderedSet
+from twitter.common.collections import OrderedDict
 from twitter.common.config import Properties
-from twitter.common.log.options import LogOptions
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
 from pants.backend.jvm.targets.jarable import Jarable
@@ -29,9 +28,7 @@ from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.build_file_parser import BuildFileParser
-from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
-from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
@@ -296,7 +293,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
 
   @classmethod
   def register_options(cls, register):
-    super(JarPublish, cls).register_options(register)
+    super(JarArtifactPublish, cls).register_options(register)
 
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
@@ -350,7 +347,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
                 'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
 
   def __init__(self, *args, **kwargs):
-    super(JarPublish, self).__init__(*args, **kwargs)
+    super(JarArtifactPublish, self).__init__(*args, **kwargs)
     ScmPublish.__init__(self, get_scm(), self.get_options().restrict_push_branches)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
@@ -517,7 +514,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
       '-m2compatible',
       ]
 
-    if LogOptions.stderr_log_level() == logging.DEBUG:
+    if self.get_options().level == 'debug':
       args.append('-verbose')
 
     if self.local_snapshot:
@@ -838,10 +835,12 @@ class JarArtifactPublish(JarTask, ScmPublish):
                               'conf': ivy_tmpl_key,
                               'classifier': classifier,
                               'ext': extension})
-    return self.stage_artifact(tgt, jar, version, changelog, confs, extra_confs=extra_confs)
+    return self.stage_artifact(tgt, jar, version, changelog, confs,
+                               artifact_ext=self.artifact_ext,
+                               extra_confs=extra_confs)
 
   def stage_artifact(self, tgt, jar, version, changelog, confs=None,
-                     artifact_ext=self.artifact_ext, extra_confs=None):
+                     artifact_ext='', extra_confs=None):
     def path(name=None, suffix='', extension='jar'):
       return self.artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
                                 artifact_ext=artifact_ext)
