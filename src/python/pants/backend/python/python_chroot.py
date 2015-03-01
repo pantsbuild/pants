@@ -32,7 +32,6 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.base.config import Config
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
@@ -63,7 +62,6 @@ class PythonChroot(object):
                platforms=None,
                interpreter=None):
     self.context = context
-    self._config = Config.from_cache()
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms
@@ -73,7 +71,7 @@ class PythonChroot(object):
 
     # Note: unrelated to the general pants artifact cache.
     self._egg_cache_root = os.path.join(
-        PythonSetup(self._config).scratch_dir('artifact_cache', default_name='artifacts'),
+        PythonSetup(self.context.config).scratch_dir('artifact_cache', default_name='artifacts'),
         str(self._interpreter.identity))
 
     self._key_generator = CacheKeyGenerator()
@@ -137,7 +135,8 @@ class PythonChroot(object):
 
   def _generate_requirement(self, library, builder_cls):
     library_key = self._key_generator.key_for_target(library)
-    builder = builder_cls(library, get_buildroot(), self._config, '-' + library_key.hash[:8])
+    builder = builder_cls(library, get_buildroot(),
+                          self.context.options, '-' + library_key.hash[:8])
 
     cache_dir = os.path.join(self._egg_cache_root, library_key.id)
     if self._build_invalidator.needs_update(library_key):
@@ -205,7 +204,7 @@ class PythonChroot(object):
         find_links.append(req.repository)
 
     distributions = resolve_multi(
-         self._config,
+         self.context.config,
          reqs_to_build,
          interpreter=self._interpreter,
          platforms=self._platforms,

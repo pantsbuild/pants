@@ -15,7 +15,6 @@ import sys
 from pants import binary_util
 from pants.backend.core.tasks.task import QuietTaskMixin, Task
 from pants.base.build_environment import get_buildroot
-from pants.base.run_info import RunInfo
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 
 
@@ -36,6 +35,10 @@ class RunServer(Task, QuietTaskMixin):
                   'your source code is exposed to all allowed clients!')
     register('--open', action='store_true', default=False,
              help='Attempt to open the server web ui in a browser.')
+    register('--template-dir', advanced=True,
+             help='Use templates from this dir instead of the defaults.')
+    register('--assets-dir', advanced=True,
+             help='Use assets from this dir instead of the defaults.')
 
   def execute(self):
     DONE = '__done_reporting'
@@ -66,11 +69,13 @@ class RunServer(Task, QuietTaskMixin):
         # but is allowed to block indefinitely on the server loop.
         if not os.fork():
           # Child process.
-          info_dir = RunInfo.dir(self.context.config)
+          # The server finds run-specific info dirs by looking at the subdirectories of info_dir,
+          # which is conveniently and obviously the parent dir of the current run's info dir.
+          info_dir = os.path.dirname(self.context.run_tracker.run_info_dir)
           # If these are specified explicitly in the config, use those. Otherwise
           # they will be None, and we'll use the ones baked into this package.
-          template_dir = self.context.config.get('reporting', 'reports_template_dir')
-          assets_dir = self.context.config.get('reporting', 'reports_assets_dir')
+          template_dir = self.get_options().template_dir
+          assets_dir = self.get_options().assets_dir
           settings = ReportingServer.Settings(info_dir=info_dir, template_dir=template_dir,
                                               assets_dir=assets_dir, root=get_buildroot(),
                                               allowed_clients=self.get_options().allowed_clients)

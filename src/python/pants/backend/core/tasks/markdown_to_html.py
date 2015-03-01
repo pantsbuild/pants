@@ -224,7 +224,7 @@ class MarkdownToHtml(Task):
   def execute(self):
     # TODO(John Sirois): consider adding change detection
 
-    outdir = os.path.join(self.context.config.getdefault('pants_distdir'), 'markdown')
+    outdir = os.path.join(self.get_options().pants_distdir, 'markdown')
     css_path = os.path.join(outdir, 'css', 'codehighlight.css')
     css = emit_codehighlight_css(css_path, self.code_style)
     if css:

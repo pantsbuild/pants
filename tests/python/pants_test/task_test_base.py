@@ -5,6 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import shutil
+import tempfile
 import uuid
 
 from pants_test.base_test import BaseTest
@@ -28,6 +31,19 @@ class TaskTestBase(BaseTest):
   def setUp(self):
     super(TaskTestBase, self).setUp()
     self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
+    # Some tasks nuke their own workdir, while we want to nuke the tempdir in tearDown.
+    # So we use a subdir.
+    self._tmpdir = tempfile.mkdtemp()
+    self._test_workdir = os.path.join(self._tmpdir, 'workdir')
+    os.mkdir(self._test_workdir)
+
+  def tearDown(self):
+    super(TaskTestBase, self).tearDown()
+    shutil.rmtree(self._tmpdir)
+
+  @property
+  def test_workdir(self):
+    return self._test_workdir
 
   def synthesize_task_subtype(self, task_type):
     """Creates a synthetic subclass of the task type.
@@ -55,5 +71,5 @@ class TaskTestBase(BaseTest):
                                              target_roots=target_roots,
                                              **kwargs)
 
-  def create_task(self, context, workdir):
-    return self._testing_task_type(context, workdir)
+  def create_task(self, context, workdir=None):
+    return self._testing_task_type(context, workdir or self._test_workdir)

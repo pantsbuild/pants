@@ -11,7 +11,8 @@ from contextlib import contextmanager
 import pytest
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
-                                   MissingRemovalVersionError, PastRemovalVersionError, deprecated)
+                                   MissingRemovalVersionError, PastRemovalVersionError,
+                                   check_deprecated_semver, deprecated)
 from pants.version import VERSION
 
 
@@ -91,29 +92,38 @@ def test_removal_version_required():
 
 def test_removal_version_bad():
   with pytest.raises(BadRemovalVersionError):
+    check_deprecated_semver(1.0)
+
+  with pytest.raises(BadRemovalVersionError):
     @deprecated(1.0)
     def test_func():
       pass
+
+  with pytest.raises(BadRemovalVersionError):
+    check_deprecated_semver('1.a.0')
 
   with pytest.raises(BadRemovalVersionError):
     @deprecated('1.a.0')
     def test_func():
       pass
 
-
 def test_removal_version_same():
+  with pytest.raises(PastRemovalVersionError):
+    check_deprecated_semver(VERSION)
+
   with pytest.raises(PastRemovalVersionError):
     @deprecated(VERSION)
     def test_func():
       pass
 
-
 def test_removal_version_too_small():
+  with pytest.raises(PastRemovalVersionError):
+    check_deprecated_semver('0.0.27')
+
   with pytest.raises(PastRemovalVersionError):
     @deprecated('0.0.27')
     def test_func():
       pass
-
 
 def test_bad_decorator_nesting():
   with pytest.raises(BadDecoratorNestingError):

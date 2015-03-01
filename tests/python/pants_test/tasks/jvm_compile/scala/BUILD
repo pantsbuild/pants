@@ -1,4 +1,4 @@
-python_test_suite(
+target(
   name = 'scala',
   dependencies = [
     ':test_zinc_analysis',

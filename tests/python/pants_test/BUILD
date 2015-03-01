@@ -88,7 +88,7 @@ target(
   ]
 )
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':test_binary_util',
@@ -104,6 +104,7 @@ python_test_suite(
     'tests/python/pants_test/graph',
     'tests/python/pants_test/goal',
     'tests/python/pants_test/java',
+    'tests/python/pants_test/logging',
     'tests/python/pants_test/net',
     'tests/python/pants_test/option',
     'tests/python/pants_test/process',
