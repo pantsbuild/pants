@@ -324,6 +324,7 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/ivy',
     'src/python/pants/option',

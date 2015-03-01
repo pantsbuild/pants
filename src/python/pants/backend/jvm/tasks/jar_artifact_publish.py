@@ -29,6 +29,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.exceptions import TaskError
+from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
@@ -526,41 +527,41 @@ class JarArtifactPublish(JarTask, ScmPublish):
     except Ivy.Error as e:
       raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))
 
+  def get_db(self, tgt):
+    # TODO(tdesai) Handle resource type in get_db.
+    if tgt.provides is None:
+      raise TaskError('trying to publish target %r which does not provide an artifact' % tgt)
+    dbfile = tgt.provides.repo.push_db(tgt)
+    result = self.pushdbs.get(dbfile)
+    if not result:
+      # Create an empty pushdb if no dbfile exists.
+      if (os.path.exists(dbfile)):
+        db = PushDb.load(dbfile)
+      else:
+        safe_mkdir(os.path.dirname(dbfile))
+        db = PushDb()
+      try:
+        repo = self.repos[tgt.provides.repo.name]
+      except KeyError:
+        raise TaskError('Repository {0} has no entry in the --repos option.'.format(
+          tgt.provides.repo.name))
+      result = (db, dbfile, repo)
+      self.pushdbs[dbfile] = result
+    return result
+
+  def get_pushdb(self, tgt):
+    return self.get_db(tgt)[0]
+
   def execute(self):
     self.check_clean_master(commit=(not self.dryrun and self.commit))
 
     exported_targets = self.exported_targets()
     self.check_targets(exported_targets)
 
-    pushdbs = {}
-
-    def get_db(tgt):
-      # TODO(tdesai) Handle resource type in get_db.
-      if tgt.provides is None:
-        raise TaskError('trying to publish target %r which does not provide an artifact' % tgt)
-      dbfile = tgt.provides.repo.push_db(tgt)
-      result = pushdbs.get(dbfile)
-      if not result:
-        # Create an empty pushdb if no dbfile exists.
-        if (os.path.exists(dbfile)):
-          db = PushDb.load(dbfile)
-        else:
-          safe_mkdir(os.path.dirname(dbfile))
-          db = PushDb()
-        try:
-          repo = self.repos[tgt.provides.repo.name]
-        except KeyError:
-          raise TaskError('Repository {0} has no entry in the --repos option.'.format(
-            tgt.provides.repo.name))
-        result = (db, dbfile, repo)
-        pushdbs[dbfile] = result
-      return result
-
-    def get_pushdb(tgt):
-      return get_db(tgt)[0]
+    self.pushdbs = {}
 
     def fingerprint_internal(tgt):
-      pushdb = get_pushdb(tgt)
+      pushdb = self.get_pushdb(tgt)
       entry = pushdb.get_entry(tgt)
       return entry.fingerprint or '0.0.0'
 
@@ -575,7 +576,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
     published = []
     skip = (self.restart_at is not None)
     for target in exported_targets:
-      pushdb, dbfile, repo = get_db(target)
+      pushdb, dbfile, repo = self.get_db(target)
       oldentry = pushdb.get_entry(target)
 
       # the jar version is ignored here, since it is overridden below with the new entry
@@ -779,7 +780,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
       generator.write(wrapper)
       return wrapper.name
 
-  def stage_artifacts(self, tgt, jar, version, changelog):
+  def stage_artifacts(self, tgt, jar, version, confs, changelog):
     self._copy_artifact(tgt, jar, version, typename=self.jar_product_type)
     extra_confs = []
 

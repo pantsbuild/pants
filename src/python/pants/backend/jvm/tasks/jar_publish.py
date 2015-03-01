@@ -82,7 +82,7 @@ class JarPublish(JarArtifactPublish):
 
   @classmethod
   def register_options(cls, register):
-    super(JarArtifactPublish, cls).register_options(register)
+    super(JarPublish, cls).register_options(register)
 
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
