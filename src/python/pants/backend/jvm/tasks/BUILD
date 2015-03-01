@@ -99,7 +99,7 @@ python_library(
   name = 'check_published_deps',
   sources = ['check_published_deps.py'],
   dependencies = [
-    ':jar_publish',
+    ':jar_artifact_publish',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/core/tasks:console_task',
   ],
