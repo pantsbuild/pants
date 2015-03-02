@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import getpass
 import hashlib
-import logging
 import os
 import pkgutil
 import shutil
@@ -23,6 +22,7 @@ from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
@@ -208,31 +208,90 @@ class DependencyWriter(object):
     raise NotImplementedError()
 
 
+class PomWriter(DependencyWriter):
+  def __init__(self, get_db):
+    super(PomWriter, self).__init__(
+      get_db,
+      os.path.join('templates', 'jar_publish', 'pom.mustache'))
+
+  def templateargs(self, target_jar, confs=None, extra_confs=None):
+    return dict(artifact=target_jar)
+
+  def jardep(self, jar):
+    return TemplateData(
+      org=jar.org,
+      name=jar.name,
+      rev=jar.rev,
+      scope='compile',
+      excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
+
+  def internaldep(self, jar_dependency, dep=None, configurations=None):
+    return self.jardep(jar_dependency)
+
+
+class IvyWriter(DependencyWriter):
+  JAVADOC_CONFIG = 'javadoc'
+  SOURCES_CONFIG = 'sources'
+  DEFAULT_CONFIG = 'default'
+
+  def __init__(self, get_db):
+    super(IvyWriter, self).__init__(
+      get_db,
+      IvyUtils.IVY_TEMPLATE_PATH,
+      template_package_name=IvyUtils.IVY_TEMPLATE_PACKAGE_NAME)
+
+  def templateargs(self, target_jar, confs=None, extra_confs=None):
+    return dict(lib=target_jar.extend(
+      publications=set(confs or []),
+      extra_publications=extra_confs if extra_confs else {},
+      overrides=None))
+
+  def _jardep(self, jar, transitive=True, configurations='default'):
+    return TemplateData(
+      org=jar.org,
+      module=jar.name,
+      version=jar.rev,
+      mutable=False,
+      force=jar.force,
+      excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
+      transitive=transitive,
+      artifacts=jar.artifacts,
+      configurations=configurations)
+
+  def jardep(self, jar):
+    return self._jardep(jar,
+                        transitive=jar.transitive,
+                        configurations=jar._configurations)
+
+  def internaldep(self, jar_dependency, dep=None, configurations=None):
+    return self._jardep(jar_dependency, configurations=configurations)
+
+
 def coordinate(org, name, rev=None):
-	return '%s#%s;%s' % (org, name, rev) if rev else '%s#%s' % (org, name)
+  return '%s#%s;%s' % (org, name, rev) if rev else '%s#%s' % (org, name)
 
 
 def jar_coordinate(jar, rev=None):
-	return coordinate(jar.org, jar.name, rev or jar.rev)
+  return coordinate(jar.org, jar.name, rev or jar.rev)
 
 
 def pushdb_coordinate(jar, entry):
-	return jar_coordinate(jar, rev=entry.version().version())
+  return jar_coordinate(jar, rev=entry.version().version())
 
 
 def target_internal_dependencies(target):
-	"""Returns internal Jarable dependencies that were "directly" declared.
+  """Returns internal Jarable dependencies that were "directly" declared.
 
-	Directly declared deps are those that are explicitly listed in the definition of a
-	target, rather than being depended on transitively. But in order to walk through
-	aggregator targets such as `target`, `dependencies`, or `jar_library`, this recursively
-	descends the dep graph and stops at Jarable instances."""
-	for dep in target.dependencies:
-		if isinstance(dep, Jarable):
-			yield dep
-		else:
-			for childdep in target_internal_dependencies(dep):
-				yield childdep
+  Directly declared deps are those that are explicitly listed in the definition of a
+  target, rather than being depended on transitively. But in order to walk through
+  aggregator targets such as `target`, `dependencies`, or `jar_library`, this recursively
+  descends the dep graph and stops at Jarable instances."""
+  for dep in target.dependencies:
+    if isinstance(dep, Jarable):
+      yield dep
+    else:
+      for childdep in target_internal_dependencies(dep):
+        yield childdep
 
 
 class JarArtifactPublish(JarTask, ScmPublish):
@@ -291,6 +350,8 @@ class JarArtifactPublish(JarTask, ScmPublish):
   """
 
   _SCM_PUSH_ATTEMPTS = 5
+  _DEFAULT_IVY = 'jar'
+  _DEFAULT_EXTENSION = 'jar'
 
   @classmethod
   def register_options(cls, register):
@@ -734,9 +795,6 @@ class JarArtifactPublish(JarTask, ScmPublish):
 
       raise TaskError('The following errors must be resolved to publish.%s' % ''.join(msg))
 
-  def exported_targets(self):
-    raise NotImplementedError('Subclasses must define exported_targets')
-
   def fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
     sha.update(target.invalidation_hash())
@@ -854,13 +912,17 @@ class JarArtifactPublish(JarTask, ScmPublish):
     self.pom_writer(self.get_pushdb).write(tgt, path(extension='pom'))
     return ivyxml
 
+  def exported_targets(self):
+    raise NotImplementedError('Subclasses must define exported_targets')
+
   @property
   def ivy_type(self):
     "Returns the default product type. Subclasses can override this "
-    return 'jar'
+    return self._DEFAULT_IVY
+
   @property
   def jar_extension(self):
-    return 'jar'
+    return self._DEFAULT_EXTENSION
 
   @property
   def jar_product_type(self):
@@ -871,11 +933,11 @@ class JarArtifactPublish(JarTask, ScmPublish):
     raise NotImplementedError('Subclasses must define artifact extension for jar')
   @property
   def ivy_writer(self):
-    raise NotImplementedError('Subclasses must define Ivy Dependency writer.')
+    return IvyWriter
 
   @property
   def pom_writer(self):
-    raise NotImplementedError('Subclasses must define Pom Dependency Writer.')
+    return PomWriter
 
   @property
   def classifier(self):

@@ -9,76 +9,13 @@ import os
 
 from twitter.common.collections import OrderedDict, OrderedSet
 
-from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.tasks.jar_artifact_publish import DependencyWriter, JarArtifactPublish
+from pants.backend.jvm.tasks.jar_artifact_publish import JarArtifactPublish
 from pants.base.build_graph import sort_targets
-from pants.base.generator import Generator, TemplateData
-
-
-class PomWriter(DependencyWriter):
-  def __init__(self, get_db):
-    super(PomWriter, self).__init__(
-        get_db,
-        os.path.join('templates', 'jar_publish', 'pom.mustache'))
-
-  def templateargs(self, target_jar, confs=None, extra_confs=None):
-    return dict(artifact=target_jar)
-
-  def jardep(self, jar):
-    return TemplateData(
-        org=jar.org,
-        name=jar.name,
-        rev=jar.rev,
-        scope='compile',
-        excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
-
-  def internaldep(self, jar_dependency, dep=None, configurations=None):
-    return self.jardep(jar_dependency)
-
-
-class IvyWriter(DependencyWriter):
-  JAVADOC_CONFIG = 'javadoc'
-  SOURCES_CONFIG = 'sources'
-  DEFAULT_CONFIG = 'default'
-
-  def __init__(self, get_db):
-    super(IvyWriter, self).__init__(
-        get_db,
-        IvyUtils.IVY_TEMPLATE_PATH,
-        template_package_name=IvyUtils.IVY_TEMPLATE_PACKAGE_NAME)
-
-  def templateargs(self, target_jar, confs=None, extra_confs=None):
-    return dict(lib=target_jar.extend(
-        publications=set(confs or []),
-        extra_publications=extra_confs if extra_confs else {},
-        overrides=None))
-
-  def _jardep(self, jar, transitive=True, configurations='default'):
-    return TemplateData(
-        org=jar.org,
-        module=jar.name,
-        version=jar.rev,
-        mutable=False,
-        force=jar.force,
-        excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
-        transitive=transitive,
-        artifacts=jar.artifacts,
-        configurations=configurations)
-
-  def jardep(self, jar):
-    return self._jardep(jar,
-        transitive=jar.transitive,
-        configurations=jar._configurations)
-
-  def internaldep(self, jar_dependency, dep=None, configurations=None):
-    return self._jardep(jar_dependency, configurations=configurations)
 
 
 class JarPublish(JarArtifactPublish):
   """Publish compiled classes, sources and javadocs to a maven repository.
   """
-
-  _CONFIG_SECTION = 'jar-publish'
 
   @classmethod
   def register_options(cls, register):
@@ -166,14 +103,6 @@ class JarPublish(JarArtifactPublish):
   @property
   def artifact_ext(self):
     return ''
-
-  @property
-  def ivy_writer(self):
-    return IvyWriter
-
-  @property
-  def pom_writer(self):
-    return PomWriter
 
   @property
   def classifier(self):

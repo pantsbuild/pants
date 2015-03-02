@@ -5,96 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import unittest
 
 import pytest
 from mock import Mock
 
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.jvm.artifact import Artifact
-from pants.backend.jvm.repository import Repository
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_publish import JarPublish
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk
-from pants_test.task_test_base import TaskTestBase
+from pants.util.dirutil import safe_walk
+from pants_test.tasks.test_jar_artifact_publish import JarArtifactPublishTest
 
 
-class JarPublishTest(TaskTestBase):
+class JarPublishTest(JarArtifactPublishTest):
   @classmethod
   def task_type(cls):
     return JarPublish
-
-  def test_smoke_publish(self):
-    with temporary_dir() as publish_dir:
-      self.set_options(local=publish_dir)
-      task = self.create_task(self.context())
-      task.scm = Mock()
-      task.execute()
-
-  @property
-  def alias_groups(self):
-    self.push_db_basedir = os.path.join(self.build_root, "pushdb")
-    safe_mkdir(self.push_db_basedir)
-
-    return BuildFileAliases.create(
-      targets={
-        'jar_library': JarLibrary,
-        'java_library': JavaLibrary,
-        'target': Dependencies,
-      },
-      objects={
-        'artifact': Artifact,
-        'internal': Repository(name='internal', url='http://example.com',
-                               push_db_basedir=self.push_db_basedir),
-      },
-    )
-
-  def _prepare_for_publishing(self, with_alias=False):
-    targets = {}
-    targets['a'] = self.create_library('a', 'java_library', 'a', ['A.java'],
-                                       provides="""artifact(org='com.example', name='nail', repo=internal)""")
-
-    targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'],
-                                       provides="""artifact(org='com.example', name='shoe', repo=internal)""",
-                                       dependencies=['a'])
-
-    if with_alias:
-      # add an alias target between c and b
-      targets['z'] = self.create_library('z', 'target', 'z', dependencies=['b'])
-      c_deps = ['z']
-    else:
-      c_deps = ['b']
-
-    targets['c'] = self.create_library('c', 'java_library', 'c', ['C.java'],
-                                       provides="""artifact(org='com.example', name='horse', repo=internal)""",
-                                       dependencies=c_deps)
-
-    return targets.values()
-
-  def _get_repos(self):
-    return {
-      'internal': {
-        'resolver': 'example.com',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
-      }
-    }
-
-
-  def _prepare_mocks(self, task):
-    task.scm = Mock()
-    task.scm.changed_files = Mock(return_value=[])
-    task._copy_artifact = Mock()
-    task.create_source_jar = Mock()
-    task.create_doc_jar = Mock()
-    task.changelog = Mock(return_value="Many changes")
-    task.publish = Mock()
-    task.confirm_push = Mock(return_value=True)
 
   def test_publish_unlisted_repo(self):
     # Note that we set a different config here, so repos:internal has no config
