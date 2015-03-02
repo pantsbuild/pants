@@ -417,7 +417,8 @@ python_tests(
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    ],
+    'tests/python/pants_test:task_test_base',
+  ],
 )
 
 python_tests(
@@ -431,6 +432,7 @@ python_tests(
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 

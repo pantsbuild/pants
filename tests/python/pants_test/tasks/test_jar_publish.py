@@ -15,10 +15,11 @@ from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
+from pants_test.task_test_base import TaskTestBase
 from pants_test.tasks.test_jar_artifact_publish import JarArtifactPublishTest
 
 
-class JarPublishTest(JarArtifactPublishTest):
+class JarPublishTest(JarArtifactPublishTest, TaskTestBase):
   @classmethod
   def task_type(cls):
     return JarPublish
@@ -66,30 +67,6 @@ class JarPublishTest(JarArtifactPublishTest):
       self.assertEquals(0, task.publish.call_count,
                         "Expected publish not to be called")
 
-  def test_publish_local(self):
-    for with_alias in [True, False]:
-      targets = self._prepare_for_publishing(with_alias=with_alias)
-
-      with temporary_dir() as publish_dir:
-        self.set_options(dryrun=False, local=publish_dir)
-        task = self.create_task(self.context(target_roots=targets))
-        self._prepare_mocks(task)
-        task.execute()
-
-        #Nothing is written to the pushdb during a local publish
-        #(maybe some directories are created, but git will ignore them)
-        files = []
-        for _, _, filenames in safe_walk(self.push_db_basedir):
-          files.extend(filenames)
-        self.assertEquals(0, len(files),
-                          "Nothing should be written to the pushdb during a local publish")
-
-        publishable_count = len(targets) - (1 if with_alias else 0)
-        self.assertEquals(publishable_count, task.confirm_push.call_count,
-                          "Expected one call to confirm_push per artifact")
-        self.assertEquals(publishable_count, task.publish.call_count,
-                          "Expected one call to publish per artifact")
-
   def test_publish_remote(self):
     targets = self._prepare_for_publishing()
     self.set_options(dryrun=False, repos=self._get_repos())
@@ -110,6 +87,9 @@ class JarPublishTest(JarArtifactPublishTest):
                       "Expected one call to publish per artifact")
     self.assertEquals(len(targets), task.scm.tag.call_count,
                       "Expected one call to scm.tag per artifact")
+
+  def test_publish_local(self):
+    self.publish_local()
 
   def test_publish_retry_works(self):
     targets = self._prepare_for_publishing()
