@@ -57,11 +57,11 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:unpack_jars',
-    'src/python/pants/base:target',
-    'tests/python/pants_test:base_test',
+    'src/python/pants/backend/jvm/tasks:ivy_imports',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:base'
-    ]
+  ]
 )
 
 python_tests(

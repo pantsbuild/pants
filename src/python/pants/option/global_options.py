@@ -33,8 +33,6 @@ def register_global_options(register):
   # TODO: After moving to the new options system these abstraction leaks can go away.
   register('-k', '--kill-nailguns', action='store_true',
            help='Kill nailguns before exiting')
-  register('--ng-daemons', action='store_true', default=True,
-           help='Use nailgun daemons to execute java tasks.')
 
   register('-i', '--interpreter', default=[], action='append', metavar='<requirement>',
            help="Constrain what Python interpreters to use.  Uses Requirement format from "

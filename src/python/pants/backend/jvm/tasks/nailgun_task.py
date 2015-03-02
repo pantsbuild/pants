@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import abstractproperty
 
 from pants.backend.core.tasks.task import Task, TaskBase
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -63,7 +62,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
 
     Call only in execute() or later. TODO: Enforce this.
     """
-    if self.nailgun_is_enabled and self.get_options().ng_daemons:
+    if self.nailgun_is_enabled:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       client = NailgunExecutor(self._executor_workdir, classpath, distribution=self._dist)
     else:
@@ -74,7 +73,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
               workunit_labels=None):
     """Runs the java main using the given classpath and args.
 
-    If --no-ng-daemons is specified then the java main is run in a freshly spawned subprocess,
+    If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
     otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
     amortized run times.
     """

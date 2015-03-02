@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrdlpncieat)"
+  echo "Usage: $0 (-h|-fxbkmsrlpncieat)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -19,7 +19,6 @@ function usage() {
   echo "              files"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
-  echo " -d           if running jvm tests, don't use nailgun daemons"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
   echo " -n           skip contrib python tests"
@@ -38,14 +37,13 @@ function usage() {
   fi
 }
 
-daemons="--ng-daemons"
 bootstrap_compile_args=(
   compile.python-eval
   --closure
   --fail-slow
 )
 
-while getopts "hfxbkmsrdlpnci:eat" opt; do
+while getopts "hfxbkmsrlpnci:eat" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_formatting_checks="true" ;;
@@ -55,7 +53,6 @@ while getopts "hfxbkmsrdlpnci:eat" opt; do
     m) skip_sanity_checks="true" ;;
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
-    d) daemons="--no-ng-daemons" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     n) skip_contrib="true" ;;
@@ -231,7 +228,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   banner "Running tests in testprojects/ "
   (
-    ./pants.pex test testprojects:: $daemons $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
+    ./pants.pex test testprojects:: $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
   ) || die "test failure in testprojects/"
 fi
 
@@ -239,7 +236,7 @@ if [[ "${skip_examples:-false}" == "false" ]]; then
   banner "Running example tests"
   (
     ./pants.pex compile.python-eval --closure --fail-slow test examples:: \
-      $daemons $android_test_opts ${PANTS_ARGS[@]}
+      $android_test_opts ${PANTS_ARGS[@]}
   ) || die "Examples test failure"
 fi
 
