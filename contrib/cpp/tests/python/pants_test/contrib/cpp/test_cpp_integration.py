@@ -22,10 +22,10 @@ class CppIntegrationTest(PantsRunIntegrationTest):
   @classmethod
   def has_compiler(cls):
     try:
-      compiler = CppToolchain().compiler
-    except Exception:
+      CppToolchain().compiler
+      return True
+    except CppToolchain.Error:
       return False
-    return True
 
   @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
                       reason='cpp integration tests require compiler')
