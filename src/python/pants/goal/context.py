@@ -78,6 +78,7 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._spec_excludes = spec_excludes
     self._replace_targets(target_roots)
+    self._synthetic_targets = defaultdict(list)
 
   @property
   def config(self):
@@ -240,7 +241,7 @@ class Context(object):
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
-  def add_new_target(self, address, target_type, dependencies=None, **kwargs):
+  def add_new_target(self, address, target_type, dependencies=None, derived_from=None, **kwargs):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
@@ -256,8 +257,11 @@ class Context(object):
     self.build_graph.inject_synthetic_target(address=address,
                                              target_type=target_type,
                                              dependencies=dependencies,
+                                             derived_from=derived_from,
                                              **kwargs)
-    return self.build_graph.get_target(address)
+    new_target = self.build_graph.get_target(address)
+    self._synthetic_targets[derived_from].append(new_target)
+    return new_target
 
   def targets(self, predicate=None, postorder=False):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
@@ -268,13 +272,10 @@ class Context(object):
     postorder parameter is True) traversal order.
     """
 
-    genmap = self.products.get('synthetic_targets')
+    synthetic_targets = self._synthetic_targets
     targets = list(self.target_roots)
     for target in self.target_roots:
-      product_mapping = genmap.get(target)
-      if product_mapping:
-        for basedir, gen_targets in product_mapping.items():
-          targets.extend(gen_targets)
+      targets.extend(synthetic_targets.get(target, []))
 
     target_root_addresses = [target.address for target in targets]
 
