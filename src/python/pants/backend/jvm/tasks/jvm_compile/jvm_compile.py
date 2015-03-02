@@ -91,6 +91,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
+    register('--use-transitive-classpath', default=False, action='store_true',
+             help='Allow the compile step to add all dependencies declared transitively to the classpath.')
+
   @classmethod
   def product_types(cls):
     return ['classes_by_target', 'classes_by_source', 'resources_by_target']
@@ -372,8 +375,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       for conf in self._confs:
         for jar in self.extra_compile_time_classpath_elements():
            yield (conf, jar)
-    compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
+    if self.get_options().use_transitive_classpath:
+      #addresses = [t.address for t in relevant_targets]
+      addresses = [t.address for t in self.context.targets()]
+      all_targets = []
+      self.context.build_graph.walk_transitive_dependency_graph(addresses,
+                                                                lambda t: all_targets.append(t))
+      #all_targets = self.context.targets()
+      compile_classpath = compile_classpaths.get_for_targets(all_targets)
+    else:
+      compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
     compile_classpath = OrderedSet(list(extra_compile_classpath_iter()) + list(compile_classpath))
+    # import pdb; pdb.set_trace()
 
     # Target -> sources (relative to buildroot), for just this chunk's targets.
     sources_by_target = self._sources_for_targets(relevant_targets)
@@ -439,7 +452,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         for partition_index, partition in enumerate(partitions):
           (vts, sources, analysis_file) = partition
           cp_entries = [entry for conf, entry in compile_classpath if conf in self._confs]
-
+          import pdb; pdb.set_trace()
           progress_message = '{} of {}'.format(partition_index + 1, len(partitions))
           self._process_target_partition(partition, cp_entries, progress_message)
 
