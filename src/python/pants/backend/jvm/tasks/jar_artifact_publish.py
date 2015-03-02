@@ -500,8 +500,9 @@ class JarArtifactPublish(JarTask, ScmPublish):
       self.restart_at = parse_jarcoordinate(self.get_options().restart_at)
 
 
-  def prepare(self, round_manager):
-    raise NotImplementedError('Subclasses must define exported_targets')
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarArtifactPublish, cls).prepare(options, round_manager)
 
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a

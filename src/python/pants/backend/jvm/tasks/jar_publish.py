@@ -9,7 +9,9 @@ import os
 
 from twitter.common.collections import OrderedDict, OrderedSet
 
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_artifact_publish import JarArtifactPublish
+from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 
 
@@ -28,7 +30,9 @@ class JarPublish(JarArtifactPublish):
   def config_section(self):
     return self._CONFIG_SECTION
 
-  def prepare(self, round_manager):
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarPublish, cls).prepare(options, round_manager)
     round_manager.require('jars')
     round_manager.require('javadoc')
     round_manager.require('scaladoc')
@@ -58,7 +62,6 @@ class JarPublish(JarArtifactPublish):
 
     return OrderedSet(filter(exportable,
                              reversed(sort_targets(filter(exportable, candidates)))))
-
 
   def _java_doc(self, target):
     return self.context.products.get('javadoc').get(target)
@@ -95,6 +98,34 @@ class JarPublish(JarArtifactPublish):
     if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
       confs.add(self.ivy_writer.JAVADOC_CONFIG)
     return super(JarPublish, self).stage_artifacts(tgt, jar, version, confs, changelog)
+
+  def create_source_jar(self, target, open_jar, version):
+    # TODO pantsbuild/pants/65: Avoid creating 2 jars with java sources for a
+    # scala_library with java_sources. Currently publish fails fast if scala_library owning
+    # java sources pointed by java_library target also provides an artifact. However, jar_create
+    # ends up creating 2 jars one scala and other java both including the java_sources.
+
+    def abs_and_relative_sources(target):
+      abs_source_root = os.path.join(get_buildroot(), target.target_base)
+      for source in target.sources_relative_to_source_root():
+        yield os.path.join(abs_source_root, source), source
+
+    jar_path = self.artifact_path(open_jar, version, suffix='-sources')
+    with self.open_jar(jar_path, overwrite=True, compressed=True) as open_jar:
+      for abs_source, rel_source in abs_and_relative_sources(target):
+        open_jar.write(abs_source, rel_source)
+
+      # TODO: pantsbuild/pants/65 Remove java_sources attribute for ScalaLibrary
+      if isinstance(target, ScalaLibrary):
+        for java_source_target in target.java_sources:
+          for abs_source, rel_source in abs_and_relative_sources(java_source_target):
+            open_jar.write(abs_source, rel_source)
+
+      if target.has_resources:
+        for resource_target in target.resources:
+          for abs_source, rel_source in abs_and_relative_sources(resource_target):
+            open_jar.write(abs_source, rel_source)
+    return jar_path
 
   @property
   def jar_product_type(self):
