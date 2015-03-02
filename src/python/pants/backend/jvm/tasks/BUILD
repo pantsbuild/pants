@@ -333,8 +333,8 @@ python_library(
     'src/python/pants/scm',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
-    ],
-  )
+  ],
+)
 
 python_library(
   name = 'jar_task',
