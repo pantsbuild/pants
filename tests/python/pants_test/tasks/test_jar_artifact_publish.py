@@ -14,9 +14,6 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.artifact import Artifact
-from pants.backend.jvm.repository import Repository
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_artifact_publish import JarArtifactPublish
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import temporary_dir
@@ -29,27 +26,28 @@ class JarArtifactPublishTest(object):
   def alias_groups(self):
     self.push_db_basedir = os.path.join(self.build_root, "pushdb")
     safe_mkdir(self.push_db_basedir)
-
     return BuildFileAliases.create(
       targets={
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
         'target': Dependencies,
-        },
+      },
       objects={
         'artifact': Artifact,
         'internal': Repository(name='internal', url='http://example.com',
                                push_db_basedir=self.push_db_basedir),
-        },
-      )
+      },
+    )
 
   def _prepare_for_publishing(self, with_alias=False):
     targets = {}
     targets['a'] = self.create_library('a', 'java_library', 'a', ['A.java'],
-                                       provides="""artifact(org='com.example', name='nail', repo=internal)""")
+                                       provides="""artifact(org='com.example',
+                                                            name='nail', repo=internal)""")
 
     targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'],
-                                       provides="""artifact(org='com.example', name='shoe', repo=internal)""",
+                                       provides="""artifact(org='com.example', name='shoe',
+                                                            repo=internal)""",
                                        dependencies=['a'])
 
     if with_alias:
@@ -60,7 +58,8 @@ class JarArtifactPublishTest(object):
       c_deps = ['b']
 
     targets['c'] = self.create_library('c', 'java_library', 'c', ['C.java'],
-                                       provides="""artifact(org='com.example', name='horse', repo=internal)""",
+                                       provides="""artifact(org='com.example', name='horse',
+                                                            repo=internal)""",
                                        dependencies=c_deps)
     return targets.values()
 
@@ -69,7 +68,7 @@ class JarArtifactPublishTest(object):
       'internal': {
         'resolver': 'example.com',
         'confs': ['default', 'sources', 'docs', 'changelog'],
-        }
+      }
     }
 
   def _prepare_mocks(self, task):
@@ -136,5 +135,5 @@ class JarArtifactPublishDerivedTest(JarArtifactPublishTest, TaskTestBase):
   def task_type(cls):
     return JarArtifactPublishDerivedTest.TestJarArtifactPublish
 
-  def  test_publish_local(self):
+  def test_publish_local(self):
     self.publish_local(1)

@@ -19,10 +19,10 @@ from twitter.common.collections import OrderedDict
 from twitter.common.config import Properties
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
+from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
-from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
@@ -448,7 +448,6 @@ class JarArtifactPublish(JarTask, ScmPublish):
     if self.named_snapshot:
       self.named_snapshot = Namedver.parse(self.named_snapshot)
 
-
     self.dryrun = self.get_options().dryrun
     self.transitive = self.get_options().transitive
     self.force = self.get_options().force
@@ -472,7 +471,8 @@ class JarArtifactPublish(JarTask, ScmPublish):
           if not target.is_exported:
             raise TaskError('%s is not an exported target' % coordinate)
           return target.provides.org, target.provides.name
-        except (BuildFile.BuildFileError, BuildFileParser.BuildFileParserError, AddressLookupError) as e:
+        except (BuildFile.BuildFileError, BuildFileParser.BuildFileParserError,
+                AddressLookupError) as e:
           raise TaskError('{message}\n  Problem with BUILD file  at {coordinate}'
                           .format(message=e, coordinate=coordinate))
 
@@ -499,7 +499,6 @@ class JarArtifactPublish(JarTask, ScmPublish):
     if self.get_options().restart_at:
       self.restart_at = parse_jarcoordinate(self.get_options().restart_at)
 
-
   @classmethod
   def prepare(cls, options, round_manager):
     super(JarArtifactPublish, cls).prepare(options, round_manager)
@@ -516,7 +515,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
       return True
     artifact_name = '-'.join(coord, self.classifier) if self.classifier else coord
     push = raw_input('Publish %s with revision %s ? [y|N] ' % (
-    artifact_name, version
+      artifact_name, version
     ))
     print('\n')
     return push.strip().lower() == 'y'
@@ -575,7 +574,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
                          '[artifact]-[revision](-[classifier]).[ext]' % self.workdir,
       '-revision', entry.version().version(),
       '-m2compatible',
-      ]
+    ]
 
     if self.get_options().level == 'debug':
       args.append('-verbose')
@@ -723,7 +722,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
               try:
                 self.context.log.debug("Trying scm push")
                 self.scm.push()
-                break # success
+                break  # success
               except Scm.RemoteException as scm_exception:
                 self.context.log.debug("Scm push failed, trying to refresh")
                 # This might fail in the event that there is a real conflict, throwing
@@ -869,7 +868,9 @@ class JarArtifactPublish(JarTask, ScmPublish):
       # A lot of flexibility is allowed in naming the extra artifact. Because the name must be
       # unique, some extra logic is required to ensure that the user supplied at least one
       # non-default value (thus ensuring a uniquely-named artifact in the end).
-      if override_name == jar.name and classifier == DEFAULT_CLASSIFIER and extension == DEFAULT_EXTENSION:
+      if (override_name == jar.name and
+          classifier == self.classifier and
+          extension == self.jar_extension):
         raise TaskError("publish_extra for '{0}' most override one of name, classifier or "
                         "extension with a non-default value.".format(extra_product))
 
@@ -932,6 +933,7 @@ class JarArtifactPublish(JarTask, ScmPublish):
   @property
   def artifact_ext(self):
     raise NotImplementedError('Subclasses must define artifact extension for jar')
+
   @property
   def ivy_writer(self):
     return IvyWriter
