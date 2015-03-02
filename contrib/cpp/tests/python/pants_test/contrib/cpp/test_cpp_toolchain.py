@@ -15,7 +15,7 @@ from pants.util.dirutil import chmod_plus_x, touch
 from pants.contrib.cpp.toolchain.cpp_toolchain import CppToolchain
 
 
-class TestCppToolchainTest(unittest.TestCase):
+class CppToolchainTest(unittest.TestCase):
   @contextmanager
   def tool(self, name):
     with temporary_dir() as tool_root:
@@ -40,8 +40,7 @@ class TestCppToolchainTest(unittest.TestCase):
 
   def test_tool_registration(self):
     with self.tool('good-tool') as tool_path:
-      self.assertEqual(tool_path, CppToolchain().register_tool(name='foo',
-                                                               tool=os.path.basename(tool_path)))
+      self.assertEqual(tool_path, CppToolchain().register_tool(name='foo', tool='good-tool'))
 
   def test_invalid_tool_registration(self):
     with self.assertRaises(CppToolchain.Error):
