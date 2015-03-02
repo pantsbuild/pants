@@ -45,6 +45,7 @@ target(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
+    ':config',
     ':deprecated',
     ':extension_loader',
     ':fingerprint_strategy',
@@ -202,6 +203,15 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:cmd_line_spec_parser',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'config',
+  sources = ['test_config.py'],
+  dependencies = [
+    'src/python/pants/base:config',
+    'src/python/pants/util:contextutil',
   ]
 )
 
