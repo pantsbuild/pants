@@ -16,7 +16,17 @@ from pants_test.android.test_android_base import TestAndroidBase
 
 
 class TestAndroidDistribution(TestAndroidBase):
+  
+  def setUp(self):
+    super(TestAndroidDistribution, self).setUp()
+    # Save local cache and then flush so tests get a clean environment. Cache restored in tearDown.
+    self._local_cache = AndroidDistribution._CACHED_SDK
+    AndroidDistribution._CACHED_SDK = {}
 
+  def tearDown(self):
+    super(TestAndroidDistribution, self).tearDown()
+    AndroidDistribution._CACHED_SDK = self._local_cache
+    
   def test_tool_registration(self):
     with self.distribution() as sdk:
       AndroidDistribution(sdk_path=sdk).register_android_tool(
@@ -53,4 +63,31 @@ class TestAndroidDistribution(TestAndroidBase):
       with env(ANDROID_HOME=sdk):
         AndroidDistribution.locate_sdk_path(path)
 
-# No live test for now, the varying installed platforms make that unpredictable.
+  def test_sdk_path(self):
+    with self.distribution() as sdk:
+      android_sdk = AndroidDistribution.cached(sdk)
+      self.assertEquals(sdk, android_sdk.sdk_path)
+
+  def test_allows_bad_path(self):
+    # This test shows that AndroidDistribution can be instantiated with an invalid path.
+    sdk = '/no/sdk/here'
+    AndroidDistribution.cached(sdk)
+
+  def test_validate_no_sdk_at_path(self):
+    # SDK paths are checked lazily, this shows the exception now is raised.
+    with self.assertRaises(AndroidDistribution.Error):
+      sdk = '/no/sdk/here'
+      android_sdk = AndroidDistribution.cached(sdk)
+      self.assertEquals(sdk, android_sdk.sdk_path)
+    
+  def test_register_android_tool(self):
+    with self.distribution() as sdk:
+      android_sdk = AndroidDistribution.cached(sdk)
+      android_sdk.register_android_tool(os.path.join('build-tools', '19.1.0', 'aapt'))
+
+  def test_register_uninstalled_android_tool(self):
+    with self.assertRaises(AndroidDistribution.Error):
+      with self.distribution() as sdk:
+        android_sdk = AndroidDistribution.cached(sdk)
+        android_sdk.register_android_tool(os.path.join('build-tools', '19.1.0', 'random_tool'))
+      
