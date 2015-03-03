@@ -53,10 +53,8 @@ class CppLibraryCreate(CppTask):
     return output
 
   def _libpath(self, target):
-    def library_name(target):
-      return 'lib' + target.name + '.a'
     output_dir = os.path.join(self.workdir, target.id)
-    return os.path.join(output_dir, library_name(target))
+    return os.path.join(output_dir, 'lib' + target.name + '.a')
 
   def _link_library(self, target, objects):
     output = self._libpath(target)

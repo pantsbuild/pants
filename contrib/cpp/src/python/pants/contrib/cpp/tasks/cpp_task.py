@@ -36,6 +36,9 @@ class CppTask(Task):
     register('--compiler',
              help='Set a specific compiler to use (eg, g++-4.8, clang++)')
 
+  def execute(self):
+    raise NotImplementedError('execute must be implemented by subclasses of CppTask')
+
   def run_command(self, cmd):
     try:
       self.context.log.debug('Executing: {0}'.format(cmd))
