@@ -13,6 +13,7 @@ from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
+
 class CppCompile(CppTask):
   """Compiles object files from C++ sources."""
 
@@ -94,4 +95,3 @@ class CppCompile(CppTask):
       self.run_command(cmd)
 
     self.context.log.info('Built c++ object: {0}'.format(obj))
-
