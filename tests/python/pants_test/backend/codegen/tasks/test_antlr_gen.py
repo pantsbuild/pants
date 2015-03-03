@@ -82,6 +82,8 @@ class AntlrGenTest(NailgunTaskTestBase):
                       "{0} is not the source root for {1}".format(syn_sourceroot, source))
       self.assertEqual(expected_package, get_package(source_path))
 
+      self.assertTrue(syn_target in context.targets())
+
   def test_explicit_package(self):
     self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent('''
       java_antlr_library(
