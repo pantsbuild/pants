@@ -34,13 +34,28 @@ class CppIntegrationTest(PantsRunIntegrationTest):
 
   @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
                       reason='cpp integration tests require compiler')
+  def test_cpp_library_compile(self):
+    self._compile_test(self.TEST_LIBRARY_TARGET)
+
+  @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
+                      reason='cpp integration tests require compiler')
   def test_cpp_binary(self):
     self._binary_test(self.TEST_SIMPLE_BINARY_TARGET)
 
   @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
                       reason='cpp integration tests require compiler')
+  def test_cpp_binary_compile(self):
+    self._compile_test(self.TEST_SIMPLE_BINARY_TARGET)
+
+  @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
+                      reason='cpp integration tests require compiler')
   def test_cpp_binary_with_library(self):
     self._binary_test(self.TEST_BINARY_WITH_LIBRARY_TARGET)
+
+  @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
+                      reason='cpp integration tests require compiler')
+  def test_cpp_binary_with_library_compile(self):
+    self._compile_test(self.TEST_BINARY_WITH_LIBRARY_TARGET)
 
   @pytest.mark.skipif('not CppIntegrationTest.has_compiler()',
                       reason='cpp integration tests require compiler')
@@ -52,4 +67,8 @@ class CppIntegrationTest(PantsRunIntegrationTest):
 
   def _binary_test(self, target):
     pants_run = self.run_pants(['binary', target])
+    self.assert_success(pants_run)
+
+  def _compile_test(self, target):
+    pants_run = self.run_pants(['compile', target])
     self.assert_success(pants_run)
