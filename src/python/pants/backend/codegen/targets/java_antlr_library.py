@@ -5,10 +5,10 @@
 from __future__ import (nested_scopes, generators, division, absolute_import, with_statement,
                         print_function, unicode_literals)
 
-from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
-class JavaAntlrLibrary(ExportableJvmLibrary):
+class JavaAntlrLibrary(JvmTarget):
   """Generates a stub Java library from Antlr grammar files."""
 
   def __init__(self,

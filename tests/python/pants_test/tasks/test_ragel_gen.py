@@ -95,8 +95,9 @@ class RagelGenTest(TaskTest):
       )
     """))
 
+    target = self.target('test_ragel_gen:atoi')
     task = self.prepare_task(build_graph=self.build_graph,
-                             targets=[self.target('test_ragel_gen:atoi')],
+                             targets=[target],
                              build_file_parser=self.build_file_parser)
 
     task._ragel_binary = 'ragel'
@@ -114,6 +115,7 @@ class RagelGenTest(TaskTest):
       address = SyntheticAddress.parse(spec=spec)
       Context.add_new_target.assert_called_once_with(address,
                                                      JavaRagelLibrary,
+                                                     derived_from=target,
                                                      sources=sources,
                                                      excludes=OrderedSet(),
                                                      dependencies=OrderedSet(),
