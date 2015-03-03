@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import textwrap
+import unittest
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -14,10 +15,9 @@ from twitter.common.collections import maybe_list
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
-from pants_test.tasks.test_base import TaskTest
 
 
-class TestAndroidBase(TaskTest):
+class TestAndroidBase(unittest.TestCase):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @contextmanager

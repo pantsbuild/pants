@@ -12,9 +12,16 @@ class AndroidDistribution(object):
   """Represents a Android SDK distribution.
   """
 
-  class Error(Exception):
+  class DistributionError(Exception):
     """Indicates an invalid android distribution."""
 
+  class MissingToolError(Exception):
+    """Indicates a missing tool at SDK location.
+    
+    The sdk_path has been either passed at invocation or as environmental variable. But the needed
+    tool cannot be found.
+    """
+    
   _CACHED_SDK = {}
 
   @classmethod
@@ -25,11 +32,10 @@ class AndroidDistribution(object):
     :param string path: Optional local address of an SDK, set by user in CLI invocation.
     :returns: a new :class:``pants.backend.android.distribution.AndroidDistribution``.
     """
-    key = path
-    dist = cls._CACHED_SDK.get(key)
+    dist = cls._CACHED_SDK.get(path)
     if not dist:
       dist = cls.locate_sdk_path(path)
-    cls._CACHED_SDK[key] = dist
+    cls._CACHED_SDK[path] = dist
     return dist
 
   @classmethod
@@ -65,7 +71,7 @@ class AndroidDistribution(object):
     """Create an Android distribution and cache tools for quick retrieval."""
     self._sdk_path = sdk_path
     self._sdk = None
-    self._validated_tools = set()
+    self._validated_tools = {}
 
 
   @property
@@ -75,25 +81,27 @@ class AndroidDistribution(object):
       if os.path.isdir(self._sdk_path):
         self._sdk = self._sdk_path
       else:
-        raise AndroidDistribution.Error('Failed to locate Android SDK. Please install SDK and '
-                                        'set ANDROID_HOME in your path')
+        raise self.DistributionError('Failed to locate Android SDK. Please install '
+                                     'SDK and set ANDROID_HOME in your path')
     return self._sdk
 
   def register_android_tool(self, tool_path):
     """Check tool located at tool_path and see if it is installed in the local Android SDK.
 
-    All android tasks should request their tools using this method.
+    All android tasks should request their tools using this method. Tools are verified and then
+    cached for quick lookup.
     :param string tool_path: Path to tool, relative to the Android SDK root, e.g
       'platforms/android-19/android.jar'.
     """
-    android_tool = os.path.join(self.sdk_path, tool_path)
-    if android_tool not in self._validated_tools:
-        if os.path.isfile(android_tool):
-          self._validated_tools.add(android_tool)
-        else:
-          raise self.Error('There is no {} installed.The Android SDK may need to be updated'
-                           .format(android_tool))
-    return android_tool
+    if tool_path not in self._validated_tools:
+      android_tool = os.path.join(self.sdk_path, tool_path)
+      if os.path.isfile(android_tool):
+        # Use entire relative path as a key since the SDK usually has multiple copies of each tool.
+        self._validated_tools[tool_path] = android_tool
+      else:
+        raise self.MissingToolError('There is no {} installed.The Android SDK may need to be updated'
+                               .format(android_tool))
+    return self._validated_tools[tool_path]
 
   def __repr__(self):
     return 'AndroidDistribution({})'.format(self._sdk_path)

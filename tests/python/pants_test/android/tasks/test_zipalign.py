@@ -9,9 +9,10 @@ import os
 
 from pants.backend.android.tasks.zipalign import Zipalign
 from pants_test.android.test_android_base import TestAndroidBase
+from pants_test.tasks.test_base import TaskTest
 
 
-class TestZipalign(TestAndroidBase):
+class TestZipalign(TaskTest, TestAndroidBase):
   """Test class for the Zipalign task."""
 
   @classmethod

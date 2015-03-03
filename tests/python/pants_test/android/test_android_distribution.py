@@ -8,15 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-import pytest
-
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
-from pants.util.contextutil import environment_as
+from pants.util.contextutil import environment_as, temporary_dir
 from pants_test.android.test_android_base import TestAndroidBase
 
 
 class TestAndroidDistribution(TestAndroidBase):
-  
+  """Test the AndroidDistribution class."""
+
   def setUp(self):
     super(TestAndroidDistribution, self).setUp()
     # Save local cache and then flush so tests get a clean environment. Cache restored in tearDown.
@@ -26,26 +25,27 @@ class TestAndroidDistribution(TestAndroidBase):
   def tearDown(self):
     super(TestAndroidDistribution, self).tearDown()
     AndroidDistribution._CACHED_SDK = self._local_cache
-    
-  def test_tool_registration(self):
+
+  def test_passing_sdk_path(self):
     with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).register_android_tool(
-              os.path.join(sdk, 'build-tools', '19.1.0', 'aapt'))
+      android_sdk = AndroidDistribution(sdk_path=sdk)
+      aapt = os.path.join(sdk, 'build-tools', '19.1.0', 'aapt')
+      android_tool = android_sdk.register_android_tool(aapt)
+      self.assertEquals(android_tool, os.path.join(sdk, aapt))
 
-    with self.distribution() as sdk:
-      AndroidDistribution(sdk_path=sdk).register_android_tool(
-        os.path.join(sdk, 'platforms', 'android-19', 'android.jar'))
+  def test_passing_sdk_path_not_valid(self):
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      sdk = '/no/sdk/here'
+      aapt = os.path.join(sdk, 'build-tools', '19.1.0', 'aapt')
+      AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
-    with pytest.raises(AndroidDistribution.Error):
-      AndroidDistribution(sdk_path=sdk).register_android_tool(
-        os.path.join(sdk, 'build-tools', 'bad-number', 'aapt'))
+  def test_passing_sdk_path_missing_tools(self):
+    with self.assertRaises(AndroidDistribution.MissingToolError):
+      with self.distribution() as sdk:
+        aapt = os.path.join(sdk, 'build-tools', 'bad-number', 'aapt')
+        AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
-    with pytest.raises(AndroidDistribution.Error):
-      AndroidDistribution(sdk_path=sdk).register_android_tool(
-        os.path.join(sdk, 'platforms', 'not-a-platform', 'android.jar'))
-
-
-  def test_locate_sdk_path(self, path=None):
+  def test_locate_sdk_path(self):
     # We can set good/bad paths alike. No checks until tools are called.
 
     @contextmanager
@@ -57,37 +57,55 @@ class TestAndroidDistribution(TestAndroidBase):
 
     with self.distribution() as sdk:
       with env(ANDROooooD_HOME=sdk):
-        AndroidDistribution.locate_sdk_path(path)
+        dist = AndroidDistribution.locate_sdk_path()
+        self.assertEquals(dist._sdk_path, None)
 
     with self.distribution() as sdk:
       with env(ANDROID_HOME=sdk):
-        AndroidDistribution.locate_sdk_path(path)
+        dist = AndroidDistribution.locate_sdk_path()
+        self.assertEquals(dist._sdk_path, sdk)
 
   def test_sdk_path(self):
     with self.distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       self.assertEquals(sdk, android_sdk.sdk_path)
 
-  def test_allows_bad_path(self):
-    # This test shows that AndroidDistribution can be instantiated with an invalid path.
-    sdk = '/no/sdk/here'
-    AndroidDistribution.cached(sdk)
+  def test_empty_sdk_path(self):
+    # Shows that sdk_path accepts any valid directory, even if not a valid SDK.
+    with temporary_dir() as sdk:
+      android_sdk = AndroidDistribution.cached(sdk)
+      self.assertEquals(android_sdk.sdk_path, sdk)
 
-  def test_validate_no_sdk_at_path(self):
-    # SDK paths are checked lazily, this shows the exception now is raised.
-    with self.assertRaises(AndroidDistribution.Error):
+  def test_validate_bad_path(self):
+    # This shows the exception is raised when dir does not exist.
+    with self.assertRaises(AndroidDistribution.DistributionError):
       sdk = '/no/sdk/here'
       android_sdk = AndroidDistribution.cached(sdk)
       self.assertEquals(sdk, android_sdk.sdk_path)
-    
+
   def test_register_android_tool(self):
     with self.distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
-      android_sdk.register_android_tool(os.path.join('build-tools', '19.1.0', 'aapt'))
+      aapt = os.path.join('build-tools', '19.1.0', 'aapt')
+      registered_aapt = android_sdk.register_android_tool(aapt)
+      self.assertEquals(registered_aapt, os.path.join(sdk, aapt))
 
-  def test_register_uninstalled_android_tool(self):
-    with self.assertRaises(AndroidDistribution.Error):
+  def test_register_android_tool_bad_sdk(self):
+    with self.assertRaises(AndroidDistribution.MissingToolError):
+      with temporary_dir() as sdk:
+        android_sdk = AndroidDistribution.cached(sdk)
+        aapt = os.path.join('build-tools', '19.1.0', 'aapt')
+        android_sdk.register_android_tool(aapt)
+
+  def test_register_nonexistent_android_tool(self):
+    with self.assertRaises(AndroidDistribution.MissingToolError):
       with self.distribution() as sdk:
         android_sdk = AndroidDistribution.cached(sdk)
         android_sdk.register_android_tool(os.path.join('build-tools', '19.1.0', 'random_tool'))
-      
+
+  def test_validated_tools(self):
+    with self.distribution() as sdk:
+      android_sdk = AndroidDistribution.cached(sdk)
+      aapt = os.path.join('build-tools', '19.1.0', 'aapt')
+      android_sdk.register_android_tool(aapt)
+      self.assertIn(aapt, android_sdk._validated_tools)
