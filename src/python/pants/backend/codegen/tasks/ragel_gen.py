@@ -106,6 +106,7 @@ class RagelGen(CodeGen):
     address = SyntheticAddress.parse(spec=spec)
     tgt = self.context.add_new_target(address,
                                       JavaRagelLibrary,
+                                      derived_from=target,
                                       sources=genfiles,
                                       provides=target.provides,
                                       dependencies=self.javadeps,
