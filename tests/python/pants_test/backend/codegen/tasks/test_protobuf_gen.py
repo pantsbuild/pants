@@ -10,28 +10,25 @@ from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen, _same_contents, calculate_genfiles
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.backend.core.register import build_file_aliases as register_core
 from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_rmtree
-from pants_test.tasks.test_base import TaskTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class ProtobufGenTest(TaskTest):
+class ProtobufGenTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return ProtobufGen
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={
-      'java_protobuf_library': JavaProtobufLibrary,
-      'target': Dependencies},
-    )
+    return register_core().merge(register_codegen())
 
 
   def setUp(self):
@@ -245,9 +242,8 @@ class ProtobufGenTest(TaskTest):
           sources=['{sample_proto_path}'],
         )''').format(sample_proto_path=sample_proto_path))
     target = self.target("sample:sample")
-    task = self.prepare_task(build_graph=self.build_graph,
-                             targets=[target],
-                             build_file_parser=self.build_file_parser)
+    context = self.context(target_roots=[target])
+    task = self.create_task(context=context)
     sources_by_base = task._calculate_sources([target])
     self.assertEquals(['extracted-source'], sources_by_base.keys())
     self.assertEquals(OrderedSet([sample_proto_path]), sources_by_base['extracted-source'])
@@ -268,9 +264,35 @@ class ProtobufGenTest(TaskTest):
     self.add_to_build_file('3rdparty', dedent("""
       target(name='protobuf-java')
     """))
-    task = self.prepare_task(build_graph=self.build_graph,
-                             targets=[self.target('test_proto:proto')],
-                             build_file_parser=self.build_file_parser)
+    context = self.context(target_roots=[self.target('test_proto:proto')])
+    task = self.create_task(context)
     javadeps = task.javadeps
     self.assertEquals(len(javadeps), 1)
     self.assertEquals('protobuf-java', javadeps.pop().name)
+
+  def test_calculate_sources(self):
+    self.add_to_build_file('proto-lib', dedent('''
+      java_protobuf_library(name='proto-target',
+        sources=['foo.proto'],
+      )
+      '''))
+    target = self.target('proto-lib:proto-target')
+    context = self.context(target_roots=[target])
+    task = self.create_task(context)
+    result = task._calculate_sources([target])
+    self.assertEquals(1, len(result.keys()))
+    self.assertEquals(OrderedSet(['proto-lib/foo.proto']), result['proto-lib'])
+
+  def test_calculate_sources_with_source_root(self):
+    SourceRoot.register('project/src/main/proto')
+    self.add_to_build_file('project/src/main/proto/proto-lib', dedent('''
+      java_protobuf_library(name='proto-target',
+        sources=['foo.proto'],
+      )
+      '''))
+    target = self.target('project/src/main/proto/proto-lib:proto-target')
+    context = self.context(target_roots=[target])
+    task = self.create_task(context)
+    result = task._calculate_sources([target])
+    self.assertEquals(1, len(result.keys()))
+    self.assertEquals(OrderedSet(['project/src/main/proto/proto-lib/foo.proto']), result['project/src/main/proto'])
