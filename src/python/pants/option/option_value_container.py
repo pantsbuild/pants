@@ -107,3 +107,8 @@ class OptionValueContainer(object):
       return val.value
     else:
       return val
+
+  def __contains__(self, key):
+    if key == '_forwardings':
+      return False
+    return key in self._forwardings

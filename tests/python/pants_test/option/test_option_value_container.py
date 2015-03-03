@@ -83,3 +83,12 @@ class OptionValueContainerTest(unittest.TestCase):
     o.baz['b'] = 222  # Add to original dict.
     self.assertEqual(1, p.foo)
     self.assertEqual({'a': 111}, p.baz)  # Ensure dict was copied.
+
+  def test_contains(self):
+    o = OptionValueContainer()
+    self.assertNotIn('foo', o)
+    self.assertNotIn('_forwardings', o)
+
+    o.add_forwardings({'foo': 'bar'})
+    self.assertIn('foo', o)
+    self.assertNotIn('_forwardings', o)
