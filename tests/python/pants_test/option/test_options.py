@@ -437,3 +437,89 @@ class OptionsTest(unittest.TestCase):
     with self.warnings_catcher() as w:
       self._parse('./pants stale --pants-foo stale --still-good')
       self.assertEquals(0, len(w))
+
+  def test_middle_scoped_options(self):
+    """
+    Make sure the rules for inheriting from a hierarchy of scopes.
+
+    Values should follow
+     1. A short circuit scan for a value from the following sources in-order:
+        flags, env, config, hardcoded defaults, where
+     2. Values for each source follow the . hierarchy scoping rule
+        thin that source (save for config which allows global setting of a non-global option).
+    """
+
+    # Short circuit using command line
+    options = self._parse('./pants --a=100 compile --a=99')
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(99, options.for_scope('compile').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
+
+    options=self._parse('./pants',
+                        config={
+                          'DEFAULT': {'a' : 100},
+                          'compile': {'a' : 99},
+                          })
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(99, options.for_scope('compile').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
+
+    options=self._parse('./pants',
+                        env={
+                          'PANTS_A': 100,
+                          'PANTS_COMPILE_A' : 99})
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(99, options.for_scope('compile').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
+
+    # Command line has precedence over config
+    options=self._parse('./pants compile --a=99',
+                        config={
+                          'DEFAULT': {'a' : 100},
+                          })
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(99, options.for_scope('compile').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
+
+    # Command line has precedence over environment
+    options=self._parse('./pants compile --a=99',
+                        env={'PANTS_A':  100},)
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(99, options.for_scope('compile').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
+
+    # Env has precedence over config
+    options=self._parse('./pants ',
+                        config={
+                          'DEFAULT': {'a' : 100},
+                          },
+                        env={'PANTS_COMPILE_A':  99},)
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(99, options.for_scope('compile').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
+
+    # Command line global overrides the middle scope setting in then env
+    options=self._parse('./pants --a=100',
+                        env={'PANTS_COMPILE_A':  99},)
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(100, options.for_scope('compile').a)
+    self.assertEquals(100, options.for_scope('compile.java').a)
+
+    # Command line global overrides the middle scope in config
+    options = self._parse('./pants --a=100 ',
+                          config={
+                            'compile': {'a' : 99},
+                            })
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(100, options.for_scope('compile').a)
+    self.assertEquals(100, options.for_scope('compile.java').a)
+
+    # Env global overrides the middle scope in config
+    options = self._parse('./pants --a=100 ',
+                          config={
+                            'compile': {'a' : 99},
+                            },
+                          env={'PANTS_A':  100},)
+    self.assertEquals(100, options.for_global_scope().a)
+    self.assertEquals(100, options.for_scope('compile').a)
+    self.assertEquals(100, options.for_scope('compile.java').a)
