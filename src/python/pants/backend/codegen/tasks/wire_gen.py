@@ -80,7 +80,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
           source_root = SourceRoot.find(target)
         relative_source = os.path.relpath(source, source_root)
         relative_sources.add(relative_source)
-      check_duplicate_conflicting_protos(sources_by_base, relative_sources, self.context.log)
+      check_duplicate_conflicting_protos(self, sources_by_base, relative_sources, self.context.log)
 
       if lang != 'java':
         raise TaskError('Unrecognized wire gen lang: {0}'.format(lang))
@@ -144,7 +144,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(calculate_genfiles(
+      genfiles.extend(self.calculate_genfiles(
         path,
         source,
         target.payload.service_writer).get('java', []))
@@ -164,28 +164,28 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     return tgt
 
 
-def calculate_genfiles(path, source, service_writer):
-  protobuf_parse = ProtobufParse(path, source)
-  protobuf_parse.parse()
+  def calculate_genfiles(self, path, source, service_writer):
+    protobuf_parse = ProtobufParse(path, source)
+    protobuf_parse.parse()
 
-  types = protobuf_parse.messages | protobuf_parse.enums
-  if service_writer:
-    types |= protobuf_parse.services
+    types = protobuf_parse.messages | protobuf_parse.enums
+    if service_writer:
+      types |= protobuf_parse.services
 
-  # Wire generates a single type for all of the 'extends' declarations in this file.
-  if protobuf_parse.extends:
-    types |= set(["Ext_{0}".format(protobuf_parse.filename)])
+    # Wire generates a single type for all of the 'extends' declarations in this file.
+    if protobuf_parse.extends:
+      types |= set(["Ext_{0}".format(protobuf_parse.filename)])
 
-  genfiles = defaultdict(set)
-  java_files = list(calculate_java_genfiles(protobuf_parse.package, types))
-  logger.debug('Path {path} yielded types {types} got files {java_files}'
-               .format(path=path, types=types, java_files=java_files))
-  genfiles['java'].update(java_files)
-  return genfiles
+    genfiles = defaultdict(set)
+    java_files = list(self.calculate_java_genfiles(protobuf_parse.package, types))
+    logger.debug('Path {path} yielded types {types} got files {java_files}'
+                 .format(path=path, types=types, java_files=java_files))
+    genfiles['java'].update(java_files)
+    return genfiles
 
-def calculate_java_genfiles(package, types):
-  basepath = package.replace('.', '/')
-  for type_ in types:
-    filename = os.path.join(basepath, '{0}.java'.format(type_))
-    logger.debug("Expecting {filename} from type {type_}".format(filename=filename, type_=type_))
-    yield filename
+  def calculate_java_genfiles(self, package, types):
+    basepath = package.replace('.', '/')
+    for type_ in types:
+      filename = os.path.join(basepath, '{0}.java'.format(type_))
+      logger.debug("Expecting {filename} from type {type_}".format(filename=filename, type_=type_))
+      yield filename
