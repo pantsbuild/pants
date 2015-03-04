@@ -20,11 +20,13 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   <resolvers>
     <filesystem name="__pants_publish_repo__" local="true" cache="__pants_publish_cache__">
+      <ivy pattern="{{dir}}/[organisation]/[module]/[revision]/[module]-[revision].xml" />
       <ivy pattern="{{dir}}/[organisation]/[module]/ivy-[revision].xml" />
       <artifact pattern="{{dir}}/[organisation]/[module]/[artifact]-[revision](-[classifier]).[ext]"/>
     </filesystem>
     {{#publish_local}}
     <filesystem name="publish_local" transactional="false" local="true" m2compatible="true">
+      <ivy pattern="{{dir}}/[organisation]/[module]/[revision]/[module]-[revision].xml" />
       <ivy pattern="{{publish_local}}/[organisation]/[module]/[revision]/ivy-[revision].xml" />
       <artifact pattern="{{publish_local}}/[organisation]/[module]/[revision]/[artifact]-[revision](-[classifier]).[ext]"/>
     </filesystem>

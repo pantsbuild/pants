@@ -25,7 +25,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     </configurations>
   {{/lib.configurations?}}
 
-  {{#lib.publications?}}
+
   <publications>
     <artifact conf="default" type="jar" ext="jar"/>
     <artifact conf="default" type="pom" ext="pom"/>
@@ -39,10 +39,9 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
     {{/lib.publications.changelog}}
     {{#lib.extra_publications}}
-    <artifact name="{{name}}" conf="{{conf}}" type="{{type}}" m:classifier="{{classifier}}" ext="{{ext}}"/>
+    <artifact conf="{{conf}}" type="{{type}}" m:classifier="{{classifier}}" ext="{{ext}}"/>
     {{/lib.extra_publications}}
   </publications>
-  {{/lib.publications?}}
 
   {{#lib.dependencies?}}
   <dependencies>
@@ -50,13 +49,15 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <dependency org="{{org}}"
                 name="{{module}}"
                 rev="{{version}}"
+                conf="{{#classifier}}idl{{/classifier}}"
                 {{#force}}force="true"{{/force}}
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}
+
     >
-      {{#configurations}}
+      {{#conf}}
       <conf name="{{.}}" mapped="{{.}}"/>
-      {{/configurations}}
+      {{/conf}}
       {{#artifacts}}
       <artifact
         {{#name}}name="{{.}}"{{/name}}
