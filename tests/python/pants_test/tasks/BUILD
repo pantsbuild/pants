@@ -24,7 +24,6 @@ target(
     ':builddict',
     ':cache_manager',
     ':check_published_deps',
-    ':config',
     ':console_task',
     ':context',
     ':dependees',
@@ -181,17 +180,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/base:build_file_aliases',
-  ]
-)
-
-# XXX Uh shouldn't this be in base?
-python_tests(
-  name = 'config',
-  sources = ['test_config.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:config',
-    'src/python/pants/util:contextutil',
   ]
 )
 

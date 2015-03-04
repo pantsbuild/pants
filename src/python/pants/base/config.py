@@ -19,8 +19,6 @@ except ImportError:
   import configparser as ConfigParser
 
 
-
-
 def reset_default_bootstrap_option_values(defaults, values=None, buildroot=None):
   """Reset the bootstrap options' default values.
 
@@ -136,6 +134,8 @@ class Config(object):
     """
     return ConfigParser.SafeConfigParser(cls._defaults)
 
+  # TODO(John Sirois): s/type/type_/
+
   def getbool(self, section, option, default=None):
     """Equivalent to calling get with expected type bool."""
     return self.get(section, option, type=bool, default=default)
@@ -157,23 +157,24 @@ class Config(object):
     return self.get(section, option, type=dict, default=default)
 
   def getdefault(self, option, type=str, default=None):
-    """
-      Retrieves option from the DEFAULT section if it exists and attempts to parse it as type.
-      If there is no definition found, the default value supplied is returned.
+    """Retrieves option from the DEFAULT section if it exists and attempts to parse it as type.
+
+    If there is no definition found, the default value supplied is returned.
     """
     return self.get(Config.DEFAULT_SECTION, option, type, default=default)
 
   def get(self, section, option, type=str, default=None):
-    """
-      Retrieves option from the specified section if it exists and attempts to parse it as type.
-      If the specified section is missing a definition for the option, the value is looked up in the
-      DEFAULT section.  If there is still no definition found, the default value supplied is
-      returned.
+    """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.
+
+    If the specified section does not exist or is missing a definition for the option, the value is
+    looked up in the DEFAULT section.  If there is still no definition found, the default value
+    supplied is returned.
     """
     return self._getinstance(section, option, type, default=default)
 
   def get_required(self, section, option, type=str):
     """Retrieves option from the specified section and attempts to parse it as type.
+
     If the specified section is missing a definition for the option, the value is
     looked up in the DEFAULT section. If there is still no definition found,
     a `ConfigError` is raised.
@@ -258,10 +259,14 @@ class SingleFileConfig(Config):
     return self.configparser.has_section(section)
 
   def has_option(self, section, option):
-    return self.configparser.has_option(section, option)
+    return (self.configparser.has_option(section, option) or
+            self.configparser.has_option(self.DEFAULT_SECTION, option))
 
   def get_value(self, section, option):
-    return self.configparser.get(section, option)
+    if self.configparser.has_option(section, option):
+      return self.configparser.get(section, option)
+    else:
+      return self.configparser.get(self.DEFAULT_SECTION, option)
 
 
 class ChainedConfig(Config):
