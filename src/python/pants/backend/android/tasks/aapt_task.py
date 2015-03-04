@@ -33,7 +33,6 @@ class AaptTask(AndroidTask):
 
   def __init__(self, *args, **kwargs):
     super(AaptTask, self).__init__(*args, **kwargs)
-    self._android_dist = self.android_sdk
     self._forced_build_tools_version = self.get_options().build_tools_version
     self.ignored_assets = self.get_options().ignored_assets
     self._forced_target_sdk = self.get_options().target_sdk
@@ -46,7 +45,7 @@ class AaptTask(AndroidTask):
     if self._forced_build_tools_version:
       build_tools_version = self._forced_build_tools_version
     aapt = os.path.join('build-tools', build_tools_version, 'aapt')
-    return self._android_dist.register_android_tool(aapt)
+    return self.android_sdk.register_android_tool(aapt)
 
   def android_jar_tool(self, target_sdk):
     """Return the appropriate android.jar.
@@ -56,4 +55,4 @@ class AaptTask(AndroidTask):
     if self._forced_target_sdk:
       target_sdk = self._forced_target_sdk
     android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
-    return self._android_dist.register_android_tool(android_jar)
+    return self.android_sdk.register_android_tool(android_jar)

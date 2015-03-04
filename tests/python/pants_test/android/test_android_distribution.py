@@ -16,7 +16,14 @@ from pants_test.android.test_android_mixin import TestAndroidMixin
 
 class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
   """Test the AndroidDistribution class."""
-
+  
+  @contextmanager
+  def env(self, **kwargs):
+    environment = dict(ANDROID_HOME=None, ANDROID_SDK_HOME=None, ANDROID_SDK=None)
+    environment.update(**kwargs)
+    with environment_as(**environment):
+      yield
+      
   def setUp(self):
     super(TestAndroidDistribution, self).setUp()
     # Save local cache and then flush so tests get a clean environment. Cache restored in tearDown.
@@ -41,34 +48,28 @@ class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
       AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
   def test_passing_sdk_path_missing_tools(self):
-    with self.assertRaises(AndroidDistribution.MissingToolError):
+    with self.assertRaises(AndroidDistribution.DistributionError):
       with self.distribution() as sdk:
         aapt = os.path.join(sdk, 'build-tools', 'bad-number', 'aapt')
         AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
+  def test_locate_bad_sdk_path(self):
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      with self.distribution() as sdk:
+        with self.env(ANDROooooD_HOME=sdk):
+          dist = AndroidDistribution.locate_sdk_path()
+          self.assertEquals(dist._sdk_path, None)
+ 
   def test_locate_sdk_path(self):
-    # We can set good/bad paths alike. No checks until tools are called.
-
-    @contextmanager
-    def env(**kwargs):
-      environment = dict(ANDROID_HOME=None, ANDROID_SDK_HOME=None, ANDROID_SDK=None)
-      environment.update(**kwargs)
-      with environment_as(**environment):
-        yield
-
     with self.distribution() as sdk:
-      with env(ANDROooooD_HOME=sdk):
-        dist = AndroidDistribution.locate_sdk_path()
-        self.assertEquals(dist._sdk_path, None)
-
-    with self.distribution() as sdk:
-      with env(ANDROID_HOME=sdk):
+      with self.env(ANDROID_HOME=sdk):
         dist = AndroidDistribution.locate_sdk_path()
         self.assertEquals(dist._sdk_path, sdk)
 
+  def test_locate_alternative_variables(self):
     # Test that alternative environmental variables are accepted.
     with self.distribution() as sdk:
-      with env(ANDROID_SDK=sdk):
+      with self.env(ANDROID_SDK=sdk):
         dist = AndroidDistribution.locate_sdk_path()
         self.assertEquals(dist._sdk_path, sdk)
 
@@ -83,20 +84,19 @@ class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
   def test_sdk_path(self):
     with self.distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
-      self.assertEquals(sdk, android_sdk.sdk_path)
+      self.assertEquals(sdk, android_sdk._sdk_path)
 
   def test_empty_sdk_path(self):
     # Shows that sdk_path accepts any valid directory, even if not a valid SDK.
     with temporary_dir() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
-      self.assertEquals(android_sdk.sdk_path, sdk)
+      self.assertEquals(android_sdk._sdk_path, sdk)
 
   def test_validate_bad_path(self):
-    # This shows DistributionError is raised when the directory does not exist.
-    with self.assertRaises(AndroidDistribution.DistributionError):
-      sdk = os.path.join('no', 'sdk', 'here')
-      android_sdk = AndroidDistribution.cached(sdk)
-      self.assertEquals(sdk, android_sdk.sdk_path)
+    # The SDK path is not validated until the tool is registered.
+    sdk = os.path.join('/no', 'sdk', 'here')
+    android_sdk = AndroidDistribution.cached(sdk)
+    self.assertEquals(sdk, android_sdk._sdk_path)
 
   def test_register_android_tool(self):
     with self.distribution() as sdk:
@@ -113,7 +113,7 @@ class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
       android_sdk.register_android_tool(aapt)
 
   def test_register_nonexistent_android_tool(self):
-    with self.assertRaises(AndroidDistribution.MissingToolError):
+    with self.assertRaises(AndroidDistribution.DistributionError):
       with self.distribution() as sdk:
         android_sdk = AndroidDistribution.cached(sdk)
         android_sdk.register_android_tool(os.path.join('build-tools', '19.1.0', 'random_tool'))

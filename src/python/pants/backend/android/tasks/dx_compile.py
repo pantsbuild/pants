@@ -47,7 +47,6 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def __init__(self, *args, **kwargs):
     super(DxCompile, self).__init__(*args, **kwargs)
-    self._android_dist = self.android_sdk
     self._forced_build_tools_version = self.get_options().build_tools_version
     self._forced_jvm_options = self.get_options().jvm_options
 
@@ -117,7 +116,7 @@ class DxCompile(AndroidTask, NailgunTask):
     :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
     """
     dx_jar = os.path.join('build-tools', build_tools_version, 'lib', 'dx.jar')
-    return self._android_dist.register_android_tool(dx_jar)
+    return self.android_sdk.register_android_tool(dx_jar)
 
   def dx_out(self, target):
     """Return the outdir for the DxCompile task."""
