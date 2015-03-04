@@ -33,6 +33,16 @@ class SetupTest(unittest.TestCase):
         log_file = setup_logging(level, console_stream=stream, log_dir=log_dir, scope=logger.name)
         yield logger, stream, log_file
 
+  def assertWarnInfoOutput(self, lines):
+    """Check to see that only warn and info output appears in the stream.
+
+    The first line may start with WARN] or WARNING] depending on whether 'WARN'
+    has been registered as a global log level.
+    """
+    self.assertEqual(2, len(lines))
+    self.assertRegexpMatches(lines[0], '^WARN\w*] warn')
+    self.assertEqual('INFO] info', lines[1])
+
   def test_standard_logging(self):
     with self.logger('INFO') as (logger, stream, _):
       logger.warn('warn')
@@ -41,7 +51,7 @@ class SetupTest(unittest.TestCase):
 
       stream.flush()
       stream.seek(0)
-      self.assertEqual(['WARNING] warn', 'INFO] info'], stream.read().splitlines())
+      self.assertWarnInfoOutput(stream.read().splitlines())
 
   def test_file_logging(self):
     with self.logger('INFO', file_logging=True) as (logger, stream, log_file):
@@ -51,7 +61,7 @@ class SetupTest(unittest.TestCase):
 
       stream.flush()
       stream.seek(0)
-      self.assertEqual(['WARNING] warn', 'INFO] info'], stream.read().splitlines())
+      self.assertWarnInfoOutput(stream.read().splitlines())
 
       with open(log_file) as fp:
         loglines = fp.read().splitlines()
