@@ -8,11 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.android.tasks.zipalign import Zipalign
-from pants_test.android.test_android_mixin import TestAndroidMixin
-from pants_test.tasks.test_base import TaskTest
+from pants_test.android.test_android_base import TestAndroidBase
 
 
-class TestZipalign(TestAndroidMixin, TaskTest):
+class TestZipalign(TestAndroidBase):
   """Test class for the Zipalign task."""
 
   @classmethod

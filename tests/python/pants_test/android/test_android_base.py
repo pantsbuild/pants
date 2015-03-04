@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -14,9 +14,10 @@ from twitter.common.collections import maybe_list
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
+from pants_test.tasks.test_base import TaskTest
 
 
-class TestAndroidMixin(object):
+class TestAndroidBase(TaskTest):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @contextmanager

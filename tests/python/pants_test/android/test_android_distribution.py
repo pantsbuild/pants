@@ -11,19 +11,18 @@ from contextlib import contextmanager
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.util.contextutil import environment_as, temporary_dir
-from pants_test.android.test_android_mixin import TestAndroidMixin
+from pants_test.android.test_android_base import TestAndroidBase
 
-
-class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
+class TestAndroidDistribution(TestAndroidBase):
   """Test the AndroidDistribution class."""
-  
+
   @contextmanager
   def env(self, **kwargs):
     environment = dict(ANDROID_HOME=None, ANDROID_SDK_HOME=None, ANDROID_SDK=None)
     environment.update(**kwargs)
     with environment_as(**environment):
       yield
-      
+
   def setUp(self):
     super(TestAndroidDistribution, self).setUp()
     # Save local cache and then flush so tests get a clean environment. Cache restored in tearDown.
@@ -59,7 +58,7 @@ class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
         with self.env(ANDROooooD_HOME=sdk):
           dist = AndroidDistribution.locate_sdk_path()
           self.assertEquals(dist._sdk_path, None)
- 
+
   def test_locate_sdk_path(self):
     with self.distribution() as sdk:
       with self.env(ANDROID_HOME=sdk):

@@ -21,7 +21,6 @@ class AndroidDistribution(object):
     """Check for cached SDK. If not found, search for local SDK.
 
     :param string path: Optional local address of an SDK.
-    :returns: 
     :return: An android distribution.
     :rtype: AndroidDistribution
     """
