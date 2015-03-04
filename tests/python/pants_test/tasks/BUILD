@@ -96,6 +96,7 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/option',
   ]
 )
 

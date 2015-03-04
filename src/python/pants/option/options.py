@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import copy
 import sys
+from collections import defaultdict
 
 from pants.base.build_environment import pants_release
 from pants.goal.goal import Goal
@@ -99,11 +100,22 @@ class Options(object):
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scopes = set(known_scopes)
+    self._doc_data = defaultdict(dict)
 
   @property
   def target_specs(self):
     """The targets to operate on."""
     return self._target_specs
+
+  @property
+  def doc_data(self):
+    """Options register data we save away to build the Options Reference web page.
+
+    Organized as a dict of dicts. E.g., If 'test.intercal' scope has a flag '-f/--foo'
+    registered ('-f', '--foo', help='Do not use', advanced=True), then
+    doc_data['test.intercal']['-f/--foo'] = { 'help': 'Do not use', 'advanced': True }
+    """
+    return self._doc_data
 
   @property
   def goals(self):
@@ -138,6 +150,7 @@ class Options(object):
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope, using argparse params."""
     self.get_parser(scope).register(*args, **kwargs)
+    self._doc_data[scope][args] = dict(kwargs)
 
   def register_global(self, *args, **kwargs):
     """Register an option in the global scope, using argparse params."""

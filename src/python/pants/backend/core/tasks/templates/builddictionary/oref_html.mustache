@@ -38,6 +38,9 @@ div.oref_ogroup_section h3 {
   border-top: 1px dotted #bcd;
   margin-left: -2%;
 }
+.advanced {
+  color: red; font-size: small; font-style: italic;
+}
 </style>
 
 {{#goals}}
@@ -51,7 +54,7 @@ div.oref_ogroup_section h3 {
 <p>{{goal.description}}
 {{/goal.description}}
 
-{{#tasks}}
+{{#scopes}}
 
 {{#ogroup}}
 <div class="oref_ogroup_section">
@@ -60,7 +63,9 @@ div.oref_ogroup_section h3 {
 <h3 id="group_{{ogroup.pantsref}}">{{ogroup.title}}</h3>
 {{/ogroup}}
 
+{{#impl}}
 <p>Implemented by <code>{{impl}}</code>
+{{/impl}}
 
 {{#doc_html}}
 <div>
@@ -78,6 +83,9 @@ div.oref_ogroup_section h3 {
 {{#default}}
       (Default: <code>{{default}}</code>)
 {{/default}}
+{{#is_advanced}}
+<span class='advanced'>Advanced Option: Use only with caution.</span>
+{{/is_advanced}}
 
 {{hlp}}
 
@@ -86,7 +94,7 @@ div.oref_ogroup_section h3 {
 </div>
 {{/ogroup}}
 
-{{/tasks}}
+{{/scopes}}
 
 
 <p><b>Other command-line options:</b><br>
@@ -114,6 +122,9 @@ These command-line flags are available with all Pants goals.
 {{#default}}
       (Default: <code>{{default}}</code>)
 {{/default}}
+{{#is_advanced}}
+<span class='advanced'>Advanced Option: Use only with caution.</span>
+{{/is_advanced}}
 
 {{hlp}}
 
