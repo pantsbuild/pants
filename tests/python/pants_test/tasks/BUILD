@@ -26,7 +26,6 @@ target(
     ':check_published_deps',
     ':config',
     ':console_task',
-    ':context',
     ':dependees',
     ':dependencies',
     ':depmap',
@@ -201,17 +200,6 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:console_task',
-  ]
-)
-
-# XXX this should be in goal
-python_tests(
-  name = 'context',
-  sources = ['test_context.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:config',
-    'src/python/pants/goal:context',
   ]
 )
 
