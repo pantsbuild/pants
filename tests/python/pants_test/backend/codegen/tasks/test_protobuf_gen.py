@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import OrderedDict
 import os
+from collections import OrderedDict
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
@@ -14,7 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.protobuf_gen import (ProtobufGen, _same_contents,
-  check_duplicate_conflicting_protos)
+                                                      check_duplicate_conflicting_protos)
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
@@ -365,4 +365,3 @@ class ProtobufGenTest(TaskTestBase):
     self.assertEquals(2, len(test_logger._error))
     self.assertRegexpMatches(test_logger._error[0], '^Proto conflict detected.*\n.*src1/foo.proto\n.*src2/foo.proto')
     self.assertRegexpMatches(test_logger._error[1], '^Proto conflict detected.*\n.*src1/foo.proto\n.*src2/foo.proto')
-
