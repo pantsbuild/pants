@@ -18,9 +18,9 @@ class AndroidDistribution(object):
 
   @classmethod
   def cached(cls, path=None):
-    """Check for cached SDK. If not found, search for local SDK.
+    """Return an AndroidDistribution and cache results.
 
-    :param string path: Optional local address of an SDK.
+    :param string path: Optional path of an Android SDK installation.
     :return: An android distribution.
     :rtype: AndroidDistribution
     """
@@ -40,7 +40,7 @@ class AndroidDistribution(object):
     :raises: ``DistributionError`` if SDK cannot be found.
     """
     def sdk_path(sdk_env_var):
-      """Determine if an environmental variable has been set."""
+      """Return the full path of environmental variable sdk_env_var."""
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
 
@@ -64,7 +64,7 @@ class AndroidDistribution(object):
     self._validated_tools = {}
 
   def register_android_tool(self, tool_path):
-    """Check tool located at tool_path and see if it is installed in the local Android SDK.
+    """Verify presence of tool at SDK location tool_path and return the full path.
 
     All android tasks should request their tools using this method.
     :param string tool_path: Path to tool, relative to the Android SDK root, e.g
