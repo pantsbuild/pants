@@ -687,7 +687,7 @@ class JarPublish(JarTask, ScmPublish):
           raise TaskError("publish_extra for '{0}' most override one of name, classifier or "
                           "extension with a non-default value.".format(extra_product))
 
-        ivy_tmpl_key = "publish_extra-{0}{1}{2}".format(override_name, classifier, extension)
+        ivy_tmpl_key = classifier or '%s-%s'.format(override_name, extension)
 
         # Build a list of targets to check. This list will consist of the current target, plus the
         # entire derived_from chain.
