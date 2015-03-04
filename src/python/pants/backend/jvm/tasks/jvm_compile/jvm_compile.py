@@ -91,6 +91,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
+    register('--use-runtime-classpath', default=False, action='store_true',
+             help='Allow the compile step to use the full runtime classpath in the compile step '
+                  'instead of just the strict set of dependencies declared for each target.')
+
   @classmethod
   def product_types(cls):
     return ['classes_by_target', 'classes_by_source', 'resources_by_target']
@@ -372,7 +376,15 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       for conf in self._confs:
         for jar in self.extra_compile_time_classpath_elements():
            yield (conf, jar)
-    compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
+    if self.get_options().use_runtime_classpath:
+      # Grab the classpath for all targets specified for this run of Pants.  This may include dependencies
+      # not transitively declared for some targets if multiple targets were specified on the
+      # command line and thus, be far too broad.
+      compile_classpath = compile_classpaths.get_for_targets(self.context.targets())
+    else:
+      # Restrict the classpath to just those declared for each project.  Transitive dependencies
+      # for targets not being built will not be included on the classpath.
+      compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
     compile_classpath = OrderedSet(list(extra_compile_classpath_iter()) + list(compile_classpath))
 
     # Target -> sources (relative to buildroot), for just this chunk's targets.
