@@ -30,8 +30,8 @@ class CppBinaryCreate(CppTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(CppBinaryCreate, cls).prepare(options, round_manager)
-    round_manager.require_data('lib')
-    round_manager.require_data('objs')
+    round_manager.require('lib')
+    round_manager.require('objs')
 
   def execute(self):
     with self.context.new_workunit(name='cpp-binary', labels=[WorkUnit.TASK]):
@@ -50,7 +50,7 @@ class CppBinaryCreate(CppTask):
   def _create_binary(self, binary):
     objects = []
     for basedir, objs in self.context.products.get('objs').get(binary).items():
-      objects = [os.path.join(basedir, obj) for obj in objs]
+      objects.extend([os.path.join(basedir, obj) for obj in objs])
     output = self._link_binary(binary, objects)
     self.context.log.info('Built c++ binary: {0}'.format(output))
     return output

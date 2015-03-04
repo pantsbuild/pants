@@ -46,7 +46,7 @@ class CppCompile(CppTask):
           self.context.products.get('objs').add(target, self.workdir).append(
               self._objpath(target, source))
 
-    # Compile ALL the things.
+    # Compile source files to objects.
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
