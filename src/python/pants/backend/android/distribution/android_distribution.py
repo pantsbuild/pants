@@ -17,11 +17,11 @@ class AndroidDistribution(object):
 
   class MissingToolError(Exception):
     """Indicates a missing tool at SDK location.
-    
+
     The sdk_path has been either passed at invocation or as environmental variable. But the needed
     tool cannot be found.
     """
-    
+
   _CACHED_SDK = {}
 
   @classmethod
@@ -99,8 +99,8 @@ class AndroidDistribution(object):
         # Use entire relative path as a key since the SDK usually has multiple copies of each tool.
         self._validated_tools[tool_path] = android_tool
       else:
-        raise self.MissingToolError('There is no {} installed.The Android SDK may need to be updated'
-                               .format(android_tool))
+        raise self.MissingToolError('There is no {} installed.The Android SDK may need to be '
+                                    'updated'.format(android_tool))
     return self._validated_tools[tool_path]
 
   def __repr__(self):

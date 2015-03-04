@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import textwrap
-import unittest
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -17,7 +16,7 @@ from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
 
 
-class TestAndroidBase(unittest.TestCase):
+class TestAndroidMixin(object):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @contextmanager
@@ -52,8 +51,8 @@ class TestAndroidBase(unittest.TestCase):
     :param tuple[strings] installed_build_tools: Build tools version of any tools.
     :param tuple[strings] files: The files are to mock non-executables and one will be created for
       each installed_sdks version.
-    :param tuple[strings] executables: Executables are any required tools and one is created for each
-      installed_build_tools version.
+    :param tuple[strings] executables: Executables are any required tools and one is created for
+      each installed_build_tools version.
     """
     with temporary_dir() as sdk:
       for sdk_version in installed_sdks:

@@ -6,14 +6,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from contextlib import contextmanager
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.util.contextutil import environment_as, temporary_dir
-from pants_test.android.test_android_base import TestAndroidBase
+from pants_test.android.test_android_mixin import TestAndroidMixin
 
 
-class TestAndroidDistribution(TestAndroidBase):
+class TestAndroidDistribution(unittest.TestCase, TestAndroidMixin):
   """Test the AndroidDistribution class."""
 
   def setUp(self):
@@ -35,7 +36,7 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_passing_sdk_path_not_valid(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      sdk = '/no/sdk/here'
+      sdk = os.path.join('no', 'sdk', 'here')
       aapt = os.path.join(sdk, 'build-tools', '19.1.0', 'aapt')
       AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
@@ -65,6 +66,20 @@ class TestAndroidDistribution(TestAndroidBase):
         dist = AndroidDistribution.locate_sdk_path()
         self.assertEquals(dist._sdk_path, sdk)
 
+    # Test that alternative environmental variables are accepted.
+    with self.distribution() as sdk:
+      with env(ANDROID_SDK=sdk):
+        dist = AndroidDistribution.locate_sdk_path()
+        self.assertEquals(dist._sdk_path, sdk)
+
+  def test_caching_multiple_sdks(self):
+    with self.distribution() as first_sdk_path:
+      with self.distribution() as second_sdk_path:
+        first_sdk_instance = AndroidDistribution.cached(first_sdk_path)
+        second_sdk_instance = AndroidDistribution.cached(second_sdk_path)
+        self.assertEquals(AndroidDistribution._CACHED_SDK[first_sdk_path], first_sdk_instance)
+        self.assertEquals(AndroidDistribution._CACHED_SDK[second_sdk_path], second_sdk_instance)
+
   def test_sdk_path(self):
     with self.distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
@@ -77,9 +92,9 @@ class TestAndroidDistribution(TestAndroidBase):
       self.assertEquals(android_sdk.sdk_path, sdk)
 
   def test_validate_bad_path(self):
-    # This shows the exception is raised when dir does not exist.
+    # This shows DistributionError is raised when the directory does not exist.
     with self.assertRaises(AndroidDistribution.DistributionError):
-      sdk = '/no/sdk/here'
+      sdk = os.path.join('no', 'sdk', 'here')
       android_sdk = AndroidDistribution.cached(sdk)
       self.assertEquals(sdk, android_sdk.sdk_path)
 
@@ -91,11 +106,11 @@ class TestAndroidDistribution(TestAndroidBase):
       self.assertEquals(registered_aapt, os.path.join(sdk, aapt))
 
   def test_register_android_tool_bad_sdk(self):
-    with self.assertRaises(AndroidDistribution.MissingToolError):
-      with temporary_dir() as sdk:
-        android_sdk = AndroidDistribution.cached(sdk)
-        aapt = os.path.join('build-tools', '19.1.0', 'aapt')
-        android_sdk.register_android_tool(aapt)
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      sdk = os.path.join('no', 'sdk', 'here')
+      android_sdk = AndroidDistribution.cached(sdk)
+      aapt = os.path.join('build-tools', '19.1.0', 'aapt')
+      android_sdk.register_android_tool(aapt)
 
   def test_register_nonexistent_android_tool(self):
     with self.assertRaises(AndroidDistribution.MissingToolError):
