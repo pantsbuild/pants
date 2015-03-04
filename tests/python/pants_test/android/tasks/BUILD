@@ -59,7 +59,8 @@ python_tests(
     'src/python/pants/backend/android/tasks:sign_apk',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/android:android_base'
+    'tests/python/pants_test/android:android_mixin',
+    'tests/python/pants_test/tasks:base'
   ],
 )
 
@@ -81,7 +82,8 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android/tasks:zipalign',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/android:android_base',
+    'tests/python/pants_test/android:android_mixin',
+    'tests/python/pants_test/tasks:base'
   ],
 )
 

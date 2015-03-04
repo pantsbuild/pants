@@ -11,10 +11,11 @@ import textwrap
 from pants.backend.android.tasks.sign_apk import SignApkTask
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants_test.android.test_android_base import TestAndroidBase
+from pants_test.android.test_android_mixin import TestAndroidMixin
+from pants_test.tasks.test_base import TaskTest
 
 
-class SignApkTest(TestAndroidBase):
+class SignApkTest(TestAndroidMixin, TaskTest):
   """Test the package signing methods in pants.backend.android.tasks.SignApk"""
 
   _TEST_KEYSTORE = '%(homedir)s/.doesnt/matter/keystore_config.ini'

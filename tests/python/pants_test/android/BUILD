@@ -32,9 +32,9 @@ python_tests(
 )
 
 python_library(
-  name = 'android_base',
+  name = 'android_mixin',
   sources = [
-    'test_android_base.py',
+    'test_android_mixin.py',
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -42,7 +42,6 @@ python_library(
     'src/python/pants/backend/android/tasks:all',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:base'
   ]
 )
 
@@ -76,7 +75,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android:android_distribution',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/android:android_base',
+    'tests/python/pants_test/android:android_mixin',
   ]
 )
 
