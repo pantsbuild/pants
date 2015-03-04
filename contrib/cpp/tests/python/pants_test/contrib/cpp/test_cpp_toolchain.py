@@ -7,36 +7,41 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
+from contextlib import contextmanager
 
-import pytest
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
 
 from pants.contrib.cpp.toolchain.cpp_toolchain import CppToolchain
 
 
-class TestCppToolchainTest(unittest.TestCase):
-  def setUp(self):
-    super(TestCppToolchainTest, self).setUp()
+class CppToolchainTest(unittest.TestCase):
+  @contextmanager
+  def tool(self, name):
+    with temporary_dir() as tool_root:
+      tool_path = os.path.join(tool_root, name)
+      touch(tool_path)
+      chmod_plus_x(tool_path)
+      new_path = os.pathsep.join([tool_root] + os.environ.get('PATH', '').split(os.pathsep))
+      with environment_as(PATH=new_path):
+        yield tool_path
 
   def test_default_compiler_from_environ(self):
-    with environment_as(CXX='g++'):
-      assert(CppToolchain().compiler == CppToolchain().register_tool('g++'))
+    with self.tool('g++') as tool_path:
+      with environment_as(CXX='g++'):
+        self.assertEqual(CppToolchain().compiler, tool_path)
+        self.assertEqual(CppToolchain().compiler,
+                         CppToolchain().register_tool(name='compiler', tool=tool_path))
 
   def test_invalid_compiler(self):
-    with pytest.raises(CppToolchain.Error):
-      CppToolchain('not-a-command')
+    cpp_toolchain = CppToolchain(compiler='not-a-command')
+    with self.assertRaises(CppToolchain.Error):
+      cpp_toolchain.compiler
 
   def test_tool_registration(self):
-    with temporary_dir() as tool_root:
-      newpath = os.pathsep.join((os.environ['PATH'], tool_root))
-      with environment_as(PATH=newpath):
-        GOODTOOL = 'good-tool'
-        goodtool_path = os.path.join(tool_root, GOODTOOL)
-        touch(goodtool_path)
-        chmod_plus_x(goodtool_path)
-        CppToolchain().register_tool(GOODTOOL)
+    with self.tool('good-tool') as tool_path:
+      self.assertEqual(tool_path, CppToolchain().register_tool(name='foo', tool='good-tool'))
 
   def test_invalid_tool_registration(self):
-    with pytest.raises(CppToolchain.Error):
+    with self.assertRaises(CppToolchain.Error):
       CppToolchain().register_tool('not-a-command')
