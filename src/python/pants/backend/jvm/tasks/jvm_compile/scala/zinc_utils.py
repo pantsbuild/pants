@@ -119,17 +119,20 @@ class ZincUtils(object):
     ret = []
 
     # Go through all the bootstrap tools required to compile.
-    for target in self._nailgun_task.get_options().scalac:
-      # Resolve to their actual targets.
-      try:
-        deps = self.context.resolve(target)
-      except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  specified by option --scalac in scope {scope}."
-                                  .format(message=e, scope=self._nailgun_task.options_scope))
+    for toolname in ['scalac', 'zinc']:
+      for target in self._nailgun_task.get_options()[toolname]:
+        # Resolve to their actual targets.
+        try:
+          deps = self.context.resolve(target)
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  specified by option --{toolname} in scope {scope}."
+                                    .format(message=e,
+                                            toolname=toolname,
+                                            scope=self._nailgun_task.options_scope))
 
-      for lib in (t for t in deps if isinstance(t, JarLibrary)):
-        for jar in lib.jar_dependencies:
-          ret.append(jar.cache_key())
+        for lib in (t for t in deps if isinstance(t, JarLibrary)):
+          for jar in lib.jar_dependencies:
+            ret.append(jar.cache_key())
     return sorted(ret)
 
   @staticmethod
