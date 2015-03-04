@@ -40,11 +40,12 @@ class AndroidDistribution(object):
     :raises: ``DistributionError`` if SDK cannot be found.
     """
     def sdk_path(sdk_env_var):
+      """Determine if an environmental variable has been set."""
       sdk = os.environ.get(sdk_env_var)
       return os.path.abspath(sdk) if sdk else None
 
     def search_path(path):
-      # Check path if one is passed and then check environmental variables.
+      """Find a Android SDK home directory."""
       if path:
         yield os.path.abspath(path)
       yield sdk_path('ANDROID_HOME')
@@ -65,8 +66,7 @@ class AndroidDistribution(object):
   def register_android_tool(self, tool_path):
     """Check tool located at tool_path and see if it is installed in the local Android SDK.
 
-    All android tasks should request their tools using this method. Tools are validated and then
-    cached for quick lookup.
+    All android tasks should request their tools using this method.
     :param string tool_path: Path to tool, relative to the Android SDK root, e.g
       'platforms/android-19/android.jar'.
     :return: Full path to android tool.

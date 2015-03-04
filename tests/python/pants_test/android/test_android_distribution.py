@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from contextlib import contextmanager
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
@@ -42,7 +41,7 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_passing_sdk_path_not_valid(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      sdk = os.path.join('no', 'sdk', 'here')
+      sdk = os.path.join('/no', 'sdk', 'here')
       aapt = os.path.join(sdk, 'build-tools', '19.1.0', 'aapt')
       AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
@@ -52,7 +51,7 @@ class TestAndroidDistribution(TestAndroidBase):
         aapt = os.path.join(sdk, 'build-tools', 'bad-number', 'aapt')
         AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
-  def test_locate_bad_sdk_path(self):
+  def test_locate_no_sdk_on_path(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
       with self.distribution() as sdk:
         with self.env(ANDROooooD_HOME=sdk):
@@ -86,10 +85,15 @@ class TestAndroidDistribution(TestAndroidBase):
       self.assertEquals(sdk, android_sdk._sdk_path)
 
   def test_empty_sdk_path(self):
-    # Shows that sdk_path accepts any valid directory, even if not a valid SDK.
+    # Shows that an AndroidDistribution can be created as long as an sdk path is declared.
     with temporary_dir() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       self.assertEquals(android_sdk._sdk_path, sdk)
+
+  def test_sdk_path_is_none(self):
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      with self.env() as sdk:
+        AndroidDistribution.cached(sdk)
 
   def test_validate_bad_path(self):
     # The SDK path is not validated until the tool is registered.
@@ -106,7 +110,7 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_register_android_tool_bad_sdk(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      sdk = os.path.join('no', 'sdk', 'here')
+      sdk = os.path.join('/no', 'sdk', 'here')
       android_sdk = AndroidDistribution.cached(sdk)
       aapt = os.path.join('build-tools', '19.1.0', 'aapt')
       android_sdk.register_android_tool(aapt)
