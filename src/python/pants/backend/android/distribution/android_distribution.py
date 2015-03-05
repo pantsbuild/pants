@@ -23,7 +23,7 @@ class AndroidDistribution(object):
     :param string path: Optional path of an Android SDK installation.
     :return: An android distribution.
     :rtype: AndroidDistribution
-    """ 
+    """
     dist = cls._CACHED_SDK.get(path)
     if not dist:
       dist = cls.locate_sdk_path(path)
