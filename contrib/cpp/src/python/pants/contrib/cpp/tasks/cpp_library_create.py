@@ -21,6 +21,11 @@ class CppLibraryCreate(CppTask):
   def product_types(cls):
     return ['lib']
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(CppLibraryCreate, cls).prepare(options, round_manager)
+    round_manager.require('objs')
+
   def __init__(self, *args, **kwargs):
     super(CppLibraryCreate, self).__init__(*args, **kwargs)
 
@@ -29,31 +34,31 @@ class CppLibraryCreate(CppTask):
       targets = self.context.targets(self.is_library)
       for target in targets:
         target.workdir = self._workdir
+        self.context.products.get('lib').add(target, self.workdir).append(self._libpath(target))
 
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
         invalid_targets = []
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
-          library = self._create_library(target)
-          self.context.products.get('lib').add(target, self.workdir).append(library)
+          self._create_library(target)
 
   def _create_library(self, library):
-    objects = self.compile_sources(library)
-
+    objects = []
+    for basedir, objs in self.context.products.get('objs').get(library).items():
+      objects = [os.path.join(basedir, obj) for obj in objs]
     # TODO: copy public headers to work dir.
     output = self._link_library(library, objects)
     self.context.log.info('Built c++ library: {0}'.format(output))
     return output
 
-  def _link_library(self, target, objects):
-    def library_name(target):
-      return 'lib' + target.name + '.a'
-
+  def _libpath(self, target):
     output_dir = os.path.join(self.workdir, target.id)
-    safe_mkdir(output_dir)
+    return os.path.join(output_dir, 'lib' + target.name + '.a')
 
-    output = os.path.join(output_dir, library_name(target))
+  def _link_library(self, target, objects):
+    output = self._libpath(target)
+    safe_mkdir(os.path.dirname(output))
 
     cmd = [self.cpp_toolchain.register_tool('ar')]
     cmd.extend(['rcs'])

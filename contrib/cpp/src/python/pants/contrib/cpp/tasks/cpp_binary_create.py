@@ -30,7 +30,8 @@ class CppBinaryCreate(CppTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(CppBinaryCreate, cls).prepare(options, round_manager)
-    round_manager.require_data('lib')
+    round_manager.require('lib')
+    round_manager.require('objs')
 
   def execute(self):
     with self.context.new_workunit(name='cpp-binary', labels=[WorkUnit.TASK]):
@@ -47,14 +48,15 @@ class CppBinaryCreate(CppTask):
           self.context.products.get('exe').add(target, self.workdir).append(binary)
 
   def _create_binary(self, binary):
-    objects = self.compile_sources(binary)
+    objects = []
+    for basedir, objs in self.context.products.get('objs').get(binary).items():
+      objects.extend([os.path.join(basedir, obj) for obj in objs])
     output = self._link_binary(binary, objects)
     self.context.log.info('Built c++ binary: {0}'.format(output))
     return output
 
   def _link_binary(self, target, objects):
     output = os.path.join(self.workdir, target.id, target.name)
-
     safe_mkdir(os.path.dirname(output))
 
     cmd = [self.cpp_toolchain.compiler]
@@ -62,6 +64,7 @@ class CppBinaryCreate(CppTask):
     library_dirs = []
     libraries = []
 
+    # TODO(dhamon): should this use self.context.products.get('lib').get(binary).items()
     def add_library(tgt):
       for dep in tgt.dependencies:
         if self.is_library(dep):
