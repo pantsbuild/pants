@@ -279,20 +279,24 @@ class Context(object):
   def targets(self, predicate=None, postorder=False):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
 
-    If specified, the predicate will be used to narrow the scope of targets returned.
+    Also includes any new synthetic targets created from the target roots or their transitive
+    dependencies during the course of the run.
 
-    :return: a list of targets evaluated by the predicate in preorder (or postorder, if the
-    postorder parameter is True) traversal order.
+    :param predicate: If specified, the predicate will be used to narrow the scope of targets
+                      returned.
+    :param bool postorder: `True` to gather transitive dependencies with a postorder traversal;
+                          `False` or preorder by default.
+    :returns: A list of matching targets.
     """
 
-    targets = list(self.target_roots)
-    for target in self.target_roots:
-      targets.extend(self._synthetic_targets.get(target, []))
-
-    target_root_addresses = [target.address for target in targets]
-
+    target_root_addresses = [target.address for target in self.target_roots]
     target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses,
                                                                    postorder=postorder)
+
+    for derived_from, synthetic_targets in self._synthetic_targets.items():
+      if derived_from in target_set:
+        target_set.update(synthetic_targets)
+
     return filter(predicate, target_set)
 
   def dependents(self, on_predicate=None, from_predicate=None):
