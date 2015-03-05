@@ -127,6 +127,10 @@ class IvyUtils(object):
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
 
+  class IvyResolveReportError(Exception):
+    """Raised when the ivy report cannot be found."""
+    pass
+
   @staticmethod
   def _generate_exclude_template(exclude):
     return TemplateData(org=exclude.org, name=exclude.name)
@@ -204,6 +208,9 @@ class IvyUtils(object):
       return None
 
     path = cls.xml_report_path(targets, conf)
+    if not os.path.exists(path):
+      raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
+
     return cls._parse_xml_report(path)
 
   @classmethod
