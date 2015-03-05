@@ -14,7 +14,7 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
   """Prepares an ephemeral test build root that supports nailgun tasks."""
   def setUp(self):
     super(NailgunTaskTestBase, self).setUp()
-    self.set_options(ng_daemons=True)
+    self.set_options(use_nailgun=True)
 
   @classmethod
   def tearDownClass(cls):

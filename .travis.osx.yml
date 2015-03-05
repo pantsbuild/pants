@@ -14,7 +14,7 @@ script: |
   sw_vers
   python --version
   java -version
-  ./build-support/bin/ci.sh -d
+  ./build-support/bin/ci.sh -x
 
 # The `notifications:` configuration will be programatically copied over from `.travis.yml` for
 # central maintenance of distribution lists, see: `build-support/bin/ci-sync.sh`.

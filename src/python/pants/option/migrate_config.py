@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from colors import cyan, green
+from colors import cyan, green, red, yellow
 
 from pants.base.config import Config, SingleFileConfig
 from pants.option import custom_types
@@ -21,7 +21,8 @@ migrations = {
   ('java-compile', 'javac_args'): ('compile.java', 'args'),
   ('java-compile', 'jvm_args'): ('compile.java', 'jvm_options'),
   ('java-compile', 'confs'): ('compile.java', 'confs'),
-  ('java-compile', 'locally_changed_targets_heuristic_limit'): ('compile.java', 'changed_targets_heuristic_limit'),
+  ('java-compile', 'locally_changed_targets_heuristic_limit'): ('compile.java',
+                                                                'changed_targets_heuristic_limit'),
   ('java-compile', 'warning_args'): ('compile.java', 'warning_args'),
   ('java-compile', 'no_warning_args'): ('compile.java', 'no_warning_args'),
   ('java-compile', 'use_nailgun'): ('compile.java', 'use_nailgun'),
@@ -29,7 +30,8 @@ migrations = {
   ('scala-compile', 'partition_size_hint'): ('compile.scala', 'partition_size_hint'),
   ('scala-compile', 'jvm_args'): ('compile.scala', 'jvm_options'),
   ('scala-compile', 'confs'): ('compile.scala', 'confs'),
-  ('scala-compile', 'locally_changed_targets_heuristic_limit'): ('compile.scala', 'changed_targets_heuristic_limit'),
+  ('scala-compile', 'locally_changed_targets_heuristic_limit'): ('compile.scala',
+                                                                 'changed_targets_heuristic_limit'),
   ('scala-compile', 'warning_args'): ('compile.scala', 'warning_args'),
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
   ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
@@ -88,7 +90,8 @@ migrations = {
   ('junit-run', 'cobertura-bootstrap-tools'): ('test.junit', 'cobertura'),
   ('java-compile', 'jmake-bootstrap-tools'): ('compile.java', 'jmake'),
   ('java-compile', 'compiler-bootstrap-tools'): ('compile.java', 'java_compiler'),
-  ('scala-compile', 'compile-bootstrap-tools'): ('compile.scala', 'scalac'),  # Note: compile-bootstrap-tools is not a typo.
+  # Note: compile-bootstrap-tools is not a typo.
+  ('scala-compile', 'compile-bootstrap-tools'): ('compile.scala', 'scalac'),
   ('scala-compile', 'zinc-bootstrap-tools'): ('compile.scala', 'zinc'),
   ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin_jars'),
   ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala_repl'),
@@ -131,9 +134,9 @@ migrations = {
 
   # Three changes are pertinent to migrate 'ide' to both idea and & eclipse. I tried to capture
   # that in notes
-  ('ide', 'python_source_paths'): ('idea', 'python_source_path'),
-  ('ide', 'python_lib_paths'): ('idea', 'python_lib_path'),
-  ('ide', 'python_test_paths'): ('idea', 'python_test_path'),
+  ('ide', 'python_source_paths'): ('idea', 'python_source_paths'),
+  ('ide', 'python_lib_paths'): ('idea', 'python_lib_paths'),
+  ('ide', 'python_test_paths'): ('idea', 'python_test_paths'),
   ('ide', 'extra_jvm_source_paths'): ('idea', 'extra_jvm_source_paths'),
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
@@ -144,10 +147,58 @@ migrations = {
   ('DEFAULT', 'stats_upload_timeout'): ('run-tracker', 'stats_upload_timeout'),
   ('DEFAULT', 'num_foreground_workers'): ('run-tracker', 'num_foreground_workers'),
   ('DEFAULT', 'num_background_workers'): ('run-tracker', 'num_background_workers'),
+
+  # These changes migrate all possible scoped configuration of --ng-daemons to --use-nailgun leaf
+  # options.
+  ('DEFAULT', 'ng_daemons'): ('DEFAULT', 'use_nailgun'),
+
+  # NB: binary.binary -> binary is a leaf scope
+  ('binary', 'ng_daemons'): ('binary', 'use_nailgun'),
+  ('binary.dex', 'ng_daemons'): ('binary.dex', 'use_nailgun'),
+  ('binary.dup', 'ng_daemons'): ('binary.dup', 'use_nailgun'),
+
+  # NB: bundle.bundle -> bundle is a leaf scope
+  ('bundle', 'ng_daemons'): ('bundle', 'use_nailgun'),
+  ('bundle.dup', 'ng_daemons'): ('bundle.dup', 'use_nailgun'),
+
+  ('compile', 'ng_daemons'): None,  # Intermediate scope - note only, no direct migration path
+  ('compile.scalastyle', 'ng_daemons'): ('compile.scalastyle', 'use_nailgun'),
+  ('compile.scala', 'ng_daemons'): ('compile.scala', 'use_nailgun'),
+  ('compile.apt', 'ng_daemons'): ('compile.apt', 'use_nailgun'),
+  ('compile.java', 'ng_daemons'): ('compile.java', 'use_nailgun'),
+  ('compile.checkstyle', 'ng_daemons'): ('compile.checkstyle', 'use_nailgun'),
+
+  ('detect-duplicates', 'ng_daemons'): ('detect-duplicates', 'use_nailgun'),
+
+  ('gen', 'ng_daemons'): None,  # Intermediate scope - note only, no direct migration path
+  ('gen.antlr', 'ng_daemons'): ('gen.antlr', 'use_nailgun'),
+  ('gen.jaxb', 'ng_daemons'): ('gen.jaxb', 'use_nailgun'),
+  ('gen.scrooge', 'ng_daemons'): ('gen.scrooge', 'use_nailgun'),
+
+  ('imports', 'ng_daemons'): None,  # Intermediate scope - note only, no direct migration path
+  ('imports.ivy-imports', 'ng_daemons'): ('imports.ivy-imports', 'use_nailgun'),
+
+  ('jar', 'ng_daemons'): ('jar', 'use_nailgun'),
+  ('publish', 'ng_daemons'): ('publish', 'use_nailgun'),
+
+  ('resolve', 'ng_daemons'): None,  # Intermediate scope - note only, no direct migration path
+  ('resolve.ivy', 'ng_daemons'): ('resolve.ivy', 'use_nailgun'),
+
+  ('thrift-linter', 'ng_daemons'): ('thrift-linter', 'use_nailgun'),
 }
 
+ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
+                   'local to each task that can use a nailgun.  A default can no longer be '
+                   'specified at intermediate scopes; ie: "compile" when the option is present in '
+                   '"compile.apt", "compile.checkstyle", "compile.java", "compile.scala" and '
+                   '"compile.scalastyle".  You must over-ride in each nailgun task section that '
+                   'should not use the default "use_nailgun" value of sTrue.  You can possibly '
+                   'limit the number of overrides by inverting the default with a DEFAULT section '
+                   'value of False.')
+
 notes = {
-  ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or compile.scala',
+  ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
+                                            'compile.scala',
   ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
                                   'target: options. Other args should be placed in args: and '
                                   'prefixed with -C.',
@@ -183,6 +234,11 @@ notes = {
                                'inherit from jvm configuration.',
 
   ('tasks', 'build_invalidator'): 'This is no longer configurable. The default will be used.',
+
+  ('compile', 'ng_daemons'): ng_daemons_note,
+  ('gen', 'ng_daemons'): ng_daemons_note,
+  ('imports', 'ng_daemons'): ng_daemons_note,
+  ('resolve', 'ng_daemons'): ng_daemons_note,
 }
 
 
@@ -196,17 +252,28 @@ def check_config_file(path):
   def section(s):
     return cyan('[{0}]'.format(s))
 
-  for (src_section, src_key), (dst_section, dst_key) in migrations.items():
-    def has_non_default_option(section, key):
-      return cp.has_option(section, key) and cp.get(section, key) != cp.defaults().get(key, None)
+  for (src_section, src_key), dst in migrations.items():
+    def has_explicit_option(section, key):
+      # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
+      # that approach fails for the important case of boolean options.  Since this is a ~short term
+      # tool and its highly likely its lifetime will be shorter than the time the private
+      # ConfigParser_sections API we use here changes, its worth the risk.
+      return cp.has_section(section) and (key in cp._sections[section])
 
-    if config.has_section(src_section) and has_non_default_option(src_section, src_key):
-      print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
-            '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
-                                    dst_key=green(dst_key), dst_section=section(dst_section)),
-                                    file=sys.stderr)
+    if has_explicit_option(src_section, src_key):
+      if dst is not None:
+        dst_section, dst_key = dst
+        print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
+              '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
+                                      dst_key=green(dst_key), dst_section=section(dst_section)),
+                                      file=sys.stderr)
+      elif (src_section, src_key) not in notes:
+        print('Found {src_key} in section {src_section} and there is no automated migration path'
+              'for this option.  Please consult the '
+              'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
+
       if (src_section, src_key) in notes:
-        print('  Note: {0}'.format(notes[(src_section, src_key)]))
+        print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
 
   # Check that all values are parseable.
   for sec in ['DEFAULT'] + cp.sections():
