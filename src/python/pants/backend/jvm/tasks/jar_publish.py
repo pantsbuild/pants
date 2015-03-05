@@ -35,7 +35,6 @@ from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.option.options import Options
-from pants.scm.scm import Scm
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
@@ -349,7 +348,6 @@ class JarPublish(JarTask, ScmPublish):
        },
      }
   """
-  _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
   def register_options(cls, register):
@@ -371,8 +369,6 @@ class JarPublish(JarTask, ScmPublish):
              help='Commit the push db. Turn off for local testing.')
     register('--local', metavar='<PATH>',
              help='Publish jars to a maven repository on the local filesystem at this path.')
-    register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
-             help='Try pushing the pushdb to the SCM this many times before aborting.')
     register('--local-snapshot', default=True, action='store_true',
              help='If --local is specified, publishes jars with -SNAPSHOT revision suffixes.')
     register('--named-snapshot', default=None,
@@ -395,8 +391,6 @@ class JarPublish(JarTask, ScmPublish):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--restrict-push-branches', advanced=True, type=Options.list,
-             help='Allow pushes only from one of these branches.')
     register('--jvm-options', advanced=True, type=Options.list,
              help='Use these jvm options when running Ivy.')
     register('--repos', advanced=True, type=Options.dict,
@@ -405,6 +399,7 @@ class JarPublish(JarTask, ScmPublish):
     register('--publish-extras', advanced=True, type=Options.dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
+    cls.register_scm_publish(register)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -811,34 +806,15 @@ class JarPublish(JarTask, ScmPublish):
             )
 
             pushdb.dump(dbfile)
+
+            self.add_pushdb(dbfile)
             self.commit_pushdb(coordinate(org, name, rev))
-            scm_exception = None
-            for attempt in range(self.get_options().scm_push_attempts):
-              try:
-                self.context.log.debug("Trying scm push")
-                self.scm.push()
-                break # success
-              except Scm.RemoteException as scm_exception:
-                self.context.log.debug("Scm push failed, trying to refresh")
-                # This might fail in the event that there is a real conflict, throwing
-                # a Scm.LocalException (in case of a rebase failure) or a Scm.RemoteException
-                # in the case of a fetch failure.  We'll directly raise a local exception,
-                # since we can't fix it by retrying, but if we do, we want to display the
-                # remote exception that caused the refresh as well just in case the user cares.
-                # Remote exceptions probably indicate network or configuration issues, so
-                # we'll let them propagate
-                try:
-                  self.scm.refresh(leave_clean=True)
-                except Scm.LocalException as local_exception:
-                  exc = traceback.format_exc(scm_exception)
-                  self.context.log.debug("SCM exception while pushing: %s" % exc)
-                  raise local_exception
-
-            else:
-              raise scm_exception
-
-            self.scm.tag('%(org)s-%(name)s-%(rev)s' % args,
-                         message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
+            self.publish_pushdb_changes_to_remote(
+              attempts=self.get_options().scm_push_attempts,
+              log=self.context.log,
+              tag_name='{org}-{name}-{rev}'.format(**args),
+              tag_message='Publish of {coordinate} initiated by {user} {cause}'.format(**args)
+            )
 
   def artifact_path(self, jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
     return os.path.join(self.workdir, jar.org, jar.name + artifact_ext,
