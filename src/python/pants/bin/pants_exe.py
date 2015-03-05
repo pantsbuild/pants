@@ -15,11 +15,6 @@ from pants.base.build_environment import get_buildroot, pants_version
 from pants.bin.goal_runner import GoalRunner
 
 
-_LOG_EXIT_OPTION = '--log-exit'
-_VERSION_OPTION = '--version'
-_PRINT_EXCEPTION_STACKTRACE = '--print-exception-stacktrace'
-
-
 class _Exiter(object):
   def __init__(self):
     # Since we have some exit paths that run via the sys.excepthook,
@@ -29,14 +24,14 @@ class _Exiter(object):
     # See: http://stackoverflow.com/questions/2572172/referencing-other-modules-in-atexit
     self._exit = sys.exit
     self._format_tb = traceback.format_tb
-    self._is_log_exit = _LOG_EXIT_OPTION in sys.argv
-    self._is_print_backtrace = _PRINT_EXCEPTION_STACKTRACE in sys.argv
+    self._is_print_backtrace = True
+
+  def apply_options(self, options):
+    self._is_print_backtrace = options.for_global_scope().print_exception_stacktrace
 
   def do_exit(self, result=0, msg=None, out=sys.stderr):
     if msg:
       print(msg, file=out)
-    if self._is_log_exit and result == 0:
-      print("\nSUCCESS\n")
     self._exit(result)
 
   def exit_and_fail(self, msg=None):
@@ -69,16 +64,13 @@ def _run(exiter):
   # This routes the warnings we enabled above through our loggers instead of straight to stderr raw.
   logging.captureWarnings(True)
 
-  version = pants_version()
-  if len(sys.argv) == 2 and sys.argv[1] == _VERSION_OPTION:
-    exiter.do_exit(msg=version, out=sys.stdout)
-
   root_dir = get_buildroot()
   if not os.path.exists(root_dir):
     exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
 
   goal_runner = GoalRunner(root_dir)
   goal_runner.setup()
+  exiter.apply_options(goal_runner.options)
   result = goal_runner.run()
   exiter.do_exit(result)
 

@@ -27,7 +27,8 @@ class CustomArgumentParser(ArgumentParser):
     self._scope = scope
 
   def error(self, message):
-    raise ParseError('{0} in scope {1}'.format(message, self._scope))
+    scope = 'global' if self._scope == GLOBAL_SCOPE else self._scope
+    raise ParseError('{0} in {1} scope'.format(message, scope))
 
   def walk_actions(self):
     """Iterates over the argparse.Action objects for options registered on this parser."""

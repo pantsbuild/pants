@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import sys
 
-from pants.base.build_environment import pants_release
+from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -196,7 +196,10 @@ class Options(object):
     Otherwise return False.
     """
     if self._help_request:
-      self._print_help()
+      if self._help_request.version:
+        print(pants_version())
+      else:
+        self._print_help()
       return True
     else:
       return False
