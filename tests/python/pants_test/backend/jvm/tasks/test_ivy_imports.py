@@ -75,7 +75,7 @@ class IvyImportsTest(TaskTest):
 
       def check_compile(expected_targets):
         ivy_imports_task = self.prepare_task(targets=[foo_target],
-                                             args=["--no-ng-daemons"],
+                                             args=["--no-test-use-nailgun"],
                                              build_graph=self.build_graph,
                                              build_file_parser=self.build_file_parser)
         imported_targets = ivy_imports_task.execute()

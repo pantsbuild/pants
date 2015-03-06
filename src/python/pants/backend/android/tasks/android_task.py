@@ -19,11 +19,9 @@ class AndroidTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(AndroidTask, self).__init__(*args, **kwargs)
-    self.forced_sdk = self.get_options().sdk_path or None
-    self._android_sdk = None
+    self._sdk_path = self.get_options().sdk_path or None
 
   @property
   def android_sdk(self):
-    if self._android_sdk is None:
-      self._android_sdk = AndroidDistribution.cached(self.forced_sdk)
-    return self._android_sdk
+    """Instantiate an Android SDK distribution that provides tools to android tasks."""
+    return AndroidDistribution.cached(self._sdk_path)

@@ -177,7 +177,7 @@ class ProtobufGen(CodeGen):
 
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
-    check_duplicate_conflicting_protos(sources_by_base, sources, self.context.log)
+    check_duplicate_conflicting_protos(self, sources_by_base, sources, self.context.log)
 
     if lang == 'java':
       output_dir = self.java_out
@@ -258,7 +258,7 @@ class ProtobufGen(CodeGen):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(calculate_genfiles(path, source).get('java', []))
+      genfiles.extend(self.calculate_genfiles(path, source).get('java', []))
     spec_path = os.path.relpath(self.java_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
     deps = OrderedSet(self.javadeps)
@@ -286,7 +286,7 @@ class ProtobufGen(CodeGen):
     genfiles = []
     for source in target.sources_relative_to_source_root():
       path = os.path.join(target.target_base, source)
-      genfiles.extend(calculate_genfiles(path, source).get('py', []))
+      genfiles.extend(self.calculate_genfiles(path, source).get('py', []))
     spec_path = os.path.relpath(self.py_out, get_buildroot())
     address = SyntheticAddress(spec_path, target.id)
     tgt = self.context.add_new_target(address,
@@ -299,30 +299,30 @@ class ProtobufGen(CodeGen):
     return tgt
 
 
-def calculate_genfiles(path, source):
-  protobuf_parse = ProtobufParse(path, source)
-  protobuf_parse.parse()
+  def calculate_genfiles(self, path, source):
+    protobuf_parse = ProtobufParse(path, source)
+    protobuf_parse.parse()
 
-  genfiles = defaultdict(set)
-  genfiles['py'].update(calculate_python_genfiles(source))
-  genfiles['java'].update(calculate_java_genfiles(protobuf_parse))
-  return genfiles
-
-
-def calculate_python_genfiles(source):
-  yield re.sub(r'\.proto$', '_pb2.py', source)
+    genfiles = defaultdict(set)
+    genfiles['py'].update(self.calculate_python_genfiles(source))
+    genfiles['java'].update(self.calculate_java_genfiles(protobuf_parse))
+    return genfiles
 
 
-def calculate_java_genfiles(protobuf_parse):
-  basepath = protobuf_parse.package.replace('.', os.path.sep)
+  def calculate_python_genfiles(self, source):
+    yield re.sub(r'\.proto$', '_pb2.py', source)
 
-  classnames = set([protobuf_parse.outer_class_name])
-  if protobuf_parse.multiple_files:
-    classnames |= protobuf_parse.enums | protobuf_parse.messages | protobuf_parse.services | \
-      set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages])
 
-  for classname in classnames:
-    yield os.path.join(basepath, '{0}.java'.format(classname))
+  def calculate_java_genfiles(self, protobuf_parse):
+    basepath = protobuf_parse.package.replace('.', os.path.sep)
+
+    classnames = set([protobuf_parse.outer_class_name])
+    if protobuf_parse.multiple_files:
+      classnames |= protobuf_parse.enums | protobuf_parse.messages | protobuf_parse.services | \
+        set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages])
+
+    for classname in classnames:
+      yield os.path.join(basepath, '{0}.java'.format(classname))
 
 
 def _same_contents(a, b):
@@ -334,7 +334,7 @@ def _same_contents(a, b):
   return a_data == b_data
 
 
-def check_duplicate_conflicting_protos(sources_by_base, sources, log):
+def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
   """Checks if proto files are duplicate or conflicting.
 
   There are sometimes two files with the same name on the .proto path.  This causes the protobuf
@@ -343,6 +343,7 @@ def check_duplicate_conflicting_protos(sources_by_base, sources, log):
   copies.  That is harmless, but if there are two files with the same name with different contents,
   that is ambiguous and we want to complain loudly.
 
+  :param task: provides an implementation of the method calculate_genfiles()
   :param dict sources_by_base: mapping of base to path
   :param list sources: list of sources
   :param Context.Log log: writes error messages to the console for conflicts
@@ -354,7 +355,7 @@ def check_duplicate_conflicting_protos(sources_by_base, sources, log):
         continue # Check to make sure we haven't already removed it.
       source = path[len(base):]
 
-      genfiles = calculate_genfiles(path, source)
+      genfiles = task.calculate_genfiles(path, source)
       for key in genfiles.keys():
         for genfile in genfiles[key]:
           if genfile in sources_by_genfile:

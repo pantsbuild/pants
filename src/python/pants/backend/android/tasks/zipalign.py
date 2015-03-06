@@ -34,7 +34,6 @@ class Zipalign(AndroidTask):
 
   def __init__(self, *args, **kwargs):
     super(Zipalign, self).__init__(*args, **kwargs)
-    self._android_dist = self.android_sdk
     self._distdir = self.get_options().pants_distdir
 
   def _render_args(self, package, target):
@@ -79,7 +78,7 @@ class Zipalign(AndroidTask):
   def zipalign_binary(self, target):
     """Return the appropriate zipalign binary."""
     zipalign_binary = os.path.join('build-tools', target.build_tools_version, 'zipalign')
-    return self._android_dist.register_android_tool(zipalign_binary)
+    return self.android_sdk.register_android_tool(zipalign_binary)
 
   def zipalign_out(self, target):
     """Compute the outdir for the zipalign task."""

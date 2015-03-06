@@ -658,6 +658,7 @@ class JarPublish(JarTask, ScmPublish):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_EXTENSION = 'jar'
+<<<<<<< HEAD
       product_config = {
         'jars': {
           'classifier': '',
@@ -691,7 +692,6 @@ class JarPublish(JarTask, ScmPublish):
       raise ValueError("No product mapping in %s for %s. "
                        "You may need to run some other task first" % (product_config.keys(),
                                                                       tgt))
-
     if self.overrides:
       print('Publishing with revision overrides:\n  %s' % '\n  '.join(
         '%s=%s' % (coordinate(org, name), rev) for (org, name), rev in self.overrides.items()

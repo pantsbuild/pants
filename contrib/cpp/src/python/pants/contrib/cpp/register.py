@@ -11,6 +11,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.targets.cpp_library import CppLibrary
 from pants.contrib.cpp.tasks.cpp_binary_create import CppBinaryCreate
+from pants.contrib.cpp.tasks.cpp_compile import CppCompile
 from pants.contrib.cpp.tasks.cpp_library_create import CppLibraryCreate
 from pants.contrib.cpp.tasks.cpp_run import CppRun
 
@@ -24,8 +25,7 @@ def build_file_aliases():
   )
 
 def register_goals():
-  # TODO: consider registering cpp-library and cpp-binary under compile
-  # to separate out the compilation step if users want that.
+  task(name='cpp-compile', action=CppCompile).install('compile')
   task(name='cpp-library', action=CppLibraryCreate).install('binary')
   task(name='cpp-binary', action=CppBinaryCreate).install('binary')
   task(name='cpp-run', action=CppRun).install('run')

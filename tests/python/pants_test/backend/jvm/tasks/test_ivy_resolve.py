@@ -24,7 +24,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.set_options(
         read_artifact_caches=None,
         write_artifact_caches=None,
-        ng_daemons=False)
+        use_nailgun=False)
 
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""

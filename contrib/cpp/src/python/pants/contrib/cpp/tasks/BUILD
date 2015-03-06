@@ -5,6 +5,7 @@
 python_library(
   name='tasks',
   sources=[
+    'cpp_compile.py',
     'cpp_binary_create.py',
     'cpp_library_create.py',
     'cpp_run.py',

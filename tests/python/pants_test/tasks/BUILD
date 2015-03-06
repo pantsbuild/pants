@@ -24,9 +24,7 @@ target(
     ':builddict',
     ':cache_manager',
     ':check_published_deps',
-    ':config',
     ':console_task',
-    ':context',
     ':dependees',
     ':dependencies',
     ':depmap',
@@ -184,34 +182,12 @@ python_tests(
   ]
 )
 
-# XXX Uh shouldn't this be in base?
-python_tests(
-  name = 'config',
-  sources = ['test_config.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:config',
-    'src/python/pants/util:contextutil',
-  ]
-)
-
 python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:console_task',
-  ]
-)
-
-# XXX this should be in goal
-python_tests(
-  name = 'context',
-  sources = ['test_context.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:config',
-    'src/python/pants/goal:context',
   ]
 )
 

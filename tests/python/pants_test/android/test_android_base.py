@@ -52,8 +52,8 @@ class TestAndroidBase(TaskTest):
     :param tuple[strings] installed_build_tools: Build tools version of any tools.
     :param tuple[strings] files: The files are to mock non-executables and one will be created for
       each installed_sdks version.
-    :param tuple[strings] executables: Executables are any required tools and one is created for each
-      installed_build_tools version.
+    :param tuple[strings] executables: Executables are any required tools and one is created for
+      each installed_build_tools version.
     """
     with temporary_dir() as sdk:
       for sdk_version in installed_sdks:
