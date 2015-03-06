@@ -238,7 +238,18 @@ class JvmCompileStrategy(object):
       cp_entries = [entry for conf, entry in compile_classpath if conf in self._confs]
 
       progress_message = 'partition {} of {}'.format(partition_index + 1, len(partitions))
-      compile_vts(vts, sources, analysis_file, cp_entries, self._classes_dir, progress_message)
+      # We have to treat the global output dir as an upstream element, so compilers can
+      # find valid analysis for previous partitions. We use the global valid analysis
+      # for the upstream.
+      upstream_analysis = ({self._classes_dir: self._analysis_file}
+                           if os.path.exists(self._analysis_file) else {})
+      compile_vts(vts,
+                  sources,
+                  analysis_file,
+                  upstream_analysis,
+                  cp_entries,
+                  self._classes_dir,
+                  progress_message)
 
       # No exception was thrown, therefore the compile succeeded and analysis_file is now valid.
       if os.path.exists(analysis_file):  # The compilation created an analysis.

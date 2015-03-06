@@ -86,7 +86,9 @@ class JavaCompile(JvmCompile):
 
     # A directory independent of any other classpath which can contain a global
     # apt processor info file.
-    self._processor_info_dir = os.path.join(self.workdir, 'apt_processor_info')
+    self._processor_info_global_dir = os.path.join(self.workdir, 'apt-processor-info-global')
+    # And another to contain per-target subdirectories
+    self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
@@ -94,7 +96,9 @@ class JavaCompile(JvmCompile):
   def extra_products(self, target):
     ret = []
     if isinstance(target, AnnotationProcessor) and target.processors:
-      root = os.path.join(self._resources_dir, Target.maybe_readable_identify([target]))
+      # The consumer of this method adds the resulting files to resources_by_target, so
+      # we can safely place them in a temporary directory here.
+      root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
       processor_info_file = os.path.join(root, JavaCompile._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
       ret.append((root, [processor_info_file]))
@@ -105,7 +109,7 @@ class JavaCompile(JvmCompile):
   def platform_version_info(self):
     return (self.get_options().target,) if self.get_options().target else ()
 
-  def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath('jmake')
     args = [
@@ -156,7 +160,8 @@ class JavaCompile(JvmCompile):
     for target in relevant_targets:
       if isinstance(target, AnnotationProcessor) and target.processors:
         all_processors.update(target.processors)
-    processor_info_file = os.path.join(self._processor_info_dir, JavaCompile._PROCESSOR_INFO_FILE)
+    processor_info_file = os.path.join(self._processor_info_global_dir,
+                                       JavaCompile._PROCESSOR_INFO_FILE)
     if os.path.exists(processor_info_file):
       with safe_open(processor_info_file, 'r') as f:
         for processor in f:
