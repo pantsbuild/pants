@@ -658,7 +658,6 @@ class JarPublish(JarTask, ScmPublish):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_EXTENSION = 'jar'
-<<<<<<< HEAD
       product_config = {
         'jars': {
           'classifier': '',
