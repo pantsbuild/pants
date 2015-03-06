@@ -197,6 +197,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     self.setup_artifact_cache()
 
+    # The ivy confs for which we're building.
+    self._confs = self.get_options().confs
+
     # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
     # Populated in prepare_execute().
     self._sources_by_target = None

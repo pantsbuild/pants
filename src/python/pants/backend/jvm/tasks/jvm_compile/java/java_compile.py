@@ -84,6 +84,10 @@ class JavaCompile(JvmCompile):
 
     self._buildroot = get_buildroot()
 
+    # A directory independent of any other classpath which can contain a global
+    # apt processor info file.
+    self._processor_info_dir = os.path.join(self.workdir, 'apt_processor_info')
+
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
 
@@ -152,12 +156,17 @@ class JavaCompile(JvmCompile):
     for target in relevant_targets:
       if isinstance(target, AnnotationProcessor) and target.processors:
         all_processors.update(target.processors)
-    processor_info_file = os.path.join(self._classes_dir, JavaCompile._PROCESSOR_INFO_FILE)
+    processor_info_file = os.path.join(self._processor_info_dir, JavaCompile._PROCESSOR_INFO_FILE)
     if os.path.exists(processor_info_file):
       with safe_open(processor_info_file, 'r') as f:
         for processor in f:
           all_processors.add(processor)
     self._write_processor_info(processor_info_file, all_processors)
+
+    # Ensure that the processor info dir is on the classpath for relevant targets.
+    compile_classpaths = self.context.products.get_data('compile_classpath')
+    for conf in self._confs:
+      compile_classpaths.add_for_targets(relevant_targets, [(conf, self._processor_info_dir)])
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:
