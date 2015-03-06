@@ -272,14 +272,16 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         self._register_vts(valid_compile_contexts)
 
         # Invoke the strategy to execute compilations for invalid targets.
+        update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
+            if self.artifact_cache_writes_enabled() else None)
         self._strategy.compile_chunk(invalidation_check,
                                      sources_by_target,
                                      relevant_targets,
                                      invalid_targets,
                                      self.extra_compile_time_classpath_elements(),
-                                     self.artifact_cache_writes_enabled(),
                                      self._compile_vts,
-                                     self._register_vts)
+                                     self._register_vts,
+                                     update_artifact_cache_vts_work)
       else:
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])

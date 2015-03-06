@@ -179,9 +179,9 @@ class JvmCompileStrategy(object):
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
-                    write_artifact_cache,
                     compile_vts,
-                    register_vts):
+                    register_vts,
+                    update_artifact_cache_vts_work):
     """Executes compilations for that invalid targets contained in a single chunk.
 
     Has the side effects of populating:
@@ -288,8 +288,11 @@ class JvmCompileStrategy(object):
             self._dep_analyzer.check(sources, actual_deps)
 
         # Kick off the background artifact cache write.
-        if write_artifact_cache:
-          self._write_to_artifact_cache(analysis_file, vts, invalid_sources_by_target)
+        if update_artifact_cache_vts_work:
+          self._write_to_artifact_cache(analysis_file,
+                                        vts,
+                                        invalid_sources_by_target,
+                                        update_artifact_cache_vts_work)
 
       if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
         with self.context.new_workunit(name='trim-downstream-analysis'):
@@ -393,7 +396,7 @@ class JvmCompileStrategy(object):
         if os.path.exists(tmp_analysis):
           self.move(tmp_analysis, self._analysis_file)
 
-  def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target):
+  def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target, get_update_artifact_cache_work):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
     vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
@@ -434,7 +437,7 @@ class JvmCompileStrategy(object):
             (vt,
              artifacts + [JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, target)]))
 
-    update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
+    update_artifact_cache_work = get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       work_chain = [
         Work(self._analysis_tools.split_to_paths, splits_args_tuples, 'split'),
