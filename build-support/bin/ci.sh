@@ -108,7 +108,6 @@ for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
 done
 
 PANTS_ARGS=(
-  "--print-exception-stacktrace"
   "${INTERPRETER_ARGS[@]}"
 )
 
