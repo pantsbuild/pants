@@ -249,7 +249,6 @@ python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':ivy_task_mixin',
     ':jvm_tool_task_mixin',
     ':nailgun_task',
