@@ -32,6 +32,16 @@ class JvmCompileStrategy(object):
   # and a finalized compile in its permanent location.
   CompileContext = namedtuple('CompileContext', ['target', 'analysis_file', 'classes_dir'])
 
+  # Common code.
+  # ------------
+  @staticmethod
+  def _analysis_for_target(analysis_dir, target):
+    return os.path.join(analysis_dir, target.id + '.analysis')
+
+  @staticmethod
+  def _portable_analysis_for_target(analysis_dir, target):
+    return JvmCompileStrategy._analysis_for_target(analysis_dir, target) + '.portable'
+
   def __init__(self, context, options, workdir, analysis_tools):
     self.context = context
 
@@ -348,8 +358,8 @@ class JvmCompileStrategy(object):
     # Localize the cached analyses.
     analyses_to_merge = []
     for target in cached_targets:
-      analysis_file = JvmCompileStrategy.analysis_for_target(self._analysis_tmpdir, target)
-      portable_analysis_file = JvmCompileStrategy.portable_analysis_for_target(self._analysis_tmpdir,
+      analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, target)
+      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir,
                                                                         target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, analysis_file)
@@ -389,11 +399,11 @@ class JvmCompileStrategy(object):
     vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
 
     split_analysis_files = [
-        JvmCompileStrategy.analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
     split_compile_contexts = [
         self.CompileContext(t, a, self._classes_dir) for t, a in zip(vts_targets, split_analysis_files)]
     portable_split_analysis_files = [
-        JvmCompileStrategy.portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
     splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
@@ -422,7 +432,7 @@ class JvmCompileStrategy(object):
         # NOTE: analysis_file doesn't exist yet.
         vts_artifactfiles_pairs.append(
             (vt,
-             artifacts + [JvmCompileStrategy.portable_analysis_for_target(self._analysis_tmpdir, target)]))
+             artifacts + [JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, target)]))
 
     update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:

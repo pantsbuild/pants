@@ -181,8 +181,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """Any extra post-execute work."""
     pass
 
-  # Common code.
-  # ------------
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
 
