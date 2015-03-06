@@ -295,7 +295,7 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/c:c',
       args=[
         '--test-include-dependees=transitive',
-        '--test-exclude-target-regexp=:b',
+        '--exclude-target-regexp=:b',
       ],
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )

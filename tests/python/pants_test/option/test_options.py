@@ -12,7 +12,10 @@ import warnings
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.base.deprecated import PastRemovalVersionError
+from pants.option.errors import ParseError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -23,9 +26,10 @@ class OptionsTest(unittest.TestCase):
   _known_scopes = ['compile', 'compile.java', 'compile.scala', 'stale', 'test', 'test.junit']
 
   def _register(self, options):
-    options.register_global('-v', '--verbose', action='store_true', help='Verbose output.')
-    options.register_global('-n', '--num', type=int, default=99)
-    options.register_global('-x', '--xlong', action='store_true')
+    options.register_global('-v', '--verbose', action='store_true', help='Verbose output.',
+                            recursive=True)
+    options.register_global('-n', '--num', type=int, default=99, recursive=True)
+    options.register_global('-x', '--xlong', action='store_true', recursive=True)
     options.register_global('--y', action='append', type=int)
     options.register_global('--pants-foo')
     options.register_global('--bar-baz')
@@ -41,8 +45,8 @@ class OptionsTest(unittest.TestCase):
     options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
 
     # For the design doc example test.
-    options.register_global('--a', type=int)
-    options.register_global('--b', type=int)
+    options.register_global('--a', type=int, recursive=True)
+    options.register_global('--b', type=int, recursive=True)
 
     # Deprecated global options
     options.register_global('--global-crufty',
@@ -55,7 +59,7 @@ class OptionsTest(unittest.TestCase):
     options.register('test', '--xlong', type=int)
 
     # For the design doc example test.
-    options.register('compile', '--c', type=int)
+    options.register('compile', '--c', type=int, recursive=True)
     options.register('compile.java', '--b', type=str, default='foo')
 
     # Test deprecated options with a scope
@@ -230,6 +234,19 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(88, options.for_global_scope().num)
     self.assertEqual(55, options.for_scope('compile').num)
     self.assertEqual(44, options.for_scope('compile.java').num)
+
+  def test_recursion(self):
+    # Recursive option.
+    options = self._parse('./pants -n=5 compile -n=6')
+    self.assertEqual(5, options.for_global_scope().n)
+    self.assertEqual(6, options.for_scope('compile').n)
+
+    # Non-recursive option.
+    options = self._parse('./pants --bar-baz=foo')
+    self.assertEqual('foo', options.for_global_scope().bar_baz)
+    options = self._parse('./pants compile --bar-baz=foo')
+    with self.assertRaises(ParseError):
+      options.for_scope('compile').bar_baz
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
