@@ -2,16 +2,25 @@
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-source "${REPO_ROOT}/build-support/common.sh"
-
+HOOK_DIR="${GIT_DIR:-${REPO_ROOT}/.git}/hooks"
 PRE_COMMIT_DEST="${GIT_DIR:-${REPO_ROOT}/.git}/hooks/pre-commit"
 PRE_COMMIT_SRC="${REPO_ROOT}/build-support/bin/pre-commit.sh"
+PRE_COMMIT_RELSRC="$(cat << EOF | python2.7
+import os
+
+print(os.path.relpath("${PRE_COMMIT_SRC}", "${HOOK_DIR}"))
+EOF
+)"
+
+source "${REPO_ROOT}/build-support/common.sh"
 
 function install_pre_commit_hook() {
-  rm -f "${PRE_COMMIT_DEST}" && \
-  ln "${PRE_COMMIT_SRC}" "${PRE_COMMIT_DEST}" && \
-  echo "Pre-commit checks installed from ${PRE_COMMIT_SRC} to ${PRE_COMMIT_DEST}";
-  cd - &> /dev/null
+  (
+    cd "${HOOK_DIR}" && \
+    rm -f pre-commit && \
+    ln -s "${PRE_COMMIT_RELSRC}" pre-commit && \
+    echo "Pre-commit checks linked from ${PRE_COMMIT_SRC} to $(pwd)/pre-commit";
+  )
 }
 
 if [[ ! -e "${PRE_COMMIT_DEST}" ]]
