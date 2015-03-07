@@ -168,9 +168,8 @@ class JavaCompile(JvmCompile):
           all_processors.add(processor)
     self._write_processor_info(processor_info_file, all_processors)
 
-    print(">>> wrote global processor annotation file at %s, with %d processors and added it for %s" % (processor_info_file, len(all_processors), all_targets))
-
     # Ensure that the processor info dir is on the classpath for all targets.
+    # TODO: move to a setup step
     compile_classpaths = self.context.products.get_data('compile_classpath')
     for conf in self._confs:
       compile_classpaths.add_for_targets(all_targets, [(conf, self._processor_info_global_dir)])
