@@ -309,9 +309,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       # Do some reporting.
       self.context.log.info(
         'Compiling ',
-        items_to_report_element(sources, 'source'),
-        ' for ',
-        self.name(),
+        items_to_report_element(sources, '%s source' % self.name()),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
