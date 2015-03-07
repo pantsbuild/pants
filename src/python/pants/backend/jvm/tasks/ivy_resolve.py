@@ -121,6 +121,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       confs=self.confs,
       custom_args=self._args,
     )
+    self.context.log.debug("{} of {} targets were relevant for ivy resolve.".format(
+      len(relevant_targets), len(targets)))
 
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.

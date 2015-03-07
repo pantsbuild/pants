@@ -43,6 +43,9 @@ class UnionProducts(object):
           visited.add(dep)
     return products
 
+  def __str__(self):
+    return "UnionProducts(%s)" % str(self._products_by_target)
+
 
 class RootedProducts(object):
   """File products of a build that have a concept of a 'root' directory.
