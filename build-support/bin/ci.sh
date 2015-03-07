@@ -46,7 +46,7 @@ bootstrap_compile_args=(
 while getopts "hfxbkmsrlpnci:eat" opt; do
   case ${opt} in
     h) usage ;;
-    f) skip_formatting_checks="true" ;;
+    f) skip_pre_commit_checks="true" ;;
     x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
     k) bootstrap_compile_args=() ;;
@@ -86,13 +86,10 @@ else
   banner "CI BEGINS"
 fi
 
-if [[ "${skip_formatting_checks:-false}" == "false" ]]; then
-  banner "Checking python code formatting"
+if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
+  banner "Running pre-commit checks"
 
-  ./build-support/bin/check_packages.sh || exit 1
-  ./build-support/bin/isort.sh || \
-    die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
-  ./build-support/bin/check_header.sh || exit 1
+  ./build-support/bin/pre-commit.sh || exit 1
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary

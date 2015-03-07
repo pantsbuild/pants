@@ -22,10 +22,6 @@ function venv_dir() {
   fi
 }
 
-function fingerprint_data() {
-  openssl md5 | cut -d' ' -f2
-}
-
 function activate_venv() {
   source "$(venv_dir)/bin/activate"
 }
