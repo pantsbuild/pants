@@ -3,7 +3,7 @@
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 HOOK_DIR="${GIT_DIR:-${REPO_ROOT}/.git}/hooks"
-PRE_COMMIT_DEST="${GIT_DIR:-${REPO_ROOT}/.git}/hooks/pre-commit"
+PRE_COMMIT_DEST="${HOOK_DIR}/pre-commit"
 PRE_COMMIT_SRC="${REPO_ROOT}/build-support/bin/pre-commit.sh"
 PRE_COMMIT_RELSRC="$(cat << EOF | python2.7
 import os
@@ -44,3 +44,4 @@ else
   fi
 fi
 exit 0
+
