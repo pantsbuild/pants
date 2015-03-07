@@ -93,7 +93,18 @@ class Bootstrapper(object):
     """
     return Ivy(self._get_classpath(bootstrap_workunit_factory),
                ivy_settings=self._ivy_settings,
-               ivy_cache_dir=self.ivy_cache_dir)
+               ivy_cache_dir=self.ivy_cache_dir,
+               extra_jvm_options=self._extra_jvm_options())
+
+  def _extra_jvm_options(self):
+    if self._ivy_http_debug():
+      return [
+        "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
+        "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
+        "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
+        "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug"
+      ]
+    return []
 
   def _get_classpath(self, workunit_factory):
     """Returns the bootstrapped ivy classpath as a list of jar paths.
@@ -127,11 +138,29 @@ class Bootstrapper(object):
     return (os.getenv('PANTS_IVY_CACHE_DIR')
             or self._config.get('ivy', 'cache_dir', default=os.path.expanduser('~/.ivy2/pants')))
 
+  def _ivy_http_debug(self):
+    """Returns true if we should enable additional debugging for ivy.
+
+    Works by turning on debugging in commons-httpclient.
+
+    TODO: Make this a regular option
+    """
+    return (os.getenv('PANTS_IVY_HTTP_DEBUG') or
+           self._config.getbool('ivy', 'http_debug', default=False))
+
   def _bootstrap_ivy_classpath(self, workunit_factory, retry=True):
     # TODO(John Sirois): Extract a ToolCache class to control the path structure:
     # https://jira.twitter.biz/browse/DPB-283
+
+    use_http_debug = self._ivy_http_debug()
+    if use_http_debug:
+      name = 'ivy-http-debug'
+      confs = 'default,optional'
+    else:
+      name = 'ivy'
+      confs = 'default'
     ivy_bootstrap_dir = \
-      os.path.join(self._config.getdefault('pants_bootstrapdir'), 'tools', 'jvm', 'ivy')
+      os.path.join(self._config.getdefault('pants_bootstrapdir'), 'tools', 'jvm', name)
 
     digest = hashlib.sha1()
     if os.path.isfile(self._version_or_ivyxml):
@@ -143,7 +172,7 @@ class Bootstrapper(object):
 
     if not os.path.exists(classpath):
       ivy = self._bootstrap_ivy(os.path.join(ivy_bootstrap_dir, 'bootstrap.jar'))
-      args = ['-confs', 'default', '-cachepath', classpath]
+      args = ['-confs', confs, '-cachepath', classpath]
       if os.path.isfile(self._version_or_ivyxml):
         args.extend(['-ivy', self._version_or_ivyxml])
       else:
