@@ -90,10 +90,6 @@ class ResourceMapping(object):
         path = os.path.join(mapping_dir, filename)
         with open(path) as f:
           self._read_resource_mappings(mappings, f.readlines())
-      else:
-        print(">>> WARNING: no resource mappings in %s" %  mapping_dir)
-    else:
-      print(">>> WARNING: no resource mappings dir at %s" %  mapping_dir)
 
     self._resource_mappings = mappings
     return self._resource_mappings

@@ -385,12 +385,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       print(">>>   resource mapping is %s" % (str(resource_mapping)))
       for compile_context in compile_contexts:
         target = compile_context.target
-        target = compile_context.classes_dir
+        classes_dir = compile_context.classes_dir
         target_products = classes_by_target[target] if classes_by_target is not None else None
         for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
           classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
           for cls in classes:
-            clsname = self._strategy.class_name_for_class_file(target, cls)
+            clsname = self._strategy.class_name_for_class_file(compile_context, cls)
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
 

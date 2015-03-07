@@ -117,7 +117,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(['compile',
                                   'testprojects/src/java/com/pants/testproject/annotation/main'],
                                  config)
-      self.assert_failure(pants_run)
+      self.assert_success(pants_run)
 
       self.assertTrue(os.path.exists(artifact_dir))
       artifacts = os.listdir(artifact_dir)

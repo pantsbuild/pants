@@ -332,10 +332,10 @@ class JvmCompileStrategy(object):
   def classes_dir_for_target(self, compile_context):
     return self._classes_dir
 
-  def class_name_for_class_file(self, target, class_file_name):
+  def class_name_for_class_file(self, compile_context, class_file_name):
     assert class_file_name.endswith(".class")
-    assert class_file_name.startswith(self.workdir)
-    class_file_name = class_file_name[len(self._classes_dir) + 1:-len(".class")]
+    assert class_file_name.startswith(compile_context.classes_dir)
+    class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
     return class_file_name.replace("/", ".")
 
   def post_process_cached_vts(self, cached_vts):
