@@ -79,7 +79,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'com.pants.testproject.publish.hello/welcome/publish.properties'],
                       extra_options=['--doc-scaladoc-skip'],
                       expected_primary_artifact_count=3,
-                      assert_config_contents=True)
+                      assert_publish_config_contents=True)
 
   @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
                       reason='No javadoc binary on the PATH.')
