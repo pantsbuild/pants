@@ -54,6 +54,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     return os.path.join(get_buildroot(), 'testprojects', 'ivy', 'pushdb')
 
   def setUp(self):
+    # This attribute is required to see the full diff between ivy and pom files.
+    self.maxDiff  = None
     safe_rmtree(self.pushdb_root)
 
   def tearDown(self):
@@ -226,6 +228,4 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
         # Remove the publication sha attribute from ivy.xml
         if artifact_path.endswith('.xml'):
           generated_file = re.sub(r'publication=.*', '/>', generated_file)
-      return self.assertEqual(generated_file, golden_file_contents,
-                              'Comparing {0} to contents {1}'.format(golden_file_nm,
-                                                                     generated_file))
+      return self.assertMultiLineEqual(generated_file, golden_file_contents)
