@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_test_suite(
+target(
   name = 'tasks',
   dependencies = [
     ':antlr_gen',
@@ -41,9 +41,10 @@ python_tests(
   sources = ['test_protobuf_gen.py'],
   dependencies = [
     'src/python/pants/backend/codegen/tasks:protobuf_gen',
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -77,9 +78,13 @@ python_tests(
   name = 'wire_gen',
   sources = ['test_wire_gen.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/tasks:wire_gen',
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/base:source_root',
+    'src/python/pants/base:validation',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:base',
-    'tests/python/pants_test/jvm:jar_task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )

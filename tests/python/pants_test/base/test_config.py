@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -50,6 +50,8 @@ class ConfigTest(unittest.TestCase):
 
           [b]
           preempt: False
+
+          [defined_section]
           """))
         ini2.close()
         self.config = Config.load(configpaths=[ini1.name, ini2.name])
@@ -85,7 +87,7 @@ that.""",
     self._check_defaults(self.config.get, [])
     self._check_defaults(self.config.get, [42])
 
-  def test_getmap(self):
+  def test_getdict(self):
     self.assertEquals(dict(a=1, b=42, c=['42', 42]), self.config.getdict('b', 'dict'))
     self._check_defaults(self.config.get, {})
     self._check_defaults(self.config.get, dict(a=42))
@@ -99,6 +101,22 @@ that.""",
       self.config.get_required('a', 'no_section')
     with self.assertRaises(Config.ConfigError):
       self.config.get_required('a', 'blank_section')
+
+  def test_getdefault(self):
+    self.assertEquals('foo', self.config.getdefault('name'))
+
+  def test_getdefault_explicit(self):
+    self.assertEquals('foo', self.config.getdefault('name', type=str))
+
+  def test_getdefault_not_found(self):
+    # TODO(John Sirois): This is an odd test that highlights odd eval behavior buried in Config.
+    # Switch to ast.literal_eval, trap ValueError, and raise ConfigErrors.
+    with self.assertRaises(NameError):
+      self.config.getdefault('name', type=int)
+
+  def test_default_section_fallback(self):
+    self.assertEquals('foo', self.config.get('defined_section', 'name'))
+    self.assertEquals('foo', self.config.get('not_a_defined_section', 'name'))
 
   def _check_defaults(self, accessor, default):
     self.assertEquals(None, accessor('c', 'fast'))

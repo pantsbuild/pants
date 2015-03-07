@@ -138,6 +138,9 @@ class IvyTaskMixin(object):
       stripped_classpath = [path.strip() for path in classpath]
       return (stripped_classpath, global_vts.targets)
 
+  def mapjar_workdir(self, target):
+    return os.path.join(self.workdir, 'mapped-jars', target.id)
+
   def mapjars(self, genmap, target, executor, jars=None):
     """Resolves jars for the target and stores their locations in genmap.
 
@@ -146,8 +149,32 @@ class IvyTaskMixin(object):
     :param jars: If specified, resolves the given jars rather than
     :type jars: List of :class:`pants.backend.jvm.targets.jar_dependency.JarDependency` (jar())
       objects.
+
+
+     Here is an example of what the resulting genmap looks like after sucessfully mapping
+     a JarLibrary target with a single JarDependency:
+
+     ProductMapping(ivy_imports) {
+      # target
+      UnpackedJars(BuildFileAddress(.../unpack/BUILD, foo)) =>
+          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+        [u'com.example-bar-0.0.1.jar']
+      # (org, name)
+      (u'com.example', u'bar') =>
+          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+        [u'com.example-bar-0.0.1.jar']
+      # (org)
+      com.example => .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+        [u'com.example-bar-0.0.1.jar']
+      # (target)
+      (UnpackedJars(BuildFileAddress(.../unpack/BUILD, foo)), u'default') =>
+          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+        [u'com.example-bar-0.0.1.jar']
+      # (org, name, conf)
+      (u'com.example', u'bar', u'default') => .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+        [u'com.example-bar-0.0.1.jar']
     """
-    mapdir = os.path.join(self.workdir, 'mapped-jars', target.id)
+    mapdir = self.mapjar_workdir(target)
     safe_mkdir(mapdir, clean=True)
     ivyargs = [
       '-retrieve', '%s/[organisation]/[artifact]/[conf]/'

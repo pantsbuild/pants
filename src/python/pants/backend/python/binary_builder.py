@@ -29,8 +29,7 @@ class PythonBinaryBuilder(object):
       raise PythonBinaryBuilder.NotABinaryTargetException(
           "Target %s is not a PythonBinary!" % target)
 
-    config = Config.from_cache()
-    self.distdir = config.getdefault('pants_distdir')
+    self.distdir = context.options.for_global_scope().pants_distdir
     distpath = tempfile.mktemp(dir=self.distdir, prefix=target.name)
 
     run_info = run_tracker.run_info

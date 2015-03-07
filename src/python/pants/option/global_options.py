@@ -9,6 +9,20 @@ from pants.option.options import Options
 
 
 def register_global_options(register):
+  """Register options not tied to any particular task.
+
+  It's important to note that another set of global options is registered in
+  `pants.option.options_bootstrapper:register_bootstrap_options`, but those are reserved for options
+  that other options or tasks may need to build upon directly or indirectly.  For a direct-use
+  example, a doc generation task may want to provide an option for its user-visible output location
+  that defaults to `${pants-distdir}/docs` and thus needs to interpolate the bootstrap option of
+  `pants-distdir`.  An indirect example would be logging options that are needed by pants itself to
+  setup logging prior to loading plugins so that plugin registration can log confidently to a
+  configured logging subsystem.
+
+  Global options here on the other hand are reserved for infrastructure objects (not tasks) that
+  have leaf configuration data.
+  """
   register('-t', '--timeout', type=int, metavar='<seconds>',
            help='Number of seconds to wait for http connections.')
   register('-x', '--time', action='store_true',
@@ -19,40 +33,38 @@ def register_global_options(register):
   # TODO: After moving to the new options system these abstraction leaks can go away.
   register('-k', '--kill-nailguns', action='store_true',
            help='Kill nailguns before exiting')
-  register('--ng-daemons', action='store_true', default=True,
-           help='Use nailgun daemons to execute java tasks.')
-
-  register('-d', '--logdir', metavar='<dir>',
-           help='Write logs to files under this directory.')
-  register('-l', '--level', choices=['debug', 'info', 'warn'], default='info',
-           help='Set the logging level.')
-  register('-q', '--quiet', action='store_true',
-           help='Squelches all console output apart from errors.')
   register('-i', '--interpreter', default=[], action='append', metavar='<requirement>',
            help="Constrain what Python interpreters to use.  Uses Requirement format from "
                 "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                 "are used.  Multiple constraints may be added.  They will be ORed together.")
-  register('--colors', action='store_true', default=True,
+  register('--colors', action='store_true', default=True, recursive=True,
            help='Set whether log messages are displayed in color.')
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
            help='Exclude these paths when computing the command-line target specs.')
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',
            help='Regex pattern to exclude from the target list (useful in conjunction with ::). '
                 'Multiple patterns may be specified by setting this flag multiple times.')
-  register('--read-from-artifact-cache', action='store_true', default=True,
+  # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
+  # options to there. When we do that, also drop the cumbersome word 'artifact' from these
+  # option names. There's only one cache concept that users care about.
+  register('--read-from-artifact-cache', action='store_true', default=True, recursive=True,
            help='Read build artifacts from cache, if available.')
-  register('--read-artifact-caches', type=Options.list,
+  register('--read-artifact-caches', type=Options.list, recursive=True,
            help='The URIs of artifact caches to read from. Each entry is a URL of a RESTful cache, '
                 'a path of a filesystem cache, or a pipe-separated list of alternate caches to '
                 'choose from.')
-  register('--write-to-artifact-cache', action='store_true', default=True,
+  register('--write-to-artifact-cache', action='store_true', default=True, recursive=True,
            help='Write build artifacts to cache, if possible.')
-  register('--write-artifact-caches', type=Options.list,
+  register('--write-artifact-caches', type=Options.list, recursive=True,
            help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful cache, '
                 'a path of a filesystem cache, or a pipe-separated list of alternate caches to '
                 'choose from.')
-  register('--overwrite-cache-artifacts', action='store_true',
+  register('--overwrite-cache-artifacts', action='store_true', recursive=True,
            help='If writing to build artifacts to cache, overwrite (instead of skip) existing.')
+  register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
+           help='The cache key generation. Bump this to invalidate every artifact for a scope.')
+  register('--cache-compression', advanced=True, type=int, default=5, recursive=True,
+           help='The gzip compression level for created artifacts.')
   register('--print-exception-stacktrace', action='store_true',
            help='Print to console the full exception stack trace if encountered.')
   register('--fail-fast', action='store_true',

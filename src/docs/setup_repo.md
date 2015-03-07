@@ -35,10 +35,10 @@ several contexts, as in these excerpts that define/use `thrift_workdir`:
     [DEFAULT]
     thrift_workdir: %(pants_workdir)s/thrift
 
-    [thrift-gen]
+    [gen.thrift]
     workdir: %(thrift_workdir)s
 
-    [java-compile]
+    [compile.java]
     args: [
       '-C-Tnowarnprefixes', '-C%(thrift_workdir)s',
     ]

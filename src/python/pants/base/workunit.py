@@ -145,7 +145,7 @@ class WorkUnit(object):
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: %s' % name)
     if name not in self._outputs:
-      path = os.path.join(self.run_tracker.info_dir, 'tool_outputs', '%s.%s' % (self.id, name))
+      path = os.path.join(self.run_tracker.run_info_dir, 'tool_outputs', '%s.%s' % (self.id, name))
       safe_mkdir_for(path)
       self._outputs[name] = FileBackedRWBuf(path)
     return self._outputs[name]

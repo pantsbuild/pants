@@ -18,17 +18,13 @@ python_library(
   ]
 )
 
-python_test_suite(
+target(
   name = 'tasks',
   dependencies = [
-    ':binary_create',
     ':builddict',
-    ':bundle_create',
     ':cache_manager',
     ':check_published_deps',
-    ':config',
     ':console_task',
-    ':context',
     ':dependees',
     ':dependencies',
     ':depmap',
@@ -56,7 +52,7 @@ python_test_suite(
   ],
 )
 
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':antlr_integration',
@@ -88,15 +84,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'binary_create',
-  sources = ['test_binary_create.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks:binary_create',
-    'tests/python/pants_test:task_test_base',
-  ]
-)
-
-python_tests(
   name = 'builddict',
   sources = ['test_builddict.py'],
   dependencies = [
@@ -108,16 +95,6 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-  ]
-)
-
-python_tests(
-  name = 'bundle_create',
-  sources = ['test_bundle_create.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks:bundle_create',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base'
   ]
 )
 
@@ -205,34 +182,12 @@ python_tests(
   ]
 )
 
-# XXX Uh shouldn't this be in base?
-python_tests(
-  name = 'config',
-  sources = ['test_config.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:config',
-    'src/python/pants/util:contextutil',
-  ]
-)
-
 python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
   dependencies = [
     ':base',
     'src/python/pants/backend/core/tasks:console_task',
-  ]
-)
-
-# XXX this should be in goal
-python_tests(
-  name = 'context',
-  sources = ['test_context.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:config',
-    'src/python/pants/goal:context',
   ]
 )
 
@@ -416,7 +371,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:source_root',
-    'src/python/pants/goal:products',
     'src/python/pants/java:jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -586,6 +540,7 @@ python_tests(
   name = 'jar_task',
   sources = ['test_jar_task.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_task',
     'src/python/pants/base:build_file_aliases',
@@ -617,7 +572,6 @@ python_tests(
     ':base',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
-    'src/python/pants/engine',
     'src/python/pants/util:contextutil',
   ]
 )

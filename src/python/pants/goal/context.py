@@ -78,6 +78,7 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._spec_excludes = spec_excludes
     self._replace_targets(target_roots)
+    self._synthetic_targets = defaultdict(list)
 
   @property
   def config(self):
@@ -240,7 +241,7 @@ class Context(object):
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
-  def add_new_target(self, address, target_type, dependencies=None, **kwargs):
+  def add_new_target(self, address, target_type, dependencies=None, derived_from=None, **kwargs):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
@@ -256,20 +257,33 @@ class Context(object):
     self.build_graph.inject_synthetic_target(address=address,
                                              target_type=target_type,
                                              dependencies=dependencies,
+                                             derived_from=derived_from,
                                              **kwargs)
-    return self.build_graph.get_target(address)
+    new_target = self.build_graph.get_target(address)
+    self._synthetic_targets[derived_from].append(new_target)
+    return new_target
 
   def targets(self, predicate=None, postorder=False):
     """Selects targets in-play in this run from the target roots and their transitive dependencies.
 
-    If specified, the predicate will be used to narrow the scope of targets returned.
+    Also includes any new synthetic targets created from the target roots or their transitive
+    dependencies during the course of the run.
 
-    :return: a list of targets evaluated by the predicate in preorder (or postorder, if the
-    postorder parameter is True) traversal order.
+    :param predicate: If specified, the predicate will be used to narrow the scope of targets
+                      returned.
+    :param bool postorder: `True` to gather transitive dependencies with a postorder traversal;
+                          `False` or preorder by default.
+    :returns: A list of matching targets.
     """
+
     target_root_addresses = [target.address for target in self.target_roots]
     target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses,
                                                                    postorder=postorder)
+
+    for derived_from, synthetic_targets in self._synthetic_targets.items():
+      if derived_from in target_set:
+        target_set.update(synthetic_targets)
+
     return filter(predicate, target_set)
 
   def dependents(self, on_predicate=None, from_predicate=None):

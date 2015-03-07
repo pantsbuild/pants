@@ -1,12 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_test_suite(
+target(
   name = 'tasks',
   dependencies = [
     ':checkstyle',
     ':ide_gen',
     ':idea_gen',
+    ':ivy_imports',
     ':junit_run',
     ':scalastyle',
     ':unpack_jars',
@@ -46,6 +47,20 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:source_root',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+
+python_tests(
+  name = 'ivy_imports',
+  sources = ['test_ivy_imports.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:ivy_imports',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:base'
   ]
 )
 

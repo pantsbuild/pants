@@ -24,19 +24,18 @@ class KeystoreResolver(object):
   class Error(Exception):
     """Indicates an invalid android distribution."""
 
-  _CONFIG_SECTION = 'android-keystore-location'
-
   @classmethod
   def resolve(cls, config_file):
     """Parse a keystore config file and return a list of Keystore objects."""
 
+    config_file = os.path.expanduser(config_file)
     config = Config.create_parser()
     try:
       with open(config_file, 'rb') as keystore_config:
         config.readfp(keystore_config)
-    except IOError:
-      raise KeystoreResolver.Error('The \'--{0}\' option must point at a valid .ini file holding '
-                                   'keystore definitions.'.format(cls._CONFIG_SECTION))
+    except IOError as e:
+      raise KeystoreResolver.Error('Problem parsing config at {}: {}'.format(config_file, e))
+
     parser = SingleFileConfig(config_file, config)
     key_names = config.sections()
     keys = {}
@@ -83,7 +82,7 @@ class Keystore(object):
 
     self.keystore_name = keystore_name
     # The os call is robust against None b/c it was validated in KeyResolver with get_required().
-    self.keystore_location = os.path.expandvars(keystore_location)
+    self.keystore_location = os.path.expanduser(keystore_location)
     self.keystore_alias = keystore_alias
     self.keystore_password = keystore_password
     self.key_password = key_password
@@ -97,8 +96,8 @@ class Keystore(object):
     if self._type is None:
       keystore_type = self._build_type.lower()
       if keystore_type not in ('release', 'debug'):
-        raise ValueError(self, 'The build_type must be one of (debug, release) '
-                               'instead of: {0}.'.format(self._build_type))
+        raise ValueError('The build_type of Android keystores must be one of (debug, release) '
+                         'instead of: {0}.'.format(self._build_type))
       else:
         self._type = keystore_type
     return self._type

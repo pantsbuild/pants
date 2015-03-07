@@ -13,7 +13,6 @@ from pants.backend.android.android_config_util import AndroidConfigUtil
 from pants.backend.android.keystore.keystore_resolver import KeystoreResolver
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.core.tasks.task import Task
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
@@ -27,8 +26,6 @@ class SignApkTask(Task):
   """Sign Android packages with keystores using the jarsigner tool."""
 
   _DEFAULT_KEYSTORE_CONFIG = 'android/keystore/default_config.ini'
-  _CONFIG_SECTION = 'android-keystore-location'
-  _CONFIG_OPTION = 'keystore_config_location'
 
   @classmethod
   def register_options(cls, register):
@@ -49,29 +46,49 @@ class SignApkTask(Task):
   def product_types(cls):
     return ['release_apk']
 
+  @classmethod
+  def setup_default_config(cls, path):
+    """Create the default keystore config file for Android targets.
+
+    :param string path: Full path for the created default config file.
+    """
+    # TODO(mateor): Hook into pants global setup instead of relying on building an Android target.
+    try:
+      AndroidConfigUtil.setup_keystore_config(path)
+    except AndroidConfigUtil.AndroidConfigError as e:
+      raise TaskError('Failed to setup default keystore config: {0}'.format(e))
+
+  @classmethod
+  def signed_package_name(cls, target, build_type):
+    """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""
+    return '{0}.{1}.signed.apk'.format(target.app_name, build_type)
+
   def __init__(self, *args, **kwargs):
     super(SignApkTask, self).__init__(*args, **kwargs)
     self._config_file = self.get_options().keystore_config_location
-    self._dist = None
     self._distdir = self.get_options().pants_distdir
+    self._configdir = self.get_options().pants_configdir
+    self._dist = None
 
   @property
   def config_file(self):
-    """Path of .ini file containing definitions for backend.android.keystore_resolver.Keystore."""
-    if self._config_file in (None, ""):
-      try:
-        self._config_file = self.context.config.get_required(self._CONFIG_SECTION,
-                                                             self._CONFIG_OPTION )
-      except Config.ConfigError:
-       raise TaskError('The "[{0}]: {1}" option must declare the location of an .ini file '
-                             'holding keystore definitions.'.format(self._CONFIG_SECTION,
-                                                                    self._CONFIG_OPTION))
-    return self._config_file
+    if not self._config_file:
+      raise TaskError('The "[sign]: keystore_config_location" option must declare the location '
+                      'of an .ini file holding keystore definitions.')
+    return os.path.expanduser(self._config_file)
+
+  @property
+  def default_config_location(self):
+    """Return the path where pants creates the default keystore config file.
+
+    This location will hold the well-known definition of the debug keystore installed with the SDK.
+    """
+    return os.path.join(self._configdir, self._DEFAULT_KEYSTORE_CONFIG)
 
   @property
   def distribution(self):
     if self._dist is None:
-      # Currently no Java 8 for Android. I considered max=1.7.0_50. See comment in render_args().
+      # Currently no Java 8 for Android. I considered max=1.7.0_50. See comment in _render_args().
       self._dist = Distribution.cached(minimum_version='1.6.0_00',
                                        maximum_version='1.7.0_99',
                                        jdk=True)
@@ -98,23 +115,19 @@ class SignApkTask(Task):
     args.extend(['-keystore', key.keystore_location])
     args.extend(['-storepass', key.keystore_password])
     args.extend(['-keypass', key.key_password])
-    args.extend(['-signedjar', os.path.join(outdir, self.package_name(target, key.build_type))])
+    args.extend(['-signedjar',
+                 os.path.join(outdir, self.signed_package_name(target, key.build_type))])
     args.append(unsigned_apk)
     args.append(key.keystore_alias)
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def execute(self):
-    targets = self.context.targets(self.is_signtarget)
-    # Check for Android keystore config file (where the default keystore definition is kept).
-    config_file = os.path.join(self.context.config.getdefault('pants_bootstrapdir'),
-                               self._DEFAULT_KEYSTORE_CONFIG)
-    if not os.path.isfile(config_file):
-      try:
-        AndroidConfigUtil.setup_keystore_config(config_file)
-      except AndroidConfigUtil.AndroidConfigError as e:
-        raise TaskError('Failed to setup keystore config: {0}'.format(e))
+    # One time setup of the default keystore config file.
+    if not os.path.isfile(self.default_config_location):
+      self.setup_default_config(self.default_config_location)
 
+    targets = self.context.targets(self.is_signtarget)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
@@ -133,8 +146,8 @@ class SignApkTask(Task):
         packages = list(get_products_path(target))
         for unsigned_apk in packages:
           keystores = KeystoreResolver.resolve(self.config_file)
-          for key in keystores:
 
+          for key in keystores:
             outdir = self.sign_apk_out(target, keystores[key].build_type)
             safe_mkdir(outdir)
             args = self._render_args(target, keystores[key], unsigned_apk, outdir)
@@ -148,15 +161,10 @@ class SignApkTask(Task):
 
     for target in targets:
       release_path = self.sign_apk_out(target, 'release')
-      release_apk = self.package_name(target, 'release')
+      release_apk = self.signed_package_name(target, 'release')
 
       if os.path.isfile(os.path.join(release_path, release_apk)):
         self.context.products.get('release_apk').add(target, release_path).append(release_apk)
-
-
-  def package_name(self, target, build_type):
-    """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""
-    return '{0}.{1}.signed.apk'.format(target.app_name, build_type)
 
   def sign_apk_out(self, target, build_type):
     """Compute the outdir for a target."""

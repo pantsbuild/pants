@@ -6,11 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import warnings
 from argparse import ArgumentParser, _HelpAction
 from collections import namedtuple
 
 import six
 
+from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
 from pants.option.help_formatter import PantsAdvancedHelpFormatter, PantsBasicHelpFormatter
@@ -20,8 +22,13 @@ from pants.option.ranked_value import RankedValue
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
 # Note that subclassing ArgumentParser for this purpose is allowed by the argparse API.
 class CustomArgumentParser(ArgumentParser):
+  def __init__(self, scope, *args, **kwargs):
+    super(CustomArgumentParser, self).__init__(*args, **kwargs)
+    self._scope = scope
+
   def error(self, message):
-    raise ParseError(message)
+    scope = 'global' if self._scope == GLOBAL_SCOPE else self._scope
+    raise ParseError('{0} in {1} scope'.format(message, scope))
 
   def walk_actions(self):
     """Iterates over the argparse.Action objects for options registered on this parser."""
@@ -103,14 +110,14 @@ class Parser(object):
     self._frozen = False
 
     # The argparser we use for actually parsing args.
-    self._argparser = CustomArgumentParser(conflict_handler='resolve')
+    self._argparser = CustomArgumentParser(scope=self._scope, conflict_handler='resolve')
 
     # The argparser we use for formatting help messages.
     # We don't use self._argparser for this as it will have all options from enclosing scopes
     # registered on it too, which would create unnecessarily repetitive help messages.
     formatter_class = (PantsAdvancedHelpFormatter if help_request and help_request.advanced
                        else PantsBasicHelpFormatter)
-    self._help_argparser = CustomArgumentParser(conflict_handler='resolve',
+    self._help_argparser = CustomArgumentParser(scope=self._scope, conflict_handler='resolve',
                                                 formatter_class=formatter_class)
 
     # Options are registered in two groups.  The first group will always be displayed in the help
@@ -126,7 +133,10 @@ class Parser(object):
     # Map of external to internal dest names. See docstring for _set_dest below.
     self._dest_forwardings = {}
 
-    # A Parser instance, or None for the global scope parser.
+    # Keep track of deprecated flags.  Maps flag -> (deprecated_version, deprecated_hint)
+    self._deprecated_flags = {}
+
+  # A Parser instance, or None for the global scope parser.
     self._parent_parser = parent_parser
 
     # List of Parser instances.
@@ -156,6 +166,7 @@ class Parser(object):
     namespace.add_forwardings(self._dest_forwardings)
     new_args = self._argparser.parse_args(args)
     namespace.update(vars(new_args))
+    self.deprecated_check(args)
     return namespace
 
   def format_help(self):
@@ -166,7 +177,11 @@ class Parser(object):
     """Register an option, using argparse params.
 
     Custom extensions to argparse params:
-    :param advanced: if True, the option will be usually be suppressed when displaying help.
+    :param advanced: if True, the option willally be suppressed when displaying help.
+    :param deprecated_version: Mark an option as deprecated.  The value is a semver that indicates
+       the release at which the option should be removed from the code.
+    :param deprecated_hint: A message to display to the user when displaying help for or invoking
+       a deprecated option.
     """
     if self._frozen:
       raise RegistrationError('Cannot register option {0} in scope {1} after registering options '
@@ -179,16 +194,29 @@ class Parser(object):
       ancestor = ancestor._parent_parser
 
     # Pull out our custom arguments, they aren't valid for argparse.
+    recursive = kwargs.pop('recursive', False)
     advanced = kwargs.pop('advanced', False)
 
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
+
+    deprecated_version = kwargs.pop('deprecated_version', None)
+    deprecated_hint = kwargs.pop('deprecated_hint', '')
+
+    if deprecated_version is not None:
+      check_deprecated_semver(deprecated_version)
+      flag = '--' + dest.replace('_', '-')
+      self._deprecated_flags[flag] = (deprecated_version, deprecated_hint)
+      help = kwargs.pop('help', '')
+      kwargs['help'] = 'DEPRECATED: {}\n{}'.format(self.deprecated_message(flag), help)
 
     inverse_args = []
     help_args = []
     for flag in self.expand_flags(*args, **kwargs):
       if flag.inverse_name:
         inverse_args.append(flag.inverse_name)
+        if deprecated_version:
+          self._deprecated_flags[flag.inverse_name] = (deprecated_version, deprecated_hint)
       help_args.append(flag.help_arg)
     is_invertible = len(inverse_args) > 0
 
@@ -209,21 +237,62 @@ class Parser(object):
     # Register the option for the purpose of parsing, on this and all enclosed scopes.
     if is_invertible:
       inverse_kwargs = self._create_inverse_kwargs(kwargs)
-      self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
+      self._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs, recursive)
     else:
-      self._register(dest, args, kwargs)
+      self._register(dest, args, kwargs, recursive)
 
-  def _register(self, dest, args, kwargs):
+  def is_deprecated(self, flag):
+    """Returns True if the flag has been marked as deprecated with 'deprecated_version'.
+
+    :param flag: flag to test  (if it starts with --{scope}-, or --no-{scope}, the scope will be
+    stripped out)
+    """
+    flag = flag.split('=')[0]
+    if flag.startswith('--{}-'.format(self._scope)):
+      flag = '--{}'.format(flag[3 + len(self._scope):])  # strip off the --{scope}- prefix
+    elif flag.startswith('--no-{}-'.format(self._scope)):
+      flag = '--no-{}'.format(flag[6 + len(self._scope):])  # strip off the --no-{scope}- prefix
+
+    return flag in self._deprecated_flags
+
+  def deprecated_message(self, flag):
+    """Returns the message to be displayed when a deprecated flag is invoked or asked for help.
+
+    The caller must insure that the flag has already been tagged as deprecated with the
+    is_deprecated() method.
+    :param flag: The flag being invoked, e.g. --foo
+    """
+    flag = flag.split('=')[0]
+    deprecated_version, deprecated_hint = self._deprecated_flags[flag]
+    scope = self._scope or 'DEFAULT'
+    message = 'Option {flag} in scope {scope} is deprecated and will be removed in version ' \
+              '{removal_version}'.format(flag=flag, scope=scope,
+                                         removal_version=deprecated_version)
+    hint = deprecated_hint or ''
+    return '{}. {}'.format(message, hint)
+
+  def deprecated_check(self, flags):
+    """Emit a warning message if one of these flags is marked as deprecated.
+
+    :param flags: list of string flags to check.  e.g. [ '--foo', '--no-bar', ... ]
+    """
+    for flag in flags:
+      if self.is_deprecated(flag):
+        warnings.warn('*** {}'.format(self.deprecated_message(flag)), DeprecationWarning,
+                      stacklevel=9999) # out of range stacklevel to suppress printing source line.
+
+  def _register(self, dest, args, kwargs, recursive):
     """Recursively register the option for parsing."""
     ranked_default = self._compute_default(dest, is_invertible=False, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
     self._argparser.add_argument(*args, **kwargs_with_default)
 
-    # Propagate registration down to inner scopes.
-    for child_parser in self._child_parsers:
-      child_parser._register(dest, args, kwargs)
+    if recursive:
+      # Propagate registration down to inner scopes.
+      for child_parser in self._child_parsers:
+        child_parser._register(dest, args, kwargs, recursive)
 
-  def _register_boolean(self, dest, args, kwargs, inverse_args, inverse_kwargs):
+  def _register_boolean(self, dest, args, kwargs, inverse_args, inverse_kwargs, recursive):
     """Recursively register the boolean option, and its inverse, for parsing."""
     group = self._argparser.add_mutually_exclusive_group()
     ranked_default = self._compute_default(dest, is_invertible=True, kwargs=kwargs)
@@ -231,9 +300,10 @@ class Parser(object):
     group.add_argument(*args, **kwargs_with_default)
     group.add_argument(*inverse_args, **inverse_kwargs)
 
-    # Propagate registration down to inner scopes.
-    for child_parser in self._child_parsers:
-      child_parser._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs)
+    if recursive:
+      # Propagate registration down to inner scopes.
+      for child_parser in self._child_parsers:
+        child_parser._register_boolean(dest, args, kwargs, inverse_args, inverse_kwargs, recursive)
 
   def _validate(self, args, kwargs):
     """Ensure that the caller isn't trying to use unsupported argparse features."""
@@ -248,8 +318,8 @@ class Parser(object):
       raise RegistrationError('nargs={0} unsupported in registration of option {1} in '
                               'scope {2}.'.format(kwargs['nargs'], args, self._scope))
     if 'required' in kwargs:
-      raise RegistrationError('{0} unsupported in registration of option {1} in '
-                              'scope {2}.'.format(k, args, self._scope))
+      raise RegistrationError('required unsupported in registration of option {0} in '
+                              'scope {1}.'.format(args, self._scope))
 
   def _set_dest(self, args, kwargs):
     """Maps the externally-used dest to a scoped one only seen internally.

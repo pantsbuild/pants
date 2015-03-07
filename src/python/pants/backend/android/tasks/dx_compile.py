@@ -22,7 +22,6 @@ class DxCompile(AndroidTask, NailgunTask):
 
   # name of output file. "Output name must end with one of: .dex .jar .zip .apk or be a directory."
   DEX_NAME = 'classes.dex'
-  _CONFIG_SECTION = 'dx-tool'
 
   @staticmethod
   def is_dextarget(target):
@@ -34,7 +33,7 @@ class DxCompile(AndroidTask, NailgunTask):
     super(DxCompile, cls).register_options(register)
     register('--build-tools-version',
              help='Create the dex file using this version of the Android build tools.')
-    register('--jvm-options',
+    register('--jvm-options', action='append', metavar='<option>...',
              help='Run dx with these JVM options.')
 
   @classmethod
@@ -48,15 +47,10 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def __init__(self, *args, **kwargs):
     super(DxCompile, self).__init__(*args, **kwargs)
-    self._android_dist = self.android_sdk
     self._forced_build_tools_version = self.get_options().build_tools_version
     self._forced_jvm_options = self.get_options().jvm_options
 
     self.setup_artifact_cache()
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   def _render_args(self, outdir, classes):
     dex_file = os.path.join(outdir, self.DEX_NAME)
@@ -122,7 +116,7 @@ class DxCompile(AndroidTask, NailgunTask):
     :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
     """
     dx_jar = os.path.join('build-tools', build_tools_version, 'lib', 'dx.jar')
-    return self._android_dist.register_android_tool(dx_jar)
+    return self.android_sdk.register_android_tool(dx_jar)
 
   def dx_out(self, target):
     """Return the outdir for the DxCompile task."""

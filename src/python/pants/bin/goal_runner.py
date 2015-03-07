@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import logging.config
-import os
 import sys
 
 import pkg_resources
@@ -28,10 +27,10 @@ from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.initialize_reporting import initial_reporting, update_reporting
 from pants.goal.run_tracker import RunTracker
+from pants.logging.setup import setup_logging
 from pants.option.global_options import register_global_options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
-from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
@@ -54,6 +53,9 @@ class GoalRunner(object):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     self.config = Config.from_cache()
 
+    # Get logging setup prior to loading backends so that they can log as needed.
+    self._setup_logging(bootstrap_options.for_global_scope())
+
     # Add any extra paths to python path (eg for loading extra source backends)
     for path in bootstrap_options.for_global_scope().pythonpath:
       sys.path.append(path)
@@ -66,7 +68,9 @@ class GoalRunner(object):
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
-    known_scopes = ['']
+    # TODO: Create a 'Subsystem' abstraction instead of special-casing run-tracker here
+    # and in register_options().
+    known_scopes = ['', 'run-tracker']
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
@@ -75,11 +79,7 @@ class GoalRunner(object):
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
 
-    # TODO(Eric Ayers) We are missing log messages. Set the log level earlier
-    # Enable standard python logging for code with no handle to a context/work-unit.
-    self._setup_logging()  # NB: self.options are needed for this call.
-
-    self.run_tracker = RunTracker.from_config(self.config)
+    self.run_tracker = RunTracker.from_options(self.options)
     report = initial_reporting(self.config, self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
@@ -106,10 +106,10 @@ class GoalRunner(object):
         # project plugins, or specialized configuration files.
         self.build_file_parser.parse_build_file_family(build_file)
 
+    self._expand_goals_and_specs()
+
     # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
     self.run_tracker.run_info.add_scm_info()
-
-    self._expand_goals_and_specs()
 
   @property
   def spec_excludes(self):
@@ -127,6 +127,15 @@ class GoalRunner(object):
       return self.options.register_global(*args, **kwargs)
     register_global.bootstrap = self.options.bootstrap_option_values()
     register_global_options(register_global)
+
+    # This is the first case we have of non-task, non-global options.
+    # The current implementation special-cases RunTracker, and is temporary.
+    # In the near future it will be replaced with a 'Subsystem' abstraction.
+    # But for now this is useful for kicking the tires.
+    def register_run_tracker(*args, **kwargs):
+      self.options.register('run-tracker', *args, **kwargs)
+    RunTracker.register_options(register_run_tracker)
+
     for goal in Goal.all():
       goal.register_options(self.options)
 
@@ -220,45 +229,8 @@ class GoalRunner(object):
     engine = RoundEngine()
     return engine.execute(context, self.goals)
 
-  def _setup_logging(self):
-    # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
-    # context/work-unit logging and standard python logging doesn't buy us anything.
-
-    # TODO(John Sirois): Support logging.config.fileConfig so a site can setup fine-grained
-    # logging control and we don't need to be the middleman plumbing an option for each python
-    # standard logging knob.
-
+  def _setup_logging(self, global_options):
     # NB: quiet help says 'Squelches all console output apart from errors'.
-    level = 'ERROR' if self.global_options.quiet else self.global_options.level.upper()
+    level = 'ERROR' if global_options.quiet else global_options.level.upper()
 
-    logging_config = {'version': 1,  # required and there is only a version 1 format so far.
-                      'disable_existing_loggers': False}
-
-    formatters_config = {'brief': {'format': '%(levelname)s] %(message)s'}}
-    handlers_config = {'console': {'class': 'logging.StreamHandler',
-                                   'formatter': 'brief',  # defined above
-                                   'level': level}}
-
-    log_dir = self.global_options.logdir
-    if log_dir:
-      safe_mkdir(log_dir)
-
-      # This is close to but not quite glog format.  Namely the leading levelname is not a single
-      # character and the fractional second is only to millis precision and not micros.
-      glog_date_format = '%m%d %H:%M:%S'
-      glog_format = ('%(levelname)s %(asctime)s.%(msecs)d %(process)d %(filename)s:%(lineno)d] '
-                     '%(message)s')
-
-      formatters_config['glog'] = {'format': glog_format, 'datefmt': glog_date_format}
-      handlers_config['file'] = {'class': 'logging.handlers.RotatingFileHandler',
-                                 'formatter': 'glog',  # defined above
-                                 'level': level,
-                                 'filename': os.path.join(log_dir, 'pants.log'),
-                                 'maxBytes': 10 * 1024 * 1024,
-                                 'backupCount': 4}
-
-    logging_config['formatters'] = formatters_config
-    logging_config['handlers'] = handlers_config
-    logging_config['root'] = {'level': level, 'handlers': handlers_config.keys()}
-
-    logging.config.dictConfig(logging_config)
+    setup_logging(level, log_dir=global_options.logdir)

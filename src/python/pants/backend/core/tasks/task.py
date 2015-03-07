@@ -140,8 +140,12 @@ class TaskBase(AbstractClass):
     """
     self.context = context
     self._workdir = workdir
+    # TODO: It would be nice to use self.get_options().cache_key_gen_version here, because then
+    # we could have a separate value for each scope if we really wanted to. However we can't
+    # access per-task options in Task.__init__ because GroupTask.__init__ calls it with the
+    # group task's scope, which isn't currently in the known scopes we generate options for.
     self._cache_key_generator = CacheKeyGenerator(
-        context.config.getdefault('cache_key_gen_version', default='200'))
+      self.context.options.for_global_scope().cache_key_gen_version)
     self._read_artifact_cache_spec = None
     self._write_artifact_cache_spec = None
     self._artifact_cache = None
@@ -149,12 +153,10 @@ class TaskBase(AbstractClass):
 
     self._cache_key_errors = set()
 
-    default_invalidator_root = os.path.join(
-      self.context.options.for_global_scope().pants_workdir, 'build_invalidator')
-    suffix_type = self.__class__.__name__
     self._build_invalidator_dir = os.path.join(
-        context.config.get('tasks', 'build_invalidator', default=default_invalidator_root),
-        suffix_type)
+      self.context.options.for_global_scope().pants_workdir,
+      'build_invalidator',
+      self.__class__.__name__)
 
   def get_options(self):
     """Returns the option values for this task's scope."""
@@ -198,7 +200,7 @@ class TaskBase(AbstractClass):
   def _create_artifact_cache(self, spec, action):
     if len(spec) > 0:
       pants_workdir = self.context.options.for_global_scope().pants_workdir
-      compression = self.context.config.getint('cache', 'compression', default=5)
+      compression = self.get_options().cache_compression
       my_name = self.__class__.__name__
       return create_artifact_cache(
         log=self.context.log,

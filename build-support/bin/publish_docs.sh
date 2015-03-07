@@ -36,8 +36,7 @@ while getopts "hopd:" opt; do
   esac
 done
 
-${PANTS_EXE} builddict --print-exception-stacktrace \
-                       --omit-impl-re='internal_backend.*' || \
+${PANTS_EXE} builddict --omit-impl-re='internal_backend.*' || \
   die "Failed to generate the 'BUILD Dictionary' and/or 'Options Reference'."
 
 function do_open() {
@@ -53,13 +52,13 @@ function do_open() {
 }
 
 # generate html from markdown pages.
-${PANTS_EXE} markdown --print-exception-stacktrace \
+${PANTS_EXE} markdown \
   --markdown-fragment src:: examples:: src/docs:: //:readme \
   testprojects/src/java/com/pants/testproject/page:readme || \
   die "Failed to generate HTML from markdown'."
 
 # invoke doc site generator.
-${PANTS_EXE} sitegen --print-exception-stacktrace \
+${PANTS_EXE} sitegen \
   --sitegen-config-path=src/python/pants/docs/docsite.json || \
   die "Failed to generate doc site'."
 

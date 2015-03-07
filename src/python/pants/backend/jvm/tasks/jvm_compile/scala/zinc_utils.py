@@ -94,6 +94,12 @@ class ZincUtils(object):
     """The jars containing code for enabled plugins."""
     return self._plugin_jars
 
+  def _name_hashing_args(self):
+    if self._nailgun_task.get_options().name_hashing:
+      return []
+    else:
+      return ['-no-name-hashing']
+
   def _run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
     zinc_args = [
       '-log-level', self._log_level,
@@ -113,21 +119,25 @@ class ZincUtils(object):
     ret = []
 
     # Go through all the bootstrap tools required to compile.
-    for target in self._nailgun_task.get_options().scalac:
-      # Resolve to their actual targets.
-      try:
-        deps = self.context.resolve(target)
-      except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  specified by option --scalac in scope {scope}."
-                                  .format(message=e, scope=self._nailgun_task.options_scope))
+    for toolname in ['scalac', 'zinc']:
+      for target in self._nailgun_task.get_options()[toolname]:
+        # Resolve to their actual targets.
+        try:
+          deps = self.context.resolve(target)
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  specified by option --{toolname} in scope {scope}."
+                                    .format(message=e,
+                                            toolname=toolname,
+                                            scope=self._nailgun_task.options_scope))
 
-      for lib in (t for t in deps if isinstance(t, JarLibrary)):
-        for jar in lib.jar_dependencies:
-          ret.append(jar.cache_key())
+        for lib in (t for t in deps if isinstance(t, JarLibrary)):
+          for jar in lib.jar_dependencies:
+            ret.append(jar.cache_key())
     return sorted(ret)
 
   @staticmethod
-  def _get_compile_args(opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+  def _get_compile_args(opts, classpath, sources, output_dir, analysis_file,
+                        upstream_analysis_files):
     args = list(opts)  # Make a copy
 
     if upstream_analysis_files:
@@ -149,8 +159,9 @@ class ZincUtils(object):
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
     big_classpath = self._compiler_classpath + classpath
-    args = ZincUtils._get_compile_args(opts + self._plugin_args(), big_classpath,
-                                       sources, output_dir, analysis_file, upstream_analysis_files)
+    args = ZincUtils._get_compile_args(opts + self._name_hashing_args() + self._plugin_args(),
+                                       big_classpath, sources, output_dir, analysis_file,
+                                       upstream_analysis_files)
     self.log_zinc_file(analysis_file)
     if self._run_zinc(args, workunit_labels=[WorkUnit.COMPILER]):
       raise TaskError('Zinc compile failed.')

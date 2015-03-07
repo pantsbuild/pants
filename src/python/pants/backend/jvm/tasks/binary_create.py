@@ -17,7 +17,7 @@ class BinaryCreate(JvmBinaryTask):
 
   def __init__(self, *args, **kwargs):
     super(BinaryCreate, self).__init__(*args, **kwargs)
-    self._outdir = self.context.config.getdefault('pants_distdir')
+    self._outdir = self.get_options().pants_distdir
 
   def execute(self):
     for binary in self.context.targets(self.is_binary):

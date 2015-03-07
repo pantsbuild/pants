@@ -249,7 +249,6 @@ python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':ivy_task_mixin',
     ':jvm_tool_task_mixin',
     ':nailgun_task',
@@ -317,6 +316,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/ivy',
+    'src/python/pants/option',
     'src/python/pants/scm',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
@@ -336,6 +336,7 @@ python_library(
     'src/python/pants/java:jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
+    'src/python/pants:binary_util',
   ],
 )
 

@@ -17,13 +17,14 @@ python_library(
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/console:stty_utils',
+    'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
   ]
 )

@@ -17,26 +17,27 @@ python_library(
   ]
 )
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':base',
   ]
 )
 
-python_test_suite(
+target(
   name = 'integration',
   dependencies = [
     ':test_spec_exclude_integration',
   ]
 )
 
-python_test_suite(
+target(
   name = 'base',
   dependencies = [
     ':abbreviate_target_ids',
     ':address',
     ':build_configuration',
+    ':build_environment',
     ':build_file',
     ':build_file_address_mapper',
     ':build_file_aliases',
@@ -44,6 +45,7 @@ python_test_suite(
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
+    ':config',
     ':deprecated',
     ':extension_loader',
     ':fingerprint_strategy',
@@ -91,6 +93,16 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'build_environment',
+  sources = ['test_build_environment.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
   ]
 )
 
@@ -191,6 +203,15 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:cmd_line_spec_parser',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'config',
+  sources = ['test_config.py'],
+  dependencies = [
+    'src/python/pants/base:config',
+    'src/python/pants/util:contextutil',
   ]
 )
 

@@ -36,6 +36,7 @@ class ScalaCompile(JvmCompile):
     # Note: Used in ZincUtils.
     # TODO: Revisit this. It's unintuitive for ZincUtils to reach back into the task for options.
     register('--plugins', action='append', help='Use these scalac plugins.')
+    register('--name-hashing', action='store_true', default=False, help='Use zinc name hashing.')
     ZincUtils.register_options(register, cls.register_jvm_tool)
 
   def __init__(self, *args, **kwargs):

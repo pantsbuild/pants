@@ -26,7 +26,6 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
-from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.util.dirutil import safe_rmtree, safe_walk
 
@@ -174,25 +173,6 @@ class PythonSetup(PythonTask):
     return False
 
   @classmethod
-  def iter_generated_sources(cls, target, root, config=None):
-    config = config or Config.from_cache()
-    # This is sort of facepalmy -- python.new will make this much better.
-    for target_type, target_builder in cls.GENERATED_TARGETS.items():
-      if isinstance(target, target_type):
-        builder_cls = target_builder
-        break
-    else:
-      raise TypeError(
-          'write_generated_sources could not find suitable code generator for %s' % type(target))
-
-    builder = builder_cls(target, root, config)
-    builder.generate()
-    for root, _, files in safe_walk(builder.package_root):
-      for fn in files:
-        target_file = os.path.join(root, fn)
-        yield os.path.relpath(target_file, builder.package_root), target_file
-
-  @classmethod
   def nearest_subpackage(cls, package, all_packages):
     """Given a package, find its nearest parent in all_packages."""
     def shared_prefix(candidate):
@@ -268,10 +248,26 @@ class PythonSetup(PythonTask):
 
   def __init__(self, *args, **kwargs):
     super(PythonSetup, self).__init__(*args, **kwargs)
-    self._config = Config.from_cache()
     self._root = get_buildroot()
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive
+
+  def iter_generated_sources(self, target):
+    # This is sort of facepalmy -- python.new will make this much better.
+    for target_type, target_builder in self.GENERATED_TARGETS.items():
+      if isinstance(target, target_type):
+        builder_cls = target_builder
+        break
+    else:
+      raise TypeError(
+        'iter_generated_sources could not find suitable code generator for %s' % type(target))
+
+    builder = builder_cls(target, self._root, self.context.options)
+    builder.generate()
+    for root, _, files in safe_walk(builder.package_root):
+      for fn in files:
+        target_file = os.path.join(root, fn)
+        yield os.path.relpath(target_file, builder.package_root), target_file
 
   def write_contents(self, root_target, chroot):
     """Write contents of the target."""
@@ -293,7 +289,7 @@ class PythonSetup(PythonTask):
 
     def write_target(target):
       if isinstance(target, tuple(self.GENERATED_TARGETS.keys())):
-        for relpath, abspath in self.iter_generated_sources(target, self._root, self._config):
+        for relpath, abspath in self.iter_generated_sources(target):
           write_codegen_source(relpath, abspath)
       else:
         sources_and_resources = (list(target.payload.sources.relative_to_buildroot()) +
@@ -380,7 +376,7 @@ class PythonSetup(PythonTask):
     chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
 
   def run_one(self, target):
-    dist_dir = self._config.getdefault('pants_distdir')
+    dist_dir = self.get_options().pants_distdir
     chroot = Chroot(dist_dir, name=target.provides.name)
     self.write_contents(target, chroot)
     self.write_setup(target, chroot)
