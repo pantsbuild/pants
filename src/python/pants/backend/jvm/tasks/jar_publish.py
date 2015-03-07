@@ -646,9 +646,6 @@ class JarPublish(JarTask, ScmPublish):
 
       IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, extra_confs=extra_confs,
                                   classifier=classifier)
-      inFile = open(ivyxml, 'r')
-      contents = inFile.read()
-      print(contents)
       PomWriter(get_pushdb).write(tgt, path(extension='pom'), extra_confs=extra_confs,
                                   classifier=classifier)
 
@@ -666,11 +663,11 @@ class JarPublish(JarTask, ScmPublish):
       product_config.update(self.get_options().publish_extras or {})
 
       for product, config in product_config.items():
+        print("\n %s" %config)
         if self.context.products.get(product).has(tgt):
           classifier = config.get('classifier', DEFAULT_CLASSIFIER)
           confs = set()
-          if classifier:
-            suffix = '-' + classifier
+          suffix = '-' + classifier if classifier else ''
           self._copy_artifact(tgt, jar, version, suffix=suffix, typename=product)
           if product == 'jars':
             confs = set(repo['confs'])
