@@ -226,5 +226,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
         golden_file = golden_file.read()
         # Remove the publication sha attribute from ivy.xml
         if artifact_path.endswith('.xml'):
-          generated_file= re.sub(r'publication=.*', '/>', generated_file)
+          generated_file= re.sub(r'publication=.*', 'er/>', generated_file)
+          print("\n tests")
       return generated_file is golden_file

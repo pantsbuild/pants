@@ -663,7 +663,6 @@ class JarPublish(JarTask, ScmPublish):
       product_config.update(self.get_options().publish_extras or {})
 
       for product, config in product_config.items():
-        print("\n %s" %config)
         if self.context.products.get(product).has(tgt):
           classifier = config.get('classifier', DEFAULT_CLASSIFIER)
           confs = set()
@@ -685,12 +684,12 @@ class JarPublish(JarTask, ScmPublish):
                          'ext': config.get('extension', DEFAULT_EXTENSION)}
           return stage_artifact(tgt, jar, version, changelog, confs,
                                 extra_confs=extra_confs, classifier=classifier)
-      raise ValueError("No product mapping in %s for %s. "
-                       "You may need to run some other task first" % (product_config.keys(),
-                                                                      tgt))
+      raise ValueError('No product mapping in {0} for {1}. '
+                       'You may need to run some other task first'.format(product_config.keys(),
+                                                                          tgt))
     if self.overrides:
-      print('Publishing with revision overrides:\n  %s' % '\n  '.join(
-        '%s=%s' % (coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
+      print('Publishing with revision overrides:\n  %0' % '\n  '.join(
+        '{1}={2}'.format(coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
       ))
 
     head_sha = self.scm.commit_id
