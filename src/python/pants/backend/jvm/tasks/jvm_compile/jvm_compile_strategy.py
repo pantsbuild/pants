@@ -253,6 +253,7 @@ class JvmCompileStrategy(object):
       # for the upstream.
       upstream_analysis = ({self._classes_dir: self._analysis_file}
                            if os.path.exists(self._analysis_file) else {})
+      print(">>> compiling %s with classpath: %s" % (vts, cp_entries))
       compile_vts(vts,
                   sources,
                   analysis_file,
@@ -401,10 +402,9 @@ class JvmCompileStrategy(object):
 
     vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
 
+    # Determine locations for analysis files that will be split in the background.
     split_analysis_files = [
         JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
-    split_compile_contexts = [
-        self.CompileContext(t, a, self._classes_dir) for t, a in zip(vts_targets, split_analysis_files)]
     portable_split_analysis_files = [
         JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
@@ -415,15 +415,19 @@ class JvmCompileStrategy(object):
     # Set up args for rebasing the splits.
     relativize_args_tuples = zip(split_analysis_files, portable_split_analysis_files)
 
-    # Set up args for artifact cache updating.
+    # Compute the classes and resources for each vts.
+    split_compile_contexts = [
+        self.CompileContext(t, analysis_file, self._classes_dir) for t in vts_targets]
     vts_artifactfiles_pairs = []
     classes_by_source = self.compute_classes_by_source(split_compile_contexts)
+    print(">>> classes by source: %s" % (classes_by_source))
     resources_by_target = self.context.products.get_data('resources_by_target')
     for target, sources in sources_by_target.items():
       if target.has_label('no_cache'):
         continue
       artifacts = []
       if resources_by_target is not None:
+        print(">>> resources for %s: %s" % (target, resources_by_target[target]))
         for _, paths in resources_by_target[target].abs_paths():
           artifacts.extend(paths)
       for source in sources:
@@ -453,11 +457,13 @@ class JvmCompileStrategy(object):
     """
     buildroot = get_buildroot()
     classes_by_src = {}
+    print(">>> compile contexts %s" % str(compile_contexts))
     for compile_context in compile_contexts:
       if not os.path.exists(compile_context.analysis_file):
         continue
       products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
                                                                 compile_context.classes_dir)
+      print(">>>   products: %s" % str(products))
       for src, classes in products.items():
         relsrc = os.path.relpath(src, buildroot)
         classes_by_src[relsrc] = classes

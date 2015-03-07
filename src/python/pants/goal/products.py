@@ -94,6 +94,9 @@ class MultipleRootedProducts(object):
   def _get_products_for_root(self, root):
     return self._rooted_products_by_root.setdefault(root, RootedProducts(root))
 
+  def __str__(self):
+    return "MultipleRootedProducts(%s)" % str(self._rooted_products_by_root)
+
 
 class Products(object):
   """An out-of-band 'dropbox' where tasks can place build product information for later tasks to use.

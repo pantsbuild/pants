@@ -19,7 +19,7 @@ from pants.base.exceptions import TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -177,7 +177,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     return []
 
-  def post_process(self, relevant_targets):
+  def post_process(self, all_targets, relevant_targets):
     """Any extra post-execute work."""
     pass
 
@@ -286,7 +286,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
-    self.post_process(relevant_targets)
+    self.post_process(self.context.targets(), relevant_targets)
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, progress_message):
     """Compiles sources for the given vts into the given output dir.
@@ -304,12 +304,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     if not sources:
       self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
-                            % (self._language, vts.targets))
+                            % (self.name(), vts.targets))
     else:
       # Do some reporting.
       self.context.log.info(
         'Compiling ',
         items_to_report_element(sources, 'source'),
+        ' for ',
+        self.name(),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -371,9 +373,16 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     classes_by_target = self.context.products.get_data('classes_by_target')
     resources_by_target = self.context.products.get_data('resources_by_target')
 
+    print(">>> registering products for %s" % (str(compile_contexts)))
     if classes_by_source is not None or classes_by_target is not None:
       computed_classes_by_source = self._strategy.compute_classes_by_source(compile_contexts)
+      listdir = "%s/../.." % self.workdir
+      print(">>> Contents of %s:" % listdir)
+      for dirpath, _, filenames in safe_walk(listdir):
+        if filenames:
+          print(">>>\t%s\t%s" % (dirpath, filenames))
       resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
+      print(">>>   resource mapping is %s" % (str(resource_mapping)))
       for compile_context in compile_contexts:
         target = compile_context.target
         target = compile_context.classes_dir

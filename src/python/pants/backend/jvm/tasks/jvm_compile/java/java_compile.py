@@ -152,7 +152,7 @@ class JavaCompile(JvmCompile):
       default_message = 'Unexpected error - JMake returned %d' % result
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
 
-  def post_process(self, relevant_targets):
+  def post_process(self, all_targets, relevant_targets):
     # Produce a monolithic apt processor service info file for further compilation rounds
     # and the unit test classpath.
     # This is distinct from the per-target ones we create in extra_products().
@@ -168,10 +168,12 @@ class JavaCompile(JvmCompile):
           all_processors.add(processor)
     self._write_processor_info(processor_info_file, all_processors)
 
-    # Ensure that the processor info dir is on the classpath for relevant targets.
+    print(">>> wrote global processor annotation file at %s, with %d processors and added it for %s" % (processor_info_file, len(all_processors), all_targets))
+
+    # Ensure that the processor info dir is on the classpath for all targets.
     compile_classpaths = self.context.products.get_data('compile_classpath')
     for conf in self._confs:
-      compile_classpaths.add_for_targets(relevant_targets, [(conf, self._processor_info_dir)])
+      compile_classpaths.add_for_targets(all_targets, [(conf, self._processor_info_global_dir)])
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:
