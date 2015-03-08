@@ -59,7 +59,7 @@ python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
-    ':jvm_compile_strategy',
+    ':jvm_compile_global_strategy',
     ':jvm_dependency_analyzer',
     ':jvm_fingerprint_strategy',
     'src/python/pants/backend/core/tasks:group_task',
@@ -73,16 +73,26 @@ python_library(
 )
 
 python_library(
-  name = 'jvm_compile_strategy',
-  sources = ['jvm_compile_strategy.py', 'resource_mapping.py'],
+  name = 'jvm_compile_global_strategy',
+  sources = ['jvm_compile_global_strategy.py', 'resource_mapping.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.threading',
+    ':jvm_compile_strategy',
     ':jvm_dependency_analyzer',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'jvm_compile_strategy',
+  sources = ['jvm_compile_strategy.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
   ],
 )

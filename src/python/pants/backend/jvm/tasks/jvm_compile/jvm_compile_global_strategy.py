@@ -9,7 +9,7 @@ import itertools
 import os
 import shutil
 import uuid
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -27,12 +27,6 @@ from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses a global classpath and analysis."""
 
-  # A strategy-specific context for the compilation of a target.
-  #
-  # This can be used to differentiate between a partially completed compile in a temporary location
-  # and a finalized compile in its permanent location.
-  CompileContext = namedtuple('CompileContext', ['target', 'analysis_file', 'classes_dir'])
-
   # Common code.
   # ------------
   @staticmethod
@@ -43,8 +37,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompileGlobalStrategy._analysis_for_target(analysis_dir, target) + '.portable'
 
-  def __init__(self, context, options, workdir, analysis_tools):
-    super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools)
+  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
+    super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'global-analysis')
@@ -110,11 +104,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
-  def prepare_compile(self, cache_manager, sources_by_target, all_targets):
-    """Prepares to compile the given set of targets.
+  def prepare_compile(self, cache_manager, all_targets):
+    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets)
 
-    Has the side effects of pruning old analysis, and computing deleted sources.
-    """
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
     for conf in self._confs:
@@ -127,7 +119,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       invalid_sources_by_target = {}
       for tgt in invalid_targets:
-        invalid_sources_by_target[tgt] = sources_by_target[tgt]
+        invalid_sources_by_target[tgt] = self._sources_for_target(tgt)
       invalid_sources = list(itertools.chain.from_iterable(invalid_sources_by_target.values()))
       self._deleted_sources = self._compute_deleted_sources()
 
@@ -154,14 +146,14 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     else:
       self._deleted_sources = []
 
-  def invalidation_hints(self, sources_by_target):
+  def invalidation_hints(self, relevant_targets):
     """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
     # If needed, find targets that we've changed locally (as opposed to
     # changes synced in from the SCM).
     # TODO(benjy): Should locally_changed_targets be available in all Tasks?
     locally_changed_targets = None
     if self._changed_targets_heuristic_limit:
-      locally_changed_targets = self._find_locally_changed_targets(sources_by_target)
+      locally_changed_targets = self._find_locally_changed_targets(relevant_targets)
       if (locally_changed_targets and
           len(locally_changed_targets) > self._changed_targets_heuristic_limit):
         locally_changed_targets = None
@@ -170,7 +162,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   def compile_chunk(self,
                     invalidation_check,
-                    sources_by_target,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -206,7 +197,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     self._validate_classpath(compile_classpath)
 
     # Find the invalid sources for this chunk.
-    invalid_sources_by_target = {k:v for (k,v) in sources_by_target.items() if k in invalid_targets}
+    invalid_sources_by_target = {t: self._sources_for_target(t) for t in invalid_targets}
 
     tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
     os.mkdir(tmpdir)
@@ -299,19 +290,12 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
           self.move(new_invalid_analysis, self._invalid_analysis_file)
 
       # Record the built target -> sources mapping for future use.
-      for target in vts.targets:
-        self._record_sources_by_target(target, sources_by_target.get(target, []))
+      for target, sources in self._sources_for_targets(vts.targets).items():
+        self._record_previous_sources_by_target(target, sources)
 
       # Now that all the analysis accounting is complete, and we have no missing deps,
       # we can safely mark the targets as valid.
       vts.update()
-
-  def compile_context(self, target):
-    """Returns the default/stable compile context for the given target.
-    
-    Temporary compile contexts are private to the strategy.
-    """
-    return self.CompileContext(target, self._analysis_file, self._classes_dir)
 
   def compute_resource_mapping(self, compile_contexts):
     return ResourceMapping(self._classes_dir)
@@ -369,13 +353,13 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
         # Record the cached target -> sources mapping for future use.
         for target, sources in sources_by_cached_target.items():
-          self._record_sources_by_target(target, sources)
+          self._record_previous_sources_by_target(target, sources)
 
         # Everything's good so move the merged analysis to its final location.
         if os.path.exists(tmp_analysis):
           self.move(tmp_analysis, self._analysis_file)
 
-  def _write_to_artifact_cache(self, analysis_file, vts, sources_by_target, get_update_artifact_cache_work):
+  def _write_to_artifact_cache(self, analysis_file, vts, get_update_artifact_cache_work):
     vt_by_target = dict([(vt.target, vt) for vt in vts.versioned_targets])
 
     vts_targets = [t for t in vts.targets if not t.has_label('no_cache')]
@@ -394,10 +378,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     relativize_args_tuples = zip(split_analysis_files, portable_split_analysis_files)
 
     # Compute the classes and resources for each vts.
-    split_compile_contexts = [
-        self.CompileContext(t, analysis_file, self._classes_dir) for t in vts_targets]
+    compile_contexts = [self.compile_context(t) for t in vts_targets]
     vts_artifactfiles_pairs = []
-    classes_by_source = self.compute_classes_by_source(split_compile_contexts)
+    classes_by_source = self.compute_classes_by_source(compile_contexts)
     resources_by_target = self.context.products.get_data('resources_by_target')
     for target, sources in sources_by_target.items():
       if target.has_label('no_cache'):
@@ -459,7 +442,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       else:
         return []
 
-  def _find_locally_changed_targets(self, sources_by_target):
+  def _find_locally_changed_targets(self, relevant_targets):
     """Finds the targets whose sources have been modified locally.
 
     Returns a list of targets, or None if no SCM is available.
@@ -468,7 +451,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # but that's not yet a hard requirement, so the value is a list of targets.
     # TODO(benjy): Might this inverse mapping be needed elsewhere too?
     targets_by_source = defaultdict(list)
-    for tgt, srcs in sources_by_target.items():
+    for tgt, srcs in self._sources_for_targets(relevant_targets).items():
       for src in srcs:
         targets_by_source[src].append(tgt)
 

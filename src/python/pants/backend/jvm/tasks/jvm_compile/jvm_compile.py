@@ -198,15 +198,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
 
-    # Map of target -> list of sources (relative to buildroot), for all targets in all chunks.
-    # Populated in prepare_execute().
-    self._sources_by_target = None
-
     # The compile strategy to use for analysis and classfile placement.
     self._strategy = JvmCompileGlobalStrategy(self.context,
-                                        self.get_options(),
-                                        self.workdir,
-                                        self.create_analysis_tools())
+                                              self.get_options(),
+                                              self.workdir,
+                                              self.create_analysis_tools(),
+                                              lambda s: s.endswith(self._file_suffix))
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.
@@ -236,25 +233,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def prepare_execute(self, chunks):
     all_targets = list(itertools.chain(*chunks))
 
-    # Target -> sources (relative to buildroot).
-    # TODO(benjy): Should sources_by_target be available in all Tasks?
-    self._sources_by_target = self._compute_current_sources_by_target(all_targets)
-
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
-    self._strategy.prepare_compile(cache_manager, self._sources_by_target, all_targets)
+    self._strategy.prepare_compile(cache_manager, all_targets)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
       return
 
-    # Target -> sources (relative to buildroot), for just this chunk's targets.
-    sources_by_target = self._sources_for_targets(relevant_targets)
-
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
-    partition_size_hint, locally_changed_targets = self._strategy.invalidation_hints(sources_by_target)
+    partition_size_hint, locally_changed_targets = self._strategy.invalidation_hints(relevant_targets)
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
@@ -275,7 +265,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
             if self.artifact_cache_writes_enabled() else None)
         self._strategy.compile_chunk(invalidation_check,
-                                     sources_by_target,
                                      relevant_targets,
                                      invalid_targets,
                                      self.extra_compile_time_classpath_elements(),
@@ -326,33 +315,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
 
-  def _compute_current_sources_by_target(self, targets):
-    """Returns map target -> list of sources (relative to buildroot)."""
-    def calculate_sources(target):
-      sources = [s for s in target.sources_relative_to_buildroot() if s.endswith(self._file_suffix)]
-      # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
-      if hasattr(target, 'java_sources') and target.java_sources:
-        sources.extend(self._resolve_target_sources(target.java_sources, '.java'))
-      return sources
-    return dict([(t, calculate_sources(t)) for t in targets])
-
-  def _resolve_target_sources(self, target_sources, extension=None):
-    """Given a list of pants targets, extract their sources as a list.
-
-    Filters against the extension if given and optionally returns the paths relative to the target
-    base.
-    """
-    resolved_sources = []
-    for target in target_sources:
-      if target.has_sources():
-        resolved_sources.extend(target.sources_relative_to_buildroot())
-    return resolved_sources
-
-  def _sources_for_targets(self, targets):
-    """Returns a map target->sources for the specified targets."""
-    if self._sources_by_target is None:
-      raise TaskError('self._sources_by_target not computed yet.')
-    return dict((t, self._sources_by_target.get(t, [])) for t in targets)
 
   def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)
@@ -378,7 +340,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         target = compile_context.target
         classes_dir = compile_context.classes_dir
         target_products = classes_by_target[target] if classes_by_target is not None else None
-        for source in self._sources_by_target.get(target, []):  # Source is relative to buildroot.
+        for source in compile_context.sources:  # Sources are relative to buildroot.
           classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
           for cls in classes:
             clsname = self._strategy.class_name_for_class_file(compile_context, cls)

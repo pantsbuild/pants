@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import ABCMeta, abstractmethod
+from collections import namedtuple
 
 from pants.util.dirutil import safe_mkdir
 from pants.base.build_environment import get_buildroot, get_scm
@@ -17,39 +18,30 @@ class JvmCompileStrategy(object):
 
   __metaclass__ = ABCMeta
 
-  def __init__(self, context, options, workdir, analysis_tools):
+  # A context for the compilation of a target.
+  #
+  # This can be used to differentiate between a partially completed compile in a temporary location
+  # and a finalized compile in its permanent location.
+  CompileContext = namedtuple('CompileContext', ['target', 'analysis_file', 'classes_dir', 'sources'])
+
+  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     self.context = context
     self._analysis_tools = analysis_tools
 
     self._target_sources_dir = os.path.join(workdir, 'target-sources')
 
+    # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
+    self._sources_predicate = sources_predicate
 
   @abstractmethod
-  def prepare_compile(self, cache_manager, sources_by_target, all_targets):
-    """Prepares to compile the given set of targets.
-
-    Has the side effects of pruning old analysis, and computing deleted sources.
-    """
-    pass
-
-  @abstractmethod
-  def invalidation_hints(self, sources_by_target):
+  def invalidation_hints(self, relevant_targets):
     """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
-    pass
-
-  @abstractmethod
-  def compile_context(self, target):
-    """Returns the default/stable compile context for the given target.
-    
-    Temporary compile contexts are private to the strategy.
-    """
     pass
 
   @abstractmethod
   def compile_chunk(self,
                     invalidation_check,
-                    sources_by_target,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -85,11 +77,58 @@ class JvmCompileStrategy(object):
     # would be wiped out by clean-all goal/task if it's specified.
     safe_mkdir(self._target_sources_dir)
 
+  def prepare_compile(self, cache_manager, all_targets):
+    """Prepares to compile the given set of targets.
+
+    Has the side effects of pruning old analysis, and computing deleted sources.
+    """
+    # Target -> sources (relative to buildroot).
+    # TODO(benjy): Should sources_by_target be available in all Tasks?
+    self._sources_by_target = self._compute_sources_by_target(all_targets)
+
+  def compile_context(self, target):
+    """Returns the default/stable compile context for the given target.
+
+    Temporary compile contexts are private to the strategy.
+    """
+    return self.CompileContext(target,
+                               self._analysis_file,
+                               self._classes_dir,
+                               self._sources_for_target(target))
+
   def class_name_for_class_file(self, compile_context, class_file_name):
     assert class_file_name.endswith(".class")
     assert class_file_name.startswith(compile_context.classes_dir)
     class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
     return class_file_name.replace("/", ".")
+
+  def _compute_sources_by_target(self, targets):
+    """Computes and returns a map target->sources (relative to buildroot)."""
+    def resolve_target_sources(target_sources):
+      resolved_sources = []
+      for target in target_sources:
+        if target.has_sources():
+          resolved_sources.extend(target.sources_relative_to_buildroot())
+      return resolved_sources
+    def calculate_sources(target):
+      sources = [s for s in target.sources_relative_to_buildroot() if self._sources_predicate(s)]
+      # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
+      if hasattr(target, 'java_sources') and target.java_sources:
+        sources.extend(resolve_target_sources(target.java_sources))
+      return sources
+    return {t: calculate_sources(t) for t in targets}
+
+  def _sources_for_targets(self, targets):
+    """Returns a cached map of target->sources for the specified targets."""
+    if self._sources_by_target is None:
+      raise TaskError('self._sources_by_target not computed yet.')
+    return {t: self._sources_by_target.get(t, []) for t in targets}
+
+  def _sources_for_target(self, target):
+    """Returns the cached sources for the given target."""
+    if self._sources_by_target is None:
+      raise TaskError('self._sources_by_target not computed yet.')
+    return self._sources_by_target.get(target, [])
 
   def _validate_classpath(self, files):
     """Validates that all files are located within the working copy, to simplify relativization."""
@@ -110,7 +149,7 @@ class JvmCompileStrategy(object):
     else:
       return []
 
-  def _record_sources_by_target(self, target, sources):
+  def _record_previous_sources_by_target(self, target, sources):
     # Record target -> source mapping for future use.
     with open(os.path.join(self._target_sources_dir, target.identifier), 'w') as outfile:
       for src in sources:
