@@ -11,6 +11,39 @@ following workarounds can get you up and running again.
 
 <a pantsmark="tshoot_verbosity"> </a>
 
+Pants Run Log
+------------
+
+The console output you get when running pants is also logged under the
+workdir.  An HTML formatted version of the log of the last run the output will be stored under
+`.pants.d/reports/latest` and additional information from the run will be
+logged under `.pants.d/runs/latest/`.
+
+An easy way to view this output is to use the reporting server.
+
+```
+$ ./pants server --open
+INFO] Detected git repository at /Users/zundel/Src/pants on branch master
+Launching server with pid 6991 at http://localhost:49266
+```
+
+![image](images/report-server-page.png)
+
+
+Now, when you point your browser at the specified URL, you will be able
+to browse through all of the runs since the last call to `./pants
+clean-all`
+
+When viewed under the reporting server, there is additional
+information available such as:
+
+- Performance timings
+- Links to source code
+- Details of the command line and stdout/stderr from running tasks
+- Details on which targets are being operated on
+- Artifact cache usage information (if artifact caching is enabled)
+
+
 Maximum Verbosity
 -----------------
 
