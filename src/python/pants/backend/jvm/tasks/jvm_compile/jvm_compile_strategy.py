@@ -24,6 +24,16 @@ class JvmCompileStrategy(object):
   # and a finalized compile in its permanent location.
   CompileContext = namedtuple('CompileContext', ['target', 'analysis_file', 'classes_dir', 'sources'])
 
+  # Common code.
+  # ------------
+  @staticmethod
+  def _analysis_for_target(analysis_dir, target):
+    return os.path.join(analysis_dir, target.id + '.analysis')
+
+  @staticmethod
+  def _portable_analysis_for_target(analysis_dir, target):
+    return JvmCompileStrategy._analysis_for_target(analysis_dir, target) + '.portable'
+
   def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     self.context = context
     self._analysis_tools = analysis_tools
