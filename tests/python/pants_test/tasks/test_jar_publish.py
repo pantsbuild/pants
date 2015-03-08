@@ -95,6 +95,7 @@ class JarPublishTest(TaskTestBase):
     task.changelog = Mock(return_value="Many changes")
     task.publish = Mock()
     task.confirm_push = Mock(return_value=True)
+    task.context.products.get = Mock(return_value=Mock())
 
   def test_publish_unlisted_repo(self):
     # Note that we set a different config here, so repos:internal has no config
