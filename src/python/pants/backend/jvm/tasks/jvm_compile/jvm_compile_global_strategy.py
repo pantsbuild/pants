@@ -27,16 +27,6 @@ from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses a global classpath and analysis."""
 
-  # Common code.
-  # ------------
-  @staticmethod
-  def _analysis_for_target(analysis_dir, target):
-    return os.path.join(analysis_dir, target.id + '.analysis')
-
-  @staticmethod
-  def _portable_analysis_for_target(analysis_dir, target):
-    return JvmCompileGlobalStrategy._analysis_for_target(analysis_dir, target) + '.portable'
-
   def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
 
@@ -324,8 +314,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Localize the cached analyses.
     analyses_to_merge = []
     for target in cached_targets:
-      analysis_file = JvmCompileGlobalStrategy._analysis_for_target(self._analysis_tmpdir, target)
-      portable_analysis_file = JvmCompileGlobalStrategy._portable_analysis_for_target(self._analysis_tmpdir,
+      analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, target)
+      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir,
                                                                         target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, analysis_file)
@@ -366,9 +356,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     # Determine locations for analysis files that will be split in the background.
     split_analysis_files = [
-        JvmCompileGlobalStrategy._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompileGlobalStrategy._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
     splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
@@ -398,7 +388,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         # NOTE: analysis_file doesn't exist yet.
         vts_artifactfiles_pairs.append(
             (vt,
-             artifacts + [JvmCompileGlobalStrategy._portable_analysis_for_target(self._analysis_tmpdir, target)]))
+             artifacts + [JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, target)]))
 
     update_artifact_cache_work = get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
