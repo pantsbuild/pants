@@ -267,8 +267,9 @@ class IvyWriter(DependencyWriter):
 
   def jardep(self, jar, classifier):
     return self._jardep(jar,
-        transitive=jar.transitive,
-        configurations=jar._configurations)
+                        classifier,
+                        transitive=jar.transitive,
+                        configurations=jar._configurations)
 
   def internaldep(self, jar_dependency, classifier, dep=None, configurations=None):
     return self._jardep(jar_dependency, classifier, configurations=configurations)
