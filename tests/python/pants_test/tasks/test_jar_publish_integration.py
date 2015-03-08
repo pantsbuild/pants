@@ -54,6 +54,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     return os.path.join(get_buildroot(), 'testprojects', 'ivy', 'pushdb')
 
   def setUp(self):
+    # This attribute is required to see the full diff between ivy and pom files.
+    self.maxDiff  = None
     safe_rmtree(self.pushdb_root)
 
   def tearDown(self):
@@ -205,8 +207,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
           self.assertTrue(os.path.exists(artifact_path))
           if assert_publish_config_contents:
             if artifact.endswith('xml') or artifact.endswith('pom'):
-              self.assertTrue('Comparing {0}'.format(artifact_path),
-                              self.compare_file_contents(artifact_path, directory))
+              self.compare_file_contents(artifact_path, directory)
 
   def compare_file_contents(self, artifact_path, directory):
     """
@@ -218,14 +219,13 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     # Strip away the version number
     [package_dir, artifact_name, version] = directory.rsplit(os.path.sep, 2)
     file_name = os.path.basename(artifact_path)
-    golden_file = os.path.join(JarPublishIntegrationTest.GOLDEN_DATA_DIR,
-                               package_dir.replace(os.path.sep, '.'), artifact_name, file_name)
+    golden_file_nm = os.path.join(JarPublishIntegrationTest.GOLDEN_DATA_DIR,
+                                  package_dir.replace(os.path.sep, '.'), artifact_name, file_name)
     with open(artifact_path, 'r') as test_file:
       generated_file = test_file.read()
-      with open(golden_file, 'r') as golden_file:
-        golden_file = golden_file.read()
+      with open(golden_file_nm, 'r') as golden_file:
+        golden_file_contents = golden_file.read()
         # Remove the publication sha attribute from ivy.xml
         if artifact_path.endswith('.xml'):
-          generated_file= re.sub(r'publication=.*', 'er/>', generated_file)
-          print("\n tests")
-      return generated_file is golden_file
+          generated_file = re.sub(r'publication=.*', '/>', generated_file)
+      return self.assertMultiLineEqual(generated_file, golden_file_contents)
