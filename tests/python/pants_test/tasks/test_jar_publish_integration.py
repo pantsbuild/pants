@@ -19,11 +19,13 @@ from pants_test.tasks.test_base import is_exe
 
 def shared_artifacts(version, extra_jar=None):
   published_file_list = ['ivy-{0}.xml'.format(version),
-                         'hello-greet-{0}.jar'.format(version),
                          'hello-greet-{0}.pom'.format(version),
                          'hello-greet-{0}-sources.jar'.format(version)]
+  # With publish extra args either the default jar or the jar with classifier is published
   if extra_jar:
     published_file_list.append(extra_jar)
+  else:
+    published_file_list.append('hello-greet-{0}.jar'.format(version))
   return {'com/pants/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
 
 
@@ -31,7 +33,7 @@ def publish_extra_config(unique_config):
   return {
           'publish': {
             'publish_extras': {
-              'extra_test_jar_example': unique_config,
+              'jars': unique_config,
               },
             },
           'backends': {
@@ -107,41 +109,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_env={'WRAPPER_SRCPATH': 'examples/src/python'},
                       success_expected=success_expected)
 
-  #
-  # Run through all the permutations of the config parameters for publish_extras.
-  #
-  def test_publish_extras_name_classifier(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'override_name': '{target_provides_name}-extra_example',
-                                'classifier': 'classy',
-                                }),
-                               artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar')
-
-  def test_publish_extras_name(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'override_name': '{target_provides_name}-extra_example',
-                                }),
-                               artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.jar')
-
-  def test_publish_extras_name_extension(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'override_name': '{target_provides_name}-extra_example',
-                                'extension': 'zip'
-                                }),
-                               artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.zip')
-
-  def test_publish_extras_extension(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'extension': 'zip'
-                                }),
-                               artifact_name='hello-greet-0.0.1-SNAPSHOT.zip')
-
-  def test_publish_extras_extension_classifier(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'classifier': 'classy',
-                                'extension': 'zip'
-                                }),
-                               artifact_name='hello-greet-0.0.1-SNAPSHOT-classy.zip')
 
   def test_publish_extras_classifier(self):
     self.publish_extras_runner(extra_config=publish_extra_config({

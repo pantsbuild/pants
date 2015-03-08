@@ -526,7 +526,7 @@ class JarPublish(JarTask, ScmPublish):
     return push.strip().lower() == 'y'
 
   def _copy_artifact(self, tgt, jar, version, typename, suffix='', extension='jar',
-                     artifact_ext='', override_name=None):
+                     artifact_ext=''):
     """Copy the products for a target into the artifact path for the jar/version"""
     genmap = self.context.products.get(typename)
     product_mapping = genmap.get(tgt)
@@ -534,8 +534,7 @@ class JarPublish(JarTask, ScmPublish):
       return
     for basedir, jars in product_mapping.items():
       for artifact in jars:
-        path = self.artifact_path(jar, version, name=override_name, suffix=suffix,
-                                  extension=extension, artifact_ext=artifact_ext)
+        path = self.artifact_path(jar, version, suffix=suffix, artifact_ext=artifact_ext)
         safe_mkdir(os.path.dirname(path))
         shutil.copy(os.path.join(basedir, artifact), path)
 
@@ -655,7 +654,6 @@ class JarPublish(JarTask, ScmPublish):
     def stage_artifacts(tgt, jar, version, changelog):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
-      DEFAULT_EXTENSION = 'jar'
       product_config = {
         'jars': {
           'classifier': '',
@@ -682,7 +680,7 @@ class JarPublish(JarTask, ScmPublish):
           extra_confs = {'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
                          'classifier': classifier,
                          'conf': classifier,
-                         'ext': config.get('extension', DEFAULT_EXTENSION)}
+                         }
           return stage_artifact(tgt, jar, version, changelog, confs,
                                 extra_confs=extra_confs, classifier=classifier)
       raise ValueError('No product mapping in {0} for {1}. '
