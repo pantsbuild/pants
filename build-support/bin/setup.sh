@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Set up the development environment.
+# Currently this just installs local git hooks.
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 HOOK_DIR="${GIT_DIR:-${REPO_ROOT}/.git}/hooks"
