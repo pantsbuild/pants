@@ -165,7 +165,6 @@ class DependencyWriter(object):
     internal_codegen = {}
 
     configurations = set(confs or [])
-    configurations.add(classifier)
 
     for dep in target_internal_dependencies(target):
       jar = self._as_versioned_jar(dep)
@@ -655,6 +654,7 @@ class JarPublish(JarTask, ScmPublish):
     def stage_artifacts(tgt, jar, version, changelog):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
+      DEFAULT_CONF = 'default'
       product_config = {
         'jars': {
           'classifier': '',
@@ -665,9 +665,9 @@ class JarPublish(JarTask, ScmPublish):
       for product, config in product_config.items():
         if self.context.products.get(product).has(tgt):
           classifier = config.get('classifier', DEFAULT_CLASSIFIER)
-          confs = set()
           suffix = '-' + classifier if classifier else ''
           self._copy_artifact(tgt, jar, version, suffix=suffix, typename=product)
+          extra_confs = {}
           if product == 'jars':
             confs = set(repo['confs'])
             self.create_source_jar(tgt, jar, version)
@@ -678,10 +678,12 @@ class JarPublish(JarTask, ScmPublish):
             # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
             if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
               confs.add(IvyWriter.JAVADOC_CONFIG)
-          extra_confs = {'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
-                         'classifier': classifier,
-                         'conf': classifier,
-                         }
+          else:
+            confs = [classifier, DEFAULT_CONF]
+            extra_confs = {'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
+                           'classifier': classifier,
+                           'conf': confs,
+                           }
           return stage_artifact(tgt, jar, version, changelog, confs,
                                 extra_confs=extra_confs, classifier=classifier)
       raise ValueError('No product mapping in {0} for {1}. '
