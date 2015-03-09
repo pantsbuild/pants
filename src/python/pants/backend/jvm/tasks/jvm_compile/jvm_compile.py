@@ -11,7 +11,7 @@ import sys
 from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
@@ -199,11 +199,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._confs = self.get_options().confs
 
     # The compile strategy to use for analysis and classfile placement.
-    self._strategy = JvmCompileGlobalStrategy(self.context,
-                                              self.get_options(),
-                                              self.workdir,
-                                              self.create_analysis_tools(),
-                                              lambda s: s.endswith(self._file_suffix))
+    self._strategy = JvmCompileIsolatedStrategy(self.context,
+                                                self.get_options(),
+                                                self.workdir,
+                                                self.create_analysis_tools(),
+                                                lambda s: s.endswith(self._file_suffix))
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.
