@@ -146,6 +146,7 @@ class DependencyWriter(object):
     Builds up a template data representing a target and applies this to a template to produce a
     dependency descriptor.
   """
+
   @staticmethod
   def create_exclude(exclude):
     return TemplateData(org=exclude.org, name=exclude.name)
