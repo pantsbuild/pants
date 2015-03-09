@@ -33,7 +33,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'global-analysis')
     self._classes_dir = os.path.join(workdir, 'global-classes')
-    self._resources_dir = os.path.join(workdir, 'global-resources')
 
     self._delete_scratch = options.delete_scratch
 
@@ -47,9 +46,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = options.partition_size_hint
-
-    # The ivy confs for which we're building.
-    self._confs = options.confs
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -83,6 +79,16 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Populated in prepare_compile().
     self._deleted_sources = None
 
+  def compile_context(self, target):
+    """Returns the default/stable compile context for the given target.
+
+    Temporary compile contexts are private to the strategy.
+    """
+    return self.CompileContext(target,
+                               self._analysis_file,
+                               self._classes_dir,
+                               self._sources_for_target(target))
+
   def move(self, src, dst):
     if self._delete_scratch:
       shutil.move(src, dst)
@@ -100,7 +106,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
     for conf in self._confs:
-      compile_classpaths.add_for_targets(all_targets, [(conf, self._classes_dir), (conf, self._resources_dir)])
+      compile_classpaths.add_for_targets(all_targets, [(conf, self._classes_dir)])
 
     # Split the global analysis file into valid and invalid parts.
     invalidation_check = cache_manager.check(all_targets)
@@ -137,7 +143,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       self._deleted_sources = []
 
   def invalidation_hints(self, relevant_targets):
-    """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
     # If needed, find targets that we've changed locally (as opposed to
     # changes synced in from the SCM).
     # TODO(benjy): Should locally_changed_targets be available in all Tasks?
@@ -158,7 +163,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                     compile_vts,
                     register_vts,
                     update_artifact_cache_vts_work):
-    """Executes compilations for that invalid targets contained in a single chunk.
+    """Executes compilations for the invalid targets contained in a single chunk.
 
     Has the side effects of populating:
     # valid/invalid analysis files
@@ -255,7 +260,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
         # Update the products with the latest classes. Must happen before the
         # missing dependencies check.
-        register_vts([self.compile_context(t) for t in relevant_targets])
+        register_vts([self.compile_context(t) for t in vts.targets])
         if self._dep_analyzer:
           # Check for missing dependencies.
           actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
@@ -398,23 +403,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
-
-  def compute_classes_by_source(self, compile_contexts):
-    """Compute src->classes.
-
-    Srcs are relative to buildroot. Classes are absolute paths.
-    """
-    buildroot = get_buildroot()
-    classes_by_src = {}
-    for compile_context in compile_contexts:
-      if not os.path.exists(compile_context.analysis_file):
-        continue
-      products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
-                                                                compile_context.classes_dir)
-      for src, classes in products.items():
-        relsrc = os.path.relpath(src, buildroot)
-        classes_by_src[relsrc] = classes
-    return classes_by_src
 
   def _compute_deleted_sources(self):
     """Computes the list of sources present in the last analysis that have since been deleted.

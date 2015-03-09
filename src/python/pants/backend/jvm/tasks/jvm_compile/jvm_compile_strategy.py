@@ -44,9 +44,20 @@ class JvmCompileStrategy(object):
     self._sources_by_target = None
     self._sources_predicate = sources_predicate
 
+    # The ivy confs for which we're building.
+    self._confs = options.confs
+
   @abstractmethod
   def invalidation_hints(self, relevant_targets):
     """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
+    pass
+
+  @abstractmethod
+  def compile_context(self, target):
+    """Returns the default/stable compile context for the given target.
+
+    Temporary compile contexts are private to the strategy.
+    """
     pass
 
   @abstractmethod
@@ -64,14 +75,6 @@ class JvmCompileStrategy(object):
   @abstractmethod
   def post_process_cached_vts(self, cached_vts):
     """Post processes VTS that have been fetched from the cache."""
-    pass
-
-  @abstractmethod
-  def compute_classes_by_source(self, compile_contexts):
-    """Compute src->classes.
-
-    Srcs are relative to buildroot. Classes are absolute paths.
-    """
     pass
 
   @abstractmethod
@@ -96,21 +99,28 @@ class JvmCompileStrategy(object):
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(all_targets)
 
-  def compile_context(self, target):
-    """Returns the default/stable compile context for the given target.
-
-    Temporary compile contexts are private to the strategy.
-    """
-    return self.CompileContext(target,
-                               self._analysis_file,
-                               self._classes_dir,
-                               self._sources_for_target(target))
-
   def class_name_for_class_file(self, compile_context, class_file_name):
     assert class_file_name.endswith(".class")
     assert class_file_name.startswith(compile_context.classes_dir)
     class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
     return class_file_name.replace("/", ".")
+
+  def compute_classes_by_source(self, compile_contexts):
+    """Compute src->classes.
+
+    Srcs are relative to buildroot. Classes are absolute paths.
+    """
+    buildroot = get_buildroot()
+    classes_by_src = {}
+    for compile_context in compile_contexts:
+      if not os.path.exists(compile_context.analysis_file):
+        continue
+      products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
+                                                                compile_context.classes_dir)
+      for src, classes in products.items():
+        relsrc = os.path.relpath(src, buildroot)
+        classes_by_src[relsrc] = classes
+    return classes_by_src
 
   def _compute_sources_by_target(self, targets):
     """Computes and returns a map target->sources (relative to buildroot)."""
@@ -140,10 +150,10 @@ class JvmCompileStrategy(object):
       raise TaskError('self._sources_by_target not computed yet.')
     return self._sources_by_target.get(target, [])
 
-  def _validate_classpath(self, files):
+  def _validate_classpath(self, classpath):
     """Validates that all files are located within the working copy, to simplify relativization."""
     buildroot = get_buildroot()
-    for _,f in files:
+    for _, f in classpath:
       if os.path.relpath(f, buildroot).startswith('..'):
         raise TaskError('Classpath entry {f} is located outside the buildroot.'.format(f=f))
 
@@ -192,7 +202,6 @@ class JvmCompileStrategy(object):
   def _analysis_parser(self):
     return self._analysis_tools.parser
 
-  # TODO: this is copy pasta between the strategy and jvm_compile.py
   def _sources_for_targets(self, targets):
     """Returns a map target->sources for the specified targets."""
     if self._sources_by_target is None:
