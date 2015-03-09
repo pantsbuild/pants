@@ -380,3 +380,154 @@ then try a `PUT` request; store the file it sends.
 If the user's `.netrc` has authentication information for the cache server[s], Pants will use it.
 (Thus, if only some users with known-good setups should be able to write to the cache, you might
 find it handy to use `.netrc` to authenticate those users.)
+
+
+Using Pants behind a firewall
+------------
+
+Pants may encounter issues running behind a firewall. Several components expect to be able to reach the Internet:
+
+* Ivy bootstrapper
+* Binary tool bootstrapping
+* Ivy itself (used for tool bootstrapping and downloading external .jar files)
+* Python requirements
+
+
+### Ivy bootstrapper and tool bootstrapping
+
+Pants fetches the 'ivy' tool with an initial manual bootstrapping
+test.  You can  re-redirect this initial download to another URL with a setting in pants.ini:
+
+```
+[ivy]
+bootstrap_jar_url: https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar
+```
+
+You may also encounter issues downloading this .jar file if you are
+using self-signed SSL certificates. See the section on SSL
+certificates below.
+
+
+### Configuring the Python requests library
+
+Code in bootstrapper.py and other parts of Pants use the Python
+[requests](http://docs.python-requests.org/en/latest/) library to
+download resources using http or https.  The first time you may
+encounter this is when Pants attempts to download an initial version
+of ivy.  If this initial download is through a proxy, the requests
+library uses the `HTTP_PROXY` or` HTTPS_PROXY` environment variable to
+find the proxy server.
+
+```
+export HTTP_PROXY=http://proxy.corp.example.com:123
+export HTTPS_PROXY=https://proxy.corp.example.com:456
+```
+
+If you are using Pants configured to find resources with HTTPS urls, you may see an error like:
+
+```
+Exception message: Problem fetching the ivy bootstrap jar! Problem GETing data from https://artifactserver.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:581)
+```
+
+The requests library attempts to verify SSL certificates by default.
+The reason it is denying the request is that it cannot find a trusted
+public key for the root certificate authority presented by the server.
+The requests library uses the 'certifi' library of well known
+certificate authorities, if that library is installed.  If you are
+using a virtualenv installation of pants, using `pip
+install certifi` to add the certify package to your pants environment
+might help.  You can also download a .pem bundle from the
+[certifi project page](http://certifi.io/en/latest/) and set
+`REQUESTS_CA_BUNDLE` as mentioned below.
+
+If you are using hosts with a self-signed certificate, your
+certificate authority will not be available in the certifi library.
+You will need a `.pem` file for the local certificate authority.
+
+You can tell the requests library about your trusted certificate
+authority certificates by setting the environment variable `REQUESTS_CA_BUNDLE`.
+This variable should point to a file containing trusted certificates:
+
+```
+export REQUESTS_CA_BUNDLE=/etc/certs/latest.pem
+```
+
+### Using Ivy behind a firewall
+
+[Apache Ivy](http://ant.apache.org/ivy/) is used as a way to download
+the tools that Pants uses and for tool bootstrapper and external
+artifacts
+
+After the initial bootstrapping of ivy, pants then invokes that
+version of ivy to re-bootstrap a new version of ivy.  Unlike the
+requests library, Ivy does not use the HTTP_PROXY environment
+variable, but instead relies on Java system properties.
+
+One way to do this is to override `jvm_options` in pants.ini:
+
+```
+[bootstrap.bootstrap_jvm_tools] 
+jvm_options: [
+    "-Dhttp.proxyHost=proxy.example.com",
+    "-Dhttp.proxyPort=123",
+    "-Dhttps.proxyHost=proxy.example.com",
+    "-Dhttps.proxyPort=456",
+  ]
+```
+
+Alternatively, you can also set these values through the `<properties>` configuration item in
+`ivysettings.xml`
+
+
+## Nexus as proxy
+
+If your site uses Sonotype Nexus or another reverse proxy for
+artifacts, you do not need to use a separate HTTP proxy.  Contact the
+reverse proxy administrator to setup a proxy for the sites listed in
+`build-support/ivy/settings.xml` and `pants.ini`.  Currently, these
+sites are `repo1.maven.org`, `maven.twttr.com`:
+
+Here is an excerpt of a modified ivysettings.xml with some possible configurations:
+
+```
+<macrodef name="_remote_resolvers">
+    <chain returnFirst="true">
+      <ibiblio name="example-corp-maven"
+               m2compatible="true"
+               usepoms="true"
+               root="https://nexus.example.com/content/groups/public/"/>
+      <ibiblio name="maven.twttr.com-maven"
+               m2compatible="true"
+               usepoms="true"
+               root="https://nexus.example.com/content/repositories/maven.twttr.com/"/>
+  </chain>
+</macrodef>
+```
+
+### Redirecting tool downloads to other servers
+
+For the binary support tools like protoc, you will need to setup a
+proxy for the `dl.bintray.com` repo, or create your own repo of build
+tools:
+
+```
+pants_support_baseurls = [
+    "https://nexus.example.com/content/repositories/dl.bintray.com/pantsbuild/bin/build-support"
+	]
+```
+
+### Redirecting python requirements to other servers
+
+For python repos, you need to override the following settings in pants.ini:
+
+```
+[python-repos]
+repos: [
+    "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
+    "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
+  ]
+
+indices: [
+    "https://pypi.python.org/simple/"
+  ]
+```
