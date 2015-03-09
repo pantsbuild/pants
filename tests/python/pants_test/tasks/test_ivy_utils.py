@@ -82,12 +82,12 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
       self.assertEqual(2, len(dependencies))
 
       dep1 = dependencies[0]
-      self.assert_attributes(dep1, org='org1', name='name1', rev='rev1')
+      self.assert_attributes(dep1, org='org1', name='name1', rev='rev1', conf='')
       conf = self.find_single(dep1, 'conf')
       self.assert_attributes(conf, name='default', mapped='default')
 
       dep2 = dependencies[1]
-      self.assert_attributes(dep2, org='org2', name='name2', rev='rev2', force='true')
+      self.assert_attributes(dep2, org='org2', name='name2', rev='rev2', force='true', conf='')
       conf = self.find_single(dep1, 'conf')
       self.assert_attributes(conf, name='default', mapped='default')
 
