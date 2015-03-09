@@ -31,13 +31,15 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
 
     # Various working directories.
-    self._analysis_dir = os.path.join(workdir, 'global-analysis')
-    self._classes_dir = os.path.join(workdir, 'global-classes')
+    # NB: These are grandfathered in with non-strategy-specific names, but to prevent
+    # collisions within the buildcache, strategies should use strategy-specific subdirectories.
+    self._analysis_dir = os.path.join(workdir, 'analysis')
+    self._classes_dir = os.path.join(workdir, 'classes')
 
     self._delete_scratch = options.delete_scratch
 
-    self._analysis_file = os.path.join(self._analysis_dir, 'analysis.valid')
-    self._invalid_analysis_file = os.path.join(self._analysis_dir, 'analysis.invalid')
+    self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
+    self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
 
     # A temporary, but well-known, dir in which to munge analysis/dependency files in before
     # caching. It must be well-known so we know where to find the files when we retrieve them from
@@ -272,7 +274,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         if update_artifact_cache_vts_work:
           self._write_to_artifact_cache(analysis_file,
                                         vts,
-                                        invalid_sources_by_target,
                                         update_artifact_cache_vts_work)
 
       if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
@@ -366,7 +367,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
-    splits = zip([sources_by_target.get(t, []) for t in vts_targets], split_analysis_files)
+    splits = zip([self._sources_for_target(t) for t in vts_targets], split_analysis_files)
     splits_args_tuples = [(analysis_file, splits)]
 
     # Set up args for rebasing the splits.
@@ -377,7 +378,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     vts_artifactfiles_pairs = []
     classes_by_source = self.compute_classes_by_source(compile_contexts)
     resources_by_target = self.context.products.get_data('resources_by_target')
-    for target, sources in sources_by_target.items():
+    for target, sources in self._sources_for_targets(vts_targets).items():
       if target.has_label('no_cache'):
         continue
       artifacts = []

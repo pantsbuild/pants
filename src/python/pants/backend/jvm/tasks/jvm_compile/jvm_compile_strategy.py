@@ -38,7 +38,7 @@ class JvmCompileStrategy(object):
     self.context = context
     self._analysis_tools = analysis_tools
 
-    self._target_sources_dir = os.path.join(workdir, 'target-sources')
+    self._target_sources_dir = os.path.join(workdir, 'target_sources')
 
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
@@ -201,9 +201,3 @@ class JvmCompileStrategy(object):
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
-
-  def _sources_for_targets(self, targets):
-    """Returns a map target->sources for the specified targets."""
-    if self._sources_by_target is None:
-      raise TaskError('self._sources_by_target not computed yet.')
-    return dict((t, self._sources_by_target.get(t, [])) for t in targets)
