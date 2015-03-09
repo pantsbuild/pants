@@ -29,22 +29,6 @@ def shared_artifacts(version, extra_jar=None):
   return {'com/pants/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
 
 
-def publish_extra_config(unique_config):
-  return {
-          'publish': {
-            'publish_extras': {
-              'jars': unique_config,
-              },
-            },
-          'backends': {
-            'packages': [
-              'example.pants_publish_plugin',
-              'internal_backend.repositories',
-              ],
-            },
-          }
-
-
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
   SCALADOC = is_exe('scaladoc')
   JAVADOC = is_exe('javadoc')
@@ -98,32 +82,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       shared_artifacts(name),
                       ['com.pants.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--publish-named-snapshot=%s' % name])
-
-  # Collect all the common factors for running a publish_extras test, and execute the test.
-  def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
-    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
-                      shared_artifacts('0.0.1-SNAPSHOT', artifact_name),
-                      ['com.pants.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--doc-javadoc-skip'],
-                      extra_config=extra_config,
-                      extra_env={'WRAPPER_SRCPATH': 'examples/src/python'},
-                      success_expected=success_expected)
-
-
-  def test_publish_extras_classifier(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'classifier': 'classy',
-                                }),
-                               artifact_name='hello-greet-0.0.1-SNAPSHOT-classy.jar')
-
-  # This test doesn't specify a proper set of parameters that uniquely name the extra artifact, and
-  # should fail with an error from pants.
-  def test_publish_extras_invalid_args(self):
-    self.publish_extras_runner(extra_config=publish_extra_config({
-                                'extension': 'jar',
-                                }),
-                               artifact_name='hello-greet-0.0.1-SNAPSHOT.jar',
-                               success_expected=False)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
