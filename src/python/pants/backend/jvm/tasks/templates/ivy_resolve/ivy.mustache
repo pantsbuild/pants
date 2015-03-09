@@ -25,6 +25,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     </configurations>
   {{/lib.configurations?}}
 
+  {{#lib.publications?}}
   <publications>
     <artifact conf="default" type="jar" ext="jar"/>
     <artifact conf="default" type="pom" ext="pom"/>
@@ -41,6 +42,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <artifact conf="{{classifier}}" type="{{type}}" m:classifier="{{classifier}}" ext="{{ext}}"/>
     {{/lib.extra_publications}}
   </publications>
+  {{/lib.publications?}}
 
   {{#lib.dependencies?}}
   <dependencies>

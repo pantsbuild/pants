@@ -163,9 +163,7 @@ class DependencyWriter(object):
     # the graph
     dependencies = OrderedDict()
     internal_codegen = {}
-
     configurations = set(confs or [])
-
     for dep in target_internal_dependencies(target):
       jar = self._as_versioned_jar(dep)
       dependencies[(jar.org, jar.name)] = self.internaldep(jar, classifier, dep)
@@ -583,7 +581,6 @@ class JarPublish(JarTask, ScmPublish):
     # that we can:
     # a.) obtain a handle to (dependency injection or manual plumbing)
     # b.) query for log detail, ie: `if log_manager.is_verbose:`
-    args.append('-overwrite')
     if self.get_options().level == 'debug':
       args.append('-verbose')
 
