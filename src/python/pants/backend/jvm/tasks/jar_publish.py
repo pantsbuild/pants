@@ -655,6 +655,7 @@ class JarPublish(JarTask, ScmPublish):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_CONF = 'default'
+      DEFAULT_EXT = 'jar'
       product_config = {
         'jars': {
           'classifier': '',
@@ -683,6 +684,7 @@ class JarPublish(JarTask, ScmPublish):
             extra_confs = {'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
                            'classifier': classifier,
                            'conf': confs,
+                           'ext': DEFAULT_EXT,
                            }
           return stage_artifact(tgt, jar, version, changelog, confs,
                                 extra_confs=extra_confs, classifier=classifier)
