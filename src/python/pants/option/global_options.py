@@ -74,6 +74,16 @@ def register_global_options(register):
            default=10 * 365 * 86400,  # 10 years.
            help='the time in seconds before we consider re-resolving an open-ended '
                 'requirement, e.g. "flask>=0.2" if a matching distribution is available on disk.')
+  register('--pants-support-baseurls', type=Options.list, advanced=True, recursive=True,
+           default = [ 'https://dl.bintray.com/pantsbuild/bin/build-support' ],
+           help='List of urls from which binary tools are downloaded.  Urls are searched in order'
+           'until the requested path is found.')
+  register('--max-subprocess-args', type=int, default=100,  advanced=True, recursive=True,
+           help='Used to limit the number of arguments passed to some subprocesses by breaking'
+           'the command up into multiple invocations')
+  register('--pants-support-fetch-timeout-secs', type=int, default=30, advanced=True, recursive=True,
+           help='Timeout in seconds for url reads when fetching binary tools from the '
+                'repos specified by --pants-support-baseurls')
 
   # The following options are specific to java_thrift_library targets.
   register('--thrift-default-compiler', type=str, advanced=True, default='thrift',

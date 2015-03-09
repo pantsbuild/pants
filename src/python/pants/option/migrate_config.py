@@ -211,6 +211,9 @@ migrations = {
   # usage has led to the former being used primarily for mathematical indices and the latter
   # for book indexes, database indexes and the like.
   ('python-repos', 'indices'): ('python-repos', 'indexes'),
+
+  {'ragel-gen', 'supportdir'}: ('gen.ragel', 'supportdir'),
+  {'ragel-gen', 'version'}: ('gen.ragel', 'version'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '

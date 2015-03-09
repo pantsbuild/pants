@@ -116,7 +116,7 @@ class BaseTest(unittest.TestCase):
       'pants_workdir': os.path.join(self.build_root, '.pants.d'),
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
-      'cache_key_gen_version': '0-test'
+      'cache_key_gen_version': '0-test',
     }
     BuildRoot().path = self.build_root
 

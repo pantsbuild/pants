@@ -158,7 +158,11 @@ class Jar(object):
     self._jars.append(jar)
 
   @contextmanager
-  def _render_jar_tool_args(self):
+  def _render_jar_tool_args(self, options):
+    """Format the arguments to jar-tool.
+
+    :param Options options:
+    """
     args = []
 
     with temporary_dir() as manifest_stage_dir:
@@ -171,9 +175,9 @@ class Jar(object):
 
       jars = self._jars or []
 
-      with safe_args(classpath, delimiter=',') as classpath_args:
-        with safe_args(files, delimiter=',') as files_args:
-          with safe_args(jars, delimiter=',') as jars_args:
+      with safe_args(classpath, options, delimiter=',') as classpath_args:
+        with safe_args(files, options, delimiter=',') as files_args:
+          with safe_args(jars, options, delimiter=',') as jars_args:
 
             if self._main:
               args.append('-main={}'.format(self._main))
@@ -191,7 +195,6 @@ class Jar(object):
               args.append('-jars={}'.format(','.join(jars_args)))
 
             yield args
-
 
 class JarTask(NailgunTask):
   """A baseclass for tasks that need to create or update jars.
@@ -257,7 +260,7 @@ class JarTask(NailgunTask):
     except jar.Error as e:
       raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
 
-    with jar._render_jar_tool_args() as args:
+    with jar._render_jar_tool_args(self.get_options()) as args:
       if args:  # Don't build an empty jar
         args.append('-update={}'.format(self._flag(not overwrite)))
         args.append('-compress={}'.format(self._flag(compressed)))

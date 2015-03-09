@@ -23,6 +23,10 @@ from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 class JUnitRunnerTest(JvmToolTaskTestBase):
   """Tests for junit_run._JUnitRunner class"""
 
+  def setUp(self):
+    super(JUnitRunnerTest, self).setUp()
+    self.set_options(pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+
   @classmethod
   def task_type(cls):
     return JUnitRun

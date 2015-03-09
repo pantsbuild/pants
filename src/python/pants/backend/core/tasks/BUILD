@@ -86,7 +86,6 @@ python_library(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
-
   ],
 )
 

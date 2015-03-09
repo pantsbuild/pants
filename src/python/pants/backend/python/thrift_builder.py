@@ -22,11 +22,20 @@ class PythonThriftBuilder(CodeGenerator):
   class UnknownPlatformException(CodeGenerator.Error):
     def __init__(self, platform):
       super(PythonThriftBuilder.UnknownPlatformException, self).__init__(
-          'Unknown platform: %s!' % str(platform))
+          'Unknown platform: {}!'.format(str(platform)))
 
   def __init__(self, target, root_dir, options, target_suffix=None):
     super(PythonThriftBuilder, self).__init__(target, root_dir, options, target_suffix)
     self._workdir = os.path.join(options.for_global_scope().pants_workdir, 'thrift', 'py-thrift')
+
+  @classmethod
+  def register_options(cls, register):
+    """Register options for this task.
+
+    Note that this task uses options from scope 'gen.thrift' to determine the settings for
+    finding the thrift binary.
+    """
+    super(PythonThriftBuilder, cls).register_options(register)
 
   @property
   def install_requires(self):
@@ -68,7 +77,7 @@ class PythonThriftBuilder(CodeGenerator):
 
   def _run_thrift(self, source):
     args = [
-        select_thrift_binary(self.options),
+        select_thrift_binary(self.options.for_scope('gen.thrift')),
         '--gen',
         'py:new_style',
         '-o', self.codegen_root,

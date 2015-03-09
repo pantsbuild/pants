@@ -201,7 +201,7 @@ class _JUnitRunner(object):
     result = 0
     cwd = cwd or get_buildroot()
     for batch in self._partition(tests):
-      with binary_util.safe_args(batch) as batch_tests:
+      with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
         result += abs(execute_java(
           classpath=classpath,
           main=main,
@@ -360,7 +360,8 @@ class Emma(_Coverage):
   def instrument(self, targets, tests, junit_classpath):
     safe_mkdir(self._coverage_instrument_dir, clean=True)
     self._emma_classpath = self._task_exports.tool_classpath('emma')
-    with binary_util.safe_args(self.get_coverage_patterns(targets)) as patterns:
+    with binary_util.safe_args(self.get_coverage_patterns(targets),
+                               self._task_exports.task_options) as patterns:
       args = [
         'instr',
         '-out', self._coverage_metadata_file,

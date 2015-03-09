@@ -97,7 +97,7 @@ def calculate_compile_roots(targets, is_thrift_target):
 def select_thrift_binary(options):
   """Selects a thrift compiler binary matching the current os and architecture.
 
+  :param Options options: options for the current task
   Defaults to the thrift compiler version specified in the gen.thrift options scope.
   """
-  thrift_options = options.for_scope('gen.thrift')
-  return BinaryUtil().select_binary(thrift_options.supportdir, thrift_options.version, 'thrift')
+  return BinaryUtil.from_options(options).select_binary('thrift')
