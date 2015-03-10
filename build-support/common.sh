@@ -37,3 +37,7 @@ function banner() {
   echo "[== $(elapsed) $@ ==]"
   echo
 }
+
+function fingerprint_data() {
+  openssl md5 | cut -d' ' -f2
+}

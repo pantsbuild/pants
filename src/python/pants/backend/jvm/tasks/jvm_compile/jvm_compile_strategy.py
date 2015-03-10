@@ -9,8 +9,8 @@ import os
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 
-from pants.util.dirutil import safe_mkdir
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.util.dirutil import safe_mkdir
 
 
 class JvmCompileStrategy(object):
