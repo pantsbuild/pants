@@ -102,8 +102,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
-  def prepare_compile(self, cache_manager, all_targets):
-    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets)
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
+    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
 
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -111,7 +111,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       compile_classpaths.add_for_targets(all_targets, [(conf, self._classes_dir)])
 
     # Split the global analysis file into valid and invalid parts.
-    invalidation_check = cache_manager.check(all_targets)
+    invalidation_check = cache_manager.check(relevant_targets)
     if invalidation_check.invalid_vts:
       # The analysis for invalid and deleted sources is no longer valid.
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
@@ -159,6 +159,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   def compile_chunk(self,
                     invalidation_check,
+                    all_targets,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -186,7 +187,10 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       for conf in self._confs:
         for jar in extra_compile_time_classpath_elements:
           yield (conf, jar)
-    compile_classpath = compile_classpaths.get_for_targets(relevant_targets)
+    # NB: The global strategy uses the aggregated classpath (for all targets) to compile each
+    # chunk, which avoids needing to introduce compile-time dependencies between annotation
+    # processors and the classes they annotate.
+    compile_classpath = compile_classpaths.get_for_targets(all_targets)
     compile_classpath = OrderedSet(list(extra_compile_classpath_iter()) + list(compile_classpath))
 
     # Validate that all classpath entries are located within the working copy, which

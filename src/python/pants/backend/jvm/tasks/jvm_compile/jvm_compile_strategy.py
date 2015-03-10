@@ -63,6 +63,7 @@ class JvmCompileStrategy(object):
   @abstractmethod
   def compile_chunk(self,
                     invalidation_check,
+                    all_targets,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -90,14 +91,14 @@ class JvmCompileStrategy(object):
     # would be wiped out by clean-all goal/task if it's specified.
     safe_mkdir(self._target_sources_dir)
 
-  def prepare_compile(self, cache_manager, all_targets):
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     """Prepares to compile the given set of targets.
 
     Has the side effects of pruning old analysis, and computing deleted sources.
     """
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
-    self._sources_by_target = self._compute_sources_by_target(all_targets)
+    self._sources_by_target = self._compute_sources_by_target(relevant_targets)
 
   def class_name_for_class_file(self, compile_context, class_file_name):
     assert class_file_name.endswith(".class")

@@ -47,12 +47,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
-  def prepare_compile(self, cache_manager, all_targets):
-    super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets)
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
+    super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
 
-    # Update the classpath for us and for downstream tasks.
+    # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
-    for target in all_targets:
+    for target in relevant_targets:
       classes = self.compile_context(target).classes_dir
       compile_classpaths.add_for_target(target, [(conf, classes) for conf in self._confs])
 
@@ -70,6 +70,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def compile_chunk(self,
                     invalidation_check,
+                    all_targets,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
