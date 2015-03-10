@@ -152,7 +152,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       for target in vt.targets:
         compile_contexts.append(self.compile_context(target))
 
-    for target in compile_contexts:
+    for compile_context in compile_contexts:
       portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
           self._analysis_dir, compile_context.target)
       if os.path.exists(portable_analysis_file):
