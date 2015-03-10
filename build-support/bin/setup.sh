@@ -28,7 +28,7 @@ if [[ ! -e "${PRE_COMMIT_DEST}" ]]
 then
   install_pre_commit_hook
 else
-  if cmp --quiet "${PRE_COMMIT_SRC}" "${PRE_COMMIT_DEST}" 
+  if cmp --quiet "${PRE_COMMIT_SRC}" "${PRE_COMMIT_DEST}"
   then
     echo "Pre-commit checks up to date."
   else
