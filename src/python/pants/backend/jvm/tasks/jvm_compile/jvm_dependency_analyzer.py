@@ -135,7 +135,7 @@ class JvmDependencyAnalyzer(object):
       transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
 
-  def check(self, srcs, actual_deps, ivy_cache_dir):
+  def check(self, srcs, actual_deps):
     """Check for missing deps.
 
     See docstring for _compute_missing_deps for details.
@@ -146,9 +146,8 @@ class JvmDependencyAnalyzer(object):
 
       buildroot = get_buildroot()
       def shorten(path):  # Make the output easier to read.
-        for prefix in [buildroot, ivy_cache_dir]:
-          if path.startswith(prefix):
-            return os.path.relpath(path, prefix)
+        if path.startswith(buildroot):
+          return os.path.relpath(path, buildroot)
         return path
 
       def filter_whitelisted(missing_deps):

@@ -51,8 +51,7 @@ class ScalaCompile(JvmCompile):
                                  log_level=self.get_options().level)
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
-                         ZincAnalysisParser(self._classes_dir), ZincAnalysis)
+    return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
@@ -78,10 +77,6 @@ class ScalaCompile(JvmCompile):
       ret.append((root, [plugin_info_file]))
     return ret
 
-  def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
-    # We have to treat our output dir as an upstream element, so zinc can find valid
-    # analysis for previous partitions. We use the global valid analysis for the upstream.
-    upstream = ({classes_output_dir: self._analysis_file}
-                if os.path.exists(self._analysis_file) else {})
-    return self._zinc_utils.compile(args, classpath + [self._classes_dir], sources,
-                                    classes_output_dir, analysis_file, upstream)
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
+    return self._zinc_utils.compile(args, classpath, sources,
+                                    classes_output_dir, analysis_file, upstream_analysis)

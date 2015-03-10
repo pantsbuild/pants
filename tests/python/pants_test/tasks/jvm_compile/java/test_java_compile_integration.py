@@ -29,7 +29,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     # Parse the analysis file from the compilation.
     analysis_file = os.path.join(workdir, 'compile', 'jvm', 'java', 'analysis',
                                  'global_analysis.valid')
-    parser = JMakeAnalysisParser('not_used')
+    parser = JMakeAnalysisParser()
     analysis = parser.parse_from_path(analysis_file)
 
     # Ensure we have entries in the analysis file.

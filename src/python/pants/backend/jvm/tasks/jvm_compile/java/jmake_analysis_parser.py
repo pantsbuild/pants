@@ -31,7 +31,7 @@ class JMakeAnalysisParser(AnalysisParser):
     src_to_deps = self._parse_deps_at_position(infile)
     return JMakeAnalysis(pcd_entries, src_to_deps)
 
-  def parse_products(self, infile):
+  def parse_products(self, infile, classes_dir):
     self._expect_header(infile.readline(), 'pcd entries')
     num_pcd_entries = self.parse_num_items(infile.readline())
     ret = defaultdict(list)
@@ -40,13 +40,13 @@ class JMakeAnalysisParser(AnalysisParser):
     for _ in xrange(0, num_pcd_entries):
       line = infile.readline()
       p1 = line.find('\t')
-      clsfile = os.path.join(self.classes_dir, line[0:p1] + '.class')
+      clsfile = os.path.join(classes_dir, line[0:p1] + '.class')
       p2 = line.find('\t', p1 + 1)
       src = line[p1+1:p2]
       ret[src].append(clsfile)
     return ret
 
-  def parse_deps(self, infile, classpath_indexer):
+  def parse_deps(self, infile, classpath_indexer, classes_dir):
     buildroot = get_buildroot()
     classpath_elements_by_class = classpath_indexer()
     self._expect_header(infile.readline(), 'pcd entries')
@@ -59,7 +59,7 @@ class JMakeAnalysisParser(AnalysisParser):
       for dep in deps:
         rel_classfile = dep + '.class'
         # Check if we have an internal class first.
-        internal_classfile = os.path.join(buildroot, self.classes_dir, rel_classfile)
+        internal_classfile = os.path.join(buildroot, classes_dir, rel_classfile)
         if os.path.exists(internal_classfile):
           # Dep is on an internal class.
           ret[src].add(internal_classfile)
