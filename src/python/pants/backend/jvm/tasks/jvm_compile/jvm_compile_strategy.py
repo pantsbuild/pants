@@ -34,6 +34,15 @@ class JvmCompileStrategy(object):
   def _portable_analysis_for_target(analysis_dir, target):
     return JvmCompileStrategy._analysis_for_target(analysis_dir, target) + '.portable'
 
+  @classmethod
+  @abstractmethod
+  def register_options(cls, register, language):
+    """Registration for strategy-specific options.
+
+    The abstract base class does not register any options itself: those are left to JvmCompile.
+    """
+    pass
+
   def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     self.context = context
     self._analysis_tools = analysis_tools
@@ -46,6 +55,11 @@ class JvmCompileStrategy(object):
 
     # The ivy confs for which we're building.
     self._confs = options.confs
+
+  @abstractmethod
+  def name(self):
+    """A readable, unique name for this strategy."""
+    pass
 
   @abstractmethod
   def invalidation_hints(self, relevant_targets):
@@ -81,7 +95,7 @@ class JvmCompileStrategy(object):
   @abstractmethod
   def compute_resource_mapping(self, compile_contexts):
     """Computes a merged ResourceMapping for the given compile contexts.
-    
+
     Since classes should live in exactly one context, a merged mapping is unambiguous.
     """
     pass

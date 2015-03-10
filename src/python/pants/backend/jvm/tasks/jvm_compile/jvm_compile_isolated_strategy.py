@@ -20,12 +20,20 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses a global classpath and analysis."""
 
+  @classmethod
+  def register_options(cls, register, language):
+    # No strategy specific options.
+    pass
+
   def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
+
+  def name(self):
+    return 'isolated'
 
   def compile_context(self, target):
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)

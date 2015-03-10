@@ -44,7 +44,7 @@ class UnionProducts(object):
     return products
 
   def __str__(self):
-    return "UnionProducts(%s)" % str(self._products_by_target)
+    return "UnionProducts({})".format(self._products_by_target)
 
 
 class RootedProducts(object):
@@ -112,7 +112,7 @@ class MultipleRootedProducts(object):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "MultipleRootedProducts(%s)" % str(self._rooted_products_by_root)
+    return "MultipleRootedProducts({})".format(self._rooted_products_by_root)
 
 
 class Products(object):
