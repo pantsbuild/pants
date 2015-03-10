@@ -112,23 +112,23 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   #
   # def test_publish_extras_name_classifier(self):
   #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               #'override_name': '{target_provides_name}-extra_example',
+  #                               'override_name': '{target_provides_name}-extra_example',
   #                               'classifier': 'classy',
   #                               }),
-  #                              artifact_name='hello-greet-classy.jar')
+  #                              artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar')
   #
   # def test_publish_extras_name(self):
   #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               #'override_name': '{target_provides_name}-extra_example',
+  #                               'override_name': '{target_provides_name}-extra_example',
   #                               }),
-  #                              artifact_name='hello-greet-SNAPSHOT.jar')
+  #                              artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.jar')
   #
   # def test_publish_extras_name_extension(self):
   #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               #'override_name': '{target_provides_name}-extra_example',
+  #                               'override_name': '{target_provides_name}-extra_example',
   #                               'extension': 'zip'
   #                               }),
-  #                              artifact_name='hello-greet-SNAPSHOT.zip')
+  #                              artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.zip')
   #
   # def test_publish_extras_extension(self):
   #   self.publish_extras_runner(extra_config=publish_extra_config({
