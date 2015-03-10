@@ -11,17 +11,10 @@ import shutil
 import uuid
 from collections import OrderedDict, defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
-from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
-from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.exceptions import TaskError
-from pants.base.target import Target
 from pants.base.worker_pool import Work
-from pants.util.contextutil import open_zip64, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
