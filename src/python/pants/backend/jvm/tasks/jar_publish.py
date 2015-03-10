@@ -410,6 +410,8 @@ class JarPublish(JarTask, ScmPublish):
     register('--publish-extras', advanced=True, type=Options.dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
+    register('--individual-plugins', advanced=True, default=False, type=bool,
+             help='Extra products to publish as a individual artifact.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -524,15 +526,19 @@ class JarPublish(JarTask, ScmPublish):
     return push.strip().lower() == 'y'
 
   def _copy_artifact(self, tgt, jar, version, typename, suffix='', extension='jar',
-                     artifact_ext=''):
+                     artifact_ext='', override_name=None):
     """Copy the products for a target into the artifact path for the jar/version"""
     genmap = self.context.products.get(typename)
     product_mapping = genmap.get(tgt)
     if product_mapping is None:
-      return
+      if self.get_options().individual_plugins:
+        return True
+      raise ValueError("No product mapping in %s for %s. "
+                       "You may need to run some other task first" % (typename, tgt))
     for basedir, jars in product_mapping.items():
       for artifact in jars:
-        path = self.artifact_path(jar, version, suffix=suffix, artifact_ext=artifact_ext)
+        path = self.artifact_path(jar, version, name=override_name, suffix=suffix,
+                                  extension=extension, artifact_ext=artifact_ext)
         safe_mkdir(os.path.dirname(path))
         shutil.copy(os.path.join(basedir, artifact), path)
 
@@ -649,6 +655,81 @@ class JarPublish(JarTask, ScmPublish):
       return ivyxml
 
     def stage_artifacts(tgt, jar, version, changelog):
+      if self.get_options().individual_plugins:
+        return stage_individual_plugins(tgt, jar, version, changelog)
+      DEFAULT_IVY_TYPE = 'jar'
+      DEFAULT_CLASSIFIER = ''
+      DEFAULT_EXTENSION = 'jar'
+
+      self._copy_artifact(tgt, jar, version, typename='jars')
+      self.create_source_jar(tgt, jar, version)
+      doc_jar = self.create_doc_jar(tgt, jar, version)
+
+      confs = set(repo['confs'])
+      extra_confs = []
+
+      # Process any extra jars that might have been previously generated for this target, or a
+      # target that it was derived from.
+      for extra_product, extra_config in (self.get_options().publish_extras or {}).items():
+        override_name = jar.name
+        if 'override_name' in extra_config:
+          # If the supplied string has a '{target_provides_name}' in it, replace it with the
+          # current jar name. If not, the string will be taken verbatim.
+          override_name = extra_config['override_name'].format(target_provides_name=jar.name)
+
+        classifier = DEFAULT_CLASSIFIER
+        suffix = ''
+        ivy_type = DEFAULT_IVY_TYPE
+        if 'classifier' in extra_config:
+          classifier = extra_config['classifier']
+          suffix = "-{0}".format(classifier)
+          ivy_type = classifier
+
+        extension = DEFAULT_EXTENSION
+        if 'extension' in extra_config:
+          extension = extra_config['extension']
+          if ivy_type == DEFAULT_IVY_TYPE:
+            ivy_type = extension
+
+        # A lot of flexibility is allowed in naming the extra artifact. Because the name must be
+        # unique, some extra logic is required to ensure that the user supplied at least one
+        # non-default value (thus ensuring a uniquely-named artifact in the end).
+        if override_name == jar.name and classifier == DEFAULT_CLASSIFIER and extension == DEFAULT_EXTENSION:
+          raise TaskError("publish_extra for '{0}' most override one of name, classifier or "
+                          "extension with a non-default value.".format(extra_product))
+
+        ivy_tmpl_key = classifier or '%s-%s'.format(override_name, extension)
+
+        # Build a list of targets to check. This list will consist of the current target, plus the
+        # entire derived_from chain.
+        target_list = [tgt]
+        target = tgt
+        while target.derived_from != target:
+          target_list.append(target.derived_from)
+          target = target.derived_from
+        for cur_tgt in target_list:
+          if self.context.products.get(extra_product).has(cur_tgt):
+            self._copy_artifact(cur_tgt, jar, version, typename=extra_product,
+                                suffix=suffix, extension=extension,
+                                override_name=override_name)
+            confs.add(ivy_tmpl_key)
+            # Supply extra data about this jar into the Ivy template, so that Ivy will publish it
+            # to the final destination.
+            extra_confs.append({'name': override_name,
+                                'type': ivy_type,
+                                'conf': ivy_tmpl_key,
+                                'classifier': classifier,
+                                'ext': extension})
+
+      confs.add(IvyWriter.SOURCES_CONFIG)
+      # don't request docs unless they are available for all transitive targets
+      # TODO: doc products should be checked by an independent jar'ing task, and
+      # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
+      if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
+        confs.add(IvyWriter.JAVADOC_CONFIG)
+      return stage_artifact(tgt, jar, version, changelog, confs, extra_confs=extra_confs)
+
+    def stage_individual_plugins(tgt, jar, version, changelog):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_CONF = 'default'
@@ -656,10 +737,9 @@ class JarPublish(JarTask, ScmPublish):
       product_config = {
         'jars': {
           'classifier': '',
-        },
-      }
+          },
+        }
       product_config.update(self.get_options().publish_extras or {})
-
       for product, config in product_config.items():
         if self.context.products.get(product).has(tgt):
           classifier = config.get('classifier', DEFAULT_CLASSIFIER)
@@ -671,23 +751,21 @@ class JarPublish(JarTask, ScmPublish):
             self.create_source_jar(tgt, jar, version)
             doc_jar = self.create_doc_jar(tgt, jar, version)
             confs.add(IvyWriter.SOURCES_CONFIG)
-            # don't request docs unless they are available for all transitive targets
-            # TODO: doc products should be checked by an independent jar'ing task, and
-            # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
             if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
               confs.add(IvyWriter.JAVADOC_CONFIG)
           else:
             confs = [classifier, DEFAULT_CONF]
             extra_confs = {'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
-                           'classifier': classifier,
-                           'conf': confs,
-                           'ext': DEFAULT_EXT,
-                           }
+                          'classifier': classifier,
+                          'conf': confs,
+                          'ext': DEFAULT_EXT,
+                          }
           return stage_artifact(tgt, jar, version, changelog, confs,
-                                extra_confs=extra_confs, classifier=classifier)
+                              extra_confs=extra_confs, classifier=classifier)
       raise ValueError('No product mapping in {0} for {1}. '
                        'You may need to run some other task first'.format(product_config.keys(),
                                                                           tgt))
+
     if self.overrides:
       print('Publishing with revision overrides:\n  %0' % '\n  '.join(
         '{1}={2}'.format(coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
