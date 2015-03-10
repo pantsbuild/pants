@@ -98,6 +98,18 @@ branch using the [syncing a
 fork](https://help.github.com/articles/syncing-a-fork/) instructions on
 github.
 
+Whether you've cloned the repo or your fork of the repo, you should setup the
+local pre-commit hooks to ensure your commits meet minimum compliance checks
+before pushing branches to ci:
+
+    :::bash
+    $ ./build-support/bin/setup.sh
+
+You can always run the pre-commit checks manually via:
+
+    :::bash
+    $ ./build-support/bin/pre-commit.sh
+
 **Pro tip:** If you want your local master branch to be an exact copy of
 the `pantsbuild/pants` repo's master branch, use these commands:
 

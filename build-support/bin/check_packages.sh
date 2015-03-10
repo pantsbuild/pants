@@ -3,7 +3,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd ${REPO_ROOT}
 
 DIRS_TO_CHECK=(
