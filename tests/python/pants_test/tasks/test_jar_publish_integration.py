@@ -107,41 +107,41 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_env={'WRAPPER_SRCPATH': 'examples/src/python'},
                       success_expected=success_expected)
 
-  # TODO bring back these tests when we fix https://github.com/pantsbuild/pants/issues/1229
+  #
   # Run through all the permutations of the config parameters for publish_extras.
   #
-  # def test_publish_extras_name_classifier(self):
-  #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               'override_name': '{target_provides_name}-extra_example',
-  #                               'classifier': 'classy',
-  #                               }),
-  #                              artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar')
-  #
-  # def test_publish_extras_name(self):
-  #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               'override_name': '{target_provides_name}-extra_example',
-  #                               }),
-  #                              artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.jar')
-  #
-  # def test_publish_extras_name_extension(self):
-  #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               'override_name': '{target_provides_name}-extra_example',
-  #                               'extension': 'zip'
-  #                               }),
-  #                              artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.zip')
-  #
-  # def test_publish_extras_extension(self):
-  #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               'extension': 'zip'
-  #                               }),
-  #                              artifact_name='hello-greet-0.0.1-SNAPSHOT.zip')
-  #
-  # def test_publish_extras_extension_classifier(self):
-  #   self.publish_extras_runner(extra_config=publish_extra_config({
-  #                               'classifier': 'classy',
-  #                               'extension': 'zip'
-  #                               }),
-  #                              artifact_name='hello-greet-0.0.1-SNAPSHOT-classy.zip')
+  def test_publish_extras_name_classifier(self):
+    self.publish_extras_runner(extra_config=publish_extra_config({
+                                'override_name': '{target_provides_name}-extra_example',
+                                'classifier': 'classy',
+                                }),
+                               artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar')
+
+  def test_publish_extras_name(self):
+    self.publish_extras_runner(extra_config=publish_extra_config({
+                                'override_name': '{target_provides_name}-extra_example',
+                                }),
+                               artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.jar')
+
+  def test_publish_extras_name_extension(self):
+    self.publish_extras_runner(extra_config=publish_extra_config({
+                                'override_name': '{target_provides_name}-extra_example',
+                                'extension': 'zip'
+                                }),
+                               artifact_name='hello-greet-extra_example-0.0.1-SNAPSHOT.zip')
+
+  def test_publish_extras_extension(self):
+    self.publish_extras_runner(extra_config=publish_extra_config({
+                                'extension': 'zip'
+                                }),
+                               artifact_name='hello-greet-0.0.1-SNAPSHOT.zip')
+
+  def test_publish_extras_extension_classifier(self):
+    self.publish_extras_runner(extra_config=publish_extra_config({
+                                'classifier': 'classy',
+                                'extension': 'zip'
+                                }),
+                               artifact_name='hello-greet-0.0.1-SNAPSHOT-classy.zip')
 
   def test_publish_extras_classifier(self):
     self.publish_extras_runner(extra_config=publish_extra_config({

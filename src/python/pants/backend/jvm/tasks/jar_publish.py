@@ -247,7 +247,6 @@ class IvyWriter(DependencyWriter):
     return dict(lib=target_jar.extend(
         publications=set(confs or []),
         extra_publications=extra_confs if extra_confs else {},
-        defaultconf=classifier,
         overrides=None))
 
   def _jardep(self, jar, classifier, transitive=True, configurations='default'):
@@ -755,10 +754,11 @@ class JarPublish(JarTask, ScmPublish):
               confs.add(IvyWriter.JAVADOC_CONFIG)
           else:
             confs = [classifier, DEFAULT_CONF]
-            extra_confs = {'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
-                          'classifier': classifier,
-                          'conf': confs,
-                          'ext': DEFAULT_EXT,
+            extra_confs = {'name': None,
+                           'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
+                           'classifier': classifier,
+                           'conf': confs,
+                           'ext': DEFAULT_EXT,
                           }
           return stage_artifact(tgt, jar, version, changelog, confs,
                               extra_confs=extra_confs, classifier=classifier)
