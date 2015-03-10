@@ -65,7 +65,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # If we have a compile context for the target, include it.
     for dep in target.closure():
       if dep in compile_contexts:
-        yield dep, compile_contexts[dep]
+        compile_context = compile_contexts[dep]
+        yield compile_context.classes_dir, compile_context.analysis_file
 
   def compile_chunk(self,
                     invalidation_check,
