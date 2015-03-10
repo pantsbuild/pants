@@ -166,12 +166,12 @@ class DependencyWriter(object):
     configurations = set(confs or [])
     for dep in target_internal_dependencies(target):
       jar = self._as_versioned_jar(dep)
-      dependencies[(jar.org, jar.name)] = self.internaldep(jar, classifier, dep)
+      dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep, classifier=classifier)
       if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
     for jar in target.jar_dependencies:
       if jar.rev:
-        dependencies[(jar.org, jar.name, classifier)] = self.jardep(jar, classifier)
+        dependencies[(jar.org, jar.name, classifier)] = self.jardep(jar, classifier=classifier)
         configurations |= set(jar._configurations)
 
     target_jar = self.internaldep(self._as_versioned_jar(target),
@@ -184,14 +184,14 @@ class DependencyWriter(object):
       template = pkgutil.get_data(self.template_package_name, self.template_relpath)
       Generator(template, **template_kwargs).write(output)
 
-  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=''):
+  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
     """
       Subclasses must return a dict for use by their template given the target jar template data
       and optional specific ivy configurations.
     """
     raise NotImplementedError()
 
-  def internaldep(self, jar_dependency, classifier, dep=None, configurations=None):
+  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
     """
       Subclasses must return a template data for the given internal target (provided in jar
       dependency form).
@@ -205,7 +205,7 @@ class DependencyWriter(object):
     jar.rev = pushdb_entry.version().version()
     return jar
 
-  def jardep(self, jar_dependency):
+  def jardep(self, jar_dependency, classifier=''):
     """Subclasses must return a template data for the given external jar dependency."""
     raise NotImplementedError()
 
@@ -216,10 +216,10 @@ class PomWriter(DependencyWriter):
         get_db,
         os.path.join('templates', 'jar_publish', 'pom.mustache'))
 
-  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=''):
+  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
     return dict(artifact=target_jar)
 
-  def jardep(self, jar, classifier):
+  def jardep(self, jar, classifier=None):
     return TemplateData(
         org=jar.org,
         name=jar.name,
@@ -228,8 +228,8 @@ class PomWriter(DependencyWriter):
         classifier=classifier,
         excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
 
-  def internaldep(self, jar_dependency, classifier, dep=None, configurations=None):
-    return self.jardep(jar_dependency, classifier)
+  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
+    return self.jardep(jar_dependency, classifier=classifier)
 
 
 class IvyWriter(DependencyWriter):
@@ -243,13 +243,13 @@ class IvyWriter(DependencyWriter):
         IvyUtils.IVY_TEMPLATE_PATH,
         template_package_name=IvyUtils.IVY_TEMPLATE_PACKAGE_NAME)
 
-  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=''):
+  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
     return dict(lib=target_jar.extend(
         publications=set(confs or []),
         extra_publications=extra_confs if extra_confs else {},
         overrides=None))
 
-  def _jardep(self, jar, classifier, transitive=True, configurations='default'):
+  def _jardep(self, jar, transitive=True, configurations='default', classifier=None):
     return TemplateData(
         org=jar.org,
         module=jar.name,
@@ -262,14 +262,14 @@ class IvyWriter(DependencyWriter):
         classifier=classifier,
         configurations=configurations)
 
-  def jardep(self, jar, classifier):
+  def jardep(self, jar, classifier=None):
     return self._jardep(jar,
-                        classifier,
                         transitive=jar.transitive,
-                        configurations=jar._configurations)
+                        configurations=jar._configurations,
+                        classifier=classifier)
 
-  def internaldep(self, jar_dependency, classifier, dep=None, configurations=None):
-    return self._jardep(jar_dependency, classifier, configurations=configurations)
+  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
+    return self._jardep(jar_dependency, configurations=configurations, classifier=classifier)
 
 
 def coordinate(org, name, rev=None):
