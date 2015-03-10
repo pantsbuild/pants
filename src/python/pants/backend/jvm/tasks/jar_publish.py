@@ -156,7 +156,7 @@ class DependencyWriter(object):
     self.template_package_name = template_package_name or __name__
     self.template_relpath = template_relpath
 
-  def write(self, target, path, confs=None, extra_confs=[], classifier=''):
+  def write(self, target, path, confs=None, extra_confs=None, classifier=None):
     # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
     # codegen target - say java_thrift_library - and the synthetic generated target (java_library)
     # Consider reworking codegen tasks to add removal of the original codegen targets when rewriting
@@ -205,7 +205,7 @@ class DependencyWriter(object):
     jar.rev = pushdb_entry.version().version()
     return jar
 
-  def jardep(self, jar_dependency, classifier=''):
+  def jardep(self, jar_dependency, classifier=None):
     """Subclasses must return a template data for the given external jar dependency."""
     raise NotImplementedError()
 
@@ -531,7 +531,7 @@ class JarPublish(JarTask, ScmPublish):
     product_mapping = genmap.get(tgt)
     if product_mapping is None:
       if self.get_options().individual_plugins:
-        return True
+        return
       raise ValueError("No product mapping in %s for %s. "
                        "You may need to run some other task first" % (typename, tgt))
     for basedir, jars in product_mapping.items():
