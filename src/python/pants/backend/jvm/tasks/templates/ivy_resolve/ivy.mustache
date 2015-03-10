@@ -50,7 +50,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <dependency org="{{org}}"
                 name="{{module}}"
                 rev="{{version}}"
-                conf="{{#classifier}}idl{{/classifier}}"
+                conf="{{#classifier}}{{classifier}}{{/classifier}}"
                 {{#force}}force="true"{{/force}}
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}
