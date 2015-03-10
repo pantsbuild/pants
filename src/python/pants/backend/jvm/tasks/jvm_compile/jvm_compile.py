@@ -11,7 +11,8 @@ import sys
 from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import JvmCompileIsolatedStrategy
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
+  JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase

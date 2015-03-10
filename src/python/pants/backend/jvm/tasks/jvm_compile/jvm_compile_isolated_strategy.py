@@ -9,7 +9,7 @@ import itertools
 import os
 import shutil
 import uuid
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 
 from twitter.common.collections import OrderedSet
 
