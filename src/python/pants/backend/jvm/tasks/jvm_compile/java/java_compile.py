@@ -119,6 +119,15 @@ class JavaCompile(JvmCompile):
   def platform_version_info(self):
     return (self.get_options().target,) if self.get_options().target else ()
 
+  def prepare_execute(self, chunks):
+    super(JavaCompile, self).prepare_execute(chunks)
+
+    # Ensure that the processor info dir is on the classpath for all targets, so that
+    # annotation processors are loaded after being compiled.
+    compile_classpaths = self.context.products.get_data('compile_classpath')
+    entries = [(conf, self._processor_info_global_dir) for conf in self._confs]
+    compile_classpaths.add_for_targets(self.context.targets(), entries)
+
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath('jmake')
@@ -180,12 +189,6 @@ class JavaCompile(JvmCompile):
         for processor in f:
           all_processors.add(processor)
     self._write_processor_info(processor_info_file, all_processors)
-
-    # Ensure that the processor info dir is on the classpath for all targets.
-    # TODO: move to a setup step
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    for conf in self._confs:
-      compile_classpaths.add_for_targets(all_targets, [(conf, self._processor_info_global_dir)])
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:

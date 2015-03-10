@@ -231,12 +231,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._create_empty_products()
 
   def prepare_execute(self, chunks):
-    all_targets = list(itertools.chain(*chunks))
+    targets_in_chunk = list(itertools.chain(*chunks))
 
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
-    self._strategy.prepare_compile(cache_manager, all_targets)
+    self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunk)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -265,6 +265,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
             if self.artifact_cache_writes_enabled() else None)
         self._strategy.compile_chunk(invalidation_check,
+                                     self.context.targets(),
                                      relevant_targets,
                                      invalid_targets,
                                      self.extra_compile_time_classpath_elements(),
