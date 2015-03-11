@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
 import pytest
 
 
@@ -18,5 +19,6 @@ def provide_compile_strategy(testmethod):
       try:
         testmethod(self, strategy)
       except Exception as e:
-        pytest.fail("failed for strategy '{}': {}".format(strategy, e))
+        print("failed for strategy '{}'".format(strategy), file=sys.stderr)
+        raise e
   return wrapped

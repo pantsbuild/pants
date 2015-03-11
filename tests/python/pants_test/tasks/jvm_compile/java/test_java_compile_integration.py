@@ -60,7 +60,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
           workdir, config)
         self.assert_success(pants_run)
 
-  def test_nocache(self):
+  @provide_compile_strategy
+  def test_nocache(self, strategy):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
                                   'testprojects.src.java.com.pants.testproject.nocache.nocache')
@@ -68,7 +69,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.nocache.cache_me')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
+      pants_run = self.run_pants(['compile.java',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/nocache::'],
                                  config)
       self.assert_success(pants_run)
