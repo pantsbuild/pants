@@ -128,3 +128,54 @@ class TestAndroidDistribution(TestAndroidBase):
       aapt = os.path.join('build-tools', '19.1.0', 'aapt')
       android_sdk.register_android_tool(aapt)
       self.assertIn(aapt, android_sdk._validated_tools)
+
+  def test_register_tool_link(self):
+    with self.distribution() as sdk:
+      with temporary_dir() as workdir:
+        android_sdk = AndroidDistribution.cached(sdk)
+        android_jar = os.path.join('platforms', 'android-19',  'android.jar')
+        android_sdk.register_tool_link(android_jar, workdir)
+        self.assertEquals(android_sdk._validated_tools[android_jar],
+                          os.path.join(workdir, 'android.jar'))
+
+  def test_register_link_is_validated(self):
+    with self.distribution() as sdk:
+      with temporary_dir() as workdir:
+        android_sdk = AndroidDistribution.cached(sdk)
+        android_jar = os.path.join('platforms', 'android-19',  'android.jar')
+        android_sdk.register_tool_link(android_jar, workdir)
+        self.assertIn(android_jar, android_sdk._validated_tools)
+
+  def test_register_link_but_no_tool(self):
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      with self.distribution() as sdk:
+        with temporary_dir() as workdir:
+          android_sdk = AndroidDistribution.cached(sdk)
+          android_jar = os.path.join('platforms', 'android-19',  'no.jar')
+          android_sdk.register_tool_link(android_jar, workdir)
+          self.assertEquals(android_sdk._validated_tools[android_jar],
+                            os.path.join(workdir, 'android.jar'))
+
+  def test_register_link_no_permission(self):
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      with self.distribution() as sdk:
+        with temporary_dir() as workdir:
+          os.chmod(workdir, 0o400)
+          android_sdk = AndroidDistribution.cached(sdk)
+          android_jar = os.path.join('platforms', 'android-19',  'android.jar')
+          android_sdk.register_tool_link(android_jar, workdir)
+
+  def test_get_tool_path(self):
+    with self.distribution() as sdk:
+      android_sdk = AndroidDistribution.cached(sdk)
+      android_jar = os.path.join('platforms', 'android-19',  'android.jar')
+      tool_path = android_sdk._get_tool_path(android_jar)
+      self.assertEquals(tool_path, os.path.join(sdk, android_jar))
+
+  def test_get_bad_tool_path(self):
+    with self.assertRaises(AndroidDistribution.DistributionError):
+      with self.distribution() as sdk:
+        android_sdk = AndroidDistribution.cached(sdk)
+        android_jar = os.path.join('platforms', 'android-19',  'no.jar')
+        tool_path = android_sdk._get_tool_path(android_jar)
+        self.assertEquals(tool_path, os.path.join(sdk, android_jar))
