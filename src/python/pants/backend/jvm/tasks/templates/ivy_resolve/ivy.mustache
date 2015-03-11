@@ -39,7 +39,14 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
     {{/lib.publications.changelog}}
     {{#lib.extra_publications}}
-    <artifact name="{{name}}" conf="{{conf}}" type="{{type}}" m:classifier="{{classifier}}" ext="{{ext}}"/>
+    <artifact
+      {{#name}}name="{{name}}"
+               conf="{{conf}}"
+      {{/name}}
+      {{^name}}conf="{{classifier}}"{{/name}}
+      type="{{type}}"
+      m:classifier="{{classifier}}"
+      ext="{{ext}}"/>
     {{/lib.extra_publications}}
   </publications>
   {{/lib.publications?}}
@@ -50,6 +57,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <dependency org="{{org}}"
                 name="{{module}}"
                 rev="{{version}}"
+                {{#classifier}}conf="{{classifier}}"{{/classifier}}
                 {{#force}}force="true"{{/force}}
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}

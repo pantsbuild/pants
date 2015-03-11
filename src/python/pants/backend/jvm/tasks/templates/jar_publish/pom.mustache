@@ -32,6 +32,9 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <artifactId>{{name}}</artifactId>
       <version>{{rev}}</version>
       <scope>{{scope}}</scope>
+      {{#classifier?}}
+      <classifier>{{classifier}}</classifier>
+      {{/classifier?}}
       {{#excludes?}}
       <exclusions>
         {{#excludes}}
