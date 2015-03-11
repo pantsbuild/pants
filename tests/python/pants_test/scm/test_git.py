@@ -18,7 +18,7 @@ import pytest
 from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
+from pants.util.dirutil import chmod_plus_x, safe_mkdtemp, safe_open, safe_rmtree, touch
 
 
 class Version(object):
@@ -224,6 +224,37 @@ class GitTest(unittest.TestCase):
         worktree_relative_to('is', clone)
         worktree_relative_to('is/a', clone)
         worktree_relative_to('is/a/dir', clone)
+
+  def test_detect_worktree_nogit(self):
+    with temporary_dir() as path:
+      with environment_as(PATH=path):
+        self.assertIsNone(Git.detect_worktree(), 'No git should be on the path.')
+
+        # The git on the path should not be executable.
+        git = os.path.join(path, 'git')
+        touch(git)
+        self.assertIsNone(Git.detect_worktree())
+        self.assertIsNone(Git.detect_worktree(binary=git))
+
+        # The git on the path is not a proper executable.
+        chmod_plus_x(git)
+        self.assertIsNone(Git.detect_worktree())
+        self.assertIsNone(Git.detect_worktree(binary=git))
+
+        # The git on the path should always fail.
+        with open(git, 'w') as fp:
+          fp.write('#!/bin/sh\n')
+          fp.write('exit 1')
+        self.assertIsNone(Git.detect_worktree())
+        self.assertIsNone(Git.detect_worktree(git))
+
+        # And finally a minimally functional git that should work.
+        with open(git, 'w') as fp:
+          fp.write('#!/bin/sh\n')
+          fp.write('echo /a/fake/worktree/dir')
+        self.assertEqual('/a/fake/worktree/dir', Git.detect_worktree())
+        self.assertEqual('/a/fake/worktree/dir', Git.detect_worktree(binary=git))
+
 
   @property
   def test_changes_in(self):

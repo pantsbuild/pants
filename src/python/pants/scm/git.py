@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import os
 import subprocess
 import traceback
@@ -16,11 +17,14 @@ class Git(Scm):
   """An Scm implementation backed by git."""
 
   @classmethod
-  def detect_worktree(cls):
-    """Detect the git working tree above cwd and return it; else, return None."""
-    cmd = ['git', 'rev-parse', '--show-toplevel']
-    process, out = cls._invoke(cmd)
+  def detect_worktree(cls, binary='git'):
+    """Detect the git working tree above cwd and return it; else, return None.
+
+    binary: The path to the git binary to use, 'git' by default.
+    """
+    cmd = [binary, 'rev-parse', '--show-toplevel']
     try:
+      process, out = cls._invoke(cmd)
       cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
     except Scm.ScmException:
       return None
@@ -32,8 +36,16 @@ class Git(Scm):
 
     stderr flows to wherever its currently mapped for the parent process - generally to
     the terminal where the user can see the error.
+
+    :param list cmd: The command in the form of a list of strings
+    :returns: The completed process object and its standard output.
+    :raises: Scm.LocalException if there was a problem exec'ing the command at all.
     """
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    try:
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    except OSError as e:
+      # Binary DNE or is not executable
+      raise cls.LocalException('Failed to execute command {}: {}'.format(' '.join(cmd), e))
     out, _ = process.communicate()
     return process, out
 
@@ -215,7 +227,8 @@ class Git(Scm):
     cmd = self._create_git_cmdline(args)
     self._log_call(cmd)
 
-    process, out = self._invoke(cmd)
+    process, out = self.\
+      _invoke(cmd)
 
     self._check_result(cmd, process.returncode, failure_msg, raise_type)
     return self._cleanse(out, errors=errors)
