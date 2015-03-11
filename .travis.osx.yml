@@ -10,6 +10,16 @@
 #   http://blog.travis-ci.com/2014-05-13-multi-os-feature-available/
 language: objective-c
 
+matrix:
+  # The https://github.com/pantsbuild/pants-for-travis-osx-ci repo this CI runs for is force
+  # pushed to asynchronously by https://github.com/pantsbuild/pants CI jobs.  With multiple
+  # shards in play for the OSX ci we often get into situations where later-scheduled shards
+  # try to check out the repo and fail since the sha they are looking for has since been
+  # eradicated by a force push from the https://github.com/pantsbuild/pants CI job when changes
+  # are landing on master quickly.  We fail-fast here to not belabor the point and allow the next
+  # green OSX CI to happen more quickly.
+  fast_finish: true
+
 env:
   global:
     - CXX=clang++
