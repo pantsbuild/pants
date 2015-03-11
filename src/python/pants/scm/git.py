@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
 import subprocess
 import traceback
@@ -227,8 +226,7 @@ class Git(Scm):
     cmd = self._create_git_cmdline(args)
     self._log_call(cmd)
 
-    process, out = self.\
-      _invoke(cmd)
+    process, out = self._invoke(cmd)
 
     self._check_result(cmd, process.returncode, failure_msg, raise_type)
     return self._cleanse(out, errors=errors)
