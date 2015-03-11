@@ -405,7 +405,7 @@ class JarPublish(JarTask, ScmPublish):
     register('--ivy_settings', default=None, #advanced=True,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
     register('--individual-plugins', #advanced=True,
-             default=False, type=bool,
+             default=False, action='store_true',
              help='Extra products to publish as a individual artifact.')
     cls.register_scm_publish(register)
 
@@ -455,6 +455,9 @@ class JarPublish(JarTask, ScmPublish):
     self.dryrun = self.get_options().dryrun
     self.transitive = self.get_options().transitive
     self.force = self.get_options().force
+    self.individual_plugins = self.context.config.getbool(self._CONFIG_SECTION,
+                                                          'individual_plugins',
+                                                          default=False)
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -533,7 +536,7 @@ class JarPublish(JarTask, ScmPublish):
     genmap = self.context.products.get(typename)
     product_mapping = genmap.get(tgt)
     if product_mapping is None:
-      if self.get_options().individual_plugins:
+      if self.individual_plugins:
         return
       raise ValueError("No product mapping in %s for %s. "
                        "You may need to run some other task first" % (typename, tgt))
@@ -653,7 +656,7 @@ class JarPublish(JarTask, ScmPublish):
       return ivyxml
 
     def stage_artifacts(tgt, jar, version, changelog):
-      if self.get_options().individual_plugins:
+      if self.individual_plugins:
         return stage_individual_plugins(tgt, jar, version, changelog)
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
@@ -741,7 +744,8 @@ class JarPublish(JarTask, ScmPublish):
           'classifier': '',
           },
       }
-      product_config.update(self.get_options().publish_extras or {})
+      publish_extras = self.context.config.getdict(self._CONFIG_SECTION, 'publish_extras') or {}
+      product_config.update(publish_extras)
       for product, config in product_config.items():
         if self.context.products.get(product).has(tgt):
           classifier = config.get('classifier', DEFAULT_CLASSIFIER)
