@@ -64,6 +64,9 @@ migrations = {
   ('checkstyle', 'configuration'): ('compile.checkstyle', 'configuration'),
   ('checkstyle', 'properties'): ('compile.checkstyle', 'properties'),
 
+  ('scalastyle', 'config'): ('compile.scalastyle', 'config'),
+  ('scalastyle', 'excludes'): ('compile.scalastyle', 'excludes'),
+
   ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
   ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
 
