@@ -737,7 +737,7 @@ class JarPublish(JarTask, ScmPublish):
         'jars': {
           'classifier': '',
           },
-        }
+      }
       product_config.update(self.get_options().publish_extras or {})
       for product, config in product_config.items():
         if self.context.products.get(product).has(tgt):
@@ -758,8 +758,7 @@ class JarPublish(JarTask, ScmPublish):
                            'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
                            'classifier': classifier,
                            'conf': confs,
-                           'ext': DEFAULT_EXT,
-                          }
+                           'ext': DEFAULT_EXT}
           return stage_artifact(tgt, jar, version, changelog, confs,
                               extra_confs=extra_confs, classifier=classifier)
       raise ValueError('No product mapping in {0} for {1}. '
