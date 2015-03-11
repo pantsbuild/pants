@@ -477,7 +477,6 @@ python_library(
     ':common',
     ':jvm_tool_task_mixin',
     ':nailgun_task',
-    'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/process',
   ],

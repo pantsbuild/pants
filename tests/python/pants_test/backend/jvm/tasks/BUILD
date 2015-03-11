@@ -85,7 +85,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/base:address',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
