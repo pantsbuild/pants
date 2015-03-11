@@ -17,7 +17,6 @@ from pants.util.contextutil import Timer, temporary_dir
 
 class ZincAnalysisTest(unittest.TestCase):
   def setUp(self):
-    super(ZincAnalysisTest, self).setUp()
     self.total_time = 0
 
   def _time(self, work, msg):
