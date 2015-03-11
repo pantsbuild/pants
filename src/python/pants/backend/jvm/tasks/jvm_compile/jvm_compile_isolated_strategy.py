@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
-  """A strategy for JVM compilation that uses a global classpath and analysis."""
+  """A strategy for JVM compilation that uses per-target classpaths and analysis."""
 
   @classmethod
   def register_options(cls, register, language):
