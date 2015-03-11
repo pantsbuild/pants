@@ -27,3 +27,11 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
+
+python_library(
+  name = 'utils',
+  sources = ['utils.py'],
+  dependencies = [
+    '3rdparty/python:pytest',
+  ]
+)

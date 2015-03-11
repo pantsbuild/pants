@@ -12,6 +12,7 @@ from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.backend.jvm.tasks.jvm_compile.utils import provide_compile_strategy
 
 
 class JavaCompileIntegrationTest(PantsRunIntegrationTest):
@@ -78,7 +79,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # But cache_me should be written.
       self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
 
-  def test_java_compile_produces_different_artifact_depending_on_java_version(self):
+  @provide_compile_strategy
+  def test_java_compile_produces_different_artifact_depending_on_java_version(self, strategy):
     # Ensure that running java compile with java 6 and then java 7
     # produces two different artifacts.
 
@@ -87,7 +89,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.unicode.main.main')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
+      pants_run = self.run_pants(['compile.java',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
@@ -98,6 +101,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # Rerun for java 7
       pants_run = self.run_pants(['compile.java',
                                   '--target=1.7',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
