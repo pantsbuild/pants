@@ -92,6 +92,8 @@ python_library(
   name = 'jvm_compile_strategy',
   sources = ['jvm_compile_strategy.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
   ],
