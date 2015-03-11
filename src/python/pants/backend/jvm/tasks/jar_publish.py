@@ -404,7 +404,8 @@ class JarPublish(JarTask, ScmPublish):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', default=None, #advanced=True,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--individual-plugins', advanced=True, default=False, type=bool,
+    register('--individual-plugins', #advanced=True,
+             default=False, type=bool,
              help='Extra products to publish as a individual artifact.')
     cls.register_scm_publish(register)
 

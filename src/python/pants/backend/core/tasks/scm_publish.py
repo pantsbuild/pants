@@ -128,7 +128,8 @@ class ScmPublish(object):
   def register_scm_publish(cls, register):
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
              help='Try pushing the pushdb to the SCM this many times before aborting.')
-    register('--restrict-push-branches', advanced=True, type=Options.list,
+    register('--restrict-push-branches', #advanced=True,
+             type=Options.list,
              help='Allow pushes only from one of these branches.')
 
   def check_clean_master(self, commit=False):
