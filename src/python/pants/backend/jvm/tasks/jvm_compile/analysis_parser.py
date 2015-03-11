@@ -7,12 +7,22 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 
 
 class ParseError(TaskError):
   pass
+
+
+@contextmanager
+def raise_on_eof(infile):
+  try:
+    yield
+  except StopIteration:
+    filename = getattr(infile, 'name', None) or repr(infile)
+    raise ParseError("Unexpected end-of-file parsing {0}".format(filename))
 
 
 class AnalysisParser(object):
@@ -31,12 +41,13 @@ class AnalysisParser(object):
     if not os.path.exists(path):
       return False
     with open(path, 'r') as infile:
-      # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
-      expected_header = '{0}:\n'.format(self.empty_test_header)
-      while infile.next() != expected_header:
-        pass
-      # Now see if this section is empty or not.
-      return self.parse_num_items(infile.next()) > 0
+      with raise_on_eof(infile):
+        # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
+        expected_header = '{0}:\n'.format(self.empty_test_header)
+        while infile.next() != expected_header:
+          pass
+        # Now see if this section is empty or not.
+        return self.parse_num_items(infile.next()) > 0
 
   def parse_from_path(self, infile_path):
     """Parse an analysis instance from a text file."""
