@@ -78,15 +78,15 @@ class AndroidDistribution(object):
     :raises: ``DistributionError`` if tool cannot be found.
     """
     if tool_path not in self._validated_tools:
-      tool_dir = self._get_tool_path(tool_path)
-      android_tool = os.path.join(workdir, os.path.basename(tool_path))
-      if not os.path.isfile(android_tool):
+      android_tool = self._get_tool_path(tool_path)
+      link_path = os.path.join(workdir, os.path.basename(tool_path))
+      if not os.path.isfile(link_path):
         safe_mkdir(workdir)
         try:
-          os.link(tool_dir, android_tool)
+          os.link(android_tool, link_path)
         except OSError as e:
           raise self.DistributionError('Problem creating a link to the android tool: ', e)
-      self._validated_tools[tool_path] = android_tool
+      self._validated_tools[tool_path] = link_path
     return self._validated_tools[tool_path]
 
   def register_android_tool(self, tool_path):
