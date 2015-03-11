@@ -34,7 +34,7 @@ def select_best_url(spec, pinger, log):
   pingtimes = pinger.pings(netlocs)  # List of pairs (host, time in ms).
   log.debug('Artifact cache server ping times: %s' %
             ', '.join(['%s: %3f secs' % p for p in pingtimes]))
-  argmin = min(xrange(len(pingtimes)), key=lambda i: pingtimes[i][1])
+  argmin = min(range(len(pingtimes)), key=lambda i: pingtimes[i][1])
   best_url = urls[argmin]
   if pingtimes[argmin][1] == Pinger.UNREACHABLE:
     return None  # No reachable artifact caches.

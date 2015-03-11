@@ -22,7 +22,7 @@ class JMakeAnalysisParser(AnalysisParser):
     self._expect_header(infile.readline(), 'pcd entries')
     num_pcd_entries = self.parse_num_items(infile.readline())
     pcd_entries = []
-    for i in xrange(0, num_pcd_entries):
+    for i in range(0, num_pcd_entries):
       line = infile.readline()
       tpl = line.split('\t')
       if len(tpl) != 5:
@@ -37,7 +37,7 @@ class JMakeAnalysisParser(AnalysisParser):
     ret = defaultdict(list)
     # Parse more efficiently than above, since we only care about
     # the first two elements in the line.
-    for _ in xrange(0, num_pcd_entries):
+    for _ in range(0, num_pcd_entries):
       line = infile.readline()
       p1 = line.find('\t')
       clsfile = os.path.join(classes_dir, line[0:p1] + '.class')
@@ -51,7 +51,7 @@ class JMakeAnalysisParser(AnalysisParser):
     classpath_elements_by_class = classpath_indexer()
     self._expect_header(infile.readline(), 'pcd entries')
     num_pcd_entries = self.parse_num_items(infile.readline())
-    for _ in xrange(0, num_pcd_entries):
+    for _ in range(0, num_pcd_entries):
       infile.readline()  # Skip these lines.
     src_to_deps = self._parse_deps_at_position(infile)
     ret = defaultdict(set)
@@ -73,7 +73,7 @@ class JMakeAnalysisParser(AnalysisParser):
     self._expect_header(infile.readline(), 'dependencies')
     num_deps = self.parse_num_items(infile.readline())
     src_to_deps = {}
-    for i in xrange(0, num_deps):
+    for i in range(0, num_deps):
       tpl = infile.readline().split('\t')
       src = tpl[0]
       deps = tpl[1:]
