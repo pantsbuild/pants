@@ -24,6 +24,9 @@ python_library(
 python_library(
   name = 'android_distribution',
   sources = ['distribution/android_distribution.py'],
+  dependencies = [
+    'src/python/pants/util:dirutil',
+  ]
 )
 
 python_library(
