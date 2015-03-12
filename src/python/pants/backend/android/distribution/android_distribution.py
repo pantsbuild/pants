@@ -87,7 +87,7 @@ class AndroidDistribution(object):
             safe_mkdir(os.path.dirname(link_path))
             os.link(android_tool, link_path)
           except OSError as e:
-            raise self.DistributionError('Problem creating a link to the android tool: '.format(e))
+            raise self.DistributionError('Problem creating a link to the android tool: {}'.format(e))
         self._validated_tools[tool_path] = link_path
       else:
         self._validated_tools[tool_path] = android_tool
