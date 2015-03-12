@@ -56,4 +56,4 @@ class AaptTask(AndroidTask):
       target_sdk = self._forced_target_sdk
     android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
     # The android.jar is bound for the classpath and so must be under the buildroot.
-    return self.android_sdk.register_tool_link(android_jar, self.workdir)
+    return self.android_sdk.register_android_tool(android_jar, workdir=self.workdir)

@@ -65,43 +65,32 @@ class AndroidDistribution(object):
     self._sdk_path = sdk_path
     self._validated_tools = {}
 
-  def register_tool_link(self, tool_path, workdir):
-    """Verify presence of tool at SDK location tool_path and return a link to that file.
-
-    Pants requires that classpath entries be underneath the buildroot. Android
-    tasks that add Android SDK jars to the classpath should use this method.
-    :param string tool_path: Path to tool, relative to the Android SDK root, e.g
-      'platforms/android-19/android.jar'.
-    :param string workdir: The workdir of the task requesting the tool.
-    :return: Full path to hard link of the android tool.
-    :rtype: string
-    :raises: ``DistributionError`` if tool cannot be found.
-    """
-    if tool_path not in self._validated_tools:
-      android_tool = self._get_tool_path(tool_path)
-      link_path = os.path.join(workdir, os.path.basename(tool_path))
-      if not os.path.isfile(link_path):
-        safe_mkdir(workdir)
-        try:
-          os.link(android_tool, link_path)
-        except OSError as e:
-          raise self.DistributionError('Problem creating a link to the android tool: ', e)
-      self._validated_tools[tool_path] = link_path
-    return self._validated_tools[tool_path]
-
-  def register_android_tool(self, tool_path):
-    """Verify presence of tool at SDK location tool_path and return the full path.
+  def register_android_tool(self, tool_path, workdir=None):
+    """Return a handle for the android tool at SDK location tool_path.
 
     All android tasks should request their tools using this method.
     :param string tool_path: Path to tool, relative to the Android SDK root, e.g
       'platforms/android-19/android.jar'.
-    :return: Full path to android tool.
+    :param string workdir: Path to the calling Task's workdir. Pants will create a link to the
+      android file under workdir.
+    :return: Full path to either the tool or hard link to that tool.
     :rtype: string
     :raises: ``DistributionError`` if tool cannot be found.
     """
     if tool_path not in self._validated_tools:
       android_tool = self._get_tool_path(tool_path)
-      self._validated_tools[tool_path] = android_tool
+      # If an android file is bound for the classpath it must be under buildroot, so create a link.
+      if workdir:
+        link_path = os.path.join(workdir, tool_path)
+        if not os.path.isfile(link_path):
+          try:
+            safe_mkdir(os.path.dirname(link_path))
+            os.link(android_tool, link_path)
+          except OSError as e:
+            raise self.DistributionError('Problem creating a link to the android tool: '.format(e))
+        self._validated_tools[tool_path] = link_path
+      else:
+        self._validated_tools[tool_path] = android_tool
     return self._validated_tools[tool_path]
 
   def _get_tool_path(self, tool_path):
