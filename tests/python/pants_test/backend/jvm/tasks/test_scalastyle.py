@@ -5,14 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 from textwrap import dedent
 
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.scalastyle import Scalastyle
+from pants.backend.jvm.tasks.scalastyle import FileExcluder, Scalastyle
 from pants.base.address import BuildFileAddress
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+
+
+logger = logging.getLogger(__name__)
 
 
 class ScalastyleTest(NailgunTaskTestBase):
@@ -26,53 +29,47 @@ class ScalastyleTest(NailgunTaskTestBase):
   # Internal test helper section
   #
 
-  def _with_skip_option(self):
-    return {
-      self.options_scope: { 'skip': True }
-    }
-
-  def _with_no_skip_option(self):
-    return {
-      self.options_scope: { 'skip': False }
-    }
-
   def _create_scalastyle_config_file(self, rules=None):
     # put a default rule there if rules are not specified.
     rules = rules or ['org.scalastyle.scalariform.ImportGroupingChecker']
     rule_section_xml = ''
     for rule in rules:
-      rule_section_xml += dedent('''
+      rule_section_xml += dedent("""
         <check level="error" class="{rule}" enabled="true"></check>
-      '''.format(rule=rule))
+      """.format(rule=rule))
     return self.create_file(
       relpath='scalastyle_config.xml',
-      contents=dedent('''
+      contents=dedent("""
         <scalastyle commentFilter="enabled">
           <name>Test Scalastyle configuration</name>
           {rule_section_xml}
         </scalastyle>
-      '''.format(rule_section_xml=rule_section_xml)))
+      """.format(rule_section_xml=rule_section_xml)))
 
   def _create_scalastyle_excludes_file(self, exclude_patterns=None):
     return self.create_file(
       relpath='scalastyle_excludes.txt',
       contents='\n'.join(exclude_patterns) if exclude_patterns else '')
 
-  def _create_context(self, config=None, options=None, target_roots=None):
+  def _create_context(self, config=None, excludes=None, skip=False, target_roots=None):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
     # Also by default, the task shouldn't be skipped, so use no skip option.
+    options={
+      'config': config,
+      'skip': skip,
+    }
+    if excludes:
+      options['excludes'] = excludes
+
     return self.context(
-      config=config or dedent('''
-        [scalastyle]
-        config: {config}
-        excludes:
-      '''.format(config=self._create_scalastyle_config_file())),
-      options=options or self._with_no_skip_option(),
+      options={
+        self.options_scope: options
+      },
       target_roots=target_roots)
 
-  def _create_scalastyle_task(self, config=None, options=None):
-    return self.create_task(self._create_context(config, options), self.build_root)
+  def _create_scalastyle_task(self, config=None, excludes=None, skip=False):
+    return self.create_task(self._create_context(config, excludes, skip), self.build_root)
 
   def _create_scalastyle_task_from_context(self, context=None):
     if context:
@@ -85,66 +82,25 @@ class ScalastyleTest(NailgunTaskTestBase):
   #
 
   def test_initialize_config_no_config_settings(self):
-    with self.assertRaises(Config.ConfigError):
-      task = self._create_scalastyle_task(config=dedent('''
-        [scalastyle]
-        # override the default pants.ini [scalastyle].config with empty string
-        # to test the logic: if config setting not specified, we should throw.
-        config:
-        excludes: file_does_not_exist.xml
-      '''))
+    with self.assertRaises(Scalastyle.UnspecifiedConfig):
+      self._create_scalastyle_task(config='').validate_scalastyle_config()
 
   def test_initialize_config_config_setting_exist_but_invalid(self):
-    with self.assertRaises(Config.ConfigError):
-      self._create_scalastyle_task(config=dedent('''
-        [scalastyle]
-        config: file_does_not_exist.xml
-        excludes:
-      '''))
+    with self.assertRaises(Scalastyle.MissingConfig):
+      self._create_scalastyle_task(config='file_does_not_exist.xml').validate_scalastyle_config()
 
-  def test_initialize_config_no_excludes_setting(self):
-    task = self._create_scalastyle_task(config=dedent('''
-      [scalastyle]
-      config: {config}
-      excludes:
-    '''.format(config=self._create_scalastyle_config_file())))
-    # config file shouldn't be none and the task shouldn't be skipped.
-    self.assertIsNotNone(task._scalastyle_config)
-    self.assertFalse(task._should_skip)
-    # but the excludes pattern should remain none.
-    self.assertIsNone(task._scalastyle_excludes)
+  def test_excludes_setting_exists_but_invalid(self):
+    with self.assertRaises(TaskError):
+      FileExcluder('file_does_not_exist.txt', logger)
 
-  def test_initialize_config_excludes_setting_exist_but_invalid(self):
-    with self.assertRaises(Config.ConfigError):
-      self._create_scalastyle_task(config=dedent('''
-        [scalastyle]
-        config: {config}
-        excludes: file_does_not_exist.xml
-      '''.format(config=self._create_scalastyle_config_file())))
-
-  def test_initialize_config_excludes_parsed_loaded_correctly(self):
-    task = self._create_scalastyle_task(config=dedent('''
-      [scalastyle]
-      config: {config}
-      excludes: {excludes}
-    '''.format(
-      config=self._create_scalastyle_config_file(),
-      excludes=self._create_scalastyle_excludes_file(['.*\.cpp', '.*\.py']))))
-    self.assertEqual(2, len(task._scalastyle_excludes))
-    self.assertTrue(task._should_include_source('com/some/org/x.scala'))
-    self.assertFalse(task._should_include_source('com/some/org/y.cpp'))
-    self.assertFalse(task._should_include_source('z.py'))
-
-  def test_should_skip_if_skip_option_specified(self):
-    task = self._create_scalastyle_task(options=self._with_skip_option())
-    self.assertIsNotNone(task._scalastyle_config)
-    self.assertTrue(task._should_skip)
+  def test_excludes_parsed_loaded_correctly(self):
+    excluder = FileExcluder(self._create_scalastyle_excludes_file(['.*\.cpp', '.*\.py']), logger)
+    self.assertEqual(2, len(excluder.excludes))
+    self.assertTrue(excluder.should_include('com/some/org/x.scala'))
+    self.assertFalse(excluder.should_include('com/some/org/y.cpp'))
+    self.assertFalse(excluder.should_include('z.py'))
 
   def test_get_non_synthetic_scala_targets(self):
-    # Create a custom context so we can manually inject multiple
-    # targets of different source types and synthetic vs non-synthetic
-    # to test the target filtering logic.
-
     # scala_library - should remain.
     scala_target_address = BuildFileAddress(
       self.add_to_build_file(
@@ -173,6 +129,8 @@ class ScalastyleTest(NailgunTaskTestBase):
     # synthetic scala_library - should be filtered
     synthetic_scala_target = self.make_target('a/synthetic_scala:ss', ScalaLibrary)
 
+    # Create a custom context so we can manually inject multiple targets of different source types
+    # and synthetic vs non-synthetic to test the target filtering logic.
     context = self._create_context(
       target_roots=[
         java_target,
@@ -187,25 +145,15 @@ class ScalastyleTest(NailgunTaskTestBase):
 
     # Now create the task and run the non_synthetic scala-only filtering.
     task = self._create_scalastyle_task_from_context(context)
-    result_targets = task._get_non_synthetic_scala_targets(context.targets())
+    result_targets = task.get_non_synthetic_scala_targets(context.targets())
 
     # Only the scala target should remain
     self.assertEquals(1, len(result_targets))
     self.assertEqual(scala_target, result_targets[0])
 
   def test_get_non_excluded_scala_sources(self):
-    # Create a custom context so we can manually inject scala targets
-    # with mixed sources in them to test the source filtering logic.
-    context = self._create_context(config=dedent('''
-      [scalastyle]
-      config: {config}
-      excludes: {excludes}
-    '''.format(
-      config=self._create_scalastyle_config_file(),
-      excludes=self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']))))
-
     # this scala target has mixed *.scala and *.java sources.
-    # the *.java source should filtered out.
+    # the *.java source should be filtered out.
     scala_target_address_1 = BuildFileAddress(
       self.add_to_build_file(
         'a/scala_1/BUILD',
@@ -223,25 +171,26 @@ class ScalastyleTest(NailgunTaskTestBase):
     self.build_graph.inject_address_closure(scala_target_address_2)
     scala_target_2 = self.build_graph.get_target(scala_target_address_2)
 
+    # Create a custom context so we can manually inject scala targets
+    # with mixed sources in them to test the source filtering logic.
     context = self._create_context(
-      config=dedent('''
-        [scalastyle]
-        config: {config}
-        excludes: {excludes}
-      '''.format(config=self._create_scalastyle_config_file(),
-                 excludes=self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']))),
+      config=self._create_scalastyle_config_file(),
+      excludes=self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']),
       target_roots=[
         scala_target_1,
         scala_target_2
-      ])
+      ]
+    )
 
     # Remember, we have the extra 'scala-library-2.9.3' dep target.
     self.assertEqual(3, len(context.targets()))
 
     # Now create the task and run the scala source and exclusion filtering.
     task = self._create_scalastyle_task_from_context(context)
-    result_sources = task._get_non_excluded_scala_sources(
-      task._get_non_synthetic_scala_targets(context.targets()))
+
+    result_sources = task.get_non_excluded_scala_sources(
+      task.create_file_excluder(),
+      task.get_non_synthetic_scala_targets(context.targets()))
 
     # Only the scala source from target 1 should remain
     self.assertEquals(1, len(result_sources))
@@ -253,14 +202,14 @@ class ScalastyleTest(NailgunTaskTestBase):
     # Create a scala source that would PASS ImportGroupingChecker rule.
     self.create_file(
       relpath='a/scala/pass.scala',
-      contents=dedent('''
+      contents=dedent("""
         import java.util
         object HelloWorld {
            def main(args: Array[String]) {
               println("Hello, world!")
            }
         }
-      '''))
+      """))
     scala_target_address = BuildFileAddress(
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="pass", sources=["pass.scala"])'),
@@ -268,7 +217,8 @@ class ScalastyleTest(NailgunTaskTestBase):
     self.build_graph.inject_address_closure(scala_target_address)
     scala_target = self.build_graph.get_target(scala_target_address)
 
-    context = self._create_context(target_roots=[scala_target])
+    context = self._create_context(config=self._create_scalastyle_config_file(),
+                                   target_roots=[scala_target])
 
     self.execute(context)
 
@@ -278,7 +228,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     # Create a scala source that would FAIL ImportGroupingChecker rule.
     self.create_file(
       relpath='a/scala/fail.scala',
-      contents=dedent('''
+      contents=dedent("""
         import java.io._
         object HelloWorld {
            def main(args: Array[String]) {
@@ -286,7 +236,7 @@ class ScalastyleTest(NailgunTaskTestBase):
            }
         }
         import java.util._
-      '''))
+      """))
     scala_target_address = BuildFileAddress(
       self.add_to_build_file(
         'a/scala/BUILD', 'scala_library(name="fail", sources=["fail.scala"])'),
