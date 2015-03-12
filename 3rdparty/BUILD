@@ -20,6 +20,12 @@ def add_log4j_excludes(jar):
             .exclude(org='com.sun.jdmk', name='jmxtools')
             .exclude(org='com.sun.jmx', name='jmxri'))
 
+jar_library(name='auto-value',
+            jars=[
+              jar(org='com.google.auto.value', name='auto-value', rev='1.0'),
+            ],
+           )
+
 jar_library(name='checkstyle',
             jars = [
               jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
