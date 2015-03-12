@@ -9,7 +9,8 @@ import os
 import re
 from collections import defaultdict
 
-from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
+from pants.backend.jvm.tasks.jvm_compile.analysis_parser import (AnalysisParser, ParseError,
+                                                                 raise_on_eof)
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import (APIs, Compilations,
                                                                      CompileSetup, Relations,
                                                                      SourceInfos, Stamps,
@@ -27,26 +28,29 @@ class ZincAnalysisParser(AnalysisParser):
       parsed_sections = [self._parse_section(infile, header) for header in cls.headers]
       return cls(parsed_sections)
 
-    self._verify_version(infile)
-    compile_setup = parse_element(CompileSetup)
-    relations = parse_element(Relations)
-    stamps = parse_element(Stamps)
-    apis = parse_element(APIs)
-    source_infos = parse_element(SourceInfos)
-    compilations = parse_element(Compilations)
-    return ZincAnalysis(compile_setup, relations, stamps, apis, source_infos, compilations)
+    with raise_on_eof(infile):
+      self._verify_version(infile)
+      compile_setup = parse_element(CompileSetup)
+      relations = parse_element(Relations)
+      stamps = parse_element(Stamps)
+      apis = parse_element(APIs)
+      source_infos = parse_element(SourceInfos)
+      compilations = parse_element(Compilations)
+      return ZincAnalysis(compile_setup, relations, stamps, apis, source_infos, compilations)
 
   def parse_products(self, infile, classes_dir):
     """An efficient parser of just the products section."""
-    self._verify_version(infile)
-    return self._find_repeated_at_header(infile, 'products')
+    with raise_on_eof(infile):
+      self._verify_version(infile)
+      return self._find_repeated_at_header(infile, 'products')
 
   def parse_deps(self, infile, classpath_indexer, classes_dir):
-    self._verify_version(infile)
-    # Note: relies on the fact that these headers appear in this order in the file.
-    bin_deps = self._find_repeated_at_header(infile, 'binary dependencies')
-    src_deps = self._find_repeated_at_header(infile, 'direct source dependencies')
-    ext_deps = self._find_repeated_at_header(infile, 'direct external dependencies')
+    with raise_on_eof(infile):
+      self._verify_version(infile)
+      # Note: relies on the fact that these headers appear in this order in the file.
+      bin_deps = self._find_repeated_at_header(infile, 'binary dependencies')
+      src_deps = self._find_repeated_at_header(infile, 'direct source dependencies')
+      ext_deps = self._find_repeated_at_header(infile, 'direct external dependencies')
 
     # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
     scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
@@ -84,7 +88,7 @@ class ZincAnalysisParser(AnalysisParser):
         raise ParseError('Expected: "%s:". Found: "%s"' % (expected_header, line))
     n = self.parse_num_items(lines_iter.next())
     relation = defaultdict(list)  # Values are lists, to accommodate relations.
-    for i in xrange(n):
+    for i in range(n):
       k, _, v = lines_iter.next().partition(' -> ')
       if len(v) == 1:  # Value on its own line.
         v = lines_iter.next()

@@ -10,6 +10,7 @@ import os
 import tarfile
 import unittest
 
+from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.contextutil import Timer, temporary_dir
@@ -50,6 +51,14 @@ class ZincAnalysisTest(unittest.TestCase):
 
       analyses = self._time(lambda: [parse(f) for f in analysis_files],
                             'Parsed %d files' % num_analyses)
+
+      # Get the right exception on a busted file
+      f = analysis_files[0]
+      with open(f, 'r+b') as truncated:
+        truncated.seek(-150, os.SEEK_END)
+        truncated.truncate()
+      with self.assertRaises(ParseError):
+        parse(f)
 
       # Write them back out individually.
       writeout_dir = os.path.join(tmpdir, 'write')

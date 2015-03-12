@@ -41,7 +41,7 @@ class JMakeAnalysis(Analysis):
 
     split_pcd_entries = []
     split_src_to_deps = []
-    for _ in xrange(0, num_outputs):
+    for _ in range(0, num_outputs):
       split_pcd_entries.append([])
       split_src_to_deps.append({})
 
