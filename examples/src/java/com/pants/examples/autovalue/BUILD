@@ -14,3 +14,15 @@ java_library(name='autovalue-lib',
     '3rdparty:auto-value',
   ],
 )
+
+annotation_processor(name='auto-value-processor',
+  sources = [],
+  processors = [
+    'com.google.auto.value.processor.AutoValueProcessor',
+    'com.google.auto.value.processor.AutoValueBuilderProcessor',
+    'com.google.auto.value.processor.AutoAnnotationProcessor',
+  ],
+  dependencies = [
+    '3rdparty:auto-value',
+  ],
+)
