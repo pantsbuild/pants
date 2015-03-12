@@ -292,7 +292,7 @@ class IvyUtils(object):
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
     # strategy generally.
     def add_jar(jar):
-      coordinate = (jar.org, jar.name)
+      coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
       jars[coordinate] = jar if not existing else (
         cls._resolve_conflict(existing=existing, proposed=jar)
