@@ -396,8 +396,9 @@ python_library(
   sources = ['jvm_task.py'],
   dependencies = [
     ':common',
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm:jvm_debug_config',
-    'src/python/pants/base:build_environment',
+    'src/python/pants/util:strutil',
   ],
 )
 
