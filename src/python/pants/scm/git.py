@@ -21,6 +21,8 @@ class Git(Scm):
 
     binary: The path to the git binary to use, 'git' by default.
     """
+    # TODO(John Sirois): This is only used as a factory for a Git instance in
+    # pants.base.build_environment.get_scm, encapsulate in a true factory method.
     cmd = [binary, 'rev-parse', '--show-toplevel']
     try:
       process, out = cls._invoke(cmd)

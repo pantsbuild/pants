@@ -225,37 +225,6 @@ class GitTest(unittest.TestCase):
         worktree_relative_to('is/a', clone)
         worktree_relative_to('is/a/dir', clone)
 
-  def test_detect_worktree_nogit(self):
-    with temporary_dir() as path:
-      with environment_as(PATH=path):
-        self.assertIsNone(Git.detect_worktree(), 'No git should be on the path.')
-
-        # The git on the path should not be executable.
-        git = os.path.join(path, 'git')
-        touch(git)
-        self.assertIsNone(Git.detect_worktree())
-        self.assertIsNone(Git.detect_worktree(binary=git))
-
-        # The git on the path is not a proper executable.
-        chmod_plus_x(git)
-        self.assertIsNone(Git.detect_worktree())
-        self.assertIsNone(Git.detect_worktree(binary=git))
-
-        # The git on the path should always fail.
-        with open(git, 'w') as fp:
-          fp.write('#!/bin/sh\n')
-          fp.write('exit 1')
-        self.assertIsNone(Git.detect_worktree())
-        self.assertIsNone(Git.detect_worktree(git))
-
-        # And finally a minimally functional git that should work.
-        with open(git, 'w') as fp:
-          fp.write('#!/bin/sh\n')
-          fp.write('echo /a/fake/worktree/dir')
-        self.assertEqual('/a/fake/worktree/dir', Git.detect_worktree())
-        self.assertEqual('/a/fake/worktree/dir', Git.detect_worktree(binary=git))
-
-
   @property
   def test_changes_in(self):
     """Test finding changes in a diffspecs
@@ -396,3 +365,55 @@ class GitTest(unittest.TestCase):
         self.git.refresh(leave_clean=True)
       # The repo is clean
       self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+
+
+class DetectWorktreeFakeGitTest(unittest.TestCase):
+  @contextmanager
+  def empty_path(self):
+    with temporary_dir() as path:
+      with environment_as(PATH=path):
+        yield path
+
+  @contextmanager
+  def unexecutable_git(self):
+    with self.empty_path() as path:
+      git = os.path.join(path, 'git')
+      touch(git)
+      yield git
+
+  @contextmanager
+  def executable_git(self):
+    with self.unexecutable_git() as git:
+      chmod_plus_x(git)
+      yield git
+
+  def test_detect_worktree_no_git(self):
+    with self.empty_path():
+      self.assertIsNone(Git.detect_worktree())
+
+  def test_detect_worktree_unexectuable_git(self):
+    with self.unexecutable_git() as git:
+      self.assertIsNone(Git.detect_worktree())
+      self.assertIsNone(Git.detect_worktree(binary=git))
+
+  def test_detect_worktree_invalid_executable_git(self):
+    with self.executable_git() as git:
+      self.assertIsNone(Git.detect_worktree())
+      self.assertIsNone(Git.detect_worktree(binary=git))
+
+  def test_detect_worktree_failing_git(self):
+    with self.executable_git() as git:
+      with open(git, 'w') as fp:
+        fp.write('#!/bin/sh\n')
+        fp.write('exit 1')
+      self.assertIsNone(Git.detect_worktree())
+      self.assertIsNone(Git.detect_worktree(git))
+
+  def test_detect_worktree_working_git(self):
+    expected_worktree_dir = '/a/fake/worktree/dir'
+    with self.executable_git() as git:
+      with open(git, 'w') as fp:
+        fp.write('#!/bin/sh\n')
+        fp.write('echo ' + expected_worktree_dir)
+      self.assertEqual(expected_worktree_dir, Git.detect_worktree())
+      self.assertEqual(expected_worktree_dir, Git.detect_worktree(binary=git))
