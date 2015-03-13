@@ -89,4 +89,17 @@ class ContextTest(BaseTest):
     # And verify the predicate operates over both normal and synthetic targets.
     self.assertEquals([syn_b], context.targets(lambda t: t.derived_from != t))
     self.assertEquals([c, b, a], context.targets(lambda t: t.derived_from == t))
->>>>>>> 795b759... Fixup Context to return all synthetic targets in-play.:tests/python/pants_test/goal/test_context.py
+
+  def test_targets_includes_synthetic_dependencies(self):
+    a = self.make_target('a')
+    b = self.make_target('b')
+    context = self.context(target_roots=[b])
+    self.assertEquals([b], context.targets())
+
+    syn_with_deps = context.add_new_target(
+                                           SyntheticAddress.parse('syn_with_deps'),
+                                           Target,
+                                           derived_from=b,
+                                           dependencies=[a])
+
+    self.assertEquals([b, syn_with_deps, a], context.targets())
