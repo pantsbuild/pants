@@ -105,15 +105,15 @@ API Changes
 * BUILD file format cleanup:
 
   - Deprecate bundle().add in favor of bundle(files=)
-  `RB #1788 <https://rbcommons.com/s/twitter/r/1788>`_
+    `RB #1788 <https://rbcommons.com/s/twitter/r/1788>`_
   - Deprecate .intransitive() in favor of argument
-  `RB #1797 <https://rbcommons.com/s/twitter/r/1797>`_
+    `RB #1797 <https://rbcommons.com/s/twitter/r/1797>`_
   - Deprecate target.with_description in favor of target(description=)
-  `RB #1790 <https://rbcommons.com/s/twitter/r/1790>`_
+    `RB #1790 <https://rbcommons.com/s/twitter/r/1790>`_
   - Allow exclude in globs
-  `RB #1790 <https://rbcommons.com/s/twitter/r/1762>`_
+    `RB #1790 <https://rbcommons.com/s/twitter/r/1762>`_
   - Move with_artifacts to an artifacts argument
-  `RB #1672 <https://rbcommons.com/s/twitter/r/1672>`_
+    `RB #1672 <https://rbcommons.com/s/twitter/r/1672>`_
 
 * An attempt to deprecate some old methods
   `RB #1720 <https://rbcommons.com/s/twitter/r/1720>`_
@@ -121,30 +121,30 @@ API Changes
 * Options refactor work
 
   - Make option registration recursion optional
-  `RB #1870 <https://rbcommons.com/s/twitter/r/1870>`_
+    `RB #1870 <https://rbcommons.com/s/twitter/r/1870>`_
   - Remove all direct config uses from jar_publish.py
-  `RB #1844 <https://rbcommons.com/s/twitter/r/1844>`_
+    `RB #1844 <https://rbcommons.com/s/twitter/r/1844>`_
   - Read pants_distdir from options instead of config
-  `RB #1842 <https://rbcommons.com/s/twitter/r/1842>`_
+    `RB #1842 <https://rbcommons.com/s/twitter/r/1842>`_
   - Remove direct config references in thrift gen code
-  `RB #1839 <https://rbcommons.com/s/twitter/r/1839>`_
+    `RB #1839 <https://rbcommons.com/s/twitter/r/1839>`_
   - Android backend now exclusively uses the new option system
-  `RB #1819 <https://rbcommons.com/s/twitter/r/1819>`_
+    `RB #1819 <https://rbcommons.com/s/twitter/r/1819>`_
   - Replace config use in RunTracker with options
-  `RB #1823 <https://rbcommons.com/s/twitter/r/1823>`_
+    `RB #1823 <https://rbcommons.com/s/twitter/r/1823>`_
   - Add pants_bootstradir and pants_configdir to options bootstrapper
-  `RB #1835 <https://rbcommons.com/s/twitter/r/1835>`_
+    `RB #1835 <https://rbcommons.com/s/twitter/r/1835>`_
   - Remove all direct config access in task.py
-  `RB #1827 <https://rbcommons.com/s/twitter/r/1827>`_
+    `RB #1827 <https://rbcommons.com/s/twitter/r/1827>`_
   - Convert config-only options in goal idea and eclipse to use new options format
-  `RB #1805 <https://rbcommons.com/s/twitter/r/1805>`_
+    `RB #1805 <https://rbcommons.com/s/twitter/r/1805>`_
   - Remove config_section from some tasks
-  `RB #1806 <https://rbcommons.com/s/twitter/r/1806>`_
+    `RB #1806 <https://rbcommons.com/s/twitter/r/1806>`_
   - Disallow --no- on the name of boolean flags, refactor existing ones
-  `Issue #34 <https://github.com/pantsbuild/intellij-pants-plugin/issues/34>`_
-  `RB #1799 <https://rbcommons.com/s/twitter/r/1799>`_
+    `Issue #34 <https://github.com/pantsbuild/intellij-pants-plugin/issues/34>`_
+    `RB #1799 <https://rbcommons.com/s/twitter/r/1799>`_
   - Migrating pants.ini config values for protobuf-gen to advanced registered options under gen.protobuf
-  `RB #1741 <https://rbcommons.com/s/twitter/r/1741>`_
+    `RB #1741 <https://rbcommons.com/s/twitter/r/1741>`_
 
 * Add a way to deprecate options with 'deprecated_version' and 'deprecated_hint' kwargs to register()
   `RB #1799 <https://rbcommons.com/s/twitter/r/1799>`_
