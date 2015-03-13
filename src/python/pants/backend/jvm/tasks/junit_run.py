@@ -139,7 +139,7 @@ class _JUnitRunner(object):
                  else self._calculate_tests_from_targets(java_tests_targets))
     if tests:
       bootstrapped_cp = self._task_exports.tool_classpath('junit')
-      junit_classpath = self._task_exports.classpath(targets, cp=bootstrapped_cp, confs=self._task_exports.confs)
+      junit_classpath = self._task_exports.classpath(targets, cp=bootstrapped_cp)
 
       self._context.release_lock()
       self.instrument(targets, tests, junit_classpath)

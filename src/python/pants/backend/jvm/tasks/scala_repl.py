@@ -38,7 +38,7 @@ class ScalaRepl(JvmTask, JvmToolTaskMixin):
       tools_classpath = self.tool_classpath('scala-repl')
       self.context.release_lock()
       with preserve_stty_settings():
-        classpath = self.classpath(targets, cp=tools_classpath, confs=self.confs)
+        classpath = self.classpath(targets, cp=tools_classpath)
 
         print('')  # Start REPL output on a new line.
         try:
