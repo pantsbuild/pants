@@ -103,6 +103,7 @@ API Changes
   `RB #1846 <https://rbcommons.com/s/twitter/r/1846>`_
 
 * BUILD file format cleanup:
+
   - Deprecate bundle().add in favor of bundle(files=)
   `RB #1788 <https://rbcommons.com/s/twitter/r/1788>`_
   - Deprecate .intransitive() in favor of argument
@@ -118,6 +119,7 @@ API Changes
   `RB #1720 <https://rbcommons.com/s/twitter/r/1720>`_
 
 * Options refactor work
+
   - Make option registration recursion optional
   `RB #1870 <https://rbcommons.com/s/twitter/r/1870>`_
   - Remove all direct config uses from jar_publish.py
