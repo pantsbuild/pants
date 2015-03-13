@@ -10,6 +10,8 @@ from contextlib import contextmanager
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import touch
+
 from pants_test.android.test_android_base import TestAndroidBase
 
 
@@ -129,7 +131,7 @@ class TestAndroidDistribution(TestAndroidBase):
       android_sdk.register_android_tool(aapt)
       self.assertIn(aapt, android_sdk._validated_tools)
 
-  def test_register_tool_link(self):
+  def test_register_tool_copy(self):
     with self.distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
@@ -138,7 +140,7 @@ class TestAndroidDistribution(TestAndroidBase):
         self.assertEquals(android_sdk._validated_tools[android_jar],
                           os.path.join(workdir, android_jar))
 
-  def test_register_tool_returns_link(self):
+  def test_register_tool_returns_file(self):
     with self.distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
@@ -146,7 +148,7 @@ class TestAndroidDistribution(TestAndroidBase):
         android_sdk.register_android_tool(android_jar, workdir=workdir)
         self.assertEquals(os.path.isfile(android_sdk._validated_tools[android_jar]), True)
 
-  def test_register_link_is_validated(self):
+  def test_register_copy_is_validated(self):
     with self.distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
@@ -154,7 +156,7 @@ class TestAndroidDistribution(TestAndroidBase):
         android_sdk.register_android_tool(android_jar, workdir=workdir)
         self.assertIn(android_jar, android_sdk._validated_tools)
 
-  def test_register_link_but_no_tool(self):
+  def test_register_copy_but_no_tool(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
       with self.distribution() as sdk:
         with temporary_dir() as workdir:
@@ -164,7 +166,17 @@ class TestAndroidDistribution(TestAndroidBase):
           self.assertEquals(android_sdk._validated_tools[android_jar],
                             os.path.join(workdir, 'android.jar'))
 
-  def test_register_link_no_permission(self):
+  def test_register_copy_file_exists(self):
+    with self.distribution() as sdk:
+      with temporary_dir() as workdir:
+        android_sdk = AndroidDistribution.cached(sdk)
+        android_jar = os.path.join('platforms', 'android-19', 'android.jar')
+        existing_file = os.path.join(workdir, android_jar)
+        touch(existing_file)
+        android_sdk.register_android_tool(android_jar, workdir=workdir)
+        self.assertIn(android_jar, android_sdk._validated_tools)
+
+  def test_register_tool_no_permission(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
       with self.distribution() as sdk:
         with temporary_dir() as workdir:
