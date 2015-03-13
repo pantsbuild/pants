@@ -82,6 +82,10 @@ class IdeGen(JvmToolTaskMixin, Task):
                   'test paths.')
     register('--debug_port', type=int, default=5005,
              help='Port to use for launching tasks under the debugger.')
+    register('--source-jars', action='store_true', default=True,
+             help='Pull source jars from external dependencies into the project.')
+    register('--javadoc-jars', action='store_true', default=True,
+             help='Pull javadoc jars from external dependencies into the project')
 
     # Options intended to be configured primarily in pants.ini
     register('--python_source_paths', action='append', advanced=True,
@@ -109,8 +113,10 @@ class IdeGen(JvmToolTaskMixin, Task):
     round_manager.require_data('ivy_jar_products')
     round_manager.require('jar_dependencies')
     round_manager.require('jar_map_default')
-    round_manager.require('jar_map_sources')
-    round_manager.require('jar_map_javadoc')
+    if options.source_jars:
+      round_manager.require('jar_map_sources')
+    if options.javadoc_jars:
+      round_manager.require('jar_map_javadoc')
 
   class Error(TaskError):
     """IdeGen Error."""
