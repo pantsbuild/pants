@@ -432,7 +432,7 @@ Bugfixes and features
 Bugfixes
 ~~~~~~~~
 
-* Numerous doc improvements and generation fixes
+* Numerous doc improvements & generation fixes
 
   - Steal some info from options docstring
   - Document `--config-override` & `PANTS_` environment vars
