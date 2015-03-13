@@ -4,9 +4,8 @@ RELEASE HISTORY
 0.0.29 (3/9/2015)
 -----------------
 
-
 CI
-~~~
+~~
 * Support local pre-commit checks
   `RB #1883 <https://rbcommons.com/s/twitter/r/1883>`_
 
@@ -30,7 +29,6 @@ CI
 
 * Fixup ci isort check
   `RB #1728 <https://rbcommons.com/s/twitter/r/1728>`_
-
 
 Tests
 ~~~~~
@@ -386,7 +384,7 @@ Bugfixes and features
 * Fix a stragler `.is_apt` usage
   `RB #1724 <https://rbcommons.com/s/twitter/r/1724>`_
 
-* Introduce isort to check *.py import ordering
+* Introduce isort to check `*.py` import ordering
   `RB #1726 <https://rbcommons.com/s/twitter/r/1726>`_
 
 * Upgrade to pex 0.8.5
@@ -425,8 +423,6 @@ Bugfixes and features
 
 * Require pushdb migration to specify a destination directory
   `RB #1684 <https://rbcommons.com/s/twitter/r/1684>`_
-
-
 
 0.0.28 (2/1/2015)
 -----------------
