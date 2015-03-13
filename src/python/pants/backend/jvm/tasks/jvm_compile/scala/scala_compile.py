@@ -60,14 +60,18 @@ class ScalaCompile(JvmCompile):
   # Invalidate caches if the toolchain changes.
   def platform_version_info(self):
     zinc_invalidation_key = self._zinc_utils.platform_version_info()
-    jvm_target_version = ''
 
     # Check scalac args for jvm target version.
+    jvm_target_version = ''
     for arg in self._args:
       if arg.strip().startswith("-S-target:"):
         jvm_target_version = arg.strip()
-
     zinc_invalidation_key.append(jvm_target_version)
+
+    # Invalidate if use of name hashing changes.
+    zinc_invalidation_key.append(
+      'name-hashing-{0}'.format('on' if self.get_options().name_hashing else 'off'))
+
     return zinc_invalidation_key
 
   def extra_products(self, target):
