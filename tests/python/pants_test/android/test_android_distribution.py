@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
-
 from pants_test.android.test_android_base import TestAndroidBase
 
 
