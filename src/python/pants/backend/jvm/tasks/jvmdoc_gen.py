@@ -108,7 +108,7 @@ class JvmdocGen(JvmTask):
     targets = self.context.targets()
     with self.invalidated(filter(docable, targets)) as invalidation_check:
       safe_mkdir(self.workdir)
-      classpath = self.classpath(targets, confs=self.confs)
+      classpath = self.classpath(targets)
 
       def find_jvmdoc_targets():
         invalid_targets = set()

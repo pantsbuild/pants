@@ -48,9 +48,13 @@ class JvmTask(Task):
 
     self.confs = self.get_options().confs
 
-  def classpath(self, targets, cp=None, confs=None):
+  def classpath(self, targets, cp=None):
     classpath = list(cp) if cp else []
     compile_classpaths = self.context.products.get_data('compile_classpath')
     compile_classpath = compile_classpaths.get_for_targets(targets)
-    classpath.extend(path for conf, path in compile_classpath if not confs or conf in confs)
+
+    def conf_needed(conf):
+      return not self.confs or conf in self.confs
+
+    classpath.extend(path for conf, path in compile_classpath if conf_needed(conf))
     return classpath
