@@ -55,6 +55,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
+    register('--strict', default=False, action='store_true', help='Enable strict compilation.')
+    register('--jvm-options', advanced=True, type=Options.list,
+             help='Use these jvm options when running Scrooge.')
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
@@ -152,7 +155,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         args.extend(['--dest', outdir])
         safe_mkdir(outdir)
 
-        if not self.context.config.getbool(_CONFIG_SECTION, 'strict', default=False):
+        if not self.get_options().strict:
           args.append('--disable-strict')
 
         if self.get_options().verbose:
@@ -164,7 +167,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         args.extend(changed_srcs)
 
         classpath = self.tool_classpath('scrooge-gen')
-        jvm_options = self.context.config.getlist(_CONFIG_SECTION, 'jvm_options', default=[])
+        jvm_options = list(self.get_options().jvm_options)
         jvm_options.append('-Dfile.encoding=UTF-8')
         returncode = self.runjava(classpath=classpath,
                                   main='com.twitter.scrooge.Main',
