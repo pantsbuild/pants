@@ -56,7 +56,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
     register('--strict', default=False, action='store_true', help='Enable strict compilation.')
-    register('--jvm-options', advanced=True, type=Options.list,
+    register('--jvm-options', default=[], advanced=True, type=Options.list,
              help='Use these jvm options when running Scrooge.')
     cls.register_jvm_tool(register, 'scrooge-gen')
 
