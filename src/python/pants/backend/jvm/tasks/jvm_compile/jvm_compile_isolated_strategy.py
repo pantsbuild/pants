@@ -102,6 +102,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       compile_contexts[target] = compile_context
 
     # Now compile each invalid target one by one.
+    invalid_vts_count = len(invalidation_check.invalid_vts_partitioned)
     for idx, vts in enumerate(invalidation_check.invalid_vts_partitioned):
       # Invalidated targets are a subset of relevant targets: get the contect for this one.
       assert len(vts.targets) == 1, ("Requested one target per partition, got %s" % vts)
@@ -119,7 +120,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       # Filter the final classpath and gather upstream analysis.
       cp_entries = [entry for conf, entry in compile_classpath if conf in self._confs]
       upstream_analysis = dict(self._upstream_analysis(compile_contexts, compile_context.target))
-      progress_message = 'target {} of {}'.format(idx + 1, len(compile_contexts))
+      progress_message = 'target {} of {}'.format(idx + 1, invalid_vts_count)
 
       compile_vts(vts,
                   compile_context.sources,
