@@ -63,18 +63,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'java_thrift_library',
-  sources = ['test_java_thrift_library.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_file_aliases',
-    'tests/python/pants_test/base:context_utils',
-  ]
-)
-
-python_tests(
   name = 'java_agent',
   sources = ['test_java_agent.py'],
   dependencies=[

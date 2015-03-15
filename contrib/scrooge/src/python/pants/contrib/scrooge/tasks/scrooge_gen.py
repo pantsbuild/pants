@@ -66,7 +66,6 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
-    self.defaults = JavaThriftLibrary.Defaults(self.context.config)
 
   @property
   def config_section(self):
@@ -90,8 +89,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     self._validate_compiler_configs(targets)
 
     gentargets_by_dependee = self.context.dependents(
-        on_predicate=self.is_gentarget,
-        from_predicate=lambda t: not self.is_gentarget(t))
+        on_predicate=self.is_scroogetarget,
+        from_predicate=lambda t: not self.is_scroogetarget(t))
 
     dependees_by_gentarget = defaultdict(set)
     for dependee, tgts in gentargets_by_dependee.items():
@@ -99,11 +98,11 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
         dependees_by_gentarget[gentarget].add(dependee)
 
     partial_cmds = defaultdict(set)
-    gentargets = filter(self.is_gentarget, targets)
+    gentargets = filter(self.is_scroogetarget, targets)
 
     for target in gentargets:
-      language = self.defaults.get_language(target)
-      rpc_style = self.defaults.get_rpc_style(target)
+      language = target.language(self.get_options())
+      rpc_style = target.rpc_style(self.get_options())
       partial_cmd = self.PartialCmd(
           language=language,
           rpc_style=rpc_style,
@@ -124,7 +123,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       for gentarget, langtarget in langtarget_by_gentarget.items():
         genmap.add(gentarget, get_buildroot(), [langtarget])
         for dep in gentarget.dependencies:
-          if self.is_gentarget(dep):
+          if self.is_scroogetarget(dep):
             langtarget.inject_dependency(langtarget_by_gentarget[dep].address)
 
   def gen(self, partial_cmd, targets):
@@ -133,7 +132,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)
 
-      import_paths, changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
+      import_paths, changed_srcs = calculate_compile_sources(invalid_targets, self.is_scroogetarget)
       outdir = self._outdir(partial_cmd)
       if changed_srcs:
         args = []
@@ -189,7 +188,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     return self.gen_file_map(targets, outdir)
 
   def createtarget(self, gentarget, dependees, outdir, gen_files_for_source):
-    assert self.is_gentarget(gentarget)
+    assert self.is_scroogetarget(gentarget)
 
     def create_target(files, deps, target_type):
       spec = '{spec_path}:{name}'.format(spec_path=outdir, name=gentarget.id)
@@ -224,7 +223,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       return self.GenInfo(gen, deps)
 
     return self._inject_target(gentarget, dependees,
-                               create_geninfo(self.defaults.get_language(gentarget)),
+                               create_geninfo(gentarget.language(self.get_options())),
                                gen_files_for_source,
                                create_target)
 
@@ -238,7 +237,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       files.extend(genfiles)
     deps = OrderedSet(geninfo.deps['service' if has_service else 'structs'])
     deps.update(target.dependencies)
-    target_type = _TARGET_TYPE_FOR_LANG[self.defaults.get_language(target)]
+    target_type = _TARGET_TYPE_FOR_LANG[target.language(self.get_options())]
     tgt = create_target(files, deps, target_type)
     tgt.add_labels('codegen')
     for dependee in dependees:
@@ -271,7 +270,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   def write_gen_file_map_for_target(self, gen_file_map, target, outdir):
     def calc_srcs(target):
-      _, srcs = calculate_compile_sources([target], self.is_gentarget)
+      _, srcs = calculate_compile_sources([target], self.is_scroogetarget)
       return srcs
     with safe_open(self.gen_file_map_path_for_target(target, outdir), 'w') as f:
       for src in sorted(calc_srcs(target)):
@@ -283,26 +282,25 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     for target in targets:
       self.write_gen_file_map_for_target(gen_file_map, target, outdir)
 
-  def is_gentarget(self, target):
+  def is_scroogetarget(self, target):
     if not isinstance(target, JavaThriftLibrary):
       return False
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    compiler = self.defaults.get_compiler(target)
-    if compiler != 'scrooge':
+    if target.compiler(self.get_options()) != 'scrooge':
       return False
 
-    language = self.defaults.get_language(target)
+    language = target.language(self.get_options())
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 
   def _validate_compiler_configs(self, targets):
-    self._validate(self.defaults, targets)
+    self._validate(self.options, targets)
 
   @staticmethod
-  def _validate(defaults, targets):
+  def _validate(options, targets):
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
@@ -312,8 +310,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       # sources. As there's no permutation allowing the creation of
       # incompatible sources with the same language+rpc_style we omit
       # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=defaults.get_language(tgt),
-                                    rpc_style=defaults.get_rpc_style(tgt))
+      return ValidateCompilerConfig(language=tgt.language(options),
+                                    rpc_style=tgt.rpc_style(options))
 
     mismatched_compiler_configs = defaultdict(set)
 

@@ -89,13 +89,6 @@ class ApacheThriftGen(CodeGen):
       self._thrift_binary = select_thrift_binary(self.context.options)
     return self._thrift_binary
 
-  _defaults = None
-  @property
-  def defaults(self):
-    if self._defaults is None:
-      self._defaults = JavaThriftLibrary.Defaults(self.context.config)
-    return self._defaults
-
   def create_geninfo(self, key):
     gen_info = self.get_options()[key]
     gen = gen_info['gen']
@@ -128,7 +121,7 @@ class ApacheThriftGen(CodeGen):
 
   def is_gentarget(self, target):
     return ((isinstance(target, JavaThriftLibrary)
-             and self.defaults.get_compiler(target) == 'thrift')
+             and target.compiler(self.get_options()) == 'thrift')
             or isinstance(target, PythonThriftLibrary))
 
   def is_forced(self, lang):
