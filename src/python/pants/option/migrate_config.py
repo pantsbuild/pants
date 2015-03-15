@@ -48,7 +48,6 @@ migrations = {
   ('specs-run', 'jvm_args'): ('test.specs', 'jvm_options'),
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
-  ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
   ('ivy-resolve', 'jvm_args'): ('resolve.ivy', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
@@ -188,6 +187,15 @@ migrations = {
   ('resolve.ivy', 'ng_daemons'): ('resolve.ivy', 'use_nailgun'),
 
   ('thrift-linter', 'ng_daemons'): ('thrift-linter', 'use_nailgun'),
+
+  # Migration of the scrooge contrib module to the new options system.
+  ('java-thrift-library', 'compiler'): ('DEFAULT', 'thrift-default-compiler'),
+  ('java-thrift-library', 'language'): ('DEFAULT', 'thrift-default-language'),
+  ('java-thrift-library', 'rpc_style'): ('DEFAULT', 'thrift-default-rpc_style'),
+  ('scrooge-gen', 'jvm_args'): ('gen.scrooge', 'jvm_options'),
+  ('scrooge-gen', 'jvm_options'): ('gen.scrooge', 'jvm_options'),
+  ('scrooge-gen', 'strict'): ('gen.scrooge', 'strict'),
+  ('thrift-linter', 'strict'): ('thrift-linter', 'strict_default'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
