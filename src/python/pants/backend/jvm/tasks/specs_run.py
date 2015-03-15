@@ -25,10 +25,6 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
     register('--test', action='append',
              help='Force running of just these specs.  Tests can be specified either by fully '
                   'qualified classname or full file path.')
-    register('--color', action='store_true', default=True,
-             deprecated_version='0.0.30',
-             deprecated_hint='Use the --colors and --no-colors instead of --color and --no-color.',
-             help='Toggle displaying console messages in color.')
     cls.register_jvm_tool(register, 'specs', default=['//:scala-specs'])
 
   @classmethod
@@ -45,21 +41,14 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     super(SpecsRun, self).__init__(*args, **kwargs)
     self.skip = self.get_options().skip
-    self.colors = self.get_options().colors
     self.tests = self.get_options().test
 
   def execute(self):
-    # TODO(Eric Ayers) Remove this logic after 0.0.30 along with the option itself.
-    if self.get_options().color is False:
-      print("--no-color is obsolete and will be removed.  Specify --no-colors instead.",
-            file=sys.stderr)
-      self.colors = self.get_options().color
-
     if not self.skip:
       targets = self.context.targets()
 
       def run_tests(tests):
-        args = ['--color'] if self.colors else []
+        args = ['--color'] if self.get_options().colors else []
         args.append('--specs=%s' % ','.join(tests))
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
