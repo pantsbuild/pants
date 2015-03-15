@@ -176,7 +176,7 @@ This `post` creates a new review, but does not yet publish it.
 
 At the provided URL, there's a web form. To get your change reviewed,
 you must fill in the change description, reviewers, testing done, etc.
-To make sure it gets seen be the appropriate people and that they have
+To make sure it gets seen by the appropriate people and that they have
 the appropriate context, add:
 
 - `pants-reviews` to the Groups field
