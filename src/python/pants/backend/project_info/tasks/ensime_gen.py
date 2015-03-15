@@ -11,7 +11,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.tasks.ide_gen import IdeGen
+from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
 from pants.util.dirutil import safe_open

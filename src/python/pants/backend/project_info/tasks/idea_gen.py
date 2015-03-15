@@ -13,7 +13,7 @@ from xml.dom import minidom
 
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.scala_tests import ScalaTests
-from pants.backend.jvm.tasks.ide_gen import IdeGen, Project
+from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData

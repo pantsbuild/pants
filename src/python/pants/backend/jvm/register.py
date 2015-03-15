@@ -28,13 +28,7 @@ from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
-from pants.backend.jvm.tasks.dependencies import Dependencies
-from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
-from pants.backend.jvm.tasks.eclipse_gen import EclipseGen
-from pants.backend.jvm.tasks.ensime_gen import EnsimeGen
-from pants.backend.jvm.tasks.filedeps import FileDeps
-from pants.backend.jvm.tasks.idea_gen import IdeaGen
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
@@ -195,25 +189,6 @@ def register_goals():
     serialize=False
   ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
 
-  # IDE support.
-  task(name='idea', action=IdeaGen).install().with_description(
-      'Create an IntelliJ IDEA project from the given targets.')
-
-  task(name='eclipse', action=EclipseGen).install().with_description(
-      'Create an Eclipse project from the given targets.')
-
-  task(name='ensime', action=EnsimeGen).install().with_description(
-      'Create an Ensime project from the given targets.')
-
   # Build graph information.
   task(name='provides', action=Provides).install().with_description(
       'Print the symbols provided by the given targets.')
-
-  # XXX(pl): These should be core, but they have dependencies on JVM
-  task(name='depmap', action=Depmap).install().with_description("Depict the target's dependencies.")
-
-  task(name='dependencies', action=Dependencies).install().with_description(
-      "Print the target's dependencies.")
-
-  task(name='filedeps', action=FileDeps).install('filedeps').with_description(
-      'Print out the source and BUILD files the target depends on.')

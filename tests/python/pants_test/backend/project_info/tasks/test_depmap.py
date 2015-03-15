@@ -20,7 +20,7 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.depmap import Depmap
+from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
 from pants_test.tasks.test_base import ConsoleTaskTest

@@ -5,8 +5,6 @@ target(
   name = 'tasks',
   dependencies = [
     ':checkstyle',
-    ':ide_gen',
-    ':idea_gen',
     ':ivy_imports',
     ':junit_run',
     ':scalastyle',
@@ -25,31 +23,6 @@ python_tests(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )
-
-python_tests(
-  name = 'ide_gen',
-  sources = ['test_ide_gen.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks:ide_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:source_root',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'idea_gen',
-  sources = ['test_idea_gen.py'],
-  dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm/tasks:ide_gen',
-    'src/python/pants/backend/jvm/tasks:idea_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:source_root',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
 
 python_tests(
   name = 'ivy_imports',
