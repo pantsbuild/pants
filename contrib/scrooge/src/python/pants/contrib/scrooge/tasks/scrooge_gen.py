@@ -32,7 +32,7 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
-  GenInfo = namedtuple('GenInfo', ['gen', 'deps'])
+  DepInfo = namedtuple('DepInfo', ['service', 'structs'])
 
   class DepLookupError(AddressLookupError):
     """Thrown when a dependency can't be found."""
@@ -58,6 +58,12 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     register('--strict', default=False, action='store_true', help='Enable strict compilation.')
     register('--jvm-options', default=[], advanced=True, type=Options.list,
              help='Use these jvm options when running Scrooge.')
+    register('--service-deps', default={}, advanced=True, type=Options.dict,
+             help='A map of language to targets to add as dependencies of '
+                  'synthetic thrift libraries that contain services.')
+    register('--structs-deps', default={}, advanced=True, type=Options.dict,
+             help='A map of language to targets to add as dependencies of '
+                  'synthetic thrift libraries that contain structs.')
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
@@ -66,6 +72,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
+    self._depinfo = None
 
   @property
   def config_section(self):
@@ -84,6 +91,24 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def _outdir(self, partial_cmd):
     return os.path.join(self.workdir, partial_cmd.relative_outdir)
 
+  def _resolve_deps(self, depmap):
+    """Given a map of gen-key=>target specs, resolves the target specs into references."""
+    deps = dict()
+    for category, depspecs in gen_info['deps'].items():
+      dependencies = OrderedSet()
+      deps[category] = dependencies
+      for depspec in depspecs:
+        try:
+          dependencies.update(self.context.resolve(depspec))
+        except AddressLookupError as e:
+          raise self.DepLookupError("{message}\n  referenced from [{section}] key: " \
+                                    "gen->deps->{category} in pants.ini".format(
+                                      message=e,
+                                      section=_CONFIG_SECTION,
+                                      category=category
+                                    ))
+    return deps
+
   def execute(self):
     targets = self.context.targets()
     self._validate_compiler_configs(targets)
@@ -99,6 +124,11 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
     partial_cmds = defaultdict(set)
     gentargets = filter(self.is_scroogetarget, targets)
+    if not gentargets:
+      return
+
+    self._depinfo = DepInfo(self._resolve_deps(self.get_options().service_deps),
+                            self._resolve_deps(self.get_options().structs_deps))
 
     for target in gentargets:
       language = target.language(self.get_options())
@@ -201,33 +231,11 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                          excludes=gentarget.excludes,
                                          derived_from=gentarget)
 
-    def create_geninfo(key):
-      gen_info = self.context.config.getdict(_CONFIG_SECTION, key,
-                                             default={'gen': key,
-                                                      'deps': {'service': [], 'structs': []}})
-      gen = gen_info['gen']
-      deps = dict()
-      for category, depspecs in gen_info['deps'].items():
-        dependencies = OrderedSet()
-        deps[category] = dependencies
-        for depspec in depspecs:
-          try:
-            dependencies.update(self.context.resolve(depspec))
-          except AddressLookupError as e:
-            raise self.DepLookupError("{message}\n  referenced from [{section}] key: " \
-                                      "gen->deps->{category} in pants.ini".format(
-                                        message=e,
-                                        section=_CONFIG_SECTION,
-                                        category=category
-                                      ))
-      return self.GenInfo(gen, deps)
-
     return self._inject_target(gentarget, dependees,
-                               create_geninfo(gentarget.language(self.get_options())),
                                gen_files_for_source,
                                create_target)
 
-  def _inject_target(self, target, dependees, geninfo, gen_files_for_source, create_target):
+  def _inject_target(self, target, dependees, gen_files_for_source, create_target):
     files = []
     has_service = False
     for source in target.sources_relative_to_buildroot():
@@ -235,9 +243,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genfiles = gen_files_for_source[source]
       has_service = has_service or services
       files.extend(genfiles)
-    deps = OrderedSet(geninfo.deps['service' if has_service else 'structs'])
+    language = target.language(self.get_options())
+    target_type = _TARGET_TYPE_FOR_LANG[language]
+    deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language]])
     deps.update(target.dependencies)
-    target_type = _TARGET_TYPE_FOR_LANG[target.language(self.get_options())]
     tgt = create_target(files, deps, target_type)
     tgt.add_labels('codegen')
     for dependee in dependees:
