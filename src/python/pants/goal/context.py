@@ -262,7 +262,10 @@ class Context(object):
                                              derived_from=derived_from,
                                              **kwargs)
     new_target = self.build_graph.get_target(address)
-    self._synthetic_targets[derived_from].append(new_target)
+
+    if derived_from:
+      self._synthetic_targets[derived_from].append(new_target)
+
     return new_target
 
   def targets(self, predicate=None, postorder=False):
@@ -284,10 +287,6 @@ class Context(object):
     for derived_from, synthetic_targets in self._synthetic_targets.items():
       if derived_from in target_set or derived_from in synthetics:
         synthetics.update(synthetic_targets)
-      else:
-        self.log.debug(
-          "Found synthetic targets derived from {}, which is outside the expected graph.".format(
-            derived_from.address))
 
     synthetic_set = self._collect_targets(synthetics, postorder=postorder)
 
