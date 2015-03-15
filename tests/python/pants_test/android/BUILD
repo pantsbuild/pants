@@ -76,6 +76,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android:android_distribution',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/android:android_base',
   ]
 )
