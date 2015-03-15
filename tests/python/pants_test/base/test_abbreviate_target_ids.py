@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
-
 from itertools import permutations
 
 from pants.base.abbreviate_target_ids import abbreviate_target_ids

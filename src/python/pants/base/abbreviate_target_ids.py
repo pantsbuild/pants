@@ -5,8 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from itertools import combinations
+
 
 def abbreviate_target_ids(targets):
   """Map a list of target IDs to shortened versions.
