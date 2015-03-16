@@ -60,13 +60,49 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             )
         """.format(org=self.b_org, name=self.b_name)))
 
+    self.add_to_build_file('3rdparty',
+        dedent("""
+            jar_library(
+              name='example-morx',
+              jars = [
+                jar(org='commons-lang', name='commons-lang', rev='2.5', classifier='morx'),
+              ]
+            )
+            jar_library(
+              name='example-fleem',
+              jars = [
+                jar(org='commons-lang', name='commons-lang', rev='2.5', classifier='fleem'),
+              ]
+            )
+        """))
+
+    self.add_to_build_file('src/java/targets',
+        dedent("""
+            java_library(
+              name='c',
+              dependencies=[
+                '3rdparty:example-morx',
+                '3rdparty:example-fleem',
+              ],
+              sources=['w.java'],
+            )
+        """.format(org=self.b_org, name=self.b_name)))
+
     self.a = self.target('src/java/targets:a')
     self.b = self.target('src/java/targets:b')
+    self.c = self.target('src/java/targets:c')
     context = self.context()
 
   def test_exclude_exported(self):
     _, excludes = IvyUtils.calculate_classpath([self.b])
     self.assertEqual(excludes, set([Exclude(org=self.b_org, name=self.b_name)]))
+
+  def test_classifiers(self):
+    jars, _ = IvyUtils.calculate_classpath([self.c])
+    self.assertEquals(2, len(jars))
+    jars.sort(key=lambda jar : jar.classifier)
+    self.assertEquals('fleem', jars[0].classifier)
+    self.assertEquals('morx', jars[1].classifier)
 
   def test_force_override(self):
     jars = list(self.a.payload.jars)

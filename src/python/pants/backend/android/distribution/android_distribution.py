@@ -6,6 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
+
+from pants.util.dirutil import safe_mkdir
 
 
 class AndroidDistribution(object):
@@ -63,25 +66,42 @@ class AndroidDistribution(object):
     self._sdk_path = sdk_path
     self._validated_tools = {}
 
-  def register_android_tool(self, tool_path):
-    """Verify presence of tool at SDK location tool_path and return the full path.
+  def register_android_tool(self, tool_path, workdir=None):
+    """Return the full path for the tool at SDK location tool_path or of a copy under workdir.
 
     All android tasks should request their tools using this method.
     :param string tool_path: Path to tool, relative to the Android SDK root, e.g
       'platforms/android-19/android.jar'.
-    :return: Full path to android tool.
+    :param string workdir: Location for the copied file. Pants will put a copy of the
+      android file under workdir.
+    :return: Full path to either the tool or a created copy of that tool.
     :rtype: string
     :raises: ``DistributionError`` if tool cannot be found.
     """
     if tool_path not in self._validated_tools:
-      android_tool = os.path.join(self._sdk_path, tool_path)
-      if os.path.isfile(android_tool):
-        # Use entire relative path as a key since the SDK usually has multiple copies of each tool.
-        self._validated_tools[tool_path] = android_tool
+      android_tool = self._get_tool_path(tool_path)
+      # If an android file is bound for the classpath it must be under buildroot, so create a copy.
+      if workdir:
+        copy_path = os.path.join(workdir, tool_path)
+        if not os.path.isfile(copy_path):
+          try:
+            safe_mkdir(os.path.dirname(copy_path))
+            shutil.copy(android_tool, copy_path)
+          except OSError as e:
+            raise self.DistributionError('Problem creating copy of the android tool: {}'.format(e))
+        self._validated_tools[tool_path] = copy_path
       else:
-        raise self.DistributionError('There is no {} installed. The Android SDK may need to be '
-                                     'updated.'.format(android_tool))
+        self._validated_tools[tool_path] = android_tool
     return self._validated_tools[tool_path]
+
+  def _get_tool_path(self, tool_path):
+    """Return full path of tool if it is found on disk."""
+    android_tool = os.path.join(self._sdk_path, tool_path)
+    if os.path.isfile(android_tool):
+      return android_tool
+    else:
+      raise self.DistributionError('There is no {} installed. The Android SDK may need to be '
+                                   'updated.'.format(android_tool))
 
   def __repr__(self):
     return 'AndroidDistribution({})'.format(self._sdk_path)

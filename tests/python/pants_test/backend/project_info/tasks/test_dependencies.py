@@ -9,7 +9,7 @@ from pants.backend.core.targets.dependencies import Dependencies as DepBag
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.dependencies import Dependencies
+from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary

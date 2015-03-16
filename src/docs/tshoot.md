@@ -22,7 +22,7 @@ will be logged under `.pants.d/runs`.
 
 An easy way to view this output is to use the reporting server.
 
-```
+```bash
 $ ./pants server --open
 Launching server with pid 6991 at http://localhost:49266
 ```
@@ -102,6 +102,119 @@ To debug this, look in `.pants.d/ng/*/*`: these files should be named
 One typical cause behind this symptom: if you removed your machine's Ivy
 cache, Pants may try to use symbolic links to files that have gone away.
 To recover from this, <a pantsref="washpants">scrub the environment</a>.
+
+Troubleshooting Ivy download failures
+---------------------------------
+
+Sometimes Ivy will refuse to download a particular artifact.   When
+the ivy step fails, pants echos the ivy output to the console.
+You can go back and look at previous runs or get more insight
+by starting the reporting server with `./pants server --open` and
+looking at the report for the failed run.
+
+* If you missed it the first time, you can open up the `[ivy-resolve]`
+or one of the `bootstrap` steps in the output and check the stderr
+and stdout links.
+
+* Using a web browser, navigate to the URLs that are failing the Ivy
+download and see if you can download the artifact manually.
+If you are downloading through a proxy you may find a configuration
+issue or an artifact missing from the proxy's cache.
+
+There are other options you can use to enable more debugging in
+Ivy if you think you need it.
+
+### Add the `-debug` flag to the ivy tool
+
+You can get more debugging in the ivy resolve task by passing the
+`-debug` argument when ivy is invoked:
+
+```ini
+[resolve.ivy]
+args: [ "-debug" ]
+```
+
+This makes the ivy output much more verbose.  You can see the output in the
+pants reporting server window for stderr and stdout for the
+`[ivy-resolve]` step.  This setting does not affect the output of the
+bootstrapping task for downloading tools.
+
+### Turn on HTTP header debugging in Ivy
+
+This is a bit more involved, but gives you deeper inspection into the
+network traffic between Ivy and the repo.
+
+First, you need to add commons-httpclient to the bootstrapped ivy
+installation by creating a custom ivy.xml.  You can
+start with the org.apache.ivy xml file under the ivy cache and just
+add a dependency for commons-httpclient as follows:
+
+```xml
+$ cat ./ivy-with-commons-httpclient.xml
+<ivy-module version="2.0">
+        <info organisation="org.apache.ivy" module="ivy-caller" />
+        <configurations defaultconf="default" />
+        <dependencies>
+                <dependency org="org.apache.ivy" name="ivy" rev="2.3.0" />
+                <dependency org="commons-httpclient" name="commons-httpclient" rev="3.0" />
+        </dependencies>
+</ivy-module>
+```
+
+Then, reference your modified ivy profile from pants.ini and flip on
+some extra logging in the commons-httpclient by setting some system properties:
+
+```ini
+[ivy]
+ivy_profile: ivy-with-commons-httpclient.xml
+
+# Enable httpcommons debugging when bootstrapping tools
+[bootstrap.bootstrap-jvm-tools]
+jvm_options: [
+    "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
+    "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
+    "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
+    "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",
+  ]
+
+# Enable httpcommons debugging when resolving 3rdparty libraries
+[resolve.ivy]
+jvm_options: [
+    "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
+    "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
+    "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
+    "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",
+	]
+```
+
+You'll be able to see the output in the pants reporting server output
+by expanding the `stderr` nodes.
+
+```
+2015/03/12 03:55:56:456 PDT [DEBUG] HttpConnection - -Open connection to repo1.maven.org:443
+2015/03/12 03:55:57:144 PDT [DEBUG] header - ->> "HEAD /maven2/org/antlr/antlr4/4.1/antlr4-4.1.pom HTTP/1.1[\r][\n]"
+2015/03/12 03:55:57:144 PDT [DEBUG] HttpMethodBase - -Adding Host request header
+2015/03/12 03:55:57:149 PDT [DEBUG] header - ->> "User-Agent: Apache Ivy/2.3.0[\r][\n]"
+2015/03/12 03:55:57:150 PDT [DEBUG] header - ->> "Host: repo1.maven.org[\r][\n]"
+2015/03/12 03:55:57:150 PDT [DEBUG] header - ->> "[\r][\n]"
+2015/03/12 03:55:57:448 PDT [DEBUG] header - -<< "HTTP/1.1 200 OK[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Date: Thu, 12 Mar 2015 10:55:57 GMT[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Server: nginx[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Content-Type: text/xml[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Content-Length: 4800[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Last-Modified: Fri, 05 Jul 2013 21:35:45 GMT[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "ETag: "51d73c31-12c0"[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Accept-Ranges: bytes[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Accept-Ranges: bytes[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -<< "Via: 1.1 varnish[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "Accept-Ranges: bytes[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "Via: 1.1 varnish[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "X-Served-By: cache-iad2127-IAD, cache-atl6233-ATL[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "X-Cache: MISS, MISS[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "X-Cache-Hits: 0, 0[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "X-Timer: S1426157757.333469,VS0,VE36[\r][\n]"
+```
+
 
 Questions, Issues, Bug Reports
 ------------------------------

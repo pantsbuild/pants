@@ -7,6 +7,7 @@ target(
     'tests/python/pants_test/backend/codegen',
     'tests/python/pants_test/backend/core',
     'tests/python/pants_test/backend/jvm',
+    'tests/python/pants_test/backend/project_info',
     'tests/python/pants_test/backend/python',
   ]
 )

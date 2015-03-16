@@ -15,8 +15,6 @@ print(os.path.relpath("${PRE_COMMIT_SRC}", "${HOOK_DIR}"))
 EOF
 )"
 
-source "${REPO_ROOT}/build-support/common.sh"
-
 function install_pre_commit_hook() {
   (
     cd "${HOOK_DIR}" && \
@@ -30,10 +28,10 @@ if [[ ! -e "${PRE_COMMIT_DEST}" ]]
 then
   install_pre_commit_hook
 else
-  existing_hook_sig="$(cat "${PRE_COMMIT_DEST}" | fingerprint_data)"
-  canonical_hook_sig="$(cat "${PRE_COMMIT_SRC}" | fingerprint_data)"
-  if [[ "${existing_hook_sig}" != "${canonical_hook_sig}" ]]
+  if cmp --quiet "${PRE_COMMIT_SRC}" "${PRE_COMMIT_DEST}"
   then
+    echo "Pre-commit checks up to date."
+  else
     read -p "A pre-commit script already exists, replace with ${PRE_COMMIT_SRC}? [Yn]" ok
     if [[ "${ok:-Y}" =~ ^[yY]([eE][sS])?$ ]]
     then
@@ -42,8 +40,6 @@ else
       echo "Pre-commit checks not installed"
       exit 1
     fi
-  else
-    echo "Pre-commit checks up to date."
   fi
 fi
 exit 0

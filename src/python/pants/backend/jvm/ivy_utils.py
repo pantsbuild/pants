@@ -199,7 +199,7 @@ class IvyUtils(object):
     """The path to the xml report ivy creates after a retrieve."""
     org, name = cls.identify(targets)
     cachedir = Bootstrapper.instance().ivy_cache_dir
-    return os.path.join(cachedir, '%s-%s-%s.xml' % (org, name, conf))
+    return os.path.join(cachedir, '{}-{}-{}.xml'.format(org, name, conf))
 
   @classmethod
   def parse_xml_report(cls, targets, conf):
@@ -292,7 +292,7 @@ class IvyUtils(object):
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
     # strategy generally.
     def add_jar(jar):
-      coordinate = (jar.org, jar.name)
+      coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
       jars[coordinate] = jar if not existing else (
         cls._resolve_conflict(existing=existing, proposed=jar)
@@ -325,24 +325,24 @@ class IvyUtils(object):
         return proposed
       return existing
     elif existing.force and proposed.force:
-      raise TaskError('Cannot force %s#%s to both rev %s and %s' % (
-        proposed.org, proposed.name, existing.rev, proposed.rev
+      raise TaskError('Cannot force {}#{};{} to both rev {} and {}'.format(
+        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
       ))
     elif existing.force:
-      logger.debug('Ignoring rev %s for %s#%s already forced to %s' % (
-        proposed.rev, proposed.org, proposed.name, existing.rev
+      logger.debug('Ignoring rev {} for {}#{};{} already forced to {}'.format(
+        proposed.rev, proposed.org, proposed.name, proposed.classifier or '', existing.rev
       ))
       return existing
     elif proposed.force:
-      logger.debug('Forcing %s#%s from %s to %s' % (
-        proposed.org, proposed.name, existing.rev, proposed.rev
+      logger.debug('Forcing {}#{};{} from {} to {}'.format(
+        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
       ))
       return proposed
     else:
       try:
         if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
-          logger.debug('Upgrading %s#%s from rev %s  to %s' % (
-            proposed.org, proposed.name, existing.rev, proposed.rev,
+          logger.debug('Upgrading {}#{};{} from rev {}  to {}'.format(
+            proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev,
           ))
           return proposed
         else:

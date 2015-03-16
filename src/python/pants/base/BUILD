@@ -164,6 +164,7 @@ python_library(
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/maven_layout:plugin',
+    'src/python/pants/backend/project_info:plugin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:build_configuration',
   ]

@@ -156,7 +156,7 @@ class DependencyWriter(object):
     self.template_package_name = template_package_name or __name__
     self.template_relpath = template_relpath
 
-  def write(self, target, path, confs=None, extra_confs=None):
+  def write(self, target, path, confs=None, extra_confs=None, classifier=None):
     # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
     # codegen target - say java_thrift_library - and the synthetic generated target (java_library)
     # Consider reworking codegen tasks to add removal of the original codegen targets when rewriting
@@ -166,31 +166,32 @@ class DependencyWriter(object):
     configurations = set(confs or [])
     for dep in target_internal_dependencies(target):
       jar = self._as_versioned_jar(dep)
-      dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep)
+      dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep, classifier=classifier)
       if dep.is_codegen:
         internal_codegen[jar.name] = jar.name
     for jar in target.jar_dependencies:
       if jar.rev:
-        dependencies[(jar.org, jar.name)] = self.jardep(jar)
+        dependencies[(jar.org, jar.name, classifier)] = self.jardep(jar, classifier=classifier)
         configurations |= set(jar._configurations)
 
     target_jar = self.internaldep(self._as_versioned_jar(target),
+                                  classifier,
                                   configurations=list(configurations))
     target_jar = target_jar.extend(dependencies=dependencies.values())
 
-    template_kwargs = self.templateargs(target_jar, confs, extra_confs)
+    template_kwargs = self.templateargs(target_jar, confs, extra_confs, classifier)
     with safe_open(path, 'w') as output:
       template = pkgutil.get_data(self.template_package_name, self.template_relpath)
       Generator(template, **template_kwargs).write(output)
 
-  def templateargs(self, target_jar, confs=None, extra_confs=None):
+  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
     """
       Subclasses must return a dict for use by their template given the target jar template data
       and optional specific ivy configurations.
     """
     raise NotImplementedError()
 
-  def internaldep(self, jar_dependency, dep=None, configurations=None):
+  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
     """
       Subclasses must return a template data for the given internal target (provided in jar
       dependency form).
@@ -204,7 +205,7 @@ class DependencyWriter(object):
     jar.rev = pushdb_entry.version().version()
     return jar
 
-  def jardep(self, jar_dependency):
+  def jardep(self, jar_dependency, classifier=None):
     """Subclasses must return a template data for the given external jar dependency."""
     raise NotImplementedError()
 
@@ -215,19 +216,20 @@ class PomWriter(DependencyWriter):
         get_db,
         os.path.join('templates', 'jar_publish', 'pom.mustache'))
 
-  def templateargs(self, target_jar, confs=None, extra_confs=None):
+  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
     return dict(artifact=target_jar)
 
-  def jardep(self, jar):
+  def jardep(self, jar, classifier=None):
     return TemplateData(
         org=jar.org,
         name=jar.name,
         rev=jar.rev,
         scope='compile',
+        classifier=classifier,
         excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
 
-  def internaldep(self, jar_dependency, dep=None, configurations=None):
-    return self.jardep(jar_dependency)
+  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
+    return self.jardep(jar_dependency, classifier=classifier)
 
 
 class IvyWriter(DependencyWriter):
@@ -241,13 +243,13 @@ class IvyWriter(DependencyWriter):
         IvyUtils.IVY_TEMPLATE_PATH,
         template_package_name=IvyUtils.IVY_TEMPLATE_PACKAGE_NAME)
 
-  def templateargs(self, target_jar, confs=None, extra_confs=None):
+  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
     return dict(lib=target_jar.extend(
         publications=set(confs or []),
         extra_publications=extra_confs if extra_confs else {},
         overrides=None))
 
-  def _jardep(self, jar, transitive=True, configurations='default'):
+  def _jardep(self, jar, transitive=True, configurations='default', classifier=None):
     return TemplateData(
         org=jar.org,
         module=jar.name,
@@ -257,15 +259,17 @@ class IvyWriter(DependencyWriter):
         excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
         transitive=transitive,
         artifacts=jar.artifacts,
+        classifier=classifier,
         configurations=configurations)
 
-  def jardep(self, jar):
+  def jardep(self, jar, classifier=None):
     return self._jardep(jar,
-        transitive=jar.transitive,
-        configurations=jar._configurations)
+                        transitive=jar.transitive,
+                        configurations=jar._configurations,
+                        classifier=classifier)
 
-  def internaldep(self, jar_dependency, dep=None, configurations=None):
-    return self._jardep(jar_dependency, configurations=configurations)
+  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
+    return self._jardep(jar_dependency, configurations=configurations, classifier=classifier)
 
 
 def coordinate(org, name, rev=None):
@@ -405,6 +409,8 @@ class JarPublish(JarTask, ScmPublish):
     register('--publish-extras', advanced=True, type=Options.dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
+    register('--individual-plugins', advanced=True, default=False, type=bool,
+             help='Extra products to publish as a individual artifact.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -524,6 +530,8 @@ class JarPublish(JarTask, ScmPublish):
     genmap = self.context.products.get(typename)
     product_mapping = genmap.get(tgt)
     if product_mapping is None:
+      if self.get_options().individual_plugins:
+        return
       raise ValueError("No product mapping in %s for %s. "
                        "You may need to run some other task first" % (typename, tgt))
     for basedir, jars in product_mapping.items():
@@ -628,7 +636,8 @@ class JarPublish(JarTask, ScmPublish):
       entry = pushdb.get_entry(tgt)
       return entry.fingerprint or '0.0.0'
 
-    def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext='', extra_confs=None):
+    def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext='',
+                       extra_confs=None, classifier=''):
       def path(name=None, suffix='', extension='jar'):
         return self.artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
                                   artifact_ext=artifact_ext)
@@ -637,12 +646,16 @@ class JarPublish(JarTask, ScmPublish):
         changelog_file.write(changelog.encode('utf-8'))
       ivyxml = path(name='ivy', extension='xml')
 
-      IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, extra_confs=extra_confs)
-      PomWriter(get_pushdb).write(tgt, path(extension='pom'))
+      IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, extra_confs=extra_confs,
+                                  classifier=classifier)
+      PomWriter(get_pushdb).write(tgt, path(extension='pom'), extra_confs=extra_confs,
+                                  classifier=classifier)
 
       return ivyxml
 
     def stage_artifacts(tgt, jar, version, changelog):
+      if self.get_options().individual_plugins:
+        return stage_individual_plugins(tgt, jar, version, changelog)
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_EXTENSION = 'jar'
@@ -715,9 +728,47 @@ class JarPublish(JarTask, ScmPublish):
         confs.add(IvyWriter.JAVADOC_CONFIG)
       return stage_artifact(tgt, jar, version, changelog, confs, extra_confs=extra_confs)
 
+    # TODO Remove this once we fix https://github.com/pantsbuild/pants/issues/1229
+    def stage_individual_plugins(tgt, jar, version, changelog):
+      DEFAULT_IVY_TYPE = 'jar'
+      DEFAULT_CLASSIFIER = ''
+      DEFAULT_CONF = 'default'
+      DEFAULT_EXT = 'jar'
+      product_config = {
+        'jars': {
+          'classifier': '',
+          },
+      }
+      product_config.update(self.get_options().publish_extras or {})
+      for product, config in product_config.items():
+        if self.context.products.get(product).has(tgt):
+          classifier = config.get('classifier', DEFAULT_CLASSIFIER)
+          suffix = '-' + classifier if classifier else ''
+          self._copy_artifact(tgt, jar, version, suffix=suffix, typename=product)
+          extra_confs = {}
+          if product == 'jars':
+            confs = set(repo['confs'])
+            self.create_source_jar(tgt, jar, version)
+            doc_jar = self.create_doc_jar(tgt, jar, version)
+            confs.add(IvyWriter.SOURCES_CONFIG)
+            if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
+              confs.add(IvyWriter.JAVADOC_CONFIG)
+          else:
+            confs = [classifier, DEFAULT_CONF]
+            extra_confs = {'name': None,
+                           'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
+                           'classifier': classifier,
+                           'conf': confs,
+                           'ext': DEFAULT_EXT}
+          return stage_artifact(tgt, jar, version, changelog, confs,
+                              extra_confs=extra_confs, classifier=classifier)
+      raise ValueError('No product mapping in {0} for {1}. '
+                       'You may need to run some other task first'.format(product_config.keys(),
+                                                                          tgt))
+
     if self.overrides:
-      print('Publishing with revision overrides:\n  %s' % '\n  '.join(
-        '%s=%s' % (coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
+      print('Publishing with revision overrides:\n  %0' % '\n  '.join(
+        '{1}={2}'.format(coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
       ))
 
     head_sha = self.scm.commit_id

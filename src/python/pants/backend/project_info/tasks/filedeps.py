@@ -14,7 +14,6 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 
 
-# XXX(pl): JVM hairball violator
 class FileDeps(ConsoleTask):
   """List all transitive file dependencies of the targets specified on the command line.
 

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.tasks.ide_gen import Project, SourceSet
+from pants.backend.project_info.tasks.ide_gen import Project, SourceSet
 from pants.base.source_root import SourceRoot
 from pants_test.base_test import BaseTest
 
