@@ -93,8 +93,8 @@ class CmdLineSpecParser(object):
                    .format(excludes='\n  '.join(self._exclude_target_regexps)))
       targets = ', '.join(self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY])
       logger.debug('Targets after excludes: {targets}'.format(targets=targets))
+      excluded_count = 0
       for pattern, targets in self._excluded_target_map.iteritems():
-        excluded_count = 0
         if pattern != CmdLineSpecParser._UNMATCHED_KEY:
           logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
                        .format(pattern=pattern,
