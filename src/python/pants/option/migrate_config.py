@@ -195,6 +195,7 @@ migrations = {
   ('scrooge-gen', 'jvm_args'): ('gen.scrooge', 'jvm_options'),
   ('scrooge-gen', 'jvm_options'): ('gen.scrooge', 'jvm_options'),
   ('scrooge-gen', 'strict'): ('gen.scrooge', 'strict'),
+  ('scrooge-gen', 'verbose'): ('gen.scrooge', 'verbose'),
   ('thrift-linter', 'strict'): ('thrift-linter', 'strict_default'),
   # NB: For the following two options, see the notes below.
   ('scrooge-gen', 'scala'): ('gen.scrooge', 'service_deps'),
