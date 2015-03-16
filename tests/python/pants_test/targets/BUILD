@@ -14,7 +14,6 @@ target(
     ':jar_library',
     ':java_agent',
     ':java_tests',
-    ':java_thrift_library',
     ':jvm_app',
     ':python_binary',
     ':python_target',
