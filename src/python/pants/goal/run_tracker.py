@@ -161,7 +161,7 @@ class RunTracker(object):
     self.report = report
     self.report.open()
 
-    self._main_root_workunit = WorkUnit(run_tracker=self, parent=None, labels=[],
+    self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None, labels=[],
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
     self._main_root_workunit.start()
@@ -212,7 +212,7 @@ class RunTracker(object):
 
     Task code should not typically call this directly.
     """
-    workunit = WorkUnit(run_tracker=self, parent=parent, name=name, labels=labels, cmd=cmd)
+    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels, cmd=cmd)
     workunit.start()
     try:
       self.report.start_workunit(workunit)
@@ -228,7 +228,12 @@ class RunTracker(object):
       workunit.set_outcome(WorkUnit.SUCCESS)
     finally:
       self.report.end_workunit(workunit)
-      workunit.end()
+      self._end_workunit(workunit)
+
+  def _end_workunit(self, workunit):
+    path, duration, self_time, is_tool = workunit.end()
+    self.cumulative_timings.add_timing(path, duration, is_tool)
+    self.self_timings.add_timing(path, self_time, is_tool)
 
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
@@ -276,7 +281,7 @@ class RunTracker(object):
         self.log(Report.INFO, "Waiting for background workers to finish.")
         self._background_worker_pool.shutdown()
       self.report.end_workunit(self._background_root_workunit)
-      self._background_root_workunit.end()
+      self._end_workunit(self._background_root_workunit)
 
     if self._foreground_worker_pool:
       if self._aborted:
@@ -289,7 +294,7 @@ class RunTracker(object):
     SubprocPool.shutdown(self._aborted)
 
     self.report.end_workunit(self._main_root_workunit)
-    self._main_root_workunit.end()
+    self._end_workunit(self._main_root_workunit)
 
     outcome = self._main_root_workunit.outcome()
     if self._background_root_workunit:
@@ -317,7 +322,7 @@ class RunTracker(object):
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
-      self._background_root_workunit = WorkUnit(run_tracker=self, parent=None, labels=[],
+      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None, labels=[],
                                                 name='background', cmd=None)
       self._background_root_workunit.start()
       self.report.start_workunit(self._background_root_workunit)
