@@ -15,12 +15,12 @@ class BootstrapperTest(BaseTest):
   def test_parse_proxy_string(self):
     bootstrapper = Bootstrapper().instance()
 
-    self.assertEquals(('example.com', '1234'),
+    self.assertEquals(('example.com', 1234),
                       bootstrapper._parse_proxy_string('http://example.com:1234'))
-    self.assertEquals(('secure-example.com', '999'),
+    self.assertEquals(('secure-example.com', 999),
                       bootstrapper._parse_proxy_string('http://secure-example.com:999'))
     # trailing slash is ok
-    self.assertEquals(('example.com', '1234'),
+    self.assertEquals(('example.com', 1234),
                       bootstrapper._parse_proxy_string('http://example.com:1234/'))
 
   def test_proxy_from_env(self):
