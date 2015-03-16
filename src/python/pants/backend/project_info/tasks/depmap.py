@@ -23,7 +23,6 @@ from pants.base.exceptions import TaskError
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
 # Please add fkorotkov, tdesai to reviews for this file
-# XXX(pl): JVM hairball violator
 class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
