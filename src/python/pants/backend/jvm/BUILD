@@ -7,7 +7,6 @@ python_library(
   sources = ['artifact.py'],
   dependencies = [
     '3rdparty/python:six',
-    ':jvm_debug_config',
     ':repository',
     'src/python/pants/base:payload_field',
   ],
@@ -43,11 +42,6 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/util:dirutil',
   ],
-)
-
-python_library(
-  name = 'jvm_debug_config',
-  sources = ['jvm_debug_config.py'],
 )
 
 python_library(
