@@ -10,6 +10,8 @@ import logging
 import os
 import shutil
 
+from six.moves import urllib
+
 from pants.base.config import Config
 from pants.ivy.ivy import Ivy
 from pants.net.http.fetcher import Fetcher
@@ -58,7 +60,9 @@ class Bootstrapper(object):
 
   @classmethod
   def instance(cls):
-    """Returns the default global ivy bootstrapper."""
+    """:returns: the default global ivy bootstrapper.
+    :rtype: Bootstrapper
+    """
     if cls._INSTANCE is None:
       cls._INSTANCE = cls()
     return cls._INSTANCE
@@ -93,7 +97,59 @@ class Bootstrapper(object):
     """
     return Ivy(self._get_classpath(bootstrap_workunit_factory),
                ivy_settings=self._ivy_settings,
-               ivy_cache_dir=self.ivy_cache_dir)
+               ivy_cache_dir=self.ivy_cache_dir,
+               extra_jvm_options=self._extra_jvm_options())
+
+  def _http_proxy(self):
+    """Set ivy to use an http proxy.
+
+    Expects a string of the form http://<host>:<port>
+
+    TODO(Eric Ayers turn this into a proper option.  Still needs the ability to read from
+    HTTP_PROXY in the environment.
+    """
+    if os.getenv('HTTP_PROXY'):
+      return os.getenv('HTTP_PROXY')
+    if os.getenv('http_proxy'):
+      return os.getenv('http_proxy')
+    return self._config.get('ivy', 'http_proxy')
+
+  def _https_proxy(self):
+    """Set ivy to use an https proxy.
+
+    Expects a string of the form http://<host>:<port>
+
+    TODO(Eric Ayers turn this into a proper option.  Still needs the ability to read from
+    HTTP_PROXY in the environment.
+    """
+    if os.getenv('HTTPS_PROXY'):
+      return os.getenv('HTTPS_PROXY')
+    if os.getenv('https_proxy'):
+      return os.getenv('https_proxy')
+    return self._config.get('ivy', 'https_proxy')
+
+  def _parse_proxy_string(self, proxy_string):
+    parse_result = urllib.parse.urlparse(proxy_string)
+    return parse_result.hostname, parse_result.port
+
+  def _extra_jvm_options(self):
+    extra_options = []
+    http_proxy = self._http_proxy()
+    if http_proxy:
+      host, port = self._parse_proxy_string(http_proxy)
+      extra_options.extend([
+        "-Dhttp.proxyHost={}".format(host),
+        "-Dhttp.proxyPort={}".format(port),
+        ])
+
+    https_proxy = self._https_proxy()
+    if https_proxy:
+      host, port = self._parse_proxy_string(https_proxy)
+      extra_options.extend([
+        "-Dhttps.proxyHost={}".format(host),
+        "-Dhttps.proxyPort={}".format(port),
+        ])
+    return extra_options
 
   def _get_classpath(self, workunit_factory):
     """Returns the bootstrapped ivy classpath as a list of jar paths.
@@ -130,8 +186,9 @@ class Bootstrapper(object):
   def _bootstrap_ivy_classpath(self, workunit_factory, retry=True):
     # TODO(John Sirois): Extract a ToolCache class to control the path structure:
     # https://jira.twitter.biz/browse/DPB-283
-    ivy_bootstrap_dir = \
-      os.path.join(self._config.getdefault('pants_bootstrapdir'), 'tools', 'jvm', 'ivy')
+
+    ivy_bootstrap_dir = os.path.join(self._config.getdefault('pants_bootstrapdir'),
+                                     'tools', 'jvm', 'ivy')
 
     digest = hashlib.sha1()
     if os.path.isfile(self._version_or_ivyxml):

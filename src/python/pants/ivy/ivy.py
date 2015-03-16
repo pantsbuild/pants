@@ -20,8 +20,13 @@ class Ivy(object):
   class Error(Exception):
     """Indicates an error executing an ivy command."""
 
-  def __init__(self, classpath, ivy_settings=None, ivy_cache_dir=None):
-    """Configures an ivy wrapper for the ivy distribution at the given classpath."""
+  def __init__(self, classpath, ivy_settings=None, ivy_cache_dir=None, extra_jvm_options=None):
+    """Configures an ivy wrapper for the ivy distribution at the given classpath.
+
+    :param ivy_settings: path to find settings.xml file
+    :param ivy_cache_dir: path to store downloaded ivy artifacts
+    :param extra_jvm_options: list of strings to add to command line when invoking Ivy
+    """
     self._classpath = maybe_list(classpath)
     self._ivy_settings = ivy_settings
     if self._ivy_settings and not isinstance(self._ivy_settings, string_types):
@@ -32,6 +37,8 @@ class Ivy(object):
     if self._ivy_cache_dir and not isinstance(self._ivy_cache_dir, string_types):
       raise ValueError('ivy_cache_dir must be a string, given %s of type %s'
                        % (self._ivy_cache_dir, type(self._ivy_cache_dir)))
+
+    self._extra_jvm_options = extra_jvm_options or []
 
   @property
   def ivy_settings(self):
@@ -65,6 +72,7 @@ class Ivy(object):
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
+    jvm_options = jvm_options or []
     executor = executor or SubprocessExecutor()
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given %s of type %s'
@@ -75,10 +83,11 @@ class Ivy(object):
       # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
       # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
       # it from BUILD constructs.
-      jvm_options = ['-Divy.cache.dir=%s' % self._ivy_cache_dir] + (jvm_options or [])
+      jvm_options += ['-Divy.cache.dir=%s' % self._ivy_cache_dir]
 
     if self._ivy_settings and '-settings' not in args:
       args = ['-settings', self._ivy_settings] + args
 
+    jvm_options += self._extra_jvm_options
     return executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
                            jvm_options=jvm_options, args=args)
