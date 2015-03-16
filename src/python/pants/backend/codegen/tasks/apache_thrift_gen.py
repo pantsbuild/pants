@@ -121,7 +121,7 @@ class ApacheThriftGen(CodeGen):
 
   def is_gentarget(self, target):
     return ((isinstance(target, JavaThriftLibrary)
-             and target.compiler(self.get_options()) == 'thrift')
+             and target.compiler(self.context.options) == 'thrift')
             or isinstance(target, PythonThriftLibrary))
 
   def is_forced(self, lang):

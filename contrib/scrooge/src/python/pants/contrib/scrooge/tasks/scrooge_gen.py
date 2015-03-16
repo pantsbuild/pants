@@ -20,6 +20,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.option.options import Options
 from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
 from twitter.common.collections import OrderedSet
@@ -93,10 +94,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   def _resolve_deps(self, depmap):
     """Given a map of gen-key=>target specs, resolves the target specs into references."""
-    deps = dict()
-    for category, depspecs in gen_info['deps'].items():
-      dependencies = OrderedSet()
-      deps[category] = dependencies
+    deps = defaultdict(lambda: OrderedSet())
+    for category, depspecs in depmap.items():
+      dependencies = deps[category]
       for depspec in depspecs:
         try:
           dependencies.update(self.context.resolve(depspec))
@@ -127,12 +127,12 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     if not gentargets:
       return
 
-    self._depinfo = DepInfo(self._resolve_deps(self.get_options().service_deps),
-                            self._resolve_deps(self.get_options().structs_deps))
+    self._depinfo = ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
+                                       self._resolve_deps(self.get_options().structs_deps))
 
     for target in gentargets:
-      language = target.language(self.get_options())
-      rpc_style = target.rpc_style(self.get_options())
+      language = target.language(self.context.options)
+      rpc_style = target.rpc_style(self.context.options)
       partial_cmd = self.PartialCmd(
           language=language,
           rpc_style=rpc_style,
@@ -243,9 +243,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genfiles = gen_files_for_source[source]
       has_service = has_service or services
       files.extend(genfiles)
-    language = target.language(self.get_options())
+    language = target.language(self.context.options)
     target_type = _TARGET_TYPE_FOR_LANG[language]
-    deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language]])
+    deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language])
     deps.update(target.dependencies)
     tgt = create_target(files, deps, target_type)
     tgt.add_labels('codegen')
@@ -297,16 +297,16 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if target.compiler(self.get_options()) != 'scrooge':
+    if target.compiler(self.context.options) != 'scrooge':
       return False
 
-    language = target.language(self.get_options())
+    language = target.language(self.context.options)
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 
   def _validate_compiler_configs(self, targets):
-    self._validate(self.options, targets)
+    self._validate(self.context.options, targets)
 
   @staticmethod
   def _validate(options, targets):
