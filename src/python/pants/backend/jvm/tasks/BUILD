@@ -397,7 +397,7 @@ python_library(
   dependencies = [
     ':common',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/backend/jvm:jvm_debug_config',
+    'src/python/pants/option',
     'src/python/pants/util:strutil',
   ],
 )

@@ -67,6 +67,12 @@ migrations = {
   ('scalastyle', 'config'): ('compile.scalastyle', 'config'),
   ('scalastyle', 'excludes'): ('compile.scalastyle', 'excludes'),
 
+  # These must now be defined for each JvmTask subtask, so we temporarily put them
+  # in the DEFAULT section as a convenience.
+  # These will soon move into a subsystem, which will fix this.
+  ('jvm', 'debug_config'): ('DEFAULT', 'debug_config'),
+  ('jvm', 'debug_port'): ('DEFAULT', 'debug_port'),
+
   ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
   ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
 
@@ -202,6 +208,10 @@ ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_n
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
                                             'compile.scala',
+  ('jvm', 'debug_port'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
+                         'move to a subsystem, which will fix this requirement.',
+  ('jvm', 'debug_args'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
+                         'move to a subsystem, which will fix this requirement.',
   ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
                                   'target: options. Other args should be placed in args: and '
                                   'prefixed with -C.',
