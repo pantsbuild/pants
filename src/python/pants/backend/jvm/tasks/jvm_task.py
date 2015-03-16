@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.core.tasks.task import Task
-from pants.backend.jvm.jvm_debug_config import JvmDebugConfig
+from pants.option.options import Options
 from pants.util.strutil import safe_shlex_split
 
 
@@ -20,11 +20,20 @@ class JvmTask(Task):
   def register_options(cls, register):
     super(JvmTask, cls).register_options(register)
     register('--jvm-options', action='append', metavar='<option>...',
-             help='Run the jvm with these extra jvm options.')
+             help='Run the JVM with these extra jvm options.')
     register('--args', action='append', metavar='<arg>...',
-             help='Run the jvm with these extra program args.')
+             help='Run the JVM with these extra program args.')
     register('--debug', action='store_true',
-             help='Run the jvm under a debugger.')
+             help='Run the JVM with remote debugging.')
+    register('--debug-port', advanced=True, type=int, default=5005,
+             help='The JVM will listen for a debugger on this port.')
+    register('--debug-args', advanced=True, type=Options.list,
+             default=[
+               '-Xdebug',
+               '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'
+             ],
+             help='The JVM remote-debugging arguments. {debug_port} will be replaced with '
+                  'the value of the --debug-port option.')
     register('--confs', action='append', default=['default'],
              help='Use only these Ivy configurations of external deps.')
 
@@ -40,7 +49,9 @@ class JvmTask(Task):
       self.jvm_options.extend(safe_shlex_split(jvm_option))
 
     if self.get_options().debug:
-      self.jvm_options.extend(JvmDebugConfig.debug_args(self.context.config))
+      debug_port = self.get_options().debug_port
+      self.jvm_options.extend(
+        [arg.format(debug_port=debug_port) for arg in self.get_options().debug_args])
 
     self.args = []
     for arg in self.get_options().args:
