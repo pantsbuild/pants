@@ -36,17 +36,9 @@ class WorkUnit(object):
   UNKNOWN = 4
 
   @staticmethod
-  def choose_for_outcome(outcome, aborted_val, failure_val, warning_val, success_val, unknown_val):
-    """Returns one of the 5 arguments, depending on the outcome."""
-    if outcome not in range(0, 5):
-      raise Exception('Invalid outcome: %s' % outcome)
-    return (aborted_val, failure_val, warning_val, success_val, unknown_val)[outcome]
-
-  @staticmethod
   def outcome_string(outcome):
     """Returns a human-readable string describing the outcome."""
-    return WorkUnit.choose_for_outcome(outcome,
-                                       'ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN')
+    return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
 
   # Labels describing a workunit.  Reporting code can use this to decide how to display
   # information about this workunit.
@@ -132,9 +124,11 @@ class WorkUnit(object):
     We can set the outcome on a work unit directly, but that outcome will also be affected by
     those of its subunits. The right thing happens: The outcome of a work unit is the
     worst outcome of any of its subunits and any outcome set on it directly."""
+    if outcome not in range(0, 5):
+      raise Exception('Invalid outcome: %s' % outcome)
+
     if outcome < self._outcome:
       self._outcome = outcome
-      self.choose(0, 0, 0, 0, 0)  # Dummy call, to validate outcome.
       if self.parent: self.parent.set_outcome(self._outcome)
 
   _valid_name_re = re.compile(r'\w+')
@@ -163,11 +157,6 @@ class WorkUnit(object):
   def output_paths(self):
     """Returns the map of output name -> path of the output file."""
     return self._output_paths
-
-  def choose(self, aborted_val, failure_val, warning_val, success_val, unknown_val):
-    """Returns one of the 5 arguments, depending on our outcome."""
-    return WorkUnit.choose_for_outcome(self._outcome,
-                            aborted_val, failure_val, warning_val, success_val, unknown_val)
 
   def duration(self):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""
