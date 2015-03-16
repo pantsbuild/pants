@@ -65,7 +65,6 @@ python_library(
     ':jvm_fingerprint_strategy',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/base:exceptions',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
@@ -106,6 +105,8 @@ python_library(
   name = 'jvm_compile_strategy',
   sources = ['jvm_compile_strategy.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
   ],

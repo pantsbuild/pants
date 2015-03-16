@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import os
 import sys
 from collections import defaultdict
 
@@ -17,11 +16,9 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
-from pants.base.exceptions import TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import safe_mkdir
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):

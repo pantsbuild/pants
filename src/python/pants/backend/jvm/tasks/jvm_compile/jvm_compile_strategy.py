@@ -7,9 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
+from collections import defaultdict, namedtuple
+
+from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir
 
 

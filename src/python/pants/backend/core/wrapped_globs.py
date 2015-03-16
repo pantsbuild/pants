@@ -89,7 +89,13 @@ class RGlobs(FilesetRelPathWrapper):
   :returns Fileset matching files in this directory and its descendents.
   :rtype Fileset
   """
-  wrapped_fn = Fileset.rglobs
+  @staticmethod
+  def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
+    if 'follow_links' not in kw:
+      kw['follow_links'] = True
+    return Fileset.rglobs(*globspecs, **kw)
+
+  wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
 
 class ZGlobs(FilesetRelPathWrapper):
@@ -97,4 +103,10 @@ class ZGlobs(FilesetRelPathWrapper):
 
   Uses ``BUILD`` file's directory as the "working directory".
   """
-  wrapped_fn = Fileset.zglobs
+  @staticmethod
+  def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
+    if 'follow_links' not in kw:
+      kw['follow_links'] = True
+    return Fileset.zglobs(*globspecs, **kw)
+
+  wrapped_fn = zglobs_following_symlinked_dirs_by_default
