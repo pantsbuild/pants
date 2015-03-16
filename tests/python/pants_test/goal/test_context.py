@@ -96,10 +96,34 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[b])
     self.assertEquals([b], context.targets())
 
-    syn_with_deps = context.add_new_target(
-                                           SyntheticAddress.parse('syn_with_deps'),
+    syn_with_deps = context.add_new_target(SyntheticAddress.parse('syn_with_deps'),
                                            Target,
                                            derived_from=b,
                                            dependencies=[a])
+
+    self.assertEquals([b, syn_with_deps, a], context.targets())
+
+  def test_targets_ignore_synthetics_with_no_derived_from_not_injected_into_graph(self):
+    a = self.make_target('a')
+    b = self.make_target('b')
+    context = self.context(target_roots=[b])
+    self.assertEquals([b], context.targets())
+
+    syn_with_deps = context.add_new_target(SyntheticAddress.parse('syn_with_deps'),
+                                           Target,
+                                           dependencies=[a])
+
+    self.assertEquals([b], context.targets())
+
+  def test_targets_include_synthetics_with_no_derived_from_injected_into_graph(self):
+    a = self.make_target('a')
+    b = self.make_target('b')
+    context = self.context(target_roots=[b])
+    self.assertEquals([b], context.targets())
+
+    syn_with_deps = context.add_new_target(SyntheticAddress.parse('syn_with_deps'),
+                                           Target,
+                                           dependencies=[a])
+    b.inject_dependency(syn_with_deps.address)
 
     self.assertEquals([b, syn_with_deps, a], context.targets())
