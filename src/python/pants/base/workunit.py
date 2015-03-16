@@ -139,11 +139,9 @@ class WorkUnit(object):
 
   def output(self, name):
     """Returns the output buffer for the specified output name (e.g., 'stdout'), creating it if necessary."""
-
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: %s' % name)
-
     if name not in self._outputs:
       workunit_name = re.sub(r'\W', '_', self.name)
       path = os.path.join(self.run_info_dir,
