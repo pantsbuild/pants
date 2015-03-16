@@ -227,13 +227,7 @@ class RunTracker(object):
     else:
       workunit.set_outcome(WorkUnit.SUCCESS)
     finally:
-      self.report.end_workunit(workunit)
-      self._end_workunit(workunit)
-
-  def _end_workunit(self, workunit):
-    path, duration, self_time, is_tool = workunit.end()
-    self.cumulative_timings.add_timing(path, duration, is_tool)
-    self.self_timings.add_timing(path, self_time, is_tool)
+      self.end_workunit(workunit)
 
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
@@ -280,8 +274,7 @@ class RunTracker(object):
       else:
         self.log(Report.INFO, "Waiting for background workers to finish.")
         self._background_worker_pool.shutdown()
-      self.report.end_workunit(self._background_root_workunit)
-      self._end_workunit(self._background_root_workunit)
+      self.end_workunit(self._background_root_workunit)
 
     if self._foreground_worker_pool:
       if self._aborted:
@@ -293,8 +286,7 @@ class RunTracker(object):
 
     SubprocPool.shutdown(self._aborted)
 
-    self.report.end_workunit(self._main_root_workunit)
-    self._end_workunit(self._main_root_workunit)
+    self.end_workunit(self._main_root_workunit)
 
     outcome = self._main_root_workunit.outcome()
     if self._background_root_workunit:
@@ -312,6 +304,12 @@ class RunTracker(object):
 
     self.report.close()
     self.upload_stats()
+
+  def end_workunit(self, workunit):
+    self.report.end_workunit(workunit)
+    path, duration, self_time, is_tool = workunit.end()
+    self.cumulative_timings.add_timing(path, duration, is_tool)
+    self.self_timings.add_timing(path, self_time, is_tool)
 
   def foreground_worker_pool(self):
     if self._foreground_worker_pool is None:  # Initialize lazily.
