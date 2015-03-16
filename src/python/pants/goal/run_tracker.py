@@ -161,7 +161,7 @@ class RunTracker(object):
     self.report = report
     self.report.open()
 
-    self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None, labels=[],
+    self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
     self._main_root_workunit.start()
@@ -322,7 +322,7 @@ class RunTracker(object):
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
-      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None, labels=[],
+      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                                 name='background', cmd=None)
       self._background_root_workunit.start()
       self.report.start_workunit(self._background_root_workunit)
