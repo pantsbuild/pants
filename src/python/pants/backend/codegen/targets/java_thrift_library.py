@@ -34,7 +34,7 @@ class JavaThriftLibrary(JvmTarget):
     :param language: The language used to generate the output files. The default is defined in
       the global options under ``--thrift-default-language``.
     :param rpc_style: An optional rpc style to generate service stubs with. The default is defined
-      in the global options under ``--thrift-default-language``.
+      in the global options under ``--thrift-default-rpc-style``.
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     """
