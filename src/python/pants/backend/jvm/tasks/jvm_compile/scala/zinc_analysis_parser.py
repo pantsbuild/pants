@@ -9,6 +9,8 @@ import os
 import re
 from collections import defaultdict
 
+from six.moves import range
+
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import (AnalysisParser, ParseError,
                                                                  raise_on_eof)
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import (APIs, Compilations,

@@ -11,6 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
 
+from six.moves import range
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.tasks.jar_task import JarTask

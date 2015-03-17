@@ -10,6 +10,8 @@ import re
 import time
 import uuid
 
+from six.moves import range
+
 from pants.rwbuf.read_write_buffer import FileBackedRWBuf
 from pants.util.dirutil import safe_mkdir_for
 

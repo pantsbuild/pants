@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from six.moves import range
+
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.base.build_environment import get_buildroot

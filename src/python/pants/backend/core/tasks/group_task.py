@@ -9,6 +9,8 @@ import os
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 
+from six.moves import range
+
 from pants.backend.core.tasks.task import Task, TaskBase
 from pants.base.build_graph import sort_targets
 from pants.base.workunit import WorkUnit
