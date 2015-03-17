@@ -18,6 +18,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
+from pants_test.base.context_utils import create_options
 from pants_test.tasks.test_base import TaskTest
 from twitter.common.collections import OrderedSet
 
@@ -44,7 +45,11 @@ class ScroogeGenTest(TaskTest):
     safe_rmtree(self.task_outdir)
 
   def test_validate(self):
-    defaults = JavaThriftLibrary.Defaults()
+    # Set synthetic defaults for the global scope.
+    option_values = {'thrift_default_compiler': 'scrooge',
+                     'thrift_default_language': 'bf',
+                     'thrift_default_rpc_style': 'async'}
+    options = create_options({'': option_values})
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
@@ -68,11 +73,11 @@ class ScroogeGenTest(TaskTest):
       )
     '''))
 
-    ScroogeGen._validate(defaults, [self.target('test_validate:one')])
-    ScroogeGen._validate(defaults, [self.target('test_validate:two')])
+    ScroogeGen._validate(options, [self.target('test_validate:one')])
+    ScroogeGen._validate(options, [self.target('test_validate:two')])
 
     with pytest.raises(TaskError):
-      ScroogeGen._validate(defaults, [self.target('test_validate:three')])
+      ScroogeGen._validate(options, [self.target('test_validate:three')])
 
   def test_smoke(self):
     contents = dedent('''namespace java com.pants.example

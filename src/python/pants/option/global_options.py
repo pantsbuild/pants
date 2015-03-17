@@ -74,3 +74,11 @@ def register_global_options(register):
            default=10 * 365 * 86400,  # 10 years.
            help='the time in seconds before we consider re-resolving an open-ended '
                 'requirement, e.g. "flask>=0.2" if a matching distribution is available on disk.')
+
+  # The following options are specific to java_thrift_library targets.
+  register('--thrift-default-compiler', type=str, advanced=True, default='thrift',
+           help='The default compiler to use for java_thrift_library targets.')
+  register('--thrift-default-language', type=str, advanced=True, default='java',
+           help='The default language to generate for java_thrift_library targets.')
+  register('--thrift-default-rpc-style', type=str, advanced=True, default='sync',
+           help='The default rpc-style to generate for java_thrift_library targets.')
