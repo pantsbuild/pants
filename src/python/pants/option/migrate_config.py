@@ -48,7 +48,6 @@ migrations = {
   ('specs-run', 'jvm_args'): ('test.specs', 'jvm_options'),
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
-  ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
   ('ivy-resolve', 'jvm_args'): ('resolve.ivy', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
@@ -194,6 +193,19 @@ migrations = {
   ('resolve.ivy', 'ng_daemons'): ('resolve.ivy', 'use_nailgun'),
 
   ('thrift-linter', 'ng_daemons'): ('thrift-linter', 'use_nailgun'),
+
+  # Migration of the scrooge contrib module to the new options system.
+  ('java-thrift-library', 'compiler'): ('DEFAULT', 'thrift_default_compiler'),
+  ('java-thrift-library', 'language'): ('DEFAULT', 'thrift_default_language'),
+  ('java-thrift-library', 'rpc_style'): ('DEFAULT', 'thrift_default_rpc_style'),
+  ('scrooge-gen', 'jvm_args'): ('gen.scrooge', 'jvm_options'),
+  ('scrooge-gen', 'jvm_options'): ('gen.scrooge', 'jvm_options'),
+  ('scrooge-gen', 'strict'): ('gen.scrooge', 'strict'),
+  ('scrooge-gen', 'verbose'): ('gen.scrooge', 'verbose'),
+  ('thrift-linter', 'strict'): ('thrift-linter', 'strict_default'),
+  # NB: For the following two options, see the notes below.
+  ('scrooge-gen', 'scala'): ('gen.scrooge', 'service_deps'),
+  ('scrooge-gen', 'java'): ('gen.scrooge', 'service_deps'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -204,6 +216,9 @@ ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_n
                    'should not use the default "use_nailgun" value of sTrue.  You can possibly '
                    'limit the number of overrides by inverting the default with a DEFAULT section '
                    'value of False.')
+
+scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been refactored into '
+                         'two options: one for service deps, and one for structs deps.')
 
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
@@ -252,6 +267,8 @@ notes = {
   ('gen', 'ng_daemons'): ng_daemons_note,
   ('imports', 'ng_daemons'): ng_daemons_note,
   ('resolve', 'ng_daemons'): ng_daemons_note,
+  ('scrooge-gen', 'scala'): scrooge_gen_deps_note,
+  ('scrooge-gen', 'java'): scrooge_gen_deps_note,
 }
 
 
