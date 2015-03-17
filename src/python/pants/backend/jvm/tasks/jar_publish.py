@@ -18,7 +18,7 @@ from collections import OrderedDict, defaultdict
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 
-from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
+from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -294,7 +294,7 @@ def target_internal_dependencies(target):
         yield childdep
 
 
-class JarPublish(JarTask, ScmPublish):
+class JarPublish(ScmPublishMixin, JarTask):
   """Publish jars to a maven repository.
 
   At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
@@ -399,7 +399,7 @@ class JarPublish(JarTask, ScmPublish):
     register('--publish-extras', advanced=True, type=Options.dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
-    cls.register_scm_publish(register)
+    cls.register_scm_publish_options(register)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -410,10 +410,12 @@ class JarPublish(JarTask, ScmPublish):
 
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
-    ScmPublish.__init__(self, get_scm(), self.get_options().restrict_push_branches)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvm_options = self.get_options().jvm_options
+
+    self.scm = get_scm()
+    self.log = self.context.log
 
     if self.get_options().local:
       local_repo = dict(
@@ -796,24 +798,19 @@ class JarPublish(JarTask, ScmPublish):
             org = jar.org
             name = jar.name
             rev = newentry.version().version()
-            args = dict(
-              org=org,
-              name=name,
-              rev=rev,
-              coordinate=coordinate(org, name, rev),
-              user=getpass.getuser(),
-              cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
-            )
+            coord = coordinate(org, name, rev)
 
             pushdb.dump(dbfile)
 
-            self.add_pushdb(dbfile)
-            self.commit_pushdb(coordinate(org, name, rev))
-            self.publish_pushdb_changes_to_remote(
-              attempts=self.get_options().scm_push_attempts,
-              log=self.context.log,
-              tag_name='{org}-{name}-{rev}'.format(**args),
-              tag_message='Publish of {coordinate} initiated by {user} {cause}'.format(**args)
+            self.publish_pushdb_changes_to_remote_scm(
+              pushdb_file=dbfile,
+              coordinate=coord,
+              tag_name='{org}-{name}-{rev}'.format(org=org, name=name, rev=rev),
+              tag_message='Publish of {coordinate} initiated by {user} {cause}'.format(
+                coordinate=coord,
+                user=getpass.getuser(),
+                cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
+              )
             )
 
   def artifact_path(self, jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
