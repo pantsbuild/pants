@@ -8,6 +8,7 @@ python_library(
     ':depmap',
     ':eclipse_gen',
     ':ensime_gen',
+    ':export',
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
@@ -36,6 +37,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
   ],
 )
@@ -63,6 +65,20 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'export',
+  sources = ['export.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/core/targets:all',
+    'src/python/pants/backend/core/tasks:console_task',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
   ],
 )
 
