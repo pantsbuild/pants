@@ -390,7 +390,12 @@ class ProjectInfoTest(ConsoleTaskTest):
       resources=[],
     )
 
+
   def test_without_dependencies(self):
+    # Are these tests failing?  --project-info is to be removed
+    # from the depmap target in 0.0.31.  The ProjectInfoTest suite
+    # has already been moved to test_export.py so you can remove
+    # this class from test_depmap.py when it goes away.
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
       targets=[self.target('project_info:first')]

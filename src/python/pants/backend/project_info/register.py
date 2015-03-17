@@ -9,6 +9,7 @@ from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.project_info.tasks.eclipse_gen import EclipseGen
 from pants.backend.project_info.tasks.ensime_gen import EnsimeGen
+from pants.backend.project_info.tasks.export import Export
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.backend.project_info.tasks.idea_gen import IdeaGen
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -28,6 +29,8 @@ def register_goals():
 
   task(name='ensime', action=EnsimeGen).install().with_description(
       'Create an Ensime project from the given targets.')
+
+  task(name='export', action=Export).install().with_description("Export project information for targets in JSON format.")
 
   task(name='depmap', action=Depmap).install().with_description("Depict the target's dependencies.")
 
