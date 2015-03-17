@@ -12,6 +12,7 @@ import sys
 from abc import abstractmethod
 from collections import defaultdict, namedtuple
 
+from six.moves import range
 from twitter.common.collections import OrderedSet
 
 from pants import binary_util

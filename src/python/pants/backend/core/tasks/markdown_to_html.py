@@ -17,6 +17,7 @@ from pygments.formatters.html import HtmlFormatter
 from pygments.lexers import PythonLexer, TextLexer, guess_lexer_for_filename
 from pygments.styles import get_all_styles
 from pygments.util import ClassNotFound
+from six.moves import range
 
 from pants import binary_util
 from pants.backend.core.targets.doc import Page

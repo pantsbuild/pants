@@ -20,6 +20,7 @@ from datetime import date, datetime
 
 import psutil
 import pystache
+from six.moves import range
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer

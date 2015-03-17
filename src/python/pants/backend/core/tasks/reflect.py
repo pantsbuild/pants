@@ -11,6 +11,7 @@ import re
 from collections import OrderedDict
 
 from docutils.core import publish_parts
+from six.moves import range
 
 from pants.base.build_manual import get_builddict_info
 from pants.base.config import Config

@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import httplib
 from multiprocessing.pool import ThreadPool
 
+from six.moves import range
+
 from pants.util.contextutil import Timer
 
 
