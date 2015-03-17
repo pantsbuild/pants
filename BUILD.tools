@@ -32,7 +32,7 @@ jar_library(name = 'cobertura-instrument',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05'),
+                rev = '2.1.1'),
               jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
             ])
 
@@ -42,7 +42,7 @@ jar_library(name = 'cobertura-run',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05',
+                rev = '2.1.1',
                 intransitive = True,
             )])
 
@@ -52,7 +52,7 @@ jar_library(name = 'cobertura-report',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05')
+                rev = '2.1.1')
               .exclude(org = 'org.ow2.asm'),
               jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
             ])
