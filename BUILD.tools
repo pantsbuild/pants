@@ -26,14 +26,17 @@ jar_library(name = 'nailgun-server',
 jar_library(name = 'emma',
             jars = [jar(org = 'emma', name = 'emma', rev = '2.1.5320')])
 
+COBERTURA_REV='2.1.1'
+SLF4J_SIMPLE_REV='1.7.5'
+
 # The Cobertura jar needs all its dependencies when instrumenting code.
 jar_library(name = 'cobertura-instrument',
             jars = [
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05'),
-              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
+                rev = COBERTURA_REV),
+              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = SLF4J_SIMPLE_REV),
             ])
 
 # Instrumented code needs cobertura.jar in the classpath to run, but none of the dependencies.
@@ -42,7 +45,7 @@ jar_library(name = 'cobertura-run',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05',
+                rev = COBERTURA_REV,
                 intransitive = True,
             )])
 
@@ -52,9 +55,9 @@ jar_library(name = 'cobertura-report',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05')
+                rev = COBERTURA_REV)
               .exclude(org = 'org.ow2.asm'),
-              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
+              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = SLF4J_SIMPLE_REV),
             ])
 
 jar_library(name = 'benchmark-caliper-0.5',
