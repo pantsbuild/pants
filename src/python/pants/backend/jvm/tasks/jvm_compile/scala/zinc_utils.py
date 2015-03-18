@@ -11,8 +11,6 @@ from contextlib import closing
 from itertools import chain
 from xml.etree import ElementTree
 
-from twitter.common.collections import OrderedDict
-
 from pants.backend.jvm.scala.target_platform import TargetPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.address_lookup_error import AddressLookupError
@@ -28,6 +26,10 @@ from pants.util.dirutil import relativize_paths, safe_open
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 
+# TODO: Fold this into ScalaCompile. Or at least the non-static parts.
+# Right now it has to access so much state from that task that we have to pass it a reference back
+# to the task.  This separation was primarily motivated  by the fact that we used to run Zinc for
+# other reasons (such as split/merge/rebase of analysis files). But now ScalaCompile is the only client.
 class ZincUtils(object):
   """Convenient wrapper around zinc invocations.
 
@@ -53,6 +55,7 @@ class ZincUtils(object):
     self._jvm_options = jvm_options
     self._color = color
     self._log_level = log_level
+    self._lazy_plugin_args = None
 
   @property
   def _zinc_classpath(self):
@@ -62,27 +65,24 @@ class ZincUtils(object):
   def _compiler_classpath(self):
     return self._nailgun_task.tool_classpath('scalac')
 
-  @property
-  def _plugin_jars(self):
-    if self._nailgun_task.get_options().plugins:
-      return self._nailgun_task.tool_classpath('plugin-jars')
-    else:
-      return []
-
-  @property
   def _zinc_jar_args(self):
     zinc_jars = ZincUtils.identify_zinc_jars(self._zinc_classpath)
     # The zinc jar names are also the flag names.
     return (list(chain.from_iterable([['-%s' % name, jarpath]
-                                     for (name, jarpath) in zinc_jars.items()])) +
+                                     for (name, jarpath) in sorted(zinc_jars.items())])) +
             ['-scala-path', ':'.join(self._compiler_classpath)])
 
   def _plugin_args(self):
-    # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = [p for val in self._nailgun_task.get_options().plugins for p in val.split(',')]
-    plugin_args = self.context.config.getdict('compile.scala', 'plugin-args', default={})
-    active_plugins = self.find_plugins(plugin_names)
+    if self._lazy_plugin_args is None:
+      self._lazy_plugin_args = self._create_plugin_args()
+    return self._lazy_plugin_args
 
+  def _create_plugin_args(self):
+    if not self._nailgun_task.get_options().plugins:
+      return []
+
+    plugin_args = self._nailgun_task.get_options().plugin_args
+    active_plugins = self.find_plugins()
     ret = []
     for name, jar in active_plugins.items():
       ret.append('-S-Xplugin:%s' % jar)
@@ -92,28 +92,10 @@ class ZincUtils(object):
 
   def plugin_jars(self):
     """The jars containing code for enabled plugins."""
-    return self._plugin_jars
-
-  def _name_hashing_args(self):
-    if self._nailgun_task.get_options().name_hashing:
-      return []
+    if self._nailgun_task.get_options().plugins:
+      return self._nailgun_task.tool_classpath('plugin-jars')
     else:
-      return ['-no-name-hashing']
-
-  def _run_zinc(self, args, workunit_name='zinc', workunit_labels=None):
-    zinc_args = [
-      '-log-level', self._log_level,
-    ]
-    if not self._color:
-      zinc_args.append('-no-color')
-    zinc_args.extend(self._zinc_jar_args)
-    zinc_args.extend(args)
-    return self._nailgun_task.runjava(classpath=self._zinc_classpath,
-                                      main=ZincUtils._ZINC_MAIN,
-                                      jvm_options=self._jvm_options,
-                                      args=zinc_args,
-                                      workunit_name=workunit_name,
-                                      workunit_labels=workunit_labels)
+      return []
 
   def platform_version_info(self):
     ret = []
@@ -125,45 +107,61 @@ class ZincUtils(object):
         try:
           deps = self.context.resolve(target)
         except AddressLookupError as e:
-          raise self.DepLookupError("{message}\n  specified by option --{toolname} in scope {scope}."
+          raise self.DepLookupError("{message}\n  specified by option --{tool} in scope {scope}."
                                     .format(message=e,
-                                            toolname=toolname,
+                                            tool=toolname,
                                             scope=self._nailgun_task.options_scope))
 
         for lib in (t for t in deps if isinstance(t, JarLibrary)):
           for jar in lib.jar_dependencies:
             ret.append(jar.cache_key())
-    return sorted(ret)
+
+    # We must invalidate on the set of plugins and their settings.
+    ret.extend(self._plugin_args())
+    return ret
 
   @staticmethod
-  def _get_compile_args(opts, classpath, sources, output_dir, analysis_file,
-                        upstream_analysis_files):
-    args = list(opts)  # Make a copy
+  def relativize_classpath(classpath):
+    return relativize_paths(classpath, get_buildroot())
 
-    if upstream_analysis_files:
-      args.extend(
-        ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
-
-    relative_classpath = relativize_paths(classpath, get_buildroot())
-    args.extend([
-      '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(relative_classpath),
-      '-d', output_dir
-    ])
-    args.extend(sources)
-    return args
-
-  def compile(self, opts, classpath, sources, output_dir, analysis_file, upstream_analysis_files):
+  def compile(self, extra_args, classpath, sources, output_dir,
+              analysis_file, upstream_analysis_files):
 
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
-    big_classpath = self._compiler_classpath + classpath
-    args = ZincUtils._get_compile_args(opts + self._name_hashing_args() + self._plugin_args(),
-                                       big_classpath, sources, output_dir, analysis_file,
-                                       upstream_analysis_files)
+    relativized_classpath = self.relativize_classpath(self._compiler_classpath + classpath)
+
+    args = []
+
+    args.extend([
+      '-log-level', self._log_level,
+      '-analysis-cache', analysis_file,
+      '-classpath', ':'.join(relativized_classpath),
+      '-d', output_dir
+    ])
+    if not self._color:
+      args.append('-no-color')
+    if not self._nailgun_task.get_options().name_hashing:
+      args.append('-no-name-hashing')
+
+    args.extend(self._zinc_jar_args())
+    args += self._plugin_args()
+    if upstream_analysis_files:
+      args.extend(
+        ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
+
+    args += extra_args
+
+    args.extend(sources)
+
     self.log_zinc_file(analysis_file)
-    if self._run_zinc(args, workunit_labels=[WorkUnit.COMPILER]):
+    if self._nailgun_task.runjava(classpath=self._zinc_classpath,
+                                  main=ZincUtils._ZINC_MAIN,
+                                  jvm_options=self._jvm_options,
+                                  args=args,
+                                  workunit_name='zinc',
+                                  workunit_labels=[WorkUnit.COMPILER]):
       raise TaskError('Zinc compile failed.')
 
   @staticmethod
@@ -189,16 +187,10 @@ class ZincUtils(object):
 
     TODO: Make these mappings explicit instead of deriving them by jar name heuristics.
     """
-    ret = OrderedDict()
-    ret.update(ZincUtils.identify_jars(ZincUtils.ZINC_JAR_NAMES, zinc_classpath))
-    return ret
-
-  @staticmethod
-  def identify_jars(names, jars):
     jars_by_name = {}
-    jars_and_filenames = [(x, os.path.basename(x)) for x in jars]
+    jars_and_filenames = [(x, os.path.basename(x)) for x in zinc_classpath]
 
-    for name in names:
+    for name in ZincUtils.ZINC_JAR_NAMES:
       jar_for_name = None
       for jar, filename in jars_and_filenames:
         if filename.startswith(name):
@@ -210,13 +202,13 @@ class ZincUtils(object):
         jars_by_name[name] = jar_for_name
     return jars_by_name
 
-  def find_plugins(self, plugin_names):
+  def find_plugins(self):
     """Returns a map from plugin name to plugin jar."""
-    plugin_names = set(plugin_names)
+    # Allow multiple flags and also comma-separated values in a single flag.
+    plugin_names = set([p for val in self._nailgun_task.get_options().plugins
+                          for p in val.split(',')])
     plugins = {}
     buildroot = get_buildroot()
-    # plugin_jars is the universe of all possible plugins and their transitive deps.
-    # Here we select the ones to actually use.
     for jar in self.plugin_jars():
       with open_zip64(jar, 'r') as jarfile:
         try:
