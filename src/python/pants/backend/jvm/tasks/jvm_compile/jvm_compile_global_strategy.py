@@ -301,6 +301,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     return ResourceMapping(self._classes_dir)
 
   def compute_classes_by_source(self, compile_contexts):
+    if not compile_contexts:
+      return {}
+
     # This implementation requires that all contexts use the same analysis file and global classes.
     analysis_file = None
     for compile_context in compile_contexts:
@@ -313,8 +316,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         if compile_context.analysis_file != analysis_file:
           raise TaskError('Inconsistent analysis file for the global strategy: {} vs {}'.format(
             compile_context.analysis_file, analysis_file))
-    if not analysis_file:
-      analysis_file = self._analysis_file
 
     # Parse the global analysis once.
     buildroot = get_buildroot()
