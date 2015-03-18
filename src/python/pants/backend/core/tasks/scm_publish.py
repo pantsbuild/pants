@@ -124,13 +124,13 @@ class ScmPublishMixin(object):
   Requires that the mixing task class
   * has the properties scm and log,
   * has the method get_options
-  * calls register_scm_publish_options in its register_options definition
   """
 
   _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
-  def register_scm_publish_options(cls, register):
+  def register_options(cls, register):
+    super(ScmPublishMixin, cls).register_options(register)
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
              help='Try pushing the pushdb to the SCM this many times before aborting.')
     register('--restrict-push-branches', advanced=True, type=Options.list,

@@ -399,7 +399,6 @@ class JarPublish(ScmPublishMixin, JarTask):
     register('--publish-extras', advanced=True, type=Options.dict,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
-    cls.register_scm_publish_options(register)
 
   @classmethod
   def prepare(cls, options, round_manager):
