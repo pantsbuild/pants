@@ -1,7 +1,21 @@
 target(
   name='tasks',
   dependencies=[
-    ':python_eval'
+    ':python_eval',
+    ':python_repl'
+  ]
+)
+
+python_tests(
+  name='python_task_test',
+  sources=['python_task_test.py'],
+  dependencies=[
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/option',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:task_test_base'
   ]
 )
 
@@ -9,13 +23,27 @@ python_tests(
   name='python_eval',
   sources=['test_python_eval.py'],
   dependencies=[
+    ':python_task_test',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
+  ]
+)
+
+python_tests(
+  name='python_repl',
+  sources=['test_python_repl.py'],
+  dependencies=[
+    ':python_task_test',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/backend/python:all_utils',
     'src/python/pants/base:address',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:base'
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
   ]
 )
