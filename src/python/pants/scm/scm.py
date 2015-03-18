@@ -90,10 +90,18 @@ class Scm(AbstractClass):
 
   @abstractmethod
   def commit(self, message):
-    """Commits all the changes in the local workspace.
+    """Commits all the changes for tracked files in the local workspace.
 
     Subclasses should raise LocalException if there is a problem making the commit.
     """
+
+  @abstractmethod
+  def add(self, *paths):
+    """Add paths to the set of tracked files.
+
+    Subclasses should raise LocalException if there is a problem adding the paths.
+    """
+
 
   @abstractmethod
   def push(self):
