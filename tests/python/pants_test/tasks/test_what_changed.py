@@ -180,6 +180,18 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
+  def test_spec_excludes(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      config=dedent('''
+      [DEFAULT]
+      spec_excludes: [
+          "root/src/py/1"
+        ]
+      '''),
+      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
+    )
+
   def test_owned(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
