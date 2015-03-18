@@ -157,6 +157,20 @@ function dry_run_install() {
   install_and_test_packages --find-links=file://${ROOT}/dist
 }
 
+function check_clean_master() {
+  (
+    [[ -z "$(git status --porcelain)" ]] && \
+    [[ "$(git branch | grep -E '^* ' | cut -d' ' -f2-)" == "master" ]]
+  ) || die "You are not on a clean master branch."
+}
+
+function tag_release() {
+  release_version="$(local_version)" && \
+  tag_name="release_${release_version}" && \
+  git tag --sign -m "pantsbuild.pants release ${release_version}" ${tag_name} && \
+    git push git@github.com:pantsbuild/pants.git ${tag_name}
+}
+
 function usage() {
   echo "Releases the following source distributions to PyPi."
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
@@ -214,7 +228,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi." && \
   (
-    dry_run_install && publish_packages && \
+    check_clean_master && dry_run_install && publish_packages && tag_release \
     banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
 fi
