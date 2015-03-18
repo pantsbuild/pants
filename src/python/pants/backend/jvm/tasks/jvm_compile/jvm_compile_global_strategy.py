@@ -17,6 +17,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileS
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.util.contextutil import open_zip64, temporary_dir
@@ -298,6 +299,34 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   def compute_resource_mapping(self, compile_contexts):
     return ResourceMapping(self._classes_dir)
+
+  def compute_classes_by_source(self, compile_contexts):
+    if not compile_contexts:
+      return {}
+
+    # This implementation requires that all contexts use the same analysis file and global classes.
+    analysis_file = None
+    for compile_context in compile_contexts:
+      if compile_context.classes_dir != self._classes_dir:
+        raise TaskError('Unrecognized classes directory for the global strategy: {}'.format(
+          compile_context.classes_dir))
+      if not analysis_file:
+        analysis_file = compile_context.analysis_file
+      else:
+        if compile_context.analysis_file != analysis_file:
+          raise TaskError('Inconsistent analysis file for the global strategy: {} vs {}'.format(
+            compile_context.analysis_file, analysis_file))
+
+    # Parse the global analysis once.
+    buildroot = get_buildroot()
+    classes_by_src = {}
+    if os.path.exists(analysis_file):
+      products = self._analysis_parser.parse_products_from_path(analysis_file,
+                                                                self._classes_dir)
+      for src, classes in products.items():
+        relsrc = os.path.relpath(src, buildroot)
+        classes_by_src[relsrc] = classes
+    return classes_by_src
 
   def post_process_cached_vts(self, cached_vts):
     """Special post processing for global scala analysis files.

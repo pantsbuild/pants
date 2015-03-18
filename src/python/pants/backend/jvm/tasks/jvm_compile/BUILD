@@ -81,6 +81,7 @@ python_library(
     ':jvm_compile_strategy',
     ':jvm_dependency_analyzer',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
