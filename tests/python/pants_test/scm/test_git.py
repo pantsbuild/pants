@@ -252,3 +252,70 @@ class GitTest(unittest.TestCase):
         self.git.refresh(leave_clean=True)
       # The repo is clean
       self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+
+  def test_commit_with_new_untracked_file_adds_file(self):
+    new_file = os.path.join(self.worktree, 'untracked_file')
+
+    touch(new_file)
+
+    self.assertEqual({'untracked_file'}, self.git.changed_files(include_untracked=True))
+
+    self.git.add(new_file)
+
+    self.assertEqual({'untracked_file'}, self.git.changed_files())
+
+    self.git.commit('API Changes.')
+
+    self.assertEqual(set(), self.git.changed_files(include_untracked=True))
+
+
+class DetectWorktreeFakeGitTest(unittest.TestCase):
+  @contextmanager
+  def empty_path(self):
+    with temporary_dir() as path:
+      with environment_as(PATH=path):
+        yield path
+
+  @contextmanager
+  def unexecutable_git(self):
+    with self.empty_path() as path:
+      git = os.path.join(path, 'git')
+      touch(git)
+      yield git
+
+  @contextmanager
+  def executable_git(self):
+    with self.unexecutable_git() as git:
+      chmod_plus_x(git)
+      yield git
+
+  def test_detect_worktree_no_git(self):
+    with self.empty_path():
+      self.assertIsNone(Git.detect_worktree())
+
+  def test_detect_worktree_unexectuable_git(self):
+    with self.unexecutable_git() as git:
+      self.assertIsNone(Git.detect_worktree())
+      self.assertIsNone(Git.detect_worktree(binary=git))
+
+  def test_detect_worktree_invalid_executable_git(self):
+    with self.executable_git() as git:
+      self.assertIsNone(Git.detect_worktree())
+      self.assertIsNone(Git.detect_worktree(binary=git))
+
+  def test_detect_worktree_failing_git(self):
+    with self.executable_git() as git:
+      with open(git, 'w') as fp:
+        fp.write('#!/bin/sh\n')
+        fp.write('exit 1')
+      self.assertIsNone(Git.detect_worktree())
+      self.assertIsNone(Git.detect_worktree(git))
+
+  def test_detect_worktree_working_git(self):
+    expected_worktree_dir = '/a/fake/worktree/dir'
+    with self.executable_git() as git:
+      with open(git, 'w') as fp:
+        fp.write('#!/bin/sh\n')
+        fp.write('echo ' + expected_worktree_dir)
+      self.assertEqual(expected_worktree_dir, Git.detect_worktree())
+      self.assertEqual(expected_worktree_dir, Git.detect_worktree(binary=git))

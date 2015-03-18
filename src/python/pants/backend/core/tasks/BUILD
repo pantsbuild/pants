@@ -275,6 +275,9 @@ python_library(
   sources = ['scm_publish.py'],
   dependencies = [
     ':common',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/option',
+    'src/python/pants/scm',
   ],
 )
 
