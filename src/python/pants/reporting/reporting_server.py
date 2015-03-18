@@ -20,6 +20,7 @@ from datetime import date, datetime
 
 import psutil
 import pystache
+from six.moves import range
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
@@ -135,7 +136,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       # Binary file. Display it as hex, split into lines.
       n = 120  # Display lines of this max size.
       content = repr(content)[1:-1]  # Will escape non-printables etc, dropping surrounding quotes.
-      content = '\n'.join([content[i:i+n] for i in xrange(0, len(content), n)])
+      content = '\n'.join([content[i:i+n] for i in range(0, len(content), n)])
       prettify = False
       prettify_extra_langs = []
     else:

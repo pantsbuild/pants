@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 
@@ -15,11 +16,17 @@ class ParseError(TaskError):
   pass
 
 
+@contextmanager
+def raise_on_eof(infile):
+  try:
+    yield
+  except StopIteration:
+    filename = getattr(infile, 'name', None) or repr(infile)
+    raise ParseError("Unexpected end-of-file parsing {0}".format(filename))
+
+
 class AnalysisParser(object):
   """Parse a file containing representation of an analysis for some JVM language."""
-
-  def __init__(self, classes_dir):
-    self.classes_dir = classes_dir  # The output dir for classes in this analysis.
 
   @property
   def empty_test_header(self):
@@ -34,12 +41,13 @@ class AnalysisParser(object):
     if not os.path.exists(path):
       return False
     with open(path, 'r') as infile:
-      # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
-      expected_header = '{0}:\n'.format(self.empty_test_header)
-      while infile.next() != expected_header:
-        pass
-      # Now see if this section is empty or not.
-      return self.parse_num_items(infile.next()) > 0
+      with raise_on_eof(infile):
+        # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
+        expected_header = '{0}:\n'.format(self.empty_test_header)
+        while infile.next() != expected_header:
+          pass
+        # Now see if this section is empty or not.
+        return self.parse_num_items(infile.next()) > 0
 
   def parse_from_path(self, infile_path):
     """Parse an analysis instance from a text file."""
@@ -50,22 +58,22 @@ class AnalysisParser(object):
     """Parse an analysis instance from an open file."""
     raise NotImplementedError()
 
-  def parse_products_from_path(self, infile_path):
+  def parse_products_from_path(self, infile_path, classes_dir):
     """An efficient parser of just the src->class mappings.
 
     Returns a map of src -> list of classfiles. All paths are absolute.
     """
     with open(infile_path, 'r') as infile:
-      return self.parse_products(infile)
+      return self.parse_products(infile, classes_dir)
 
-  def parse_products(self, infile):
+  def parse_products(self, infile, classes_dir):
     """An efficient parser of just the src->class mappings.
 
     Returns a map of src -> list of classfiles. All paths are absolute.
     """
     raise NotImplementedError()
 
-  def parse_deps_from_path(self, infile_path, classpath_indexer):
+  def parse_deps_from_path(self, infile_path, classpath_indexer, classes_dir):
     """An efficient parser of just the src->dep mappings.
 
     classpath_indexer - a no-arg method that an implementation may call if it needs a mapping
@@ -73,9 +81,9 @@ class AnalysisParser(object):
                         We use this indirection to avoid unnecessary precomputation.
     """
     with open(infile_path, 'r') as infile:
-      return self.parse_deps(infile, classpath_indexer)
+      return self.parse_deps(infile, classpath_indexer, classes_dir)
 
-  def parse_deps(self, infile, classpath_indexer):
+  def parse_deps(self, infile, classpath_indexer, classes_dir):
     """An efficient parser of just the binary, source and external deps sections.
 
     classpath_indexer - a no-arg method that an implementation may call if it needs a mapping

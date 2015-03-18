@@ -106,10 +106,10 @@ class GoalRunner(object):
         # project plugins, or specialized configuration files.
         self.build_file_parser.parse_build_file_family(build_file)
 
+    self._expand_goals_and_specs()
+
     # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
     self.run_tracker.run_info.add_scm_info()
-
-    self._expand_goals_and_specs()
 
   @property
   def spec_excludes(self):

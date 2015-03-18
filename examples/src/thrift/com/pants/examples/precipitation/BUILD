@@ -8,6 +8,9 @@ java_thrift_library(name='precipitation-java',
   dependencies=[
     'examples/src/thrift/com/pants/examples/distance:distance-java',
   ],
+  provides = artifact(org='com.pants.example',
+                      name='precipitation-thrift-java',
+                      repo=public),
 )
 
 python_thrift_library(name='precipitation-python',

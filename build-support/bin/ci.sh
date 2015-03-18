@@ -46,7 +46,7 @@ bootstrap_compile_args=(
 while getopts "hfxbkmsrlpnci:eat" opt; do
   case ${opt} in
     h) usage ;;
-    f) skip_formatting_checks="true" ;;
+    f) skip_pre_commit_checks="true" ;;
     x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
     k) bootstrap_compile_args=() ;;
@@ -86,13 +86,10 @@ else
   banner "CI BEGINS"
 fi
 
-if [[ "${skip_formatting_checks:-false}" == "false" ]]; then
-  banner "Checking python code formatting"
+if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
+  banner "Running pre-commit checks"
 
-  ./build-support/bin/check_packages.sh || exit 1
-  ./build-support/bin/isort.sh || \
-    die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
-  ./build-support/bin/check_header.sh || exit 1
+  ./build-support/bin/pre-commit.sh || exit 1
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
@@ -108,7 +105,6 @@ for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
 done
 
 PANTS_ARGS=(
-  "--print-exception-stacktrace"
   "${INTERPRETER_ARGS[@]}"
 )
 
@@ -128,10 +124,10 @@ fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
   banner "Sanity checking bootrapped pants and repo BUILD files"
-  ./pants.pex clean-all ${PANTS_ARGS[@]} || die "Failed to clean-all."
-  ./pants.pex goals ${PANTS_ARGS[@]} || die "Failed to list goals."
-  ./pants.pex list :: ${PANTS_ARGS[@]} || die "Failed to list all targets."
-  ./pants.pex targets ${PANTS_ARGS[@]} || die "Failed to show target help."
+  ./pants.pex ${PANTS_ARGS[@]} clean-all || die "Failed to clean-all."
+  ./pants.pex ${PANTS_ARGS[@]} goals || die "Failed to list goals."
+  ./pants.pex ${PANTS_ARGS[@]} list :: || die "Failed to list all targets."
+  ./pants.pex ${PANTS_ARGS[@]} targets || die "Failed to show target help."
 fi
 
 if [[ "${skip_distribution:-false}" == "false" ]]; then
@@ -150,10 +146,10 @@ packages: [
   ]
 EOF
     ) && \
-    ./pants.pex binary ${INTERPRETER_ARGS[@]} --config-override=${config} \
+    ./pants.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
         src/python/pants:_pants_transitional_publishable_binary_ && \
     mv dist/_pants_transitional_publishable_binary_.pex dist/self.pex && \
-    ./dist/self.pex binary --config-override=${config} ${INTERPRETER_ARGS[@]} \
+    ./dist/self.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
       src/python/pants:_pants_transitional_publishable_binary_ && \
     ./dist/self.pex --config-override=${config} setup-py --recursive \
       src/python/pants:pants-packaged
@@ -169,7 +165,7 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex test ${PANTS_ARGS[@]} \
+      ./pants.pex ${PANTS_ARGS[@]} test \
         $(./pants.pex list pants-plugins/tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
@@ -181,7 +177,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex test ${PANTS_ARGS[@]} \
+      ./pants.pex ${PANTS_ARGS[@]} test \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
@@ -195,7 +191,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex test.pytest --no-fast ${PANTS_ARGS[@]} contrib::
+    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex ${PANTS_ARGS[@]} test.pytest --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 
@@ -228,15 +224,15 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   banner "Running tests in testprojects/ "
   (
-    ./pants.pex test testprojects:: $android_test_opts $exclude_opts ${PANTS_ARGS[@]}
+    ./pants.pex ${PANTS_ARGS[@]} test testprojects:: $android_test_opts $exclude_opts
   ) || die "test failure in testprojects/"
 fi
 
 if [[ "${skip_examples:-false}" == "false" ]]; then
   banner "Running example tests"
   (
-    ./pants.pex compile.python-eval --closure --fail-slow test examples:: \
-      $android_test_opts ${PANTS_ARGS[@]}
+    ./pants.pex ${PANTS_ARGS[@]} compile.python-eval --closure --fail-slow test examples:: \
+      $android_test_opts
   ) || die "Examples test failure"
 fi
 
@@ -248,7 +244,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex test ${PANTS_ARGS[@]} \
+      ./pants.pex ${PANTS_ARGS[@]} test \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep integration | \

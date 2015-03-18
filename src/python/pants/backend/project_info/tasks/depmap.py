@@ -18,12 +18,10 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 
 
-# Changing the behavior of this task may affect the IntelliJ Pants plugin
-# Please add fkorotkov, tdesai to reviews for this file
-# XXX(pl): JVM hairball violator
 class Depmap(ConsoleTask):
   """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
@@ -71,9 +69,13 @@ class Depmap(ConsoleTask):
              help='Specifies the internal dependency graph should be output in the dot digraph '
                   'format.')
     register('--project-info', default=False, action='store_true',
+             deprecated_version='0.0.31',
+             deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
              help='Produces a json object with info about the target, including source roots, '
                   'dependencies, and paths to libraries for their targets and dependencies.')
     register('--project-info-formatted', default=True, action='store_false',
+             deprecated_version='0.0.31',
+             deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
              help='Causes project-info output to be a single line of JSON.')
     register('--separator', default='-',
              help='Specifies the separator to use between the org/name/rev components of a '
@@ -238,6 +240,8 @@ class Depmap(ConsoleTask):
     graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']
     return header + graph_attr + output_deps(set(), target) + ['}']
 
+  @deprecated(removal_version='0.0.31',
+      hint_message='Information from "depmap --project-info" should now be accessed through the "export" goal')
   def project_info_output(self, targets):
     targets_map = {}
     resource_target_map = {}

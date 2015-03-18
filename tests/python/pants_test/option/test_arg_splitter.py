@@ -19,7 +19,7 @@ class ArgSplitterTest(unittest.TestCase):
              expected_is_help=False, expected_help_advanced=False, expected_help_all=False):
     expected_passthru = expected_passthru or []
     splitter = ArgSplitter(ArgSplitterTest._known_scopes)
-    args = shlex.split(str(args_str))
+    args = shlex.split(args_str)
     goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
     self.assertEquals(expected_goals, goals)
     self.assertEquals(expected_scope_to_flags, scope_to_flags)
@@ -31,6 +31,7 @@ class ArgSplitterTest(unittest.TestCase):
                       splitter.help_request is not None and splitter.help_request.advanced)
     self.assertEquals(expected_help_all,
                       splitter.help_request is not None and splitter.help_request.all_scopes)
+    self.assertFalse(splitter.help_request is not None and splitter.help_request.version)
 
   def _split_help(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
                   expected_help_advanced=False, expected_help_all=False):
@@ -39,6 +40,12 @@ class ArgSplitterTest(unittest.TestCase):
                 expected_is_help=True,
                 expected_help_advanced=expected_help_advanced,
                 expected_help_all=expected_help_all)
+
+  def _split_version(self, args_str):
+    splitter = ArgSplitter(ArgSplitterTest._known_scopes)
+    args = shlex.split(args_str)
+    splitter.split_args(args)
+    self.assertTrue(splitter.help_request is not None and splitter.help_request.version)
 
   def test_arg_splitting(self):
     # Various flag combos.
@@ -143,3 +150,13 @@ class ArgSplitterTest(unittest.TestCase):
                      {'': [], 'compile': []}, [], True, False)
     self._split_help('./pants compile help-all test --help', ['compile', 'test'],
                      {'': [], 'compile': [], 'test': []}, [], False, True)
+
+  def test_version_request_detection(self):
+    self._split_version('./pants -V')
+    self._split_version('./pants --version')
+
+    # --version in a non-global scope is OK, and not a version request.
+    self._split('./pants compile --version src/java/com/pants/foo',
+                ['compile'],
+                { '': [], 'compile': ['--version'], },
+                ['src/java/com/pants/foo'])

@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -51,8 +49,7 @@ class ScalaCompile(JvmCompile):
                                  log_level=self.get_options().level)
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, self.ivy_cache_dir,
-                         ZincAnalysisParser(self._classes_dir), ZincAnalysis)
+    return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
@@ -61,14 +58,18 @@ class ScalaCompile(JvmCompile):
   # Invalidate caches if the toolchain changes.
   def platform_version_info(self):
     zinc_invalidation_key = self._zinc_utils.platform_version_info()
-    jvm_target_version = ''
 
     # Check scalac args for jvm target version.
+    jvm_target_version = ''
     for arg in self._args:
       if arg.strip().startswith("-S-target:"):
         jvm_target_version = arg.strip()
-
     zinc_invalidation_key.append(jvm_target_version)
+
+    # Invalidate if use of name hashing changes.
+    zinc_invalidation_key.append(
+      'name-hashing-{0}'.format('on' if self.get_options().name_hashing else 'off'))
+
     return zinc_invalidation_key
 
   def extra_products(self, target):
@@ -78,10 +79,6 @@ class ScalaCompile(JvmCompile):
       ret.append((root, [plugin_info_file]))
     return ret
 
-  def compile(self, args, classpath, sources, classes_output_dir, analysis_file):
-    # We have to treat our output dir as an upstream element, so zinc can find valid
-    # analysis for previous partitions. We use the global valid analysis for the upstream.
-    upstream = ({classes_output_dir: self._analysis_file}
-                if os.path.exists(self._analysis_file) else {})
-    return self._zinc_utils.compile(args, classpath + [self._classes_dir], sources,
-                                    classes_output_dir, analysis_file, upstream)
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
+    return self._zinc_utils.compile(args, classpath, sources,
+                                    classes_output_dir, analysis_file, upstream_analysis)

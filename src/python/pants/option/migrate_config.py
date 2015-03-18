@@ -48,7 +48,6 @@ migrations = {
   ('specs-run', 'jvm_args'): ('test.specs', 'jvm_options'),
   ('junit-run', 'jvm_args'): ('test.junit', 'jvm_options'),
   ('scala-repl', 'jvm_args'): ('repl.scala', 'jvm_options'),
-  ('scrooge-gen', 'jvm_args'): ('scrooge-gen', 'jvm_options'),
   ('ivy-resolve', 'jvm_args'): ('resolve.ivy', 'jvm_options'),
 
   ('jvm-run', 'confs'): ('run.jvm', 'confs'),
@@ -63,6 +62,15 @@ migrations = {
   ('checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'bootstrap_tools'),
   ('checkstyle', 'configuration'): ('compile.checkstyle', 'configuration'),
   ('checkstyle', 'properties'): ('compile.checkstyle', 'properties'),
+
+  ('scalastyle', 'config'): ('compile.scalastyle', 'config'),
+  ('scalastyle', 'excludes'): ('compile.scalastyle', 'excludes'),
+
+  # These must now be defined for each JvmTask subtask, so we temporarily put them
+  # in the DEFAULT section as a convenience.
+  # These will soon move into a subsystem, which will fix this.
+  ('jvm', 'debug_config'): ('DEFAULT', 'debug_config'),
+  ('jvm', 'debug_port'): ('DEFAULT', 'debug_port'),
 
   ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
   ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
@@ -185,6 +193,19 @@ migrations = {
   ('resolve.ivy', 'ng_daemons'): ('resolve.ivy', 'use_nailgun'),
 
   ('thrift-linter', 'ng_daemons'): ('thrift-linter', 'use_nailgun'),
+
+  # Migration of the scrooge contrib module to the new options system.
+  ('java-thrift-library', 'compiler'): ('DEFAULT', 'thrift_default_compiler'),
+  ('java-thrift-library', 'language'): ('DEFAULT', 'thrift_default_language'),
+  ('java-thrift-library', 'rpc_style'): ('DEFAULT', 'thrift_default_rpc_style'),
+  ('scrooge-gen', 'jvm_args'): ('gen.scrooge', 'jvm_options'),
+  ('scrooge-gen', 'jvm_options'): ('gen.scrooge', 'jvm_options'),
+  ('scrooge-gen', 'strict'): ('gen.scrooge', 'strict'),
+  ('scrooge-gen', 'verbose'): ('gen.scrooge', 'verbose'),
+  ('thrift-linter', 'strict'): ('thrift-linter', 'strict_default'),
+  # NB: For the following two options, see the notes below.
+  ('scrooge-gen', 'scala'): ('gen.scrooge', 'service_deps'),
+  ('scrooge-gen', 'java'): ('gen.scrooge', 'service_deps'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -196,9 +217,16 @@ ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_n
                    'limit the number of overrides by inverting the default with a DEFAULT section '
                    'value of False.')
 
+scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been refactored into '
+                         'two options: one for service deps, and one for structs deps.')
+
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
                                             'compile.scala',
+  ('jvm', 'debug_port'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
+                         'move to a subsystem, which will fix this requirement.',
+  ('jvm', 'debug_args'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
+                         'move to a subsystem, which will fix this requirement.',
   ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
                                   'target: options. Other args should be placed in args: and '
                                   'prefixed with -C.',
@@ -239,6 +267,8 @@ notes = {
   ('gen', 'ng_daemons'): ng_daemons_note,
   ('imports', 'ng_daemons'): ng_daemons_note,
   ('resolve', 'ng_daemons'): ng_daemons_note,
+  ('scrooge-gen', 'scala'): scrooge_gen_deps_note,
+  ('scrooge-gen', 'java'): scrooge_gen_deps_note,
 }
 
 

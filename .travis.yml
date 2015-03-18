@@ -6,7 +6,7 @@ sudo: false
 
 cache:
   directories:
-    - $HOME/.pants.d
+    - $HOME/.cache/pants
     - $HOME/.ivy2
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv

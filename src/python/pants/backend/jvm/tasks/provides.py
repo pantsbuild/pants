@@ -14,6 +14,7 @@ from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.base.deprecated import deprecated
 from pants.util.contextutil import open_zip64
 from pants.util.dirutil import safe_mkdir
 
@@ -50,6 +51,8 @@ class Provides(Task):
     #   configurations=self.confs)
     # self.context.products.require('jars')
 
+  @deprecated('0.0.31',
+              'There is no replacement planned for this task. Contact pants-devel@ if you need it.')
   def execute(self):
     safe_mkdir(self.workdir)
     targets = self.context.targets()

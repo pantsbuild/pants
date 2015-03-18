@@ -10,6 +10,8 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import BuildGraph
@@ -260,7 +262,10 @@ class Context(object):
                                              derived_from=derived_from,
                                              **kwargs)
     new_target = self.build_graph.get_target(address)
-    self._synthetic_targets[derived_from].append(new_target)
+
+    if derived_from:
+      self._synthetic_targets[derived_from].append(new_target)
+
     return new_target
 
   def targets(self, predicate=None, postorder=False):
@@ -275,16 +280,25 @@ class Context(object):
                           `False` or preorder by default.
     :returns: A list of matching targets.
     """
-
     target_root_addresses = [target.address for target in self.target_roots]
-    target_set = self.build_graph.transitive_subgraph_of_addresses(target_root_addresses,
-                                                                   postorder=postorder)
+    target_set = self._collect_targets(self.target_roots, postorder=postorder)
 
+    synthetics = OrderedSet()
     for derived_from, synthetic_targets in self._synthetic_targets.items():
-      if derived_from in target_set:
-        target_set.update(synthetic_targets)
+      if derived_from in target_set or derived_from in synthetics:
+        synthetics.update(synthetic_targets)
+
+    synthetic_set = self._collect_targets(synthetics, postorder=postorder)
+
+    target_set.update(synthetic_set)
 
     return filter(predicate, target_set)
+
+  def _collect_targets(self, root_targets, postorder=False):
+    addresses = [target.address for target in root_targets]
+    target_set = self.build_graph.transitive_subgraph_of_addresses(addresses,
+                                                                   postorder=postorder)
+    return target_set
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that

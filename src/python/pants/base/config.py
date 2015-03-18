@@ -9,6 +9,8 @@ import getpass
 import itertools
 import os
 
+from six.moves import range
+
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.strutil import is_text_or_binary
 

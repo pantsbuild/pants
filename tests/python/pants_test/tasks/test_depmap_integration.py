@@ -25,6 +25,9 @@ class DepmapIntegrationTest(PantsRunIntegrationTest):
         '--output-file={out_file}'.format(out_file=depmap_out_file),
         test_target],
         workdir)
+    # Is the above call failing? The --project-info flag is scheduled to be removed
+    # after 0.0.31. These tests have already been duplicated to test_export_integration.py
+    # so you can just remove this file completely.
     self.assert_success(pants_run)
     self.assertTrue(os.path.exists(depmap_out_file),
                     msg='Could not find depmap output file in {out_file}'

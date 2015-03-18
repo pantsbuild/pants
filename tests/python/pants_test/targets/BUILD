@@ -14,7 +14,6 @@ target(
     ':jar_library',
     ':java_agent',
     ':java_tests',
-    ':java_thrift_library',
     ':jvm_app',
     ':python_binary',
     ':python_target',
@@ -60,18 +59,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/backend/jvm/targets:jvm',
     ]
-)
-
-python_tests(
-  name = 'java_thrift_library',
-  sources = ['test_java_thrift_library.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_file_aliases',
-    'tests/python/pants_test/base:context_utils',
-  ]
 )
 
 python_tests(

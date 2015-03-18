@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import httplib
 from multiprocessing.pool import ThreadPool
 
+from six.moves import range
+
 from pants.util.contextutil import Timer
 
 
@@ -35,7 +37,7 @@ class Pinger(object):
     host, colon, portstr = netloc.partition(':')
     port = int(portstr) if portstr else None
     rt_secs = Pinger.UNREACHABLE
-    for _ in xrange(self._tries):
+    for _ in range(self._tries):
       try:
         with Timer() as timer:
           conn = httplib.HTTPConnection(host, port, timeout=self._timeout)

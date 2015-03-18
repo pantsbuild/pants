@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.wrapped_globs import Globs
+import os
+
+from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file_aliases import BuildFileAliases
@@ -18,16 +20,19 @@ class FilesetRelPathWrapperTest(BaseTest):
     return BuildFileAliases.create(
       targets={
         'java_library': JavaLibrary,
-        },
+      },
       context_aware_object_factories={
         'globs': Globs,
-        },
-      )
+        'rglobs': RGlobs,
+      },
+    )
 
   def setUp(self):
     super(FilesetRelPathWrapperTest, self).setUp()
     self.create_file('y/morx.java')
     self.create_file('y/fleem.java')
+    self.create_file('z/w/foo.java')
+    os.symlink('../../y', os.path.join(self.build_root, 'z/w/y'))
 
   def test_no_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
@@ -97,3 +102,13 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("/root/?.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan(self.build_root)
+
+  def test_rglob_follows_symlinked_dirs_by_default(self):
+    self.add_to_build_file('z/w/BUILD', 'java_library(name="w", sources=rglobs("*.java"))')
+    graph = self.context().scan(self.build_root)
+    assert ['y/fleem.java', 'y/morx.java', 'foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+
+  def test_rglob_respects_follow_links_override(self):
+    self.add_to_build_file('z/w/BUILD', 'java_library(name="w", sources=rglobs("*.java", follow_links=False))')
+    graph = self.context().scan(self.build_root)
+    assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())

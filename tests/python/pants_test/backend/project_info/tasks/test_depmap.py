@@ -20,7 +20,7 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.depmap import Depmap
+from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
 from pants_test.tasks.test_base import ConsoleTaskTest
@@ -390,7 +390,12 @@ class ProjectInfoTest(ConsoleTaskTest):
       resources=[],
     )
 
+
   def test_without_dependencies(self):
+    # Are these tests failing?  --project-info is to be removed
+    # from the depmap target in 0.0.31.  The ProjectInfoTest suite
+    # has already been moved to test_export.py so you can remove
+    # this class from test_depmap.py when it goes away.
     result = get_json(self.execute_console_task(
       args=['--test-project-info'],
       targets=[self.target('project_info:first')]

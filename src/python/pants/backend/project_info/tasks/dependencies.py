@@ -13,7 +13,6 @@ from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
 
 
-# XXX(pl): JVM/Python hairball violator
 class Dependencies(ConsoleTask):
   """Generates a textual list (using the target format) for the dependency set of a target."""
 

@@ -33,15 +33,16 @@ class SplitArgs(namedtuple('SplitArgs',
   pass
 
 
-class HelpRequest(namedtuple('HelpRequest', ['advanced', 'all_scopes'])):
+class HelpRequest(namedtuple('HelpRequest', ['version', 'advanced', 'all_scopes'])):
   """A help request from the user.
 
+  version: Did the user ask for version info.
   advanced: Did the user ask for advanced help (e.g., using --help-advanced).
   all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
   """
   @classmethod
   def basic(cls):
-    return cls(advanced=False, all_scopes=False)
+    return cls(version=False, advanced=False, all_scopes=False)
 
 
 class ArgSplitter(object):
@@ -54,12 +55,14 @@ class ArgSplitter(object):
   ./pants -x compile target1 target2 --compile-java-flag
   ./pants -x --compile-java-flag compile target1 target2
 
-  Handles help args (-h, --help-* flags and the scope 'help') specially.
+  Handles help and version args specially.
   """
   _HELP_BASIC_ARGS = ('-h', '--help', 'help')
   _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
   _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
   _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS
+
+  _VERSION_ARGS = ('-V', '--version')
 
   def __init__(self, known_scopes):
     self._known_scopes = set(known_scopes + ['help', 'help-advanced', 'help-all'])
@@ -72,7 +75,7 @@ class ArgSplitter(object):
 
     # Check for prefixes in reverse order, so we match the longest prefix first.
     self._known_scoping_prefixes = [('{0}-'.format(scope.replace('.', '-')), scope)
-                                    for scope in filter(None, sorted(self._known_scopes, reverse=True))]
+        for scope in filter(None, sorted(self._known_scopes, reverse=True))]
 
   @property
   def help_request(self):
@@ -87,7 +90,7 @@ class ArgSplitter(object):
     # Now see if we need to enhance it.
     advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
     all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
-    self._help_request = HelpRequest(advanced, all_scopes)
+    self._help_request = HelpRequest(False, advanced, all_scopes)
     return True
 
   def split_args(self, args=None):
@@ -127,6 +130,14 @@ class ArgSplitter(object):
       scope_to_flags[flag_scope].append(descoped_flag)
 
     global_flags = self._consume_flags()
+    # We only check for _VERSION_ARGS in the global flags. It's reasonable for tasks
+    # to have a --version flag with different meaning.
+    for version_arg in self._VERSION_ARGS:
+      if version_arg in global_flags:
+        if not self._help_request:
+          self._help_request = HelpRequest(True, False, False)
+        global_flags.remove(version_arg)
+
     add_scope(GLOBAL_SCOPE)
     for flag in global_flags:
       assign_flag_to_scope(flag, GLOBAL_SCOPE)

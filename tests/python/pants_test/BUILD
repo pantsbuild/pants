@@ -103,6 +103,7 @@ target(
     'tests/python/pants_test/fs',
     'tests/python/pants_test/graph',
     'tests/python/pants_test/goal',
+    'tests/python/pants_test/ivy',
     'tests/python/pants_test/java',
     'tests/python/pants_test/logging',
     'tests/python/pants_test/net',

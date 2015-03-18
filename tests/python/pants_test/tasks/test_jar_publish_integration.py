@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 
 import pytest
 
@@ -23,7 +24,7 @@ def shared_artifacts(version, extra_jar=None):
                          'hello-greet-{0}-sources.jar'.format(version)]
   if extra_jar:
     published_file_list.append(extra_jar)
-  return {'com/pants/testproject/publish/hello-greet/{0}/'.format(version): published_file_list}
+  return {'com/pants/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
 
 
 def publish_extra_config(unique_config):
@@ -45,6 +46,7 @@ def publish_extra_config(unique_config):
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
   SCALADOC = is_exe('scaladoc')
   JAVADOC = is_exe('javadoc')
+  GOLDEN_DATA_DIR = 'tests/python/pants_test/tasks/jar_publish_resources/'
 
   # This is where all pushdb properties files will end up.
   @property
@@ -52,6 +54,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     return os.path.join(get_buildroot(), 'testprojects', 'ivy', 'pushdb')
 
   def setUp(self):
+    # This attribute is required to see the full diff between ivy and pom files.
+    self.maxDiff  = None
     safe_rmtree(self.pushdb_root)
 
   def tearDown(self):
@@ -76,7 +80,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'com.pants.testproject.publish/jvm-example-lib/publish.properties',
                        'com.pants.testproject.publish.hello/welcome/publish.properties'],
                       extra_options=['--doc-scaladoc-skip'],
-                      expected_primary_artifact_count=3)
+                      expected_primary_artifact_count=3,
+                      assert_publish_config_contents=True)
 
   @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
                       reason='No javadoc binary on the PATH.')
@@ -154,7 +159,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                                success_expected=False)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
-                   extra_env=None, expected_primary_artifact_count=1, success_expected=True):
+                   extra_env=None, expected_primary_artifact_count=1, success_expected=True,
+                   assert_publish_config_contents=False):
     """Tests that publishing the given target results in the expected output.
 
     :param target: Target to test.
@@ -162,7 +168,11 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     :param extra_options: Extra command-line options to the pants run.
     :param extra_config: Extra pants.ini configuration for the pants run.
     :param expected_primary_artifact_count: Number of artifacts we expect to be published.
-    :param extra_env: Extra environment variables for the pants run."""
+    :param extra_env: Extra environment variables for the pants run.
+    :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
+           If set to True, compares the generated ivy.xml and pom files in
+           tests/python/pants_test/tasks/jar_publish_resources/<pakage_name>/<artifact_name>/
+    """
 
     with temporary_dir() as publish_dir:
       options = ['--publish-local=%s' % publish_dir,
@@ -195,3 +205,27 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
         for artifact in artifact_list:
           artifact_path = os.path.join(publish_dir, directory, artifact)
           self.assertTrue(os.path.exists(artifact_path))
+          if assert_publish_config_contents:
+            if artifact.endswith('xml') or artifact.endswith('pom'):
+              self.compare_file_contents(artifact_path, directory)
+
+  def compare_file_contents(self, artifact_path, directory):
+    """
+    Tests the ivy.xml and pom
+    :param artifact_path: Path of the artifact
+    :param directory: Directory where the artifact resides.
+    :return:
+    """
+    # Strip away the version number
+    [package_dir, artifact_name, version] = directory.rsplit(os.path.sep, 2)
+    file_name = os.path.basename(artifact_path)
+    golden_file_nm = os.path.join(JarPublishIntegrationTest.GOLDEN_DATA_DIR,
+                                  package_dir.replace(os.path.sep, '.'), artifact_name, file_name)
+    with open(artifact_path, 'r') as test_file:
+      generated_file = test_file.read()
+      with open(golden_file_nm, 'r') as golden_file:
+        golden_file_contents = golden_file.read()
+        # Remove the publication sha attribute from ivy.xml
+        if artifact_path.endswith('.xml'):
+          generated_file = re.sub(r'publication=.*', '/>', generated_file)
+      return self.assertMultiLineEqual(generated_file, golden_file_contents)

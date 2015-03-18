@@ -10,6 +10,8 @@ import re
 import time
 import uuid
 
+from six.moves import range
+
 from pants.rwbuf.read_write_buffer import FileBackedRWBuf
 from pants.util.dirutil import safe_mkdir_for
 
@@ -98,6 +100,7 @@ class WorkUnit(object):
     # A workunit may have multiple outputs, which we identify by a name.
     # E.g., a tool invocation may have 'stdout', 'stderr', 'debug_log' etc.
     self._outputs = {}  # name -> output buffer.
+    self._output_paths = {}
 
     # Do this last, as the parent's _self_time() might get called before we're
     # done initializing ourselves.
@@ -145,14 +148,24 @@ class WorkUnit(object):
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: %s' % name)
     if name not in self._outputs:
-      path = os.path.join(self.run_tracker.run_info_dir, 'tool_outputs', '%s.%s' % (self.id, name))
+      workunit_name = re.sub(r'\W', '_', self.name)
+      path = os.path.join(self.run_tracker.run_info_dir,
+                          'tool_outputs', '{workunit_name}-{id}.{output_name}'
+                          .format(workunit_name=workunit_name,
+                                  id=self.id,
+                                  output_name=name))
       safe_mkdir_for(path)
       self._outputs[name] = FileBackedRWBuf(path)
+      self._output_paths[name] = path
     return self._outputs[name]
 
   def outputs(self):
     """Returns the map of output name -> output buffer."""
     return self._outputs
+
+  def output_paths(self):
+    """Returns the map of output name -> path of the output file."""
+    return self._output_paths
 
   def choose(self, aborted_val, failure_val, warning_val, success_val, unknown_val):
     """Returns one of the 5 arguments, depending on our outcome."""

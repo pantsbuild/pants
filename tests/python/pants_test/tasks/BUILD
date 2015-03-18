@@ -26,10 +26,7 @@ target(
     ':check_published_deps',
     ':console_task',
     ':dependees',
-    ':dependencies',
-    ':depmap',
     ':detect_duplicates',
-    ':filemap',
     ':filter',
     ':group_task',
     ':ivy_utils',
@@ -59,6 +56,7 @@ target(
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
+    ':export_integration',
     ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
@@ -208,39 +206,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'dependencies',
-  sources = ['test_dependencies.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:dependencies',
-    'src/python/pants/backend/python/targets:python',
-    'src/python/pants/backend/python:python_requirement',
-    'src/python/pants/base:exceptions',
-  ]
-)
-
-python_tests(
-  name = 'depmap',
-  sources = ['test_depmap.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:depmap',
-    'src/python/pants/backend/python:plugin',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:exceptions',
-  ]
-)
-
-python_tests(
   name = 'depmap_integration',
   sources = ['test_depmap_integration.py'],
   dependencies = [
@@ -265,21 +230,16 @@ python_tests(
 )
 
 python_tests(
-  name = 'filedeps',
-  sources = ['test_filedeps.py'],
+  name = 'export_integration',
+  sources = ['test_export_integration.py'],
   dependencies = [
-    ':base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:filedeps',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:config',
+    'src/python/pants/ivy:ivy',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
   ],
 )
-
 python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],

@@ -28,19 +28,14 @@ from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
-from pants.backend.jvm.tasks.dependencies import Dependencies
-from pants.backend.jvm.tasks.depmap import Depmap
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
-from pants.backend.jvm.tasks.eclipse_gen import EclipseGen
-from pants.backend.jvm.tasks.ensime_gen import EnsimeGen
-from pants.backend.jvm.tasks.filedeps import FileDeps
-from pants.backend.jvm.tasks.idea_gen import IdeaGen
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from pants.backend.jvm.tasks.jvm_run import JvmRun
@@ -114,20 +109,6 @@ def register_goals():
 
   # Compilation.
 
-  # AnnotationProcessors are java targets, but we need to force them into their own compilation
-  # rounds so that they are on classpath of any dependees downstream that may use them. Without
-  # forcing a separate member type we could get a java chunk containing a mix of apt processors and
-  # code that relied on the un-compiled apt processor in the same javac invocation.  If so, javac
-  # would not be smart enough to compile the apt processors 1st and activate them.
-  class AptCompile(JavaCompile):
-    @classmethod
-    def name(cls):
-      return 'apt'
-
-    def select(self, target):
-      return super(AptCompile, self).select(target) and isinstance(target, AnnotationProcessor)
-
-
   jvm_compile = GroupTask.named(
       'jvm-compilers',
       product_type=['classes_by_target', 'classes_by_source'],
@@ -195,25 +176,6 @@ def register_goals():
     serialize=False
   ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
 
-  # IDE support.
-  task(name='idea', action=IdeaGen).install().with_description(
-      'Create an IntelliJ IDEA project from the given targets.')
-
-  task(name='eclipse', action=EclipseGen).install().with_description(
-      'Create an Eclipse project from the given targets.')
-
-  task(name='ensime', action=EnsimeGen).install().with_description(
-      'Create an Ensime project from the given targets.')
-
   # Build graph information.
   task(name='provides', action=Provides).install().with_description(
       'Print the symbols provided by the given targets.')
-
-  # XXX(pl): These should be core, but they have dependencies on JVM
-  task(name='depmap', action=Depmap).install().with_description("Depict the target's dependencies.")
-
-  task(name='dependencies', action=Dependencies).install().with_description(
-      "Print the target's dependencies.")
-
-  task(name='filedeps', action=FileDeps).install('filedeps').with_description(
-      'Print out the source and BUILD files the target depends on.')

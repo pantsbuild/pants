@@ -47,7 +47,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_protobuf_unpacked_jars(self):
     pants_run = self.run_pants(
       [ 'bundle', 'examples/src/java/com/pants/examples/protobuf/unpacked_jars',
-       '--bundle-deployjar', '--print-exception-stacktrace',])
+        '--bundle-deployjar',])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
                       "got stderr:\n{1}\n"

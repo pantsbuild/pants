@@ -1,6 +1,431 @@
 RELEASE HISTORY
 ===============
 
+0.0.29 (3/9/2015)
+-----------------
+
+CI
+~~
+* Support local pre-commit checks
+  `RB #1883 <https://rbcommons.com/s/twitter/r/1883>`_
+
+* Fix newline to fix broken master build
+  `RB #1888 <https://rbcommons.com/s/twitter/r/1888>`_
+
+* Shard out OSX CI
+  `RB #1873 <https://rbcommons.com/s/twitter/r/1873>`_
+
+* Update travis's pants cache settings
+  `RB #1875 <https://rbcommons.com/s/twitter/r/1875>`_
+
+* Fixup contrib tests on osx CI
+  `RB #1867 <https://rbcommons.com/s/twitter/r/1867>`_
+
+* Reduce number of test shards from 8 to 6 on Travis-ci
+  `RB #1804 <https://rbcommons.com/s/twitter/r/1804>`_
+
+* Cache the isort venv for ci runs
+  `RB #1740 <https://rbcommons.com/s/twitter/r/1740>`_
+
+* Fixup ci isort check
+  `RB #1728 <https://rbcommons.com/s/twitter/r/1728>`_
+
+Tests
+~~~~~
+* Add jar Publish integration tests to test the generated pom and ivy.xml files
+  `RB #1879 <https://rbcommons.com/s/twitter/r/1879>`_
+
+* Added test that shows that nested scope inherits properly from cmdline, config, and env
+  `RB #1851 <https://rbcommons.com/s/twitter/r/1851>`_
+  `RB #1865 <https://rbcommons.com/s/twitter/r/1865>`_
+
+* Improve AndroidDistribution coverage
+  `RB #1861 <https://rbcommons.com/s/twitter/r/1861>`_
+
+* Modernize the protobuf and wire task tests
+  `RB #1854 <https://rbcommons.com/s/twitter/r/1854>`_
+
+* Replace python_test_suite with target
+  `RB #1821 <https://rbcommons.com/s/twitter/r/1821>`_
+
+* Switch test_jvm_run.py to the new TaskTestBase instead of the old TaskTest
+  `RB #1829 <https://rbcommons.com/s/twitter/r/1829>`_
+
+* Remove two non-useful tests
+  `RB #1828 <https://rbcommons.com/s/twitter/r/1828>`_
+
+* Fix a python run integration test
+  `RB #1810 <https://rbcommons.com/s/twitter/r/1810>`_
+
+* Work around py test_runner issue with ns packages
+  `RB #1813 <https://rbcommons.com/s/twitter/r/1813>`_
+
+* Add a test for the Git changelog
+  `RB #1792 <https://rbcommons.com/s/twitter/r/1792>`_
+
+* Create a directory with no write perms for TestAndroidConfigUtil
+  `RB #1796 <https://rbcommons.com/s/twitter/r/1796>`_
+
+* Relocated some tests (no code changes) from tests/python/pants_test/tasks into tests/python/pants_test/backend/codegen/tasks to mirror the source location
+  `RB #1746 <https://rbcommons.com/s/twitter/r/1746>`_
+
+Docs
+~~~~
+* Add some documentation about using the pants reporting server for troubleshooting
+  `RB #1887 <https://rbcommons.com/s/twitter/r/1887>`_
+
+* Docstring reformatting for Task and InvalidationCheck
+  `RB #1769 <https://rbcommons.com/s/twitter/r/1769>`_
+
+* docs: Show correct pictures for intellij.html
+  `RB #1716 <https://rbcommons.com/s/twitter/r/1716>`_
+
+* doc += how to turn on cache
+  `RB #1668 <https://rbcommons.com/s/twitter/r/1668>`_
+
+New language: C++
+~~~~~~~~~~~~~~~~~
+* Separate compile step for C++ to just compile objects
+  `RB #1855 <https://rbcommons.com/s/twitter/r/1855>`_
+
+* Fixup CppToolchain to be lazy and actually cache
+  `RB #1850 <https://rbcommons.com/s/twitter/r/1850>`_
+
+* C++ support in contrib
+  `RB #1818 <https://rbcommons.com/s/twitter/r/1818>`_
+
+API Changes
+~~~~~~~~~~~
+* Kill the global `--ng-daemons` flag
+  `RB #1852 <https://rbcommons.com/s/twitter/r/1852>`_
+
+* Removed parallel_test_paths setting from pants.ini.  It isn't needed in the pants repo any more
+  `RB #1846 <https://rbcommons.com/s/twitter/r/1846>`_
+
+* BUILD file format cleanup:
+
+  - Deprecate bundle().add in favor of bundle(files=)
+    `RB #1788 <https://rbcommons.com/s/twitter/r/1788>`_
+  - Deprecate .intransitive() in favor of argument
+    `RB #1797 <https://rbcommons.com/s/twitter/r/1797>`_
+  - Deprecate target.with_description in favor of target(description=)
+    `RB #1790 <https://rbcommons.com/s/twitter/r/1790>`_
+  - Allow exclude in globs
+    `RB #1790 <https://rbcommons.com/s/twitter/r/1762>`_
+  - Move with_artifacts to an artifacts argument
+    `RB #1672 <https://rbcommons.com/s/twitter/r/1672>`_
+
+* An attempt to deprecate some old methods
+  `RB #1720 <https://rbcommons.com/s/twitter/r/1720>`_
+
+* Options refactor work
+
+  - Make option registration recursion optional
+    `RB #1870 <https://rbcommons.com/s/twitter/r/1870>`_
+  - Remove all direct config uses from jar_publish.py
+    `RB #1844 <https://rbcommons.com/s/twitter/r/1844>`_
+  - Read pants_distdir from options instead of config
+    `RB #1842 <https://rbcommons.com/s/twitter/r/1842>`_
+  - Remove direct config references in thrift gen code
+    `RB #1839 <https://rbcommons.com/s/twitter/r/1839>`_
+  - Android backend now exclusively uses the new option system
+    `RB #1819 <https://rbcommons.com/s/twitter/r/1819>`_
+  - Replace config use in RunTracker with options
+    `RB #1823 <https://rbcommons.com/s/twitter/r/1823>`_
+  - Add pants_bootstradir and pants_configdir to options bootstrapper
+    `RB #1835 <https://rbcommons.com/s/twitter/r/1835>`_
+  - Remove all direct config access in task.py
+    `RB #1827 <https://rbcommons.com/s/twitter/r/1827>`_
+  - Convert config-only options in goal idea and eclipse to use new options format
+    `RB #1805 <https://rbcommons.com/s/twitter/r/1805>`_
+  - Remove config_section from some tasks
+    `RB #1806 <https://rbcommons.com/s/twitter/r/1806>`_
+  - Disallow --no- on the name of boolean flags, refactor existing ones
+    `Issue #34 <https://github.com/pantsbuild/intellij-pants-plugin/issues/34>`_
+    `RB #1799 <https://rbcommons.com/s/twitter/r/1799>`_
+  - Migrating pants.ini config values for protobuf-gen to advanced registered options under gen.protobuf
+    `RB #1741 <https://rbcommons.com/s/twitter/r/1741>`_
+
+* Add a way to deprecate options with 'deprecated_version' and 'deprecated_hint' kwargs to register()
+  `RB #1799 <https://rbcommons.com/s/twitter/r/1799>`_
+  `RB #1814 <https://rbcommons.com/s/twitter/r/1814>`_
+
+* Implement compile_classpath using UnionProducts
+  `RB #1761 <https://rbcommons.com/s/twitter/r/1761>`_
+
+* Introduce a @deprecated decorator
+  `RB #1725 <https://rbcommons.com/s/twitter/r/1725>`_
+
+* Update jar-tool to 0.1.9 and switch to use @argfile calling convention
+  `RB #1798 <https://rbcommons.com/s/twitter/r/1798>`_
+
+* Pants to respect XDB spec for global storage on unix systems
+  `RB #1817 <https://rbcommons.com/s/twitter/r/1817>`_
+
+* Adds a mixin (ImportJarsMixin) for the IvyImports task
+  `RB #1783 <https://rbcommons.com/s/twitter/r/1783>`_
+
+* Added invalidation check to UnpackJars task
+  `RB #1776 <https://rbcommons.com/s/twitter/r/1776>`_
+
+* Enable python-eval for pants source code
+  `RB #1773 <https://rbcommons.com/s/twitter/r/1773>`_
+
+* adding xml output for python coverage
+  `Issue #1105 <https://github.com/pantsbuild/pants/issues/1105>`_
+  `RB #1770 <https://rbcommons.com/s/twitter/r/1770>`_
+
+* Optionally adds a path value onto protoc's PATH befor launching it
+  `RB #1756 <https://rbcommons.com/s/twitter/r/1756>`_
+
+* Add progress information to partition reporting
+  `RB #1749 <https://rbcommons.com/s/twitter/r/1749>`_
+
+* Add SignApk product and Zipalign task
+  `RB #1737 <https://rbcommons.com/s/twitter/r/1737>`_
+
+* Add an 'advanced' parameter to registering options
+  `RB #1739 <https://rbcommons.com/s/twitter/r/1739>`_
+
+* Add an env var for enabling the profiler
+  `RB #1305 <https://rbcommons.com/s/twitter/r/1305>`_
+
+Bugfixes and features
+~~~~~~~~~~~~~~~~~~~~~
+* Kill the .saplings split
+  `RB #1886 <https://rbcommons.com/s/twitter/r/1886>`_
+
+* Update our requests library to something more recent
+  `RB #1884 <https://rbcommons.com/s/twitter/r/1884>`_
+
+* Make a nicer looking name for workunit output
+  `RB #1876 <https://rbcommons.com/s/twitter/r/1876>`_
+
+* Fixup DxCompile jvm_options to be a list
+  `RB #1878 <https://rbcommons.com/s/twitter/r/1878>`_
+
+* Make sure <?xml starts at the beginning of the file when creating an empty xml report
+  `RB #1856 <https://rbcommons.com/s/twitter/r/1856>`_
+
+* Set print_exception_stacktrace in pants.ini
+  `RB #1872 <https://rbcommons.com/s/twitter/r/1872>`_
+
+* Handle --print-exception-stacktrace and --version more elegantly
+  `RB #1871 <https://rbcommons.com/s/twitter/r/1871>`_
+
+* Improve AndroidDistribution caching
+  `RB #1861 <https://rbcommons.com/s/twitter/r/1861>`_
+
+* Add zinc to the platform_tools for zinc_utils
+  `RB #1779 <https://rbcommons.com/s/twitter/r/1779>`_
+  `RB #1858 <https://rbcommons.com/s/twitter/r/1858>`_
+
+* Fix WARN/WARNING confusion
+  `RB #1866 <https://rbcommons.com/s/twitter/r/1866>`_
+
+* Fixup Config to find DEFAULT values for missing sections
+  `RB #1851 <https://rbcommons.com/s/twitter/r/1851>`_
+
+* Get published artifact classfier from config
+  `RB #1857 <https://rbcommons.com/s/twitter/r/1857>`_
+
+* Make Context.targets() include synthetic targets
+  `RB #1840 <https://rbcommons.com/s/twitter/r/1840>`_
+  `RB #1863 <https://rbcommons.com/s/twitter/r/1863>`_
+
+* Fix micros to be left 0 padded to 6 digits
+  `RB #1849 <https://rbcommons.com/s/twitter/r/1849>`_
+
+* Setup logging before plugins are loaded
+  `RB #1820 <https://rbcommons.com/s/twitter/r/1820>`_
+
+* Introduce pants_setup_py and contrib_setup_py helpers
+  `RB #1822 <https://rbcommons.com/s/twitter/r/1822>`_
+
+* Support zinc name hashing
+  `RB #1779 <https://rbcommons.com/s/twitter/r/1779>`_
+
+* Actually generate a depfile from t.c.tools.compiler and use it in jmake
+  `RB #1824 <https://rbcommons.com/s/twitter/r/1824>`_
+  `RB #1825 <https://rbcommons.com/s/twitter/r/1825>`_
+
+* Ivy Imports now has a cache
+  `RB #1785 <https://rbcommons.com/s/twitter/r/1785>`_
+
+* Get rid of some direct config uses in python_repl.py
+  `RB #1826 <https://rbcommons.com/s/twitter/r/1826>`_
+
+* Add check if jars exists before registering products
+  `RB #1808 <https://rbcommons.com/s/twitter/r/1808>`_
+
+* shlex the python run args
+  `RB #1782 <https://rbcommons.com/s/twitter/r/1782>`_
+
+* Convert t.c.log usages to logging
+  `RB #1815 <https://rbcommons.com/s/twitter/r/1815>`_
+
+* Kill unused twitter.common reqs and deps
+  `RB #1816 <https://rbcommons.com/s/twitter/r/1816>`_
+
+* Check import sorting before checking headers
+  `RB #1812 <https://rbcommons.com/s/twitter/r/1812>`_
+
+* Fixup typo accessing debug_port option
+  `RB #1811 <https://rbcommons.com/s/twitter/r/1811>`_
+
+* Allow the dependees goal and idea to respect the --spec_excludes option
+  `RB #1795 <https://rbcommons.com/s/twitter/r/1795>`_
+
+* Copy t.c.lang.{AbstractClass,Singleton} to pants
+  `RB #1803 <https://rbcommons.com/s/twitter/r/1803>`_
+
+* Replace all t.c.lang.Compatibility uses with six
+  `RB #1801 <https://rbcommons.com/s/twitter/r/1801>`_
+
+* Fix sp in java example readme.md
+  `RB #1800 <https://rbcommons.com/s/twitter/r/1800>`_
+
+* Add util.XmlParser and AndroidManifestParser
+  `RB #1757 <https://rbcommons.com/s/twitter/r/1757>`_
+
+* Replace Compatibility.exec_function with six.exec_
+  `RB #1742 <https://rbcommons.com/s/twitter/r/1742>`_
+  `RB #1794 <https://rbcommons.com/s/twitter/r/1794>`_
+
+* Take care of stale pidfiles for pants server
+  `RB #1791 <https://rbcommons.com/s/twitter/r/1791>`_
+
+* Fixup the scrooge release
+  `RB #1793 <https://rbcommons.com/s/twitter/r/1793>`_
+
+* Extract scrooge tasks to contrib/
+  `RB #1780 <https://rbcommons.com/s/twitter/r/1780>`_
+
+* Fixup JarPublish changelog rendering
+  `RB #1780 <https://rbcommons.com/s/twitter/r/1787>`_
+
+* Preserve dictionary order in the anonymizer
+  `RB #1779 <https://rbcommons.com/s/twitter/r/1779>`_
+  `RB #1781 <https://rbcommons.com/s/twitter/r/1781>`_
+
+* Fix a test file leak to the build root
+  `RB #1771 <https://rbcommons.com/s/twitter/r/1771>`_
+
+* Replace all instances of compatibility.string
+  `RB #1764 <https://rbcommons.com/s/twitter/r/1764>`_
+
+* Improve the python run error message
+  `RB #1773 <https://rbcommons.com/s/twitter/r/1773>`_
+  `RB #1777 <https://rbcommons.com/s/twitter/r/1777>`_
+
+* Upgrade pex to 0.8.6
+  `RB #1778 <https://rbcommons.com/s/twitter/r/1778>`_
+
+* Introduce a PythonEval task
+  `RB #1772 <https://rbcommons.com/s/twitter/r/1772>`_
+
+* Add an elapsed timestamp to the banner for CI
+  `RB #1775 <https://rbcommons.com/s/twitter/r/1775>`_
+
+* Trying to clean up a TODO in IvyTaskMixin
+  `RB #1753 <https://rbcommons.com/s/twitter/r/1753>`_
+
+* rm double_dag
+  `RB #1711 <https://rbcommons.com/s/twitter/r/1711>`_
+
+* Add skip / target invalidation to thrift linting
+  `RB #1755 <https://rbcommons.com/s/twitter/r/1755>`_
+
+* Fixup `Task.invalidated` UI
+  `RB #1758 <https://rbcommons.com/s/twitter/r/1758>`_
+
+* Improve the implementation of help printing
+  `RB #1739 <https://rbcommons.com/s/twitter/r/1739>`_
+  `RB #1744 <https://rbcommons.com/s/twitter/r/1744>`_
+
+* Fix TestAndroidBase task_type override miss
+  `RB #1751 <https://rbcommons.com/s/twitter/r/1751>`_
+
+* Pass the BUILD file path to compile
+  `RB #1742 <https://rbcommons.com/s/twitter/r/1742>`_
+
+* Bandaid leaks of global Config state in tests
+  `RB #1750 <https://rbcommons.com/s/twitter/r/1750>`_
+
+* Fixing cobertura coverage so that it actually works
+  `RB #1704 <https://rbcommons.com/s/twitter/r/1704>`_
+
+* Restore the ability to bootstrap Ivy with a custom configuration file
+  `RB #1709 <https://rbcommons.com/s/twitter/r/1709>`_
+
+* Kill BUILD file bytecode compilation
+  `RB #1736 <https://rbcommons.com/s/twitter/r/1736>`_
+
+* Kill 'goal' usage in the pants script
+  `RB #1738 <https://rbcommons.com/s/twitter/r/1738>`_
+
+* Fixup ivy report generation and opening
+  `RB #1735 <https://rbcommons.com/s/twitter/r/1735>`_
+
+* Fixup pants sys.excepthook for pex context
+  `RB #1733 <https://rbcommons.com/s/twitter/r/1733>`_
+  `RB #1734 <https://rbcommons.com/s/twitter/r/1734>`_
+
+* Adding long form of help arguments to the help output
+  `RB #1732 <https://rbcommons.com/s/twitter/r/1732>`_
+
+* Simplify isort config
+  `RB #1731 <https://rbcommons.com/s/twitter/r/1731>`_
+
+* Expand scope of python file format checks
+  `RB #1729 <https://rbcommons.com/s/twitter/r/1729>`_
+
+* Add path-to option to depmap.
+  `RB #1545 <https://rbcommons.com/s/twitter/r/1545>`_
+
+* Fix a stragler `.is_apt` usage
+  `RB #1724 <https://rbcommons.com/s/twitter/r/1724>`_
+
+* Introduce isort to check `*.py` import ordering
+  `RB #1726 <https://rbcommons.com/s/twitter/r/1726>`_
+
+* Upgrade to pex 0.8.5
+  `RB #1721 <https://rbcommons.com/s/twitter/r/1721>`_
+
+* cleanup is_xxx checks: is_jar_library
+  `RB #1719 <https://rbcommons.com/s/twitter/r/1719>`_
+
+* Avoid redundant traversal in classpath calculation
+  `RB #1714 <https://rbcommons.com/s/twitter/r/1714>`_
+
+* Upgrade to the latest virtualenv
+  `RB #1715 <https://rbcommons.com/s/twitter/r/1715>`_
+  `RB #1718 <https://rbcommons.com/s/twitter/r/1718>`_
+
+* Fixup the release script
+  `RB #1715 <https://rbcommons.com/s/twitter/r/1715>`_
+
+* './pants goal' -> './pants'
+  `RB #1617 <https://rbcommons.com/s/twitter/r/1617>`_
+
+* Add new function open_zip64 which defaults allowZip64=True for Zip files
+  `RB #1708 <https://rbcommons.com/s/twitter/r/1708>`_
+
+* Fix a bug that --bundle-archive=tar generates .tar.gz instead of a .tar
+  `RB #1707 <https://rbcommons.com/s/twitter/r/1707>`_
+
+* Remove 3rdparty debug.keystore
+  `RB #1703 <https://rbcommons.com/s/twitter/r/1703>`_
+
+* Keystore no longer a target, apks signed with SignApkTask
+  `RB #1690 <https://rbcommons.com/s/twitter/r/1690>`_
+
+* remove this jar_rule I accidentally added
+  `RB #1701 <https://rbcommons.com/s/twitter/r/1701>`_
+
+* Require pushdb migration to specify a destination directory
+  `RB #1684 <https://rbcommons.com/s/twitter/r/1684>`_
+
 0.0.28 (2/1/2015)
 -----------------
 

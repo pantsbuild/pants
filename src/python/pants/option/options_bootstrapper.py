@@ -61,7 +61,7 @@ def register_bootstrap_options(register, buildroot=None):
   # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
   # setup a 'WARN' logging level name that maps to 'WARNING'.
   logging.addLevelName(logging.WARNING, 'WARN')
-  register('-l', '--level', choices=['debug', 'info', 'warn'], default='info',
+  register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
            help='Set the logging level.')
 
   register('-q', '--quiet', action='store_true',

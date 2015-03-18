@@ -23,8 +23,9 @@ python_library(
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants:thrift_util',
+    'src/python/pants/option',
     'src/python/pants/util:dirutil',
+    'src/python/pants:thrift_util',
   ],
 )
 
@@ -36,5 +37,6 @@ python_library(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/option',
   ],
 )

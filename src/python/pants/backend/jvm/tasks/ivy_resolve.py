@@ -9,8 +9,7 @@ import os
 import shutil
 import time
 from collections import defaultdict
-
-from twitter.common.collections import OrderedSet
+from textwrap import dedent
 
 from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -122,6 +121,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
       confs=self.confs,
       custom_args=self._args,
     )
+    self.context.log.debug("{} of {} targets were relevant for ivy resolve.".format(
+      len(relevant_targets), len(targets)))
 
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
@@ -182,25 +183,25 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
   def _generate_ivy_report(self, targets):
     def make_empty_report(report, organisation, module, conf):
-      no_deps_xml_template = """
-        <?xml version="1.0" encoding="UTF-8"?>
+      no_deps_xml_template = dedent("""<?xml version="1.0" encoding="UTF-8"?>
         <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
         <ivy-report version="1.0">
           <info
-            organisation="%(organisation)s"
-            module="%(module)s"
+            organisation="{organisation}"
+            module="{module}"
             revision="latest.integration"
-            conf="%(conf)s"
-            confs="%(conf)s"
-            date="%(timestamp)s"/>
+            conf="{conf}"
+            confs="{conf}"
+            date="{timestamp}"/>
         </ivy-report>
-      """
-      no_deps_xml = no_deps_xml_template % dict(organisation=organisation,
-                                                module=module,
-                                                conf=conf,
-                                                timestamp=time.strftime('%Y%m%d%H%M%S'))
+        """).format(
+        organisation=organisation,
+        module=module,
+        conf=conf,
+        timestamp=time.strftime('%Y%m%d%H%M%S'),
+        )
       with open(report, 'w') as report_handle:
-        print(no_deps_xml, file=report_handle)
+        print(no_deps_xml_template, file=report_handle)
 
     tool_classpath = self.tool_classpath('xalan')
 
@@ -213,12 +214,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     safe_mkdir(self._outdir, clean=False)
 
     for conf in self.confs:
-      params = dict(org=org, name=name, conf=conf)
-      xml = IvyUtils.xml_report_path(targets, conf)
-      if not os.path.exists(xml):
-        make_empty_report(xml, org, name, conf)
-      out = os.path.join(self._outdir, '%(org)s-%(name)s-%(conf)s.html' % params)
-      args = ['-IN', xml, '-XSL', xsl, '-OUT', out]
+      xml_path = IvyUtils.xml_report_path(targets, conf)
+      if not os.path.exists(xml_path):
+        # Make it clear that this is not the original report from Ivy by changing its name.
+        xml_path = xml_path[:-4] + "-empty.xml"
+        make_empty_report(xml_path, org, name, conf)
+      out = os.path.join(self._outdir,
+                         '{org}-{name}-{conf}.html'.format(org=org, name=name, conf=conf))
+      args = ['-IN', xml_path, '-XSL', xsl, '-OUT', out]
 
       # The ivy-report.xsl genrates tab links to files with extension 'xml' by default, we
       # override that to point to the html files we generate.

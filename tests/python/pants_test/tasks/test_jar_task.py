@@ -11,6 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
 
+from six.moves import range
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.tasks.jar_task import JarTask
@@ -193,7 +194,7 @@ class JarTaskTest(BaseJarTaskTest):
         # so the -jars argument to jar-tool will exceed max_args limit thus
         # switch to @argfile calling style.
         with self.jar_task.open_jar(main_jar, overwrite=True) as jar:
-          for i in xrange(self.MAX_SUBPROC_ARGS + 1):
+          for i in range(self.MAX_SUBPROC_ARGS + 1):
             jar.writejar(included_jar)
 
         with open_zip(main_jar) as jar:

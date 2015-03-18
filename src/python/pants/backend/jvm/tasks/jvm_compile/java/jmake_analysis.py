@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from six.moves import range
+
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
 from pants.base.build_environment import get_buildroot
 
@@ -41,7 +43,7 @@ class JMakeAnalysis(Analysis):
 
     split_pcd_entries = []
     split_src_to_deps = []
-    for _ in xrange(0, num_outputs):
+    for _ in range(0, num_outputs):
       split_pcd_entries.append([])
       split_src_to_deps.append({})
 

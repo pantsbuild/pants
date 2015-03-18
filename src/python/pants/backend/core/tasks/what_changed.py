@@ -26,7 +26,8 @@ class ChangeCalculator(object):
                changes_since=None,
                diffspec=None,
                include_dependees=None,
-               exclude_target_regexp=None):
+               exclude_target_regexp=None,
+               spec_excludes=None):
 
     self._scm = scm
     self._workspace = workspace
@@ -38,6 +39,7 @@ class ChangeCalculator(object):
     self._diffspec = diffspec
     self._include_dependees = include_dependees
     self._exclude_target_regexp = exclude_target_regexp
+    self._spec_excludes = spec_excludes
 
     self._mapper_cache = None
 
@@ -72,7 +74,7 @@ class ChangeCalculator(object):
       return changed
 
     # Load the whole build graph since we need it for dependee finding in either remaining case.
-    for address in self._address_mapper.scan_addresses():
+    for address in self._address_mapper.scan_addresses(spec_excludes=self._spec_excludes):
       self._build_graph.inject_address_closure(address)
 
     if self._include_dependees == 'direct':
@@ -124,7 +126,7 @@ class ChangedFileTaskMixin(object):
              help='Include direct or transitive dependees of changed targets.')
 
   @classmethod
-  def change_calculator(cls, options, address_mapper, build_graph, scm=None, workspace=None):
+  def change_calculator(cls, options, address_mapper, build_graph, scm=None, workspace=None, spec_excludes=None):
     scm = scm or get_scm()
     if scm is None:
       raise TaskError('No SCM available.')
@@ -140,10 +142,15 @@ class ChangedFileTaskMixin(object):
                             include_dependees=options.include_dependees,
                             # NB: exclude_target_regexp is a global scope option registered
                             # elsewhere
-                            exclude_target_regexp=options.exclude_target_regexp)
+                            exclude_target_regexp=options.exclude_target_regexp,
+                            spec_excludes=spec_excludes)
 
 
 class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
+  def __init__(self, *args, **kwargs):
+    super(WhatChanged, self).__init__(*args, **kwargs)
+    self._spec_excludes = self.context.options.for_global_scope().spec_excludes
+
   """Emits the targets that have been modified since a given commit."""
   @classmethod
   def register_options(cls, register):
@@ -157,7 +164,8 @@ class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
                                                self.context.address_mapper,
                                                self.context.build_graph,
                                                scm=self.context.scm,
-                                               workspace=self.context.workspace)
+                                               workspace=self.context.workspace,
+                                               spec_excludes=self._spec_excludes)
     if self.get_options().files:
       for f in sorted(change_calculator.changed_files()):
         yield f

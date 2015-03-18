@@ -33,12 +33,11 @@ def register_global_options(register):
   # TODO: After moving to the new options system these abstraction leaks can go away.
   register('-k', '--kill-nailguns', action='store_true',
            help='Kill nailguns before exiting')
-
   register('-i', '--interpreter', default=[], action='append', metavar='<requirement>',
            help="Constrain what Python interpreters to use.  Uses Requirement format from "
                 "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                 "are used.  Multiple constraints may be added.  They will be ORed together.")
-  register('--colors', action='store_true', default=True,
+  register('--colors', action='store_true', default=True, recursive=True,
            help='Set whether log messages are displayed in color.')
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
            help='Exclude these paths when computing the command-line target specs.')
@@ -48,23 +47,23 @@ def register_global_options(register):
   # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
   # options to there. When we do that, also drop the cumbersome word 'artifact' from these
   # option names. There's only one cache concept that users care about.
-  register('--read-from-artifact-cache', action='store_true', default=True,
+  register('--read-from-artifact-cache', action='store_true', default=True, recursive=True,
            help='Read build artifacts from cache, if available.')
-  register('--read-artifact-caches', type=Options.list,
+  register('--read-artifact-caches', type=Options.list, recursive=True,
            help='The URIs of artifact caches to read from. Each entry is a URL of a RESTful cache, '
                 'a path of a filesystem cache, or a pipe-separated list of alternate caches to '
                 'choose from.')
-  register('--write-to-artifact-cache', action='store_true', default=True,
+  register('--write-to-artifact-cache', action='store_true', default=True, recursive=True,
            help='Write build artifacts to cache, if possible.')
-  register('--write-artifact-caches', type=Options.list,
+  register('--write-artifact-caches', type=Options.list, recursive=True,
            help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful cache, '
                 'a path of a filesystem cache, or a pipe-separated list of alternate caches to '
                 'choose from.')
-  register('--overwrite-cache-artifacts', action='store_true',
+  register('--overwrite-cache-artifacts', action='store_true', recursive=True,
            help='If writing to build artifacts to cache, overwrite (instead of skip) existing.')
-  register('--cache-key-gen-version', advanced=True, default='200',
-           help='The cache key generation. Bump this to invalidate every artifact.')
-  register('--cache-compression', advanced=True, type=int, default=5,
+  register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
+           help='The cache key generation. Bump this to invalidate every artifact for a scope.')
+  register('--cache-compression', advanced=True, type=int, default=5, recursive=True,
            help='The gzip compression level for created artifacts.')
   register('--print-exception-stacktrace', action='store_true',
            help='Print to console the full exception stack trace if encountered.')
@@ -75,3 +74,11 @@ def register_global_options(register):
            default=10 * 365 * 86400,  # 10 years.
            help='the time in seconds before we consider re-resolving an open-ended '
                 'requirement, e.g. "flask>=0.2" if a matching distribution is available on disk.')
+
+  # The following options are specific to java_thrift_library targets.
+  register('--thrift-default-compiler', type=str, advanced=True, default='thrift',
+           help='The default compiler to use for java_thrift_library targets.')
+  register('--thrift-default-language', type=str, advanced=True, default='java',
+           help='The default language to generate for java_thrift_library targets.')
+  register('--thrift-default-rpc-style', type=str, advanced=True, default='sync',
+           help='The default rpc-style to generate for java_thrift_library targets.')

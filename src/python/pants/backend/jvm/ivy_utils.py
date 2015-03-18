@@ -127,6 +127,10 @@ class IvyUtils(object):
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
 
+  class IvyResolveReportError(Exception):
+    """Raised when the ivy report cannot be found."""
+    pass
+
   @staticmethod
   def _generate_exclude_template(exclude):
     return TemplateData(org=exclude.org, name=exclude.name)
@@ -195,15 +199,26 @@ class IvyUtils(object):
     """The path to the xml report ivy creates after a retrieve."""
     org, name = cls.identify(targets)
     cachedir = Bootstrapper.instance().ivy_cache_dir
-    return os.path.join(cachedir, '%s-%s-%s.xml' % (org, name, conf))
+    return os.path.join(cachedir, '{}-{}-{}.xml'.format(org, name, conf))
 
   @classmethod
   def parse_xml_report(cls, targets, conf):
-    """Returns the IvyInfo representing the info in the xml report, or None if no report exists."""
+    """Parse the ivy xml report corresponding to the targets and conf passed.
+
+    :param targets: Targets ivy considered during ivy_resolve()
+    :type targets: list of Target
+    :param string conf: the ivy conf name (e.g. "default")
+    :return: The info in the xml report or None if target is empty.
+    :rtype: IvyInfo
+    :raises:  IvyResolveReportError if no report exists.
+    """
     if not targets:
       return None
 
     path = cls.xml_report_path(targets, conf)
+    if not os.path.exists(path):
+      raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
+
     return cls._parse_xml_report(path)
 
   @classmethod
@@ -277,7 +292,7 @@ class IvyUtils(object):
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
     # strategy generally.
     def add_jar(jar):
-      coordinate = (jar.org, jar.name)
+      coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
       jars[coordinate] = jar if not existing else (
         cls._resolve_conflict(existing=existing, proposed=jar)
@@ -310,24 +325,24 @@ class IvyUtils(object):
         return proposed
       return existing
     elif existing.force and proposed.force:
-      raise TaskError('Cannot force %s#%s to both rev %s and %s' % (
-        proposed.org, proposed.name, existing.rev, proposed.rev
+      raise TaskError('Cannot force {}#{};{} to both rev {} and {}'.format(
+        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
       ))
     elif existing.force:
-      logger.debug('Ignoring rev %s for %s#%s already forced to %s' % (
-        proposed.rev, proposed.org, proposed.name, existing.rev
+      logger.debug('Ignoring rev {} for {}#{};{} already forced to {}'.format(
+        proposed.rev, proposed.org, proposed.name, proposed.classifier or '', existing.rev
       ))
       return existing
     elif proposed.force:
-      logger.debug('Forcing %s#%s from %s to %s' % (
-        proposed.org, proposed.name, existing.rev, proposed.rev
+      logger.debug('Forcing {}#{};{} from {} to {}'.format(
+        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
       ))
       return proposed
     else:
       try:
         if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
-          logger.debug('Upgrading %s#%s from rev %s  to %s' % (
-            proposed.org, proposed.name, existing.rev, proposed.rev,
+          logger.debug('Upgrading {}#{};{} from rev {}  to {}'.format(
+            proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev,
           ))
           return proposed
         else:
