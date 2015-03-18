@@ -299,6 +299,29 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def compute_resource_mapping(self, compile_contexts):
     return ResourceMapping(self._classes_dir)
 
+  def compute_classes_by_source(self, compile_contexts):
+    # This implementation requires that all contexts use the same (global) analysis file.
+    analysis_file = None
+    for compile_context in compile_contexts:
+      assert compile_context.classes_dir == self._classes_dir
+      if not analysis_file:
+        analysis_file = compile_context.analysis_file
+      else:
+        assert compile_context.analysis_file == analysis_file
+    else:
+      analysis_file = self._analysis_file
+
+    # Parse the global analysis once.
+    buildroot = get_buildroot()
+    classes_by_src = {}
+    if os.path.exists(analysis_file):
+      products = self._analysis_parser.parse_products_from_path(analysis_file,
+                                                                self._classes_dir)
+      for src, classes in products.items():
+        relsrc = os.path.relpath(src, buildroot)
+        classes_by_src[relsrc] = classes
+    return classes_by_src
+
   def post_process_cached_vts(self, cached_vts):
     """Special post processing for global scala analysis files.
 

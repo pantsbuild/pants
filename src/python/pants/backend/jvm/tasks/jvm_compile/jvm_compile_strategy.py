@@ -64,6 +64,14 @@ class JvmCompileStrategy(object):
     pass
 
   @abstractmethod
+  def compute_classes_by_source(self, compile_contexts):
+    """Compute src->classes for the given compile_contexts.
+
+    Srcs are relative to buildroot. Classes are absolute paths.
+    """
+    pass
+
+  @abstractmethod
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
@@ -108,23 +116,6 @@ class JvmCompileStrategy(object):
     assert class_file_name.startswith(compile_context.classes_dir)
     class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
     return class_file_name.replace("/", ".")
-
-  def compute_classes_by_source(self, compile_contexts):
-    """Compute src->classes.
-
-    Srcs are relative to buildroot. Classes are absolute paths.
-    """
-    buildroot = get_buildroot()
-    classes_by_src = {}
-    for compile_context in compile_contexts:
-      if not os.path.exists(compile_context.analysis_file):
-        continue
-      products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
-                                                                compile_context.classes_dir)
-      for src, classes in products.items():
-        relsrc = os.path.relpath(src, buildroot)
-        classes_by_src[relsrc] = classes
-    return classes_by_src
 
   def _compute_sources_by_target(self, targets):
     """Computes and returns a map target->sources (relative to buildroot)."""
