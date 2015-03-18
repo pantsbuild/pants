@@ -11,6 +11,8 @@ import re
 import uuid
 from collections import defaultdict, namedtuple
 
+from six.moves import range
+
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.workunit import WorkUnit

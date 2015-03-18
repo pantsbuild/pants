@@ -14,6 +14,7 @@ import shutil
 
 import bs4
 import pystache
+from six.moves import range
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError

@@ -13,7 +13,6 @@ from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMake
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import relativize_paths, safe_mkdir
 

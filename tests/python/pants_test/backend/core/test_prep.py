@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from six.moves import range
+
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.base.build_file_aliases import BuildFileAliases

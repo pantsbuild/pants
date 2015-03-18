@@ -6,6 +6,7 @@ python_library(
   dependencies = [
     ':dependencies',
     ':depmap',
+    ':export',
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
@@ -40,6 +41,23 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/tasks:base',
+  ]
+)
+
+python_tests(
+  name = 'export',
+  sources = ['test_export.py'],
+  dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/project_info/tasks:export',
+    'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/tasks:base',
   ]

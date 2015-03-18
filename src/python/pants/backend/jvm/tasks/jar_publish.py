@@ -15,6 +15,7 @@ import sys
 import traceback
 from collections import OrderedDict, defaultdict
 
+from six.moves import range
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 

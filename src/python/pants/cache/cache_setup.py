@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import urlparse
 
+from six.moves import range
+
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import Pinger
