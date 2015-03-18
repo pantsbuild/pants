@@ -225,4 +225,4 @@ class ScmPublish(ScmPublishMixin):
 
   @property
   def scm_push_attempts(self):
-    return ScmPublishMixin._SCM_PUSH_ATTEMPTS
+    return self._SCM_PUSH_ATTEMPTS

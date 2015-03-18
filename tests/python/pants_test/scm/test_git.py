@@ -379,7 +379,8 @@ class GitTest(unittest.TestCase):
 
     self.git.commit('API Changes.')
 
-    self.assertEqual(set([]), self.git.changed_files(include_untracked=True))
+    self.assertEqual(set(), self.git.changed_files(include_untracked=True))
+
 
 class DetectWorktreeFakeGitTest(unittest.TestCase):
   @contextmanager

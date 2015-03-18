@@ -285,6 +285,7 @@ python_library(
     ':common',
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
+    'src/python/pants/scm',
   ],
 )
 
