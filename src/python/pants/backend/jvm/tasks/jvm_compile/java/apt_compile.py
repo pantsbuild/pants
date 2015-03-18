@@ -25,9 +25,26 @@ class AptCompile(JavaCompile):
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
+  def __init__(self, *args, **kwargs):
+    super(AptCompile, self).__init__(*args, **kwargs)
+    # A directory independent of any other classpath which can contain a global
+    # apt processor info file.
+    self._processor_info_global_dir = os.path.join(self.workdir, 'apt-processor-info-global')
+    # And another to contain per-target subdirectories
+    self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
+
   @classmethod
   def name(cls):
     return 'apt'
+
+  def prepare_execute(self, chunks):
+    super(JavaCompile, self).prepare_execute(chunks)
+
+    # Ensure that the processor info dir is on the classpath for all targets, so that
+    # annotation processors are loaded after being compiled.
+    compile_classpaths = self.context.products.get_data('compile_classpath')
+    entries = [(conf, self._processor_info_global_dir) for conf in self._confs]
+    compile_classpaths.add_for_targets(self.context.targets(), entries)
 
   def select(self, target):
     return target.has_sources(self._file_suffix) and isinstance(target, AnnotationProcessor)
