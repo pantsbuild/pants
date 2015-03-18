@@ -71,9 +71,9 @@ class WorkUnit(object):
 
   PREP = 13      # Running a prep command
 
-  def __init__(self, run_tracker, parent, name, labels=None, cmd=''):
+  def __init__(self, run_info_dir, parent, name, labels=None, cmd=''):
     """
-    - run_tracker: The RunTracker that tracks this WorkUnit.
+    - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
               'scala' might contain 'compile', 'split' etc.
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -84,7 +84,7 @@ class WorkUnit(object):
     """
     self._outcome = WorkUnit.UNKNOWN
 
-    self.run_tracker = run_tracker
+    self.run_info_dir = run_info_dir
     self.parent = parent
     self.children = []
 
@@ -120,10 +120,7 @@ class WorkUnit(object):
     self.end_time = time.time()
     for output in self._outputs.values():
       output.close()
-    is_tool = self.has_label(WorkUnit.TOOL)
-    path = self.path()
-    self.run_tracker.cumulative_timings.add_timing(path, self.duration(), is_tool)
-    self.run_tracker.self_timings.add_timing(path, self._self_time(), is_tool)
+    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnit.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit."""
@@ -143,13 +140,13 @@ class WorkUnit(object):
   _valid_name_re = re.compile(r'\w+')
 
   def output(self, name):
-    """Returns the output buffer for the specified output name (e.g., 'stdout')."""
+    """Returns the output buffer for the specified output name (e.g., 'stdout'), creating it if necessary."""
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: %s' % name)
     if name not in self._outputs:
       workunit_name = re.sub(r'\W', '_', self.name)
-      path = os.path.join(self.run_tracker.run_info_dir,
+      path = os.path.join(self.run_info_dir,
                           'tool_outputs', '{workunit_name}-{id}.{output_name}'
                           .format(workunit_name=workunit_name,
                                   id=self.id,

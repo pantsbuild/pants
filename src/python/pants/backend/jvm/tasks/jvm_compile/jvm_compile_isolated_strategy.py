@@ -14,6 +14,7 @@ from collections import OrderedDict, defaultdict
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.worker_pool import Work
+from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -68,6 +69,19 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       if dep in compile_contexts:
         compile_context = compile_contexts[dep]
         yield compile_context.classes_dir, compile_context.analysis_file
+
+  def compute_classes_by_source(self, compile_contexts):
+    buildroot = get_buildroot()
+    classes_by_src = {}
+    for compile_context in compile_contexts:
+      if not os.path.exists(compile_context.analysis_file):
+        continue
+      products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
+                                                                compile_context.classes_dir)
+      for src, classes in products.items():
+        relsrc = os.path.relpath(src, buildroot)
+        classes_by_src[relsrc] = classes
+    return classes_by_src
 
   def compile_chunk(self,
                     invalidation_check,

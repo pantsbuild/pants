@@ -194,6 +194,10 @@ class Git(Scm):
   def commit(self, message):
     self._check_call(['commit', '--all', '--message=' + message], raise_type=Scm.LocalException)
 
+  def add(self, *paths):
+    self._check_call(['add'] + list(paths), raise_type=Scm.LocalException)
+
+
   def commit_date(self, commit_reference):
     return self._check_output(['log', '-1', '--pretty=tformat:%ci', commit_reference],
                               raise_type=Scm.LocalException)

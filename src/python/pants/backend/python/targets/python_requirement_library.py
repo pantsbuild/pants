@@ -26,3 +26,4 @@ class PythonRequirementLibrary(Target):
       'requirements': PythonRequirementsField(requirements or []),
     })
     super(PythonRequirementLibrary, self).__init__(payload=payload, **kwargs)
+    self.add_labels('python')

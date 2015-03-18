@@ -188,9 +188,10 @@ python_library(
   sources = ['jar_publish.py'],
   resources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
   dependencies = [
-    ':jar_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
+    '3rdparty/python:six',
+    ':jar_task',
     'src/python/pants/backend/core/tasks:scm_publish',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -241,16 +242,17 @@ python_library(
   name = 'junit_run',
   sources = ['junit_run.py'],
   dependencies = [
+    '3rdparty/python:six',
     ':common',
     ':jvm_task',
     ':jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/java:util',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants:binary_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants:binary_util',
   ],
 )
 

@@ -176,13 +176,17 @@ class JarPublishTest(TaskTestBase):
     files = []
     for _, _, filenames in safe_walk(self.push_db_basedir):
       files.extend(filenames)
+
     self.assertEquals(len(targets), len(files),
                       "During a remote publish, one pushdb should be written per target")
-
     self.assertEquals(len(targets), task.confirm_push.call_count,
                       "Expected one call to confirm_push per artifact")
     self.assertEquals(len(targets), task.publish.call_count,
                       "Expected one call to publish per artifact")
+    self.assertEquals(len(targets), task.scm.commit.call_count,
+                      "Expected one call to scm.commit per artifact")
+    self.assertEquals(len(targets), task.scm.add.call_count,
+                      "Expected one call to scm.add per artifact")
     self.assertEquals(len(targets), task.scm.tag.call_count,
                       "Expected one call to scm.tag per artifact")
 

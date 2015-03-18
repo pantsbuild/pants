@@ -19,7 +19,7 @@ from six.moves import range
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 
-from pants.backend.core.tasks.scm_publish import Namedver, ScmPublish, Semver
+from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -36,7 +36,6 @@ from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.option.options import Options
-from pants.scm.scm import Scm
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
@@ -300,7 +299,7 @@ def target_internal_dependencies(target):
         yield childdep
 
 
-class JarPublish(JarTask, ScmPublish):
+class JarPublish(ScmPublishMixin, JarTask):
   """Publish jars to a maven repository.
 
   At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
@@ -354,7 +353,6 @@ class JarPublish(JarTask, ScmPublish):
        },
      }
   """
-  _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
   def register_options(cls, register):
@@ -376,8 +374,6 @@ class JarPublish(JarTask, ScmPublish):
              help='Commit the push db. Turn off for local testing.')
     register('--local', metavar='<PATH>',
              help='Publish jars to a maven repository on the local filesystem at this path.')
-    register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
-             help='Try pushing the pushdb to the SCM this many times before aborting.')
     register('--local-snapshot', default=True, action='store_true',
              help='If --local is specified, publishes jars with -SNAPSHOT revision suffixes.')
     register('--named-snapshot', default=None,
@@ -400,8 +396,6 @@ class JarPublish(JarTask, ScmPublish):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--restrict-push-branches', advanced=True, type=Options.list,
-             help='Allow pushes only from one of these branches.')
     register('--jvm-options', advanced=True, type=Options.list,
              help='Use these jvm options when running Ivy.')
     register('--repos', advanced=True, type=Options.dict,
@@ -422,10 +416,12 @@ class JarPublish(JarTask, ScmPublish):
 
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
-    ScmPublish.__init__(self, get_scm(), self.get_options().restrict_push_branches)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvm_options = self.get_options().jvm_options
+
+    self.scm = get_scm()
+    self.log = self.context.log
 
     if self.get_options().local:
       local_repo = dict(
@@ -853,44 +849,20 @@ class JarPublish(JarTask, ScmPublish):
             org = jar.org
             name = jar.name
             rev = newentry.version().version()
-            args = dict(
-              org=org,
-              name=name,
-              rev=rev,
-              coordinate=coordinate(org, name, rev),
-              user=getpass.getuser(),
-              cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
-            )
+            coord = coordinate(org, name, rev)
 
             pushdb.dump(dbfile)
-            self.commit_pushdb(coordinate(org, name, rev))
-            scm_exception = None
-            for attempt in range(self.get_options().scm_push_attempts):
-              try:
-                self.context.log.debug("Trying scm push")
-                self.scm.push()
-                break # success
-              except Scm.RemoteException as scm_exception:
-                self.context.log.debug("Scm push failed, trying to refresh")
-                # This might fail in the event that there is a real conflict, throwing
-                # a Scm.LocalException (in case of a rebase failure) or a Scm.RemoteException
-                # in the case of a fetch failure.  We'll directly raise a local exception,
-                # since we can't fix it by retrying, but if we do, we want to display the
-                # remote exception that caused the refresh as well just in case the user cares.
-                # Remote exceptions probably indicate network or configuration issues, so
-                # we'll let them propagate
-                try:
-                  self.scm.refresh(leave_clean=True)
-                except Scm.LocalException as local_exception:
-                  exc = traceback.format_exc(scm_exception)
-                  self.context.log.debug("SCM exception while pushing: %s" % exc)
-                  raise local_exception
 
-            else:
-              raise scm_exception
-
-            self.scm.tag('%(org)s-%(name)s-%(rev)s' % args,
-                         message='Publish of %(coordinate)s initiated by %(user)s %(cause)s' % args)
+            self.publish_pushdb_changes_to_remote_scm(
+              pushdb_file=dbfile,
+              coordinate=coord,
+              tag_name='{org}-{name}-{rev}'.format(org=org, name=name, rev=rev),
+              tag_message='Publish of {coordinate} initiated by {user} {cause}'.format(
+                coordinate=coord,
+                user=getpass.getuser(),
+                cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
+              )
+            )
 
   def artifact_path(self, jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
     return os.path.join(self.workdir, jar.org, jar.name + artifact_ext,

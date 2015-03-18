@@ -21,6 +21,7 @@ python_tests(
   name = 'prep',
   sources = ['test_prep.py'],
   dependencies = [
+    '3rdparty/python:six',
     'src/python/pants/backend/core:plugin',
     'tests/python/pants_test:base_test',
   ]
