@@ -35,6 +35,7 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from pants.backend.jvm.tasks.jvm_run import JvmRun
@@ -107,20 +108,6 @@ def register_goals():
     'Unpack artifacts specified by unpacked_jars() targets.')
 
   # Compilation.
-
-  # AnnotationProcessors are java targets, but we need to force them into their own compilation
-  # rounds so that they are on classpath of any dependees downstream that may use them. Without
-  # forcing a separate member type we could get a java chunk containing a mix of apt processors and
-  # code that relied on the un-compiled apt processor in the same javac invocation.  If so, javac
-  # would not be smart enough to compile the apt processors 1st and activate them.
-  class AptCompile(JavaCompile):
-    @classmethod
-    def name(cls):
-      return 'apt'
-
-    def select(self, target):
-      return super(AptCompile, self).select(target) and isinstance(target, AnnotationProcessor)
-
 
   jvm_compile = GroupTask.named(
       'jvm-compilers',

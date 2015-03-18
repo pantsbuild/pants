@@ -7,16 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import relativize_paths, safe_mkdir, safe_open
+from pants.util.dirutil import relativize_paths, safe_mkdir
 
 
 # From http://kenai.com/projects/jmake/sources/mercurial/content
@@ -47,9 +45,6 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 class JavaCompile(JvmCompile):
   _language = 'java'
   _file_suffix = '.java'
-
-    # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
-  _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
   _JMAKE_MAIN = 'org.pantsbuild.jmake.Main'
 
@@ -102,17 +97,6 @@ class JavaCompile(JvmCompile):
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
-
-  def extra_products(self, target):
-    ret = []
-    if isinstance(target, AnnotationProcessor) and target.processors:
-      # The consumer of this method adds the resulting files to resources_by_target, so
-      # we can safely place them in a temporary directory here.
-      root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
-      processor_info_file = os.path.join(root, JavaCompile._PROCESSOR_INFO_FILE)
-      self._write_processor_info(processor_info_file, target.processors)
-      ret.append((root, [processor_info_file]))
-    return ret
 
   # Make the java target language version part of the cache key hash,
   # this ensures we invalidate if someone builds against a different version.
@@ -173,24 +157,3 @@ class JavaCompile(JvmCompile):
     if result:
       default_message = 'Unexpected error - JMake returned %d' % result
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
-
-  def post_process(self, all_targets, relevant_targets):
-    # Produce a monolithic apt processor service info file for further compilation rounds
-    # and the unit test classpath.
-    # This is distinct from the per-target ones we create in extra_products().
-    all_processors = set()
-    for target in relevant_targets:
-      if isinstance(target, AnnotationProcessor) and target.processors:
-        all_processors.update(target.processors)
-    processor_info_file = os.path.join(self._processor_info_global_dir,
-                                       JavaCompile._PROCESSOR_INFO_FILE)
-    if os.path.exists(processor_info_file):
-      with safe_open(processor_info_file, 'r') as f:
-        for processor in f:
-          all_processors.add(processor)
-    self._write_processor_info(processor_info_file, all_processors)
-
-  def _write_processor_info(self, processor_info_file, processors):
-    with safe_open(processor_info_file, 'w') as f:
-      for processor in processors:
-        f.write('%s\n' % processor.strip())
