@@ -501,6 +501,7 @@ python_tests(
   sources = ['test_jar_task.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_task',
     'src/python/pants/base:build_file_aliases',

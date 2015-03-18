@@ -146,6 +146,7 @@ python_library(
   name = 'group_task',
   sources = ['group_task.py'],
   dependencies = [
+    '3rdparty/python:six',
     ':task',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
@@ -176,17 +177,18 @@ python_library(
   sources = ['markdown_to_html.py'],
   resources = globs('templates/markdown/*.mustache'),
   dependencies = [
-    '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
+    '3rdparty/python:docutils',
+    '3rdparty/python:six',
     ':common',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
+    'src/python/pants:binary_util',
   ],
 )
 
@@ -250,6 +252,7 @@ python_library(
   sources = ['reflect.py'],
   dependencies = [
     '3rdparty/python:docutils',
+    '3rdparty/python:six',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:config',
     'src/python/pants/base:generator',

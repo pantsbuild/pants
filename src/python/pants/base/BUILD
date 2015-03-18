@@ -137,6 +137,7 @@ python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
+    '3rdparty/python:six',
     ':build_environment',
     'src/python/pants/util:strutil',
   ]
@@ -314,6 +315,7 @@ python_library(
   name = 'workunit',
   sources = ['workunit.py'],
   dependencies = [
+    '3rdparty/python:six',
     'src/python/pants/rwbuf',
     'src/python/pants/util:dirutil',
   ],
