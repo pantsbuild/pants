@@ -55,9 +55,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     register('--strategy', choices=['global', 'isolated'], default='global',
              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
-                  'global classpath for all compiled classes, and batches target compilation. The '
-                  '"isolated" strategy uses per-target classpaths, and rather than batching, will '
-                  '(soon) compile targets in parallel.')
+                  'global classpath for all compiled classes, and the "isolated" strategy uses '
+                  'per-target classpaths.')
 
     JvmCompileGlobalStrategy.register_options(register, cls._language)
     JvmCompileIsolatedStrategy.register_options(register, cls._language)

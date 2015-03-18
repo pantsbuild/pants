@@ -10,16 +10,32 @@ import sys
 import pytest
 
 
-def provide_compile_strategy(testmethod):
-  """A decorator for test methods that provides the compilation strategy.
+"""Helpers to provide compile strategies to unit tests.
 
-  This is a workaround for the fact that pytest.mark.parametrize does not support methods.
-  """
+These methods work around the fact that pytest.mark.parametrize does not support methods.
+"""
+
+_STRATEGIES = ['global', 'isolated']
+_SCOPES = ['apt', 'java', 'scala']
+
+def _wrap(testmethod, setupfun):
   def wrapped(self):
-    for strategy in ['global', 'isolated']:
+    for strategy in _STRATEGIES:
       try:
-        testmethod(self, strategy)
+        setupfun(self, testmethod, strategy)
       except Exception as e:
         print("failed for strategy '{}'".format(strategy), file=sys.stderr)
         raise e
   return wrapped
+
+def provide_compile_strategies(testmethod):
+  """A decorator for test methods that provides the compilation strategy as a parameter."""
+  return _wrap(testmethod, lambda self, testmethod, strategy: testmethod(self, strategy))
+
+def set_compile_strategies(testmethod):
+  """A decorator for BaseTests which sets strategy options differently for each invoke."""
+  def setup(self, testmethod, strategy):
+    for scope in _SCOPES:
+      self.set_options_for_scope('compile.{}'.format(scope), strategy=strategy)
+    testmethod(self)
+  return _wrap(testmethod, setup)
