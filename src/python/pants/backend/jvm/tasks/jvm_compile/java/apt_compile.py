@@ -30,7 +30,7 @@ class AptCompile(JavaCompile):
     return 'apt'
 
   def select(self, target):
-    return super(AptCompile, self).select(target) and isinstance(target, AnnotationProcessor)
+    return target.has_sources(self._file_suffix) and isinstance(target, AnnotationProcessor)
 
   def extra_products(self, target):
     ret = super(AptCompile, self).extra_products(target)
@@ -44,8 +44,7 @@ class AptCompile(JavaCompile):
     return ret
 
   def post_process(self, all_targets, relevant_targets):
-    """
-    Produce a monolithic apt processor service info file.
+    """Produce a monolithic apt processor service info file.
 
     This is used in further compilation rounds, and the unit-test classpath. This is
     distinct from the per-target ones we create in extra_products().
