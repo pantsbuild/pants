@@ -5,69 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-import shutil
 from textwrap import dedent
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_eval import PythonEval
-from pants.base.address import SyntheticAddress
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.util.dirutil import safe_mkdir
-from pants_test.tasks.test_base import TaskTest
+from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
 
-class PythonEvalTest(TaskTest):
+class PythonEvalTest(PythonTaskTest):
   @classmethod
   def task_type(cls):
     return PythonEval
 
-  @property
-  def alias_groups(self):
-    return BuildFileAliases.create(targets={'python_library': PythonLibrary,
-                                            'python_binary': PythonBinary})
-
-  def create_python_library(self, relpath, name, source, contents, dependencies=()):
-    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
-    python_library(
-      name='{name}',
-      sources=['__init__.py', '{source}'],
-      dependencies=[
-        {dependencies}
-      ]
-    )
-    """).format(name=name, source=source, dependencies=','.join(map(repr, dependencies))))
-
-    self.create_file(relpath=os.path.join(relpath, '__init__.py'))
-    self.create_file(relpath=os.path.join(relpath, source), contents=contents)
-    return self.target(SyntheticAddress(relpath, name).spec)
-
-  def create_python_binary(self, relpath, name, entry_point, dependencies=()):
-    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
-    python_binary(
-      name='{name}',
-      entry_point='{entry_point}',
-      dependencies=[
-        {dependencies}
-      ]
-    )
-    """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies))))
-
-    return self.target(SyntheticAddress(relpath, name).spec)
-
   def setUp(self):
     super(PythonEvalTest, self).setUp()
-
-    # Re-use the main pants python cache to speed up interpreter selection and artifact resolution.
-    # TODO(John Sirois): Lift this up to TaskTest or else to a PythonTaskTest base class so more
-    # tests can pickup the speed improvement.
-    safe_mkdir(os.path.join(self.build_root, '.pants.d'))
-    shutil.copytree(os.path.join(self.real_build_root, '.pants.d', 'python'),
-                    os.path.join(self.build_root, '.pants.d', 'python'),
-                    symlinks=True)
 
     SourceRoot.register('src', PythonBinary, PythonLibrary)
 

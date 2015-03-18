@@ -27,7 +27,8 @@ class PythonRepl(PythonTask):
     register('--ipython-requirements', advanced=True, type=Options.list, default=['ipython==1.0.0'],
              help='The IPython interpreter version to use.')
 
-  def execute(self):
+  # NB: **pex_run_kwargs is used by tests only, execute nominally has (void)void signature.
+  def execute(self, **pex_run_kwargs):
     (accept_predicate, reject_predicate) = Target.lang_discriminator('python')
     targets = self.require_homogeneous_targets(accept_predicate, reject_predicate)
     if targets:
@@ -59,7 +60,7 @@ class PythonRepl(PythonTask):
         self.context.release_lock()
         with stty_utils.preserve_stty_settings():
           with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
-            po = pex.run(blocking=False)
+            po = pex.run(blocking=False, **pex_run_kwargs)
             try:
               return po.wait()
             except KeyboardInterrupt:
