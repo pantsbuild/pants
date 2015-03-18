@@ -51,7 +51,7 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
-class PythonSetup(PythonTask):
+class SetupPy(PythonTask):
   """Generate setup.py-based Python projects from python_library targets."""
 
   GENERATED_TARGETS = {
@@ -62,7 +62,7 @@ class PythonSetup(PythonTask):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonSetup, cls).register_options(register)
+    super(SetupPy, cls).register_options(register)
     register('--run',
              help="The command to run against setup.py.  Don't forget to quote any additional "
                   "parameters.  If no run command is specified, pants will by default generate "
@@ -247,7 +247,7 @@ class PythonSetup(PythonTask):
     return isinstance(tgt, PythonTarget) and tgt.provides
 
   def __init__(self, *args, **kwargs):
-    super(PythonSetup, self).__init__(*args, **kwargs)
+    super(SetupPy, self).__init__(*args, **kwargs)
     self._root = get_buildroot()
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive
@@ -398,14 +398,14 @@ class PythonSetup(PythonTask):
       setup_runner.run()
 
   def execute(self):
-    targets = filter(PythonSetup.has_provides, self.context.target_roots)
+    targets = filter(SetupPy.has_provides, self.context.target_roots)
     if not targets:
       raise TaskError('setup-py target(s) must provide an artifact.')
 
     setup_targets = OrderedSet()
     if self._recursive:
       def add_providing_target(target):
-        if PythonSetup.has_provides(target):
+        if SetupPy.has_provides(target):
           setup_targets.add(target)
           return OrderedSet(target.provided_binaries.values())
       for target in targets:
