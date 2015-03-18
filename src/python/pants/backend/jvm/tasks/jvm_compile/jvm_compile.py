@@ -302,7 +302,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
 
-
   def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)
     if self.context.products.is_required_data('classes_by_source'):
