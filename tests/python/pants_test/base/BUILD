@@ -34,7 +34,6 @@ target(
 target(
   name = 'base',
   dependencies = [
-    ':abbreviate_target_ids',
     ':address',
     ':build_configuration',
     ':build_environment',
@@ -57,15 +56,6 @@ target(
     ':run_info',
     ':source_root',
     ':target',
-  ]
-)
-
-python_tests(
-  name = 'abbreviate_target_ids',
-  sources = ['test_abbreviate_target_ids.py'],
-  dependencies = [
-    'src/python/pants/base:abbreviate_target_ids',
-    'tests/python/pants_test:base_test',
   ]
 )
 
