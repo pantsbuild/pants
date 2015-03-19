@@ -21,6 +21,7 @@ code that relied on the un-compiled apt processor in the same javac invocation. 
 would not be smart enough to compile the apt processors 1st and activate them.
 """
 
+
 class AptCompile(JavaCompile):
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
@@ -28,6 +29,15 @@ class AptCompile(JavaCompile):
   @classmethod
   def name(cls):
     return 'apt'
+
+  def __init__(self, *args, **kwargs):
+    super(AptCompile, self).__init__(*args, **kwargs)
+
+    # A directory independent of any other classpath which can contain a global
+    # apt processor info file.
+    self._processor_info_global_dir = os.path.join(self.workdir, 'apt-processor-info-global')
+    # And another to contain per-target subdirectories
+    self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
   def select(self, target):
     return target.has_sources(self._file_suffix) and isinstance(target, AnnotationProcessor)
@@ -54,13 +64,18 @@ class AptCompile(JavaCompile):
     for target in relevant_targets:
       if isinstance(target, AnnotationProcessor) and target.processors:
         all_processors.update(target.processors)
-    processor_info_file = os.path.join(self._processor_info_global_dir,
-                                       AptCompile._PROCESSOR_INFO_FILE)
+    processor_info_file = os.path.join(self._processor_info_global_dir, self._PROCESSOR_INFO_FILE)
     if os.path.exists(processor_info_file):
       with safe_open(processor_info_file, 'r') as f:
         for processor in f:
           all_processors.add(processor)
     self._write_processor_info(processor_info_file, all_processors)
+
+    # Ensure that the processor info dir is on the classpath for all targets, so that
+    # annotation processors are loaded after being compiled.
+    compile_classpaths = self.context.products.get_data('compile_classpath')
+    entries = [(conf, self._processor_info_global_dir) for conf in self._confs]
+    compile_classpaths.add_for_targets(self.context.targets(), entries)
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:

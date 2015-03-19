@@ -45,7 +45,6 @@ target(
     ':sorttargets',
     ':targets_help',
     ':what_changed',
-    'tests/python/pants_test/tasks/jvm_compile/scala'
   ],
 )
 
@@ -67,7 +66,6 @@ target(
     ':protobuf_integration',
     ':scala_repl_integration',
     ':wire_integration',
-    'tests/python/pants_test/tasks/jvm_compile/java:integration',
   ],
 )
 
