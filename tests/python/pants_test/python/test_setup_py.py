@@ -23,7 +23,7 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp
 from pants_test.task_test_base import TaskTestBase
 
 
-class TestPythonSetup(TaskTestBase):
+class TestSetupPy(TaskTestBase):
   @classmethod
   def task_type(cls):
     return SetupPy
