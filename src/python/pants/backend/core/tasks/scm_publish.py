@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 from abc import abstractmethod
 
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.scm.scm import Scm
@@ -213,7 +212,7 @@ class ScmPublishMixin(object):
       raise scm_exception
 
 class ScmPublish(ScmPublishMixin):
-  @deprecated('0.0.30', hint_message='Use ScmPublishMixin instead.')
+  @deprecated('0.0.31', hint_message='Use ScmPublishMixin instead.')
   def __init__(self, scm, restrict_push_branches):
     self._restrict_push_branches = frozenset(restrict_push_branches or ())
     self.scm = scm

@@ -84,6 +84,10 @@ New Features
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Deleting dead abbreviate_target_ids code.
+  `RB #1918 <https://rbcommons.com/s/twitter/r/1918>`_
+  `RB #1944 <https://rbcommons.com/s/twitter/r/1944>`_
+
 * Move AptCompile to its own file
   `RB #1935 <https://rbcommons.com/s/twitter/r/1935>`_
 
