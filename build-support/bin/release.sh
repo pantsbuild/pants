@@ -158,10 +158,10 @@ function dry_run_install() {
 }
 
 function check_clean_master() {
-  (
-    [[ -z "$(git status --porcelain)" ]] && \
-    [[ "$(git branch | grep -E '^* ' | cut -d' ' -f2-)" == "master" ]]
-  ) || die "You are not on a clean master branch."
+  [[
+    -z "$(git status --porcelain)" &&
+    "$(git branch | grep -E '^* ' | cut -d' ' -f2-)" == "master"
+  ]] || die "You are not on a clean master branch."
 }
 
 function tag_release() {
