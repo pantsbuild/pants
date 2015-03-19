@@ -228,7 +228,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi." && \
   (
-    check_clean_master && dry_run_install && publish_packages && tag_release \
+    check_clean_master && dry_run_install && publish_packages && tag_release && \
     banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
 fi
