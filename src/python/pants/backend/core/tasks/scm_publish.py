@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 from abc import abstractmethod
 
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.scm.scm import Scm
