@@ -108,7 +108,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_options=['--doc-javadoc-skip'],
                       expected_primary_artifact_count=2)
 
-
   def test_named_snapshot(self):
     name = "abcdef0123456789"
     self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
