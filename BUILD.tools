@@ -46,15 +46,12 @@ jar_library(name = 'cobertura-run',
                 intransitive = True,
             )])
 
-# The reporting phase does not need asm.
 jar_library(name = 'cobertura-report',
             jars = [
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
                 rev = '2.1.1')
-              .exclude(org = 'org.ow2.asm'),
-              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
             ])
 
 jar_library(name = 'benchmark-caliper-0.5',
