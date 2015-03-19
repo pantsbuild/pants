@@ -54,7 +54,7 @@ class TestPythonSetup(TaskTestBase):
     self.assertEqual(PythonSetup.minified_dependencies(target_map['baz']), OrderedSet())
     self.assertEqual(PythonSetup.install_requires(target_map['foo']), set(['bar==0.0.0']))
     self.assertEqual(PythonSetup.install_requires(target_map['bar']), set(['baz==0.0.0']))
-    self.assertEqual(PythonSetup.install_requires(target_map['baz']), set([]))
+    self.assertEqual(PythonSetup.install_requires(target_map['baz']), set())
 
   @contextmanager
   def run_execute(self, target, recursive=False):
