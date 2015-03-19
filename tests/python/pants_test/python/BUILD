@@ -103,8 +103,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_python_setup',
-  sources = ['test_python_setup.py'],
+  name = 'test_setup_py',
+  sources = ['test_setup_py.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
