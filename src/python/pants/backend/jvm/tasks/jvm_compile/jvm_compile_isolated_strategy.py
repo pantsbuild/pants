@@ -13,8 +13,8 @@ from collections import OrderedDict, defaultdict
 
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
-from pants.base.worker_pool import Work
 from pants.base.build_environment import get_buildroot
+from pants.base.worker_pool import Work
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
