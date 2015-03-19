@@ -59,7 +59,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     safe_rmtree(self.pushdb_root)
 
   def tearDown(self):
-    safe_rmtree(self.pushdb_root)
+    print(os.listdir(os.path.join(get_buildroot(), 'testprojects', 'ivy')))
+    #safe_rmtree(self.pushdb_root)
 
   @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
                       reason='No scaladoc binary on the PATH.')
@@ -89,6 +90,25 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
                       ['com.pants.testproject.publish/hello-greet/publish.properties'],)
+
+  def test_protobuf_publish(self):
+    unique_artifacts = {'com/pants/testproject/publish/protobuf/protobuf-java/0.0.1-SNAPSHOT':
+                        ['ivy-0.0.1-SNAPSHOT.xml',
+                         'protobuf-java-0.0.1-SNAPSHOT.jar',
+                         'protobuf-java-0.0.1-SNAPSHOT.pom',
+                         'protobuf-java-0.0.1-SNAPSHOT-sources.jar'],
+                        'com/pants/testproject/protobuf/distance/0.0.1-SNAPSHOT/':
+                        ['ivy-0.0.1-SNAPSHOT.xml',
+                         'distance-0.0.1-SNAPSHOT.jar',
+                         'distance-0.0.1-SNAPSHOT.pom',
+                         'distance-0.0.1-SNAPSHOT-sources.jar'],}
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/protobuf:protobuf-java',
+                      unique_artifacts,
+                      ['com.pants.testproject.publish.protobuf/protobuf-java/publish.properties',
+                       'com.pants.testproject.protobuf/distance/publish.properties'],
+                      extra_options=['--doc-javadoc-skip'],
+                      expected_primary_artifact_count=2)
+
 
   def test_named_snapshot(self):
     name = "abcdef0123456789"
@@ -195,6 +215,9 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       # New pushdb directory should be created for all artifacts.
       for pushdb_file in pushdb_files:
         pushdb_dir = os.path.dirname(os.path.join(self.pushdb_root, pushdb_file))
+        print(os.listdir(self.pushdb_root))
+        print("%s" %pushdb_dir)
+        print(" %s" %(1/0))
         self.assertTrue(os.path.exists(pushdb_dir))
 
       # But because we are doing local publishes, no pushdb files are created

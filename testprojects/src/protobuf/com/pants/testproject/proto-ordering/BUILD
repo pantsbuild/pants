@@ -7,4 +7,9 @@ java_protobuf_library(name='protos',
     'testprojects/src/protobuf/com/pants/testproject/proto-ordering/a',
     'testprojects/src/protobuf/com/pants/testproject/proto-ordering/b',
   ],
+  provides = artifact(
+    org = 'com.pants.testproject.protoordering',
+    name = 'protos',
+    repo = public,
+  )
 )
