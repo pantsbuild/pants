@@ -148,16 +148,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return []
 
   def extra_products(self, target):
-    """Any extra, out-of-band products created for a target.
+    """Any extra, out-of-band resources created for a target.
 
-    E.g., targets that produce scala compiler plugins produce an info file.
+    E.g., targets that produce scala compiler plugins or annotation processor files
+    produce an info file. The resources will be added to the compile_classpath, and
+    made available in resources_by_target.
     Returns a list of pairs (root, [absolute paths of files under root]).
     """
     return []
-
-  def post_process(self, all_targets, relevant_targets):
-    """Any extra post-execute work."""
-    pass
 
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
@@ -262,8 +260,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
-    self.post_process(self.context.targets(), relevant_targets)
-
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, progress_message):
     """Compiles sources for the given vts into the given output dir.
 
@@ -317,8 +313,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
+    compile_classpath = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
 
+    # Register class products.
     if classes_by_source is not None or classes_by_target is not None:
       computed_classes_by_source = self._strategy.compute_classes_by_source(compile_contexts)
       resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
@@ -338,9 +336,16 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           if classes_by_source is not None:
             classes_by_source[source].add_abs_paths(classes_dir, classes)
 
-    # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-    if resources_by_target is not None:
-      for compile_context in compile_contexts:
+    # Register resource products.
+    for compile_context in compile_contexts:
+      extra_resources = self.extra_products(compile_context.target)
+      # Add to resources_by_target (if it was requested).
+      if resources_by_target is not None:
         target_resources = resources_by_target[compile_context.target]
-        for root, abs_paths in self.extra_products(compile_context.target):
+        for root, abs_paths in extra_resources:
           target_resources.add_abs_paths(root, abs_paths)
+      # And to the compile_classpath, to make them available within the next round.
+      # TODO(stuhood): This is redundant with resources_by_target, but resources_by_target
+      # are not available during compilation. https://github.com/pantsbuild/pants/issues/206
+      entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
+      compile_classpath.add_for_target(compile_context.target, entries)

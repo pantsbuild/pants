@@ -27,57 +27,25 @@ class AptCompile(JavaCompile):
 
   def __init__(self, *args, **kwargs):
     super(AptCompile, self).__init__(*args, **kwargs)
-    # A directory independent of any other classpath which can contain a global
-    # apt processor info file.
-    self._processor_info_global_dir = os.path.join(self.workdir, 'apt-processor-info-global')
-    # And another to contain per-target subdirectories
+    # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
   @classmethod
   def name(cls):
     return 'apt'
 
-  def prepare_execute(self, chunks):
-    super(JavaCompile, self).prepare_execute(chunks)
-
-    # Ensure that the processor info dir is on the classpath for all targets, so that
-    # annotation processors are loaded after being compiled.
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    entries = [(conf, self._processor_info_global_dir) for conf in self._confs]
-    compile_classpaths.add_for_targets(self.context.targets(), entries)
-
   def select(self, target):
     return target.has_sources(self._file_suffix) and isinstance(target, AnnotationProcessor)
 
   def extra_products(self, target):
-    ret = super(AptCompile, self).extra_products(target)
+    """Override extra_products to produce an annotation processor information file."""
+    ret = []
     if isinstance(target, AnnotationProcessor) and target.processors:
-      # The consumer of this method adds the resulting files to resources_by_target, so
-      # we can safely place them in a temporary directory here.
       root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
       processor_info_file = os.path.join(root, AptCompile._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
       ret.append((root, [processor_info_file]))
     return ret
-
-  def post_process(self, all_targets, relevant_targets):
-    """Produce a monolithic apt processor service info file.
-
-    This is used in further compilation rounds, and the unit-test classpath. This is
-    distinct from the per-target ones we create in extra_products().
-    """
-    super(AptCompile, self).post_process(all_targets, relevant_targets)
-    all_processors = set()
-    for target in relevant_targets:
-      if isinstance(target, AnnotationProcessor) and target.processors:
-        all_processors.update(target.processors)
-    processor_info_file = os.path.join(self._processor_info_global_dir,
-                                       AptCompile._PROCESSOR_INFO_FILE)
-    if os.path.exists(processor_info_file):
-      with safe_open(processor_info_file, 'r') as f:
-        for processor in f:
-          all_processors.add(processor)
-    self._write_processor_info(processor_info_file, all_processors)
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:

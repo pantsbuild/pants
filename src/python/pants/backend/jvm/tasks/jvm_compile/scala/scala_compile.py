@@ -73,6 +73,7 @@ class ScalaCompile(JvmCompile):
     return zinc_invalidation_key
 
   def extra_products(self, target):
+    """Override extra_products to produce a plugin information file."""
     ret = []
     if target.is_scalac_plugin and target.classname:
       root, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
