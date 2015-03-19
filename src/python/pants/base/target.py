@@ -14,7 +14,6 @@ from six import string_types
 from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -26,7 +25,6 @@ from pants.base.validation import assert_list
 
 
 class AbstractTarget(object):
-  _deprecated_predicate = functools.partial(deprecated, '0.0.30')
 
   @property
   def has_resources(self):
@@ -38,24 +36,6 @@ class AbstractTarget(object):
     """Returns True if the target provides an artifact exportable from the repo."""
     # TODO(John Sirois): fixup predicate dipping down into details here.
     return self.has_label('exportable') and self.provides
-
-  @property
-  @_deprecated_predicate('Do not use this method, use an isinstance check on JarDependency.')
-  def is_jar(self):
-    """Returns True if the target is a jar."""
-    return False
-
-  @property
-  @_deprecated_predicate('Do not use this method, use an isinstance check on JavaAgent.')
-  def is_java_agent(self):
-    """Returns `True` if the target is a java agent."""
-    return self.has_label('java_agent')
-
-  @property
-  @_deprecated_predicate('Do not use this method, use an isinstance check on JvmApp.')
-  def is_jvm_app(self):
-    """Returns True if the target produces a java application with bundled auxiliary files."""
-    return False
 
   # DEPRECATED  to be removed after 0.0.29
   # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
@@ -78,24 +58,12 @@ class AbstractTarget(object):
     """Returns True if the target is a codegen target."""
     return self.has_label('codegen')
 
-  @property
-  @_deprecated_predicate('Do not use this method, use an isinstance check on JarLibrary.')
-  def is_jar_library(self):
-    """Returns True if the target is an external jar library."""
-    return self.has_label('jars')
-
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
   def is_java(self):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')
-
-  @property
-  @_deprecated_predicate('Do not use this method, use an isinstance check on AnnotationProcessor.')
-  def is_apt(self):
-    """Returns True if the target exports an annotation processor."""
-    return self.has_label('apt')
 
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
@@ -447,15 +415,6 @@ class Target(AbstractTarget):
   def closure(self):
     """Returns this target's transitive dependencies, in DFS preorder traversal."""
     return self._build_graph.transitive_subgraph_of_addresses([self.address])
-
-  @manual.builddict()
-  @deprecated('0.0.30', hint_message='Use the description parameter of target() instead')
-  def with_description(self, description):
-    """Set a human-readable description of this target.
-
-    :param description: Descriptive string"""
-    self.description = description
-    return self
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):

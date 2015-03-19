@@ -277,7 +277,6 @@ python_library(
     ':address',
     ':build_environment',
     ':build_manual',
-    ':deprecated',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',

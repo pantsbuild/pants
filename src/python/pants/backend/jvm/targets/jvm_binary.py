@@ -15,7 +15,6 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import BundleField
@@ -368,17 +367,6 @@ class Bundle(object):
 
     if fileset is not None:
       self._add([fileset])
-
-  @manual.builddict()
-  @deprecated(removal_version='0.0.30',
-              hint_message='Use the fileset= parameter to bundle() instead')
-  def add(self, *filesets):
-    """Deprecated: Use the fileset= parameter to bundle() instead.
-
-    Add files to the bundle, where ``filesets`` is a filename, ``globs``, or ``rglobs``.
-    add() may be specified any number of times.
-    """
-    return self._add(filesets)
 
   def _add(self, filesets):
     for fileset in filesets:
