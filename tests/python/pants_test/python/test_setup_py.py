@@ -51,10 +51,10 @@ class TestPythonSetup(TaskTestBase):
                      OrderedSet([target_map['bar']]))
     self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
-    self.assertEqual(PythonSetup.minified_dependencies(target_map['baz']), OrderedSet())
-    self.assertEqual(PythonSetup.install_requires(target_map['foo']), set(['bar==0.0.0']))
-    self.assertEqual(PythonSetup.install_requires(target_map['bar']), set(['baz==0.0.0']))
-    self.assertEqual(PythonSetup.install_requires(target_map['baz']), set())
+    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
+    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['baz==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['baz']), set())
 
   @contextmanager
   def run_execute(self, target, recursive=False):
