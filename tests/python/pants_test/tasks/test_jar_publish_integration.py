@@ -59,8 +59,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     safe_rmtree(self.pushdb_root)
 
   def tearDown(self):
-    print(os.listdir(os.path.join(get_buildroot(), 'testprojects', 'ivy')))
-    #safe_rmtree(self.pushdb_root)
+    safe_rmtree(self.pushdb_root)
 
   @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
                       reason='No scaladoc binary on the PATH.')
@@ -215,9 +214,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       # New pushdb directory should be created for all artifacts.
       for pushdb_file in pushdb_files:
         pushdb_dir = os.path.dirname(os.path.join(self.pushdb_root, pushdb_file))
-        print(os.listdir(self.pushdb_root))
-        print("%s" %pushdb_dir)
-        print(" %s" %(1/0))
         self.assertTrue(os.path.exists(pushdb_dir))
 
       # But because we are doing local publishes, no pushdb files are created
