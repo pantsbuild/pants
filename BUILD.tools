@@ -36,15 +36,16 @@ jar_library(name = 'cobertura-instrument',
               jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
             ])
 
-# Instrumented code needs cobertura.jar in the classpath to run, but none of the dependencies.
+# Instrumented code needs cobertura.jar in the classpath to run, but not most of the dependencies.
 jar_library(name = 'cobertura-run',
             jars = [
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
                 rev = '2.1.1',
-                intransitive = True,
-            )])
+                intransitive = True),
+              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
+            ])
 
 jar_library(name = 'cobertura-report',
             jars = [
