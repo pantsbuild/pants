@@ -32,29 +32,27 @@ jar_library(name = 'cobertura-instrument',
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05'),
+                rev = '2.1.1'),
               jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
             ])
 
-# Instrumented code needs cobertura.jar in the classpath to run, but none of the dependencies.
+# Instrumented code needs cobertura.jar in the classpath to run, but not most of the dependencies.
 jar_library(name = 'cobertura-run',
             jars = [
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05',
-                intransitive = True,
-            )])
+                rev = '2.1.1',
+                intransitive = True),
+              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
+            ])
 
-# The reporting phase does not need asm.
 jar_library(name = 'cobertura-report',
             jars = [
               jar(
                 org = 'net.sourceforge.cobertura',
                 name = 'cobertura',
-                rev = '2.1.0-twitter-05')
-              .exclude(org = 'org.ow2.asm'),
-              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
+                rev = '2.1.1')
             ])
 
 jar_library(name = 'benchmark-caliper-0.5',
