@@ -252,18 +252,3 @@ class GitTest(unittest.TestCase):
         self.git.refresh(leave_clean=True)
       # The repo is clean
       self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
-
-  def test_commit_with_new_untracked_file_adds_file(self):
-    new_file = os.path.join(self.worktree, 'untracked_file')
-
-    touch(new_file)
-
-    self.assertEqual({'untracked_file'}, self.git.changed_files(include_untracked=True))
-
-    self.git.add(new_file)
-
-    self.assertEqual({'untracked_file'}, self.git.changed_files())
-
-    self.git.commit('API Changes.')
-
-    self.assertEqual(set([]), self.git.changed_files(include_untracked=True))
