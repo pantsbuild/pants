@@ -69,6 +69,9 @@ class IvyTaskMixin(object):
     super(IvyTaskMixin, cls).register_options(register)
     register('--jvm-options', action='append', metavar='<option>...',
              help='Run Ivy with these extra jvm options.')
+    register('--soft-excludes', action='store_true', default=False, advanced=True,
+             help='If a target depends on a jar that is excluded by another target '
+                  'resolve this jar anyway')
 
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
@@ -242,6 +245,8 @@ class IvyTaskMixin(object):
 
     if not jars:
       jars, excludes = IvyUtils.calculate_classpath(targets)
+      if self.get_options().soft_excludes:
+        excludes = filter(self._exclude_is_not_contained_in_jars(jars), excludes)
     else:
       excludes = set()
 
@@ -262,3 +267,16 @@ class IvyTaskMixin(object):
           raise TaskError('Ivy returned %d' % result)
       except runner.executor.Error as e:
         raise TaskError(e)
+
+  @staticmethod
+  def _exclude_is_not_contained_in_jars(jars):
+    """
+    :type jars: list[JarDependency]
+    """
+    jars = { (jar.org, jar.name) for jar in jars }
+    def exclude_filter(exclude):
+      """
+      :type exclude: Exclude
+      """
+      return (exclude.org, exclude.name) not in jars
+    return exclude_filter

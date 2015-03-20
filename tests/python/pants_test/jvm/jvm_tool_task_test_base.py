@@ -38,6 +38,7 @@ class JvmToolTaskTestBase(TaskTestBase):
     # This may not be true forever.  But getting the 'real' value here is tricky, as we have no
     # access to the enclosing pants run's options here.
     self.set_options_for_scope(bootstrap_scope, jvm_options=[])
+    self.set_options_for_scope(bootstrap_scope, soft_excludes=False)
     JvmToolTaskMixin.reset_registered_tools()
 
     def link_or_copy(src, dest):

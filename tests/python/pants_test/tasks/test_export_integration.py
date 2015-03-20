@@ -54,6 +54,18 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       targets = json_data.get('targets')
       self.assertIn('org.hamcrest:hamcrest-core:1.3', targets[test_target]['libraries'])
 
+  def test_export_jar_path_with_excludes(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'testprojects/src/java/com/pants/testproject/exclude:foo'
+      json_data = self.run_export(test_target, workdir, ['resolve'])
+      self.assertIsNone(json_data.get('libraries').get('com.typesafe.sbt:incremental-compiler:0.13.7'))
+
+  def test_export_jar_path_with_excludes_soft(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'testprojects/src/java/com/pants/testproject/exclude:'
+      json_data = self.run_export(test_target, workdir, ['resolve', '--resolve-ivy-soft-excludes'])
+      self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
+
   def test_export_jar_path(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
