@@ -7,6 +7,12 @@ RELEASE HISTORY
 Bugfixes
 ~~~~~~~~
 
+* Make JavaProtobufLibrary not exportable to fix publish.
+  `RB #1952 <https://rbcommons.com/s/twitter/r/1952>`_
+
+* Pass compression option along to temp local artifact caches.
+  `RB #1955 <https://rbcommons.com/s/twitter/r/1955>`_
+
 * Fix a missing symbol in ScalaCompile
   `RB #1885 <https://rbcommons.com/s/twitter/r/1885>`_
   `RB #1945 <https://rbcommons.com/s/twitter/r/1945>`_
@@ -32,6 +38,9 @@ Documentation
 
 New Features
 ~~~~~~~~~~~~
+
+* added sources and javadocs to export goal output
+  `RB #1936 <https://rbcommons.com/s/twitter/r/1936>`_
 
 * Add flags to idea and eclipse goals to exclude pulling in sources and javadoc via ivy
   `RB #1939 <https://rbcommons.com/s/twitter/r/1939>`_
