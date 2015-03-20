@@ -59,13 +59,15 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression,
   :param str spec: See above.
   :param str task_name: The name of the task using this cache (eg 'ScalaCompile')
   :param int compression: The gzip compression level for created artifacts.
-                          Valid values are 1-9, or Falsy-y to disable compression.
+                          Valid values are 0-9.  0 means that gzip is used in a mode where it
+                          does not compress the input data; this is used for its side-effect of
+                          providing checksums.
   :param str action: A verb, eg 'read' or 'write' for printed messages.
   :param LocalArtifactCache local: A local cache for use by created remote caches
   """
   if not spec:
     raise EmptyCacheSpecError()
-  if compression and not isinstance(compression, (int, long)):
+  if not isinstance(compression, (int, long)):
     raise ValueError('compression value must be an integer: {comp}'.format(comp=compression))
 
   def recurse(new_spec, new_local=local):
@@ -89,7 +91,7 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression,
       if best_url:
         url = best_url.rstrip('/') + '/' + task_name
         log.debug('{0} {1} remote artifact cache at {2}'.format(task_name, action, url))
-        local = local or TempLocalArtifactCache(artifact_root)
+        local = local or TempLocalArtifactCache(artifact_root, compression)
         return RESTfulArtifactCache(artifact_root, url, local)
       else:
         log.warn('{0} has no reachable artifact cache in {1}.'.format(task_name, spec))

@@ -24,7 +24,7 @@ class BaseLocalArtifactCache(ArtifactCache):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
-                            Valid values are 1-9, or Falsy-y to disable compression.
+                            Valid values are 0-9.
     """
     super(BaseLocalArtifactCache, self).__init__(artifact_root)
     self._compression = compression
@@ -115,11 +115,11 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
     This implementation does not have a backing _cache_root, and never
     actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
-  def __init__(self, artifact_root):
+  def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     """
-    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=None)
+    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=compression)
 
   def _store_tarball(self, cache_key, src):
     return src

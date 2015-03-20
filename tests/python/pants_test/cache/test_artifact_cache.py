@@ -95,7 +95,7 @@ class TestArtifactCache(unittest.TestCase):
   @contextmanager
   def setup_rest_cache(self, local=None):
     with temporary_dir() as artifact_root:
-      local = local or TempLocalArtifactCache(artifact_root)
+      local = local or TempLocalArtifactCache(artifact_root, 0)
       with self.setup_server() as base_url:
         yield RESTfulArtifactCache(artifact_root, base_url, local)
 
@@ -196,7 +196,7 @@ class TestArtifactCache(unittest.TestCase):
     """make sure that the combined cache finds what it should and that it backfills"""
     with self.setup_server() as url:
       with self.setup_local_cache() as local:
-        tmp = TempLocalArtifactCache(local.artifact_root)
+        tmp = TempLocalArtifactCache(local.artifact_root, 0)
         remote = RESTfulArtifactCache(local.artifact_root, url, tmp)
         combined = RESTfulArtifactCache(local.artifact_root, url, local)
 
