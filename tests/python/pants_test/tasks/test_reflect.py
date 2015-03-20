@@ -7,11 +7,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.tasks import reflect
+from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants_test.tasks.test_base import BaseTest
+
+
+class DummyTask(Task):
+  def __init__(self, *args, **kwargs):
+    super(DummyTask, self).__init__(*args, **kwargs)
+
+  def execute(self): return 42
 
 
 class BuildsymsSanityTests(BaseTest):
@@ -39,7 +47,7 @@ class BuildsymsSanityTests(BaseTest):
 class GoalDataTest(BaseTest):
   def test_gen_tasks_options_reference_data(self):
     # can we run our reflection-y goal code without crashing? would be nice
-    Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
+    Goal.by_name('jack').install(TaskRegistrar('jill', DummyTask))
     oref_data = reflect.gen_tasks_options_reference_data()
     self.assertTrue(len(oref_data) > 0,
                     'Tried to generate data for options reference, got emptiness')
