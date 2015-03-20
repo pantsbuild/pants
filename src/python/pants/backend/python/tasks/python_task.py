@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.base.exceptions import TaskError
 
@@ -83,9 +84,26 @@ class PythonTask(Task):
     return interpreter
 
   @contextmanager
-  def temporary_pex_builder(self, interpreter=None, pex_info=None, parent_dir=None):
-    """Yields a PEXBuilder and cleans up its chroot when it goes out of context."""
-    path = tempfile.mkdtemp(dir=parent_dir)
+  def temporary_chroot(self, interpreter=None, pex_info=None, targets=None,
+                       extra_requirements=None, platforms=None, pre_freeze=None):
+    """Yields a temporary PythonChroot created with the specified args.
+
+    pre_freeze is an optional function run on the chrooy just before freezing its builder,
+    to allow for any extra modification.
+    """
+    path = tempfile.mkdtemp()
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
-    yield builder
-    builder.chroot().delete()
+    with self.context.new_workunit('chroot'):
+      chroot = PythonChroot(
+        context=self.context,
+        targets=targets,
+        extra_requirements=extra_requirements,
+        builder=builder,
+        platforms=platforms,
+        interpreter=interpreter)
+      chroot.dump()
+      if pre_freeze:
+        pre_freeze(chroot)
+      builder.freeze()
+    yield chroot
+    chroot.delete()
