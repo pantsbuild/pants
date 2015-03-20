@@ -15,71 +15,41 @@ from pants.util.contextutil import temporary_dir
 
 class TestInterpreterCache(unittest.TestCase):
   def _make_bad_requirement(self, requirement):
-    """
-    Turn a requirement that passes into one we know will fail. E.g. 'CPython==2.7.5' becomes
-    'CPython==99.7.5'
+    """Turns a requirement that passes into one we know will fail.
+
+    E.g. 'CPython==2.7.5' becomes 'CPython==99.7.5'
     """
     return str(requirement).replace('==2.', '==99.')
 
-  @mock.patch('pants.backend.python.interpreter_cache.PythonSetup', return_value=mock.MagicMock())
-  def test_cache_setup_with_no_filters_uses_repo_default_excluded(self, MockSetup):
-    # This is the interpreter we'll inject into the cache
-    interpreter = PythonInterpreter.get()
+  def setUp(self):
+    self._interpreter = PythonInterpreter.get()
 
-    mock_setup = MockSetup.return_value
-    # Explicitly set a repo-wide requirement that excludes our one interpreter
+  def _do_test(self, interpreter_requirement, filters, expected):
+    mock_setup = mock.MagicMock().return_value
+
+    # Explicitly set a repo-wide requirement that excludes our one interpreter.
     type(mock_setup).interpreter_requirement = mock.PropertyMock(
-        return_value=self._make_bad_requirement(interpreter.identity.requirement))
+      return_value=interpreter_requirement)
 
     with temporary_dir() as path:
-      mock_setup.scratch_dir.return_value = path
-
-      cache = PythonInterpreterCache(mock.MagicMock())
+      mock_setup.scratch_dir = path
+      cache = PythonInterpreterCache(mock_setup, mock.MagicMock())
 
       def set_interpreters(_):
-        cache._interpreters.add(interpreter)
+        cache._interpreters.add(self._interpreter)
 
       cache._setup_cached = mock.Mock(side_effect=set_interpreters)
       cache._setup_paths = mock.Mock()
 
-      self.assertEqual(len(cache.setup()), 0)
+      self.assertEqual(cache.setup(filters=filters), expected)
 
-  @mock.patch('pants.backend.python.interpreter_cache.PythonSetup', return_value=mock.MagicMock())
-  def test_cache_setup_with_no_filters_uses_repo_default_excluded(self, MockSetup):
-    interpreter = PythonInterpreter.get()
+  def test_cache_setup_with_no_filters_uses_repo_default_excluded(self):
+    self._do_test(self._make_bad_requirement(self._interpreter.identity.requirement), [], [])
 
-    mock_setup = MockSetup.return_value
-    type(mock_setup).interpreter_requirement = mock.PropertyMock(return_value=None)
+  def test_cache_setup_with_no_filters_uses_repo_default(self):
+    self._do_test(None, [], [self._interpreter])
 
-    with temporary_dir() as path:
-      mock_setup.scratch_dir.return_value = path
-
-      cache = PythonInterpreterCache(mock.MagicMock())
-
-      def set_interpreters(_):
-        cache._interpreters.add(interpreter)
-
-      cache._setup_cached = mock.Mock(side_effect=set_interpreters)
-
-      self.assertEqual(cache.setup(), [interpreter])
-
-  @mock.patch('pants.backend.python.interpreter_cache.PythonSetup', return_value=mock.MagicMock())
-  def test_cache_setup_with_filter_overrides_repo_default(self, MockSetup):
-    interpreter = PythonInterpreter.get()
-
-    mock_setup = MockSetup.return_value
-    # Explicitly set a repo-wide requirement that excludes our one interpreter
-    type(mock_setup).interpreter_requirement = mock.PropertyMock(
-        return_value=self._make_bad_requirement(interpreter.identity.requirement))
-
-    with temporary_dir() as path:
-      mock_setup.scratch_dir.return_value = path
-
-      cache = PythonInterpreterCache(mock.MagicMock())
-
-      def set_interpreters(_):
-        cache._interpreters.add(interpreter)
-
-      cache._setup_cached = mock.Mock(side_effect=set_interpreters)
-
-      self.assertEqual(cache.setup(filters=(str(interpreter.identity.requirement),)), [interpreter])
+  def test_cache_setup_with_filter_overrides_repo_default(self):
+    self._do_test(self._make_bad_requirement(self._interpreter.identity.requirement),
+                  (str(self._interpreter.identity.requirement), ), [
+                  self._interpreter])

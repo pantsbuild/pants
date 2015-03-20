@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.base.exceptions import TaskError
 
 
@@ -26,7 +27,8 @@ class PythonTask(Task):
   @property
   def interpreter_cache(self):
     if self._interpreter_cache is None:
-      self._interpreter_cache = PythonInterpreterCache(self.context.config,
+      self._interpreter_cache = PythonInterpreterCache(PythonSetup(self.context.config),
+                                                       PythonRepos(self.context.config),
                                                        logger=self.context.log.debug)
 
       # Cache setup's requirement fetching can hang if run concurrently by another pants proc.

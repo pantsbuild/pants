@@ -7,41 +7,88 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pex.fetcher import Fetcher, PyPIFetcher
+from pex.http import Context
+from pkg_resources import Requirement
+
+
+# TODO(benjy): These are basically proto-subsystems. There's some obvious commonality, but
+# rather than factor that out now I'll retrofit these to use whatever general subsystem
+# implementation we come up with in the near future.
 
 class PythonSetup(object):
-  """A clearing house for configuration data needed by components setting up python environments."""
-
-  def __init__(self, config, section='python-setup'):
+  """Configuration data for a python environment."""
+  def __init__(self, config):
     self._config = config
-    self._section = section
-
-  @property
-  def scratch_root(self):
-    """Returns the root scratch space for assembling python environments.
-
-    Components should probably carve out their own directory rooted here.  See `scratch_dir`.
-    """
-    return self._config.get(
-        self._section,
-        'cache_root',
-        default=os.path.join(self._config.getdefault('pants_workdir'), 'python'))
 
   @property
   def interpreter_requirement(self):
     """Returns the repo-wide interpreter requirement."""
-    return self._config.get(self._section, 'interpreter_requirement')
+    return self._get_config('interpreter_requirement')
 
-  def scratch_dir(self, key, default_name=None):
-    """Returns a named scratch dir.
+  @property
+  def setuptools_version(self):
+    return self._get_config('setuptools_version', default='5.4.1')
 
-    By default this will be a child of the `scratch_root` with the same name as the key.
+  @property
+  def wheel_version(self):
+    return self._get_config('wheel_version', default='0.23.0')
 
-    :param string key: The pants.ini config key this scratch dir can be overridden with.
-    :param default_name: A name to use instead of the keyname for the scratch dir.
+  @property
+  def platforms(self):
+    return self._get_config_list('platforms', default=['current'])
 
-    User's can override the location using the key in pants.ini.
-    """
-    return self._config.get(
-        self._section,
-        key,
-        default=os.path.join(self.scratch_root, default_name or key))
+  @property
+  def scratch_dir(self):
+    return os.path.join(self._config.getdefault('pants_workdir'), 'python')
+
+  def setuptools_requirement(self):
+    return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))
+
+  def wheel_requirement(self):
+    return self._failsafe_parse('wheel=={0}'.format(self.wheel_version))
+
+  # This is a setuptools <1 and >1 compatible version of Requirement.parse.
+  # For setuptools <1, if you did Requirement.parse('setuptools'), it would
+  # return 'distribute' which of course is not desirable for us.  So they
+  # added a replacement=False keyword arg.  Sadly, they removed this keyword
+  # arg in setuptools >= 1 so we have to simply failover using TypeError as a
+  # catch for 'Invalid Keyword Argument'.
+  def _failsafe_parse(self, requirement):
+    try:
+      return Requirement.parse(requirement, replacement=False)
+    except TypeError:
+      return Requirement.parse(requirement)
+
+  def _get_config(self, *args, **kwargs):
+    return self._config.get('python-setup', *args, **kwargs)
+
+  def _get_config_list(self, *args, **kwargs):
+    return self._config.getlist('python-setup', *args, **kwargs)
+
+
+class PythonRepos(object):
+  """Configuration data for a python code repository."""
+  def __init__(self, config):
+    self._config = config
+
+  @property
+  def repos(self):
+    return self._get_config_list('repos', [])
+
+  @property
+  def indexes(self):
+    return self._get_config_list('indexes', [])
+
+  def get_fetchers(self):
+    fetchers = []
+    fetchers.extend(Fetcher([url]) for url in self.repos)
+    fetchers.extend(PyPIFetcher(url) for url in self.indexes)
+    return fetchers
+
+  def get_network_context(self):
+    # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
+    return Context.get()
+
+  def _get_config_list(self, *args, **kwargs):
+    return self._config.getlist('python-repos', *args, **kwargs)
