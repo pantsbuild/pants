@@ -25,7 +25,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
                '--interpreter=CPython>=3.3',
                '--quiet']
     pants_run = self.run_pants(command=command)
-    assert pants_run.returncode == 1
+    assert pants_run.returncode == 57
 
   def _maybe_run_version(self, version):
     if self.has_python_version(version):
