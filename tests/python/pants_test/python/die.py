@@ -8,5 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import sys
 
 
-print('Exiting with status 1')
-sys.exit(1)
+if __name__ == "__main__":
+  print('Exiting with status 1')
+  sys.exit(1)
