@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -51,6 +53,10 @@ class ScalaCompile(JvmCompile):
                                  color=color,
                                  log_level=self.get_options().level)
 
+    # A directory independent of any other classpath which can contain per-target
+    # plugin resource files.
+    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
+
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
 
@@ -79,7 +85,10 @@ class ScalaCompile(JvmCompile):
   def extra_products(self, target):
     ret = []
     if target.is_scalac_plugin and target.classname:
-      root, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
+      # NB: We don't post-process the plugin_info_files onto the compile_classpath since we don't
+      # yet support in-line compilation of scala compiler plugins from the workspace to be used in
+      # subsequent compile rounds like we do for annotation processors with javac.
+      root, plugin_info_file = ZincUtils.write_plugin_info(self._plugin_info_dir, target)
       ret.append((root, [plugin_info_file]))
     return ret
 
