@@ -115,7 +115,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
     This implementation does not have a backing _cache_root, and never
     actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
-  def __init__(self, artifact_root, compression=0):
+  def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     """
