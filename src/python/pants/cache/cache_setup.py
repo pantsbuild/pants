@@ -67,8 +67,9 @@ def create_artifact_cache(log, artifact_root, spec, task_name, compression,
   """
   if not spec:
     raise EmptyCacheSpecError()
-  if not isinstance(compression, (int, long)):
-    raise ValueError('compression value must be an integer: {comp}'.format(comp=compression))
+  if not compression in range(10):
+    raise ValueError('compression value must be an integer between 0 and 9 inclusive: {com}'.format(
+      com=compression))
 
   def recurse(new_spec, new_local=local):
     return create_artifact_cache(log=log, artifact_root=artifact_root, spec=new_spec,
