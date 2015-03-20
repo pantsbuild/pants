@@ -700,7 +700,7 @@ class JarPublish(ScmPublishMixin, JarTask):
         # unique, some extra logic is required to ensure that the user supplied at least one
         # non-default value (thus ensuring a uniquely-named artifact in the end).
         if override_name == jar.name and classifier == DEFAULT_CLASSIFIER and extension == DEFAULT_EXTENSION:
-          raise TaskError("publish_extra for '{0}' most override one of name, classifier or "
+          raise TaskError("publish_extra for '{0}' must override one of name, classifier or "
                           "extension with a non-default value.".format(extra_product))
 
         ivy_tmpl_key = classifier or '%s-%s'.format(override_name, extension)
@@ -774,9 +774,9 @@ class JarPublish(ScmPublishMixin, JarTask):
                                                                           tgt))
 
     if self.overrides:
-      print('Publishing with revision overrides:\n  %0' % '\n  '.join(
-        '{1}={2}'.format(coordinate(org, name), rev) for (org, name), rev in self.overrides.items()
-      ))
+      print('\nPublishing with revision overrides:')
+      for (org, name), rev in self.overrides.items():
+        print('{0}={1}'.format(coordinate(org, name), rev))
 
     head_sha = self.scm.commit_id
 
@@ -793,13 +793,12 @@ class JarPublish(ScmPublishMixin, JarTask):
 
       if skip and (jar.org, jar.name) == self.restart_at:
         skip = False
-
       # select the next version: either a named version, or semver via the pushdb/overrides
       if self.named_snapshot:
         newentry = oldentry.with_named_ver(self.named_snapshot)
       else:
         override = self.overrides.get((jar.org, jar.name))
-        sem_ver = Semver.parse(override) if override else oldentry.sem_ver.bump()
+        sem_ver = override if override else oldentry.sem_ver.bump()
         if self.local_snapshot:
           sem_ver = sem_ver.make_snapshot()
 
