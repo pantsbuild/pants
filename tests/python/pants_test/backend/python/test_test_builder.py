@@ -14,6 +14,7 @@ import coverage
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.test_builder import PythonTestBuilder
@@ -28,7 +29,7 @@ class PythonTestBuilderTestBase(BaseTest):
     self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
 
   def _cache_current_interpreter(self):
-    cache = PythonInterpreterCache(self.config())
+    cache = PythonInterpreterCache(PythonSetup(self.config()), PythonRepos(self.config()))
 
     # We only need to cache the current interpreter, avoid caching for every interpreter on the
     # PATH.
