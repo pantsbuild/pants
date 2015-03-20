@@ -151,9 +151,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       if update_artifact_cache_vts_work:
         self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
 
-      # Record the built target -> sources mapping for future use.
-      self._record_previous_sources_by_target(compile_context.target, compile_context.sources)
-
       # Now that all the analysis accounting is complete, we can safely mark the target as valid.
       vts.update()
 

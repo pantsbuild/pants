@@ -50,8 +50,6 @@ class JvmCompileStrategy(object):
     self.context = context
     self._analysis_tools = analysis_tools
 
-    self._target_sources_dir = os.path.join(workdir, 'target_sources')
-
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
     self._sources_predicate = sources_predicate
@@ -112,9 +110,8 @@ class JvmCompileStrategy(object):
     pass
 
   def pre_compile(self):
-    # Only create these working dirs during execution phase, otherwise, they
-    # would be wiped out by clean-all goal/task if it's specified.
-    safe_mkdir(self._target_sources_dir)
+    """Executed once before any compiles."""
+    pass
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     """Prepares to compile the given set of targets.
@@ -165,25 +162,6 @@ class JvmCompileStrategy(object):
     for _, f in classpath:
       if os.path.relpath(f, buildroot).startswith('..'):
         raise TaskError('Classpath entry {f} is located outside the buildroot.'.format(f=f))
-
-  def _get_previous_sources_by_target(self, target):
-    """Returns the target's sources as recorded on the last successful build of target.
-
-    Returns a list of absolute paths.
-    """
-    path = os.path.join(self._target_sources_dir, target.identifier)
-    if os.path.exists(path):
-      with open(path, 'r') as infile:
-        return [s.rstrip() for s in infile.readlines()]
-    else:
-      return []
-
-  def _record_previous_sources_by_target(self, target, sources):
-    # Record target -> source mapping for future use.
-    with open(os.path.join(self._target_sources_dir, target.identifier), 'w') as outfile:
-      for src in sources:
-        outfile.write(os.path.join(get_buildroot(), src))
-        outfile.write('\n')
 
   def _find_locally_changed_targets(self, sources_by_target):
     """Finds the targets whose sources have been modified locally.

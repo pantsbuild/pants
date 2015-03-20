@@ -73,6 +73,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
 
+    self._target_sources_dir = os.path.join(workdir, 'target_sources')
+
     # A temporary, but well-known, dir in which to munge analysis/dependency files in before
     # caching. It must be well-known so we know where to find the files when we retrieve them from
     # the cache.
@@ -133,7 +135,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       shutil.copy(src, dst)
 
   def pre_compile(self):
-    super(JvmCompileGlobalStrategy, self).pre_compile()
+    # Only create these working dirs during execution phase, otherwise, they
+    # would be wiped out by clean-all goal/task if it's specified.
+    safe_mkdir(self._target_sources_dir)
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
@@ -471,6 +475,25 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
+
+  def _get_previous_sources_by_target(self, target):
+    """Returns the target's sources as recorded on the last successful build of target.
+
+    Returns a list of absolute paths.
+    """
+    path = os.path.join(self._target_sources_dir, target.identifier)
+    if os.path.exists(path):
+      with open(path, 'r') as infile:
+        return [s.rstrip() for s in infile.readlines()]
+    else:
+      return []
+
+  def _record_previous_sources_by_target(self, target, sources):
+    # Record target -> source mapping for future use.
+    with open(os.path.join(self._target_sources_dir, target.identifier), 'w') as outfile:
+      for src in sources:
+        outfile.write(os.path.join(get_buildroot(), src))
+        outfile.write('\n')
 
   def _compute_deleted_sources(self):
     """Computes the list of sources present in the last analysis that have since been deleted.
