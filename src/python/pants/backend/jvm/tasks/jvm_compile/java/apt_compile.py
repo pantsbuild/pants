@@ -48,7 +48,7 @@ class AptCompile(JavaCompile):
       # The consumer of this method adds the resulting files to resources_by_target, so
       # we can safely place them in a temporary directory here.
       root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
-      processor_info_file = os.path.join(root, AptCompile._PROCESSOR_INFO_FILE)
+      processor_info_file = os.path.join(root, self._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
       ret.append((root, [processor_info_file]))
     return ret
