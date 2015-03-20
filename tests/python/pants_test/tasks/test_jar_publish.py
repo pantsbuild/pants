@@ -214,6 +214,21 @@ class JarPublishTest(TaskTestBase):
     with self.assertRaises(Scm.RemoteException):
       task.execute()
 
+  def test_publish_retry_fails_immediately_with_exception_on_refresh_failure(self):
+    targets = self._prepare_for_publishing()
+    self.set_options(dryrun=False, scm_push_attempts=3, repos=self._get_repos())
+    task = self.create_task(self.context(target_roots=targets[0:1]))
+
+    self._prepare_mocks(task)
+    task.scm.push = Mock()
+    task.scm.push.side_effect = FailNTimes(3, Scm.RemoteException)
+    task.scm.refresh = Mock()
+    task.scm.refresh.side_effect = FailNTimes(1, Scm.LocalException)
+
+    with self.assertRaises(Scm.LocalException):
+      task.execute()
+    self.assertEquals(1, task.scm.push.call_count)
+
   def test_publish_local_only(self):
     with pytest.raises(TaskError):
       self.create_task(self.context())

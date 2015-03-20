@@ -350,7 +350,7 @@ class GitTest(unittest.TestCase):
 
       subprocess.check_call(['git', 'commit', '-am', 'Conflict'])
 
-      self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+      self.assertEquals(set(), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
       with self.assertRaises(Scm.LocalException):
         self.git.refresh(leave_clean=False)
       # The repo is dirty
@@ -364,7 +364,7 @@ class GitTest(unittest.TestCase):
       with self.assertRaises(Scm.LocalException):
         self.git.refresh(leave_clean=True)
       # The repo is clean
-      self.assertEquals(set([]), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+      self.assertEquals(set(), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
 
   def test_commit_with_new_untracked_file_adds_file(self):
     new_file = os.path.join(self.worktree, 'untracked_file')

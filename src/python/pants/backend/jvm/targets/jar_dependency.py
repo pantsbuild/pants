@@ -13,7 +13,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_manual import manual
-from pants.base.deprecated import deprecated
 from pants.base.payload_field import PayloadField, stable_json_sha1
 
 
@@ -146,15 +145,6 @@ class JarDependency(object):
     """Adds a transitive dependency of this jar to the exclude list."""
 
     self.excludes += (Exclude(org, name),)
-    return self
-
-  @manual.builddict()
-  @deprecated('0.0.30', hint_message='Use jar(..., intransitive=True) instead')
-  def intransitive(self):
-    """Declares this Dependency intransitive, indicating only the jar for the dependency itself
-    should be downloaded and placed on the classpath"""
-
-    self.transitive = False
     return self
 
   @manual.builddict()

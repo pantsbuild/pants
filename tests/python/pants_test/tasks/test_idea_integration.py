@@ -125,7 +125,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_idea_on_all_examples(self):
     self._idea_test(['examples/src/java/com/pants/examples::'])
 
-  def _check_javadoc_and_sources(self, path, library_name):
+  def _check_javadoc_and_sources(self, path, library_name, with_sources=True, with_javadoc=True):
     """
     :param path: path to the idea project directory
     :param library_name: name of the library to check for (e.g. guava)
@@ -155,7 +155,10 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                       .format(library_name=library_name), url):
         sources_found = True
         break
-    self.assertTrue(sources_found)
+    if with_sources:
+      self.assertTrue(sources_found)
+    else:
+      self.assertFalse(sources_found)
 
     javadoc = libraryElement.getElementsByTagName('JAVADOC')[0]
     javadoc_found = False
@@ -165,7 +168,10 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                       .format(library_name=library_name), url):
         javadoc_found = True
         break
-    self.assertTrue(javadoc_found)
+    if with_javadoc:
+      self.assertTrue(javadoc_found)
+    else:
+      self.assertFalse(javadoc_found)
 
   # NOTE(Garrett Malmquist): The test below assumes that the annotation example's dependency on
   # guava will never be removed. If it ever is, these tests will need to be changed to check for a
@@ -185,8 +191,19 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_idea_external_javadoc_and_sources(self):
     def do_check(path):
       self._check_javadoc_and_sources(path, 'guava')
+
+    def do_check_no_sources(path):
+      self._check_javadoc_and_sources(path, 'guava', with_sources=False)
+
+    def do_check_no_javadoc(path):
+      self._check_javadoc_and_sources(path, 'guava', with_javadoc=False)
+
     self._idea_test(['examples/src/java/com/pants/examples/annotation::'],
                     check_func=do_check)
+    self._idea_test(['examples/src/java/com/pants/examples/annotation::', '--idea-no-source-jars'],
+                    check_func=do_check_no_sources)
+    self._idea_test(['examples/src/java/com/pants/examples/annotation::', '--idea-no-javadoc-jars'],
+                    check_func=do_check_no_javadoc)
 
   def test_idea_on_java_sources(self):
     self._idea_test(['testprojects/src/scala/com/pants/testproject/javasources::'])

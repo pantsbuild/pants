@@ -12,7 +12,6 @@ import os
 import pkgutil
 import shutil
 import sys
-import traceback
 from collections import OrderedDict, defaultdict
 
 from six.moves import range

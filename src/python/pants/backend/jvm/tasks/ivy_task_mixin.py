@@ -10,7 +10,7 @@ import logging
 import os
 import shutil
 import threading
-from collections import defaultdict
+from hashlib import sha1
 
 from twitter.common.collections import maybe_list
 
@@ -19,7 +19,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
@@ -28,16 +28,31 @@ from pants.util.dirutil import safe_mkdir
 logger = logging.getLogger(__name__)
 
 
-class IvyResolveFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
+class IvyResolveFingerprintStrategy(FingerprintStrategy):
+
+  def __init__(self, confs):
+    super(IvyResolveFingerprintStrategy, self).__init__()
+    self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):
+    hasher = sha1()
+    for conf in self._confs:
+      hasher.update(conf)
     if isinstance(target, JarLibrary):
-      return target.payload.fingerprint()
+      hasher.update(target.payload.fingerprint())
+      return hasher.hexdigest()
     if isinstance(target, JvmTarget):
       if target.payload.excludes or target.payload.configurations:
-        return target.payload.fingerprint(field_keys=('excludes', 'configurations'))
+        hasher.update(target.payload.fingerprint(field_keys=('excludes', 'configurations')))
+        return hasher.hexdigest()
+
     return None
 
+  def __hash__(self):
+    return hash((type(self), '-'.join(self._confs)))
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self._confs == other._confs
 
 
 class IvyTaskMixin(object):
@@ -81,7 +96,7 @@ class IvyTaskMixin(object):
 
     ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
 
-    fingerprint_strategy = IvyResolveFingerprintStrategy()
+    fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
     with self.invalidated(targets,
                           invalidate_dependents=False,

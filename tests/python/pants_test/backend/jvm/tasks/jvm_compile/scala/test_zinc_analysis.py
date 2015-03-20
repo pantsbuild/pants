@@ -10,7 +10,7 @@ import os
 import tarfile
 import unittest
 
-from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
+from pants.backend.jvm.tasks.jvm_compile.analysis_parser import ParseError
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.contextutil import Timer, temporary_dir
@@ -29,7 +29,6 @@ class ZincAnalysisTest(unittest.TestCase):
     return ret
 
   def test_analysis_files(self):
-    classes_dir = '/Users/kermit/src/acme.web/.pants.d/scalac/classes/'
     parser = ZincAnalysisParser()
 
     with temporary_dir() as tmpdir:

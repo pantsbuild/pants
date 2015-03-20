@@ -13,22 +13,18 @@ from pants_test.base_test import BaseTest
 
 class TestZincUtils(BaseTest):
 
-  def test_get_compile_args(self):
+  def test_identify_zinc_jars(self):
+    cp = ['/foo/bar/baz/compiler-interface-2.10.11-M1.jar',
+          '/foo/bar/qux/sbt-interface-2.10.12-M2.jar']
+    expected = {
+      'compiler-interface': '/foo/bar/baz/compiler-interface-2.10.11-M1.jar',
+      'sbt-interface': '/foo/bar/qux/sbt-interface-2.10.12-M2.jar'
+    }
+    self.assertEquals(expected, ZincUtils.identify_zinc_jars(cp))
+
+  def test_classpath_relativization(self):
     jar_outside_build_root = os.path.join(os.path.sep, 'outside-build-root', 'bar.jar')
     classpath = [os.path.join(self.build_root, 'foo.jar'), jar_outside_build_root]
-    sources = ['X.scala']
-
-    args = ZincUtils._get_compile_args([], classpath, sources, 'bogus output dir',
-                                      'bogus analysis file', [])
-    classpath_found = False
-    classpath_correct = False
-    for arg in args:
-      if classpath_found:
-        # Classpath elements are always relative to the build root.
-        jar_relpath = os.path.relpath(jar_outside_build_root, self.build_root)
-        self.assertEquals('foo.jar:{0}'.format(jar_relpath), arg)
-        classpath_correct = True
-        break
-      if arg == '-classpath':
-        classpath_found = True
-    self.assertTrue(classpath_correct)
+    relativized_classpath = ZincUtils.relativize_classpath(classpath)
+    jar_relpath = os.path.relpath(jar_outside_build_root, self.build_root)
+    self.assertEquals(['foo.jar', jar_relpath], relativized_classpath)

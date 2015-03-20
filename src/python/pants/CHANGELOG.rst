@@ -1,11 +1,159 @@
 RELEASE HISTORY
 ===============
 
+0.0.30 (3/18/2015)
+------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix missing deps from global switch to six range
+  `RB #1931 <https://rbcommons.com/s/twitter/r/1931>`_
+  `RB #1937 <https://rbcommons.com/s/twitter/r/1937>`_
+
+* Fix python_repl to work for python_requirement_libraries
+  `RB #1934 <https://rbcommons.com/s/twitter/r/1934>`_
+
+* Move count variable outside loop
+  `RB #1926 <https://rbcommons.com/s/twitter/r/1926>`_
+
+* Fix regression in synthetic target context handling
+  `RB #1921 <https://rbcommons.com/s/twitter/r/1921>`_
+
+* Try to fix the .rst render of the CHANGELOG on pypi
+  `RB #1911 <https://rbcommons.com/s/twitter/r/1911>`_
+
+* To add android.jar to the classpath, create a copy under task's workdir
+  `RB #1902 <https://rbcommons.com/s/twitter/r/1902>`_
+
+* walk synthetic targets dependencies when constructing context.target()
+  `RB #1863 <https://rbcommons.com/s/twitter/r/1863>`_
+  `RB #1914 <https://rbcommons.com/s/twitter/r/1914>`_
+
+* Mix the value of the zinc name-hashing flag into cache keys
+  `RB #1912 <https://rbcommons.com/s/twitter/r/1912>`_
+
+* Allow multiple ivy artifacts distinguished only by classifier
+  `RB #1905 <https://rbcommons.com/s/twitter/r/1905>`_
+
+* Fix `Git.detect_worktree` to fail gracefully
+  `RB #1903 <https://rbcommons.com/s/twitter/r/1903>`_
+
+* Avoid reparsing analysis repeatedly
+  `RB #, <https://rbcommons.com/s/twitter/r/1898/,>`_
+  `RB #1938 <https://rbcommons.com/s/twitter/r/1938>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Remove the now-superfluous "parallel resource directories" hack
+  `RB #1907 <https://rbcommons.com/s/twitter/r/1907>`_
+
+* Make rglobs follow symlinked directories by default
+  `RB #1881 <https://rbcommons.com/s/twitter/r/1881>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Trying to clarify how to contribute docs
+  `RB #1922 <https://rbcommons.com/s/twitter/r/1922>`_
+
+* Add documentation on how to turn on extra ivy debugging
+  `RB #1906 <https://rbcommons.com/s/twitter/r/1906>`_
+
+* Adds documentation to setup_repo.md with tips for how to configure Pants to work behind a firewall
+  `RB #1899 <https://rbcommons.com/s/twitter/r/1899>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support spec_excludes in what_changed. Prior art: https://rbcommons.com/s/twitter/r/1795/
+  `RB #1930 <https://rbcommons.com/s/twitter/r/1930>`_
+
+* Add a new 'export' goal for use by IDE integration
+  `RB #1917 <https://rbcommons.com/s/twitter/r/1917>`_
+  `RB #1929 <https://rbcommons.com/s/twitter/r/1929>`_
+
+* Add ability to detect HTTP_PROXY or HTTPS_PROXY in environment and pass it along to ivy
+  `RB #1877 <https://rbcommons.com/s/twitter/r/1877>`_
+
+* Pants publish to support publishing extra publish artifacts as individual artifacts with classifier attached
+  `RB #1879 <https://rbcommons.com/s/twitter/r/1879>`_
+  `RB #1889 <https://rbcommons.com/s/twitter/r/1889>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Deleting dead abbreviate_target_ids code.
+  `RB #1918 <https://rbcommons.com/s/twitter/r/1918>`_
+  `RB #1944 <https://rbcommons.com/s/twitter/r/1944>`_
+
+* Move AptCompile to its own file
+  `RB #1935 <https://rbcommons.com/s/twitter/r/1935>`_
+
+* use six.moves.range everywhere
+  `RB #1931 <https://rbcommons.com/s/twitter/r/1931>`_
+
+* Port scrooge/linter config to the options system
+  `RB #1927 <https://rbcommons.com/s/twitter/r/1927>`_
+
+* Fixes for import issues in JvmCompileStrategy post https://rbcommons.com/s/twitter/r/1885/
+  `RB #1900 <https://rbcommons.com/s/twitter/r/1900>`_
+
+* Moving stuff out of jvm and into project info backend
+  `RB #1917 <https://rbcommons.com/s/twitter/r/1917>`_
+
+* Provides is meant to have been deprecated a long time ago
+  `RB #1915 <https://rbcommons.com/s/twitter/r/1915>`_
+
+* Move JVM debug config functionality to the new options system
+  `RB #1924 <https://rbcommons.com/s/twitter/r/1924>`_
+
+* Remove the --color option from specs_run.  See https://rbcommons.com/s/twitter/r/1814/
+  `RB #1916 <https://rbcommons.com/s/twitter/r/1916>`_
+
+* Remove superfluous 'self.conf' argument to self.classpath
+  `RB #1913 <https://rbcommons.com/s/twitter/r/1913>`_
+
+* Update ivy_utils error messages: include classifier and switch interpolation from % to format
+  `RB #1908 <https://rbcommons.com/s/twitter/r/1908>`_
+
+* Added a python helper for check_header.sh in git pre-commit script
+  `RB #1910 <https://rbcommons.com/s/twitter/r/1910>`_
+
+* Remove direct config access in scalastyle.py
+  `RB #1897 <https://rbcommons.com/s/twitter/r/1897>`_
+
+* Replace all instances of xrange with range, as xrange is deprecated in Python 3
+  `RB #1901 <https://rbcommons.com/s/twitter/r/1901>`_
+
+* Raise a better exception on truncated Zinc analysis files
+  `RB #1896 <https://rbcommons.com/s/twitter/r/1896>`_
+
+* Fail fast for OSX CI runs
+  `RB #1894 <https://rbcommons.com/s/twitter/r/1894>`_
+
+* Upgrade to the latest rbt release
+  `RB #1893 <https://rbcommons.com/s/twitter/r/1893>`_
+
+* Use cmp instead of a file hash
+  `RB #1892 <https://rbcommons.com/s/twitter/r/1892>`_
+
+* Split out a JvmCompileStrategy interface
+  `RB #1885 <https://rbcommons.com/s/twitter/r/1885>`_
+
+* Decouple WorkUnit from RunTracker
+  `RB #1928 <https://rbcommons.com/s/twitter/r/1928>`_
+
+* Add Scm.add, change publish to add pushdb explicitly, move scm publish around
+  `RB #1868 <https://rbcommons.com/s/twitter/r/1868>`_
+
 0.0.29 (3/9/2015)
 -----------------
 
 CI
 ~~
+
 * Support local pre-commit checks
   `RB #1883 <https://rbcommons.com/s/twitter/r/1883>`_
 
@@ -32,6 +180,7 @@ CI
 
 Tests
 ~~~~~
+
 * Add jar Publish integration tests to test the generated pom and ivy.xml files
   `RB #1879 <https://rbcommons.com/s/twitter/r/1879>`_
 
@@ -66,11 +215,13 @@ Tests
 * Create a directory with no write perms for TestAndroidConfigUtil
   `RB #1796 <https://rbcommons.com/s/twitter/r/1796>`_
 
-* Relocated some tests (no code changes) from tests/python/pants_test/tasks into tests/python/pants_test/backend/codegen/tasks to mirror the source location
+* Relocated some tests (no code changes) from tests/python/pants_test/tasks into
+  tests/python/pants_test/backend/codegen/tasks to mirror the source location
   `RB #1746 <https://rbcommons.com/s/twitter/r/1746>`_
 
 Docs
 ~~~~
+
 * Add some documentation about using the pants reporting server for troubleshooting
   `RB #1887 <https://rbcommons.com/s/twitter/r/1887>`_
 
@@ -85,6 +236,7 @@ Docs
 
 New language: C++
 ~~~~~~~~~~~~~~~~~
+
 * Separate compile step for C++ to just compile objects
   `RB #1855 <https://rbcommons.com/s/twitter/r/1855>`_
 
@@ -96,6 +248,7 @@ New language: C++
 
 API Changes
 ~~~~~~~~~~~
+
 * Kill the global `--ng-daemons` flag
   `RB #1852 <https://rbcommons.com/s/twitter/r/1852>`_
 
@@ -192,6 +345,7 @@ API Changes
 
 Bugfixes and features
 ~~~~~~~~~~~~~~~~~~~~~
+
 * Kill the .saplings split
   `RB #1886 <https://rbcommons.com/s/twitter/r/1886>`_
 
@@ -380,7 +534,7 @@ Bugfixes and features
 * Expand scope of python file format checks
   `RB #1729 <https://rbcommons.com/s/twitter/r/1729>`_
 
-* Add path-to option to depmap.
+* Add path-to option to depmap
   `RB #1545 <https://rbcommons.com/s/twitter/r/1545>`_
 
 * Fix a stragler `.is_apt` usage
@@ -568,7 +722,7 @@ Bugfixes
 * Remove variable shadowing from method in archive.py
   `RB #1589 <https://rbcommons.com/s/twitter/r/1589>`_
 
-* Don't realpath jars on the classpath.
+* Don't realpath jars on the classpath
   `RB #1588 <https://rbcommons.com/s/twitter/r/1588>`_
   `RB #1591 <https://rbcommons.com/s/twitter/r/1591>`_
 
@@ -1013,7 +1167,7 @@ API Changes
 * Refactor Payload
   `RB #1063 <https://rbcommons.com/s/twitter/r/1063>`_
 
-* Add support for publishing plugins to pants.
+* Add support for publishing plugins to pants
   `RB #1021 <https://rbcommons.com/s/twitter/r/1021>`_
 
 Bugfixes
@@ -1323,7 +1477,7 @@ API Changes
 * Support absolute paths on the command line when they start with the build root
   `RB #867 <https://rbcommons.com/s/twitter/r/867>`_
 
-* Make `::` fail for an invalid dir much like `:` does for a dir with no BUILD file.
+* Make `::` fail for an invalid dir much like `:` does for a dir with no BUILD file
   `Issue #484 <https://github.com/pantsbuild/pants/issues/484>`_
   `RB #907 <https://rbcommons.com/s/twitter/r/907>`_
 
@@ -1527,11 +1681,11 @@ Bugfixes
 * Properly order resources for pants goal test and pants goal run
   `RB #845 <https://rbcommons.com/s/twitter/r/845>`_
 
-* Fixup Dependencies to be mainly target-type agnostic.
+* Fixup Dependencies to be mainly target-type agnostic
   `Issue #499 <https://github.com/pantsbuild/pants/issues/499>`_
   `RB #920 <https://rbcommons.com/s/twitter/r/920>`_
 
-* Fixup JvmRun only-write-cmd-line flag to accept relative paths.
+* Fixup JvmRun only-write-cmd-line flag to accept relative paths
   `Issue #494 <https://github.com/pantsbuild/pants/issues/494>`_
   `RB #908 <https://rbcommons.com/s/twitter/r/908>`_
   `RB #911 <https://rbcommons.com/s/twitter/r/911>`_
@@ -1619,7 +1773,7 @@ API Changes
 * Upgrade requests, flip to a ranged requirement to help plugins
   `RB #771 <https://rbcommons.com/s/twitter/r/771>`_
 
-* New goal ``ensime`` to generate Ensime projects for Emacs users.
+* New goal ``ensime`` to generate Ensime projects for Emacs users
   `RB #753 <https://rbcommons.com/s/twitter/r/753>`_
 
 Bugfixes
@@ -1802,5 +1956,5 @@ Bugfixes
 0.0.17 (7/15/2014)
 ------------------
 
-* Initial published version of ``pantsbuild.pants``.
+* Initial published version of ``pantsbuild.pants``
 

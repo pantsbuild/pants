@@ -17,7 +17,7 @@ from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
-from pants.backend.python.tasks.python_setup import PythonSetup
+from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -47,5 +47,5 @@ def register_goals():
   task(name='pytest', action=PytestRun).install('test')
   task(name='py', action=PythonRun).install('run')
   task(name='py', action=PythonRepl).install('repl')
-  task(name='setup-py', action=PythonSetup).install().with_description(
+  task(name='setup-py', action=SetupPy).install().with_description(
     'Build setup.py-based Python projects from python_library targets.')

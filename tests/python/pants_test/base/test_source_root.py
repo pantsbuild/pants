@@ -63,8 +63,8 @@ class SourceRootTest(unittest.TestCase):
     self._assert_source_root_empty()
 
     SourceRoot.register("tests", )
-    self.assertEquals({"tests": OrderedSet([])}, SourceRoot.all_roots())
-    self.assertEquals(OrderedSet([]), SourceRoot.types("tests"))
+    self.assertEquals({"tests": OrderedSet()}, SourceRoot.all_roots())
+    self.assertEquals(OrderedSet(), SourceRoot.types("tests"))
     self.assertEquals("tests", SourceRoot.find(TestTarget("//tests/foo/bar:baz")))
     self.assertEquals("tests", SourceRoot.find_by_path("tests/foo/bar"))
 

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
+import traceback
 from abc import abstractmethod
 
 from pants.base.deprecated import deprecated
@@ -173,7 +174,6 @@ class ScmPublishMixin(object):
     self._add_pushdb(pushdb_file)
     self.commit_pushdb(coordinate)
     self._push_and_tag_changes(
-      attempts=self.scm_push_attempts,
       tag_name=tag_name,
       tag_message=tag_message
     )
@@ -181,7 +181,7 @@ class ScmPublishMixin(object):
   def _add_pushdb(self, pushdb_file):
     self.scm.add(pushdb_file)
 
-  def _push_and_tag_changes(self, attempts, tag_name, tag_message):
+  def _push_and_tag_changes(self, tag_name, tag_message):
     self._push_with_retry(self.scm, self.log, self.scm_push_attempts)
     self.scm.tag(tag_name, tag_message)
 
@@ -213,7 +213,7 @@ class ScmPublishMixin(object):
       raise scm_exception
 
 class ScmPublish(ScmPublishMixin):
-  @deprecated('0.0.30', hint_message='Use ScmPublishMixin instead.')
+  @deprecated('0.0.31', hint_message='Use ScmPublishMixin instead.')
   def __init__(self, scm, restrict_push_branches):
     self._restrict_push_branches = frozenset(restrict_push_branches or ())
     self.scm = scm

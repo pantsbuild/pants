@@ -5,11 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
+from pants.option.options import Options
 
 
 class ScalaCompile(JvmCompile):
@@ -34,6 +37,8 @@ class ScalaCompile(JvmCompile):
     # Note: Used in ZincUtils.
     # TODO: Revisit this. It's unintuitive for ZincUtils to reach back into the task for options.
     register('--plugins', action='append', help='Use these scalac plugins.')
+    register('--plugin-args', advanced=True, type=Options.dict, default={},
+             help='Map from plugin name to list of arguments for that plugin.')
     register('--name-hashing', action='store_true', default=False, help='Use zinc name hashing.')
     ZincUtils.register_options(register, cls.register_jvm_tool)
 
@@ -48,6 +53,10 @@ class ScalaCompile(JvmCompile):
                                  color=color,
                                  log_level=self.get_options().level)
 
+    # A directory independent of any other classpath which can contain per-target
+    # plugin resource files.
+    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
+
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
 
@@ -59,12 +68,13 @@ class ScalaCompile(JvmCompile):
   def platform_version_info(self):
     zinc_invalidation_key = self._zinc_utils.platform_version_info()
 
-    # Check scalac args for jvm target version.
-    jvm_target_version = ''
-    for arg in self._args:
-      if arg.strip().startswith("-S-target:"):
-        jvm_target_version = arg.strip()
-    zinc_invalidation_key.append(jvm_target_version)
+    # Invalidate if any compiler args change.
+    # Note that while some args are obviously important for invalidation (e.g., the jvm target
+    # version), some might not be. However we must invalidated on all the args, because Zinc
+    # ignores analysis files if the compiler args they were created with are different from the
+    # current ones, and does a full recompile. So if we allow cached artifacts with those analysis
+    # files to be used, Zinc will do unnecessary full recompiles on subsequent edits.
+    zinc_invalidation_key.extend(self._args)
 
     # Invalidate if use of name hashing changes.
     zinc_invalidation_key.append(
@@ -76,7 +86,10 @@ class ScalaCompile(JvmCompile):
     """Override extra_products to produce a plugin information file."""
     ret = []
     if target.is_scalac_plugin and target.classname:
-      root, plugin_info_file = ZincUtils.write_plugin_info(self._resources_dir, target)
+      # NB: We don't yet support explicit in-line compilation of scala compiler plugins from
+      # the workspace to be used in subsequent compile rounds like we do for annotation processors
+      # with javac. This would require another GroupTask similar to AptCompile, but for scala.
+      root, plugin_info_file = ZincUtils.write_plugin_info(self._plugin_info_dir, target)
       ret.append((root, [plugin_info_file]))
     return ret
 

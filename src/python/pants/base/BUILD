@@ -2,11 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'abbreviate_target_ids',
-  sources = ['abbreviate_target_ids.py'],
-)
-
-python_library(
   name = 'address',
   sources = ['address.py'],
   dependencies = [
@@ -282,7 +277,6 @@ python_library(
     ':address',
     ':build_environment',
     ':build_manual',
-    ':deprecated',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',

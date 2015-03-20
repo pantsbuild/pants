@@ -21,18 +21,19 @@ code that relied on the un-compiled apt processor in the same javac invocation. 
 would not be smart enough to compile the apt processors 1st and activate them.
 """
 
+
 class AptCompile(JavaCompile):
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
+
+  @classmethod
+  def name(cls):
+    return 'apt'
 
   def __init__(self, *args, **kwargs):
     super(AptCompile, self).__init__(*args, **kwargs)
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
-
-  @classmethod
-  def name(cls):
-    return 'apt'
 
   def select(self, target):
     return target.has_sources(self._file_suffix) and isinstance(target, AnnotationProcessor)
@@ -42,7 +43,7 @@ class AptCompile(JavaCompile):
     ret = []
     if isinstance(target, AnnotationProcessor) and target.processors:
       root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
-      processor_info_file = os.path.join(root, AptCompile._PROCESSOR_INFO_FILE)
+      processor_info_file = os.path.join(root, self._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
       ret.append((root, [processor_info_file]))
     return ret
