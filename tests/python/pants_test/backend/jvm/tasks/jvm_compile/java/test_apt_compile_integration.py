@@ -19,14 +19,14 @@ class AptCompileIntegrationTest(BaseCompileIT):
               'com/pants/testproject/annotation/processor/ResourceMappingProcessor.class'))
 
       processor_service_files = found['javax.annotation.processing.Processor']
-      # There should be both a per-target service info file and a global file.
-      self.assertEqual(2, len(processor_service_files))
-      for processor_service_file in processor_service_files:
-        self.assertTrue(processor_service_file.endswith(
-            'META-INF/services/javax.annotation.processing.Processor'))
-        with open(processor_service_file) as fp:
-          self.assertEqual('com.pants.testproject.annotation.processor.ResourceMappingProcessor',
-                           fp.read().strip())
+      # There should be only a per-target service info file.
+      self.assertEqual(1, len(processor_service_files))
+      processor_service_file = list(processor_service_files)[0]
+      self.assertTrue(processor_service_file.endswith(
+          'META-INF/services/javax.annotation.processing.Processor'))
+      with open(processor_service_file) as fp:
+        self.assertEqual('com.pants.testproject.annotation.processor.ResourceMappingProcessor',
+                          fp.read().strip())
 
   def test_apt_compile_and_run(self):
     with self.do_test_compile('testprojects/src/java/com/pants/testproject/annotation/main',
