@@ -1,6 +1,59 @@
 RELEASE HISTORY
 ===============
 
+0.0.31 (3/20/2015)
+~~~~~~~~~~~~~~~~~~
+
+Bugfixes
+~~~~~~~~
+
+* Fix a missing symbol in ScalaCompile
+  `RB #1885 <https://rbcommons.com/s/twitter/r/1885>`_
+  `RB #1945 <https://rbcommons.com/s/twitter/r/1945>`_
+
+* die only when invoked directly
+  `RB #1953 <https://rbcommons.com/s/twitter/r/1953>`_
+
+* add import for traceback, and add test to exercise that code path, rm unsed kwargs
+  `RB #1868 <https://rbcommons.com/s/twitter/r/1868>`_
+  `RB #1943 <https://rbcommons.com/s/twitter/r/1943>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Use the publically released 2.1.1 version of Cobertura
+  `RB #1933 <https://rbcommons.com/s/twitter/r/1933>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update docs for 'prep_command()'
+  `RB #1940 <https://rbcommons.com/s/twitter/r/1940>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add flags to idea and eclipse goals to exclude pulling in sources and javadoc via ivy
+  `RB #1939 <https://rbcommons.com/s/twitter/r/1939>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove a spurious import in test_antlr_builder
+  `RB #1951 <https://rbcommons.com/s/twitter/r/1951>`_
+
+* Refactor ZincUtils
+  `RB #1946 <https://rbcommons.com/s/twitter/r/1946>`_
+
+* change set([]) / OrderedSet([]) to set() / OrderedSet()
+  `RB #1947 <https://rbcommons.com/s/twitter/r/1947>`_
+
+* Rename TestPythonSetup to TestSetupPy
+  `RB #1950 <https://rbcommons.com/s/twitter/r/1950>`_
+
+* Rename the PythonSetup task to SetupPy
+  `RB #1942 <https://rbcommons.com/s/twitter/r/1942>`_
+
 0.0.30 (3/18/2015)
 ------------------
 

@@ -69,12 +69,12 @@ class Depmap(ConsoleTask):
              help='Specifies the internal dependency graph should be output in the dot digraph '
                   'format.')
     register('--project-info', default=False, action='store_true',
-             deprecated_version='0.0.31',
+             deprecated_version='0.0.32',
              deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
              help='Produces a json object with info about the target, including source roots, '
                   'dependencies, and paths to libraries for their targets and dependencies.')
     register('--project-info-formatted', default=True, action='store_false',
-             deprecated_version='0.0.31',
+             deprecated_version='0.0.32',
              deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
              help='Causes project-info output to be a single line of JSON.')
     register('--separator', default='-',
@@ -240,7 +240,7 @@ class Depmap(ConsoleTask):
     graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']
     return header + graph_attr + output_deps(set(), target) + ['}']
 
-  @deprecated(removal_version='0.0.31',
+  @deprecated(removal_version='0.0.32',
       hint_message='Information from "depmap --project-info" should now be accessed through the "export" goal')
   def project_info_output(self, targets):
     targets_map = {}

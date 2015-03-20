@@ -59,7 +59,7 @@ class Export(ConsoleTask):
   def register_options(cls, register):
     super(Export, cls).register_options(register)
     register('--project-info', default=True, action='store_true',
-             deprecated_version='0.0.31',
+             deprecated_version='0.0.32',
              deprecated_hint='This option is a no-op. Project info format is always enabled for '
                              'the export goal.',
              help='Produces a json object with info about the target, including source roots, '
