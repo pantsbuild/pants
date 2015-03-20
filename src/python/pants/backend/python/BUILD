@@ -46,6 +46,8 @@ python_library(
   name = 'python_setup',
   sources = ['python_setup.py'],
   dependencies = [
+    '3rdparty/python:pex',
+    '3rdparty/python:setuptools',
     'src/python/pants/base:config',
   ]
 )
@@ -89,8 +91,6 @@ python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],
   dependencies = [
-    ':python_setup',
-    ':resolver',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     'src/python/pants/util:dirutil',
@@ -138,7 +138,6 @@ python_library(
   name = 'resolver',
   sources = ['resolver.py'],
   dependencies = [
-    ':python_setup',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/python/targets:python',
