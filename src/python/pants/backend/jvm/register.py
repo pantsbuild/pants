@@ -40,7 +40,6 @@ from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ScalaCompile
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
-from pants.backend.jvm.tasks.provides import Provides
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
@@ -175,7 +174,3 @@ def register_goals():
     action=ScalaRepl,
     serialize=False
   ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
-
-  # Build graph information.
-  task(name='provides', action=Provides).install().with_description(
-      'Print the symbols provided by the given targets.')
