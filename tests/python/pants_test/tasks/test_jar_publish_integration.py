@@ -115,6 +115,13 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       ['com.pants.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--publish-named-snapshot=%s' % name])
 
+  def test_publish_override_flag_succeeds(self):
+    override = "com.twitter.foo#baz=0.1.0"
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
+                      shared_artifacts('0.0.1-SNAPSHOT'),
+                      ['com.pants.testproject.publish/hello-greet/publish.properties'],
+                      extra_options=['--publish-override=%s' % override])
+
   # Collect all the common factors for running a publish_extras test, and execute the test.
   def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
     self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
@@ -202,7 +209,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       yes = 'y' * expected_primary_artifact_count
       pants_run = self.run_pants(['publish', target] + options, config=extra_config,
                                  stdin_data=yes, extra_env=extra_env)
-
       if success_expected:
         self.assert_success(pants_run, "'pants goal publish' expected success, but failed instead.")
       else:
