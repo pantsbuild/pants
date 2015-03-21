@@ -9,5 +9,5 @@ import sys
 
 
 if __name__ == "__main__":
-  print('Exiting with status 1')
-  sys.exit(1)
+  print('Exiting with status 57')
+  sys.exit(57)
