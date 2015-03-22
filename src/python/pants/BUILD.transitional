@@ -5,18 +5,20 @@ python_library(
   name='_pants_transitional_publishable_library_',
   sources=rglobs('*.py'),
   resources=(
-    globs('java/distribution/*.class') +
-    globs('backend/core/tasks/templates/builddictionary/*.mustache') +
-    globs('backend/core/tasks/templates/markdown/*.mustache')
-    globs('backend/core/tasks/templates/targets_help/*.mustache') +
-    globs('backend/jvm/tasks/templates/ivy_resolve/*.mustache') +
-    globs('backend/jvm/tasks/templates/jar_publish/*.mustache') +
-    globs('backend/project_info/tasks/templates/eclipse/*.mustache') +
-    globs('backend/project_info/tasks/templates/eclipse/*.prefs') +
-    globs('backend/project_info/tasks/templates/ensime/*.mustache') +
-    globs('backend/project_info/tasks/templates/idea/*.mustache') +
-    globs('backend/python/tasks/templates/python_eval/*.mustache')
-    rglobs('reporting/assets/*') + globs('reporting/templates/*.mustache') +
+    globs(
+      'java/distribution/*.class',
+      'backend/core/tasks/templates/builddictionary/*.mustache',
+      'backend/core/tasks/templates/markdown/*.mustache',
+      'backend/core/tasks/templates/targets_help/*.mustache',
+      'backend/jvm/tasks/templates/ivy_resolve/*.mustache',
+      'backend/jvm/tasks/templates/jar_publish/*.mustache',
+      'backend/project_info/tasks/templates/eclipse/*.mustache',
+      'backend/project_info/tasks/templates/eclipse/*.prefs',
+      'backend/project_info/tasks/templates/ensime/*.mustache',
+      'backend/project_info/tasks/templates/idea/*.mustache',
+      'backend/python/tasks/templates/python_eval/*.mustache',
+      'reporting/templates/*.mustache'
+    ) + rglobs('reporting/assets/*')
   ),
   dependencies=[
     '3rdparty/python:ansicolors',
