@@ -10,7 +10,6 @@ import pkgutil
 
 from pex.pex import PEX
 
-from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_task import PythonTask
@@ -134,29 +133,19 @@ class PythonEval(PythonTask):
       else:
         pexinfo, platforms = None, None
 
-      with self.temporary_pex_builder(interpreter=interpreter, pex_info=pexinfo) as builder:
-        with self.context.new_workunit(name='resolve'):
-          chroot = PythonChroot(
-              context=self.context,
-              targets=[target],
-              builder=builder,
-              platforms=platforms,
-              interpreter=interpreter)
-
-          chroot.dump()
-
-        with temporary_file() as imports_file:
+      with temporary_file() as imports_file:
+        def pre_freeze(chroot):
           generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH),
                                 chroot=chroot.path(),
                                 modules=modules)
           generator.write(imports_file)
           imports_file.close()
+          chroot.builder.set_executable(imports_file.name, '__pants_python_eval__.py')
 
-          builder.set_executable(imports_file.name, '__pants_python_eval__.py')
-
-          builder.freeze()
-          pex = PEX(builder.path(), interpreter=interpreter)
-
+        with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo,
+                                   targets=[target], platforms=platforms,
+                                   pre_freeze=pre_freeze) as chroot:
+          pex = PEX(chroot.builder.path(), interpreter=interpreter)
           with self.context.new_workunit(name='eval',
                                          labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
                                          cmd=' '.join(pex.cmdline())) as workunit:
