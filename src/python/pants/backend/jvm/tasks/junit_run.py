@@ -121,38 +121,32 @@ class _JUnitRunner(object):
       self._args.append(options.test_shard)
 
   def execute(self, targets):
-    working_dir = None
-    if self._cwd_opt != _CWD_NOT_PRESENT:
-      working_dir = self._cwd_opt
-      if not working_dir and targets:
-        working_dir = targets[0].address.spec_path
-    # For running the junit tests, we're only interested in
-    # java_tests/junit_tests targets.
+    # We only run tests within java_tests/junit_tests targets.
     #
-    # But if coverage options are specified, the original
-    # behavior is that in addition to the junit runs, the coverage
-    # tools would also look into additional targets such as sources.
+    # But if coverage options are specified, we want to instrument
+    # and report on all the original targets, not just the test targets.
     #
     # Thus, we filter out the non-java-tests targets first but
     # keep the original targets set intact for coverages.
-    java_tests_targets = list(self._test_target_candidates(targets))
-    tests = list(self._get_tests_to_run() if self._tests_to_run
-                 else self._calculate_tests_from_targets(java_tests_targets))
-    if tests:
-      bootstrapped_cp = self._task_exports.tool_classpath('junit')
-      junit_classpath = self._task_exports.classpath(targets, cp=bootstrapped_cp)
+    tests = self._collect_test_targets(targets)
 
-      self._context.release_lock()
-      self.instrument(targets, tests, junit_classpath)
+    if not tests:
+      return
 
-      def _do_report(exception=None):
-        self.report(targets, tests, tests_failed_exception=exception)
-      try:
-        self.run(tests, junit_classpath, cwd=working_dir)
-        _do_report(exception=None)
-      except TaskError as e:
-        _do_report(exception=e)
-        raise
+    bootstrapped_cp = self._task_exports.tool_classpath('junit')
+    junit_classpath = self._task_exports.classpath(targets, cp=bootstrapped_cp)
+
+    self._context.release_lock()
+    self.instrument(targets, tests, junit_classpath)
+
+    def _do_report(exception=None):
+      self.report(targets, tests, tests_failed_exception=exception)
+    try:
+      self.run(tests, junit_classpath, cwd=self._working_dir(targets))
+      _do_report(exception=None)
+    except TaskError as e:
+      _do_report(exception=e)
+      raise
 
   def instrument(self, targets, tests, junit_classpath):
     """Called from coverage classes. Run any code instrumentation needed.
@@ -192,6 +186,21 @@ class _JUnitRunner(object):
       coverage should happen, if at all.
     """
     pass
+
+  def _collect_test_targets(self, targets):
+    if self._tests_to_run:
+      return list(self._get_tests_to_run())
+    else:
+      java_tests_targets = list(self._test_target_candidates(targets))
+      return list(self._calculate_tests_from_targets(java_tests_targets))
+
+  def _working_dir(self, targets):
+    if self._cwd_opt == _CWD_NOT_PRESENT:
+      return None
+    elif self._cwd_opt:
+      return self._cwd_opt
+    elif targets:
+      return targets[0].address.spec_path
 
   def _run_tests(self, tests, classpath, main, extra_jvm_options=None, cwd=None):
     # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
@@ -242,7 +251,7 @@ class _JUnitRunner(object):
             yield _classfile_to_classname(cls)
 
   def _classnames_from_source_file(self, srcfile):
-    relsrc = os.path.relpath(srcfile, get_buildroot()) if os.path.isabs(srcfile) else srcfile
+    relsrc = os.path.relpath(srcfile, get_buildroot())
     source_products = self._context.products.get_data('classes_by_source').get(relsrc)
     if not source_products:
       # It's valid - if questionable - to have a source file with no classes when, for

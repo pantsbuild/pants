@@ -13,19 +13,15 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
+  def _assert_junit_output_exists_for_class(self, workdir, classname):
+    self.assertTrue(os.path.exists(
+      os.path.join(workdir, 'test', 'junit', '{}.out.txt'.format(classname))))
+    self.assertTrue(os.path.exists(
+      os.path.join(workdir, 'test', 'junit', '{}.err.txt'.format(classname))))
+
   def _assert_junit_output(self, workdir):
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.examples.hello.greet.GreetingTest.out.txt')))
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.examples.hello.greet.GreetingTest.err.txt')))
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.example.hello.welcome.WelSpec.out.txt')))
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.example.hello.welcome.WelSpec.err.txt')))
+    self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+    self._assert_junit_output_exists_for_class(workdir, 'com.pants.example.hello.welcome.WelSpec')
 
   def test_junit_test(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -38,6 +34,39 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
+
+  def test_junit_test_with_test_option_with_relpath(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-test=examples/tests/java/com/pants/examples/hello/greet/GreetingTest.java',
+          'examples/tests/java/com/pants/examples/hello/greet',
+          'examples/tests/scala/com/pants/example/hello/welcome'],
+          workdir)
+      self.assert_success(pants_run)
+      self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+
+  def test_junit_test_with_test_option_with_dot_slash_relpath(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-test=./examples/tests/java/com/pants/examples/hello/greet/GreetingTest.java',
+          'examples/tests/java/com/pants/examples/hello/greet',
+          'examples/tests/scala/com/pants/example/hello/welcome'],
+          workdir)
+      self.assert_success(pants_run)
+      self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+
+  def test_junit_test_with_test_option_with_classname(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-test=com.pants.examples.hello.greet.GreetingTest',
+          'examples/tests/java/com/pants/examples/hello/greet',
+          'examples/tests/scala/com/pants/example/hello/welcome'],
+          workdir)
+      self.assert_success(pants_run)
+      self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
 
   def test_junit_test_with_emma(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
