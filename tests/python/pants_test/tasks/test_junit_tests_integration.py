@@ -79,7 +79,9 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           '--test-junit-coverage-processor=emma',
           '--test-junit-coverage',
           '--test-junit-coverage-xml',
-          '--test-junit-coverage-html'],
+          '--test-junit-coverage-html',
+          '--test-junit-coverage-jvm-options=-Xmx1g',
+          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
@@ -117,7 +119,9 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           '--test-junit-coverage-processor=cobertura',
           '--test-junit-coverage',
           '--test-junit-coverage-xml',
-          '--test-junit-coverage-html'],
+          '--test-junit-coverage-html',
+          '--test-junit-coverage-jvm-options=-Xmx1g',
+          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)

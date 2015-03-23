@@ -26,6 +26,7 @@ from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
+from pants.util.strutil import safe_shlex_split
 
 
 _CWD_NOT_PRESENT='CWD NOT PRESENT'
@@ -291,6 +292,9 @@ class _Coverage(_JUnitRunner):
                   'example, to include all code in com.pants.raven except claws and the eye you '
                   'would use: {flag}=com.pants.raven.* {flag}=-com.pants.raven.claw '
                   '{flag}=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
+    register('--coverage-jvm-options', action='append',
+             help='JVM flags to be added when running the coverage processor. For example: '
+                  '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
     register('--coverage-console', action='store_true', default=True,
              help='Output a simple coverage report to the console.')
     register('--coverage-xml', action='store_true',
@@ -308,6 +312,11 @@ class _Coverage(_JUnitRunner):
     options = task_exports.task_options
     self._coverage = options.coverage
     self._coverage_filters = options.coverage_patterns or []
+
+    self._coverage_jvm_options = []
+    for jvm_option in options.coverage_jvm_options:
+      self._coverage_jvm_options.extend(safe_shlex_split(jvm_option))
+
     self._coverage_dir = os.path.join(task_exports.workdir, 'coverage')
     self._coverage_instrument_dir = os.path.join(self._coverage_dir, 'classes')
     # TODO(ji): These may need to be transferred down to the Emma class, as the suffixes
@@ -382,7 +391,10 @@ class Emma(_Coverage):
       for pattern in patterns:
         args.extend(['-filter', pattern])
       main = 'emma'
-      result = execute_java(classpath=self._emma_classpath, main=main, args=args,
+      result = execute_java(classpath=self._emma_classpath,
+                            main=main,
+                            jvm_options=self._coverage_jvm_options,
+                            args=args,
                             workunit_factory=self._context.new_workunit,
                             workunit_name='emma-instrument')
       if result != 0:
@@ -430,7 +442,10 @@ class Emma(_Coverage):
                    '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
-    result = execute_java(classpath=self._emma_classpath, main=main, args=args,
+    result = execute_java(classpath=self._emma_classpath,
+                          main=main,
+                          jvm_options=self._coverage_jvm_options,
+                          args=args,
                           workunit_factory=self._context.new_workunit,
                           workunit_name='emma-report')
     if result != 0:
@@ -517,6 +532,7 @@ class Cobertura(_Coverage):
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
         result = execute_java(classpath=cobertura_cp,
                               main=main,
+                              jvm_options=self._coverage_jvm_options,
                               args=args,
                               workunit_factory=self._context.new_workunit,
                               workunit_name='cobertura-instrument')
@@ -622,6 +638,7 @@ class Cobertura(_Coverage):
       main = 'net.sourceforge.cobertura.reporting.ReportMain'
       result = execute_java(classpath=cobertura_cp,
                             main=main,
+                            jvm_options=self._coverage_jvm_options,
                             args=args,
                             workunit_factory=self._context.new_workunit,
                             workunit_name='cobertura-report-' + report_format)
