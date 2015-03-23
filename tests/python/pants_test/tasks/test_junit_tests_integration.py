@@ -128,8 +128,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
 
-  def test_junit_test_with_cwd(self):
-    # Make sure the test fails if you don't specify cwd
+  def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
@@ -138,7 +137,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-jvm-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-    # Expicit cwd specified
+  def test_junit_test_requiring_cwd_passes_with_option_with_value_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
@@ -148,7 +147,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-cwd=testprojects/src/java/com/pants/testproject/cwdexample/subdir'])
     self.assert_success(pants_run)
 
-    # Implicit cwd specified based on path to target
+  def test_junit_test_requiring_cwd_passes_with_option_with_no_value_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
@@ -157,3 +156,14 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-jvm-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd',])
     self.assert_success(pants_run)
+
+  def test_junit_test_requiring_cwd_fails_when_target_not_first(self):
+    pants_run = self.run_pants([
+        'test',
+        'examples/tests/scala/com/pants/example/hello/welcome',
+        'testprojects/tests/java/com/pants/testproject/cwdexample',
+        '--interpreter=CPython>=2.6,<3',
+        '--interpreter=CPython>=3.3',
+        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+        '--test-junit-cwd',])
+    self.assert_failure(pants_run)
