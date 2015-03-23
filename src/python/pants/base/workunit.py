@@ -72,7 +72,7 @@ class WorkUnit(object):
     - labels: An optional iterable of labels. The reporters can use this to decide how to
               display information about this work.
     - cmd: An optional longer string representing this work.
-           E.g., the cmd line of a compiler invocation.
+            E.g., the cmd line of a compiler invocation.
     """
     self._outcome = WorkUnit.UNKNOWN
 
