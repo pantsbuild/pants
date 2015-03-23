@@ -393,21 +393,6 @@ Pants may encounter issues running behind a firewall. Several components expect 
 * Python requirements
 
 
-### Ivy bootstrapper and tool bootstrapping
-
-Pants fetches the 'ivy' tool with an initial manual bootstrapping
-test.  You can  re-redirect this initial download to another URL with a setting in pants.ini:
-
-```
-[ivy]
-bootstrap_jar_url: https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar
-```
-
-You may also encounter issues downloading this .jar file if you are
-using self-signed SSL certificates. See the section on SSL
-certificates below.
-
-
 ### Configuring the Python requests library
 
 Code in bootstrapper.py and other parts of Pants use the Python
@@ -415,7 +400,7 @@ Code in bootstrapper.py and other parts of Pants use the Python
 download resources using http or https.  The first time you may
 encounter this is when Pants attempts to download an initial version
 of ivy.  If this initial download is through a proxy, the requests
-library uses the `HTTP_PROXY` or` HTTPS_PROXY` environment variable to
+library uses the `HTTP_PROXY` or `HTTPS_PROXY` environment variable to
 find the proxy server.
 
 ```
@@ -452,21 +437,35 @@ This variable should point to a file containing trusted certificates:
 export REQUESTS_CA_BUNDLE=/etc/certs/latest.pem
 ```
 
-### Using Ivy behind a firewall
+### Ivy bootstrapper and tool bootstrapping
 
 [Apache Ivy](http://ant.apache.org/ivy/) is used as a way to download
 the tools that Pants uses and for tool bootstrapper and external
-artifacts
+artifacts.
 
-After the initial bootstrapping of ivy, pants then invokes that
-version of ivy to re-bootstrap a new version of ivy.  Unlike the
-requests library, Ivy does not use the HTTP_PROXY environment
-variable, but instead relies on Java system properties.
-
-One way to do this is to override `jvm_options` in pants.ini:
+Pants fetches the Ivy tool with an initial manual bootstrapping
+step using the Python requests library.  If you won't want to use `HTTP_PROXY` or `HTTPS_PROXY` as described above, you can
+re-redirect this initial download to another URL with a setting in pants.ini:
 
 ```
-[bootstrap.bootstrap_jvm_tools] 
+[ivy]
+bootstrap_jar_url: https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar
+```
+
+You may also encounter issues downloading this .jar file if you are
+using self-signed SSL certificates. See the section on Configuring the Python requests library
+above.
+
+
+### Using Ivy with a proxy
+
+If you are using a version of pants 0.0.30 or greater, you can just set HTTP_PROXY and HTTPS_PROXY
+in the environment and Pants will automatically configure the proxies for Ivy.
+If you are using an earlier version of pants, you must setup the system properties to
+Ivy.  One way to do this is in pants.ini:
+
+```
+[bootstrap.bootstrap_jvm_tools]
 jvm_options: [
     "-Dhttp.proxyHost=proxy.example.com",
     "-Dhttp.proxyPort=123",
@@ -485,7 +484,7 @@ If your site uses Sonotype Nexus or another reverse proxy for
 artifacts, you do not need to use a separate HTTP proxy.  Contact the
 reverse proxy administrator to setup a proxy for the sites listed in
 `build-support/ivy/settings.xml` and `pants.ini`.  Currently, these
-sites are `repo1.maven.org`, `maven.twttr.com`:
+sites are `repo1.maven.org` and `maven.twttr.com`:
 
 Here is an excerpt of a modified ivysettings.xml with some possible configurations:
 
