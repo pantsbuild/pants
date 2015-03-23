@@ -19,7 +19,6 @@ python_library(
   name = 'all_utils',
   dependencies = [
     ':antlr_builder',
-    ':binary_builder',
     ':code_generator',
     ':interpreter_cache',
     ':python_artifact',
@@ -62,18 +61,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/ivy',
     'src/python/pants/util:dirutil',
-  ]
-)
-
-python_library(
-  name = 'binary_builder',
-  sources = ['binary_builder.py'],
-  dependencies = [
-    ':code_generator',
-    ':python_chroot',
-    '3rdparty/python:pex',
-    'src/python/pants/base:config',
-    'src/python/pants/backend/python/targets:python',
   ]
 )
 
