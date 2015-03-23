@@ -456,17 +456,15 @@ export REQUESTS_CA_BUNDLE=/etc/certs/latest.pem
 
 [Apache Ivy](http://ant.apache.org/ivy/) is used as a way to download
 the tools that Pants uses and for tool bootstrapper and external
-artifacts
+artifacts.
 
-After the initial bootstrapping of ivy, pants then invokes that
-version of ivy to re-bootstrap a new version of ivy.  Unlike the
-requests library, Ivy does not use the HTTP_PROXY environment
-variable, but instead relies on Java system properties.
-
-One way to do this is to override `jvm_options` in pants.ini:
+If you are using a version of pants 0.0.30 or greater, you can just set HTTP_PROXY and HTTPS_PROXY
+in the environment and Pants will automatically configure the proxies for Ivy.
+If you are using an earlier version of pants, you must setup the system properties to
+Ivy.  One way to do this is in pants.ini:
 
 ```
-[bootstrap.bootstrap_jvm_tools] 
+[bootstrap.bootstrap_jvm_tools]
 jvm_options: [
     "-Dhttp.proxyHost=proxy.example.com",
     "-Dhttp.proxyPort=123",
