@@ -13,10 +13,10 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
@@ -58,12 +58,6 @@ class Export(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(Export, cls).register_options(register)
-    register('--project-info', default=True, action='store_true',
-             deprecated_version='0.0.31',
-             deprecated_hint='This option is a no-op. Project info format is always enabled for '
-                             'the export goal.',
-             help='Produces a json object with info about the target, including source roots, '
-                  'dependencies, and paths to libraries for their targets and dependencies.')
     register('--formatted', default=True, action='store_false',
              help='Causes output to be a single line of JSON.')
 
@@ -78,13 +72,6 @@ class Export(ConsoleTask):
     self.target_aliases_map = None
 
   def console_output(self, targets):
-    if len(self.context.target_roots) == 0:
-      raise TaskError("One or more target addresses are required.")
-    output = self.project_info_output(targets)
-    for line in output:
-      yield line
-
-  def project_info_output(self, targets):
     targets_map = {}
     resource_target_map = {}
     ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
@@ -176,11 +163,9 @@ class Export(ConsoleTask):
   def _resolve_jars_info(self):
     mapping = defaultdict(list)
     jar_data = self.context.products.get_data('ivy_jar_products')
-    if not jar_data:
-      return mapping
-    for dep in jar_data['default']:
-      for module in dep.modules_by_ref.values():
-        mapping[self._jar_id(module.ref)] = [artifact.path for artifact in module.artifacts]
+    jar_infos = IdeGen.get_jar_infos(ivy_products=jar_data, confs=['default', 'sources', 'javadoc'])
+    for jar, paths in jar_infos.iteritems():
+      mapping[self._jar_id(jar)] = paths
     return mapping
 
   def _get_pants_target_alias(self, pants_target_type):

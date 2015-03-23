@@ -276,26 +276,29 @@ class IdeGen(JvmToolTaskMixin, Task):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  def _get_jar_paths(self, confs=None):
+  @staticmethod
+  def get_jar_infos(ivy_products, confs=None):
     """Returns a list of dicts containing the paths of various jar file resources.
 
     Keys include 'default' (normal jar path), 'sources' (path to source jar), and 'javadoc'
     (path to doc jar). None of them are guaranteed to be present, but 'sources' and 'javadoc'
     will never be present if 'default' isn't.
 
+    :param ivy_products: ivy_jar_products data from a context
     :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
       left unspecified.
+    :returns {dict}
     """
-    ivy_products = self.context.products.get_data('ivy_jar_products')
     classpath_maps = defaultdict(dict)
-    for conf, info_group in ivy_products.items():
-      if conf not in confs:
-        continue # We don't care about it.
-      for info in info_group:
-        for module in info.modules_by_ref.values():
-          for artifact in module.artifacts:
-            classpath_maps[(module.ref.org, module.ref.name, module.ref.rev,)][conf] = artifact.path
-    return classpath_maps.values()
+    if ivy_products:
+      for conf, info_group in ivy_products.items():
+        if conf not in confs:
+          continue # We don't care about it.
+        for info in info_group:
+          for module in info.modules_by_ref.values():
+            for artifact in module.artifacts:
+              classpath_maps[module.ref][conf] = artifact.path
+    return classpath_maps
 
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
@@ -308,7 +311,8 @@ class IdeGen(JvmToolTaskMixin, Task):
     safe_mkdir(external_javadoc_jar_dir, clean=True)
 
     confs = ['default', 'sources', 'javadoc']
-    for entry in self._get_jar_paths(confs=confs):
+    jar_paths = self.get_jar_infos(self.context.products.get_data('ivy_jar_products'), confs)
+    for entry in jar_paths.values():
       jar = entry.get('default')
       if jar:
         cp_jar = os.path.join(external_jar_dir, os.path.basename(jar))

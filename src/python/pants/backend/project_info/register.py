@@ -30,7 +30,9 @@ def register_goals():
   task(name='ensime', action=EnsimeGen).install().with_description(
       'Create an Ensime project from the given targets.')
 
-  task(name='export', action=Export).install().with_description("Export project information for targets in JSON format.")
+  task(name='export', action=Export).install().with_description(
+    'Export project information for targets in JSON format. '
+    'Use with resolve goal to get detailed information about libraries.')
 
   task(name='depmap', action=Depmap).install().with_description("Depict the target's dependencies.")
 

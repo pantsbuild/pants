@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
                            yield_lines)
 
+from pants.backend.core.tasks.task import Task
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import BuildConfigurationError
@@ -36,6 +37,10 @@ class MockMetadata(EmptyProvider):
 
   def get_metadata_lines(self, name):
     return yield_lines(self.get_metadata(name))
+
+
+class DummyTask(Task):
+  def execute(self): return 42
 
 
 class LoaderTest(unittest.TestCase):
@@ -95,7 +100,7 @@ class LoaderTest(unittest.TestCase):
 
   def test_load_valid_partial_goals(self):
     def register_goals():
-      Goal.by_name('jack').install(TaskRegistrar('jill', lambda: 42))
+      Goal.by_name('jack').install(TaskRegistrar('jill', DummyTask))
 
     with self.create_register(register_goals=register_goals) as backend_package:
       Goal.clear()
@@ -202,7 +207,7 @@ class LoaderTest(unittest.TestCase):
 
   def test_plugin_installs_goal(self):
     def reg_goal():
-      Goal.by_name('plugindemo').install(TaskRegistrar('foo', lambda: 1))
+      Goal.by_name('plugindemo').install(TaskRegistrar('foo', DummyTask))
     self.working_set.add(self.get_mock_plugin('regdemo', '0.0.1', reg=reg_goal))
 
     # Start without the custom goal.

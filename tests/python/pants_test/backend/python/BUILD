@@ -17,6 +17,7 @@ python_tests(
     '3rdparty/python:coverage',
     '3rdparty/python:pex',
     'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python:python_setup',
     'src/python/pants/backend/python:test_builder',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/util:contextutil',

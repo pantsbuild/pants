@@ -23,7 +23,7 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp
 from pants_test.task_test_base import TaskTestBase
 
 
-class TestPythonSetup(TaskTestBase):
+class TestSetupPy(TaskTestBase):
   @classmethod
   def task_type(cls):
     return SetupPy
@@ -54,7 +54,7 @@ class TestPythonSetup(TaskTestBase):
     self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
     self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0']))
     self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['baz==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['baz']), set([]))
+    self.assertEqual(SetupPy.install_requires(target_map['baz']), set())
 
   @contextmanager
   def run_execute(self, target, recursive=False):

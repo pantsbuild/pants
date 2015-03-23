@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pex.pex import PEX
 
-from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.target import Target
@@ -45,18 +44,10 @@ class PythonRepl(PythonTask):
       else:
         entry_point = 'code:interact'
 
-      with self.temporary_pex_builder(interpreter=interpreter) as builder:
-        builder.set_entry_point(entry_point)
-        chroot = PythonChroot(
-          context=self.context,
-          targets=targets,
-          extra_requirements=extra_requirements,
-          builder=builder,
-          interpreter=interpreter)
-
-        chroot.dump()
-        builder.freeze()
-        pex = PEX(builder.path(), interpreter=interpreter)
+      with self.temporary_chroot(interpreter=interpreter, targets=targets,
+                                 extra_requirements=extra_requirements,
+                                 pre_freeze=lambda ch: ch.builder.set_entry_point(entry_point)) as chroot:
+        pex = PEX(chroot.builder.path(), interpreter=interpreter)
         self.context.release_lock()
         with stty_utils.preserve_stty_settings():
           with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):

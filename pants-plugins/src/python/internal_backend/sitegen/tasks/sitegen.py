@@ -175,7 +175,7 @@ def rel_href(src, dst):
 
 def find_existing_anchors(soup):
   """Return existing ids (and names) from a soup."""
-  existing_anchors = set([])
+  existing_anchors = set()
   for tag in soup.find_all(True):
     for attr in ['id', 'name']:
       if tag.has_attr(attr):

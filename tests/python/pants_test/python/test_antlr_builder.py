@@ -10,15 +10,9 @@ import unittest
 import antlr3
 import antlr3.tree
 
-# ANTLR code, and so will be masked by it if namespace packages are broken.
-from pants.backend.python.python_setup import PythonSetup
 from pants.backend.python.test.Eval import Eval
 from pants.backend.python.test.ExprLexer import ExprLexer
 from pants.backend.python.test.ExprParser import ExprParser
-
-
-# We import this gratuitously, just to test that namespace packages work correctly in the
-# generated ANTLR code. This module shares a namespace prefix with the generated
 
 
 class AntlrBuilderTest(unittest.TestCase):

@@ -147,10 +147,6 @@ class ChangedFileTaskMixin(object):
 
 
 class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
-  def __init__(self, *args, **kwargs):
-    super(WhatChanged, self).__init__(*args, **kwargs)
-    self._spec_excludes = self.context.options.for_global_scope().spec_excludes
-
   """Emits the targets that have been modified since a given commit."""
   @classmethod
   def register_options(cls, register):
@@ -160,12 +156,13 @@ class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
              help='Show changed files instead of the targets that own them.')
 
   def console_output(self, _):
+    spec_excludes = self.context.options.for_global_scope().spec_excludes
     change_calculator = self.change_calculator(self.get_options(),
                                                self.context.address_mapper,
                                                self.context.build_graph,
                                                scm=self.context.scm,
                                                workspace=self.context.workspace,
-                                               spec_excludes=self._spec_excludes)
+                                               spec_excludes=spec_excludes)
     if self.get_options().files:
       for f in sorted(change_calculator.changed_files()):
         yield f

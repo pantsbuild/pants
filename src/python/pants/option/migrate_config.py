@@ -206,6 +206,11 @@ migrations = {
   # NB: For the following two options, see the notes below.
   ('scrooge-gen', 'scala'): ('gen.scrooge', 'service_deps'),
   ('scrooge-gen', 'java'): ('gen.scrooge', 'service_deps'),
+
+  # Technically 'indices' and 'indexes' are both acceptable plural forms of 'index'. However
+  # usage has led to the former being used primarily for mathematical indices and the latter
+  # for book indexes, database indexes and the like.
+  ('python-repos', 'indices'): ('python-repos', 'indexes'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '

@@ -90,12 +90,37 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       shared_artifacts('0.0.1-SNAPSHOT'),
                       ['com.pants.testproject.publish/hello-greet/publish.properties'],)
 
+  def test_protobuf_publish(self):
+    unique_artifacts = {'com/pants/testproject/publish/protobuf/protobuf-java/0.0.1-SNAPSHOT':
+                        ['ivy-0.0.1-SNAPSHOT.xml',
+                         'protobuf-java-0.0.1-SNAPSHOT.jar',
+                         'protobuf-java-0.0.1-SNAPSHOT.pom',
+                         'protobuf-java-0.0.1-SNAPSHOT-sources.jar'],
+                        'com/pants/testproject/protobuf/distance/0.0.1-SNAPSHOT/':
+                        ['ivy-0.0.1-SNAPSHOT.xml',
+                         'distance-0.0.1-SNAPSHOT.jar',
+                         'distance-0.0.1-SNAPSHOT.pom',
+                         'distance-0.0.1-SNAPSHOT-sources.jar'],}
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/protobuf:protobuf-java',
+                      unique_artifacts,
+                      ['com.pants.testproject.publish.protobuf/protobuf-java/publish.properties',
+                       'com.pants.testproject.protobuf/distance/publish.properties'],
+                      extra_options=['--doc-javadoc-skip'],
+                      expected_primary_artifact_count=2)
+
   def test_named_snapshot(self):
     name = "abcdef0123456789"
     self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
                       shared_artifacts(name),
                       ['com.pants.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--publish-named-snapshot=%s' % name])
+
+  def test_publish_override_flag_succeeds(self):
+    override = "com.twitter.foo#baz=0.1.0"
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
+                      shared_artifacts('0.0.1-SNAPSHOT'),
+                      ['com.pants.testproject.publish/hello-greet/publish.properties'],
+                      extra_options=['--publish-override=%s' % override])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
   def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
@@ -184,7 +209,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       yes = 'y' * expected_primary_artifact_count
       pants_run = self.run_pants(['publish', target] + options, config=extra_config,
                                  stdin_data=yes, extra_env=extra_env)
-
       if success_expected:
         self.assert_success(pants_run, "'pants goal publish' expected success, but failed instead.")
       else:
