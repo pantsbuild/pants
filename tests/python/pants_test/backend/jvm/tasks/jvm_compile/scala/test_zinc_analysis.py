@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import contextlib
 import os
+import StringIO
 import tarfile
 import unittest
 
@@ -18,6 +19,7 @@ from pants.util.contextutil import Timer, temporary_dir
 
 class ZincAnalysisTest(unittest.TestCase):
   def setUp(self):
+    self.maxDiff = None
     self.total_time = 0
 
   def _time(self, work, msg):
@@ -28,6 +30,59 @@ class ZincAnalysisTest(unittest.TestCase):
     self.total_time += elapsed
     return ret
 
+  # Test a simple example that is non-trivial, but still small enough to verify manually.
+  def test_split_merge(self):
+    def get_test_analysis_path(name):
+      return os.path.join(os.path.dirname(__file__), 'testdata', name)
+
+    def get_analysis_text(name):
+      with open(get_test_analysis_path(name), 'r') as fp:
+        return fp.read()
+
+    def parse_analyis(name):
+      return ZincAnalysisParser().parse_from_path(get_test_analysis_path(name))
+
+    def analysis_to_string(analysis):
+      buf = StringIO.StringIO()
+      analysis.write(buf)
+      return buf.getvalue()
+
+    full_analysis = parse_analyis('simple_analysis')
+
+    analysis_splits = full_analysis.split([
+      ['/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala'],
+      ['/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala'],
+    ])
+    self.assertEquals(len(analysis_splits), 2)
+
+    def compare_split(i):
+      expected_filename = 'simple_analysis_split{0}'.format(i)
+
+      # First compare as objects.  This verifies that __eq__ works, but is weaker than the
+      # text comparison because in some cases there can be small text differences that don't
+      # affect logical equivalence.
+      expected_analyis = parse_analyis(expected_filename)
+      self.assertTrue(expected_analyis == analysis_splits[i])
+
+      # Then compare as text.  In this simple case we expect them to be byte-for-byte equal.
+      expected = get_analysis_text(expected_filename)
+      actual = analysis_to_string(analysis_splits[i])
+      self.assertMultiLineEqual(expected, actual)
+
+    compare_split(0)
+    compare_split(1)
+
+    # Now merge and check that we get what we started with.
+    merged_analysis = ZincAnalysis.merge(analysis_splits)
+    # Check that they compare as objects.
+    self.assertTrue(full_analysis == merged_analysis)
+    # Check that they compare as text.
+    expected = get_analysis_text('simple_analysis')
+    actual = analysis_to_string(merged_analysis)
+    self.assertMultiLineEqual(expected, actual)
+
+
+  # Test on large-scale analysis files.
   def test_analysis_files(self):
     parser = ZincAnalysisParser()
 
