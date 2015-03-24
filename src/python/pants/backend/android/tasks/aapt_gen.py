@@ -11,6 +11,7 @@ import subprocess
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -50,7 +51,7 @@ class AaptGen(AaptTask, CodeGen):
     self._jar_library_by_sdk = {}
 
   def is_gentarget(self, target):
-    return isinstance(target, AndroidResources)
+    return isinstance(target, AndroidBinary)
 
   def genlangs(self):
     return dict(java=lambda t: t.is_jvm)
@@ -60,14 +61,14 @@ class AaptGen(AaptTask, CodeGen):
 
   def prepare_gen(self, targets):
     # prepare exactly N android jar targets where N is the number of SDKs in-play
-    sdks = set(ar.manifest.target_sdk for ar in targets)
+    sdks = set(ar.target_sdk for ar in targets)
     for sdk in sdks:
       jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
       jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
       address = SyntheticAddress(self.workdir, '{0}-jars'.format(sdk))
       self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
-  def _render_args(self, target, output_dir):
+  def _render_args(self, target, resource_dirs, output_dir):
     """Compute the args that will be passed to the aapt tool."""
     args = []
 
@@ -76,13 +77,17 @@ class AaptGen(AaptTask, CodeGen):
     #   : '-m' is to "make" a package directory under location '-J'.
     #   : '-J' Points to the output directory.
     #   : '-M' is the AndroidManifest.xml of the project.
-    #   : '-S' points to the resource_dir to "spider" down while collecting resources.
+    #   : '-S' points to each dir in resource_dirs, aapt 'scans' them in order while
+    #            collecting resources (resource priority is left -> right).
     #   : '-I' packages to add to base "include" set, here it is the android.jar of the target-sdk.
     args.extend([self.aapt_tool(target.build_tools_version)])
     args.extend(['package', '-m', '-J', output_dir])
     args.extend(['-M', target.manifest.path])
-    args.extend(['-S', target.resource_dir])
-    args.extend(['-I', self.android_jar_tool(target.manifest.target_sdk)])
+    args.append('--auto-add-overlay')
+    while resource_dirs:
+      # Priority for resources is left to right, so reverse the collection order of DFS preorder.
+      args.extend(['-S', resource_dirs.pop()])
+    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
@@ -92,7 +97,16 @@ class AaptGen(AaptTask, CodeGen):
     for target in targets:
       if lang != 'java':
         raise TaskError('Unrecognized android gen lang: {0}'.format(lang))
-      args = self._render_args(target, self.workdir)
+      resource_dirs = []
+      def collect_resource_dirs(tgt):
+        """Gather the 'resource_dir's of the target's AndroidResources dependencies."""
+        if isinstance(tgt, AndroidResources):
+          resource_dirs.append(os.path.join(get_buildroot(), tgt.resource_dir))
+
+      if self.is_gentarget(target):
+        target.walk(collect_resource_dirs)
+
+      args = self._render_args(target, resource_dirs, self.workdir)
       with self.context.new_workunit(name='aapt_gen', labels=[WorkUnit.MULTITOOL]) as workunit:
         returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                      stderr=workunit.output('stderr'))
@@ -103,7 +117,7 @@ class AaptGen(AaptTask, CodeGen):
     spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
     aapt_gen_file = self._calculate_genfile(gentarget.manifest.package_name)
-    deps = OrderedSet([self._jar_library_by_sdk[gentarget.manifest.target_sdk]])
+    deps = OrderedSet([self._jar_library_by_sdk[gentarget.target_sdk]])
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,

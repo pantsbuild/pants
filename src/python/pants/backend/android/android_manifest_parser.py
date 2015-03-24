@@ -27,10 +27,10 @@ class AndroidManifestParser(object):
     """
     try:
       manifest = XmlParser.from_file(manifest_path)
-      target_sdk = manifest.get_attribute('uses-sdk', 'android:targetSdkVersion')
       package_name = manifest.get_attribute('manifest', 'package')
     except XmlParser.XmlError as e:
       raise cls.BadManifestError("AndroidManifest.xml parsing error: {}".format(e))
+    target_sdk = manifest.get_optional_attribute('uses-sdk', 'android:targetSdkVersion')
     app_name = manifest.get_optional_attribute('activity', 'android:name')
 
     return AndroidManifest(manifest.xml_path, target_sdk, package_name, app_name=app_name)

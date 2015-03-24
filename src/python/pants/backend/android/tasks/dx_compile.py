@@ -20,7 +20,7 @@ class DxCompile(AndroidTask, NailgunTask):
   Compile java classes into dex files, Dalvik executables.
   """
 
-  # name of output file. "Output name must end with one of: .dex .jar .zip .apk or be a directory."
+  # Name of output file. "Output name must end with one of: .dex .jar .zip .apk or be a directory."
   DEX_NAME = 'classes.dex'
 
   @staticmethod
@@ -44,6 +44,7 @@ class DxCompile(AndroidTask, NailgunTask):
   def prepare(cls, options, round_manager):
     super(DxCompile, cls).prepare(options, round_manager)
     round_manager.require_data('classes_by_target')
+    round_manager.require_data('unpacked_archives')
 
   def __init__(self, *args, **kwargs):
     super(DxCompile, self).__init__(*args, **kwargs)
@@ -81,31 +82,42 @@ class DxCompile(AndroidTask, NailgunTask):
   def execute(self):
     with self.context.new_workunit(name='dx-compile', labels=[WorkUnit.MULTITOOL]):
       targets = self.context.targets(self.is_dextarget)
+
       with self.invalidated(targets) as invalidation_check:
         invalid_targets = []
         for vt in invalidation_check.invalid_vts:
           invalid_targets.extend(vt.targets)
         for target in invalid_targets:
+
           outdir = self.dx_out(target)
           safe_mkdir(outdir)
           classes_by_target = self.context.products.get_data('classes_by_target')
+          unpacked_archives = self.context.products.get_data('unpacked_archives')
           classes = []
 
-          def add_to_dex(tgt):
+          def gather_classes(tgt):
+            def add_classes(target_products):
+              for _, products in target_products.abs_paths():
+                for prod in products:
+                  classes.append(prod)
+
             target_classes = classes_by_target.get(tgt)
+
             if target_classes:
-
-              def add_classes(target_products):
-                for _, products in target_products.abs_paths():
-                  for prod in products:
-                    classes.append(prod)
-
               add_classes(target_classes)
 
-          target.walk(add_to_dex)
+            if unpacked_archives:
+              unpacked = unpacked_archives.get(tgt)
+              if unpacked:
+                # The unpacked_archives are passed as a list of [found_files, rel_unpack_dir].
+                # For Android's purposes, just passing the containing dir is fine.
+                classes.append(unpacked[1])
+
+          target.walk(gather_classes)
           if not classes:
             raise TaskError("No classes were found for {0!r}.".format(target))
           args = self._render_args(outdir, classes)
+          # TODO (mateor) wrap this in a workunit and properly handle stdout/err.
           self._compile_dex(args, target.build_tools_version)
       for target in targets:
         self.context.products.get('dex').add(target, self.dx_out(target)).append(self.DEX_NAME)

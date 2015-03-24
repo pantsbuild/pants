@@ -27,7 +27,7 @@ class UnpackedJars(ImportJarsMixin, Target):
                **kwargs):
     """
     :param libraries: List of addresses of `jar_library <#jar_library>`_
-      targets which contain .proto definitions.
+      targets which contain .class or .proto definitions.
     :param list libraries: addresses of jar_library targets that specify the jars you want to unpack
     :param list include_patterns: fileset patterns to include from the archive
     :param list exclude_patterns: fileset patterns to exclude from the archive

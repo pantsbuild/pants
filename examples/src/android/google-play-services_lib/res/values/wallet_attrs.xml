@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright 2014 Google Inc. All Rights Reserved. -->
+<resources>
+    <!-- Attributes for the WalletFragment &lt;fragment&gt; tag -->
+    <declare-styleable name="WalletFragmentOptions">
+        <!-- Theme to be used for the Wallet selector -->
+        <attr name="appTheme" format="enum">
+            <enum name="holo_dark" value="0"/>
+            <enum name="holo_light" value="1"/>
+        </attr>
+        <!-- Google Wallet environment to use -->
+        <attr name="environment" format="enum">
+            <enum name="production" value="1"/>
+            <enum name="sandbox" value="0"/>
+            <enum name="strict_sandbox" value="2"/>
+        </attr>
+        <!-- A style resource specifing attributes to customize the look and feel of WalletFragment -->
+        <attr name="fragmentStyle" format="reference"/>
+        <!-- Fragment mode -->
+        <attr name="fragmentMode" format="enum">
+            <enum name="buyButton" value="1"/>
+            <enum name="selectionDetails" value="2"/>
+        </attr>
+    </declare-styleable>
+
+    <!-- Attributes that may be specified in a style resource to customize the look and feel of
+         WalletFragment -->
+    <declare-styleable name="WalletFragmentStyle">
+        <!-- Height of the buy button. This includes an 8dp padding (4dp on each side) used for
+             pressed and focused states of the button. The value can be a specific height, e.g.
+             "48dp", or special values "match_parent" and "wrap_content". -->
+        <attr name="buyButtonHeight" format="dimension">
+            <enum name="match_parent" value="-1" />
+            <enum name="wrap_content" value="-2" />
+        </attr>
+        <!-- Width of the buy button. This includes an 8dp padding (4dp on each side) used for
+             pressed and focused states of the button. The value can be a specific width, e.g.
+             "300dp", or special values "match_parent" and "wrap_content". -->
+        <attr name="buyButtonWidth" format="dimension">
+            <enum name="match_parent" value="-1" />
+            <enum name="wrap_content" value="-2" />
+        </attr>
+        <!-- The text on the buy button -->
+        <attr name="buyButtonText" format="enum">
+            <enum name="buy_with_google" value="1"/>
+            <enum name="buy_now" value="2"/>
+            <enum name="book_now" value="3"/>
+            <enum name="donate_with_google" value="4" />
+        </attr>
+        <!-- The appearance of the buy button -->
+        <attr name="buyButtonAppearance" format="enum">
+            <enum name="classic" value="1"/>
+            <enum name="grayscale" value="2"/>
+            <enum name="monochrome" value="3"/>
+        </attr>
+        <!-- TextAppearance for masked wallet details -->
+        <attr name="maskedWalletDetailsTextAppearance" format="reference"/>
+        <!-- TextAppearance for headers describing masked wallet details -->
+        <attr name="maskedWalletDetailsHeaderTextAppearance" format="reference"/>
+        <!-- Masked wallet details background -->
+        <attr name="maskedWalletDetailsBackground" format="reference|color"/>
+        <!-- TextAppearance for the "Change" button in masked wallet details view -->
+        <attr name="maskedWalletDetailsButtonTextAppearance" format="reference"/>
+        <!-- "Change" button background in masked wallet details view -->
+        <attr name="maskedWalletDetailsButtonBackground" format="reference|color"/>
+        <!-- Color of the Google Wallet logo text in masked wallet details view -->
+        <attr name="maskedWalletDetailsLogoTextColor" format="color"/>
+        <!-- Type of the wallet logo image in masked wallet details view -->
+        <attr name="maskedWalletDetailsLogoImageType" format="enum">
+            <enum name="classic" value="1"/>
+            <enum name="monochrome" value="2"/>
+        </attr>
+    </declare-styleable>
+</resources>
