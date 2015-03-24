@@ -16,6 +16,7 @@ pex \
   -r "beautifulsoup4>=4.3.2,<4.4" \
   -e pants.bin.pants_exe:main \
   -o pants.pex && \
+zipinfo -1 pants.pex && \
 ./pants.pex && \
 ./pants.pex goals && \
 ./pants.pex list && \
