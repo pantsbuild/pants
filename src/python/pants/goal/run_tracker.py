@@ -261,6 +261,8 @@ class RunTracker(object):
       except Exception as e:
         error("Error: %s" % e)
 
+  _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
+
   def end(self):
     """This pants run is over, so stop tracking it.
 
@@ -292,8 +294,7 @@ class RunTracker(object):
     if self._background_root_workunit:
       outcome = min(outcome, self._background_root_workunit.outcome())
     outcome_str = WorkUnit.outcome_string(outcome)
-    log_level = WorkUnit.choose_for_outcome(outcome, Report.ERROR, Report.ERROR,
-                                            Report.WARN, Report.INFO, Report.INFO)
+    log_level = RunTracker._log_levels[outcome]
     self.log(log_level, outcome_str)
 
     if self.run_info.get_info('outcome') is None:
