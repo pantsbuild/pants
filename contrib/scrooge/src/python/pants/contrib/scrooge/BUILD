@@ -6,7 +6,7 @@ python_library(
   sources=['register.py'],
   dependencies=[
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks',
-    'src/python/pants/goal:task_registrar',
+    'src/python/pants:pants-packaged',
   ],
   provides=contrib_setup_py(
     name='pantsbuild.pants.contrib.scrooge',

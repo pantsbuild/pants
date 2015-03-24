@@ -8,8 +8,7 @@ python_library(
     'contrib/cpp/src/python/pants/contrib/cpp/targets:targets',
     'contrib/cpp/src/python/pants/contrib/cpp/tasks:tasks',
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/goal:task_registrar',
+    'src/python/pants:pants-packaged',
   ],
   provides=contrib_setup_py(
     name='pantsbuild.pants.contrib.cpp',
