@@ -419,7 +419,7 @@ class ZincAnalysis(Analysis):
     for fqcn in classes:
       if fqcn.rsplit('.', 1)[-1] == primary_class_name:
         # For ease of debugging, pick the class with the same name as the source file, if it exists.
-        return primary_class_name
+        return fqcn
     # Pick the class that sorts lowest in dictionary order.
     return min(classes)
 

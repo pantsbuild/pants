@@ -5,16 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pex.crawler import Crawler
-from pex.fetcher import Fetcher, PyPIFetcher
-from pex.http import Context
+import os
+
+from pex.fetcher import Fetcher
 from pex.interpreter import PythonInterpreter
-from pex.iterator import Iterator
 from pex.platforms import Platform
 from pex.resolver import resolve
-from pex.translator import Translator
-
-from pants.backend.python.python_setup import PythonSetup
 
 
 def get_platforms(platform_list):
@@ -23,19 +19,9 @@ def get_platforms(platform_list):
   return tuple(set(map(translate, platform_list)))
 
 
-def fetchers_from_config(config):
-  fetchers = []
-  fetchers.extend(Fetcher([url]) for url in config.getlist('python-repos', 'repos', []))
-  fetchers.extend(PyPIFetcher(url) for url in config.getlist('python-repos', 'indices', []))
-  return fetchers
 
-
-def context_from_config(config):
-  # TODO(wickman) Add retry, conn_timeout, threads, etc configuration here.
-  return Context.get()
-
-
-def resolve_multi(config,
+def resolve_multi(python_setup,
+                  python_repos,
                   requirements,
                   interpreter=None,
                   platforms=None,
@@ -47,7 +33,8 @@ def resolve_multi(config,
      that must be included in order to satisfy them.  That may involve distributions for
      multiple platforms.
 
-     :param config: Pants :class:`Config` object.
+     :param python_setup: Pants :class:`PythonSetup` object.
+     :param python_repos: Pants :class:`PythonRepos` object.
      :param requirements: A list of :class:`PythonRequirement` objects to resolve.
      :param interpreter: :class:`PythonInterpreter` for which requirements should be resolved.
                          If None specified, defaults to current interpreter.
@@ -63,12 +50,12 @@ def resolve_multi(config,
   if not isinstance(interpreter, PythonInterpreter):
     raise TypeError('Expected interpreter to be a PythonInterpreter, got %s' % type(interpreter))
 
-  cache = PythonSetup(config).scratch_dir('install_cache', default_name='eggs')
-  platforms = get_platforms(platforms or config.getlist('python-setup', 'platforms', ['current']))
-  fetchers = fetchers_from_config(config)
+  cache = os.path.join(python_setup.scratch_dir, 'eggs')
+  platforms = get_platforms(platforms or python_setup.platforms)
+  fetchers = python_repos.get_fetchers()
   if find_links:
     fetchers.extend(Fetcher([path]) for path in find_links)
-  context = context_from_config(config)
+  context = python_repos.get_network_context()
 
   for platform in platforms:
     distributions[platform] = resolve(

@@ -72,6 +72,7 @@ python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
+    ':ide_gen',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:console_task',

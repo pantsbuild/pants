@@ -33,7 +33,6 @@ python_library(
     ':jvm_tool_task_mixin',
     ':jvmdoc_gen',
     ':nailgun_task',
-    ':provides',
     ':scala_repl',
     ':scaladoc_gen',
     ':scalastyle',
@@ -324,20 +323,6 @@ python_library(
     'src/python/pants/java:distribution',
     'src/python/pants/java:util',
     'src/python/pants/backend/core/tasks:task',
-  ],
-)
-
-python_library(
-  name = 'provides',
-  sources = ['provides.py'],
-  dependencies = [
-    ':common',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:deprecated',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ],
 )
 

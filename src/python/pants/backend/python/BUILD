@@ -19,7 +19,6 @@ python_library(
   name = 'all_utils',
   dependencies = [
     ':antlr_builder',
-    ':binary_builder',
     ':code_generator',
     ':interpreter_cache',
     ':python_artifact',
@@ -46,6 +45,8 @@ python_library(
   name = 'python_setup',
   sources = ['python_setup.py'],
   dependencies = [
+    '3rdparty/python:pex',
+    '3rdparty/python:setuptools',
     'src/python/pants/base:config',
   ]
 )
@@ -64,18 +65,6 @@ python_library(
 )
 
 python_library(
-  name = 'binary_builder',
-  sources = ['binary_builder.py'],
-  dependencies = [
-    ':code_generator',
-    ':python_chroot',
-    '3rdparty/python:pex',
-    'src/python/pants/base:config',
-    'src/python/pants/backend/python/targets:python',
-  ]
-)
-
-python_library(
   name = 'code_generator',
   sources = ['code_generator.py'],
   dependencies = [
@@ -89,8 +78,6 @@ python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],
   dependencies = [
-    ':python_setup',
-    ':resolver',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     'src/python/pants/util:dirutil',
@@ -138,7 +125,6 @@ python_library(
   name = 'resolver',
   sources = ['resolver.py'],
   dependencies = [
-    ':python_setup',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/python/targets:python',

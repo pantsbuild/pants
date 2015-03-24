@@ -23,7 +23,7 @@ from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonSetup
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.resolver import resolve_multi
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -62,6 +62,10 @@ class PythonChroot(object):
                platforms=None,
                interpreter=None):
     self.context = context
+    # TODO: These should come from the caller, and we should not know about config.
+    self._python_setup = PythonSetup(self.context.config)
+    self._python_repos = PythonRepos(self.context.config)
+
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms
@@ -71,8 +75,7 @@ class PythonChroot(object):
 
     # Note: unrelated to the general pants artifact cache.
     self._egg_cache_root = os.path.join(
-        PythonSetup(self.context.config).scratch_dir('artifact_cache', default_name='artifacts'),
-        str(self._interpreter.identity))
+      self._python_setup.scratch_dir, 'artifacts', str(self._interpreter.identity))
 
     self._key_generator = CacheKeyGenerator()
     self._build_invalidator = BuildInvalidator( self._egg_cache_root)
@@ -204,7 +207,8 @@ class PythonChroot(object):
         find_links.append(req.repository)
 
     distributions = resolve_multi(
-         self.context.config,
+         self._python_setup,
+         self._python_repos,
          reqs_to_build,
          interpreter=self._interpreter,
          platforms=self._platforms,

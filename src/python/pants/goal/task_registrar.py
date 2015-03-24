@@ -28,32 +28,7 @@ class TaskRegistrar(object):
     """
     self.serialize = serialize
     self.name = name
-
-    if isinstance(type(action), type) and issubclass(action, Task):
-      self._task = action
-    else:
-      args, varargs, keywords, defaults = inspect.getargspec(action)
-      if varargs or keywords or defaults:
-        raise GoalError('Invalid action supplied, cannot accept varargs, keywords or defaults')
-      if len(args) > 1:
-        raise GoalError('Invalid action supplied, must accept either no args or else a single '
-                        'Context object')
-
-      class FuncTask(Task):
-        def __init__(self, *args, **kwargs):
-          super(FuncTask, self).__init__(*args, **kwargs)
-
-          if not args:
-            self.action = action
-          elif len(args) == 1:
-            self.action = functools.partial(action, self.context)
-          else:
-            raise AssertionError('Unexpected fallthrough')
-
-        def execute(self):
-          self.action()
-
-      self._task = FuncTask
+    self._task = action
 
     if dependencies:
       # TODO(John Sirois): kill this warning and the kwarg after a deprecation cycle.

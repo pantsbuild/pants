@@ -13,19 +13,15 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
+  def _assert_junit_output_exists_for_class(self, workdir, classname):
+    self.assertTrue(os.path.exists(
+      os.path.join(workdir, 'test', 'junit', '{}.out.txt'.format(classname))))
+    self.assertTrue(os.path.exists(
+      os.path.join(workdir, 'test', 'junit', '{}.err.txt'.format(classname))))
+
   def _assert_junit_output(self, workdir):
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.examples.hello.greet.GreetingTest.out.txt')))
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.examples.hello.greet.GreetingTest.err.txt')))
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.example.hello.welcome.WelSpec.out.txt')))
-    self.assertTrue(os.path.exists(
-      os.path.join(workdir, 'test', 'junit',
-                   'com.pants.example.hello.welcome.WelSpec.err.txt')))
+    self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+    self._assert_junit_output_exists_for_class(workdir, 'com.pants.example.hello.welcome.WelSpec')
 
   def test_junit_test(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -39,6 +35,39 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
 
+  def test_junit_test_with_test_option_with_relpath(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-test=examples/tests/java/com/pants/examples/hello/greet/GreetingTest.java',
+          'examples/tests/java/com/pants/examples/hello/greet',
+          'examples/tests/scala/com/pants/example/hello/welcome'],
+          workdir)
+      self.assert_success(pants_run)
+      self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+
+  def test_junit_test_with_test_option_with_dot_slash_relpath(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-test=./examples/tests/java/com/pants/examples/hello/greet/GreetingTest.java',
+          'examples/tests/java/com/pants/examples/hello/greet',
+          'examples/tests/scala/com/pants/example/hello/welcome'],
+          workdir)
+      self.assert_success(pants_run)
+      self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+
+  def test_junit_test_with_test_option_with_classname(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-test=com.pants.examples.hello.greet.GreetingTest',
+          'examples/tests/java/com/pants/examples/hello/greet',
+          'examples/tests/scala/com/pants/example/hello/welcome'],
+          workdir)
+      self.assert_success(pants_run)
+      self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
+
   def test_junit_test_with_emma(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
@@ -50,7 +79,9 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           '--test-junit-coverage-processor=emma',
           '--test-junit-coverage',
           '--test-junit-coverage-xml',
-          '--test-junit-coverage-html'],
+          '--test-junit-coverage-html',
+          '--test-junit-coverage-jvm-options=-Xmx1g',
+          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
@@ -88,7 +119,9 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           '--test-junit-coverage-processor=cobertura',
           '--test-junit-coverage',
           '--test-junit-coverage-xml',
-          '--test-junit-coverage-html'],
+          '--test-junit-coverage-html',
+          '--test-junit-coverage-jvm-options=-Xmx1g',
+          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
@@ -99,8 +132,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
 
-  def test_junit_test_with_cwd(self):
-    # Make sure the test fails if you don't specify cwd
+  def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
@@ -109,7 +141,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-jvm-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-    # Expicit cwd specified
+  def test_junit_test_requiring_cwd_passes_with_option_with_value_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
@@ -119,7 +151,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-cwd=testprojects/src/java/com/pants/testproject/cwdexample/subdir'])
     self.assert_success(pants_run)
 
-    # Implicit cwd specified based on path to target
+  def test_junit_test_requiring_cwd_passes_with_option_with_no_value_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
@@ -128,3 +160,14 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-jvm-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd',])
     self.assert_success(pants_run)
+
+  def test_junit_test_requiring_cwd_fails_when_target_not_first(self):
+    pants_run = self.run_pants([
+        'test',
+        'examples/tests/scala/com/pants/example/hello/welcome',
+        'testprojects/tests/java/com/pants/testproject/cwdexample',
+        '--interpreter=CPython>=2.6,<3',
+        '--interpreter=CPython>=3.3',
+        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+        '--test-junit-cwd',])
+    self.assert_failure(pants_run)
