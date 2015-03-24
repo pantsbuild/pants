@@ -1,8 +1,4 @@
-language: objective-c
-
-before_install:
-  - brew update
-  - brew install python
+language: python
 
 script: |
   ./test-pants-pex.sh
