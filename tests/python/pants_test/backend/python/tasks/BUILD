@@ -20,6 +20,22 @@ python_library(
 )
 
 python_tests(
+  name='pytest_run',
+  sources=['test_pytest_run.py'],
+  dependencies=[
+    '3rdparty/python:coverage',
+    '3rdparty/python:pex',
+    'src/python/pants/backend/python:python_setup',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:task_test_base'
+  ]
+)
+
+
+python_tests(
   name='python_eval',
   sources=['test_python_eval.py'],
   dependencies=[
