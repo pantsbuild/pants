@@ -29,7 +29,6 @@
     "page": "dist/markdown/html/examples/src/java/com/pants/examples/page.html",
     "pex_design": "dist/markdown/html/examples/src/python/example/pex_design.html",
     "publish": "dist/markdown/html/src/docs/publish.html",
-    "python_old": "dist/markdown/html/examples/src/python/example/python_old.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
     "release": "dist/markdown/html/src/python/pants/docs/release.html",
     "scala": "dist/markdown/html/examples/src/scala/com/pants/example/readme.html",
@@ -70,8 +69,7 @@
         { "page": "python-readme",
           "children": [
             { "page": "3rdparty_py" },
-            { "page": "pex_design" },
-            { "page": "python_old" }
+            { "page": "pex_design" }
           ]
         },
         { "page": "page" },

@@ -15,15 +15,6 @@ easy to manage the dependencies.
 This page assumes that you've already read
 [[the Pants Tutorial|pants('src/docs:first_tutorial')]].
 
-Pants' Python support changed in 2014. Depending on how old your Pants
-is, Pants goals might not work with Python code. If you use older pants,
-please see
-[[Using Pants for Python development, 2014 and Earlier|pants('examples/src/python/example:python_old')]].
-
-Pants' Python support is still changing. Depending on what you're trying
-to do, your Pants command might start with `goal` or might start with
-something else.
-
 Relevant Goals and Targets
 --------------------------
 
