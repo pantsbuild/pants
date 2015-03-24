@@ -17,24 +17,23 @@ logger = logging.getLogger(__name__)
 
 
 class DeferredSourcesMapper(Task):
-  """Map DeferredSorucesFields to files that produce product 'unpacked_archives', like UnpackJars
+  """Map DeferredSourcesFields to files that produce product 'unpacked_archives', like UnpackJars
 
   If you want a task to be able to map sources like this, make it require the  'deferred_sources'
   product.
   """
 
   class SourcesTargetLookupError(AddressLookupError):
-    """Raised when the referenced target cannot be found in the build graph"""
+    """Raised when the referenced target cannot be found in the build graph."""
     pass
 
   class NoUnpackedSourcesError(AddressLookupError):
-    """Raised when there are no files found unpacked from the archive"""
+    """Raised when there are no files found unpacked from the archive."""
     pass
 
   @classmethod
   def product_types(cls):
-    """
-    Declare product produced by this task
+    """Declare product produced by this task
 
     deferred_sources does not have any data associated with it. Downstream tasks can
     depend on it just make sure that this task completes first.

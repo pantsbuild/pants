@@ -222,7 +222,7 @@ class ProtobufGen(CodeGen):
         if not base:
           base, _ = target.target_base, target.sources_relative_to_buildroot()
           self.context.log.debug('Could not find source root for {source}.'
-                                 ' Missing call to SourceRoot.register()?  Fell back to {base}.'
+                                 ' Missing call to SourceRoot.register()? Fell back to {base}.'
                                  .format(source=source, base=base))
         if base not in sources_by_base:
           sources_by_base[base] = OrderedSet()
