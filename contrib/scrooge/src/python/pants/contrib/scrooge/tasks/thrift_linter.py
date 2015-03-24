@@ -79,8 +79,9 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     self.context.log.debug('Linting {0}'.format(target.address.spec))
 
     classpath = self.tool_classpath('scrooge-linter')
+    config_args = []
 
-    config_args = self.get_options().linter_args
+    config_args.extend(self.get_options().linter_args)
     if not self._is_strict(target):
       config_args.append('--ignore-errors')
 
