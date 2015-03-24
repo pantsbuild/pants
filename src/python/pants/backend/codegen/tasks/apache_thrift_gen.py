@@ -62,8 +62,12 @@ class ApacheThriftGen(CodeGen):
              help='Force generation of thrift code for these languages.')
     register('--strict', action='store_true',
              help='Run thrift compiler with strict warnings.')
-    register('--supportdir', advanced=True, help='Find thrift binaries under this dir.')
-    register('--version', advanced=True, help='Thrift compiler version.')
+    register('--supportdir', advanced=True, default='bin/thrift',
+             help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
+                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
+    register('--version', advanced=True, default='0.5.0-finagle',
+             help='Thrift compiler version.   Used as part of the path to lookup the'
+                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
     register('--java', advanced=True, type=Options.dict, help='GenInfo for Java.')
     register('--python', advanced=True, type=Options.dict, help='GenInfo for Python.')
 
@@ -86,7 +90,7 @@ class ApacheThriftGen(CodeGen):
   @property
   def thrift_binary(self):
     if self._thrift_binary is None:
-      self._thrift_binary = select_thrift_binary(self.context.options)
+      self._thrift_binary = select_thrift_binary(self.get_options())
     return self._thrift_binary
 
   def create_geninfo(self, key):

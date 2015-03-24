@@ -23,20 +23,23 @@ from pants.binary_util import BinaryUtil
 class RagelGen(CodeGen):
   def __init__(self, *args, **kwargs):
     super(RagelGen, self).__init__(*args, **kwargs)
-
-    self._ragel_supportdir = self.context.config.get('ragel-gen', 'supportdir')
-    self._ragel_version = self.context.config.get('ragel-gen', 'version', default='6.8')
     self._java_out = os.path.join(self.workdir, 'gen-java')
     self._ragel_binary = None
+
+  @classmethod
+  def register_options(cls, register):
+    super(RagelGen, cls).register_options(register)
+    register('--supportdir', default='bin/ragel', advanced=True,
+             help='The path to find the ragel binary.  Used as part of the path to lookup the'
+                  'tool with --pants-support-baseurls and --pants_bootstrapdir.')
+    register('--version', default='6.8', advanced=True,
+             help='The version of ragel to use.  Used as part of the path to lookup the'
+                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
 
   @property
   def ragel_binary(self):
     if self._ragel_binary is None:
-      self._ragel_binary = BinaryUtil(config=self.context.config).select_binary(
-        self._ragel_supportdir,
-        self._ragel_version,
-        'ragel'
-        )
+      self._ragel_binary = BinaryUtil.from_options(self.get_options()).select_binary('ragel')
     return self._ragel_binary
 
   @property

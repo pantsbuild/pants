@@ -27,8 +27,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
-    self.set_options(compressed=False)
-
+    self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):

@@ -61,12 +61,8 @@ class JarTaskTest(BaseJarTaskTest):
 
   def setUp(self):
     super(JarTaskTest, self).setUp()
-
-    self.jar_task = self.prepare_jar_task(
-      self.context(config=dedent('''
-        [DEFAULT]
-        max_subprocess_args: {}
-        '''.format(self.MAX_SUBPROC_ARGS))))
+    self.set_options(max_subprocess_args=self.MAX_SUBPROC_ARGS)
+    self.jar_task = self.prepare_jar_task(self.context())
 
   def test_update_write(self):
     with temporary_dir() as chroot:
@@ -202,6 +198,11 @@ class JarTaskTest(BaseJarTaskTest):
 
 
 class JarBuilderTest(BaseJarTaskTest):
+
+  def setUp(self):
+    super(JarBuilderTest, self).setUp()
+    self.set_options(max_subprocess_args=100)
+
   def test_agent_manifest(self):
     self.add_to_build_file('src/java/pants/agents', dedent('''
         java_agent(

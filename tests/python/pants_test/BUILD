@@ -52,7 +52,7 @@ python_tests(
   dependencies = [
     ':base_test',
     'src/python/pants:binary_util',
-    'src/python/pants/base:exceptions'
+    'tests/python/pants_test/base:context_utils',
   ]
 )
 

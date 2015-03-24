@@ -31,19 +31,6 @@ from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 
 
-# Override with protobuf-gen -> supportdir
-_PROTOBUF_GEN_SUPPORTDIR_DEFAULT='bin/protobuf'
-
-# Override with protobuf-gen -> version
-_PROTOBUF_VERSION_DEFAULT='2.4.1'
-
-# Override with protobuf-gen -> javadeps (Accepts a list)
-_PROTOBUF_GEN_JAVADEPS_DEFAULT=['3rdparty:protobuf-java']
-
-# Override with in protobuf-gen -> pythondeps (Accepts a list)
-_PROTOBUF_GEN_PYTHONDEPS_DEFAULT = []
-
-
 class ProtobufGen(CodeGen):
 
   @classmethod
@@ -52,10 +39,11 @@ class ProtobufGen(CodeGen):
     register('--lang', action='append', choices=['python', 'java'],
              help='Force generation of protobuf code for these languages.')
     register('--version', advanced=True,
-             help='Version of protoc to download in the bootstrapping step from repo declared'
-                  'in pants_support_baseurls. When changing this parameter you may also need to '
+             help='Version of protoc.  Used to create the default --javadeps and as part of '
+                  'the path to lookup the tool with --pants-support-baseurls and '
+                  '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
-             default=_PROTOBUF_VERSION_DEFAULT)
+             default='2.4.1')
     register('--plugins', advanced=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
@@ -65,16 +53,17 @@ class ProtobufGen(CodeGen):
                   'Intended to help protoc find its plugins.',
              default=None)
     register('--supportdir', advanced=True,
-             help='This directory will be created under pants_bootstrapdir for the protoc binary.',
-             default=_PROTOBUF_GEN_SUPPORTDIR_DEFAULT)
+             help='Path to use for the protoc binary.  Used as part of the path to lookup the'
+                  'tool under --pants-bootstrapdir.',
+             default='bin/protobuf')
     register('--javadeps', advanced=True, action='append',
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
-             default=_PROTOBUF_GEN_JAVADEPS_DEFAULT)
+             default=['3rdparty:protobuf-java'])
     register('--pythondeps', advanced=True, action='append',
              help='Dependencies to bootstrap this task for generating python code.  When changing '
-                  'this parameter, you may also need to update --version',
-             default=_PROTOBUF_GEN_PYTHONDEPS_DEFAULT)
+                  'this parameter, you may also need to update --version.',
+             default=[])
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
@@ -88,8 +77,6 @@ class ProtobufGen(CodeGen):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
 
-    self.protoc_supportdir = self.get_options().supportdir
-    self.protoc_version = self.get_options().version
     self.plugins = self.get_options().plugins
     self._extra_paths = self.get_options().extra_path
 
@@ -101,11 +88,7 @@ class ProtobufGen(CodeGen):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
-    self.protobuf_binary = BinaryUtil(config=self.context.config).select_binary(
-      self.protoc_supportdir,
-      self.protoc_version,
-      'protoc'
-    )
+    self.protobuf_binary = BinaryUtil.from_options(self.get_options()).select_binary('protoc')
 
   def resolve_deps(self, deps_list, key):
     deps = OrderedSet()
