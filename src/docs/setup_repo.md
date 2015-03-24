@@ -153,19 +153,48 @@ keep internal. You can put open-source things in `BUILD.oss` and internal things
 `BUILD.internal`. Pants "sees" both of these. When shipping open-source code, you can hold back
 the `BUILD.internal` file.
 
-Configure JVM Artifact Publishing
----------------------------------
+Configure JVM Artifact Downloads
+--------------------------------
 
-Pants uses `ivy` to publish artifacts. To specify where it should publish those artifacts,
-bring over a working `build-support/ivy/ivysettings.xml` file from a working Pants workspace
-and tweak to fit your situation. You can change the location of this file in `pants.ini`:
+Pants uses `ivy` to fetch libraries external to the repo (also called 3rdparty libraries).
+Ivy uses an XML configuration file.  Pants ships with an ivy configuration under
+`build-support/ivy/ivysettings.xml`.  For your repo, you will need to setup your own.  Here's a
+simple example to get you started:
 
-    :::ini
+    :::xml
+    <?xml version="1.0"?>
+
+    <ivysettings>
+
+      <settings defaultResolver="chain-repos"/>
+      <resolvers>
+        <chain name="chain-repos" returnFirst="true">
+          <ibiblio name="maven2"
+                   m2compatible="true"
+                   usepoms="true"
+                   root="https://repo1.maven.org/maven2/"/>
+
+          <!-- This is just for twitter-hosted jvm tools used by Pants -->
+          <ibiblio name="maven.twttr.com-maven"
+                   m2compatible="true"
+                   usepoms="true"
+                   root="http://maven.twttr.com/"/>
+
+        </chain>
+      </resolvers>
+    </ivysettings>
+
+Note that the location of this file and the location of the `ivy.cache.dir` property in the
+`ivysettings.xml` file must match up with the ivy configuration in pants.  To modify these, update
+the following settings in `pants.ini`:
+
     [ivy]
-    ivy_settings: some/other/path/ivysettings.xml
+    ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
+    cache_dir: ~/.ivy2/pants
 
-If the `PANTS_IVY_SETTINGS_XML` environment variable is defined, Pants uses that value instead
-of the one in `pants.ini`.
+
+For more information on Ivy settings, see the [Ivy documentation](http://ant.apache.org/ivy/)
+
 
 Integrate New Tools via a Pants Plugin
 --------------------------------------
@@ -281,37 +310,36 @@ good place, and is used in the example above):
       password=netrc.getpassword)
 
 Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
-(for example: '`build-support/ivy/ivysettings_for_publishing.xml`'). Here is an example file to get
-you started:
+with the additional information needed to publish artifacts. Here is an example to get you started:
 
-		<?xml version="1.0"?>
-		<!-- pants.ini forces this settings file to be loaded by Ivy, but only at
-		     publish time. -->
+   :::xml
+    <?xml version="1.0"?>
 
-		<ivysettings>
-		  <settings defaultResolver="chain-repos"/>
+    <ivysettings>
+      <settings defaultResolver="chain-repos"/>
 
-		  <include file="${ivy.settings.dir}/ivysettings.xml"/>
-
-		  <credentials host="artifactory.example.com"
-		               realm="Artifactory Realm"
+      <credentials host="artifactory.example.com"
+                   realm="Artifactory Realm"
                    <!-- These values come from a credentials() object, which is fed by '~/.netrc'.
                         There must be a '~/.netrc' machine entry which matches a resolver in the
                         "repos" object in 'pants.ini', which also matches the 'host' in this XML
                         block. -->
-		               username="${login}"
-		               passwd="${password}"/>
+                   username="${login}"
+                   passwd="${password}"/>
 
-		  <resolvers>
-		    <chain name="chain-repos" returnFirst="true">
-		      <_remote_resolvers name="remote-repos"/>
-		    </chain>
+      <resolvers>
+        <chain name="chain-repos" returnFirst="true">
+           <ibiblio name="corp-maven"
+                         m2compatible="true"
+                         usepoms="true"
+                         root="https://artifactory.example.com/content/groups/public/"/>
+        </chain>
 
-		    <url name="artifactory.example.com" m2compatible="true">
-		      <artifact pattern="https://artifactory.example.com/libs-releases-local/[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"/>
-		    </url>
-		  </resolvers>
-		</ivysettings>
+        <url name="artifactory.example.com" m2compatible="true">
+          <artifact pattern="https://artifactory.example.com/libs-releases-local/[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"/>
+        </url>
+      </resolvers>
+    </ivysettings>
 
 With this file in place, add a `[publish]` section to `pants.ini`, and tell pants to use
 the custom Ivy settings when publishing:
