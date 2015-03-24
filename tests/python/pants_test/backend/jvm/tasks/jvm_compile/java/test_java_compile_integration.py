@@ -11,6 +11,7 @@ from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMake
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
+from pants_test.backend.jvm.tasks.jvm_compile.utils import provide_compile_strategies
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -41,7 +42,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self._java_compile_produces_valid_analysis_file(workdir)
       self._java_compile_produces_valid_analysis_file(workdir)
 
-  def test_resources_by_target_and_partitions(self):
+  @provide_compile_strategies
+  def test_resources_by_target_and_partitions(self, strategy):
     """
     This tests that resources_by_target interacts correctly with
     partitions; we want to make sure that even targets that are outside
@@ -53,13 +55,14 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
-          ['compile', 'compile.java', '--partition-size-hint=1',
+          ['compile', 'compile.java', '--strategy={}'.format(strategy), '--partition-size-hint=1',
            'testprojects/src/java/com/pants/testproject/publish/hello/main:',
          ],
           workdir, config)
         self.assert_success(pants_run)
 
-  def test_nocache(self):
+  @provide_compile_strategies
+  def test_nocache(self, strategy):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
                                   'testprojects.src.java.com.pants.testproject.nocache.nocache')
@@ -67,7 +70,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.nocache.cache_me')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
+      pants_run = self.run_pants(['compile.java',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/nocache::'],
                                  config)
       self.assert_success(pants_run)
@@ -78,7 +82,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # But cache_me should be written.
       self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
 
-  def test_java_compile_produces_different_artifact_depending_on_java_version(self):
+  @provide_compile_strategies
+  def test_java_compile_produces_different_artifact_depending_on_java_version(self, strategy):
     # Ensure that running java compile with java 6 and then java 7
     # produces two different artifacts.
 
@@ -87,7 +92,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.unicode.main.main')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
+      pants_run = self.run_pants(['compile.java',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
@@ -98,6 +104,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # Rerun for java 7
       pants_run = self.run_pants(['compile.java',
                                   '--target=1.7',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
@@ -105,7 +112,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # One artifact for java 6 and one for 7
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
 
-  def test_java_compile_reads_resource_mapping(self):
+  @provide_compile_strategies
+  def test_java_compile_reads_resource_mapping(self, strategy):
     # Ensure that if an annotation processor produces a resource-mapping,
     # the artifact contains that resource mapping.
 
@@ -114,7 +122,10 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects.src.java.com.pants.testproject.annotation.main.main')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
+      pants_run = self.run_pants(['compile.java',
+                                  '--strategy={}'.format(strategy),
+                                  'compile.apt',
+                                  '--strategy={}'.format(strategy),
                                   'testprojects/src/java/com/pants/testproject/annotation/main'],
                                  config)
       self.assert_success(pants_run)
@@ -131,13 +142,19 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
             path = os.path.join(dirpath, name)
             all_files.add(path)
 
-        report_file_name = os.path.join(extract_dir, 'compile/jvm/java/classes/deprecation_report.txt')
-        self.assertIn(report_file_name, all_files)
+        # Locate the report file on the classpath.
+        report_file_name = 'deprecation_report.txt'
+        reports = [f for f in all_files if f.endswith(report_file_name)]
+        self.assertEquals(1, len(reports),
+                          'Expected exactly one {} file; got: {}'.format(report_file_name,
+                                                                         all_files))
 
-        annotated_classes = [line.rstrip() for line in file(report_file_name).read().splitlines()]
-        self.assertEquals(
-          {'com.pants.testproject.annotation.main.Main', 'com.pants.testproject.annotation.main.Main$TestInnerClass'},
-          set(annotated_classes))
+        with open(reports[0]) as fp:
+          annotated_classes = [line.rstrip() for line in fp.read().splitlines()]
+          self.assertEquals(
+            {'com.pants.testproject.annotation.main.Main',
+             'com.pants.testproject.annotation.main.Main$TestInnerClass'},
+            set(annotated_classes))
 
   def _whitelist_test(self, target, fatal_flag, whitelist):
     # We want to ensure that a project missing dependencies can be

@@ -83,11 +83,12 @@ class ScalaCompile(JvmCompile):
     return zinc_invalidation_key
 
   def extra_products(self, target):
+    """Override extra_products to produce a plugin information file."""
     ret = []
     if target.is_scalac_plugin and target.classname:
-      # NB: We don't post-process the plugin_info_files onto the compile_classpath since we don't
-      # yet support in-line compilation of scala compiler plugins from the workspace to be used in
-      # subsequent compile rounds like we do for annotation processors with javac.
+      # NB: We don't yet support explicit in-line compilation of scala compiler plugins from
+      # the workspace to be used in subsequent compile rounds like we do for annotation processors
+      # with javac. This would require another GroupTask similar to AptCompile, but for scala.
       root, plugin_info_file = ZincUtils.write_plugin_info(self._plugin_info_dir, target)
       ret.append((root, [plugin_info_file]))
     return ret
