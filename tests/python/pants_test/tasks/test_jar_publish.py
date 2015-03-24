@@ -22,6 +22,7 @@ from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants_test.backend.jvm.tasks.jvm_compile.utils import set_compile_strategies
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -85,7 +86,6 @@ class JarPublishTest(TaskTestBase):
       }
     }
 
-
   def _prepare_mocks(self, task):
     task.scm = Mock()
     task.scm.changed_files = Mock(return_value=[])
@@ -118,6 +118,7 @@ class JarPublishTest(TaskTestBase):
           assert "Repository internal has no" in str(e)
           raise e
 
+  @set_compile_strategies
   def test_publish_local_dryrun(self):
     targets = self._prepare_for_publishing()
 

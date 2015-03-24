@@ -222,18 +222,40 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
   )
   exclude_opts="${targets_to_exclude[@]/#/--exclude-target-regexp=}"
 
-  banner "Running tests in testprojects/ "
-  (
-    ./pants.pex ${PANTS_ARGS[@]} test testprojects:: $android_test_opts $exclude_opts
-  ) || die "test failure in testprojects/"
+  run()
+  {
+    local strategy=$1
+    banner "Running tests in testprojects/ with the $strategy strategy"
+    (
+      ./pants.pex ${PANTS_ARGS[@]} test \
+        --compile-apt-strategy=$strategy \
+        --compile-java-strategy=$strategy \
+        --compile-scala-strategy=$strategy \
+        testprojects:: $android_test_opts $exclude_opts
+    ) || die "test failure in testprojects/ with the $strategy strategy"
+  }
+
+  run "global"
+  run "isolated"
 fi
 
 if [[ "${skip_examples:-false}" == "false" ]]; then
-  banner "Running example tests"
-  (
-    ./pants.pex ${PANTS_ARGS[@]} compile.python-eval --closure --fail-slow test examples:: \
-      $android_test_opts
-  ) || die "Examples test failure"
+  run()
+  {
+    local strategy=$1
+    banner "Running example tests with the $strategy strategy"
+    (
+      ./pants.pex ${PANTS_ARGS[@]} test \
+        --compile-apt-strategy=$strategy \
+        --compile-java-strategy=$strategy \
+        --compile-scala-strategy=$strategy \
+        examples:: \
+        $android_test_opts
+    ) || die "Examples tests failure with the $strategy strategy"
+  }
+
+  run "global"
+  run "isolated"
 fi
 
 

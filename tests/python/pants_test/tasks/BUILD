@@ -351,6 +351,7 @@ python_tests(
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:utils',
   ],
 )
 

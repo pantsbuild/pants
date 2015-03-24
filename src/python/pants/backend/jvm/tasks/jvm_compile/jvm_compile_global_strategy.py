@@ -20,12 +20,44 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
+from pants.option.options import Options
 from pants.util.contextutil import open_zip64, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses a global classpath and analysis."""
+
+  @classmethod
+  def register_options(cls, register, language):
+    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
+             help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
+                  'where there is no transitive BUILD file dependency path from A to B. If fatal, '
+                  'missing deps are treated as a build error.'.format(language))
+
+    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for missing direct dependencies in {0} code. Reports actual dependencies '
+                  'A -> B where there is no direct BUILD file dependency path from A to B. This is '
+                  'a very strict check; In practice it is common to rely on transitive, indirect '
+                  'dependencies, e.g., due to type inference or when the main target in a BUILD '
+                  'file is modified to depend on other targets in the same BUILD file, as an '
+                  'implementation detail. However it may still be useful to use this on '
+                  'occasion. '.format(language))
+
+    register('--missing-deps-whitelist', type=Options.list,
+             help="Don't report these targets even if they have missing deps.")
+
+    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for declared dependencies in {0} code that are not needed. This is a very '
+                  'strict check. For example, generated code will often legitimately have BUILD '
+                  'dependencies that are unused in practice.'.format(language))
+
+    register('--changed-targets-heuristic-limit', type=int, default=0,
+             help='If non-zero, and we have fewer than this number of locally-changed targets, '
+                  'partition them separately, to preserve stability when compiling repeatedly.')
+
+    register('--delete-scratch', default=True, action='store_true',
+             help='Leave intermediate scratch files around, for debugging build problems.')
 
   def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
@@ -40,6 +72,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
+
+    self._target_sources_dir = os.path.join(workdir, 'target_sources')
 
     # A temporary, but well-known, dir in which to munge analysis/dependency files in before
     # caching. It must be well-known so we know where to find the files when we retrieve them from
@@ -81,6 +115,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Populated in prepare_compile().
     self._deleted_sources = None
 
+  def name(self):
+    return 'global'
+
   def compile_context(self, target):
     """Returns the default/stable compile context for the given target.
 
@@ -98,7 +135,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       shutil.copy(src, dst)
 
   def pre_compile(self):
-    super(JvmCompileGlobalStrategy, self).pre_compile()
+    # Only create these working dirs during execution phase, otherwise, they
+    # would be wiped out by clean-all goal/task if it's specified.
+    safe_mkdir(self._target_sources_dir)
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
@@ -436,6 +475,25 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
+
+  def _get_previous_sources_by_target(self, target):
+    """Returns the target's sources as recorded on the last successful build of target.
+
+    Returns a list of absolute paths.
+    """
+    path = os.path.join(self._target_sources_dir, target.identifier)
+    if os.path.exists(path):
+      with open(path, 'r') as infile:
+        return [s.rstrip() for s in infile.readlines()]
+    else:
+      return []
+
+  def _record_previous_sources_by_target(self, target, sources):
+    # Record target -> source mapping for future use.
+    with open(os.path.join(self._target_sources_dir, target.identifier), 'w') as outfile:
+      for src in sources:
+        outfile.write(os.path.join(get_buildroot(), src))
+        outfile.write('\n')
 
   def _compute_deleted_sources(self):
     """Computes the list of sources present in the last analysis that have since been deleted.

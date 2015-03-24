@@ -31,6 +31,14 @@ python_tests(
 )
 
 python_library(
+  name = 'utils',
+  sources = ['utils.py'],
+  dependencies = [
+    '3rdparty/python:pytest',
+  ]
+)
+
+python_library(
   name='base_compile_integration_test',
   sources=['base_compile_integration_test.py'],
   dependencies=[

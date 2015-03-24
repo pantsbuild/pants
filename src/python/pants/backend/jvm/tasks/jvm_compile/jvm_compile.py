@@ -11,6 +11,8 @@ from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
+  JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
@@ -51,34 +53,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--no-warning-args', action='append', default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
-             help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
-                  'where there is no transitive BUILD file dependency path from A to B. If fatal, '
-                  'missing deps are treated as a build error.'.format(cls._language))
+    register('--strategy', choices=['global', 'isolated'], default='global',
+             help='Selects the compilation strategy to use. The "global" strategy uses a shared '
+                  'global classpath for all compiled classes, and the "isolated" strategy uses '
+                  'per-target classpaths.')
 
-    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
-             help='Check for missing direct dependencies in {0} code. Reports actual dependencies '
-                  'A -> B where there is no direct BUILD file dependency path from A to B. This is '
-                  'a very strict check; In practice it is common to rely on transitive, indirect '
-                  'dependencies, e.g., due to type inference or when the main target in a BUILD '
-                  'file is modified to depend on other targets in the same BUILD file, as an '
-                  'implementation detail. However it may still be useful to use this on '
-                  'occasion. '.format(cls._language))
-
-    register('--missing-deps-whitelist', type=Options.list,
-             help="Don't report these targets even if they have missing deps.")
-
-    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
-             help='Check for declared dependencies in {0} code that are not needed. This is a very '
-                  'strict check. For example, generated code will often legitimately have BUILD '
-                  'dependencies that are unused in practice.'.format(cls._language))
-
-    register('--changed-targets-heuristic-limit', type=int, default=0,
-             help='If non-zero, and we have fewer than this number of locally-changed targets, '
-                  'partition them separately, to preserve stability when compiling repeatedly.')
-
-    register('--delete-scratch', default=True, action='store_true',
-             help='Leave intermediate scratch files around, for debugging build problems.')
+    JvmCompileGlobalStrategy.register_options(register, cls._language)
+    JvmCompileIsolatedStrategy.register_options(register, cls._language)
 
   @classmethod
   def product_types(cls):
@@ -167,16 +148,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return []
 
   def extra_products(self, target):
-    """Any extra, out-of-band products created for a target.
+    """Any extra, out-of-band resources created for a target.
 
-    E.g., targets that produce scala compiler plugins produce an info file.
+    E.g., targets that produce scala compiler plugins or annotation processor files
+    produce an info file. The resources will be added to the compile_classpath, and
+    made available in resources_by_target.
     Returns a list of pairs (root, [absolute paths of files under root]).
     """
     return []
-
-  def post_process(self, all_targets, relevant_targets):
-    """Any extra post-execute work."""
-    pass
 
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
@@ -196,25 +175,33 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._confs = self.get_options().confs
 
     # The compile strategy to use for analysis and classfile placement.
-    self._strategy = JvmCompileGlobalStrategy(self.context,
-                                              self.get_options(),
-                                              self.workdir,
-                                              self.create_analysis_tools(),
-                                              lambda s: s.endswith(self._file_suffix))
+    if self.get_options().strategy == 'global':
+      strategy_constructor = JvmCompileGlobalStrategy
+    else:
+      assert self.get_options().strategy == 'isolated'
+      strategy_constructor = JvmCompileIsolatedStrategy
+    self._strategy = strategy_constructor(self.context,
+                                          self.get_options(),
+                                          self.workdir,
+                                          self.create_analysis_tools(),
+                                          lambda s: s.endswith(self._file_suffix))
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.
-    return JvmFingerprintStrategy(self.platform_version_info())
+    return JvmFingerprintStrategy(self._platform_version_info())
 
-  def platform_version_info(self):
+  def _platform_version_info(self):
+    return (self._strategy.name(),) + self._language_platform_version_info()
+
+  def _language_platform_version_info(self):
     """
     Provides extra platform information such as java version that will be used
     in the fingerprinter. This in turn ensures different platform versions create different
     cache artifacts.
 
-    Sublclasses should override this and return a list of version info.
+    Subclasses can override this and return a list of version info.
     """
-    return None
+    return ()
 
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
@@ -228,12 +215,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._create_empty_products()
 
   def prepare_execute(self, chunks):
-    targets_in_chunk = list(itertools.chain(*chunks))
+    targets_in_chunks = list(itertools.chain(*chunks))
 
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
-    self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunk)
+    self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -273,8 +260,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
-    self.post_process(self.context.targets(), relevant_targets)
-
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, progress_message):
     """Compiles sources for the given vts into the given output dir.
 
@@ -313,7 +298,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
 
-
   def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)
     if self.context.products.is_required_data('classes_by_source'):
@@ -329,8 +313,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
+    compile_classpath = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
 
+    # Register class products.
     if classes_by_source is not None or classes_by_target is not None:
       computed_classes_by_source = self._strategy.compute_classes_by_source(compile_contexts)
       resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
@@ -350,9 +336,16 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           if classes_by_source is not None:
             classes_by_source[source].add_abs_paths(classes_dir, classes)
 
-    # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-    if resources_by_target is not None:
-      for compile_context in compile_contexts:
+    # Register resource products.
+    for compile_context in compile_contexts:
+      extra_resources = self.extra_products(compile_context.target)
+      # Add to resources_by_target (if it was requested).
+      if resources_by_target is not None:
         target_resources = resources_by_target[compile_context.target]
-        for root, abs_paths in self.extra_products(compile_context.target):
+        for root, abs_paths in extra_resources:
           target_resources.add_abs_paths(root, abs_paths)
+      # And to the compile_classpath, to make them available within the next round.
+      # TODO(stuhood): This is redundant with resources_by_target, but resources_by_target
+      # are not available during compilation. https://github.com/pantsbuild/pants/issues/206
+      entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
+      compile_classpath.add_for_target(compile_context.target, entries)
