@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+PANTS_DEV=1 ./pants setup-py --recursive contrib/scrooge/src/python/pants/contrib/scrooge:plugin && \
 curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-12.0.7.tar.gz && \
 tar -xzf virtualenv-12.0.7.tar.gz && \
 cd virtualenv-12.0.7 && \
@@ -10,6 +11,7 @@ pip install pex && \
 pex \
   --no-wheel \
   --python=python2.7 \
+  --repo=./dist/ \
   -r pantsbuild.pants==0.0.31 \
   -r pantsbuild.pants.contrib.scrooge==0.0.31 \
   -r twitter.common.pants==0.8.2 \
