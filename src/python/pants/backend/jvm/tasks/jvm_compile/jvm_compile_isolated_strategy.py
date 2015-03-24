@@ -118,7 +118,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Now compile each invalid target one by one.
     invalid_vts_count = len(invalidation_check.invalid_vts_partitioned)
     for idx, vts in enumerate(invalidation_check.invalid_vts_partitioned):
-      # Invalidated targets are a subset of relevant targets: get the contect for this one.
+      # Invalidated targets are a subset of relevant targets: get the context for this one.
       assert len(vts.targets) == 1, ("Requested one target per partition, got %s" % vts)
       compile_context = compile_contexts[vts.targets[0]]
 
@@ -144,7 +144,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                   compile_context.classes_dir,
                   progress_message)
 
-      # Update the products with the latest classes
+      # Update the products with the latest classes.
       register_vts([compile_context])
 
       # Kick off the background artifact cache write.
@@ -195,7 +195,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       for _, paths in resources_by_target[compile_context.target].abs_paths():
         artifacts.extend(paths)
     for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
-      artifacts.extend([os.path.join(compile_context.classes_dir, dirpath, f) for f in filenames])
+      artifacts.extend([os.path.join(dirpath, f) for f in filenames])
 
     # Get the 'work' that will publish these artifacts to the cache.
     # NB: the portable analysis_file won't exist until we finish.

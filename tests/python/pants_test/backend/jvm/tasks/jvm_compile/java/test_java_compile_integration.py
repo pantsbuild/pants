@@ -42,7 +42,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self._java_compile_produces_valid_analysis_file(workdir)
       self._java_compile_produces_valid_analysis_file(workdir)
 
-  def test_resources_by_target_and_partitions(self):
+  @provide_compile_strategies
+  def test_resources_by_target_and_partitions(self, strategy):
     """
     This tests that resources_by_target interacts correctly with
     partitions; we want to make sure that even targets that are outside
@@ -54,7 +55,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
-          ['compile', 'compile.java', '--partition-size-hint=1',
+          ['compile', 'compile.java', '--strategy={}'.format(strategy), '--partition-size-hint=1',
            'testprojects/src/java/com/pants/testproject/publish/hello/main:',
          ],
           workdir, config)
@@ -143,17 +144,17 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
         # Locate the report file on the classpath.
         report_file_name = 'deprecation_report.txt'
-        for f in all_files:
-          if f.endswith(report_file_name):
-            report_file_name = f
-            break
-        else:
-          fail('No {} file found in {}'.format(report_file_name, all_files))
+        reports = [f for f in all_files if f.endswith(report_file_name)]
+        self.assertEquals(1, len(reports),
+                          'Expected exactly one {} file; got: {}'.format(report_file_name,
+                                                                         all_files))
 
-        annotated_classes = [line.rstrip() for line in file(report_file_name).read().splitlines()]
-        self.assertEquals(
-          {'com.pants.testproject.annotation.main.Main', 'com.pants.testproject.annotation.main.Main$TestInnerClass'},
-          set(annotated_classes))
+        with open(reports[0]) as fp:
+          annotated_classes = [line.rstrip() for line in fp.read().splitlines()]
+          self.assertEquals(
+            {'com.pants.testproject.annotation.main.Main',
+             'com.pants.testproject.annotation.main.Main$TestInnerClass'},
+            set(annotated_classes))
 
   def _whitelist_test(self, target, fatal_flag, whitelist):
     # We want to ensure that a project missing dependencies can be
