@@ -14,8 +14,10 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TargetDefinitionException
 from pants.util.contextutil import temporary_dir, temporary_file
@@ -52,8 +54,8 @@ class TestSetupPy(TaskTestBase):
     self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
     self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
-    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['baz==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['foo']), {'bar==0.0.0'})
+    self.assertEqual(SetupPy.install_requires(target_map['bar']), {'baz==0.0.0'})
     self.assertEqual(SetupPy.install_requires(target_map['baz']), set())
 
   @contextmanager
@@ -87,7 +89,7 @@ class TestSetupPy(TaskTestBase):
     dep_map = OrderedDict(foo=['bar', 'baz'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
     self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
-                     OrderedSet([target_map['bar']]))
+                     OrderedSet([target_map['bar'], target_map['baz']]))
     self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
     self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
@@ -104,33 +106,33 @@ class TestSetupPy(TaskTestBase):
                      OrderedSet([target_map['bak']]))
     self.assertEqual(SetupPy.minified_dependencies(target_map['baz']),
                      OrderedSet([target_map['bak']]))
-    self.assertEqual(SetupPy.install_requires(target_map['foo']), set(['bar==0.0.0', 'baz==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['bar']), set(['bak==0.0.0']))
-    self.assertEqual(SetupPy.install_requires(target_map['baz']), set(['bak==0.0.0']))
+    self.assertEqual(SetupPy.install_requires(target_map['foo']), {'bar==0.0.0', 'baz==0.0.0'})
+    self.assertEqual(SetupPy.install_requires(target_map['bar']), {'bak==0.0.0'})
+    self.assertEqual(SetupPy.install_requires(target_map['baz']), {'bak==0.0.0'})
 
   def test_binary_target_injected_into_minified_dependencies(self):
     foo_bin_dep = self.make_target(
-      spec = ':foo_bin_dep',
-      target_type = PythonLibrary,
+      spec=':foo_bin_dep',
+      target_type=PythonLibrary,
     )
 
     foo_bin = self.make_target(
-      spec = ':foo_bin',
-      target_type = PythonBinary,
-      entry_point = 'foo.bin.foo',
-      dependencies = [
+      spec=':foo_bin',
+      target_type=PythonBinary,
+      entry_point='foo.bin.foo',
+      dependencies=[
         foo_bin_dep,
       ]
     )
 
     foo = self.make_target(
-      spec = ':foo',
-      target_type = PythonLibrary,
-      provides = PythonArtifact(
-        name = 'foo',
-        version = '0.0.0',
+      spec=':foo',
+      target_type=PythonLibrary,
+      provides=PythonArtifact(
+        name='foo',
+        version='0.0.0',
       ).with_binaries(
-        foo_binary = ':foo_bin',
+        foo_binary=':foo_bin',
       )
     )
 
@@ -146,37 +148,36 @@ class TestSetupPy(TaskTestBase):
 
   def test_binary_target_injected_into_minified_dependencies_with_provider(self):
     bar_bin_dep = self.make_target(
-      spec = ':bar_bin_dep',
-      target_type = PythonLibrary,
-      provides = PythonArtifact(
-        name = 'bar_bin_dep',
-        version = '0.0.0',
+      spec=':bar_bin_dep',
+      target_type=PythonLibrary,
+      provides=PythonArtifact(
+        name='bar_bin_dep',
+        version='0.0.0',
       )
     )
 
     bar_bin = self.make_target(
-      spec = ':bar_bin',
-      target_type = PythonBinary,
-      entry_point = 'bar.bin.bar',
-      dependencies = [
+      spec=':bar_bin',
+      target_type=PythonBinary,
+      entry_point='bar.bin.bar',
+      dependencies=[
         bar_bin_dep,
       ],
     )
 
     bar = self.make_target(
-      spec = ':bar',
-      target_type = PythonLibrary,
-      provides = PythonArtifact(
-        name = 'bar',
-        version = '0.0.0',
+      spec=':bar',
+      target_type=PythonLibrary,
+      provides=PythonArtifact(
+        name='bar',
+        version='0.0.0',
       ).with_binaries(
-        bar_binary = ':bar_bin'
+        bar_binary=':bar_bin'
       )
     )
 
-    # TODO(pl): Why is this set ordered?  Does the order actually matter?
     assert SetupPy.minified_dependencies(bar) == OrderedSet([bar_bin, bar_bin_dep])
-    assert SetupPy.install_requires(bar) == set(['bar_bin_dep==0.0.0'])
+    assert SetupPy.install_requires(bar) == {'bar_bin_dep==0.0.0'}
     entry_points = dict(SetupPy.iter_entry_points(bar))
     assert entry_points == {'bar_binary': 'bar.bin.bar'}
 
@@ -191,27 +192,91 @@ class TestSetupPy(TaskTestBase):
 
   def test_binary_cycle(self):
     foo = self.make_target(
-      spec = ':foo',
-      target_type = PythonLibrary,
-      provides = PythonArtifact(
-        name = 'foo',
-        version = '0.0.0',
+      spec=':foo',
+      target_type=PythonLibrary,
+      provides=PythonArtifact(
+        name='foo',
+        version='0.0.0',
       ).with_binaries(
-        foo_binary = ':foo_bin',
+        foo_binary=':foo_bin',
       )
     )
 
-    foo_bin = self.make_target(
-      spec = ':foo_bin',
-      target_type = PythonBinary,
-      entry_point = 'foo.bin.foo',
-      dependencies = [
+    self.make_target(
+      spec=':foo_bin',
+      target_type=PythonBinary,
+      entry_point='foo.bin.foo',
+      dependencies=[
         foo,
       ],
     )
 
     with self.assertRaises(TargetDefinitionException):
       SetupPy.minified_dependencies(foo)
+
+  def test_pants_contrib_case(self):
+    def create_requirement_lib(name):
+      return self.make_target(
+        spec=':{}'.format(name),
+        target_type=PythonRequirementLibrary,
+        requirements=[
+          PythonRequirement('{}==1.1.1'.format(name))
+        ]
+      )
+
+    req1 = create_requirement_lib('req1')
+    req2 = create_requirement_lib('req2')
+    req3 = create_requirement_lib('req3')
+
+    pants_lib = self.make_target(
+      spec=':pants_lib',
+      target_type=PythonLibrary,
+      dependencies=[
+        req1,
+        req2,
+      ]
+    )
+    self.make_target(
+      spec=':pants_bin',
+      target_type=PythonBinary,
+      entry_point='pants.bin.pants_exe:main',
+      dependencies=[
+        pants_lib  # Should be stripped in minify since pants_packaged provides these sources.
+      ]
+    )
+    pants_packaged = self.make_target(
+      spec=':pants_packaged',
+      target_type=PythonLibrary,
+      provides=PythonArtifact(
+        name='pants_packaged',
+        version='0.0.0'
+      ).with_binaries(
+        pants_bin=':pants_bin'  # Should be stripped in minify since pants_packaged provides this.
+      )
+    )
+    contrib_lib = self.make_target(
+      spec=':contrib_lib',
+      target_type=PythonLibrary,
+      dependencies=[
+        pants_lib,  # Should be stripped in minify since pants_packaged provides these sources.
+        req3,
+      ]
+    )
+    contrib_plugin = self.make_target(
+      spec=':contrib_plugin',
+      target_type=PythonLibrary,
+      provides=PythonArtifact(
+        name='contrib',
+        version='0.0.0'
+      ),
+      dependencies=[
+        contrib_lib,
+        pants_packaged,
+        req1
+      ]
+    )
+    minified_dependencies = SetupPy.minified_dependencies(contrib_plugin)
+    assert minified_dependencies == OrderedSet([contrib_lib, req3, pants_packaged, req1])
 
 
 def test_detect_namespace_packages():
@@ -281,11 +346,8 @@ def test_find_packages():
   with yield_chroot(['foo', 'foo.bar'], [], resources) as chroot:
     _, _, r = SetupPy.find_packages(chroot)
     assert r == {
-      'foo': set(['f0']),
-      'foo.bar': set([
-        os.path.join('baz', 'f1'),
-        os.path.join('baz', 'f2'),
-      ])
+      'foo': {'f0'},
+      'foo.bar': {os.path.join('baz', 'f1'), os.path.join('baz', 'f2')}
     }
 
   # assert that nearest submodule splits on module prefixes
@@ -295,7 +357,7 @@ def test_find_packages():
       {'foo.bar1': ['f0']}) as chroot:
 
     _, _, r = SetupPy.find_packages(chroot)
-    assert r == {'foo': set(['bar1/f0'])}
+    assert r == {'foo': {'bar1/f0'}}
 
 
 def test_nearest_subpackage():

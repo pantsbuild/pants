@@ -60,6 +60,18 @@ class SetupPy(PythonTask):
   }
   SOURCE_ROOT = b'src'
 
+  @staticmethod
+  def is_requirements(target):
+    return isinstance(target, PythonRequirementLibrary)
+
+  @staticmethod
+  def is_python_target(target):
+    return isinstance(target, PythonTarget)
+
+  @classmethod
+  def has_provides(cls, target):
+    return cls.is_python_target(target) and target.provides
+
   @classmethod
   def register_options(cls, register):
     super(SetupPy, cls).register_options(register)
@@ -71,76 +83,60 @@ class SetupPy(PythonTask):
              help='Transitively run setup_py on all provided downstream targets.')
 
   @classmethod
-  def _combined_dependencies(cls, target):
-    dependencies = OrderedSet(target.dependencies)
-    if isinstance(target, PythonTarget):
-      return dependencies | OrderedSet(target.provided_binaries.values())
-    else:
-      return dependencies
-
-  @classmethod
-  def _construct_provider_map(cls, root_target, descendant, parents, providers, depmap):
-    if isinstance(descendant, PythonTarget) and descendant.provides:
-      providers.append(descendant)
-    for dep in cls._combined_dependencies(descendant):
-      for prv in providers:
-        depmap[prv].add(dep)
-        if dep in parents:
-          raise TargetDefinitionException(root_target,
-             '%s and %s combined have a cycle!' % (root_target, dep))
-        parents.add(dep)
-        cls._construct_provider_map(root_target, dep, parents, providers, depmap)
-        parents.remove(dep)
-    if isinstance(descendant, PythonTarget) and descendant.provides:
-      assert providers[-1] == descendant
-      providers.pop()
-
-  @classmethod
-  def construct_provider_map(cls, root_target):
-    """Construct a mapping of provider => minimal target set within :root_target.
-
-       The algorithm works in the following fashion:
-
-         1. Recursively resolve every dependency starting at root_target (the thing
-            that setup_py is being called against).  This includes the dependencies
-            of any binaries attached to the PythonArtifact using with_binaries
-         2. For every PythonTarget that provides a PythonArtifact, add an
-            entry for it to depmap[], keyed on the artifact name, containing
-            an OrderedSet of all transitively resolved children
-            dependencies.
-         3. Any concrete target with sources that is provided by another PythonArtifact
-            other than the one being built with setup_py will be elided.
-
-       Downsides:
-         - Explicitly requested dependencies may be elided if transitively included by others,
-           e.g.
-             python_library(
-               ...,
-               dependencies = [
-                  pants('src/python/twitter/common/dirutil'),
-                  pants('src/python/twitter/common/python'),
-               ]
-            )
-          will result in only pex being exported even if top-level sources
-          directly reference twitter.common.dirutil, which could be considered a leak.
-    """
-    depmap = defaultdict(OrderedSet)
-    cls._construct_provider_map(root_target, root_target, parents=set(), providers=[],
-                                depmap=depmap)
-    return depmap
-
-  @classmethod
   def minified_dependencies(cls, root_target):
-    """Minify the dependencies of a PythonTarget."""
-    depmap = cls.construct_provider_map(root_target)
-    root_deps = depmap.pop(root_target, OrderedSet())
+    """Minify the dependencies of a PythonTarget.
 
-    def elide(target):
-      if any(target in depset for depset in depmap.values()):
-        root_deps.discard(target)
+    The minified set of dependencies will be just those transitive dependencies "owned" by
+    `root_target`.
 
-    root_target.walk(elide)
-    return root_deps
+    A target is considered "owned" if:
+    1. It's 3rdparty and directly reachable from `root_target` by at least 1 path.
+    2. It's not 3rdparty and not directly reachable by any of `root_target`'s 3rdparty dependencies.
+
+    Here 3rdparty refers to either a PythonRequirementLibrary (already external distributions) or a
+    local python target that provides (able to be exported as distribution).  A non-3rdparty target
+    is just local python target that does not provide.
+    """
+
+    visits = []  # All the paths we've visited (node, [ancestors]).
+    path = []  # The current path in the walk.
+
+    def walk(current):
+      if current in path:
+        message = '{} and {} combined have a cycle!'.format(root_target, current)
+        raise TargetDefinitionException(root_target, message)
+
+      if current != root_target:
+        ancestors = list(path)
+        visits.append((current, ancestors))
+        path.append(current)
+
+      for dependency in current.dependencies:
+        walk(dependency)
+      if cls.is_python_target(current):
+        for binary in current.provided_binaries.values():
+          walk(binary)
+
+      if current != root_target:
+        path.pop()
+
+    walk(root_target)
+
+    provided_by_dep = defaultdict(bool)
+    for dep, ancestors in visits:
+      if cls.has_provides(dep) or any(p for p in ancestors if cls.has_provides(p)):
+        provided_by_dep[dep] = True
+
+    minified_deps = OrderedSet()
+    for dep, ancestors in visits:
+      if cls.is_requirements(dep) or cls.has_provides(dep):
+        if not any(provided_by_dep[p] for p in ancestors):
+          # 1 non-provided path means we keep it
+          minified_deps.add(dep)
+      elif not provided_by_dep[dep]:
+        minified_deps.add(dep)
+
+    return minified_deps
 
   @classmethod
   def iter_entry_points(cls, target):
@@ -235,16 +231,12 @@ class SetupPy(PythonTask):
   def install_requires(cls, root_target):
     install_requires = set()
     for dep in cls.minified_dependencies(root_target):
-      if isinstance(dep, PythonRequirementLibrary):
+      if cls.is_requirements(dep):
         for req in dep.payload.requirements:
           install_requires.add(str(req.requirement))
-      elif isinstance(dep, PythonTarget) and dep.provides:
+      elif cls.has_provides(dep):
         install_requires.add(dep.provides.key)
     return install_requires
-
-  @staticmethod
-  def has_provides(tgt):
-    return isinstance(tgt, PythonTarget) and tgt.provides
 
   def __init__(self, *args, **kwargs):
     super(SetupPy, self).__init__(*args, **kwargs)
@@ -302,7 +294,7 @@ class SetupPy(PythonTask):
 
     write_target(root_target)
     for dependency in self.minified_dependencies(root_target):
-      if isinstance(dependency, PythonTarget) and not dependency.provides:
+      if self.is_python_target(dependency) and not dependency.provides:
         write_target(dependency)
 
   def write_setup(self, root_target, chroot):

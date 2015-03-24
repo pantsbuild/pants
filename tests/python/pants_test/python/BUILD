@@ -102,25 +102,6 @@ python_tests(
   ],
 )
 
-python_tests(
-  name = 'test_setup_py',
-  sources = ['test_setup_py.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/python:python_artifact',
-    'src/python/pants/backend/python/targets:python',
-    'src/python/pants/backend/python/tasks:python',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
-    ],
-  )
-
 # Used by interpreter_selection_integration.
 python_binary(
   name = 'echo_interpreter_version_2.6',
