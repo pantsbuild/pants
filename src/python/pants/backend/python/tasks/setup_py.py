@@ -136,9 +136,13 @@ class SetupPy(PythonTask):
     root_deps = depmap.pop(root_target, OrderedSet())
 
     def elide(target):
-      if any(target in depset for depset in depmap.values()):
-        root_deps.discard(target)
-
+      for provider, depset in depmap.items():
+        if target in depset:
+          root_deps.discard(target)
+        elif target == provider:
+          for dep in depset:
+            if isinstance(dep, PythonTarget):
+              root_deps.discard(dep)
     root_target.walk(elide)
     return root_deps
 

@@ -14,9 +14,6 @@ python_library(
   dependencies=[
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
     'contrib/cpp/src/python/pants/contrib/cpp/targets:targets',
-    'src/python/pants/backend/core/tasks:common',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
-    'src/python/pants/util:dirutil',
+    'src/python/pants:pants-packaged',
   ],
 )
