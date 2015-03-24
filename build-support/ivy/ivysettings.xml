@@ -8,7 +8,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="root.dir" value="${ivy.settings.dir}/../.." override="false"/>
   <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
   <properties file="${root.dir}/build.properties" override="false"/>
-  <properties environment="env" />
 
   <settings defaultResolver="chain-repos"/>
 
@@ -42,10 +41,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="sbt.repo.dir" value="${user.home}/.ivy2/local" override="false"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
   <property name="pants-android.repo.dir" value="${root.dir}/3rdparty/android" override="false"/>
-  <property name="android.sdk"
-            value="${env.ANDROID_HOME}/extras/android/m2repository/com/android/support" />
-  <property name="android.repo.artifact-pattern"
-            value="[module]/[revision]/[artifact]-[revision]"/>
+
   <resolvers>
     <chain name="chain-repos" returnFirst="true">
       <_remote_resolvers name="remote-repos"/>
@@ -92,13 +88,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
           <artifact pattern="${pants-android.repo.dir}/${pants-android.repo.artifact}"/>
       </filesystem>
 
-      <!-- Local Android SDK, as pointed to by the ANDROID_HOME environmental variable. -->
-      <filesystem name="local.android" m2compatible="true" local="true" checkmodified="true">
-          <ivy pattern="${android.sdk}/${android.repo.artifact-pattern}.[ext]" />
-          <artifact pattern="${android.sdk}/${android.repo.artifact-pattern}.[ext]" />
-          <artifact pattern="${android.sdk}/${android.repo.artifact-pattern}-sources.[ext]" />
-          <artifact pattern="${android.sdk}/[${android.repo.artifact-pattern}-javadoc.[ext]" />
-      </filesystem>
     </chain>
   </resolvers>
 
