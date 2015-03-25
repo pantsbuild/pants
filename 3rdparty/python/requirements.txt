@@ -1,9 +1,4 @@
 ansicolors==1.0.2
-
-antlr_python_runtime==3.1.3
---allow-external antlr-python-runtime
---allow-unverified antlr-python-runtime
-
 coverage>=3.7,<3.8
 docutils>=0.12,<0.13
 Markdown==2.1.1

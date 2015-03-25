@@ -56,7 +56,6 @@ python_library(
   sources = ['antlr_builder.py'],
   dependencies = [
     ':code_generator',
-    '3rdparty/python:antlr-3.1.3',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/ivy',

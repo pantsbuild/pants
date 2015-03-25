@@ -39,8 +39,7 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) \
-    --allow-external antlr-python-runtime --allow-unverified antlr-python-runtime && \
+  pip install ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) && \
   python -c "import pants_test"
 }
 
@@ -139,9 +138,6 @@ function install_and_test_packages() {
   PIP_ARGS=(
     "$@"
     --quiet
-
-    # Needed for now by pantsbuild.pants which any install requires.
-    --allow-external antlr-python-runtime --allow-unverified antlr-python-runtime
   )
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
