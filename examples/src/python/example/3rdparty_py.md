@@ -29,7 +29,7 @@ file and make a pip `requirements.txt` file in the same directory.
 
 E.g, your `3rdparty/python/BUILD` file might look like:
 
-!inc[start-at=python_requirement&end-before=target](../../../../3rdparty/python/BUILD)
+!inc[start-at=python_requirement&end-before=#](../../../../3rdparty/python/BUILD)
 
 ...with `3rdparty/python/requirements.txt` like:
 

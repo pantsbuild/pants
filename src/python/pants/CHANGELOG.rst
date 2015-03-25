@@ -326,7 +326,7 @@ API Changes
   - Deprecate target.with_description in favor of target(description=)
     `RB #1790 <https://rbcommons.com/s/twitter/r/1790>`_
   - Allow exclude in globs
-    `RB #1790 <https://rbcommons.com/s/twitter/r/1762>`_
+    `RB #1762 <https://rbcommons.com/s/twitter/r/1762>`_
   - Move with_artifacts to an artifacts argument
     `RB #1672 <https://rbcommons.com/s/twitter/r/1672>`_
 
@@ -504,7 +504,7 @@ Bugfixes and features
 * Add util.XmlParser and AndroidManifestParser
   `RB #1757 <https://rbcommons.com/s/twitter/r/1757>`_
 
-* Replace Compatibility.exec_function with six.exec_
+* Replace Compatibility.exec_function with `six.exec_`
   `RB #1742 <https://rbcommons.com/s/twitter/r/1742>`_
   `RB #1794 <https://rbcommons.com/s/twitter/r/1794>`_
 
@@ -518,7 +518,7 @@ Bugfixes and features
   `RB #1780 <https://rbcommons.com/s/twitter/r/1780>`_
 
 * Fixup JarPublish changelog rendering
-  `RB #1780 <https://rbcommons.com/s/twitter/r/1787>`_
+  `RB #1787 <https://rbcommons.com/s/twitter/r/1787>`_
 
 * Preserve dictionary order in the anonymizer
   `RB #1779 <https://rbcommons.com/s/twitter/r/1779>`_

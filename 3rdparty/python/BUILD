@@ -4,4 +4,11 @@
 # see/edit requirements.txt in this directory to change deps.
 python_requirements()
 
-target(name='antlr-3.1.3', dependencies=[':antlr-python-runtime'])
+# Only used by tests so we lift this library out of the requirements.txt
+# file used to bootstrap pants itself.
+python_requirement_library(
+  name='antlr-3.1.3',
+  requirements=[
+    python_requirement('antlr_python_runtime==3.1.3')
+  ]
+)
