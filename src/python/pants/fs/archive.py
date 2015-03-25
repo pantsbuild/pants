@@ -10,7 +10,7 @@ from abc import abstractmethod
 from collections import OrderedDict
 from zipfile import ZIP_DEFLATED
 
-from pants.util.contextutil import open_tar, open_zip64
+from pants.util.contextutil import open_tar, open_zip
 from pants.util.dirutil import safe_walk
 from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_text
@@ -66,7 +66,7 @@ class ZipArchiver(Archiver):
     :param function filter_func: optional filter with the filename as the parameter.  Returns True if
       the file should be extracted.
     """
-    with open_zip64(path) as archive_file:
+    with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
         if name.startswith(b'/') or name.startswith(b'..'):
@@ -85,7 +85,7 @@ class ZipArchiver(Archiver):
 
   def create(self, basedir, outdir, name, prefix=None):
     zippath = os.path.join(outdir, '%s.zip' % name)
-    with open_zip64(zippath, 'w', compression=ZIP_DEFLATED) as zip:
+    with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
       for root, _, files in safe_walk(basedir):
         root = ensure_text(root)
         for file in files:

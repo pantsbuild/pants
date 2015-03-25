@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
-from pants.util.contextutil import open_zip64
+from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_rmtree, touch
 from pants_test.task_test_base import TaskTestBase
 
@@ -40,7 +40,7 @@ class DuplicateDetectorTest(TaskTestBase):
     touch(unicode_class_path)
 
     def generate_jar(path, *class_name):
-      with open_zip64(generate_path(path), 'w') as zipfile:
+      with open_zip(generate_path(path), 'w') as zipfile:
         for clazz in class_name:
           zipfile.write(clazz)
         return zipfile.filename
