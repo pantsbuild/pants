@@ -94,7 +94,13 @@ class ScalastyleTest(NailgunTaskTestBase):
       FileExcluder('file_does_not_exist.txt', logger)
 
   def test_excludes_parsed_loaded_correctly(self):
-    excluder = FileExcluder(self._create_scalastyle_excludes_file(['.*\.cpp', '.*\.py']), logger)
+    excludes_text = dedent('''
+      # ignore C++
+      .*\.cpp
+
+      # ignore python
+      .*\.py''')
+    excluder = FileExcluder(self._create_scalastyle_excludes_file([excludes_text]), logger)
     self.assertEqual(2, len(excluder.excludes))
     self.assertTrue(excluder.should_include('com/some/org/x.scala'))
     self.assertFalse(excluder.should_include('com/some/org/y.cpp'))

@@ -23,9 +23,11 @@ class FileExcluder(object):
       if not os.path.exists(excludes_path):
         raise TaskError('Excludes file does not exist: {0}'.format(excludes_path))
       with open(excludes_path) as fh:
-        for pattern in fh.readlines():
-          self.excludes.add(re.compile(pattern.strip()))
-          log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
+        for line in fh.readlines():
+          pattern = line.strip()
+          if pattern and not pattern.startswith('#'):
+            self.excludes.add(re.compile(pattern))
+            log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
     else:
       log.debug('No excludes file specified. All scala sources will be checked.')
 
@@ -62,8 +64,9 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     register('--skip', action='store_true', help='Skip scalastyle.')
     register('--config', advanced=True, help='Path to scalastyle config file.')
     register('--excludes', advanced=True,
-             help='Path to optional scalastyle excludes file. Each line is a regex. a file is '
-                  'skipped if its path (relative to the repo root) matches any of these regexes.')
+             help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
+                  'and lines starting with \'#\' are ignored.) A file is skipped if its path '
+                  '(relative to the repo root) matches any of these regexes.')
     cls.register_jvm_tool(register, 'scalastyle')
 
   @classmethod
