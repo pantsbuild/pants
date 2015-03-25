@@ -18,7 +18,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
-from pants.util.contextutil import open_zip64
+from pants.util.contextutil import open_zip
 from pants.util.dirutil import relativize_paths, safe_open
 
 
@@ -211,7 +211,7 @@ class ZincUtils(object):
     plugins = {}
     buildroot = get_buildroot()
     for jar in self.plugin_jars():
-      with open_zip64(jar, 'r') as jarfile:
+      with open_zip(jar, 'r') as jarfile:
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
             plugin_info = ElementTree.parse(plugin_info_file).getroot()

@@ -13,7 +13,7 @@ from pex.compatibility import to_bytes
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
-from pants.util.contextutil import open_zip64
+from pants.util.contextutil import open_zip
 
 
 EXCLUDED_FILES = ['dependencies,license,notice,.DS_Store,notice.txt,cmdline.arg.info.txt.1,'
@@ -105,7 +105,7 @@ class DuplicateDetector(JvmBinaryTask):
     for basedir, externaljar in  self.list_external_jar_dependencies(binary_target):
       external_dep = os.path.join(basedir, externaljar)
       self.context.log.debug('  scanning %s' % external_dep)
-      with open_zip64(external_dep) as dep_zip:
+      with open_zip(external_dep) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
           # Zip entry names can come in any encoding and in practice we find some jars that have
           # utf-8 encoded entry names, some not.  As a result we cannot simply decode in all cases

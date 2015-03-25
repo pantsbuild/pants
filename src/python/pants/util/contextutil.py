@@ -142,24 +142,14 @@ def open_zip(path_or_file, *args, **kwargs):
     A with-context for zip files.  Passes through positional and kwargs to zipfile.ZipFile.
   """
   try:
-    zf = zipfile.ZipFile(path_or_file, *args, **kwargs)
+    allowZip64 = kwargs.pop('allowZip64', True)
+    zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allowZip64, **kwargs)
   except zipfile.BadZipfile as bze:
     raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(path_or_file, bze))
   try:
     yield zf
   finally:
     zf.close()
-
-
-@contextmanager
-def open_zip64(path_or_file, *args, **kwargs):
-  """
-    A with-context for zip files with allowZip64 True.
-    Passes through positional and kwargs to openZip.
-  """
-  allowZip64 = kwargs.pop('allowZip64', True)
-  with open_zip(path_or_file, *args, allowZip64=allowZip64, **kwargs) as zf:
-    yield zf
 
 
 @contextmanager
