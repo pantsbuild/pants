@@ -16,9 +16,7 @@ python_library(
     description='A bottom-up build tool.',
     namespace_packages=['pants'],
   ).with_binaries(
-    # TODO(John Sirois): Switch back when target cycles have been sorted out.
-    # pants='src/python/pants/bin:pants',
-    pants=':_pants_transitional_publishable_binary_',
+    pants='src/python/pants/bin:pants',
   )
 )
 

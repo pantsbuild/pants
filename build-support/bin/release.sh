@@ -59,7 +59,7 @@ ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)
 source ${ROOT}/build-support/common.sh
 
 function run_local_pants() {
-  PANTS_DEV=1 ${ROOT}/pants "$@"
+  ${ROOT}/pants "$@"
 }
 
 # When we do (dry-run) testing, we need to run the packaged pants.
@@ -136,7 +136,13 @@ function post_install() {
 }
 
 function install_and_test_packages() {
-  PIP_ARGS="$@ --quiet"
+  PIP_ARGS=(
+    "$@"
+    --quiet
+
+    # Needed for now by pantsbuild.pants which any install requires.
+    --allow-external antlr-python-runtime --allow-unverified antlr-python-runtime
+  )
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
@@ -146,7 +152,7 @@ function install_and_test_packages() {
     banner "Installing and testing package ${NAME}-$(local_version) ..."
 
     pre_install && \
-    eval $INSTALL_TEST_FUNC $PIP_ARGS && \
+    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} && \
     post_install || \
     die "Failed to install and test package ${NAME}-$(local_version)!"
   done
@@ -183,8 +189,9 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.github.io/release.html"
   echo
-  echo "Usage: $0 (-h|-opd)"
+  echo "Usage: $0 (-h|-pnt)"
   echo " -h  Prints out this help message."
+  echo " -p  Use pants.pex to do the release instead of PANTS_DEV=1 ./pants."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
@@ -202,14 +209,21 @@ function usage() {
   fi
 }
 
-while getopts "hnt" opt; do
+use_pex="false"
+
+while getopts "hpnt" opt; do
   case ${opt} in
     h) usage ;;
+    p) use_pex="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
+
+if [[ "${use_pex}" != "true" ]]; then
+  export PANTS_DEV=1
+fi
 
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."
