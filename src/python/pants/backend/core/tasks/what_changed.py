@@ -70,7 +70,7 @@ class ChangeCalculator(object):
     if not changed:
       return changed
 
-    if self._include_dependees is None:
+    if self._include_dependees == 'none':
       return changed
 
     # Load the whole build graph since we need it for dependee finding in either remaining case.
@@ -122,7 +122,7 @@ class ChangedFileTaskMixin(object):
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
     register('--diffspec',
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
-    register('--include-dependees', choices=['direct', 'transitive'], default=None,
+    register('--include-dependees', choices=['none', 'direct', 'transitive'], default='none',
              help='Include direct or transitive dependees of changed targets.')
 
   @classmethod
