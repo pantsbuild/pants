@@ -1,6 +1,96 @@
 RELEASE HISTORY
 ===============
 
+0.0.32 (3/26/2015)
+------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fixup minified_dependencies
+  `Issue #1329 <https://github.com/pantsbuild/pants/issues/1329>`_
+  `RB #1986 <https://rbcommons.com/s/twitter/r/1986>`_
+
+* Don`t mutate options in the linter
+  `RB #1978 <https://rbcommons.com/s/twitter/r/1978>`_
+
+* Fix a bad logic bug in zinc analysis split code
+  `RB #1969 <https://rbcommons.com/s/twitter/r/1969>`_
+
+* always use relpath on --test file args
+  `RB #1976 <https://rbcommons.com/s/twitter/r/1976>`_
+
+* Fixup resources drift in the sdist package
+  `RB #1974 <https://rbcommons.com/s/twitter/r/1974>`_
+
+* Fix publish override flag
+  `Issue #1277 <https://github.com/pantsbuild/pants/issues/1277>`_
+  `RB #1959 <https://rbcommons.com/s/twitter/r/1959>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Remove open_zip64 in favor of supporting zip64 everywhere
+  `RB #1984 <https://rbcommons.com/s/twitter/r/1984>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* rm python_old, an old document
+  `RB #1973 <https://rbcommons.com/s/twitter/r/1973>`_
+
+* Updated ivysettings.xml with comments and commented out local repos
+  `RB #1979 <https://rbcommons.com/s/twitter/r/1979>`_
+
+* Update how to setup proxies in ivy
+  `RB #1975 <https://rbcommons.com/s/twitter/r/1975>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Ignore blank lines and comments in scalastyle excludes file
+  `RB #1971 <https://rbcommons.com/s/twitter/r/1971>`_
+
+* Adding a --test-junit-coverage-jvm-options flag
+  `RB #1968 <https://rbcommons.com/s/twitter/r/1968>`_
+
+* --soft-excludes flag for resolve-ivy
+  `RB #1961 <https://rbcommons.com/s/twitter/r/1961>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Rid pantsbuild.pants of an un-needed antlr dep
+  `RB #1989 <https://rbcommons.com/s/twitter/r/1989>`_
+
+* Kill the BUILD.transitional targets
+  `Issue #1126 <https://github.com/pantsbuild/pants/issues/1126>`_
+  `RB #1983 <https://rbcommons.com/s/twitter/r/1983>`_
+
+* Convert ragel-gen.py to use new options and expunge config from BinaryUtil
+  `RB #1970 <https://rbcommons.com/s/twitter/r/1970>`_
+
+* Add the JvmCompileIsolatedStrategy
+  `RB #1898 <https://rbcommons.com/s/twitter/r/1898>`_
+
+* Move construction of PythonChroot to PythonTask base class
+  `RB #1965 <https://rbcommons.com/s/twitter/r/1965>`_
+
+* Delete the PythonBinaryBuilder class
+  `RB #1964 <https://rbcommons.com/s/twitter/r/1964>`_
+
+* Removing dead code
+  `RB #1960 <https://rbcommons.com/s/twitter/r/1960>`_
+
+* Make the test check that the return code is propagated
+  `RB #1966 <https://rbcommons.com/s/twitter/r/1966>`_
+
+* Cleanup
+  `RB #1962 <https://rbcommons.com/s/twitter/r/1962>`_
+
+* Get rid of almost all direct config access in python-building code
+  `RB #1954 <https://rbcommons.com/s/twitter/r/1954>`_
+
 0.0.31 (3/20/2015)
 ------------------
 

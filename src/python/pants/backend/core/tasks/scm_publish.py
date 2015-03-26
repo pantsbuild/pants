@@ -211,18 +211,3 @@ class ScmPublishMixin(object):
 
     else:
       raise scm_exception
-
-class ScmPublish(ScmPublishMixin):
-  @deprecated('0.0.32', hint_message='Use ScmPublishMixin instead.')
-  def __init__(self, scm, restrict_push_branches):
-    self._restrict_push_branches = frozenset(restrict_push_branches or ())
-    self.scm = scm
-    self.log = self.context.log
-
-  @property
-  def restrict_push_branches(self):
-    return self._restrict_push_branches
-
-  @property
-  def scm_push_attempts(self):
-    return self._SCM_PUSH_ATTEMPTS
