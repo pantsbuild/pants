@@ -21,13 +21,7 @@ PKG_SCROOGE=(
 )
 function pkg_scrooge_install_test() {
   PIP_ARGS="$@"
-  # TODO(John Sirois): The generated pantsbuild.pants.contrib.scrooge should have a requirement on
-  # pantsbuild.pants but it currently does not so we must manually install it here.  Investigate
-  # this and when fixed, drop the pantsbuild.pants install requirement here.
-  # See: https://github.com/pantsbuild/pants/issues/1126
-  pip install ${PIP_ARGS} \
-    pantsbuild.pants==$(local_version) \
-    pantsbuild.pants.contrib.scrooge==$(local_version) && \
+  pip install ${PIP_ARGS} pantsbuild.pants.contrib.scrooge==$(local_version) && \
   execute_packaged_pants_with_internal_backends --explain gen | grep "scrooge" &> /dev/null && \
   execute_packaged_pants_with_internal_backends goals | grep "thrift-linter" &> /dev/null
 }

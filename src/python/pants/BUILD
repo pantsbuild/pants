@@ -29,6 +29,10 @@ python_library(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/engine:engine_test_base',
+
+    # TODO(John Sirois): Remove this once setup-py learns to index providers that are out of scope.
+    # see: https://github.com/pantsbuild/pants/issues/1329
+    'src/python/pants:pants-packaged',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
