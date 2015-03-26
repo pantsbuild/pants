@@ -90,13 +90,26 @@ class SetupPy(PythonTask):
     `root_target`.
 
     A target is considered "owned" if:
-    1. It's 3rdparty and directly reachable from `root_target` by at least 1 path.
-    2. It's not 3rdparty and not directly reachable by any of `root_target`'s 3rdparty dependencies.
+    1. It's "3rdparty" and "directly reachable" from `root_target` by at least 1 path.
+    2. It's not "3rdparty" and not "directly reachable" by any of `root_target`'s "3rdparty"
+       dependencies.
 
-    Here 3rdparty refers to either a PythonRequirementLibrary (already external distributions) or a
-    local python target that provides (able to be exported as distribution).  A non-3rdparty target
-    is just local python target that does not provide.
+    Here "3rdparty" refers to either a PythonRequirementLibrary (already external distributions) or
+    an exportable python target, typically a PythonLibrary or PythonBinary that provides a
+    `setup_py` configuration.
+
+    And in this context "directly reachable" means the target can be reached by following a series
+    of dependency links from the `root_target`, never crossing an exportable target.
     """
+
+    # The strategy here follows the description above closely.
+    # 1. Build a pre-order traversal list of all paths in `root_target`'s dependency closure.
+    # 2. Iterate the list and use the path information to determine if each visited target should
+    #    be included in `root_target`'s distribution as sources or as a setup_requires requirement.
+    #
+    # NB: The `root_target` dependency closure collection follows the logic of `PythonTarget.walk`
+    # and collects not only `root_target`'s direct dependency graph closure but also the targets
+    # reachable from any exportable python targets provided binaries (if any).
 
     visits = []  # All the paths we've visited (node, [ancestors]).
     path = []  # The current path in the walk.
@@ -122,7 +135,7 @@ class SetupPy(PythonTask):
 
     walk(root_target)
 
-    provided_by_dep = defaultdict(bool)
+    provided_by_dep = defaultdict(lambda: False)
     for dep, ancestors in visits:
       if cls.has_provides(dep) or any(p for p in ancestors if cls.has_provides(p)):
         provided_by_dep[dep] = True
@@ -130,6 +143,7 @@ class SetupPy(PythonTask):
     minified_deps = OrderedSet()
     for dep, ancestors in visits:
       if cls.is_requirements(dep) or cls.has_provides(dep):
+        # A "3rdparty" dep
         if not any(provided_by_dep[p] for p in ancestors):
           # 1 non-provided path means we keep it
           minified_deps.add(dep)

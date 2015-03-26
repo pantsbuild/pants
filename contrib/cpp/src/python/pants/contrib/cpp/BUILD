@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/goal:task_registrar',
 
     # TODO(John Sirois): Remove this once setup-py learns to index providers that are out of scope.
+    # see: https://github.com/pantsbuild/pants/issues/1329
     'src/python/pants:pants-packaged',
   ],
   provides=contrib_setup_py(
