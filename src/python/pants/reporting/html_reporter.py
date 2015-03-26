@@ -124,7 +124,7 @@ class HtmlReporter(Reporter):
       if unaccounted_time_secs >= 1 and unaccounted_time_secs > 0.05 * duration:
         unaccounted_time = '%.3f' % unaccounted_time_secs
     args = { 'workunit': workunit.to_dict(),
-             'status': workunit.choose(*HtmlReporter._outcome_css_classes),
+             'status': HtmlReporter._outcome_css_classes[workunit.outcome()],
              'timing': timing,
              'unaccounted_time': unaccounted_time,
              'aborted': workunit.outcome() == WorkUnit.ABORTED }
