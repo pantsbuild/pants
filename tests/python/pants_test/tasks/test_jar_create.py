@@ -16,7 +16,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
 from pants.base.source_root import SourceRoot
-from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
