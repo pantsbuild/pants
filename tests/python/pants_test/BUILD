@@ -70,7 +70,6 @@ target(
 target(
   name = 'all',
   dependencies = [
-    ':test_binaryutil',
     ':test_maven_layout',
     'tests/python/pants_test/android',
     'tests/python/pants_test/authentication:netrc',
