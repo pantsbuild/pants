@@ -5,7 +5,7 @@ python_library(
   name = 'subsystem',
   sources = globs('*.py'),
   dependencies = [
-    'src/python/pants/options',
+    'src/python/pants/option',
     'src/python/pants/util:meta',
     ],
   )
