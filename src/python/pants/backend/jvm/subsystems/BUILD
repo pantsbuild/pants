@@ -17,5 +17,6 @@ python_library(
     ':jvm_tool_mixin',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
+    'src/python/pants/subsystem',
     ],
   )
