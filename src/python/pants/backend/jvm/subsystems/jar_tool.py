@@ -21,8 +21,9 @@ class JarTool(JvmToolMixin, Subsystem):
              help='Run the jar tool with these JVM options.')
     cls.register_jvm_tool(register, 'jar-tool')
 
-  def run(self, runjava, args):
-    return runjava(self.tool_classpath('jar-tool'),
+  def run(self, context, runjava, args):
+    return runjava(self.tool_classpath_from_products(context.products, 'jar-tool',
+                                                     scope=self.options_scope),
                    'com.twitter.common.jar.tool.Main',
                    jvm_options=self.get_options().jvm_options,
                    args=args,

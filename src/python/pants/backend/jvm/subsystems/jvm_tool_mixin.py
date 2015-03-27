@@ -10,6 +10,7 @@ from pants.option.options import Options
 
 
 class JvmToolMixin(object):
+  """A mixin for registering and accessing JVM-based tools."""
 
   _tool_keys = []  # List of (scope, key) pairs.
 
@@ -17,6 +18,7 @@ class JvmToolMixin(object):
   def register_jvm_tool(cls, register, key, default=None):
     """Register a tool."""
     register('--{0}'.format(key),
+             advanced=True,
              type=Options.list,
              default=default or ['//:{0}'.format(key)],
              help='Target specs for bootstrapping the {0} tool.'.format(key))
@@ -31,21 +33,19 @@ class JvmToolMixin(object):
     """Needed only for test isolation."""
     JvmToolMixin._tool_keys = []
 
-  def tool_classpath(self, key, scope=None):
+  def tool_classpath_from_products(self, products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.
 
     Returns a list of paths.
     """
-    return self.lazy_tool_classpath(key, scope)()
+    return self.lazy_tool_classpath_from_products(products, key, scope)()
 
-  def lazy_tool_classpath(self, key, scope=None):
+  def lazy_tool_classpath_from_products(self, products, key, scope):
     """Get a lazy classpath for the tool previously registered under the key in the given scope.
 
     Returns a no-arg callable. Invoking it returns a list of paths.
     """
-    scope = scope or self.options_scope
-    callback_product_map = \
-      self.context.products.get_data('jvm_build_tools_classpath_callbacks') or {}
+    callback_product_map = products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(scope, {}).get(key)
     if not callback:
       raise TaskError('No bootstrap callback registered for {key} in {scope}'.format(

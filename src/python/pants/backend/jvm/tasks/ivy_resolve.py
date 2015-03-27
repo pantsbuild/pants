@@ -13,9 +13,9 @@ from textwrap import dedent
 
 from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
@@ -25,7 +25,7 @@ from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 
-class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolMixin):
+class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
   class Error(TaskError):
     """Error in IvyResolve."""

@@ -17,8 +17,8 @@ from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
@@ -30,7 +30,7 @@ from pants.java import util
 logger = logging.getLogger(__name__)
 
 
-class WireGen(CodeGen, JvmToolMixin):
+class WireGen(CodeGen, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)

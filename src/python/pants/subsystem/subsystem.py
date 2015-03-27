@@ -74,7 +74,7 @@ class Subsystem(AbstractClass):
   def global_instance(cls):
     return cls.instance_for_scope(Options.GLOBAL_SCOPE)
 
-  def __init__(self, scoped_options):
+  def __init__(self, context, scope, scoped_options):
     """Note: A subsystem has no access to options in global scope or scopes other than its own.
 
     Task code should prefer to call instance_for_scope() or global_instance() to get a subsystem
@@ -82,7 +82,17 @@ class Subsystem(AbstractClass):
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
     """
+    self._context = context
+    self._scope = scope
     self._scoped_options = scoped_options
+
+  @property
+  def context(self):
+    return self._context
+
+  @property
+  def options_scope(self):
+    return self._scope
 
   def get_options(self):
     """Returns the option values for this subsystem's scope."""

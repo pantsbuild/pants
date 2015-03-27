@@ -12,9 +12,9 @@ import tempfile
 from collections import defaultdict, namedtuple
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
@@ -31,7 +31,7 @@ _CONFIG_SECTION = 'scrooge-gen'
 _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 
-class ScroogeGen(NailgunTask, JvmToolMixin):
+class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
 

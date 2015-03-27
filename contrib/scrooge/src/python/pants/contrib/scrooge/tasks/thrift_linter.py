@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -16,7 +16,7 @@ class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinter(NailgunTask, JvmToolMixin):
+class ThriftLinter(NailgunTask, JvmToolTaskMixin):
   """Print linter warnings for thrift files.
   """
 
