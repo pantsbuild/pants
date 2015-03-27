@@ -280,7 +280,7 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
-        JarTool.global_instance().run(runjava=self.runjava, args=args)
+        JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args)
 
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""

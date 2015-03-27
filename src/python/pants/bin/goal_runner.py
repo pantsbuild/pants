@@ -86,6 +86,10 @@ class GoalRunner(object):
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
 
+    # Make the options values available on all subsystems.
+    for subsystem_type in Goal.all_subsystem_types():
+      subsystem_type._options = self.options
+
     self.run_tracker = RunTracker.from_options(self.options)
     report = initial_reporting(self.config, self.run_tracker)
     self.run_tracker.start(report)

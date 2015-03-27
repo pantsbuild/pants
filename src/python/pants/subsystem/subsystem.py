@@ -37,7 +37,7 @@ class Subsystem(AbstractClass):
     cls._register_options_on_scope(options, Options.GLOBAL_SCOPE)
 
   @classmethod
-  def register_options_for_per_task_instance(cls, options, task):
+  def register_options_for_task_instance(cls, options, task):
     """Register options for a per-task instance of this subsystem.
 
     Subclasses should not generally need to override this method.
@@ -67,14 +67,15 @@ class Subsystem(AbstractClass):
   @classmethod
   def instance_for_scope(cls, scope):
     if scope not in cls._scoped_instances:
-      cls._scoped_instances[scope] = cls(cls._options.for_scope(cls.qualify_scope(scope)))
+      scope = cls.qualify_scope(scope)
+      cls._scoped_instances[scope] = cls(scope, cls._options.for_scope(scope))
     return cls._scoped_instances[scope]
 
   @classmethod
   def global_instance(cls):
     return cls.instance_for_scope(Options.GLOBAL_SCOPE)
 
-  def __init__(self, context, scope, scoped_options):
+  def __init__(self, scope, scoped_options):
     """Note: A subsystem has no access to options in global scope or scopes other than its own.
 
     Task code should prefer to call instance_for_scope() or global_instance() to get a subsystem
@@ -82,13 +83,8 @@ class Subsystem(AbstractClass):
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
     """
-    self._context = context
     self._scope = scope
     self._scoped_options = scoped_options
-
-  @property
-  def context(self):
-    return self._context
 
   @property
   def options_scope(self):
