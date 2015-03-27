@@ -70,9 +70,9 @@ python_tests(
   name = 'test_binaryutil',
   sources = ['test_binaryutil.py',],
   dependencies = [
-    ':base_test',
     'src/python/pants/util:binaryutil',
     'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:base_test',
   ]
 )
 
