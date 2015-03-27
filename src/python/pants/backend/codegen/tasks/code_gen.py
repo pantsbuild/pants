@@ -80,6 +80,17 @@ class CodeGen(Task):
   def execute(self):
     gentargets = self.context.targets(self.is_gentarget)
     capabilities = self.genlangs() # lang_name => predicate
+
+    # Try to eliminate running the codegen task for languages that
+    # don't reference the codegen targets.
+
+    # TODO(Eric Ayers) This only get direct dependents of codegen targets,
+    # so if you have a dependency that goes through target() or only
+    # a transitive dependency from a language specific target to the codegen
+    # target, this will inadvertently skip calling the code generator.  You
+    # can work around this by always turning on code generation
+    # through the implemention of self.is_forced()
+    # See: https://github.com/pantsbuild/pants/pull/121.
     gentargets_by_dependee = self.context.dependents(
       on_predicate=self.is_gentarget,
       from_predicate=lambda t: not self.is_gentarget(t)
@@ -98,9 +109,12 @@ class CodeGen(Task):
       return tgts.intersection(set(gentargets))
 
     gentargets_bylang = {}
+    forced = False
     for lang, predicate in capabilities.items():
+      if self.is_forced(lang):
+        forced = True
       gentargets_bylang[lang] = gentargets if self.is_forced(lang) else find_gentargets(predicate)
-    if gentargets_by_dependee:
+    if not forced and gentargets_by_dependee:
       self.context.log.warn('Left with unexpected unconsumed gen targets:\n\t%s' % '\n\t'.join(
         '%s -> %s' % (dependee, gentargets)
         for dependee, gentargets in gentargets_by_dependee.items()
