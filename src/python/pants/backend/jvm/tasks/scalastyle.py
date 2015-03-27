@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
@@ -38,7 +38,7 @@ class FileExcluder(object):
     return True
 
 
-class Scalastyle(NailgunTask, JvmToolTaskMixin):
+class Scalastyle(NailgunTask, JvmToolMixin):
   """Checks scala source files to ensure they're stylish.
 
   Scalastyle only checks scala sources in non-synthetic targets.

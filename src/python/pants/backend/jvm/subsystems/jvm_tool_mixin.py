@@ -9,26 +9,27 @@ from pants.base.exceptions import TaskError
 from pants.option.options import Options
 
 
-class JvmToolTaskMixin(object):
+class JvmToolMixin(object):
 
   _tool_keys = []  # List of (scope, key) pairs.
 
   @classmethod
   def register_jvm_tool(cls, register, key, default=None):
+    """Register a tool."""
     register('--{0}'.format(key),
              type=Options.list,
              default=default or ['//:{0}'.format(key)],
              help='Target specs for bootstrapping the {0} tool.'.format(key))
-    JvmToolTaskMixin._tool_keys.append((cls.options_scope, key))
+    JvmToolMixin._tool_keys.append((register.scope, key))
 
   @staticmethod
   def get_registered_tools():
-    return JvmToolTaskMixin._tool_keys
+    return JvmToolMixin._tool_keys
 
   @staticmethod
   def reset_registered_tools():
     """Needed only for test isolation."""
-    JvmToolTaskMixin._tool_keys = []
+    JvmToolMixin._tool_keys = []
 
   def tool_classpath(self, key, scope=None):
     """Get a classpath for the tool previously registered under key in the given scope.

@@ -13,11 +13,11 @@ from contextlib import contextmanager
 from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
+from pants.backend.jvm.subsystems.jar_tool import JarTool
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
 from pants.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import temporary_dir
@@ -202,8 +202,9 @@ class JarTask(NailgunTask):
   All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
   invocations.
   """
-
-  _CONFIG_SECTION = 'jar-tool'
+  @classmethod
+  def subsystems(cls):
+    return super(JarTask, cls).subsystems() + (JarTool, )
 
   @staticmethod
   def _flag(bool_value):
@@ -224,11 +225,6 @@ class JarTask(NailgunTask):
     return name
 
   @classmethod
-  def register_options(cls, register):
-    super(JarTask, cls).register_options(register)
-    cls.register_jvm_tool(register, 'jar-tool')
-
-  @classmethod
   def prepare(cls, options, round_manager):
     super(JarTask, cls).prepare(options, round_manager)
     round_manager.require_data('resources_by_target')
@@ -239,10 +235,6 @@ class JarTask(NailgunTask):
     self.set_distribution(jdk=True)
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
-
-  @property
-  def config_section(self):
-    return self._CONFIG_SECTION
 
   @contextmanager
   def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
@@ -288,16 +280,7 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
-        # TODO(Eric Ayers): This needs to be migrated with some thought behind it.  Consider
-        # that The jar-tool nailgun instance is shared between tasks and doesn't necessarily
-        # need the same JVM args as its parent.
-        jvm_options = self.context.config.getlist('jar-tool', 'jvm_args', default=['-Xmx64M'])
-        self.runjava(self.tool_classpath('jar-tool'),
-                     'com.twitter.common.jar.tool.Main',
-                     jvm_options=jvm_options,
-                     args=args,
-                     workunit_name='jar-tool',
-                     workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])
+        JarTool.global_instance().run(runjava=self.runjava, args=args)
 
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""

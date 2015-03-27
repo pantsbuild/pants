@@ -43,6 +43,14 @@ class Goal(object):
     """Returns all registered goals, sorted alphabetically by name."""
     return [pair[1] for pair in sorted(Goal._goal_by_name.items())]
 
+  @classmethod
+  def all_subsystem_types(cls):
+    """Returns all subsystem types used by all tasks, in no particular order."""
+    subsystem_types = set()
+    for goal in cls.all():
+      subsystem_types.update(goal.subsystem_types())
+    return subsystem_types
+
 
 class _Goal(object):
   def __init__(self, name):
@@ -138,6 +146,17 @@ class _Goal(object):
       for scope in task_type.known_scopes():
         if scope != self.name:
           yield scope
+        # Also allow any subsystems in task scope (for the cases when different tasks want to
+        # configure the same subsystem differently).
+        for subsystem in task_type.subsystems():
+          yield subsystem.qualify_scope(scope)
+
+  def subsystem_types(self):
+    """Returns all subsystem types used by tasks in this goal, in no particular order."""
+    subsystem_types = set()
+    for task_type in self.task_types():
+      subsystem_types.update(task_type.subsystems())
+    return subsystem_types
 
   def ordered_task_names(self):
     """The task names in this goal, in registration order."""

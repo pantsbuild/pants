@@ -16,9 +16,9 @@ from six.moves import range
 from twitter.common.collections import OrderedSet
 
 from pants import binary_util
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
@@ -648,7 +648,7 @@ class Cobertura(_Coverage):
                         " 'failed to report'".format(main, result))
 
 
-class JUnitRun(JvmTask, JvmToolTaskMixin):
+class JUnitRun(JvmTask, JvmToolMixin):
   _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
 
   @classmethod

@@ -15,7 +15,7 @@ python_library(
   name = 'jvm_tool_task_test_base',
   sources = ['jvm_tool_task_test_base.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/base:config',
     'src/python/pants/base:extension_loader',

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.tasks.task import Task, TaskBase
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.distribution.distribution import Distribution
@@ -16,7 +16,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
 
 
-class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
+class NailgunTaskBase(TaskBase, JvmToolMixin):
 
   @staticmethod
   def killall(everywhere=False):

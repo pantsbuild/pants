@@ -15,9 +15,9 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:address',
     'src/python/pants/base:address_lookup_error',
@@ -33,7 +33,7 @@ python_library(
   name = 'thrift_linter',
   sources = ['thrift_linter.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',

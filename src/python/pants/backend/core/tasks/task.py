@@ -51,6 +51,11 @@ class TaskBase(AbstractClass):
   """
 
   @classmethod
+  def subsystems(cls):
+    """The subsystems types this task uses."""
+    return tuple()
+
+  @classmethod
   def product_types(cls):
     """The list of products this Task produces. Set the product type(s) for this
     task i.e. the product type(s) this task creates e.g ['classes'].
@@ -74,17 +79,15 @@ class TaskBase(AbstractClass):
 
     Subclasses should not generally need to override this method.
     """
-    def register(*args, **kwargs):
-      options.register(cls.options_scope, *args, **kwargs)
-    register.bootstrap = options.bootstrap_option_values()
-    cls.register_options(register)
+    cls.register_options(options.registration_function_for_scope(cls.options_scope))
+    for subsystem_type in cls.subsystems():
+      subsystem_type.register_options_for_per_task_instance(cls)
 
   @classmethod
   def register_options(cls, register):
-    """Set up the new options system.
+    """Register options for this subsystem.
 
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments
-    to register options.
+    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
     """
 
   @classmethod

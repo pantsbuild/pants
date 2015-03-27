@@ -5,14 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.target import Target
 from pants.console.stty_utils import preserve_stty_settings
 from pants.java.util import execute_java
 
 
-class ScalaRepl(JvmTask, JvmToolTaskMixin):
+class ScalaRepl(JvmTask, JvmToolMixin):
   @classmethod
   def register_options(cls, register):
     super(ScalaRepl, cls).register_options(register)

@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.jvm_task import JvmTask
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java.util import execute_java
 
 
-class BenchmarkRun(JvmTask, JvmToolTaskMixin):
+class BenchmarkRun(JvmTask, JvmToolMixin):
   @classmethod
   def register_options(cls, register):
     super(BenchmarkRun, cls).register_options(register)

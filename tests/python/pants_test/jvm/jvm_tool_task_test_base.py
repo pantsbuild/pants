@@ -9,8 +9,8 @@ import errno
 import os
 import shutil
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
@@ -39,7 +39,7 @@ class JvmToolTaskTestBase(TaskTestBase):
     # access to the enclosing pants run's options here.
     self.set_options_for_scope(bootstrap_scope, jvm_options=[])
     self.set_options_for_scope(bootstrap_scope, soft_excludes=False)
-    JvmToolTaskMixin.reset_registered_tools()
+    JvmToolMixin.reset_registered_tools()
 
     def link_or_copy(src, dest):
       try:
