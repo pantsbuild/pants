@@ -219,6 +219,7 @@ python_library(
     ':nailgun_task',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/subsystems:jar_tool',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/jar:manifest',
