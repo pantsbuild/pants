@@ -80,9 +80,9 @@ python_tests(
   name = 'test_thriftutil',
   sources = ['test_thriftutil.py'],
   dependencies = [
-    ':base_test',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:thriftutil',
+    'tests/python/pants_test:base_test',
   ]
 )
