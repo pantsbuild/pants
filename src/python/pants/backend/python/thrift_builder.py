@@ -13,8 +13,8 @@ import sys
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.code_generator import CodeGenerator
 from pants.base.build_environment import get_buildroot
-from pants.thrift_util import select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.thriftutil import select_thrift_binary
 
 
 class PythonThriftBuilder(CodeGenerator):

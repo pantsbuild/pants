@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.binary_util import BinaryUtil
+from pants.util.binaryutil import BinaryUtil
 from pants_test.base.context_utils import create_options
 from pants_test.base_test import BaseTest
 
 
 class BinaryUtilTest(BaseTest):
-  """Tests binary_util's pants_support_baseurls handling."""
+  """Tests binaryutil's pants_support_baseurls handling."""
 
 
   class LambdaReader(object):

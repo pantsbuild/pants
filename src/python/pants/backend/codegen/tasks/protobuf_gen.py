@@ -26,8 +26,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
+from pants.util.binaryutil import BinaryUtil
 from pants.util.dirutil import safe_mkdir
 
 

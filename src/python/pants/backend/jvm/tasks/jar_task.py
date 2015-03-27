@@ -18,8 +18,8 @@ from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
+from pants.util.binaryutil import safe_args
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 

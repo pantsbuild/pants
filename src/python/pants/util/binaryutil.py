@@ -116,7 +116,7 @@ class BinaryUtil(object):
     :param url_opener: Optional argument used only for testing, to 'pretend' to open urls.
     :returns: a 'stream' to download it from a support directory. The returned 'stream' is actually
       a lambda function which returns the files binary contents.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
+    :raises: :class:`pants.util.binaryutil.BinaryUtil.BinaryNotFound` if no binary of the given version
       and name could not be found.
     """
 
@@ -148,7 +148,7 @@ class BinaryUtil(object):
     """Selects a binary matching the current os and architecture.
 
     :param name: the name of the binary to fetch.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
+    :raises: :class:`pants.util.binaryutil.BinaryUtil.BinaryNotFound` if no binary of the given version
       and name could be found.
     """
     # TODO(John Sirois): finish doc of the path structure expected under base_path

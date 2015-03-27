@@ -11,7 +11,6 @@ import time
 from collections import defaultdict
 from textwrap import dedent
 
-from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
@@ -21,6 +20,7 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.util import binaryutil
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
@@ -243,4 +243,4 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
     shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
 
     if self._open and report:
-      binary_util.ui_open(report)
+      binaryutil.ui_open(report)

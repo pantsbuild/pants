@@ -92,7 +92,6 @@ location:
     $ ./pants list tests/python/pants_test/:
     tests/python/pants_test:base-test
     tests/python/pants_test:test_maven_layout
-    tests/python/pants_test:test_thrift_util
     tests/python/pants_test:all
 
 A trailing double colon specifies a recursive glob of targets at the
