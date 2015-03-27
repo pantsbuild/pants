@@ -21,7 +21,7 @@ class Netrc(object):
       super(Netrc.NetrcError, self).__init__(*args, **kwargs)
 
   def __init__(self):
-    self._login    = collections.defaultdict(lambda: None)
+    self._login = collections.defaultdict(lambda: None)
     self._password = collections.defaultdict(lambda: None)
 
   def getusername(self, repository):
