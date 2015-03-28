@@ -13,6 +13,7 @@ from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.parser import Parser
 
 
 class Options(object):
