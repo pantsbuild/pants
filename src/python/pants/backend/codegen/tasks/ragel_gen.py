@@ -17,7 +17,7 @@ from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.binary_util import BinaryUtil
+from pants.util.binaryutil import BinaryUtil
 
 
 class RagelGen(CodeGen):

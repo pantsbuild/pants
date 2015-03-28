@@ -12,7 +12,6 @@ from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants import binary_util
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -20,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.util import binaryutil
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -355,7 +355,7 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     idefile = self.generate_project(self._project)
     if idefile:
-      binary_util.ui_open(idefile)
+      binaryutil.ui_open(idefile)
 
   def generate_project(self, project):
     raise NotImplementedError('Subclasses must generate a project for an ide')

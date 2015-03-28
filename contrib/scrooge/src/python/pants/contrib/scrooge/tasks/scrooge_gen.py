@@ -21,8 +21,8 @@ from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
-from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.thriftutil import calculate_compile_sources
 from twitter.common.collections import OrderedSet
 
 

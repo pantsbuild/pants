@@ -12,10 +12,10 @@ import signal
 import socket
 import sys
 
-from pants import binary_util
 from pants.backend.core.tasks.task import QuietTaskMixin, Task
 from pants.base.build_environment import get_buildroot
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
+from pants.util import binaryutil
 
 
 class RunServer(Task, QuietTaskMixin):
@@ -45,7 +45,7 @@ class RunServer(Task, QuietTaskMixin):
 
     def maybe_open(port):
       if self.get_options().open:
-        binary_util.ui_open('http://localhost:{port}'.format(port=port))
+        binaryutil.ui_open('http://localhost:{port}'.format(port=port))
 
     (pid, port) = ReportingServerManager.get_current_server_pid_and_port()
     if port:

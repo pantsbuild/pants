@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.thrift_util import find_includes, find_root_thrifts
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
+from pants.util.thriftutil import find_includes, find_root_thrifts
 
 
 class ThriftUtilTest(unittest.TestCase):

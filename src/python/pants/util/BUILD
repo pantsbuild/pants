@@ -43,3 +43,24 @@ python_library(
   name = 'xml_parser',
   sources = ['xml_parser.py'],
 )
+
+python_library(
+  name='binaryutil',
+  sources=['binaryutil.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    'src/python/pants/base:config',
+    'src/python/pants/base:exceptions',
+    ':contextutil',
+    ':dirutil',
+  ],
+)
+
+python_library(
+  name='thriftutil',
+  sources=['thriftutil.py'],
+  dependencies=[
+    ':binaryutil',
+  ],
+)

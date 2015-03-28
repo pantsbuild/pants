@@ -23,8 +23,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.option.options import Options
-from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.thriftutil import calculate_compile_roots, select_thrift_binary
 
 
 INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')

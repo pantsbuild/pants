@@ -13,8 +13,8 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.binary_util import safe_args
 from pants.java.util import execute_java
+from pants.util.binaryutil import safe_args
 
 
 class SpecsRun(JvmTask, JvmToolTaskMixin):

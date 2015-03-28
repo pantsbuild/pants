@@ -65,3 +65,24 @@ python_tests(
     'src/python/pants/util:contextutil',
   ]
 )
+
+python_tests(
+  name = 'test_binaryutil',
+  sources = ['test_binaryutil.py',],
+  dependencies = [
+    'src/python/pants/util:binaryutil',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'test_thriftutil',
+  sources = ['test_thriftutil.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:thriftutil',
+    'tests/python/pants_test:base_test',
+  ]
+)

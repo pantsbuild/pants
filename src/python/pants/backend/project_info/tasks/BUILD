@@ -107,7 +107,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants:binary_util',
+    'src/python/pants/util:binaryutil',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -128,4 +128,3 @@ python_library(
     'src/python/pants/util:dirutil',
   ],
 )
-

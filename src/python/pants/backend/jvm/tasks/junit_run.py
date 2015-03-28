@@ -15,7 +15,6 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
-from pants import binary_util
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -23,6 +22,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
+from pants.util import binaryutil
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
@@ -213,7 +213,7 @@ class _JUnitRunner(object):
     extra_jvm_options = extra_jvm_options or []
     result = 0
     for batch in self._partition(tests):
-      with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
+      with binaryutil.safe_args(batch, self._task_exports.task_options) as batch_tests:
         result += abs(execute_java(
           classpath=classpath,
           main=main,
@@ -380,7 +380,7 @@ class Emma(_Coverage):
   def instrument(self, targets, tests, junit_classpath):
     safe_mkdir(self._coverage_instrument_dir, clean=True)
     self._emma_classpath = self._task_exports.tool_classpath('emma')
-    with binary_util.safe_args(self.get_coverage_patterns(targets),
+    with binaryutil.safe_args(self.get_coverage_patterns(targets),
                                self._task_exports.task_options) as patterns:
       args = [
         'instr',
@@ -457,7 +457,7 @@ class Emma(_Coverage):
       with safe_open(self._coverage_console_file) as console_report:
         sys.stdout.write(console_report.read())
     if self._coverage_report_html_open:
-      binary_util.ui_open(self._coverage_html_file)
+      binaryutil.ui_open(self._coverage_html_file)
 
 
 class Cobertura(_Coverage):

@@ -25,7 +25,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
-    'src/python/pants:thrift_util',
+    'src/python/pants/util:thriftutil',
   ],
 )
 
