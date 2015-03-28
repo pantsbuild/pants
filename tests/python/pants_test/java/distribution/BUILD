@@ -7,7 +7,6 @@ python_tests(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:revision',
-    'src/python/pants/java:distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]

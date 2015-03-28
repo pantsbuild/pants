@@ -329,7 +329,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:source_root',
-    'src/python/pants/java:jar',
+    'src/python/pants/java/jar:manifest',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',

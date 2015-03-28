@@ -26,7 +26,7 @@ python_tests(
     'android_integration_test.py',
   ],
   dependencies = [
-    'src/python/pants/java:distribution',
+    'src/python/pants/java/distribution:distribution',
     'tests/python/pants_test:int-test',
   ],
 )
