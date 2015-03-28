@@ -51,8 +51,19 @@ class TaskBase(AbstractClass):
   """
 
   @classmethod
-  def subsystems(cls):
-    """The subsystems types this task uses."""
+  def global_subsystems(cls):
+    """The global subsystems this task uses.
+
+    A tuple of subsystem types.
+    """
+    return tuple()
+
+  @classmethod
+  def task_subsystems(cls):
+    """The private, per-task subsystems this task uses.
+
+    A tuple of subsystem types.
+    """
     return tuple()
 
   @classmethod
@@ -80,7 +91,7 @@ class TaskBase(AbstractClass):
     Subclasses should not generally need to override this method.
     """
     cls.register_options(options.registration_function_for_scope(cls.options_scope))
-    for subsystem_type in cls.subsystems():
+    for subsystem_type in cls.task_subsystems():
       subsystem_type.register_options_for_task_instance(options, task=cls)
 
   @classmethod

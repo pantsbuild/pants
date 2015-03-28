@@ -32,6 +32,7 @@ from pants.option.global_options import register_global_options
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
+from pants.subsystem.subsystem import Subsystem
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class GoalRunner(object):
     known_scopes = ['', 'run-tracker']
 
     # Add scopes for global instances of all subsystems.
-    for subsystem_type in Goal.all_subsystem_types():
+    for subsystem_type in Goal.global_subsystem_types():
       known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
 
     # Add scopes for all tasks in all goals.
@@ -87,8 +88,7 @@ class GoalRunner(object):
     self.register_options()
 
     # Make the options values available on all subsystems.
-    for subsystem_type in Goal.all_subsystem_types():
-      subsystem_type._options = self.options
+    Subsystem._options = self.options
 
     self.run_tracker = RunTracker.from_options(self.options)
     report = initial_reporting(self.config, self.run_tracker)
@@ -136,7 +136,7 @@ class GoalRunner(object):
     register_global_options(self.options.registration_function_for_global_scope())
 
     # Options for global-level subsystems.
-    for subsystem_type in Goal.all_subsystem_types():
+    for subsystem_type in Goal.global_subsystem_types():
       subsystem_type.register_options_for_global_instance(self.options)
 
     # This is the first case we have of non-task, non-global options.
@@ -146,6 +146,7 @@ class GoalRunner(object):
     RunTracker.register_options(self.options.registration_function_for_scope('run-tracker'))
 
     for goal in Goal.all():
+      # Register task options (including per-task subsystem options).
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):

@@ -183,10 +183,11 @@ class BaseTest(unittest.TestCase):
         return register
 
       task_type.register_options(register_func(scope))
-      for subsystem in task_type.subsystems():
+      for subsystem in task_type.global_subsystems():
         if subsystem not in registered_global_subsystems:
           subsystem.register_options(register_func(subsystem.qualify_scope(Options.GLOBAL_SCOPE)))
           registered_global_subsystems.add(subsystem)
+      for subsystem in task_type.task_subsystems():
         subsystem.register_options(register_func(subsystem.qualify_scope(scope)))
 
     # Now override with any caller-specified values.
@@ -211,14 +212,15 @@ class BaseTest(unittest.TestCase):
           if key not in opts:  # Inner scope values override the inherited ones.
             opts[key] = val
 
-    Subsystem._options = options
-    return create_context(config=self.config(overrides=config),
-                          options=option_values,
-                          target_roots=target_roots,
-                          build_graph=self.build_graph,
-                          build_file_parser=self.build_file_parser,
-                          address_mapper=self.address_mapper,
-                          **kwargs)
+    context = create_context(config=self.config(overrides=config),
+                             options=option_values,
+                             target_roots=target_roots,
+                             build_graph=self.build_graph,
+                             build_file_parser=self.build_file_parser,
+                             address_mapper=self.address_mapper,
+                             **kwargs)
+    Subsystem._options = context.options
+    return context
 
   def tearDown(self):
     BuildRoot().reset()

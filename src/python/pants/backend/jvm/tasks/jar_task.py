@@ -203,8 +203,8 @@ class JarTask(NailgunTask):
   invocations.
   """
   @classmethod
-  def subsystems(cls):
-    return super(JarTask, cls).subsystems() + (JarTool, )
+  def global_subsystems(cls):
+    return super(JarTask, cls).global_subsystems() + (JarTool, )
 
   @staticmethod
   def _flag(bool_value):
