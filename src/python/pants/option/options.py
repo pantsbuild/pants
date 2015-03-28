@@ -253,5 +253,5 @@ class Options(object):
 def scoped_parsers(env, config, all_scopes, help_request):
   # Sort so ancestors precede descendants.
   for s in sorted({GLOBAL_SCOPE} | set(all_scopes)):
-    parent_parser = None if scope == GLOBAL_SCOPE else parsers[s.rpartition('.')[0]]
-    parsers[scope] = Parser(env, config, scope, help_request, parent_parser)
+    parent_parser = None if s == GLOBAL_SCOPE else parsers[s.rpartition('.')[0]]
+    parsers[s] = Parser(env, config, s, help_request, parent_parser)
