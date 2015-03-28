@@ -95,7 +95,7 @@ class Options(object):
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
     self._help_request = splitter.help_request
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, self._help_request)
+    self._scoped_parsers = scoped_parsers(env, config, known_scopes, self._help_request)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scopes = set(known_scopes)
@@ -145,7 +145,7 @@ class Options(object):
 
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
-    return self._parser_hierarchy.get_parser_by_scope(scope)
+    return self._scoped_parsers[scope]
 
   def get_global_parser(self):
     """Returns the parser for the global scope, so code can register on it directly."""
@@ -169,7 +169,7 @@ class Options(object):
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
+    self._scoped_parsers[scope].parse_args(flags_in_scope, values)
     self._values_by_scope[scope] = values
     return values
 
@@ -249,3 +249,10 @@ class Options(object):
   def _format_help_for_scope(self, scope):
     """Generate a help message for options at the specified scope."""
     return self.get_parser(scope).format_help()
+
+
+def scoped_parsers(env, config, all_scopes, help_request):
+  # Sort so ancestors precede descendants.
+  for s in sorted({GLOBAL_SCOPE} | set(all_scopes)):
+    parent_parser = None if scope == GLOBAL_SCOPE else parsers[s.rpartition('.')[0]]
+    parsers[scope] = Parser(env, config, scope, help_request, parent_parser)
