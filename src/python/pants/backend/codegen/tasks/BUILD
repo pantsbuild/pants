@@ -130,9 +130,9 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
     'src/python/pants/java:distribution',
-    'src/python/pants/base:exceptions',
     'src/python/pants/util:binaryutil',
   ],
 )

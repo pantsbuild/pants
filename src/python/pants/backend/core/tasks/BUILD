@@ -186,8 +186,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:binaryutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
