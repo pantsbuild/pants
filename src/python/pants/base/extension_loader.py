@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import importlib
 import traceback
 
 from pkg_resources import Requirement, working_set
@@ -116,16 +117,11 @@ def load_backend(build_configuration, backend_package):
     the build configuration."""
   backend_module = backend_package + '.register'
   try:
-    module = __import__(backend_module,
-                        {},  # globals
-                        {},  # locals
-                        ['build_file_aliases',
-                         'register_goals'])
+    module = importlib.import_module(backend_module)
   except ImportError as e:
     traceback.print_exc()
     raise BackendConfigurationError('Failed to load the {backend} backend: {error}'
                                     .format(backend=backend_module, error=e))
-
   def invoke_entrypoint(name):
     entrypoint = getattr(module, name, lambda: None)
     try:
