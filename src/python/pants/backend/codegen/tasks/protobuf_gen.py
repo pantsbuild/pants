@@ -36,7 +36,10 @@ class ProtobufGen(CodeGen):
   @classmethod
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
-    register('--lang', action='append', choices=['python', 'java'],
+    # TODO(Eric Ayers): ProtobufGen currently only supports Java, even though there are
+    # some references to python in this code.  To work around a bug in CodeGen, turn on
+    # forced generation for Java.  See https://github.com/pantsbuild/pants/pull/121.
+    register('--lang', action='append', choices=['python', 'java'], default=['java'],
              help='Force generation of protobuf code for these languages.')
     register('--version', advanced=True,
              help='Version of protoc.  Used to create the default --javadeps and as part of '
