@@ -123,8 +123,9 @@ def load_backend(build_configuration, backend_package):
     raise BackendConfigurationError('Failed to load the {backend} backend: {error}'
                                     .format(backend=backend_module, error=e))
   def invoke_entrypoint(name):
+    entrypoint = getattr(module, name, lambda: None)
     try:
-      return getattr(module, name, lambda: None)()
+      return entrypoint()
     except TypeError as e:
       traceback.print_exc()
       raise BackendConfigurationError(
