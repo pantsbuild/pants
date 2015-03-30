@@ -111,9 +111,11 @@ class BaseTest(unittest.TestCase):
     Goal.clear()
     self.real_build_root = BuildRoot().path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.pants_workdir = os.path.join(self.build_root, '.pants.d')
+    safe_mkdir(self.pants_workdir)
     self.options = defaultdict(dict)  # scope -> key-value mapping.
     self.options[''] = {
-      'pants_workdir': os.path.join(self.build_root, '.pants.d'),
+      'pants_workdir': self.pants_workdir,
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
       'cache_key_gen_version': '0-test',

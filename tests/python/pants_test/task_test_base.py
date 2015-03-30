@@ -31,15 +31,11 @@ class TaskTestBase(BaseTest):
   def setUp(self):
     super(TaskTestBase, self).setUp()
     self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
-    # Some tasks nuke their own workdir, while we want to nuke the tempdir in tearDown.
-    # So we use a subdir.
-    self._tmpdir = tempfile.mkdtemp()
+    # We locate the workdir below the pants_workdir, which BaseTest locates within
+    # the BuildRoot.
+    self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
     self._test_workdir = os.path.join(self._tmpdir, 'workdir')
     os.mkdir(self._test_workdir)
-
-  def tearDown(self):
-    super(TaskTestBase, self).tearDown()
-    shutil.rmtree(self._tmpdir)
 
   @property
   def test_workdir(self):
