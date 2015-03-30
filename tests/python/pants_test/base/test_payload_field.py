@@ -7,10 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
-from pants.backend.jvm.targets.jvm_binary import Bundle
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
-from pants.base.payload_field import (BundleField, ExcludesField, JarsField, PrimitiveField,
+from pants.base.payload_field import (ExcludesField, JarsField, PrimitiveField,
                                       PythonRequirementsField, SourcesField)
 from pants_test.base_test import BaseTest
 

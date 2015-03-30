@@ -14,7 +14,6 @@ target(
     ':jar_library',
     ':java_agent',
     ':java_tests',
-    ':jvm_app',
     ':python_binary',
     ':python_target',
     ':scala_library',
@@ -28,17 +27,6 @@ target(
   dependencies = [
     ':scala_library_integration',
   ],
-)
-
-python_tests(
-  name = 'jvm_app',
-  sources = ['test_jvm_app.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/base:exceptions',
-  ]
 )
 
 python_tests(

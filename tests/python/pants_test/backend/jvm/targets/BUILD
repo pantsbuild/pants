@@ -5,8 +5,33 @@
 target(
   name = 'targets',
   dependencies = [
+    ':jvm_app',
+    ':jvm_binary',
     ':jvm_target',
     ':unpacked_jars',
+  ]
+)
+
+python_tests(
+  name = 'jvm_app',
+  sources = ['test_jvm_app.py'],
+  dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:address',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'jvm_binary',
+  sources = ['test_jvm_binary.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:address',
+    'tests/python/pants_test:base_test',
   ]
 )
 

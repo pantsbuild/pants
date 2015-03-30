@@ -40,6 +40,7 @@ class JvmTarget(Target, Jarable):
     :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     :param no_cache: If True, this should not be stored in the artifact cache
     """
+    self.address = address  # Set in case a TargetDefinitionException is thrown early
     if sources_rel_path is None:
       sources_rel_path = address.spec_path
     payload = payload or Payload()

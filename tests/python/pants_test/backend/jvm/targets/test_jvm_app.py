@@ -11,19 +11,17 @@ import pytest
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
-from pants.backend.jvm.targets.jvm_binary import DirectoryReMapper
+from pants.backend.jvm.targets.jvm_app import DirectoryReMapper
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
 
-class BaseJvmAppTest(BaseTest):
+class BinaryTest(BaseTest):
   @property
   def alias_groups(self):
-    return register_core().merge(register_jvm())
+    return register_jvm()
 
-
-class BinaryTest(BaseJvmAppTest):
   def setUp(self):
     super(BinaryTest, self).setUp()
     self.create_dir('src/java/org/archimedes/buoyancy/config')
@@ -137,7 +135,11 @@ class BinaryTest(BaseJvmAppTest):
       app.binary
 
 
-class BundleTest(BaseJvmAppTest):
+class BundleTest(BaseTest):
+  @property
+  def alias_groups(self):
+    return register_core().merge(register_jvm())
+
   def test_bundle_filemap_dest_bypath(self):
     self.create_dir('src/java/org/archimedes/buoyancy/config')
     self.create_file('src/java/org/archimedes/buoyancy/config/densities.xml')

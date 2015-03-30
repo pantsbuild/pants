@@ -9,7 +9,7 @@ import itertools
 import os
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.targets.jvm_binary import JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
 

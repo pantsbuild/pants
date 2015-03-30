@@ -8,15 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.core.targets.resources import Resources
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.codegen.register import build_file_aliases as register_codegen
+from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.jvm_binary import Bundle, JvmApp, JvmBinary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.config import Config
 from pants_test.tasks.test_base import ConsoleTaskTest
 
@@ -24,23 +20,7 @@ from pants_test.tasks.test_base import ConsoleTaskTest
 class FileDepsTest(ConsoleTaskTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
-      context_aware_object_factories={
-        'bundle': Bundle.factory,
-      },
-      objects={
-        'jar': JarDependency,
-      },
-      targets={
-        'jar_library': JarLibrary,
-        'java_library': JavaLibrary,
-        'java_thrift_library': JavaThriftLibrary,
-        'jvm_binary': JvmBinary,
-        'jvm_app': JvmApp,
-        'resources': Resources,
-        'scala_library': ScalaLibrary,
-      },
-    )
+    return register_core().merge(register_jvm()).merge(register_codegen())
 
   @classmethod
   def task_type(cls):

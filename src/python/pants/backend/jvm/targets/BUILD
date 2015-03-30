@@ -19,6 +19,7 @@ python_library(
     'jar_dependency.py',
     'jar_library.py',
     'jarable.py',
+    'jvm_app.py',
     'jvm_binary.py',
     'jvm_target.py',
     'unpacked_jars.py',
