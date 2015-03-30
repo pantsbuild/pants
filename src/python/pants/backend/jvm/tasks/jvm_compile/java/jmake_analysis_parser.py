@@ -19,6 +19,7 @@ class JMakeAnalysisParser(AnalysisParser):
   """Parse a file containing representation of an analysis for some JVM language."""
 
   empty_test_header = 'pcd entries'
+  current_test_header = 'pcd entries:\n'
 
   def parse(self, infile):
     self._expect_header(infile.readline(), 'pcd entries')

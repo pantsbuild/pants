@@ -141,6 +141,10 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
+    # Look for invalid analysis files.
+    for f in (self._invalid_analysis_file, self._analysis_file):
+      self.validate_analysis(f)
+
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
 

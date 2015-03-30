@@ -44,13 +44,20 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--confs', type=Options.list, default=['default'],
              help='Compile for these Ivy confs.')
 
+    register('--clear-invalid-analysis', default=False, action='store_true',
+             advanced=True,
+             help='When set, any invalid/incompatible analysis files will be deleted '
+                  'automatically.  When unset, an error is raised instead.')
+
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
 
     register('--warning-args', action='append', default=list(cls.get_warning_args_default()),
+             advanced=True,
              help='Extra compiler args to use when warnings are enabled.')
 
     register('--no-warning-args', action='append', default=list(cls.get_no_warning_args_default()),
+             advanced=True,
              help='Extra compiler args to use when warnings are disabled.')
 
     register('--strategy', choices=['global', 'isolated'], default='global',

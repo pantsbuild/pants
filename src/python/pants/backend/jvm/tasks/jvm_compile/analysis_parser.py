@@ -36,6 +36,31 @@ class AnalysisParser(object):
     """
     raise NotImplementedError('Subclasses must implement.')
 
+  @property
+  def current_test_header(self):
+    """The header expected at the beginning of a file for the current analysis version.
+
+    It is assumed that if this header mismatches, the file is unreadable.
+    """
+    raise NotImplementedError('Subclasses must implement.')
+
+  def validate_analysis(self, path):
+    """Validates that the given path is either empty, or contains a readable analysis file.
+
+    Raises ParseError on failure.
+    """
+    if not os.path.exists(path):
+      return
+    with open(path, 'r') as infile:
+      with raise_on_eof(infile):
+        # The first line of the file should contain the expected header.
+        firstline = infile.next()
+        if firstline != self.current_test_header:
+          raise ParseError("The '{}' analysis file mismatches the current analysis format."
+                           " Got:\n  {}\nExpected:\n  {}".format(path,
+                                                                  firstline,
+                                                                  self.current_test_header))
+
   def is_nonempty_analysis(self, path):
     """Does the specified analysis file contain information for at least one source file."""
     if not os.path.exists(path):

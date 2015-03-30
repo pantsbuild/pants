@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_delete, safe_mkdir
 
 
 class JvmCompileStrategy(object):
@@ -56,6 +56,7 @@ class JvmCompileStrategy(object):
 
     # The ivy confs for which we're building.
     self._confs = options.confs
+    self._clear_invalid_analysis = options.clear_invalid_analysis
 
   @abstractmethod
   def name(self):
@@ -112,6 +113,20 @@ class JvmCompileStrategy(object):
   def pre_compile(self):
     """Executed once before any compiles."""
     pass
+
+  def validate_analysis(self, path):
+    """Throws a TaskError for invalid analysis files."""
+    try:
+      self._analysis_parser.validate_analysis(path)
+    except Exception as e:
+      if self._clear_invalid_analysis:
+        self.context.log.warn("Invalid analysis detected at path {} ... pants will remove these "
+                              "automatically, but\nyou may experience spurious warnings until "
+                              "clean-all is executed.\n{}".format(path, e))
+        safe_delete(path)
+      else:
+        raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
+                        "run `clean-all` if your tools versions changed recently:\n{}".format(e))
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     """Prepares to compile the given set of targets.

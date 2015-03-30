@@ -23,6 +23,7 @@ class ZincAnalysisParser(AnalysisParser):
   """Parses a zinc analysis file."""
 
   empty_test_header = 'products'
+  current_test_header = ZincAnalysis.FORMAT_VERSION_LINE
 
   def parse(self, infile):
     """Parse a ZincAnalysis instance from an open text file."""

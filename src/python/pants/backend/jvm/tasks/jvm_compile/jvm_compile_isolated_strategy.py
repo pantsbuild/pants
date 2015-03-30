@@ -55,8 +55,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
     for target in relevant_targets:
-      classes = self.compile_context(target).classes_dir
-      compile_classpaths.add_for_target(target, [(conf, classes) for conf in self._confs])
+      cc = self.compile_context(target)
+      compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
+      self.validate_analysis(cc.analysis_file)
 
   def invalidation_hints(self, relevant_targets):
     # No partitioning.
