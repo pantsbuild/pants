@@ -97,7 +97,7 @@ class TargetAncestorIerator(object):
 # TODO(John Sirois): Get jvm and python publishing on the same page.
 # Either python should require all nodes in an exported target closure be either exported or
 # 3rdparty or else jvm publishing should use an ExportedTargetDependencyCalculator to aggregate
-# un-exported non-3rdparty interior nodes as needed.  It seems like the latter is preferrable since
+# un-exported non-3rdparty interior nodes as needed.  It seems like the latter is preferable since
 # it can be used with a BUILD graph validator requiring completely exported subgraphs to enforce the
 # former as a matter of local repo policy.
 class ExportedTargetDependencyCalculator(AbstractClass):
@@ -108,11 +108,11 @@ class ExportedTargetDependencyCalculator(AbstractClass):
   In other words, exported targets generally can have reduced dependency sets and an
   `ExportedTargetDependencyCalculator` can calculate these reduced dependency sets.
 
-  To use an `ExportedTargetDependencyCalculator` a subclass must be created that implements three
+  To use an `ExportedTargetDependencyCalculator` a subclass must be created that implements two
   predicates and a walk function for the class of targets in question.  For example, a
   `JvmDependencyCalculator` would need to be able to identify jvm third party dependency targets,
-  local jvm library and targets, and local exportable jvm library targets.  In addition it would
-  need to define a walk function that knew how to walk a jvm target's dependencies.
+  and local exportable jvm library targets.  In addition it would need to define a walk function
+  that knew how to walk a jvm target's dependencies.
   """
 
   class UnExportedError(TaskError):
@@ -142,7 +142,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
 
   @abstractmethod
   def walk(self, target, visitor):
-    """Walks the dependency graph fo the given target.
+    """Walks the dependency graph for the given target.
 
     :param target: The target to start the walk from.
     :param visitor: A function that takes a target and returns `True` if its dependencies should
@@ -159,21 +159,19 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     the `exported_target`.
 
     A target is considered "owned" if:
-    1. It's "3rdparty" and "directly reachable" from `root_target` by at least 1 path.
-    2. It's not "3rdparty" and not "directly reachable" by any of `root_target`'s "3rdparty"
+    1. It's "3rdparty" and "directly reachable" from `exported_target` by at least 1 path.
+    2. It's not "3rdparty" and not "directly reachable" by any of `exported_target`'s "3rdparty"
        dependencies.
 
-    Here "3rdparty" refers to either a PythonRequirementLibrary (already external distributions) or
-    an exported python target, typically a PythonLibrary or PythonBinary that provides a `setup_py`
-    configuration.
+    Here "3rdparty" refers to targets identified as either `is_third_party` or `is_exported`.
 
     And in this context "directly reachable" means the target can be reached by following a series
-    of dependency links from the `root_target`, never crossing an exported target and staying within
-    the `root_target` address space.  Its the latter restriction that allows for unambiguous
-    ownership of exportable targets and mirrors the BUILD file convention of targets only being able
-    to own sources in their filesystem subtree.  The single ambiguous case that can arise is when
-    there is more than one exported target in the same BUILD file fammily that can "directly reach"
-    a target in its address space.
+    of dependency links from the `exported_target`, never crossing another exported target and
+    staying within the `exported_target` address space.  It's the latter restriction that allows for
+    unambiguous ownership of exportable targets and mirrors the BUILD file convention of targets
+    only being able to own sources in their filesystem subtree.  The single ambiguous case that can
+    arise is when there is more than one exported target in the same BUILD file family that can
+    "directly reach" a target in its address space.
 
     :raises: `UnExportedError` if the given `exported_target` is not, in-fact, exported.
     :raises: `NoOwnerError` if a transitive dependency is found with no proper owning exported
@@ -190,14 +188,14 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     #     owner.
 
     if not self.is_exported(exported_target):
-      raise self.UnExportedError('Cannot calculate minified dependencies for a non-exported '
-                                   'target, given: {}'.format(exported_target))
+      raise self.UnExportedError('Cannot calculate reduced dependencies for a non-exported '
+                                 'target, given: {}'.format(exported_target))
 
     provider_by_owned_python_target = OrderedDict()
 
     def collect_potentially_owned_python_targets(current):
       if (current != exported_target) and not self.is_third_party(current):
-        provider_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass
+        provider_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
     self.walk(exported_target, collect_potentially_owned_python_targets)
@@ -225,25 +223,25 @@ class ExportedTargetDependencyCalculator(AbstractClass):
                                                                   ambiguous_owners))
         provider_by_owned_python_target[target] = owner
 
-    minified_dependencies = OrderedSet()
+    reduced_dependencies = OrderedSet()
 
-    def collect_minified_dependencies(current):
+    def collect_reduced_dependencies(current):
       if current == exported_target:
         return True
       else:
         # The provider will be one of:
-        #  `None`, ie: a 3rdparty requirement
-        #  `exported_target`, ie: a local exportable target owned by `exported_target`
-        #  Or else a local exportable target owned by some other exported target
+        #  `None`, ie: a 3rdparty requirement.
+        #  `exported_target`, ie: a local exportable target owned by `exported_target`.
+        #  Or else a local exportable target owned by some other exported target.
         provider = provider_by_owned_python_target.get(current)
         if provider is None:
-          minified_dependencies.add(current)
+          reduced_dependencies.add(current)
         else:
-          minified_dependencies.add(current if provider == exported_target else provider)
+          reduced_dependencies.add(current if provider == exported_target else provider)
         return provider == exported_target
 
-    self.walk(exported_target, collect_minified_dependencies)
-    return minified_dependencies
+    self.walk(exported_target, collect_reduced_dependencies)
+    return reduced_dependencies
 
 
 class SetupPy(PythonTask):
@@ -553,8 +551,8 @@ class SetupPy(PythonTask):
     dist_dir = self.get_options().pants_distdir
 
     # NB: We have to create and then run in 2 steps so that we can discover all exported targets
-    # in-play in the creation phase which allows a tsort of these exported targets in the run phase
-    # to ensure an exported target is, for example (--run="sdist upload"), uploaded before any
+    # in-play in the creation phase which then allows a tsort of these exported targets in the run
+    # phase to ensure an exported target is, for example (--run="sdist upload"), uploaded before any
     # exported target that depends on it is uploaded.
 
     created = {}
@@ -572,7 +570,7 @@ class SetupPy(PythonTask):
     for target in targets:
       create(target)
 
-    executed = []  # Collected and returned for tests
+    executed = []  # Collected and returned for tests.
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:
