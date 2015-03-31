@@ -14,7 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.jvm_binary import JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.ide_gen import IdeGen
 from pants.base.build_environment import get_buildroot

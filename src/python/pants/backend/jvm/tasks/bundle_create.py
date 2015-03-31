@@ -9,7 +9,8 @@ import os
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jvm_binary import JvmApp, JvmBinary
+from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.fs import archive
@@ -78,7 +79,7 @@ class BundleCreate(JvmBinaryTask):
         self.context.log.error("Unable to create symlink: {0} -> {1}".format(src, dst))
         raise e
 
-    bundle_dir = os.path.join(self._outdir, '%s-bundle' % app.basename)
+    bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
     self.context.log.info('creating %s' % os.path.relpath(bundle_dir, get_buildroot()))
 
     safe_mkdir(bundle_dir, clean=True)
@@ -109,7 +110,7 @@ class BundleCreate(JvmBinaryTask):
         verbose_symlink(path, os.path.join(lib_dir, external_jar))
         classpath.add(external_jar)
 
-    bundle_jar = os.path.join(bundle_dir, '%s.jar' % app.binary.basename)
+    bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
     with self.monolithic_jar(app.binary, bundle_jar,
                              with_external_deps=self._create_deployjar) as jar:

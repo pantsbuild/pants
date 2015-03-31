@@ -17,8 +17,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.jvm_binary import (Bundle, DirectoryReMapper, Duplicate, JarRules,
-                                                  JvmApp, JvmBinary, Skip)
+from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
+from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
