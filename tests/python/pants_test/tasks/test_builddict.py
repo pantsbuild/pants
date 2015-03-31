@@ -12,25 +12,21 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
-from pants_test.tasks.test_base import BaseTest, TaskTest
+from pants_test.base_test import BaseTest
+from pants_test.task_test_base import TaskTestBase
 
 
 OUTDIR = '/tmp/dist'
 
-sample_ini_test_1 = """
-[DEFAULT]
-outdir: %s
-""" % OUTDIR
-
-
-class BaseBuildBuildDictionaryTest(TaskTest):
+class BaseBuildBuildDictionaryTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return builddictionary.BuildBuildDictionary
 
-  def execute_task(self, config=sample_ini_test_1):
+  def execute_task(self):
+    self.set_options(pants_distdir=OUTDIR)
     with closing(StringIO()) as output:
-      task = self.prepare_task(config=config)
+      task = self.create_task(self.context())
       task.execute()
       return output.getvalue()
 
@@ -51,7 +47,6 @@ class ExtractedContentSanityTests(BaseTest):
   def setUp(self):
     super(ExtractedContentSanityTests, self).setUp()
     self._syms = reflect.assemble_buildsyms(build_file_parser=self.build_file_parser)
-
 
   def test_sub_tocls(self):
     python_symbols = builddictionary.python_sub_tocl(self._syms).e

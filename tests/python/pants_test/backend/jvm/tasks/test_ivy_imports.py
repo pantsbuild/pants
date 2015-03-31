@@ -17,10 +17,10 @@ from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.tasks.test_base import TaskTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class IvyImportsTest(TaskTest):
+class IvyImportsTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return IvyImports
@@ -74,10 +74,8 @@ class IvyImportsTest(TaskTest):
       foo_target = self.target('unpack:foo')
 
       def check_compile(expected_targets):
-        ivy_imports_task = self.prepare_task(targets=[foo_target],
-                                             args=["--no-test-use-nailgun"],
-                                             build_graph=self.build_graph,
-                                             build_file_parser=self.build_file_parser)
+        self.set_options(use_nailgun=False)
+        ivy_imports_task = self.create_task(self.context(target_roots=[foo_target]))
         imported_targets = ivy_imports_task.execute()
 
         self.assertEquals(expected_targets, imported_targets)
@@ -102,10 +100,10 @@ class IvyImportsTest(TaskTest):
     What we care about for UnpackJars and ProtobufGen are the target => builddir mapping.
 
       UnpackedJars(BuildFileAddress(.../unpack/BUILD, foo)) =>
-          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+          <workdir>/mapped-jars/unpack.foo/com.example/bar/default
         [u'com.example-bar-0.0.1.jar']
     """
-    symlinkdir_suffix = os.path.join('IvyImports', 'mapped-jars', target.id, org, name, conf)
+    symlinkdir_suffix = os.path.join('mapped-jars', target.id, org, name, conf)
     mapping = ivy_imports_product.get(target)
     found = False
     for (symlinkdir, jar_filenames) in mapping.iteritems():

@@ -17,10 +17,10 @@ from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprin
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_walk
-from pants_test.tasks.test_base import TaskTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class UnpackJarsTest(TaskTest):
+class UnpackJarsTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
@@ -54,11 +54,11 @@ class UnpackJarsTest(TaskTest):
       UnpackJars._compile_patterns([45])
 
   def test_unpack_filter(self):
-    def run_filter(filename, include_patterns=[], exclude_patterns=[]):
+    def run_filter(filename, include_patterns=None, exclude_patterns=None):
       return UnpackJars._unpack_filter(
         filename,
-        UnpackJars._compile_patterns(include_patterns),
-        UnpackJars._compile_patterns(exclude_patterns))
+        UnpackJars._compile_patterns(include_patterns or []),
+        UnpackJars._compile_patterns(exclude_patterns or []))
 
     # If no patterns are specified, everything goes through
     self.assertTrue(run_filter("foo/bar.java"))
@@ -138,9 +138,7 @@ class UnpackJarsTest(TaskTest):
       foo_target = self.target('unpack:foo')
 
       # The first time through, the target should be unpacked.
-      unpack_task = self.prepare_task(targets=[foo_target],
-                                      build_graph=self.build_graph,
-                                      build_file_parser=self.build_file_parser)
+      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
       self._add_dummy_product(foo_target, jar_filename, unpack_task)
       unpacked_targets = unpack_task.execute()
 
@@ -152,9 +150,7 @@ class UnpackJarsTest(TaskTest):
       self.assertEquals(['foo.proto'], files)
 
       # Calling the task a second time should not need to unpack any targets
-      unpack_task = self.prepare_task(targets=[foo_target],
-                                      build_graph=self.build_graph,
-                                      build_file_parser=self.build_file_parser)
+      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
       self._add_dummy_product(foo_target, jar_filename, unpack_task)
       unpacked_targets = unpack_task.execute()
 
@@ -165,9 +161,7 @@ class UnpackJarsTest(TaskTest):
       self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
       foo_target = self.target('unpack:foo') # Re-inject the target
       self._add_dummy_product(foo_target, jar_filename, unpack_task)
-      unpack_task = self.prepare_task(targets=[foo_target],
-                                      build_graph=self.build_graph,
-                                      build_file_parser=self.build_file_parser)
+      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
       unpacked_targets = unpack_task.execute()
 
       self.assertEquals([foo_target], unpacked_targets)
