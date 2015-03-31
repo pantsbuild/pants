@@ -44,6 +44,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--confs', type=Options.list, default=['default'],
              help='Compile for these Ivy confs.')
 
+    # TODO: Stale analysis should be automatically ignored via Task identities:
+    # https://github.com/pantsbuild/pants/issues/1351
     register('--clear-invalid-analysis', default=False, action='store_true',
              advanced=True,
              help='When set, any invalid/incompatible analysis files will be deleted '

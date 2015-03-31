@@ -106,8 +106,12 @@ class JavaCompile(JvmCompile):
       '-d', classes_output_dir,
       '-pdb', analysis_file,
       '-pdb-text-format',
-      '-depfile', self._depfile
       ]
+    # TODO: This file should always exist for modern jmake installs; this check should
+    # be removed via a Task-level identity bump after:
+    # https://github.com/pantsbuild/pants/issues/1351
+    if os.path.exists(self._depfile):
+      args.extend(['-depfile', self._depfile])
 
     compiler_classpath = self.tool_classpath('java-compiler')
     args.extend([
