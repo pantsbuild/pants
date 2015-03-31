@@ -28,6 +28,7 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.option.options import Options
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
@@ -118,6 +119,7 @@ class BaseTest(unittest.TestCase):
       'pants_workdir': self.pants_workdir,
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
+      'pants_configdir': os.path.join(self.build_root, 'config'),
       'cache_key_gen_version': '0-test',
     }
     BuildRoot().path = self.build_root
@@ -152,9 +154,9 @@ class BaseTest(unittest.TestCase):
     for_task_types = for_task_types or []
     options = options or {}
 
-    new_option_values = defaultdict(dict)
+    option_values = defaultdict(dict)
 
-    # Get values for all new-style options registered by the tasks in for_task_types.
+    # Get default values for all options registered by the tasks in for_task_types.
     for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
@@ -164,7 +166,7 @@ class BaseTest(unittest.TestCase):
       # When testing we set option values directly, so we don't care about cmd-line flags, config,
       # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
       def register(*rargs, **rkwargs):
-        scoped_options = new_option_values[scope]
+        scoped_options = option_values[scope]
         default = rkwargs.get('default')
         if default is None and rkwargs.get('action') == 'append':
           default = []
@@ -179,14 +181,25 @@ class BaseTest(unittest.TestCase):
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
     for scope, opts in options.items():
       for key, val in opts.items():
-        new_option_values[scope][key] = val
+        option_values[scope][key] = val
 
     for scope, opts in self.options.items():
       for key, val in opts.items():
-        new_option_values[scope][key] = val
+        option_values[scope][key] = val
+
+    # Make inner scopes inherit option values from their enclosing scopes.
+    # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
+    # and therefore only have to inherit from our immediately enclosing scope.
+    for scope in sorted(option_values.keys()):
+      if scope != Options.GLOBAL_SCOPE:
+        enclosing_scope = scope.rpartition('.')[0]
+        opts = option_values[scope]
+        for key, val in option_values.get(enclosing_scope, {}).items():
+          if key not in opts:  # Inner scope values override the inherited ones.
+            opts[key] = val
 
     return create_context(config=self.config(overrides=config),
-                          options=new_option_values,
+                          options=option_values,
                           target_roots=target_roots,
                           build_graph=self.build_graph,
                           build_file_parser=self.build_file_parser,

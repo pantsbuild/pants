@@ -73,8 +73,7 @@ class SignApkTask(Task):
   @property
   def config_file(self):
     if not self._config_file:
-      raise TaskError('The "[sign]: keystore_config_location" option must declare the location '
-                      'of an .ini file holding keystore definitions.')
+      raise TaskError('The --keystore_config_location option must be set.')
     return os.path.expanduser(self._config_file)
 
   @property

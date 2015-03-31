@@ -70,6 +70,7 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal:context',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/tasks:base',
   ],
 )

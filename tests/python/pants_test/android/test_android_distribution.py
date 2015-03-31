@@ -11,10 +11,11 @@ from contextlib import contextmanager
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
-from pants_test.android.test_android_base import TestAndroidBase
+from pants_test.android.test_android_base import distribution
+from pants_test.base_test import BaseTest
 
 
-class TestAndroidDistribution(TestAndroidBase):
+class TestAndroidDistribution(BaseTest):
   """Test the AndroidDistribution class."""
 
   @contextmanager
@@ -35,7 +36,7 @@ class TestAndroidDistribution(TestAndroidBase):
     AndroidDistribution._CACHED_SDK = self._local_cache
 
   def test_passing_sdk_path(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       android_sdk = AndroidDistribution(sdk_path=sdk)
       aapt = os.path.join(sdk, 'build-tools', '19.1.0', 'aapt')
       android_tool = android_sdk.register_android_tool(aapt)
@@ -49,40 +50,40 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_passing_sdk_path_missing_tools(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      with self.distribution() as sdk:
+      with distribution() as sdk:
         aapt = os.path.join(sdk, 'build-tools', 'bad-number', 'aapt')
         AndroidDistribution(sdk_path=sdk).register_android_tool(aapt)
 
   def test_locate_no_sdk_on_path(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      with self.distribution() as sdk:
+      with distribution() as sdk:
         with self.env(ANDROooooD_HOME=sdk):
           dist = AndroidDistribution.locate_sdk_path()
           self.assertEquals(dist._sdk_path, None)
 
   def test_locate_sdk_path(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       with self.env(ANDROID_HOME=sdk):
         dist = AndroidDistribution.locate_sdk_path()
         self.assertEquals(dist._sdk_path, sdk)
 
   def test_locate_alternative_variables(self):
     # Test that alternative environmental variables are accepted.
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       with self.env(ANDROID_SDK=sdk):
         dist = AndroidDistribution.locate_sdk_path()
         self.assertEquals(dist._sdk_path, sdk)
 
   def test_caching_multiple_sdks(self):
-    with self.distribution() as first_sdk_path:
-      with self.distribution() as second_sdk_path:
+    with distribution() as first_sdk_path:
+      with distribution() as second_sdk_path:
         first_sdk_instance = AndroidDistribution.cached(first_sdk_path)
         second_sdk_instance = AndroidDistribution.cached(second_sdk_path)
         self.assertEquals(AndroidDistribution._CACHED_SDK[first_sdk_path], first_sdk_instance)
         self.assertEquals(AndroidDistribution._CACHED_SDK[second_sdk_path], second_sdk_instance)
 
   def test_sdk_path(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       self.assertEquals(sdk, android_sdk._sdk_path)
 
@@ -104,7 +105,7 @@ class TestAndroidDistribution(TestAndroidBase):
     self.assertEquals(sdk, android_sdk._sdk_path)
 
   def test_register_android_tool(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       aapt = os.path.join('build-tools', '19.1.0', 'aapt')
       registered_aapt = android_sdk.register_android_tool(aapt)
@@ -119,19 +120,19 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_register_nonexistent_android_tool(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      with self.distribution() as sdk:
+      with distribution() as sdk:
         android_sdk = AndroidDistribution.cached(sdk)
         android_sdk.register_android_tool(os.path.join('build-tools', '19.1.0', 'random_tool'))
 
   def test_validated_tools(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       aapt = os.path.join('build-tools', '19.1.0', 'aapt')
       android_sdk.register_android_tool(aapt)
       self.assertIn(aapt, android_sdk._validated_tools)
 
   def test_register_tool_copy(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
         android_jar = os.path.join('platforms', 'android-19', 'android.jar')
@@ -140,7 +141,7 @@ class TestAndroidDistribution(TestAndroidBase):
                           os.path.join(workdir, android_jar))
 
   def test_register_tool_returns_file(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
         android_jar = os.path.join('platforms', 'android-19', 'android.jar')
@@ -148,7 +149,7 @@ class TestAndroidDistribution(TestAndroidBase):
         self.assertEquals(os.path.isfile(android_sdk._validated_tools[android_jar]), True)
 
   def test_register_copy_is_validated(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
         android_jar = os.path.join('platforms', 'android-19', 'android.jar')
@@ -157,7 +158,7 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_register_copy_but_no_tool(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      with self.distribution() as sdk:
+      with distribution() as sdk:
         with temporary_dir() as workdir:
           android_sdk = AndroidDistribution.cached(sdk)
           android_jar = os.path.join('platforms', 'android-19', 'no.jar')
@@ -166,7 +167,7 @@ class TestAndroidDistribution(TestAndroidBase):
                             os.path.join(workdir, 'android.jar'))
 
   def test_register_copy_file_exists(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
         android_jar = os.path.join('platforms', 'android-19', 'android.jar')
@@ -177,7 +178,7 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_register_tool_no_permission(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      with self.distribution() as sdk:
+      with distribution() as sdk:
         with temporary_dir() as workdir:
           os.chmod(workdir, 0o400)
           android_sdk = AndroidDistribution.cached(sdk)
@@ -185,7 +186,7 @@ class TestAndroidDistribution(TestAndroidBase):
           android_sdk.register_android_tool(android_jar, workdir=workdir)
 
   def test_get_tool_path(self):
-    with self.distribution() as sdk:
+    with distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       android_jar = os.path.join('platforms', 'android-19', 'android.jar')
       tool_path = android_sdk._get_tool_path(android_jar)
@@ -193,7 +194,7 @@ class TestAndroidDistribution(TestAndroidBase):
 
   def test_get_bad_tool_path(self):
     with self.assertRaises(AndroidDistribution.DistributionError):
-      with self.distribution() as sdk:
+      with distribution() as sdk:
         android_sdk = AndroidDistribution.cached(sdk)
         android_jar = os.path.join('platforms', 'android-19', 'no.jar')
         tool_path = android_sdk._get_tool_path(android_jar)

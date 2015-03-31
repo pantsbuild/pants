@@ -42,7 +42,7 @@ python_library(
     'src/python/pants/backend/android/tasks:all',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:base'
+    'tests/python/pants_test:task_test_base'
   ]
 )
 
@@ -77,7 +77,7 @@ python_tests(
     'src/python/pants/backend/android:android_distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/android:android_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
