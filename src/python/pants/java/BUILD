@@ -2,35 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'distribution',
-  sources = globs('distribution/*.py'),
-  resources = globs('distribution/*.class'),
-  dependencies = [
-    '3rdparty/python:six',
-    'src/python/pants/base:revision',
-    'src/python/pants/util:contextutil',
-  ]
-)
-
-python_library(
   name = 'executor',
   sources = ['executor.py'],
   dependencies = [
-    ':distribution',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/java/distribution:distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
-  name = 'jar',
-  sources = globs('jar/manifest.py'),
-  dependencies = [
-    '3rdparty/python:six',
   ]
 )
 

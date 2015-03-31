@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':executor',
     'tests/python/pants_test/java/distribution',
+    'tests/python/pants_test/java/jar',
   ]
 )
 
@@ -13,7 +14,7 @@ python_tests(
   name = 'executor',
   sources = ['test_executor.py'],
   dependencies = [
-    'src/python/pants/java:distribution',
+    'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

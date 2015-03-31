@@ -45,7 +45,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:junit_run',
     'src/python/pants/goal:products',
     'src/python/pants/ivy',
-    'src/python/pants/java:distribution',
+    'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
