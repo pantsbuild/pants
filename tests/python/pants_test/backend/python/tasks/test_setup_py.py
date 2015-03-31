@@ -15,7 +15,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.backend.python.tasks.setup_py import ExportedTargetDependencyCalculator, SetupPy
+from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_dir, temporary_file
@@ -81,7 +81,7 @@ class TestSetupPy(TaskTestBase):
     distdir = os.path.join(self._tmpdir, 'dist')
     self.set_options(pants_distdir=distdir)
 
-    self.dependency_calculator = SetupPy.DependencyCalculator(self.address_mapper)
+    self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 
   def create_dependencies(self, depmap):
     target_map = {}

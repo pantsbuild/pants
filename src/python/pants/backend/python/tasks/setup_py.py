@@ -58,9 +58,8 @@ class SetupPyRunner(InstallerBase):
 class TargetAncestorIerator(object):
   """Supports iteration of target ancestor lineages."""
 
-  def __init__(self, address_mapper):
-    self._address_mapper = address_mapper
-    self._build_graph = BuildGraph(address_mapper)
+  def __init__(self, build_graph):
+    self._build_graph = build_graph
 
   def iter_target_siblings_and_ancestors(self, target):
     """Produces an iterator over a target's siblings and ancestor lineage.
@@ -70,7 +69,7 @@ class TargetAncestorIerator(object):
     """
     def iter_targets_in_spec_path(spec_path):
       try:
-        for address in self._address_mapper.addresses_in_spec_path(spec_path):
+        for address in self._build_graph.address_mapper.addresses_in_spec_path(spec_path):
           self._build_graph.inject_address_closure(address)
           yield self._build_graph.get_target(address)
       except AddressLookupError:
@@ -124,6 +123,9 @@ class ExportedTargetDependencyCalculator(AbstractClass):
   class AmbiguousOwnerError(TaskError):
     """Indicates an exportable target has more than one owning exported target."""
 
+  def __init__(self, build_graph):
+    self._ancestor_iterator = TargetAncestorIerator(build_graph)
+
   @abstractmethod
   def is_third_party(self, target):
     """Identifies targets that are exported by third parties.
@@ -149,8 +151,16 @@ class ExportedTargetDependencyCalculator(AbstractClass):
                     also be visited.
     """
 
-  def __init__(self, address_mapper):
-    self._ancestor_ierator = TargetAncestorIerator(address_mapper)
+  def _closure(self, target):
+    """Return the target closure as defined by this dependency calculator's definition of a walk."""
+    closure = set()
+
+    def collect(current):
+      closure.add(current)
+      return True
+    self.walk(target, collect)
+
+    return closure
 
   def reduced_dependencies(self, exported_target):
     """Calculates the reduced transitive dependencies for an exported target.
@@ -191,37 +201,34 @@ class ExportedTargetDependencyCalculator(AbstractClass):
       raise self.UnExportedError('Cannot calculate reduced dependencies for a non-exported '
                                  'target, given: {}'.format(exported_target))
 
-    provider_by_owned_python_target = OrderedDict()
+    owner_by_owned_python_target = OrderedDict()
 
     def collect_potentially_owned_python_targets(current):
       if (current != exported_target) and not self.is_third_party(current):
-        provider_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
+        owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
     self.walk(exported_target, collect_potentially_owned_python_targets)
 
-    for target in provider_by_owned_python_target:
-      if not self.is_exported(target):
+    for owned in owner_by_owned_python_target:
+      if not self.is_exported(owned):
         potential_owners = set()
-        for potential_owner in self._ancestor_ierator.iter_target_siblings_and_ancestors(target):
-          if self.is_exported(potential_owner):
-            if (target in potential_owner.closure() or
-                any(target in binary.closure()
-                    for binary in potential_owner.provided_binaries.values())):
-              potential_owners.add(potential_owner)
+        for potential_owner in self._ancestor_iterator.iter_target_siblings_and_ancestors(owned):
+          if self.is_exported(potential_owner) and owned in self._closure(potential_owner):
+            potential_owners.add(potential_owner)
         if not potential_owners:
-          raise self.NoOwnerError('No exported target owner found for {}'.format(target))
+          raise self.NoOwnerError('No exported target owner found for {}'.format(owned))
         owner = potential_owners.pop()
-        if len(potential_owners) > 0:
+        if potential_owners:
           ambiguous_owners = [o for o in potential_owners
                               if o.address.spec_path == owner.address.spec_path]
           if ambiguous_owners:
             raise self.AmbiguousOwnerError('Owners for {} are ambiguous.  Found {} and '
-                                           '{} others: {}'.format(target,
+                                           '{} others: {}'.format(owned,
                                                                   owner,
                                                                   len(ambiguous_owners),
                                                                   ambiguous_owners))
-        provider_by_owned_python_target[target] = owner
+        owner_by_owned_python_target[owned] = owner
 
     reduced_dependencies = OrderedSet()
 
@@ -230,15 +237,17 @@ class ExportedTargetDependencyCalculator(AbstractClass):
         return True
       else:
         # The provider will be one of:
-        #  `None`, ie: a 3rdparty requirement.
-        #  `exported_target`, ie: a local exportable target owned by `exported_target`.
-        #  Or else a local exportable target owned by some other exported target.
-        provider = provider_by_owned_python_target.get(current)
-        if provider is None:
+        # 1. `None`, ie: a 3rdparty requirement we should collect.
+        # 2. `exported_target`, ie: a local exportable target owned by `exported_target` that we
+        #    should collect
+        # 3. Or else a local exportable target owned by some other exported target in which case
+        #    we should collect the exported owner.
+        owner = owner_by_owned_python_target.get(current)
+        if owner is None or owner == exported_target:
           reduced_dependencies.add(current)
         else:
-          reduced_dependencies.add(current if provider == exported_target else provider)
-        return provider == exported_target
+          reduced_dependencies.add(owner)
+        return owner == exported_target
 
     self.walk(exported_target, collect_reduced_dependencies)
     return reduced_dependencies
@@ -533,7 +542,7 @@ class SetupPy(PythonTask):
 
   def create_setup_py(self, target, dist_dir):
     chroot = Chroot(dist_dir, name=target.provides.name)
-    dependency_calculator = self.DependencyCalculator(self.context.address_mapper)
+    dependency_calculator = self.DependencyCalculator(self.context.build_graph)
     reduced_deps = dependency_calculator.reduced_dependencies(target)
     self.write_contents(target, reduced_deps, chroot)
     self.write_setup(target, reduced_deps, chroot)
