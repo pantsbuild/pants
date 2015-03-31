@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
+  # Subsytems used outside of any task.
+  subsystems = (RunTracker, )
+
   def __init__(self, root_dir):
     """
     :param root_dir: The root directory of the pants workspace.
@@ -70,12 +73,12 @@ class GoalRunner(object):
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
-    # TODO: Retrofit RunTracker as a subsystem, instead of special-casing it here
-    # and in register_options().
-    known_scopes = ['', 'run-tracker']
 
-    # Add scopes for global instances of all subsystems.
-    for subsystem_type in Goal.global_subsystem_types():
+    known_scopes = ['']
+
+    # Add scopes for global subsystem instances.
+    global_subsystems = set(self.subsystems) | Goal.global_subsystem_types()
+    for subsystem_type in global_subsystems:
       known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
 
     # Add scopes for all tasks in all goals.
@@ -87,10 +90,10 @@ class GoalRunner(object):
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options()
 
-    # Make the options values available on all subsystems.
+    # Make the options values available to all subsystems.
     Subsystem._options = self.options
 
-    self.run_tracker = RunTracker.from_options(self.options)
+    self.run_tracker = RunTracker.global_instance()
     report = initial_reporting(self.config, self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')

@@ -20,23 +20,31 @@ from pants.reporting.report import Report
 from pants.util.dirutil import safe_mkdtemp
 
 
+def create_option_values(option_values):
+  """Create a fake OptionValues object for testing.
+
+  :param dict option_values: A dict of option name -> value.
+  """
+  class TestOptionValues(object):
+    def __init__(self):
+      self.__dict__ = option_values
+    def __getitem__(self, key):
+      return getattr(self, key)
+  return TestOptionValues()
+
+
 def create_options(options):
-  """Create a fake new-style options object for testing.
+  """Create a fake Options object for testing.
 
   Note that the returned object only provides access to the provided options values. There is
-  no registration mechanism on this object. Code under test shouldn't care  about resolving
+  no registration mechanism on this object. Code under test shouldn't care about resolving
   cmd-line flags vs. config vs. env vars etc. etc.
 
-  :param dict options: An optional dict of scope -> (dict of option name -> value).
+  :param dict options: A dict of scope -> (dict of option name -> value).
   """
   class TestOptions(object):
     def for_scope(self, scope):
-      class TestOptionValues(object):
-        def __init__(self):
-          self.__dict__ = options[scope]
-        def __getitem__(self, key):
-          return getattr(self, key)
-      return TestOptionValues()
+      return create_option_values(options[scope])
 
     def for_global_scope(self):
       return self.for_scope('')
@@ -63,16 +71,19 @@ def create_config(sample_ini=''):
   return SingleFileConfig('dummy/path', parser)
 
 
-def create_run_tracker(info_dir=None):
-  """Creates a ``RunTracker`` and starts it.
-
-  :param string info_dir: An optional director for the run tracker to store state; defaults to a
-    new temp dir that will be be cleaned up on interpreter exit.
-  """
+def create_run_tracker():
+  """Creates a ``RunTracker`` and starts it."""
   # TODO(John Sirois): Rework uses around a context manager for cleanup of the info_dir in a more
-  # disciplined manner
-  info_dir = info_dir or safe_mkdtemp()
-  run_tracker = RunTracker(info_dir)
+  # disciplined manner.
+  # The RunTracker writes its info into <pants_workdir>/run-tracker.  But it's not important that
+  # it be under the pants_workdir the rest of the code sees, so here we just give it a tmpdir
+  # for this (but no other) purpose.
+  # TODO(benjy): Some more regular way to set up a temporary buildroot and pants_workdir for tests.
+  # TODO(benjy): Find a way to get rid of this? Tests shouldn't require a run tracker or reporter.
+  workdir = safe_mkdtemp()
+  run_tracker = RunTracker('run-tracker', create_option_values({
+    'pants_workdir': workdir,
+  }))
   report = Report()
   settings = PlainTextReporter.Settings(outfile=sys.stdout,
                                         log_level=Report.INFO,

@@ -11,7 +11,6 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
-    'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:dirutil',
   ]

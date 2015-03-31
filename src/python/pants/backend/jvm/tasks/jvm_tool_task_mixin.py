@@ -9,7 +9,7 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 
 
 class JvmToolTaskMixin(JvmToolMixin):
-  """A JvmToolMixin specialized for mixin in to Tasks."""
+  """A JvmToolMixin specialized for mixing in to Tasks."""
 
   def tool_classpath(self, key, scope=None):
     """Get a classpath for the tool previously registered under key in the given scope.
