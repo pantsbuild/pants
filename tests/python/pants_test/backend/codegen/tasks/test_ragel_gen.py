@@ -20,7 +20,8 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_rmtree
-from pants_test.tasks.test_base import TaskTest, is_exe
+from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.test_base import is_exe
 
 
 ragel_file_contents = dedent("""
@@ -65,7 +66,7 @@ public class Parser {
 """)
 
 
-class RagelGenTest(TaskTest):
+class RagelGenTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return RagelGen
@@ -78,7 +79,6 @@ class RagelGenTest(TaskTest):
   def setUp(self):
     super(RagelGenTest, self).setUp()
     self.task_outdir =  os.path.join(self.build_root, 'ragel', 'gen')
-
 
   def tearDown(self):
     super(RagelGenTest, self).tearDown()
@@ -96,9 +96,7 @@ class RagelGenTest(TaskTest):
     """))
 
     target = self.target('test_ragel_gen:atoi')
-    task = self.prepare_task(build_graph=self.build_graph,
-                             targets=[target],
-                             build_file_parser=self.build_file_parser)
+    task = self.create_task(self.context(target_roots=[target]))
 
     task._ragel_binary = 'ragel'
     task.invalidate_for_files = lambda: []

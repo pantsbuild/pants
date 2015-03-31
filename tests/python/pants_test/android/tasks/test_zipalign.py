@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.android.tasks.zipalign import Zipalign
-from pants_test.android.test_android_base import TestAndroidBase
+from pants_test.android.test_android_base import TestAndroidBase, distribution
 
 
 class TestZipalign(TestAndroidBase):
@@ -19,36 +19,31 @@ class TestZipalign(TestAndroidBase):
     return Zipalign
 
   def test_zipalign_smoke(self):
-    task = self.prepare_task(build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser)
+    task = self.create_task(self.context())
     task.execute()
 
-
   def test_zipalign_binary(self):
-    with self.distribution() as dist:
+    with distribution() as dist:
       with self.android_binary() as android_binary:
-        task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
-                                 build_graph=self.build_graph,
-                                 build_file_parser=self.build_file_parser)
+        self.set_options(sdk_path=dist)
+        task = self.create_task(self.context())
         target = android_binary
         self.assertEqual(task.zipalign_binary(target),
                          os.path.join(dist, 'build-tools', target.build_tools_version, 'zipalign'))
 
   def test_zipalign_out(self):
-    with self.distribution() as dist:
+    with distribution() as dist:
       with self.android_binary() as android_binary:
-        task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
-                                 build_graph=self.build_graph,
-                                 build_file_parser=self.build_file_parser)
+        self.set_options(sdk_path=dist)
+        task = self.create_task(self.context())
         target = android_binary
         self.assertEqual(task.zipalign_out(target), os.path.join(task._distdir, target.name))
 
   def test_render_args(self):
-    with self.distribution() as dist:
+    with distribution() as dist:
       with self.android_binary() as android_binary:
-        task = self.prepare_task(args=['--test-sdk-path={0}'.format(dist)],
-                                 build_graph=self.build_graph,
-                                 build_file_parser=self.build_file_parser)
+        self.set_options(sdk_path=dist)
+        task = self.create_task(self.context())
         target = android_binary
         expected_args = [os.path.join(dist, 'build-tools', target.build_tools_version, 'zipalign'),
                          '-f', '4', 'package/path',

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import textwrap
 
 from pants.backend.android.tasks.sign_apk import SignApkTask
 from pants.base.exceptions import TaskError
@@ -22,18 +21,6 @@ class SignApkTest(TestAndroidBase):
   @classmethod
   def task_type(cls):
     return SignApkTask
-
-  @classmethod
-  def _get_config(cls,
-                  section='test',
-                  option='keystore_config_location',
-                  location=_TEST_KEYSTORE):
-    ini = textwrap.dedent("""
-    [{0}]
-
-    {1}: {2}
-    """).format(section, option, location)
-    return ini
 
   class FakeKeystore(object):
     # Mock keystore to test the render_args method.
@@ -51,54 +38,23 @@ class SignApkTest(TestAndroidBase):
     def binary(cls, tool):
       return 'path/to/{0}'.format(tool)
 
+  def _get_context(self, location=_TEST_KEYSTORE):
+    self.set_options(keystore_config_location=location)
+    return self.context()
+
   def test_sign_apk_smoke(self):
-    task = self.prepare_task(config=self._get_config(),
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser)
+    task = self.create_task(self._get_context())
     task.execute()
 
-  def test_config_file(self):
-    task = self.prepare_task(config=self._get_config(),
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser)
-    task.config_file
-
-  def test_no_config_file_defined(self):
+  def test_no_location_defined(self):
     with self.assertRaises(TaskError):
-      task = self.prepare_task(config=self._get_config(location=''),
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
+      task = self.create_task(self._get_context(location=''))
       task.config_file
 
-  def test_config_file_from_pantsini(self):
+  def test_setting_location(self):
     with temporary_dir() as temp:
-      task = self.prepare_task(config=self._get_config(location=temp),
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      task.config_file
+      task = self.create_task(self._get_context(location=temp))
       self.assertEquals(temp, task.config_file)
-
-  def test_no_section_in_pantsini(self):
-    with self.assertRaises(TaskError):
-      task = self.prepare_task(config=self._get_config(location=''),
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      task.config_file
-
-  def test_overriding_config_with_cli(self):
-    with temporary_dir() as temp:
-      task = self.prepare_task(config=self._get_config(section='bad-section-header'),
-                               args=['--test-keystore-config-location={0}'.format(temp)],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      self.assertEquals(temp, task.config_file)
-
-  def test_passing_empty_config_cli(self):
-    with self.assertRaises(TaskError):
-      task = self.prepare_task(args=['--test-keystore-config-location={0}'.format("")],
-                               build_graph=self.build_graph,
-                               build_file_parser=self.build_file_parser)
-      task.config_file
 
   def test_package_name(self):
     with self.android_binary() as android_binary:
@@ -122,9 +78,7 @@ class SignApkTest(TestAndroidBase):
   def test_render_args(self):
     with temporary_dir() as temp:
       with self.android_binary() as android_binary:
-        task = self.prepare_task(config=self._get_config(),
-                                 build_graph=self.build_graph,
-                                 build_file_parser=self.build_file_parser)
+        task = self.create_task(self._get_context())
         target = android_binary
         fake_key = self.FakeKeystore()
         task._dist = self.FakeDistribution()
