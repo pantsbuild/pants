@@ -134,7 +134,14 @@ jar_library(name='libthrift-0.5.0',
               # test projects.
               # The org.apache.hadoop#libthrift;0.5.0.0 version of the artifact is
               # the right API and hosted on maven central.
-              jar(org='org.apache.hadoop', name='libthrift', rev='0.5.0.0'),
+              jar(org='org.apache.hadoop', name='libthrift', rev='0.5.0.0',
+                  excludes=[
+                    # These are transitive should-be-optional-but-are-not log4j deps
+                    # not hosted on maven central.
+                    exclude(org='javax.jms', name='jms'),
+                    exclude(org='com.sun.jdmk', name='jmxtools'),
+                    exclude(org='com.sun.jmx', name='jmxri'),
+                  ]),
             ]
            )
 
