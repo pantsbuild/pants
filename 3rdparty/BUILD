@@ -128,7 +128,13 @@ jar_library(name='slf4j-api',
 
 jar_library(name='libthrift-0.5.0',
             jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.5.0-1'),
+              # Note that this was org.apache.thrift#libthrift;0.5.0-1, a jar
+              # hosted at maven.twttr.com.  That jar serves up flaky and we don't
+              # really care about the NPE fix it contains for pants examples and
+              # test projects.
+              # The org.apache.hadoop#libthrift;0.5.0 version of the artifact is
+              # the right API and hosted on maven central.
+              jar(org='org.apache.hadoop', name='libthrift', rev='0.5.0'),
             ]
            )
 
