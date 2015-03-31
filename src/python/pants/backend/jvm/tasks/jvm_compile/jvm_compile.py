@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import sys
+from abc import abstractmethod
 from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
@@ -200,17 +201,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return JvmFingerprintStrategy(self._platform_version_info())
 
   def _platform_version_info(self):
-    return (self._strategy.name(),) + self._language_platform_version_info()
+    return [self._strategy.name()] + self._language_platform_version_info()
 
+  @abstractmethod
   def _language_platform_version_info(self):
     """
     Provides extra platform information such as java version that will be used
     in the fingerprinter. This in turn ensures different platform versions create different
     cache artifacts.
 
-    Subclasses can override this and return a list of version info.
+    Subclasses must override this and return a list of version info.
     """
-    return ()
+    pass
 
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
