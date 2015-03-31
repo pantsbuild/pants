@@ -26,23 +26,34 @@ class GoalExecutor(object):
   def goal(self):
     return self._goal
 
+  def _task_workdir(self, options, task_name, task_type):
+    """Generates a workdir based on a Task's identity Payload."""
+    goal_workdir = os.path.join(options.for_global_scope().pants_workdir, self._goal.name)
+    # Get the task identity, and ensure that it is non-empty.
+    task_identity_payload = task_type.identity(options)
+    fingerprint = task_identity_payload.fingerprint()
+    if not fingerprint:
+      raise TaskError("{} was configured incorrectly: "
+                      "Tasks must have a unique identity.".format(task_name))
+
+    # Concatenate goal, task, and fingerprint into the final workdir.
+    return os.path.join(goal_workdir, task_name, fingerprint)
+
   def attempt(self, explain):
     """Attempts to execute the goal's tasks in installed order.
 
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.
     """
-    goal_workdir = os.path.join(self._context.options.for_global_scope().pants_workdir,
-                                self._goal.name)
     with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.GOAL]):
       for name, task_type in reversed(self._tasktypes_by_name.items()):
         with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
           if explain:
             self._context.log.debug('Skipping execution of %s in explain mode' % name)
-          else:
-            task_workdir = os.path.join(goal_workdir, name)
-            task = task_type(self._context, task_workdir)
-            task.execute()
+            continue
+          task_workdir = self._task_workdir(self._context.options, name, task_type)
+          task = task_type(self._context, task_workdir)
+          task.execute()
 
       if explain:
         reversed_tasktypes_by_name = reversed(self._tasktypes_by_name.items())

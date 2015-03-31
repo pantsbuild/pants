@@ -17,6 +17,8 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
@@ -36,7 +38,9 @@ class TaskBase(AbstractClass):
   3. alternate_target_roots - propose a different set of target roots to use than those specified
                               via the CLI for the active pants run.
   4. prepare - request any products needed from other tasks.
-  5. __init__ - distill configuration into the information needed to execute.
+  5. identity - returns an identity Payload for the task, which will be used to compute
+                Task level invalidation.
+  6. __init__ - distill configuration into the information needed to execute.
 
   Provides access to the current run context for scoping work.
 
@@ -111,6 +115,23 @@ class TaskBase(AbstractClass):
 
     :returns list: The new target roots to use or none to accept the CLI specified target roots.
     """
+
+  @classmethod
+  def identity(cls, options):
+    """Returns a Payload representing the unique identity of this Task.
+
+    The identity Payload of a Task is used to differentiate between inputs to a Task
+    that may behave differently. Usually options that change the behaviour of a Task
+    should be included in its identity Payload.
+
+    Subclasses should add to the Payload instances returned by their superclass, rather
+    than completely overriding the identity.
+
+    :returns Payload: a Payload encapsulating unique information about this Task.
+    """
+    payload = Payload()
+    payload.add_field('task_class_name', PrimitiveField(cls.__name__))
+    return payload
 
   @classmethod
   def _prepare(cls, options, round_manager):
@@ -487,8 +508,6 @@ class TaskBase(AbstractClass):
       return accepted
     else:
       # both accepted and rejected targets
-      # TODO: once https://github.com/pantsbuild/pants/issues/425 lands, we should add
-      # language-specific flags that would resolve the ambiguity here
       raise TaskError('Mutually incompatible targets specified: %s vs %s (and %d others)' %
                       (accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
 
