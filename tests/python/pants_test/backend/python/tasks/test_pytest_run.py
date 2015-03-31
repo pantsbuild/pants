@@ -29,13 +29,13 @@ class PythonTestBuilderTestBase(TaskTestBase):
     super(PythonTestBuilderTestBase, self).setUp()
     self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
 
-  def run_tests(self, targets, debug=False):
+  def run_tests(self, targets):
     options = {
       # TODO: Clean up this hard-coded interpreter constraint once we have subsystems
       # and can simplify InterpreterCache and PythonSetup.
       'interpreter': ['CPython>=2.7,<3'],  # These tests don't pass on Python 3 yet.
       'colors': False,
-      'level': 'debug' if debug else 'level'
+      'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
     }
     self.set_options(**options)
     context = self.context(target_roots=targets)
@@ -43,9 +43,9 @@ class PythonTestBuilderTestBase(TaskTestBase):
     with pushd(self.build_root):
       pytest_run_task.execute()
 
-  def run_failing_tests(self, targets, debug=False):
+  def run_failing_tests(self, targets):
     with self.assertRaises(PythonTestFailure):
-      self.run_tests(targets=targets, debug=debug)
+      self.run_tests(targets=targets)
 
 class PythonTestBuilderTestEmpty(PythonTestBuilderTestBase):
   def test_empty(self):
@@ -269,7 +269,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       self.assertEqual([1, 2, 5, 6], not_run_statements)
 
     with environment_as(PANTS_PY_COVERAGE='paths:core.py'):
-      self.run_failing_tests(targets=[self.all], debug=True)
+      self.run_failing_tests(targets=[self.all])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([], not_run_statements)
