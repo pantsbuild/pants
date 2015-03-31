@@ -96,7 +96,7 @@ class JavaCompile(JvmCompile):
   # Make the java target language version part of the cache key hash,
   # this ensures we invalidate if someone builds against a different version.
   def _language_platform_version_info(self):
-    return (self.get_options().target,) if self.get_options().target else ()
+    return [self.get_options().target] if self.get_options().target else []
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
