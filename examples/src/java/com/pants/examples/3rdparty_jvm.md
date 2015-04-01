@@ -91,19 +91,20 @@ might want to look out for "round trip" dependencies. You can publish an
 artifact *near* generated from your workspace's source code and consume
 a third-party artifact *far* that depends on *near*. If you're not
 careful, you might depend on two versions of the *near* code: the local
-source code and an artifact you published a while ago. When consuming
-such third-party artifacts, exclude dependencies that "collide" with
-source code and depend on local source:
+source code and an artifact you published a while ago.
+
+When consuming such third-party artifacts, ensure that your source dependencies
+have `provides` clauses (*near*), and then add the source dependencies
+explicitly when you depend on the binary copy of the *far* dependency:
 
     :::python
     jar_library(name='far',
       jars=[
-        # exclude conflicting dep:
-        jar(org='org.archie', name='far', rev='0.0.18').with_sources()
-          .exclude(org='org.archimedes', name='near')
+        jar(org='org.archie', name='far', rev='0.0.18'),
       ]
       dependencies=[
-        # and re-include local version of source manually:
+        # including the local version of source manually will cause the binary
+        # dependency to be automatically excluded:
         'util/near',
       ]
     )
