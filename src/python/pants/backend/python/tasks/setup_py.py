@@ -55,7 +55,7 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
-class TargetAncestorIerator(object):
+class TargetAncestorIterator(object):
   """Supports iteration of target ancestor lineages."""
 
   def __init__(self, build_graph):
@@ -124,7 +124,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     """Indicates an exportable target has more than one owning exported target."""
 
   def __init__(self, build_graph):
-    self._ancestor_iterator = TargetAncestorIerator(build_graph)
+    self._ancestor_iterator = TargetAncestorIterator(build_graph)
 
   @abstractmethod
   def is_third_party(self, target):
@@ -143,13 +143,31 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     """
 
   @abstractmethod
-  def walk(self, target, visitor):
+  def dependencies(self, target):
+    """Returns an iterator over the dependencies of the given target.
+
+    :param target: The target to iterate dependencies of.
+    :returns: An iterator over all of the target's dependencies.
+    """
+
+  def _walk(self, target, visitor):
     """Walks the dependency graph for the given target.
 
     :param target: The target to start the walk from.
     :param visitor: A function that takes a target and returns `True` if its dependencies should
                     also be visited.
     """
+    visited = set()
+
+    def walk(current):
+      if current not in visited:
+        visited.add(current)
+        keep_going = visitor(current)
+        if keep_going:
+          for dependency in self.dependencies(current):
+            walk(dependency)
+
+    walk(target)
 
   def _closure(self, target):
     """Return the target closure as defined by this dependency calculator's definition of a walk."""
@@ -158,7 +176,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     def collect(current):
       closure.add(current)
       return True
-    self.walk(target, collect)
+    self._walk(target, collect)
 
     return closure
 
@@ -193,7 +211,9 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     # 1.) Walk the exported target to collect provisional owned exportable targets, but _not_
     #     3rdparty since these may be introduced by exported subgraphs we discover in later steps!
     # 2.) Determine the owner of each target collected in 1 by walking the ancestor chain to find
-    #     the closest exported target.
+    #     the closest exported target.  The ancestor chain is just all targets whose spec path is
+    #     a prefix of th descendant.  In other words, all targets in descendant's BUILD file family
+    #     (its siblings), all targets in its parent directory BUILD file family, and so on.
     # 3.) Finally walk the exported target once more, replacing each visited dependency with its
     #     owner.
 
@@ -208,7 +228,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
         owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
-    self.walk(exported_target, collect_potentially_owned_python_targets)
+    self._walk(exported_target, collect_potentially_owned_python_targets)
 
     for owned in owner_by_owned_python_target:
       if not self.is_exported(owned):
@@ -249,7 +269,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
           reduced_dependencies.add(owner)
         return owner == exported_target
 
-    self.walk(exported_target, collect_reduced_dependencies)
+    self._walk(exported_target, collect_reduced_dependencies)
     return reduced_dependencies
 
 
@@ -283,21 +303,12 @@ class SetupPy(PythonTask):
     def is_exported(self, target):
       return SetupPy.has_provides(target)
 
-    def walk(self, target, visitor):
-      visited = set()
-
-      def _walk(current):
-        if current not in visited:
-          visited.add(current)
-          keep_going = visitor(current)
-          if keep_going:
-            for dependency in current.dependencies:
-              _walk(dependency)
-            if self.is_exported(current):
-              for binary in current.provided_binaries.values():
-                _walk(binary)
-
-      _walk(target)
+    def dependencies(self, target):
+      for dependency in target.dependencies:
+        yield dependency
+      if self.is_exported(target):
+        for binary in target.provided_binaries.values():
+          yield binary
 
   @classmethod
   def register_options(cls, register):
