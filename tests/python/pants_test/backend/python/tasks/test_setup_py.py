@@ -8,20 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import OrderedDict
 from contextlib import contextmanager
+from textwrap import dedent
 
-from mock import MagicMock, Mock, call
+from mock import Mock
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.tasks.setup_py import SetupPy
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp
+from pants.util.dirutil import safe_mkdir
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -30,13 +28,68 @@ class TestSetupPy(TaskTestBase):
   def task_type(cls):
     return SetupPy
 
+  @property
+  def alias_groups(self):
+    return register_python()
+
+  def create_target(self, relpath, name, contents):
+    self.create_file(relpath=self.build_path(relpath), contents=contents)
+    return self.target(SyntheticAddress(relpath, name).spec)
+
+  def create_python_requirement_library(self, relpath, name, requirements):
+    def make_requirement(req):
+      return 'python_requirement("{}")'.format(req)
+
+    return self.create_target(relpath=relpath, name=name, contents=dedent("""
+    python_requirement_library(
+      name='{name}',
+      requirements=[
+        {requirements}
+      ]
+    )
+    """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
+
+  def create_python_library(self, relpath, name, dependencies=(), provides=None):
+    return self.create_target(relpath=relpath, name=name, contents=dedent("""
+    python_library(
+      name='{name}',
+      dependencies=[
+        {dependencies}
+      ],
+      provides={provides}
+    )
+    """).format(name=name, dependencies=','.join(map(repr, dependencies)), provides=provides))
+
+  def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None):
+    return self.create_target(relpath=relpath, name=name, contents=dedent("""
+    python_binary(
+      name='{name}',
+      entry_point='{entry_point}',
+      dependencies=[
+        {dependencies}
+      ],
+      provides={provides}
+    )
+    """).format(name=name,
+                entry_point=entry_point,
+                dependencies=','.join(map(repr, dependencies)),
+                provides=provides))
+
+  def setUp(self):
+    super(TestSetupPy, self).setUp()
+
+    distdir = os.path.join(self._tmpdir, 'dist')
+    self.set_options(pants_distdir=distdir)
+
+    self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
+
   def create_dependencies(self, depmap):
     target_map = {}
     for name, deps in depmap.items():
-      target_map[name] = self.make_target(
-        spec=name,
-        target_type=PythonLibrary,
-        provides=PythonArtifact(name=name, version='0.0.0')
+      target_map[name] = self.create_python_library(
+        relpath=name,
+        name=name,
+        provides='setup_py(name="{name}", version="0.0.0")'.format(name=name)
       )
     for name, deps in depmap.items():
       target = target_map[name]
@@ -45,238 +98,278 @@ class TestSetupPy(TaskTestBase):
         self.build_graph.inject_dependency(target.address, dep.address)
     return target_map
 
-  def test_minified_dependencies_1(self):
+  def assert_requirements(self, target, expected):
+    reduced_dependencies = self.dependency_calculator.reduced_dependencies(target)
+    self.assertEqual(SetupPy.install_requires(reduced_dependencies), expected)
+
+  def test_reduced_dependencies_1(self):
     # foo -> bar -> baz
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['foo']),
                      OrderedSet([target_map['bar']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
-    self.assertEqual(SetupPy.install_requires(target_map['foo']), {'bar==0.0.0'})
-    self.assertEqual(SetupPy.install_requires(target_map['bar']), {'baz==0.0.0'})
-    self.assertEqual(SetupPy.install_requires(target_map['baz']), set())
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['baz']),
+                     OrderedSet())
+    self.assert_requirements(target_map['foo'], {'bar==0.0.0'})
+    self.assert_requirements(target_map['bar'], {'baz==0.0.0'})
+    self.assert_requirements(target_map['baz'], set())
 
   @contextmanager
   def run_execute(self, target, recursive=False):
     self.set_options(recursive=recursive, interpreter=[])
     context = self.context(target_roots=[target])
-    workdir = safe_mkdtemp(dir=self.build_root)
-    setup_py = self.create_task(context, workdir)
-    setup_py.run_one = MagicMock()
-    setup_py.run_one.return_value = True
-    setup_py.execute()
-    yield setup_py
+    setup_py = self.create_task(context)
+    yield setup_py.execute()
 
-  def test_execution_minified_dependencies_1(self):
+  def test_execution_reduced_dependencies_1(self):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    with self.run_execute(target_map['foo'], recursive=False) as setup_py:
-      setup_py.run_one.assert_called_with(target_map['foo'])
-    with self.run_execute(target_map['foo'], recursive=True) as setup_py:
-      setup_py.run_one.assert_has_calls([
-          call(target_map['foo']),
-          call(target_map['bar']),
-          call(target_map['baz'])
-      ], any_order=True)
+    with self.run_execute(target_map['foo'], recursive=False) as created:
+      self.assertEqual([target_map['foo']], created)
+    with self.run_execute(target_map['foo'], recursive=True) as created:
+      self.assertEqual([target_map['baz'], target_map['bar'], target_map['foo']], created)
 
-  def test_minified_dependencies_2(self):
+  def test_reduced_dependencies_2(self):
     # foo --> baz
     #  |      ^
     #  v      |
     # bar ----'
     dep_map = OrderedDict(foo=['bar', 'baz'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
-    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['foo']),
                      OrderedSet([target_map['bar'], target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['bar']),
                      OrderedSet([target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']), OrderedSet())
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['baz']),
+                     OrderedSet())
 
-  def test_minified_dependencies_diamond(self):
+  def test_reduced_dependencies_diamond(self):
     #   bar <-- foo --> baz
     #    |               |
     #    `----> bak <----'
     dep_map = OrderedDict(foo=['bar', 'baz'], bar=['bak'], baz=['bak'], bak=[])
     target_map = self.create_dependencies(dep_map)
-    self.assertEqual(SetupPy.minified_dependencies(target_map['foo']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['foo']),
                      OrderedSet([target_map['bar'], target_map['baz']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['bar']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['bar']),
                      OrderedSet([target_map['bak']]))
-    self.assertEqual(SetupPy.minified_dependencies(target_map['baz']),
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(target_map['baz']),
                      OrderedSet([target_map['bak']]))
-    self.assertEqual(SetupPy.install_requires(target_map['foo']), {'bar==0.0.0', 'baz==0.0.0'})
-    self.assertEqual(SetupPy.install_requires(target_map['bar']), {'bak==0.0.0'})
-    self.assertEqual(SetupPy.install_requires(target_map['baz']), {'bak==0.0.0'})
+    self.assert_requirements(target_map['foo'], {'bar==0.0.0', 'baz==0.0.0'})
+    self.assert_requirements(target_map['bar'], {'bak==0.0.0'})
+    self.assert_requirements(target_map['baz'], {'bak==0.0.0'})
 
-  def test_binary_target_injected_into_minified_dependencies(self):
-    foo_bin_dep = self.make_target(
-      spec=':foo_bin_dep',
-      target_type=PythonLibrary,
-    )
+  def test_binary_target_injected_into_reduced_dependencies(self):
+    foo_bin_dep = self.create_python_library(relpath='foo/dep', name='dep')
 
-    foo_bin = self.make_target(
-      spec=':foo_bin',
-      target_type=PythonBinary,
-      entry_point='foo.bin.foo',
+    foo_bin = self.create_python_binary(
+      relpath='foo/bin',
+      name='bin',
+      entry_point='foo.bin:foo',
       dependencies=[
-        foo_bin_dep,
+        'foo/dep',
       ]
     )
 
-    foo = self.make_target(
-      spec=':foo',
-      target_type=PythonLibrary,
-      provides=PythonArtifact(
+    foo = self.create_python_library(
+      relpath='foo',
+      name='foo',
+      provides=dedent("""
+      setup_py(
         name='foo',
-        version='0.0.0',
+        version='0.0.0'
       ).with_binaries(
-        foo_binary=':foo_bin',
+        foo_binary='foo/bin'
       )
+      """)
     )
 
-    self.assertEqual(SetupPy.minified_dependencies(foo), OrderedSet([foo_bin, foo_bin_dep]))
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(foo),
+                     OrderedSet([foo_bin, foo_bin_dep]))
     entry_points = dict(SetupPy.iter_entry_points(foo))
-    self.assertEqual(entry_points, {'foo_binary': 'foo.bin.foo'})
+    self.assertEqual(entry_points, {'foo_binary': 'foo.bin:foo'})
 
-    with self.run_execute(foo, recursive=False) as setup_py_command:
-      setup_py_command.run_one.assert_called_with(foo)
+    with self.run_execute(foo, recursive=False) as created:
+      self.assertEqual([foo], created)
 
-    with self.run_execute(foo, recursive=True) as setup_py_command:
-      setup_py_command.run_one.assert_called_with(foo)
+    with self.run_execute(foo, recursive=True) as created:
+      self.assertEqual([foo], created)
 
-  def test_binary_target_injected_into_minified_dependencies_with_provider(self):
-    bar_bin_dep = self.make_target(
-      spec=':bar_bin_dep',
-      target_type=PythonLibrary,
-      provides=PythonArtifact(
+  def test_binary_target_injected_into_reduced_dependencies_with_provider(self):
+    bar_bin_dep = self.create_python_library(
+      relpath='bar/dep',
+      name='dep',
+      provides=dedent("""
+      setup_py(
         name='bar_bin_dep',
-        version='0.0.0',
+        version='0.0.0'
       )
+      """)
     )
 
-    bar_bin = self.make_target(
-      spec=':bar_bin',
-      target_type=PythonBinary,
-      entry_point='bar.bin.bar',
+    bar_bin = self.create_python_binary(
+      relpath='bar/bin',
+      name='bin',
+      entry_point='bar.bin:bar',
       dependencies=[
-        bar_bin_dep,
+        'bar/dep'
       ],
     )
 
-    bar = self.make_target(
-      spec=':bar',
-      target_type=PythonLibrary,
-      provides=PythonArtifact(
+    bar = self.create_python_library(
+      relpath='bar',
+      name='bar',
+      provides=dedent("""
+      setup_py(
         name='bar',
-        version='0.0.0',
+        version='0.0.0'
       ).with_binaries(
-        bar_binary=':bar_bin'
+        bar_binary='bar/bin'
       )
+      """)
     )
 
-    assert SetupPy.minified_dependencies(bar) == OrderedSet([bar_bin, bar_bin_dep])
-    assert SetupPy.install_requires(bar) == {'bar_bin_dep==0.0.0'}
+    self.assertEqual(self.dependency_calculator.reduced_dependencies(bar),
+                     OrderedSet([bar_bin, bar_bin_dep]))
+    self.assert_requirements(bar, {'bar_bin_dep==0.0.0'})
     entry_points = dict(SetupPy.iter_entry_points(bar))
-    assert entry_points == {'bar_binary': 'bar.bin.bar'}
+    self.assertEqual(entry_points, {'bar_binary': 'bar.bin:bar'})
 
-    with self.run_execute(bar, recursive=False) as setup_py_command:
-      setup_py_command.run_one.assert_called_with(bar)
+    with self.run_execute(bar, recursive=False) as created:
+      self.assertEqual([bar], created)
 
-    with self.run_execute(bar, recursive=True) as setup_py_command:
-      setup_py_command.run_one.assert_has_calls([
-          call(bar),
-          call(bar_bin_dep)
-      ], any_order=True)
-
-  def test_binary_cycle(self):
-    foo = self.make_target(
-      spec=':foo',
-      target_type=PythonLibrary,
-      provides=PythonArtifact(
-        name='foo',
-        version='0.0.0',
-      ).with_binaries(
-        foo_binary=':foo_bin',
-      )
-    )
-
-    self.make_target(
-      spec=':foo_bin',
-      target_type=PythonBinary,
-      entry_point='foo.bin.foo',
-      dependencies=[
-        foo,
-      ],
-    )
-
-    with self.assertRaises(TargetDefinitionException):
-      SetupPy.minified_dependencies(foo)
+    with self.run_execute(bar, recursive=True) as created:
+      self.assertEqual([bar_bin_dep, bar], created)
 
   def test_pants_contrib_case(self):
     def create_requirement_lib(name):
-      return self.make_target(
-        spec=':{}'.format(name),
-        target_type=PythonRequirementLibrary,
+      return self.create_python_requirement_library(
+        relpath=name,
+        name=name,
         requirements=[
-          PythonRequirement('{}==1.1.1'.format(name))
+          '{}==1.1.1'.format(name)
         ]
       )
 
     req1 = create_requirement_lib('req1')
-    req2 = create_requirement_lib('req2')
+    create_requirement_lib('req2')
     req3 = create_requirement_lib('req3')
 
-    pants_lib = self.make_target(
-      spec=':pants_lib',
-      target_type=PythonLibrary,
+    self.create_python_library(
+      relpath='src/python/pants/base',
+      name='base',
       dependencies=[
-        req1,
-        req2,
+        'req1',
+        'req2',
       ]
     )
-    self.make_target(
-      spec=':pants_bin',
-      target_type=PythonBinary,
+    self.create_python_binary(
+      relpath='src/python/pants/bin',
+      name='bin',
       entry_point='pants.bin.pants_exe:main',
       dependencies=[
-        pants_lib  # Should be stripped in minify since pants_packaged provides these sources.
+        # Should be stripped in reduced_dependencies since pants_packaged provides these sources.
+        'src/python/pants/base',
       ]
     )
-    pants_packaged = self.make_target(
-      spec=':pants_packaged',
-      target_type=PythonLibrary,
-      provides=PythonArtifact(
+    pants_packaged = self.create_python_library(
+      relpath='src/python/pants',
+      name='pants_packaged',
+      provides=dedent("""
+      setup_py(
         name='pants_packaged',
         version='0.0.0'
       ).with_binaries(
-        pants_bin=':pants_bin'  # Should be stripped in minify since pants_packaged provides this.
+        # Should be stripped in reduced_dependencies since pants_packaged provides this.
+        pants_bin='src/python/pants/bin'
       )
+      """)
     )
-    contrib_lib = self.make_target(
-      spec=':contrib_lib',
-      target_type=PythonLibrary,
+    contrib_lib = self.create_python_library(
+      relpath='contrib/lib/src/python/pants/contrib/lib',
+      name='lib',
       dependencies=[
-        pants_lib,  # Should be stripped in minify since pants_packaged provides these sources.
-        req3,
+        'req3',
+        # Should be stripped in reduced_dependencies since pants_packaged provides these sources.
+        'src/python/pants/base',
       ]
     )
-    contrib_plugin = self.make_target(
-      spec=':contrib_plugin',
-      target_type=PythonLibrary,
-      provides=PythonArtifact(
+    contrib_plugin = self.create_python_library(
+      relpath='contrib/lib/src/python/pants/contrib',
+      name='plugin',
+      provides=dedent("""
+      setup_py(
         name='contrib',
         version='0.0.0'
-      ),
+      )
+      """),
       dependencies=[
-        contrib_lib,
-        pants_packaged,
-        req1
+        'contrib/lib/src/python/pants/contrib/lib',
+        'src/python/pants:pants_packaged',
+        'req1'
       ]
     )
-    minified_dependencies = SetupPy.minified_dependencies(contrib_plugin)
-    assert minified_dependencies == OrderedSet([contrib_lib, req3, pants_packaged, req1])
+    reduced_dependencies = self.dependency_calculator.reduced_dependencies(contrib_plugin)
+    self.assertEqual(reduced_dependencies, OrderedSet([contrib_lib, req3, pants_packaged, req1]))
+
+  def test_no_exported(self):
+    foo = self.create_python_library(relpath='foo', name='foo')
+    with self.assertRaises(TaskError):
+      with self.run_execute(foo):
+        self.fail('Should not have gotten past run_execute.')
+
+  def test_no_owner(self):
+    self.create_python_library(relpath='foo', name='foo')
+    exported = self.create_python_library(
+      relpath='bar',
+      name='bar',
+      dependencies=[
+        'foo'
+      ],
+      provides=dedent("""
+      setup_py(
+        name='bar',
+        version='0.0.0'
+      )
+      """),
+    )
+    # `foo` is not in `bar`'s address space and has no owner in its own address space.
+    with self.assertRaises(self.dependency_calculator.NoOwnerError):
+      self.dependency_calculator.reduced_dependencies(exported)
+
+
+  def test_ambiguous_owner(self):
+    self.create_python_library(relpath='foo/bar', name='bar')
+    self.create_file(relpath=self.build_path('foo'), contents=dedent("""
+    python_library(
+      name='foo1',
+      dependencies=[
+        'foo/bar'
+      ],
+      provides=setup_py(
+        name='foo1',
+        version='0.0.0'
+      )
+    )
+    python_library(
+      name='foo2',
+      dependencies=[
+        'foo/bar'
+      ],
+      provides=setup_py(
+        name='foo2',
+        version='0.0.0'
+      )
+    )
+    """))
+
+    with self.assertRaises(self.dependency_calculator.AmbiguousOwnerError):
+      self.dependency_calculator.reduced_dependencies(self.target('foo:foo1'))
+
+    with self.assertRaises(self.dependency_calculator.AmbiguousOwnerError):
+      self.dependency_calculator.reduced_dependencies(self.target('foo:foo2'))
 
 
 def test_detect_namespace_packages():

@@ -10,7 +10,8 @@ import itertools
 import os
 import pprint
 import shutil
-from collections import defaultdict
+from abc import abstractmethod
+from collections import OrderedDict, defaultdict
 
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
@@ -25,9 +26,12 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.backend.python.thrift_builder import PythonThriftBuilder
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
+from pants.base.build_graph import BuildGraph, sort_targets
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.meta import AbstractClass
 
 
 SETUP_BOILERPLATE = """
@@ -51,6 +55,224 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
+class TargetAncestorIterator(object):
+  """Supports iteration of target ancestor lineages."""
+
+  def __init__(self, build_graph):
+    self._build_graph = build_graph
+
+  def iter_target_siblings_and_ancestors(self, target):
+    """Produces an iterator over a target's siblings and ancestor lineage.
+
+    :returns: A target iterator yielding the target and its siblings and then it ancestors from
+              nearest to furthest removed.
+    """
+    def iter_targets_in_spec_path(spec_path):
+      try:
+        for address in self._build_graph.address_mapper.addresses_in_spec_path(spec_path):
+          self._build_graph.inject_address_closure(address)
+          yield self._build_graph.get_target(address)
+      except AddressLookupError:
+        # A spec path may not have any addresses registered under it and that's ok.
+        # For example:
+        #  a:a
+        #  a/b/c:c
+        #
+        # Here a/b contains no addresses.
+        pass
+
+    def iter_siblings_and_ancestors(spec_path):
+      for sibling in iter_targets_in_spec_path(spec_path):
+        yield sibling
+      parent_spec_path = os.path.dirname(spec_path)
+      if parent_spec_path != spec_path:
+        for parent in iter_siblings_and_ancestors(parent_spec_path):
+          yield parent
+
+    for target in iter_siblings_and_ancestors(target.address.spec_path):
+      yield target
+
+
+# TODO(John Sirois): Get jvm and python publishing on the same page.
+# Either python should require all nodes in an exported target closure be either exported or
+# 3rdparty or else jvm publishing should use an ExportedTargetDependencyCalculator to aggregate
+# un-exported non-3rdparty interior nodes as needed.  It seems like the latter is preferable since
+# it can be used with a BUILD graph validator requiring completely exported subgraphs to enforce the
+# former as a matter of local repo policy.
+class ExportedTargetDependencyCalculator(AbstractClass):
+  """Calculates the dependencies of exported targets.
+
+  When a target is exported many of its internal transitive library dependencies may be satisfied by
+  other internal targets that are also exported and "own" these internal transitive library deps.
+  In other words, exported targets generally can have reduced dependency sets and an
+  `ExportedTargetDependencyCalculator` can calculate these reduced dependency sets.
+
+  To use an `ExportedTargetDependencyCalculator` a subclass must be created that implements two
+  predicates and a walk function for the class of targets in question.  For example, a
+  `JvmDependencyCalculator` would need to be able to identify jvm third party dependency targets,
+  and local exportable jvm library targets.  In addition it would need to define a walk function
+  that knew how to walk a jvm target's dependencies.
+  """
+
+  class UnExportedError(TaskError):
+    """Indicates a target is not exported."""
+
+  class NoOwnerError(TaskError):
+    """Indicates an exportable target has no owning exported target."""
+
+  class AmbiguousOwnerError(TaskError):
+    """Indicates an exportable target has more than one owning exported target."""
+
+  def __init__(self, build_graph):
+    self._ancestor_iterator = TargetAncestorIterator(build_graph)
+
+  @abstractmethod
+  def is_third_party(self, target):
+    """Identifies targets that are exported by third parties.
+
+    :param target: The target to identify.
+    :returns: `True` if the given `target` represents a third party dependency.
+    """
+
+  @abstractmethod
+  def is_exported(self, target):
+    """Identifies targets of interest that are exported from this project.
+
+    :param target: The target to identify.
+    :returns: `True` if the given `target` represents a top-level target exported from this project.
+    """
+
+  @abstractmethod
+  def dependencies(self, target):
+    """Returns an iterator over the dependencies of the given target.
+
+    :param target: The target to iterate dependencies of.
+    :returns: An iterator over all of the target's dependencies.
+    """
+
+  def _walk(self, target, visitor):
+    """Walks the dependency graph for the given target.
+
+    :param target: The target to start the walk from.
+    :param visitor: A function that takes a target and returns `True` if its dependencies should
+                    also be visited.
+    """
+    visited = set()
+
+    def walk(current):
+      if current not in visited:
+        visited.add(current)
+        keep_going = visitor(current)
+        if keep_going:
+          for dependency in self.dependencies(current):
+            walk(dependency)
+
+    walk(target)
+
+  def _closure(self, target):
+    """Return the target closure as defined by this dependency calculator's definition of a walk."""
+    closure = set()
+
+    def collect(current):
+      closure.add(current)
+      return True
+    self._walk(target, collect)
+
+    return closure
+
+  def reduced_dependencies(self, exported_target):
+    """Calculates the reduced transitive dependencies for an exported target.
+
+    The reduced set of dependencies will be just those transitive dependencies "owned" by
+    the `exported_target`.
+
+    A target is considered "owned" if:
+    1. It's "3rdparty" and "directly reachable" from `exported_target` by at least 1 path.
+    2. It's not "3rdparty" and not "directly reachable" by any of `exported_target`'s "3rdparty"
+       dependencies.
+
+    Here "3rdparty" refers to targets identified as either `is_third_party` or `is_exported`.
+
+    And in this context "directly reachable" means the target can be reached by following a series
+    of dependency links from the `exported_target`, never crossing another exported target and
+    staying within the `exported_target` address space.  It's the latter restriction that allows for
+    unambiguous ownership of exportable targets and mirrors the BUILD file convention of targets
+    only being able to own sources in their filesystem subtree.  The single ambiguous case that can
+    arise is when there is more than one exported target in the same BUILD file family that can
+    "directly reach" a target in its address space.
+
+    :raises: `UnExportedError` if the given `exported_target` is not, in-fact, exported.
+    :raises: `NoOwnerError` if a transitive dependency is found with no proper owning exported
+             target.
+    :raises: `AmbiguousOwnerError` if there is more than one viable exported owner target for a
+             given transitive dependency.
+    """
+    # The strategy adopted requires 3 passes:
+    # 1.) Walk the exported target to collect provisional owned exportable targets, but _not_
+    #     3rdparty since these may be introduced by exported subgraphs we discover in later steps!
+    # 2.) Determine the owner of each target collected in 1 by walking the ancestor chain to find
+    #     the closest exported target.  The ancestor chain is just all targets whose spec path is
+    #     a prefix of th descendant.  In other words, all targets in descendant's BUILD file family
+    #     (its siblings), all targets in its parent directory BUILD file family, and so on.
+    # 3.) Finally walk the exported target once more, replacing each visited dependency with its
+    #     owner.
+
+    if not self.is_exported(exported_target):
+      raise self.UnExportedError('Cannot calculate reduced dependencies for a non-exported '
+                                 'target, given: {}'.format(exported_target))
+
+    owner_by_owned_python_target = OrderedDict()
+
+    def collect_potentially_owned_python_targets(current):
+      if (current != exported_target) and not self.is_third_party(current):
+        owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
+      return (current == exported_target) or not self.is_exported(current)
+
+    self._walk(exported_target, collect_potentially_owned_python_targets)
+
+    for owned in owner_by_owned_python_target:
+      if not self.is_exported(owned):
+        potential_owners = set()
+        for potential_owner in self._ancestor_iterator.iter_target_siblings_and_ancestors(owned):
+          if self.is_exported(potential_owner) and owned in self._closure(potential_owner):
+            potential_owners.add(potential_owner)
+        if not potential_owners:
+          raise self.NoOwnerError('No exported target owner found for {}'.format(owned))
+        owner = potential_owners.pop()
+        if potential_owners:
+          ambiguous_owners = [o for o in potential_owners
+                              if o.address.spec_path == owner.address.spec_path]
+          if ambiguous_owners:
+            raise self.AmbiguousOwnerError('Owners for {} are ambiguous.  Found {} and '
+                                           '{} others: {}'.format(owned,
+                                                                  owner,
+                                                                  len(ambiguous_owners),
+                                                                  ambiguous_owners))
+        owner_by_owned_python_target[owned] = owner
+
+    reduced_dependencies = OrderedSet()
+
+    def collect_reduced_dependencies(current):
+      if current == exported_target:
+        return True
+      else:
+        # The provider will be one of:
+        # 1. `None`, ie: a 3rdparty requirement we should collect.
+        # 2. `exported_target`, ie: a local exportable target owned by `exported_target` that we
+        #    should collect
+        # 3. Or else a local exportable target owned by some other exported target in which case
+        #    we should collect the exported owner.
+        owner = owner_by_owned_python_target.get(current)
+        if owner is None or owner == exported_target:
+          reduced_dependencies.add(current)
+        else:
+          reduced_dependencies.add(owner)
+        return owner == exported_target
+
+    self._walk(exported_target, collect_reduced_dependencies)
+    return reduced_dependencies
+
+
 class SetupPy(PythonTask):
   """Generate setup.py-based Python projects from python_library targets."""
 
@@ -72,6 +294,22 @@ class SetupPy(PythonTask):
   def has_provides(cls, target):
     return cls.is_python_target(target) and target.provides
 
+  class DependencyCalculator(ExportedTargetDependencyCalculator):
+    """Calculates reduced dependencies for exported python targets."""
+
+    def is_third_party(self, target):
+      return SetupPy.is_requirements(target)
+
+    def is_exported(self, target):
+      return SetupPy.has_provides(target)
+
+    def dependencies(self, target):
+      for dependency in target.dependencies:
+        yield dependency
+      if self.is_exported(target):
+        for binary in target.provided_binaries.values():
+          yield binary
+
   @classmethod
   def register_options(cls, register):
     super(SetupPy, cls).register_options(register)
@@ -81,76 +319,6 @@ class SetupPy(PythonTask):
                   "and dump the source distribution.")
     register('--recursive', action='store_true',
              help='Transitively run setup_py on all provided downstream targets.')
-
-  @classmethod
-  def minified_dependencies(cls, root_target):
-    """Minify the dependencies of a PythonTarget.
-
-    The minified set of dependencies will be just those transitive dependencies "owned" by
-    `root_target`.
-
-    A target is considered "owned" if:
-    1. It's "3rdparty" and "directly reachable" from `root_target` by at least 1 path.
-    2. It's not "3rdparty" and not "directly reachable" by any of `root_target`'s "3rdparty"
-       dependencies.
-
-    Here "3rdparty" refers to either a PythonRequirementLibrary (already external distributions) or
-    an exportable python target, typically a PythonLibrary or PythonBinary that provides a
-    `setup_py` configuration.
-
-    And in this context "directly reachable" means the target can be reached by following a series
-    of dependency links from the `root_target`, never crossing an exportable target.
-    """
-
-    # The strategy here follows the description above closely.
-    # 1. Build a pre-order traversal list of all paths in `root_target`'s dependency closure.
-    # 2. Iterate the list and use the path information to determine if each visited target should
-    #    be included in `root_target`'s distribution as sources or as a setup_requires requirement.
-    #
-    # NB: The `root_target` dependency closure collection follows the logic of `PythonTarget.walk`
-    # and collects not only `root_target`'s direct dependency graph closure but also the targets
-    # reachable from any exportable python targets provided binaries (if any).
-
-    visits = []  # All the paths we've visited (node, [ancestors]).
-    path = []  # The current path in the walk.
-
-    def walk(current):
-      if current in path:
-        message = '{} and {} combined have a cycle!'.format(root_target, current)
-        raise TargetDefinitionException(root_target, message)
-
-      if current != root_target:
-        ancestors = list(path)
-        visits.append((current, ancestors))
-        path.append(current)
-
-      for dependency in current.dependencies:
-        walk(dependency)
-      if cls.is_python_target(current):
-        for binary in current.provided_binaries.values():
-          walk(binary)
-
-      if current != root_target:
-        path.pop()
-
-    walk(root_target)
-
-    provided_by_dep = defaultdict(lambda: False)
-    for dep, ancestors in visits:
-      if cls.has_provides(dep) or any(p for p in ancestors if cls.has_provides(p)):
-        provided_by_dep[dep] = True
-
-    minified_deps = OrderedSet()
-    for dep, ancestors in visits:
-      if cls.is_requirements(dep) or cls.has_provides(dep):
-        # A "3rdparty" dep
-        if not any(provided_by_dep[p] for p in ancestors):
-          # 1 non-provided path means we keep it
-          minified_deps.add(dep)
-      elif not provided_by_dep[dep]:
-        minified_deps.add(dep)
-
-    return minified_deps
 
   @classmethod
   def iter_entry_points(cls, target):
@@ -196,10 +364,10 @@ class SetupPy(PythonTask):
   def find_packages(cls, chroot, log=None):
     """Detect packages, namespace packages and resources from an existing chroot.
 
-       Returns a tuple of:
-         set(packages)
-         set(namespace_packages)
-         map(package => set(files))
+    :returns: a tuple of:
+                set(packages)
+                set(namespace_packages)
+                map(package => set(files))
     """
     base = os.path.join(chroot.path(), cls.SOURCE_ROOT)
     packages, namespace_packages = set(), set()
@@ -242,9 +410,9 @@ class SetupPy(PythonTask):
     return packages, namespace_packages, resources
 
   @classmethod
-  def install_requires(cls, root_target):
-    install_requires = set()
-    for dep in cls.minified_dependencies(root_target):
+  def install_requires(cls, reduced_dependencies):
+    install_requires = OrderedSet()
+    for dep in reduced_dependencies:
       if cls.is_requirements(dep):
         for req in dep.payload.requirements:
           install_requires.add(str(req.requirement))
@@ -275,7 +443,7 @@ class SetupPy(PythonTask):
         target_file = os.path.join(root, fn)
         yield os.path.relpath(target_file, builder.package_root), target_file
 
-  def write_contents(self, root_target, chroot):
+  def write_contents(self, root_target, reduced_dependencies, chroot):
     """Write contents of the target."""
     def write_target_source(target, src):
       chroot.link(os.path.join(target.target_base, src), os.path.join(self.SOURCE_ROOT, src))
@@ -307,17 +475,19 @@ class SetupPy(PythonTask):
           write_target_source(target, source_root_relative_path)
 
     write_target(root_target)
-    for dependency in self.minified_dependencies(root_target):
+    for dependency in reduced_dependencies:
       if self.is_python_target(dependency) and not dependency.provides:
         write_target(dependency)
 
-  def write_setup(self, root_target, chroot):
-    """Write the setup.py of a target.  Must be run after writing the contents to the chroot."""
+  def write_setup(self, root_target, reduced_dependencies, chroot):
+    """Write the setup.py of a target.
 
+    Must be run after writing the contents to the chroot.
+    """
     # NB: several explicit str conversions below force non-unicode strings in order to comply
     # with setuptools expectations.
 
-    setup_keywords = root_target.provides.setup_py_keywords
+    setup_keywords = root_target.provides.setup_py_keywords.copy()
 
     package_dir = {b'': self.SOURCE_ROOT}
     packages, namespace_packages, resources = self.find_packages(chroot, self.context.log)
@@ -332,7 +502,7 @@ class SetupPy(PythonTask):
           package_data=dict((str(package), list(map(str, rs)))
                             for (package, rs) in resources.items()))
 
-    setup_keywords['install_requires'] = sorted(list(self.install_requires(root_target)))
+    setup_keywords['install_requires'] = list(self.install_requires(reduced_dependencies))
 
     for binary_name, entry_point in self.iter_entry_points(root_target):
       if 'entry_points' not in setup_keywords:
@@ -381,43 +551,59 @@ class SetupPy(PythonTask):
     # make sure that setup.py is included
     chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
 
-  def run_one(self, target):
-    dist_dir = self.get_options().pants_distdir
+  def create_setup_py(self, target, dist_dir):
     chroot = Chroot(dist_dir, name=target.provides.name)
-    self.write_contents(target, chroot)
-    self.write_setup(target, chroot)
+    dependency_calculator = self.DependencyCalculator(self.context.build_graph)
+    reduced_deps = dependency_calculator.reduced_dependencies(target)
+    self.write_contents(target, reduced_deps, chroot)
+    self.write_setup(target, reduced_deps, chroot)
     target_base = '%s-%s' % (target.provides.name, target.provides.version)
     setup_dir = os.path.join(dist_dir, target_base)
     safe_rmtree(setup_dir)
     shutil.move(chroot.path(), setup_dir)
-
-    if not self._run:
-      self.context.log.info('Running packager against %s' % setup_dir)
-      setup_runner = Packager(setup_dir)
-      tgz_name = os.path.basename(setup_runner.sdist())
-      self.context.log.info('Writing %s' % os.path.join(dist_dir, tgz_name))
-      shutil.move(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
-      safe_rmtree(setup_dir)
-    else:
-      self.context.log.info('Running %s against %s' % (self._run, setup_dir))
-      setup_runner = SetupPyRunner(setup_dir, self._run)
-      setup_runner.run()
+    return setup_dir, reduced_deps
 
   def execute(self):
-    targets = filter(SetupPy.has_provides, self.context.target_roots)
+    targets = [target for target in self.context.target_roots if self.has_provides(target)]
     if not targets:
       raise TaskError('setup-py target(s) must provide an artifact.')
 
-    setup_targets = OrderedSet()
-    if self._recursive:
-      def add_providing_target(target):
-        if SetupPy.has_provides(target):
-          setup_targets.add(target)
-          return OrderedSet(target.provided_binaries.values())
-      for target in targets:
-        target.walk(add_providing_target)
-    else:
-      setup_targets = targets
+    dist_dir = self.get_options().pants_distdir
 
-    for target in setup_targets:
-      self.run_one(target)
+    # NB: We have to create and then run in 2 steps so that we can discover all exported targets
+    # in-play in the creation phase which then allows a tsort of these exported targets in the run
+    # phase to ensure an exported target is, for example (--run="sdist upload"), uploaded before any
+    # exported target that depends on it is uploaded.
+
+    created = {}
+
+    def create(target):
+      if target not in created:
+        self.context.log.info('Creating setup.py project for {}'.format(target))
+        setup_dir, dependencies = self.create_setup_py(target, dist_dir)
+        created[target] = setup_dir
+        if self._recursive:
+          for dep in dependencies:
+            if self.has_provides(dep):
+              create(dep)
+
+    for target in targets:
+      create(target)
+
+    executed = []  # Collected and returned for tests.
+    for target in reversed(sort_targets(created.keys())):
+      setup_dir = created.get(target)
+      if setup_dir:
+        if not self._run:
+          self.context.log.info('Running packager against {}'.format(setup_dir))
+          setup_runner = Packager(setup_dir)
+          tgz_name = os.path.basename(setup_runner.sdist())
+          self.context.log.info('Writing {}'.format(os.path.join(dist_dir, tgz_name)))
+          shutil.move(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
+          safe_rmtree(setup_dir)
+        else:
+          self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
+          setup_runner = SetupPyRunner(setup_dir, self._run)
+          setup_runner.run()
+        executed.append(target)
+    return executed

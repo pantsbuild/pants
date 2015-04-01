@@ -34,7 +34,7 @@ function pkg_pants_install_test() {
 
 PKG_PANTS_TESTINFRA=(
   "pantsbuild.pants.testinfra"
-  "//src/python/pants:test_infra"
+  "//tests/python/pants_test:test_infra"
   "pkg_pants_testinfra_install_test"
 )
 function pkg_pants_testinfra_install_test() {
@@ -109,18 +109,14 @@ function build_packages() {
 }
 
 function publish_packages() {
+  targets=()
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
-    NAME=$(pkg_name $PACKAGE)
-    BUILD_TARGET=$(pkg_build_target $PACKAGE)
-
-    banner "Publishing package ${NAME}-$(local_version) with target '${BUILD_TARGET}' ..."
-
-    # TODO(Jin Feng) Note --recursive option would cause some of the packages being
-    # uploaded multiple times because of dependencies. No harms, but not efficient.
-    run_local_pants setup-py --run="register sdist upload" --recursive ${BUILD_TARGET} || \
-    die "Failed to publish package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
+    targets+=($(pkg_build_target $PACKAGE))
   done
+  banner "Publishing packages ..."
+  run_local_pants setup-py --run="register sdist upload" --recursive ${targets[@]} || \
+  die "Failed to publish packages!"
 }
 
 function pre_install() {
