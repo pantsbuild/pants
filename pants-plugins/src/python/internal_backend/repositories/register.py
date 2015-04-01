@@ -13,11 +13,11 @@ from pants.base.build_manual import manual
 
 
 public_repo = Repository(name = 'public',
-                         url = 'http://maven.twttr.com',
+                         url = 'https://dl.bintray.com/pantsbuild/maven',
                          push_db_basedir = os.path.join('build-support', 'ivy', 'pushdb'))
 
 testing_repo = Repository(name = 'testing',
-                          url = 'http://maven.twttr.com',
+                          url = 'https://dl.bintray.com/pantsbuild/maven',
                           push_db_basedir = os.path.join('testprojects', 'ivy', 'pushdb'))
 
 

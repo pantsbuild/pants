@@ -174,11 +174,11 @@ simple example to get you started:
                    usepoms="true"
                    root="https://repo1.maven.org/maven2/"/>
 
-          <!-- This is just for twitter-hosted jvm tools used by Pants -->
-          <ibiblio name="maven.twttr.com-maven"
+          <!-- This is just for jvm tools used by Pants and not yet published to maven central. -->
+          <ibiblio name="pantsbuild-maven-repo"
                    m2compatible="true"
                    usepoms="true"
-                   root="http://maven.twttr.com/"/>
+                   root="https://dl.bintray.com/pantsbuild/maven/"/>
 
         </chain>
       </resolvers>
@@ -513,7 +513,7 @@ If your site uses Sonotype Nexus or another reverse proxy for
 artifacts, you do not need to use a separate HTTP proxy.  Contact the
 reverse proxy administrator to setup a proxy for the sites listed in
 `build-support/ivy/settings.xml` and `pants.ini`.  Currently, these
-sites are `repo1.maven.org` and `maven.twttr.com`:
+sites are `https://repo1.maven.org/maven2/` and `https://dl.bintray.com/pantsbuild/maven/`:
 
 Here is an excerpt of a modified ivysettings.xml with some possible configurations:
 
