@@ -196,7 +196,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
           return None
         jvm_repo = Repository(
           name = 'maven-central',
-          url = 'http://maven.twttr.com',
+          url = 'http://maven.example.com',
           push_db_basedir = os.path.join('build-support', 'ivy', 'pushdb'),
         )
         return parse_context.create_object('artifact',

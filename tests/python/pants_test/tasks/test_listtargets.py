@@ -42,7 +42,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'pants': lambda x: x,
         'artifact': Artifact,
         'public': Repository(name='public',
-                             url='http://maven.twttr.com',
+                             url='http://maven.example.com',
                              push_db_basedir='/tmp'),
       }
     )
@@ -56,7 +56,7 @@ class ListTargetsTest(BaseListTargetsTest):
         self.name = name
         self.provides = dedent('''
             artifact(
-              org='com.twitter',
+              org='com.example',
               name='%s',
               repo=public
             )
@@ -156,14 +156,14 @@ class ListTargetsTest(BaseListTargetsTest):
 
   def test_list_provides(self):
     self.assert_console_output(
-        'a/b:b com.twitter#b',
-        'a/b/c:c2 com.twitter#c2',
+        'a/b:b com.example#b',
+        'a/b/c:c2 com.example#c2',
         args=['--test-provides'])
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
-        '/tmp a/b:b http://maven.twttr.com public com.twitter#b',
-        '/tmp a/b/c:c2 http://maven.twttr.com public com.twitter#c2',
+        '/tmp a/b:b http://maven.example.com public com.example#b',
+        '/tmp a/b/c:c2 http://maven.example.com public com.example#c2',
         args=[
             '--test-provides',
             '--test-provides-columns=push_db_basedir,address,repo_url,repo_name,artifact_id'

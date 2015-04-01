@@ -342,7 +342,7 @@ class JarPublish(ScmPublishMixin, JarTask):
        # repository target name is paired with this key
        'myrepo': {
          # ivysettings.xml resolver to use for publishing
-         'resolver': 'maven.twttr.com',
+         'resolver': 'maven.example.com',
          # ivy configurations to publish
          'confs': ['default', 'sources', 'javadoc'],
          # address of a Credentials target to use when publishing

@@ -18,12 +18,12 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
                usepoms="true"
                root="https://repo1.maven.org/maven2/"/>
 
-      <!-- This is just for twitter-hosted jvm tools - kill once they are published to maven
-           central. -->
-      <ibiblio name="maven.twttr.com-maven"
+      <!-- This is just for jvm tools used by Pants and not yet published to maven central.
+           Kill once they are published to maven central. -->
+      <ibiblio name="pantsbuild-maven-repo"
                m2compatible="true"
                usepoms="true"
-               root="http://maven.twttr.com/"/>
+               root="https://dl.bintray.com/pantsbuild/maven/"/>
     </chain>
   </macrodef>
 
