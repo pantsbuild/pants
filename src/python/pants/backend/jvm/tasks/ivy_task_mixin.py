@@ -108,6 +108,17 @@ class IvyTaskMixin(object):
       if not invalidation_check.all_vts:
         return ([], set())
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+
+      # If a report file is not present, we need to exec ivy, even if all the individual
+      # targets seem to be up to date.
+      report_missing = False
+      report_confs = confs or ['default']
+      for conf in report_confs:
+        report_path = IvyUtils.xml_report_path(global_vts.targets, conf)
+        if not os.path.exists(report_path):
+          report_missing = True
+          break
+
       target_workdir = os.path.join(ivy_workdir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
       raw_target_classpath_file = target_classpath_file + '.raw'
@@ -120,7 +131,7 @@ class IvyTaskMixin(object):
 
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
-      if invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
+      if report_missing or invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
         args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
         self.exec_ivy(
