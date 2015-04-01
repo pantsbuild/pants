@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.filter import Filter
@@ -14,10 +16,10 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class BaseFilterTest(ConsoleTaskTest):
+class BaseFilterTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -40,12 +42,12 @@ class FilterEmptyTargetsTest(BaseFilterTest):
     self.assert_console_output()
 
   def test_type(self):
-    self.assert_console_output(args=['--test-type=page'])
-    self.assert_console_output(args=['--test-type=-java_library'])
+    self.assert_console_output(options={ 'type': ['page'] })
+    self.assert_console_output(options={ 'type': ['java_library'] })
 
   def test_regex(self):
-    self.assert_console_output(args=['--test-regex=^common'])
-    self.assert_console_output(args=['--test-regex=-^common'])
+    self.assert_console_output(options={ 'regex': ['^common'] })
+    self.assert_console_output(options={ 'regex': ['-^common'] })
 
 
 class FilterTest(BaseFilterTest):
@@ -58,12 +60,12 @@ class FilterTest(BaseFilterTest):
       if path not in requirement_injected:
         self.add_to_build_file(path, "python_requirement_library(name='foo')")
         requirement_injected.add(path)
-      all_deps = ["'%s'" % dep for dep in deps] + ["':foo'"]
-      self.add_to_build_file(path, dedent('''
-          python_library(name='%s',
-            dependencies=[%s]
+      all_deps = ["'{0}'".format(dep) for dep in deps] + ["':foo'"]
+      self.add_to_build_file(path, dedent("""
+          python_library(name='{name}',
+            dependencies=[{all_deps}]
           )
-          ''' % (name, ','.join(all_deps))))
+          """.format(name=name, all_deps=','.join(all_deps))))
 
     add_to_build_file('common/a', 'a')
     add_to_build_file('common/b', 'b')
@@ -115,8 +117,8 @@ class FilterTest(BaseFilterTest):
       'overlaps:one',
       'overlaps:two',
       'overlaps:three',
-      args=['--test-type=python_library'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={'type': ['python_library']}
     )
 
     self.assert_console_output(
@@ -124,8 +126,8 @@ class FilterTest(BaseFilterTest):
       'common/b:foo',
       'common/c:foo',
       'overlaps:foo',
-      args=['--test-type=-python_library'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={'type': ['-python_library']}
     )
 
     self.assert_console_output(
@@ -139,17 +141,37 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       'overlaps:foo',
-      args=['--test-type=python_requirement_library,'
-            'pants.backend.python.targets.python_library.PythonLibrary'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={'type': ['python_requirement_library,'
+                        'pants.backend.python.targets.python_library.PythonLibrary']}
+    )
+
+  @pytest.mark.xfail
+  def test_filter_multiple_types(self):
+    # TODO: The 'type' option should accept lists of multiple items, but this doesn't
+    # currently work. Ditto for the other filter flag.
+    self.assert_console_output(
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:one',
+      'overlaps:two',
+      'overlaps:three',
+      'overlaps:foo',
+      targets=self.targets('::'),
+      options={'type': ['python_requirement_library',
+                        'pants.backend.python.targets.python_library.PythonLibrary']}
     )
 
   def test_filter_target(self):
     self.assert_console_output(
       'common/a:a',
       'overlaps:foo',
-      args=['--test-target=common/a,overlaps/:foo'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={'target': ['common/a,overlaps/:foo']}
     )
 
     self.assert_console_output(
@@ -160,8 +182,8 @@ class FilterTest(BaseFilterTest):
       'common/c:foo',
       'overlaps:two',
       'overlaps:three',
-      args=['--test-target=-common/a:a,overlaps:one,overlaps:foo'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={'target': ['-common/a:a,overlaps:one,overlaps:foo']}
     )
 
   def test_filter_ancestor(self):
@@ -172,8 +194,8 @@ class FilterTest(BaseFilterTest):
       'common/b:foo',
       'overlaps:one',
       'overlaps:foo',
-      args=['--test-ancestor=overlaps:one,overlaps:foo'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={ 'ancestor': ['overlaps:one,overlaps:foo'] }
     )
 
     self.assert_console_output(
@@ -181,8 +203,8 @@ class FilterTest(BaseFilterTest):
       'common/c:foo',
       'overlaps:two',
       'overlaps:three',
-      args=['--test-ancestor=-overlaps:one,overlaps:foo'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={ 'ancestor': ['-overlaps:one,overlaps:foo'] }
     )
 
   def test_filter_ancestor_out_of_context(self):
@@ -200,8 +222,8 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       'overlaps:foo',
-      args=['--test-ancestor=-blacklist'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={ 'ancestor': ['-blacklist'] }
     )
 
   def test_filter_ancestor_not_passed_targets(self):
@@ -215,8 +237,8 @@ class FilterTest(BaseFilterTest):
       'common/b:foo',
       'common/c:c',
       'common/c:foo',
-      args=['--test-ancestor=-blacklist'],
-      targets=self.targets('common/::') # blacklist is not in the list of targets
+      targets=self.targets('common/::'), # blacklist is not in the list of targets
+      options={ 'ancestor': ['-blacklist'] }
     )
 
     self.assert_console_output(
@@ -226,7 +248,8 @@ class FilterTest(BaseFilterTest):
       'common/b:foo',
       'common/c:c',
       'common/c:foo',
-      targets=self.targets('common/::')
+      targets=self.targets('common/::'),
+      options={ 'ancestor': [] }
     )
 
   def test_filter_regex(self):
@@ -237,8 +260,8 @@ class FilterTest(BaseFilterTest):
       'common/b:foo',
       'common/c:c',
       'common/c:foo',
-      args=['--test-regex=^common'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={ 'regex': ['^common'] }
     )
 
     self.assert_console_output(
@@ -249,14 +272,14 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       'overlaps:foo',
-      args=['--test-regex=+foo,^overlaps'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={ 'regex': ['+foo,^overlaps'] }
     )
 
     self.assert_console_output(
       'overlaps:one',
       'overlaps:two',
       'overlaps:three',
-      args=['--test-regex=-^common,foo$'],
-      targets=self.targets('::')
+      targets=self.targets('::'),
+      options={ 'regex': ['-^common,foo$'] }
     )

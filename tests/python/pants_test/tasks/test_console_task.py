@@ -46,7 +46,7 @@ class ConsoleTaskTest(TaskTest):
       except IOError as e:
         raised.put(e)
 
-    execution = threading.Thread(target=execute, name='ConsoleTaskTest_sigpipe')
+    execution = threading.Thread(target=execute, name='ConsoleTaskTestBase_sigpipe')
     execution.setDaemon(True)
     execution.start()
     try:
@@ -62,4 +62,4 @@ class ConsoleTaskTest(TaskTest):
 
       # Instead of taking the generic pytest.raises message, provide a more detailed failure
       # message that shows exactly what untrapped error was on the queue.
-      self.fail('task raised %s' % e)
+      self.fail('task raised {0}'.format(e))

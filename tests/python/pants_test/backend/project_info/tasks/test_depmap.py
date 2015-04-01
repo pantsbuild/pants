@@ -24,10 +24,10 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class BaseDepmapTest(ConsoleTaskTest):
+class BaseDepmapTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return Depmap
@@ -42,38 +42,38 @@ class DepmapTest(BaseDepmapTest):
     super(DepmapTest, self).setUp()
 
     def add_to_build_file(path, name, type, deps=(), **kwargs):
-      self.add_to_build_file(path, dedent('''
-          %(type)s(name='%(name)s',
-            dependencies=[%(deps)s],
-            %(extra)s
+      self.add_to_build_file(path, dedent("""
+          {type}(name='{name}',
+            dependencies=[{deps}],
+            {extra}
           )
-          ''' % dict(
+          """.format(
         type=type,
         name=name,
-        deps=','.join("pants('%s')" % dep for dep in list(deps)),
-        extra=('' if not kwargs else ', '.join('%s=%r' % (k, v) for k, v in kwargs.items()))
+        deps=','.join("pants('{0}')".format(dep) for dep in list(deps)),
+        extra=('' if not kwargs else ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items()))
       )))
 
     def create_python_binary_target(path, name, entry_point, type, deps=()):
-      self.add_to_build_file(path, dedent('''
-          %(type)s(name='%(name)s',
-            entry_point='%(entry_point)s',
-            dependencies=[%(deps)s]
+      self.add_to_build_file(path, dedent("""
+          {type}(name='{name}',
+            entry_point='{entry_point}',
+            dependencies=[{deps}]
           )
-          ''' % dict(
+          """.format(
         type=type,
         entry_point=entry_point,
         name=name,
-        deps=','.join("pants('%s')" % dep for dep in list(deps)))
+        deps=','.join("pants('{0}')".format(dep) for dep in list(deps)))
       ))
 
     def create_jvm_app(path, name, type, binary, deps=()):
-      self.add_to_build_file(path, dedent('''
-          %(type)s(name='%(name)s',
-            dependencies=[pants('%(binary)s')],
-            bundles=%(deps)s
+      self.add_to_build_file(path, dedent("""
+          {type}(name='{name}',
+            dependencies=[pants('{binary}')],
+            bundles={deps}
           )
-          ''' % dict(
+          """.format(
         type=type,
         name=name,
         binary=binary,
@@ -82,11 +82,11 @@ class DepmapTest(BaseDepmapTest):
 
     add_to_build_file('common/a', 'a', 'target')
     add_to_build_file('common/b', 'b', 'jar_library')
-    self.add_to_build_file('common/c', dedent('''
+    self.add_to_build_file('common/c', dedent("""
       java_library(name='c',
         sources=[],
       )
-    '''))
+    """))
     add_to_build_file('common/d', 'd', 'python_library')
     create_python_binary_target('common/e', 'e', 'common.e.entry', 'python_binary')
     add_to_build_file('common/f', 'f', 'jvm_binary')
@@ -98,32 +98,32 @@ class DepmapTest(BaseDepmapTest):
     self.create_file('common/i/common.g')
     create_jvm_app('common/i', 'i', 'jvm_app', 'common/g:g', "[bundle(fileset='common.g')]")
     add_to_build_file('overlaps', 'one', 'jvm_binary', deps=['common/h', 'common/i'])
-    self.add_to_build_file('overlaps', dedent('''
+    self.add_to_build_file('overlaps', dedent("""
       java_library(name='two',
         dependencies=[pants('overlaps:one')],
         sources=[],
       )
-    '''))
-    self.add_to_build_file('resources/a', dedent('''
+    """))
+    self.add_to_build_file('resources/a', dedent("""
       resources(
         name='a_resources',
         sources=['a.resource']
       )
-    '''))
-    self.add_to_build_file('src/java/a', dedent('''
+    """))
+    self.add_to_build_file('src/java/a', dedent("""
       java_library(
         name='a_java',
         resources=[pants('resources/a:a_resources')]
       )
-    '''))
-    self.add_to_build_file('src/java/a', dedent('''
+    """))
+    self.add_to_build_file('src/java/a', dedent("""
       target(
         name='a_dep',
         dependencies=[pants(':a_java')]
       )
-    '''))
+    """))
 
-    self.add_to_build_file('src/java/b', dedent('''
+    self.add_to_build_file('src/java/b', dedent("""
       java_library(
         name='b_java',
         dependencies=[':b_dep']
@@ -136,18 +136,18 @@ class DepmapTest(BaseDepmapTest):
         name='b_lib',
         sources=[],
       )
-    '''))
+    """))
 
     # It makes no sense whatsoever to have a java_library that depends
     # on a Python library, but we want to ensure that depmap handles
     # cases like this anyway because there might be other cases which
     # do make sense (e.g. things that generate generic resources)
-    self.add_to_build_file('src/java/java_depends_on_python', dedent('''
+    self.add_to_build_file('src/java/java_depends_on_python', dedent("""
       java_library(
         name='java_depends_on_python',
         dependencies=['common/d:d']
       )
-    '''))
+    """))
 
   def test_java_depends_on_python(self):
     self.assert_console_output_ordered(
@@ -246,7 +246,7 @@ class DepmapTest(BaseDepmapTest):
       '    internal-common.i.i',
       '      internal-common.g.g',
       targets=[self.target('overlaps:two')],
-      args=['--test-minimal']
+      options={ 'minimal': True }
     )
 
   def test_multi(self):
@@ -268,7 +268,7 @@ class DepmapTest(BaseDepmapTest):
       '    internal-common.i.i',
       '      internal-common.g.g',
       targets=[self.target('overlaps:two')],
-      args=['--test-path-to=internal-common.g.g'],
+      options={ 'path_to': 'internal-common.g.g' },
     )
 
   def test_resources(self):
@@ -295,7 +295,7 @@ class DepmapTest(BaseDepmapTest):
     )
 
 
-class ProjectInfoTest(ConsoleTaskTest):
+class ProjectInfoTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return Depmap
@@ -391,23 +391,28 @@ class ProjectInfoTest(ConsoleTaskTest):
       resources=[],
     )
 
+  # TODO: All these tests require the deprecated project_info option to be True.
+  # They will need to be rewritten in order to remove that option.
+  def get_depmap_task_result(self, targets, extra_options=None):
+    options = { 'project_info': True }
+    if extra_options:
+      options.update(extra_options)
+    return self.execute_console_task(targets=targets, options=options)
+
+  def get_depmap_task_json(self, targets):
+    self.set_options(project_info=True)
+    return json.loads(''.join(self.get_depmap_task_result(targets=targets)))
 
   def test_without_dependencies(self):
     # Are these tests failing?  --project-info is to be removed
     # from the depmap target in 0.0.31.  The ProjectInfoTest suite
     # has already been moved to test_export.py so you can remove
     # this class from test_depmap.py when it goes away.
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:first')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:first')])
     self.assertEqual({}, result['libraries'])
 
   def test_with_dependencies(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:third')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:third')])
 
     self.assertEqual(
       [
@@ -423,23 +428,17 @@ class ProjectInfoTest(ConsoleTaskTest):
     source_root = result['targets']['project_info:third']['roots'][0]
     self.assertEqual('com.foo', source_root['package_prefix'])
     self.assertEqual(
-      '%s/project_info/com/foo' % self.build_root,
+      '{0}/project_info/com/foo'.format(self.build_root),
       source_root['source_root']
     )
 
   def test_jvm_app(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:jvm_app')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:jvm_app')])
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:jvm_app']['libraries'])
 
   def test_jvm_target(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:jvm_target')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:jvm_target')])
     jvm_target = result['targets']['project_info:jvm_target']
     expected_jmv_target = {
       'libraries': ['org.apache:apache-jar:12.12.2012'],
@@ -457,10 +456,7 @@ class ProjectInfoTest(ConsoleTaskTest):
     self.assertEqual(jvm_target, expected_jmv_target)
 
   def test_java_test(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:java_test')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:java_test')])
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:java_test']['libraries'])
@@ -468,56 +464,39 @@ class ProjectInfoTest(ConsoleTaskTest):
                      result['targets']['project_info:test_resource']['target_type'])
 
   def test_jvm_binary(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:jvm_binary')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:jvm_binary')])
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:jvm_binary']['libraries'])
 
   def test_top_dependency(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:top_dependency')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:top_dependency')])
     self.assertEqual([], result['targets']['project_info:top_dependency']['libraries'])
     self.assertEqual(['project_info:jvm_binary'],
                      result['targets']['project_info:top_dependency']['targets'])
 
   def test_format_flag(self):
-    result = self.execute_console_task(
-      args=['--test-project-info', '--test-project-info-formatted'],
-      targets=[self.target('project_info:third')]
-    )
+    result = self.get_depmap_task_result(targets=[self.target('project_info:third')],
+                                         extra_options={ 'project_info_formatted': False })
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
 
   def test_target_types(self):
-    result = get_json(self.execute_console_task(
-      args=['--test-project-info'],
-      targets=[self.target('project_info:target_type')]
-    ))
+    result = self.get_depmap_task_json(targets=[self.target('project_info:target_type')])
     self.assertEqual('SOURCE',
                      result['targets']['project_info:target_type']['target_type'])
     self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
 
   def test_output_file(self):
     outfile = os.path.join(self.build_root, '.pants.d', 'test')
-    self.execute_console_task(args=['--test-project-info', '--test-output-file=%s' % outfile],
-                              targets=[self.target('project_info:target_type')])
+    self.get_depmap_task_result(targets=[self.target('project_info:target_type')],
+                                extra_options={ 'output_file': outfile })
     self.assertTrue(os.path.exists(outfile))
 
   def test_output_file_error(self):
     with self.assertRaises(TaskError):
-      self.execute_console_task(args=['--test-project-info',
-                                      '--test-output-file=%s' % self.build_root],
-                                targets=[self.target('project_info:target_type')])
+      self.get_depmap_task_result(targets=[self.target('project_info:target_type')],
+                                  extra_options={ 'output_file': self.build_root })
 
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):
-      self.execute_console_task(args=['--test-project-info'],
-                                targets=[self.target('project_info:unrecognized_target_type')])
-
-
-def get_json(lines):
-  return json.loads(''.join(lines))
+      self.get_depmap_task_result(targets=[self.target('project_info:unrecognized_target_type')])

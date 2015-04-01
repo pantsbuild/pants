@@ -22,6 +22,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -222,6 +223,22 @@ class BaseTest(unittest.TestCase):
     address = SyntheticAddress.parse(spec)
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
+
+  def targets(self, spec):
+    """Resolves a target spec to one or more Target objects.
+
+    spec: Either BUILD target address or else a target glob using the siblings ':' or
+          descendants '::' suffixes.
+
+    Returns the set of all Targets found.
+    """
+
+    spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
+    addresses = list(spec_parser.parse_addresses(spec))
+    for address in addresses:
+      self.build_graph.inject_address_closure(address)
+    targets = [self.build_graph.get_target(address) for address in addresses]
+    return targets
 
   def create_files(self, path, files):
     """Writes to a file under the buildroot with contents same as file name.

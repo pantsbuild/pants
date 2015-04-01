@@ -11,10 +11,10 @@ from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.task import Task
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class ListGoalsTest(ConsoleTaskTest):
+class ListGoalsTest(ConsoleTaskTestBase):
   _INSTALLED_HEADER = 'Installed goals:'
   _UNDOCUMENTED_HEADER = 'Undocumented goals:'
   _LIST_GOALS_NAME = 'goals'
@@ -41,23 +41,23 @@ class ListGoalsTest(ConsoleTaskTest):
       .install().with_description(self._LIST_GOALS_DESC)
     self.assert_console_output(
       self._INSTALLED_HEADER,
-      '  %s: %s' % (self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
+      '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
     )
 
     TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
       .install().with_description(self._LLAMA_DESC)
     self.assert_console_output(
       self._INSTALLED_HEADER,
-      '  %s: %s' % (self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
-      '  %s: %s' % (self._LLAMA_NAME, self._LLAMA_DESC),
+      '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
+      '  {0}: {1}'.format(self._LLAMA_NAME, self._LLAMA_DESC),
     )
 
     TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
       .install()
     self.assert_console_output(
       self._INSTALLED_HEADER,
-      '  %s: %s' % (self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
-      '  %s: %s' % (self._LLAMA_NAME, self._LLAMA_DESC),
+      '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
+      '  {0}: {1}'.format(self._LLAMA_NAME, self._LLAMA_DESC),
     )
 
   def test_list_goals_all(self):
@@ -72,12 +72,12 @@ class ListGoalsTest(ConsoleTaskTest):
 
     self.assert_console_output(
       self._INSTALLED_HEADER,
-      '  %s: %s' % (self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
-      '  %s: %s' % (self._LLAMA_NAME, self._LLAMA_DESC),
+      '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
+      '  {0}: {1}'.format(self._LLAMA_NAME, self._LLAMA_DESC),
       '',
       self._UNDOCUMENTED_HEADER,
-      '  %s' % self._ALPACA_NAME,
-      args=['--test-all'],
+      '  {0}'.format(self._ALPACA_NAME),
+      options={ 'all': True }
     )
 
   # TODO(John Sirois): Re-enable when fixing up ListGoals `--graph` in
@@ -106,5 +106,5 @@ class ListGoalsTest(ConsoleTaskTest):
       '  }',
       '  alpaca_alpaca -> llama_llama [ltail=cluster_alpaca lhead=cluster_llama];',
       '}',
-      args=['--test-graph'],
+      options={ 'graph': True }
     )

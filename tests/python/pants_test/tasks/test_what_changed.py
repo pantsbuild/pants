@@ -18,10 +18,10 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.goal.workspace import Workspace
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class BaseWhatChangedTest(ConsoleTaskTest):
+class BaseWhatChangedTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -45,6 +45,13 @@ class BaseWhatChangedTest(ConsoleTaskTest):
   def task_type(cls):
     return WhatChanged
 
+  def assert_console_output(self, *output, **kwargs):
+    options = { 'spec_excludes': [], 'exclude_target_regexp': [] }
+    if 'options' in kwargs:
+      options.update(kwargs['options'])
+    kwargs['options'] = options
+    super(BaseWhatChangedTest, self).assert_console_output(*output, **kwargs)
+
   def workspace(self, files=None, parent=None, diffspec=None, diff_files=None):
     class MockWorkspace(Workspace):
       def touched_files(_, p):
@@ -61,14 +68,15 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
     self.assert_console_output(workspace=self.workspace())
 
   def test_parent(self):
-    self.assert_console_output(args=['--test-parent=42'], workspace=self.workspace(parent='42'))
+    self.assert_console_output(options={ 'changes_since': '42' },
+                               workspace=self.workspace(parent='42'))
 
   def test_files(self):
     self.assert_console_output(
       'a/b/c',
       'd',
       'e/f',
-      args=['--test-files'],
+      options={ 'files': True },
       workspace=self.workspace(files=['a/b/c', 'd', 'e/f'])
     )
 
@@ -183,12 +191,7 @@ class WhatChangedTest(BaseWhatChangedTest):
   def test_spec_excludes(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
-      config=dedent('''
-      [DEFAULT]
-      spec_excludes: [
-          "root/src/py/1"
-        ]
-      '''),
+      options = { 'spec_excludes': 'root/src/py/1' },
       workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
     )
 
@@ -255,7 +258,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/src/py/a:alpha',
       'root/src/py/1:numeric',
-      args=['--test-fast'],
+      options={ 'fast': True },
       workspace=self.workspace(
         files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
       ),
@@ -265,9 +268,9 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/src/py/a:alpha',
       'root/src/py/1:numeric',
-      args=['--test-diffspec=42'],
+      options={ 'diffspec': '42' },
       workspace=self.workspace(
-        diffspec="42",
+        diffspec='42',
         diff_files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
       ),
     )
@@ -281,7 +284,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/b:b',
-      args=['--test-include-dependees=direct'],
+      options={ 'include_dependees': 'direct' },
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
@@ -289,7 +292,7 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/b:b',
       'root/src/py/dependency_tree/c:c',
-      args=['--test-include-dependees=transitive'],
+      options={ 'include_dependees': 'transitive' },
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
@@ -298,16 +301,13 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/b:b',
       'root/src/py/dependency_tree/c:c',
-      args=['--test-include-dependees=transitive'],
+      options={ 'include_dependees': 'transitive' },
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
     self.assert_console_output(
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/c:c',
-      args=[
-        '--test-include-dependees=transitive',
-        '--exclude-target-regexp=:b',
-      ],
+      options={ 'include_dependees': 'transitive', 'exclude_target_regexp': [':b'] },
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
