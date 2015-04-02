@@ -66,7 +66,7 @@ class BuildConfiguration(object):
                       'given {0}'.format(target))
 
     if alias in self._target_aliases:
-      logger.info('Target alias {alias} has already been registered.  Overwriting!'
+      logger.debug('Target alias {alias} has already been registered. Overwriting!'
                   .format(alias=alias))
     self._target_aliases[alias] = target
     self.register_addressable_alias(alias, target.get_addressable_type())
@@ -82,7 +82,7 @@ class BuildConfiguration(object):
                       'via `register_target_alias`'.format(obj))
 
     if alias in self._exposed_objects:
-      logger.info('Object alias {alias} has already been registered.  Overwriting!'
+      logger.debug('Object alias {alias} has already been registered. Overwriting!'
                   .format(alias=alias))
     self._exposed_objects[alias] = obj
 
@@ -99,7 +99,7 @@ class BuildConfiguration(object):
     of the type of instance it yields.
     """
     if alias in self._addressable_alias_map:
-      logger.info('Addressable alias {alias} has already been registered.  Overwriting!'
+      logger.debug('Addressable alias {alias} has already been registered. Overwriting!'
                   .format(alias=alias))
     self._addressable_alias_map[alias] = addressable_type
 
@@ -115,7 +115,7 @@ class BuildConfiguration(object):
                       .format(factory=context_aware_object_factory))
 
     if alias in self._exposed_context_aware_object_factories:
-      logger.info('This context aware object factory alias {alias} has already been registered. '
+      logger.debug('This context aware object factory alias {alias} has already been registered. '
                   'Overwriting!'.format(alias=alias))
 
     if callable(context_aware_object_factory):
