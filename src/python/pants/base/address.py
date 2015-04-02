@@ -140,6 +140,7 @@ class Address(AbstractClass):
 
   @property
   def path_safe_spec(self):
+    """Return the path to the target from the build root and the target name, joined by periods."""
     return ('{safe_spec_path}.{target_name}'
             .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
                     target_name=self._target_name))

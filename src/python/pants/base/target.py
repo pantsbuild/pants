@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import os
 from hashlib import sha1
 
@@ -13,7 +12,6 @@ from six import string_types
 
 from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
-from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -381,7 +379,7 @@ class Target(AbstractTarget):
   def id(self):
     """A unique identifier for the Target.
 
-    The generated id is safe for use as a path name on unix systems.
+    The generated id is safe for use as a filename on unix systems.
     """
     return self.address.path_safe_spec
 
@@ -389,7 +387,7 @@ class Target(AbstractTarget):
   def identifier(self):
     """A unique identifier for the Target.
 
-    The generated id is safe for use as a path name on unix systems.
+    The generated id is safe for use as a filename on unix systems.
     """
     return self.id
 

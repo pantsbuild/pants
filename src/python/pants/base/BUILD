@@ -273,10 +273,9 @@ python_library(
   sources = ['target.py'],
   dependencies = [
     '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
     ':build_environment',
-    ':build_manual',
+    ':exceptions',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',
@@ -284,6 +283,7 @@ python_library(
     ':payload_field',
     ':source_root',
     ':target_addressable',
+    ':validation',
   ],
 )
 
