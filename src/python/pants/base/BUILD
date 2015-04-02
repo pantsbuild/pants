@@ -276,6 +276,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
     ':build_environment',
+    ':build_manual',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',
