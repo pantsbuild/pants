@@ -139,7 +139,7 @@ class Address(AbstractClass):
                                               target_name=self._target_name)
 
   @property
-  def path_safe_spec(self):
+  def fully_qualified_spec_path(self):
     return ('{safe_spec_path}.{target_name}'
             .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
                     target_name=self._target_name))
