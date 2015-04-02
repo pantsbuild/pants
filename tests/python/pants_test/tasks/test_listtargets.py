@@ -26,7 +26,7 @@ class BaseListTargetsTest(ConsoleTaskTestBase):
 class ListTargetsTestEmpty(BaseListTargetsTest):
   def test_list_all_empty(self):
     self.assertEqual('', self.execute_task())
-    self.assertEqual('', self.execute_task(options={ 'sep': '###' }))
+    self.assertEqual('', self.execute_task(options={'sep': '###'}))
     self.assertEqual([], self.execute_console_task())
 
 
@@ -142,7 +142,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/e:e1',
         'f:alias',
         'g:g',
-        options={ 'sep': ', ' })
+        options={'sep': ', '})
 
     self.assert_console_output(
         'a:a',
@@ -197,5 +197,5 @@ class ListTargetsTest(BaseListTargetsTest):
       g:g
         the description
       """).strip(),
-      options={ 'documented': True }
+      options={'documented': True}
     )

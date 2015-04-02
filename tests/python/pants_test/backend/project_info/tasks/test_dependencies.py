@@ -95,14 +95,14 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
       'dependencies:third',
       'dependencies:second',
       targets=[self.target('project:project')],
-      options={ 'internal_only': True }
+      options={'internal_only': True}
     )
 
   def test_external_dependencies(self):
     self.assert_console_output_ordered(
       'org.apache:apache-jar:12.12.2012',
       targets=[self.target('project:project')],
-      options={ 'external_only': True }
+      options={'external_only': True}
     )
 
   def test_dep_bag(self):
@@ -172,12 +172,12 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
       'dependencies:python_leaf',
       'dependencies:python_inner_with_external',
       targets=[self.target('dependencies:python_root')],
-      options={ 'internal_only': True }
+      options={'internal_only': True}
     )
 
   def test_external_dependencies(self):
     self.assert_console_output_ordered(
       'antlr-python-runtime==3.1.3',
       targets=[self.target('dependencies:python_root')],
-      options={ 'external_only': True }
+      options={'external_only': True}
     )

@@ -205,7 +205,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
   def test_format_flag(self):
     result = self.execute_console_task(
       targets=[self.target('project_info:third')],
-      options={ 'formatted': False },
+      options={'formatted': False},
     )
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
@@ -221,13 +221,13 @@ class ProjectInfoTest(ConsoleTaskTestBase):
   def test_output_file(self):
     outfile = os.path.join(self.build_root, '.pants.d', 'test')
     self.execute_console_task(targets=[self.target('project_info:target_type')],
-                              options={ 'output_file': outfile })
+                              options={'output_file': outfile})
     self.assertTrue(os.path.exists(outfile))
 
   def test_output_file_error(self):
     with self.assertRaises(TaskError):
       self.execute_console_task(targets=[self.target('project_info:target_type')],
-                                options={ 'output_file': self.build_root })
+                                options={'output_file': self.build_root})
 
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):

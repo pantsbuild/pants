@@ -246,7 +246,7 @@ class DepmapTest(BaseDepmapTest):
       '    internal-common.i.i',
       '      internal-common.g.g',
       targets=[self.target('overlaps:two')],
-      options={ 'minimal': True }
+      options={'minimal': True}
     )
 
   def test_multi(self):
@@ -268,7 +268,7 @@ class DepmapTest(BaseDepmapTest):
       '    internal-common.i.i',
       '      internal-common.g.g',
       targets=[self.target('overlaps:two')],
-      options={ 'path_to': 'internal-common.g.g' },
+      options={'path_to': 'internal-common.g.g'},
     )
 
   def test_resources(self):
@@ -476,7 +476,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
 
   def test_format_flag(self):
     result = self.get_depmap_task_result(targets=[self.target('project_info:third')],
-                                         extra_options={ 'project_info_formatted': False })
+                                         extra_options={'project_info_formatted': False})
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
 
@@ -489,13 +489,13 @@ class ProjectInfoTest(ConsoleTaskTestBase):
   def test_output_file(self):
     outfile = os.path.join(self.build_root, '.pants.d', 'test')
     self.get_depmap_task_result(targets=[self.target('project_info:target_type')],
-                                extra_options={ 'output_file': outfile })
+                                extra_options={'output_file': outfile})
     self.assertTrue(os.path.exists(outfile))
 
   def test_output_file_error(self):
     with self.assertRaises(TaskError):
       self.get_depmap_task_result(targets=[self.target('project_info:target_type')],
-                                  extra_options={ 'output_file': self.build_root })
+                                  extra_options={'output_file': self.build_root})
 
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):

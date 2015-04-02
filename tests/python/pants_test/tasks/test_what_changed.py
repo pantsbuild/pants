@@ -68,7 +68,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
     self.assert_console_output(workspace=self.workspace())
 
   def test_parent(self):
-    self.assert_console_output(options={ 'changes_since': '42' },
+    self.assert_console_output(options={'changes_since': '42'},
                                workspace=self.workspace(parent='42'))
 
   def test_files(self):
@@ -76,7 +76,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
       'a/b/c',
       'd',
       'e/f',
-      options={ 'files': True },
+      options={'files': True},
       workspace=self.workspace(files=['a/b/c', 'd', 'e/f'])
     )
 
@@ -258,7 +258,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/src/py/a:alpha',
       'root/src/py/1:numeric',
-      options={ 'fast': True },
+      options={'fast': True},
       workspace=self.workspace(
         files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
       ),
@@ -268,7 +268,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/src/py/a:alpha',
       'root/src/py/1:numeric',
-      options={ 'diffspec': '42' },
+      options={'diffspec': '42'},
       workspace=self.workspace(
         diffspec='42',
         diff_files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
@@ -284,7 +284,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/b:b',
-      options={ 'include_dependees': 'direct' },
+      options={'include_dependees': 'direct'},
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
@@ -292,7 +292,7 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/b:b',
       'root/src/py/dependency_tree/c:c',
-      options={ 'include_dependees': 'transitive' },
+      options={'include_dependees': 'transitive'},
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
@@ -301,13 +301,13 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/b:b',
       'root/src/py/dependency_tree/c:c',
-      options={ 'include_dependees': 'transitive' },
+      options={'include_dependees': 'transitive'},
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
     self.assert_console_output(
       'root/src/py/dependency_tree/a:a',
       'root/src/py/dependency_tree/c:c',
-      options={ 'include_dependees': 'transitive', 'exclude_target_regexp': [':b'] },
+      options={'include_dependees': 'transitive', 'exclude_target_regexp': [':b']},
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
