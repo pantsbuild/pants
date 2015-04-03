@@ -104,6 +104,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         'examples/src/java/com/pants/example/hello',
         'examples/src/java/com/pants/examples/hello/greet',
         'examples/src/java/com/pants/examples/hello/main',
+        'examples/src/java/com/pants/examples/hello/simple',
         'examples/src/resources/com/pants/example/hello',
       ]]
       remaining = set(expected_paths)
