@@ -26,8 +26,8 @@ class TargetsHelpTest(ConsoleTaskTestBase):
   def test_ok_details(self):
     # If something has an entry in predefs, we should render it
     # Assumes that we have an entry for 'egg' in PREDEFS
-    output = '\n'.join(self.execute_console_task(options={'details': 'egg'}))
+    output = '\n'.join(self.execute_console_task(options={ 'details': 'egg' }))
     self.assertIn('In older Pants', output)
 
   def test_bad_details(self):
-    self.assert_console_output('\nNo such symbol: invalid\n', options={'details' :'invalid'})
+    self.assert_console_output('\nNo such symbol: invalid\n', options={ 'details' :'invalid' })

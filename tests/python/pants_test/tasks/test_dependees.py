@@ -175,7 +175,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:two',
       'common/c:c',
       targets=[self.target('common/c')],
-      options={'type': ['python_tests']}
+      options={'closed': True}
     )
 
   def test_transitive(self):
@@ -185,7 +185,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:four',
       'overlaps:five',
       targets=[self.target('common/b')],
-      options={'type': ['python_tests']}
+      options={'transitive': True}
     )
 
   def test_nodups_dependees(self):
@@ -205,7 +205,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:two',
       'common/c:c',
       targets=targets,
-      options={'type': ['python_tests']}
+      options={'closed': True}
     )
 
   def test_aliasing(self):

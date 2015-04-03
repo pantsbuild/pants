@@ -77,7 +77,7 @@ class ListGoalsTest(ConsoleTaskTestBase):
       '',
       self._UNDOCUMENTED_HEADER,
       '  {0}'.format(self._ALPACA_NAME),
-      options={'all': True}
+      options={ 'all': True }
     )
 
   # TODO(John Sirois): Re-enable when fixing up ListGoals `--graph` in
@@ -106,5 +106,5 @@ class ListGoalsTest(ConsoleTaskTestBase):
       '  }',
       '  alpaca_alpaca -> llama_llama [ltail=cluster_alpaca lhead=cluster_llama];',
       '}',
-      options={'graph': True}
+      options={ 'graph': True }
     )
