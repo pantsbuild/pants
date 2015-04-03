@@ -7,28 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-#from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
-#from pants.base.address import BuildFileAddress
 from pants_test.base_test import BaseTest
-
-
-#from pants.backend.core.register import build_file_aliases as register_core
-#from pants.backend.jvm.register import build_file_aliases as register_jvm
-#from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 
 
 class JarDependencyTest(BaseTest):
 
-  #org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-  #               type_=None, classifier=None, mutable=None, artifacts=None, intransitive=False
-
-  # constructing JarDep w/ multiple artifacts and no classifier results in error on init
-  # constructing w/ just an artifact in artifact list blows up nicely
-  # artifact defaults name? Could do that to be less annoying.
-  # add coordinate method that produces org,name,classifier
-  # test jar dep w/ != classifiers are !=
-  # test jar dep " " " " are not deduped in a set
   def test_jar_dependency_with_no_classifier_and_multiple_artifacts_fails_on_construction(self):
     def invalid_jar_dep():
       JarDependency('com.example',
@@ -76,4 +60,3 @@ class JarDependencyTest(BaseTest):
                             artifacts=[IvyArtifact('dep', classifier="artifact")])
 
     self.assertEqual('direct', jar_dep.classifier)
-
