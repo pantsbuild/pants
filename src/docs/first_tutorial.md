@@ -279,13 +279,7 @@ will still compile them since it knows it must compile before it can
 test.
 
     :::bash
-    $ pants test src/java/com/myorg/myproject tests/java/com/myorg/myproject
-
-**Run a binary**<br>
-Use pants to execute a binary target.  Compiles the code first if it is not up to date.
-
-    :::bash
-    $ ./pants run examples/src/java/com/pants/examples/hello/simple
+    $ pants goal test src/java/com/myorg/myproject tests/java/com/myorg/myproject
 
 **Get Help**<br>
 Get the list of goals:
