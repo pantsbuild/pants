@@ -134,10 +134,6 @@ class JarDependency(object):
     if self.classifier:
       self._coordinates += (self.classifier,)
 
-    self.coordinate_without_rev = (self.org, self.name, self.classifier)
-
-    self.id = "-".join(map(str, self._coordinates))
-
     if not self.classifier and len(self.artifacts) > 1:
       raise ValueError('Cannot determine classifier. No explicit classifier is set and this jar '
                        'has more than 1 artifact: {}\n\t{}'.format(self, '\n\t'.join(map(str, self.artifacts))))
@@ -204,13 +200,13 @@ class JarDependency(object):
     return self
 
   def __eq__(self, other):
-    return self._coordinates == self._other_coordinates(other)
+    return self._coordinates == other._coordinates
 
   def __hash__(self):
     return hash(self._coordinates)
 
   def __lt__(self, other):
-    return self._coordinates < self._other_coordinates(other)
+    return self._coordinates < other._coordinates
 
   def __ne__(self, other):
     return not self.__eq__(other)
@@ -218,13 +214,13 @@ class JarDependency(object):
   def __repr__(self):
     return self.id
 
-  def _other_coordinates(self, other):
-    if isinstance(other, type(self)):
-      return other._coordinates
-    elif isinstance(other, tuple): # other may be an IvyModuleRef
-      return other
-    else:
-      return ()
+  @property
+  def id(self):
+    return "-".join(map(str, self._coordinates))
+
+  @property
+  def coordinate_without_rev(self):
+    return (self.org, self.name, self.classifier)
 
   def cache_key(self):
     key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)

@@ -100,7 +100,8 @@ class IvyInfo(object):
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      for module_ref in self.traverse_dependency_graph(jar, create_collection, memo):
+      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+      for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
         modules.update(self._artifacts_by_ref[unversioned_ref])
     return modules
@@ -111,13 +112,14 @@ class IvyInfo(object):
     :param memo see `traverse_dependency_graph`
     """
 
-    ref = jar
+    ref = IvyModuleRef(jar.org, jar.name, jar.rev)
     def create_collection(dep):
       s = OrderedSet()
       if ref != dep:
         s.add(dep)
       return s
     return self.traverse_dependency_graph(jar, create_collection, memo)
+
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
