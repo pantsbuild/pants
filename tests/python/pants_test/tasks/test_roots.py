@@ -12,7 +12,7 @@ from pants.backend.core.tasks.roots import ListRoots
 from pants.base.build_environment import get_buildroot
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
 @contextmanager
@@ -20,13 +20,13 @@ def register_sourceroot():
   try:
     yield SourceRoot.register
   except (ValueError, IndexError) as e:
-    print("SourceRoot Registration Failed.")
+    print('SourceRoot Registration Failed.')
     raise e
   finally:
     SourceRoot.reset()
 
 
-class ListRootsTest(ConsoleTaskTest):
+class ListRootsTest(ConsoleTaskTestBase):
 
   class TypeA(Target):
     pass
@@ -42,21 +42,21 @@ class ListRootsTest(ConsoleTaskTest):
     try:
       self.assert_console_output()
     except AssertionError:
-      self.fail("./pants goal roots failed without any registered SourceRoot.")
+      self.fail('./pants goal roots failed without any registered SourceRoot.')
 
   def test_no_source_root(self):
     with register_sourceroot() as sourceroot:
-      sourceroot(os.path.join(get_buildroot(), "fakeroot"))
+      sourceroot(os.path.join(get_buildroot(), 'fakeroot'))
       self.assert_console_output('fakeroot: *')
 
   def test_single_source_root(self):
     with register_sourceroot() as sourceroot:
-      sourceroot(os.path.join(get_buildroot(), "fakeroot"), ListRootsTest.TypeA,
+      sourceroot(os.path.join(get_buildroot(), 'fakeroot'), ListRootsTest.TypeA,
                                                             ListRootsTest.TypeB)
-      self.assert_console_output("fakeroot: TypeA,TypeB")
+      self.assert_console_output('fakeroot: TypeA,TypeB')
 
   def test_multiple_source_root(self):
     with register_sourceroot() as sourceroot:
-      sourceroot(os.path.join(get_buildroot(), "fakerootA"), ListRootsTest.TypeA)
-      sourceroot(os.path.join(get_buildroot(), "fakerootB"), ListRootsTest.TypeB)
+      sourceroot(os.path.join(get_buildroot(), 'fakerootA'), ListRootsTest.TypeA)
+      sourceroot(os.path.join(get_buildroot(), 'fakerootB'), ListRootsTest.TypeB)
       self.assert_console_output('fakerootA: TypeA', 'fakerootB: TypeB')

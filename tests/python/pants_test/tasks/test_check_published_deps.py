@@ -16,10 +16,10 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.base.build_file_aliases import BuildFileAliases
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class CheckPublishedDepsTest(ConsoleTaskTest):
+class CheckPublishedDepsTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -44,20 +44,20 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
   def setUp(self):
     super(CheckPublishedDepsTest, self).setUp()
 
-    self.create_file('repo/org.name/lib1/publish.properties', dedent('''
+    self.create_file('repo/org.name/lib1/publish.properties', dedent("""
         revision.major.org.name%lib1=2
         revision.minor.org.name%lib1=0
         revision.patch.org.name%lib1=0
         revision.sha.org.name%lib1=12345
-        '''))
-    self.create_file('repo/org.name/lib2/publish.properties', dedent('''
+        """))
+    self.create_file('repo/org.name/lib2/publish.properties', dedent("""
         revision.major.org.name%lib2=2
         revision.minor.org.name%lib2=0
         revision.patch.org.name%lib2=0
         revision.sha.org.name%lib2=12345
-        '''))
+        """))
 
-    self.add_to_build_file('provider/BUILD', dedent('''
+    self.add_to_build_file('provider/BUILD', dedent("""
         java_library(name='lib1',
           provides=artifact(
             org='org.name',
@@ -70,25 +70,25 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
             name='lib2',
             repo=repo),
           sources=[])
-        '''))
-    self.add_to_build_file('outdated/BUILD', dedent('''
+        """))
+    self.add_to_build_file('outdated/BUILD', dedent("""
         jar_library(name='outdated',
           jars=[jar(org='org.name', name='lib1', rev='1.0.0')]
         )
-        '''))
-    self.add_to_build_file('uptodate/BUILD', dedent('''
+        """))
+    self.add_to_build_file('uptodate/BUILD', dedent("""
         jar_library(name='uptodate',
           jars=[jar(org='org.name', name='lib2', rev='2.0.0')]
         )
-        '''))
-    self.add_to_build_file('both/BUILD', dedent('''
+        """))
+    self.add_to_build_file('both/BUILD', dedent("""
         target(name='both',
           dependencies=[
             'outdated',
             'uptodate',
           ]
         )
-        '''))
+        """))
 
   def test_all_up_to_date(self):
     self.assert_console_output(
@@ -100,7 +100,7 @@ class CheckPublishedDepsTest(ConsoleTaskTest):
       'outdated org.name#lib1 1.0.0 latest 2.0.0',
       'up-to-date org.name#lib2 2.0.0',
       targets=[self.target('both')],
-      args=['--test-print-uptodate']
+      options = { 'print_uptodate': True }
     )
 
   def test_outdated(self):

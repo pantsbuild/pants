@@ -19,13 +19,21 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class BaseReverseDepmapTest(ConsoleTaskTest):
+class BaseReverseDepmapTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return ReverseDepmap
+
+  def assert_console_output(self, *args, **kwargs):
+    # Ensure that the globally-registered spec_excludes option is set, as Dependees consults it.
+    options = { 'spec_excludes': [] }
+    if 'options' in kwargs:
+      options.update(kwargs['options'])
+    kwargs['options'] = options
+    return super(BaseReverseDepmapTest, self).assert_console_output(*args, **kwargs)
 
 
 class ReverseDepmapEmptyTest(BaseReverseDepmapTest):
@@ -55,14 +63,14 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     super(ReverseDepmapTest, self).setUp()
 
     def add_to_build_file(path, name, alias=False, deps=()):
-      self.add_to_build_file(path, dedent('''
-          %(type)s(name='%(name)s',
-            dependencies=[%(deps)s]
+      self.add_to_build_file(path, dedent("""
+          {type}(name='{name}',
+            dependencies=[{deps}]
           )
-          ''' % dict(
+          """.format(
         type='target' if alias else 'python_library',
         name=name,
-        deps=','.join("'%s'" % dep for dep in list(deps)))
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)))
       ))
 
     add_to_build_file('common/a', 'a', deps=['common/d'])
@@ -76,40 +84,40 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     add_to_build_file('overlaps', 'four', alias=True, deps=['common/b'])
     add_to_build_file('overlaps', 'five', deps=['overlaps:four'])
 
-    self.add_to_build_file('resources/a', dedent('''
+    self.add_to_build_file('resources/a', dedent("""
       resources(
         name='a_resources',
         sources=['a.resource']
       )
-    '''))
+    """))
 
-    self.add_to_build_file('src/java/a', dedent('''
+    self.add_to_build_file('src/java/a', dedent("""
       java_library(
         name='a_java',
         resources=['resources/a:a_resources']
       )
-    '''))
+    """))
 
     #Compile idl tests
-    self.add_to_build_file('src/thrift/example', dedent('''
+    self.add_to_build_file('src/thrift/example', dedent("""
       java_thrift_library(
         name='mybird',
         compiler='scrooge',
         language='scala',
         sources=['1.thrift']
       )
-      '''))
+      """))
 
-    self.add_to_build_file('src/thrift/example', dedent('''
+    self.add_to_build_file('src/thrift/example', dedent("""
       jar_library(
         name='compiled_scala',
         dependencies=[
           ':mybird',
         ]
       )
-      '''))
+      """))
 
-    self.add_to_build_file('src/thrift/example', dedent('''
+    self.add_to_build_file('src/thrift/example', dedent("""
       java_library(
         name='compiled_java_user',
         dependencies=[
@@ -117,29 +125,29 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         ],
         sources=['1.java'],
       )
-      '''))
+      """))
 
     add_to_build_file('src/thrift/dependent', 'my-example', deps=['src/thrift/example:mybird'])
 
-    self.add_to_build_file('src/java/example', dedent('''
+    self.add_to_build_file('src/java/example', dedent("""
       jar_library(
         name='mybird-jars',
         jars=[
           jar(org='com', name='twitter')
         ],
       )
-      '''))
+      """))
 
     #External Dependency tests
-    self.add_to_build_file('src/java/example', dedent('''
+    self.add_to_build_file('src/java/example', dedent("""
       java_library(
         name='mybird',
         dependencies=[':mybird-jars'],
         sources=['1.java'],
       )
-      '''))
+      """))
 
-    self.add_to_build_file('src/java/example', dedent('''
+    self.add_to_build_file('src/java/example', dedent("""
       java_library(
         name='example2',
         dependencies=[
@@ -147,7 +155,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         ],
         sources=['2.java']
       )
-      '''))
+      """))
 
   def test_roots(self):
     self.assert_console_output(
@@ -166,8 +174,8 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     self.assert_console_output(
       'overlaps:two',
       'common/c:c',
-      args=['--test-closed'],
-      targets=[self.target('common/c')]
+      targets=[self.target('common/c')],
+      options={'closed': True}
     )
 
   def test_transitive(self):
@@ -176,8 +184,8 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:three',
       'overlaps:four',
       'overlaps:five',
-      args=['--test-transitive'],
-      targets=[self.target('common/b')]
+      targets=[self.target('common/b')],
+      options={'transitive': True}
     )
 
   def test_nodups_dependees(self):
@@ -196,8 +204,8 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     self.assert_console_output(
       'overlaps:two',
       'common/c:c',
-      args=['--test-closed'],
-      targets=targets
+      targets=targets,
+      options={'closed': True}
     )
 
   def test_aliasing(self):
@@ -210,15 +218,15 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     SourceRoot.register('tests', PythonTests)
     self.assert_console_output(
       'tests/d:d',
-      args=['--test-type=python_tests'],
-      targets=[self.target('common/d')]
+      targets=[self.target('common/d')],
+      options={'type': ['python_tests']}
     )
 
   def test_empty_dependees_type(self):
     self.assert_console_raises(
       TaskError,
-      args=['--test-type=target'],
-      targets=[self.target('common/d')]
+      targets=[self.target('common/d')],
+      options={'spec_excludes': [], 'type': ['target']}
     )
 
   def test_compile_idls(self):
@@ -252,10 +260,5 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
 
     self.assert_console_output(
       targets=[self.target('common/a')],
-      config=dedent('''
-      [DEFAULT]
-      spec_excludes: [
-          "overlaps"
-        ]
-      '''),
+      options={'spec_excludes': ['overlaps']}
     )
