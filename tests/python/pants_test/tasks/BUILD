@@ -8,13 +8,12 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
+    'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -184,8 +183,8 @@ python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
   dependencies = [
-    ':base',
     'src/python/pants/backend/core/tasks:console_task',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

@@ -14,10 +14,10 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.base.config import Config
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class FileDepsTest(ConsoleTaskTest):
+class FileDepsTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm()).merge(register_codegen())
@@ -37,27 +37,27 @@ class FileDepsTest(ConsoleTaskTest):
       self.add_to_build_file(path, definition)
 
     self.create_file('pants.ini',
-                     contents=dedent('''
+                     contents=dedent("""
                        [compile.scala]
                        runtime-deps: ['tools:scala-library']
-                     '''),
+                     """),
                      mode='a')
 
     # TODO: Required because target code has no direct config reference. Remove after fixing that.
     Config.cache(Config.load())
 
     create_target(path='tools',
-                  definition=dedent('''
+                  definition=dedent("""
                     jar_library(
                       name='scala-library',
                       jars=[
                         jar('org.scala-lang', 'scala-library', '2.11.2'),
                       ]
                     )
-                  '''))
+                  """))
 
     create_target(path='src/scala/core',
-                  definition=dedent('''
+                  definition=dedent("""
                     scala_library(
                       name='core',
                       sources=[
@@ -67,11 +67,11 @@ class FileDepsTest(ConsoleTaskTest):
                         'src/java/core'
                       ]
                     )
-                  '''),
+                  """),
                   sources=['core1.scala'])
 
     create_target(path='src/java/core',
-                  definition=dedent('''
+                  definition=dedent("""
                     java_library(
                       name='core',
                       sources=[
@@ -82,33 +82,33 @@ class FileDepsTest(ConsoleTaskTest):
                         'src/scala/core'
                       ]
                     )
-                  '''),
+                  """),
                   sources=['core1.java', 'core2.java'])
 
     create_target(path='src/resources/lib',
-                  definition=dedent('''
+                  definition=dedent("""
                     resources(
                       name='lib',
                       sources=[
                         'data.json'
                       ]
                     )
-                  '''),
+                  """),
                   sources=['data.json'])
 
     create_target(path='src/thrift/storage',
-                  definition=dedent('''
+                  definition=dedent("""
                     java_thrift_library(
                       name='storage',
                       sources=[
                         'data_types.thrift'
                       ]
                     )
-                  '''),
+                  """),
                   sources=['src/thrift/storage/data_types.thrift'])
 
     create_target(path='src/java/lib',
-                  definition=dedent('''
+                  definition=dedent("""
                     java_library(
                       name='lib',
                       sources=[
@@ -122,7 +122,7 @@ class FileDepsTest(ConsoleTaskTest):
                         'src/resources/lib'
                       ]
                     )
-                  '''),
+                  """),
                   sources=['lib1.java'])
 
     # Derive a synthetic target from the src/thrift/storage thrift target as-if doing code-gen.
@@ -137,7 +137,7 @@ class FileDepsTest(ConsoleTaskTest):
     java_lib.inject_dependency(synthetic_java_lib.address)
 
     create_target(path='src/java/bin',
-                  definition=dedent('''
+                  definition=dedent("""
                     jvm_binary(
                       name='bin',
                       source='main.java',
@@ -146,11 +146,11 @@ class FileDepsTest(ConsoleTaskTest):
                         'src/java/lib'
                       ]
                     )
-                  '''),
+                  """),
                   sources=['main.java'])
 
     create_target(path='project',
-                  definition=dedent('''
+                  definition=dedent("""
                     jvm_app(
                       name='app',
                       binary='src/java/bin',
@@ -158,7 +158,7 @@ class FileDepsTest(ConsoleTaskTest):
                         bundle(fileset=['config/app.yaml'])
                       ]
                     )
-                  '''),
+                  """),
                   sources=['config/app.yaml'])
 
 

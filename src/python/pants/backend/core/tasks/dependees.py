@@ -39,7 +39,7 @@ class ReverseDepmap(ConsoleTask):
     self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
     self._dependees_type = self.get_options().type
-    self._spec_excludes = self.context.options.for_global_scope().spec_excludes
+    self._spec_excludes = self.get_options().spec_excludes
 
 
   def console_output(self, _):

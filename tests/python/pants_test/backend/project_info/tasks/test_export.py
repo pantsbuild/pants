@@ -22,10 +22,10 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import Export
 from pants.base.exceptions import TaskError
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class ProjectInfoTest(ConsoleTaskTest):
+class ProjectInfoTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return Export
@@ -146,7 +146,7 @@ class ProjectInfoTest(ConsoleTaskTest):
     source_root = result['targets']['project_info:third']['roots'][0]
     self.assertEqual('com.foo', source_root['package_prefix'])
     self.assertEqual(
-      '%s/project_info/com/foo' % self.build_root,
+      '{0}/project_info/com/foo'.format(self.build_root),
       source_root['source_root']
     )
 
@@ -204,8 +204,8 @@ class ProjectInfoTest(ConsoleTaskTest):
 
   def test_format_flag(self):
     result = self.execute_console_task(
-      args=['--test-formatted'],
-      targets=[self.target('project_info:third')]
+      targets=[self.target('project_info:third')],
+      options={'formatted': False},
     )
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
@@ -220,14 +220,14 @@ class ProjectInfoTest(ConsoleTaskTest):
 
   def test_output_file(self):
     outfile = os.path.join(self.build_root, '.pants.d', 'test')
-    self.execute_console_task(args=['--test-output-file={}'.format(outfile)],
-                              targets=[self.target('project_info:target_type')])
+    self.execute_console_task(targets=[self.target('project_info:target_type')],
+                              options={'output_file': outfile})
     self.assertTrue(os.path.exists(outfile))
 
   def test_output_file_error(self):
     with self.assertRaises(TaskError):
-      self.execute_console_task(args=['--test-output-file={}'.format(self.build_root)],
-                                targets=[self.target('project_info:target_type')])
+      self.execute_console_task(targets=[self.target('project_info:target_type')],
+                                options={'output_file': self.build_root})
 
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):

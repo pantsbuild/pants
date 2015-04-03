@@ -14,10 +14,10 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class BaseListTargetsTest(ConsoleTaskTest):
+class BaseListTargetsTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return ListTargets
@@ -26,7 +26,7 @@ class BaseListTargetsTest(ConsoleTaskTest):
 class ListTargetsTestEmpty(BaseListTargetsTest):
   def test_list_all_empty(self):
     self.assertEqual('', self.execute_task())
-    self.assertEqual('', self.execute_task(args=['--test-sep=###']))
+    self.assertEqual('', self.execute_task(options={ 'sep': '###' }))
     self.assertEqual([], self.execute_console_task())
 
 
@@ -54,18 +54,19 @@ class ListTargetsTest(BaseListTargetsTest):
     class Lib(object):
       def __init__(self, name, provides=False):
         self.name = name
-        self.provides = dedent('''
+        self.provides = dedent("""
             artifact(
               org='com.example',
-              name='%s',
+              name='{0}',
               repo=public
             )
-            ''' % name).strip() if provides else 'None'
+            """.format(name)).strip() if provides else 'None'
 
     def create_library(path, *libs):
       libs = libs or [Lib(os.path.basename(os.path.dirname(self.build_path(path))))]
       for lib in libs:
-        target = "java_library(name='%s', provides=%s, sources=[])\n" % (lib.name, lib.provides)
+        target = "java_library(name='{name}', provides={provides}, sources=[])\n".format(
+          name=lib.name, provides=lib.provides)
         self.add_to_build_file(path, target)
 
     create_library('a')
@@ -141,7 +142,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/e:e1',
         'f:alias',
         'g:g',
-        args=['--test-sep=, '])
+        options={ 'sep': ', ' })
 
     self.assert_console_output(
         'a:a',
@@ -158,16 +159,15 @@ class ListTargetsTest(BaseListTargetsTest):
     self.assert_console_output(
         'a/b:b com.example#b',
         'a/b/c:c2 com.example#c2',
-        args=['--test-provides'])
+        options={'provides': True })
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
         '/tmp a/b:b http://maven.example.com public com.example#b',
         '/tmp a/b/c:c2 http://maven.example.com public com.example#c2',
-        args=[
-            '--test-provides',
-            '--test-provides-columns=push_db_basedir,address,repo_url,repo_name,artifact_id'
-        ])
+        options={ 'provides': True,
+                  'provides_columns': 'push_db_basedir,address,repo_url,repo_name,artifact_id'}
+    )
 
   def test_list_dedups(self):
     targets = []
@@ -183,19 +183,19 @@ class ListTargetsTest(BaseListTargetsTest):
   def test_list_documented(self):
     self.assert_console_output(
       # Confirm empty listing
-      args=['--test-documented'],
-      targets=[self.target('a/b')]
+      targets=[self.target('a/b')],
+      options={'documented': True },
     )
 
     self.assert_console_output(
-      dedent('''
+      dedent("""
       f:alias
         Exercises alias resolution.
         Further description.
-      ''').strip(),
-      dedent('''
+      """).strip(),
+      dedent("""
       g:g
         the description
-      ''').strip(),
-      args=['--test-documented']
+      """).strip(),
+      options={ 'documented': True }
     )

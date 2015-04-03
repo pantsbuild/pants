@@ -12,10 +12,10 @@ from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
-from pants_test.tasks.test_base import ConsoleTaskTest
+from pants_test.tasks.test_base import ConsoleTaskTestBase
 
 
-class FilemapTest(ConsoleTaskTest):
+class FilemapTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -38,11 +38,11 @@ class FilemapTest(ConsoleTaskTest):
       for f in files:
         self.create_file(os.path.join(path, f), '')
 
-      self.add_to_build_file(path, dedent('''
-          python_library(name='%s',
-            sources=[%s]
+      self.add_to_build_file(path, dedent("""
+          python_library(name='{name}',
+            sources=[{sources}]
           )
-          ''' % (name, ','.join(repr(f) for f in files))))
+          """.format(name=name, sources=','.join(repr(f) for f in files))))
 
     self.add_to_build_file('common', 'source_root.here(python_library)')
     add_to_build_file('common/a', 'a', 'one.py')
