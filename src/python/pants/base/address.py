@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from collections import namedtuple
+from hashlib import sha1
 
 from pants.util.meta import AbstractClass
 
@@ -85,7 +86,7 @@ def parse_spec(spec, relative_to=None):
   return spec_path, target_name
 
 
-class Addresses (namedtuple('Addresses', ['addresses', 'rel_path'])):
+class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   """ Used as a sentinel type for identifying a list of string specs.
 
   addresses: list of string specs
@@ -124,6 +125,7 @@ class Address(AbstractClass):
     norm_path = os.path.normpath(spec_path)
     self._spec_path = norm_path if norm_path != '.' else ''
     self._target_name = target_name
+    self._hashed_path_safe_specs = {}
 
   @property
   def spec_path(self):
@@ -140,13 +142,15 @@ class Address(AbstractClass):
 
   @property
   def path_safe_spec(self):
-    """Return spec address in a form safe for use as a filename on unix systems.
-
-    This is exactly as unique as the spec itself when compared with other path_spec_names.
-    """
-    return ('{safe_spec_path}.{target_name}'
-            .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
-                    target_name=self._target_name))
+    """Return spec address in a form safe for use as a filename on unix systems."""
+    # Inserting the hash should maintain uniqueness for specs that might have collided when
+    # transformed, for instance if one path already contained periods.
+    if self.spec not in self._hashed_path_safe_specs:
+      hash_object = sha1(b'{}'.format(self.spec))
+      hash_suffix = hash_object.hexdigest()[:12]
+      self._hashed_path_safe_specs[self.spec] = '{}.{}'.format(hash_suffix,
+                                                               self.spec.replace(os.sep, '.'))
+    return self._hashed_path_safe_specs[self.spec]
 
   @property
   def relative_spec(self):
@@ -167,8 +171,8 @@ class Address(AbstractClass):
 
   def __eq__(self, other):
     return (other and
-            self._spec_path == other._spec_path and
-            self._target_name == other._target_name)
+            self._spec_path == other.spec_path and
+            self._target_name == other.target_name)
 
   _hash = None
   def __hash__(self):
@@ -183,7 +187,7 @@ class Address(AbstractClass):
     return self.spec
 
   def __lt__(self, other):
-    return (self._spec_path, self._target_name) < (other._spec_path, other._target_name)
+    return (self._spec_path, self._target_name) < (other.spec_path, other.target_name)
 
 
 class BuildFileAddress(Address):
