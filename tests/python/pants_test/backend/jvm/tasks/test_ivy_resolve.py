@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
@@ -60,6 +60,26 @@ class IvyResolveTest(JvmToolTaskTestBase):
     winning_cp = compile_classpath.get_for_target(winning_lib)
     self.assertEquals(losing_cp, winning_cp)
     self.assertEquals(1, len(winning_cp))
+
+  def test_resolve_multiple_artifacts(self):
+    no_classifier = JarDependency('junit', 'junit', rev='4.12')
+    classifier_and_no_classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources', artifacts=[IvyArtifact('junit')])
+
+    no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
+    classifier_and_no_classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier_and_no_classifier])
+
+    compile_classpath = self.resolve([no_classifier_lib, classifier_and_no_classifier_lib])
+
+    no_classifier_cp = compile_classpath.get_for_target(no_classifier_lib)
+    classifier_and_no_classifier_cp = compile_classpath.get_for_target(classifier_and_no_classifier_lib)
+
+    sources_jar = 'junit-4.12-sources.jar'
+    regular_jar = 'junit-4.12.jar'
+    self.assertTrue(any(sources_jar in j[-1] for j in classifier_and_no_classifier_cp), 'expected {} in {}'.format(sources_jar, classifier_and_no_classifier_cp))
+    self.assertTrue(any(regular_jar in j[-1] for j in classifier_and_no_classifier_cp), 'expected {} in {}'.format(regular_jar, classifier_and_no_classifier_cp))
+
+    self.assertTrue(all(sources_jar not in j[-1] for j in no_classifier_cp), 'expected {} to not be in {}'.format(regular_jar, no_classifier_cp))
+    self.assertTrue(any(regular_jar in j[-1] for j in no_classifier_cp), 'expected {} in {}'.format(regular_jar, no_classifier_cp))
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
