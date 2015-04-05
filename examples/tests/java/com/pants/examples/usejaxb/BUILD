@@ -8,6 +8,6 @@ junit_tests(name='usejaxb',
   dependencies=[
     '3rdparty:junit',
     'examples/src/java/com/pants/examples/jaxb/reader',
-    'examples/src/resources/com/pants/example/names',
+    'examples/src/resources/com/pants/examples/names',
   ],
 )

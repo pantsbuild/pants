@@ -14,7 +14,7 @@ java_library(name='make_it_rain',
     'examples/src/thrift/com/pants/examples/distance:distance-java',
     'examples/src/thrift/com/pants/examples/precipitation:precipitation-java',
   ],
-  provides = artifact(org='com.pants.example',
+  provides = artifact(org='com.pants.examples',
                       name='make-it-rain',
                       repo=public),
 )

@@ -25,8 +25,8 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
     return pants_run.stdout_data.rstrip().split('\n')
 
   def test_run_repl_direct(self):
-    output_lines = self.run_repl('examples/src/scala/com/pants/example/hello/welcome', dedent("""\
-      import com.pants.example.hello.welcome.WelcomeEverybody
+    output_lines = self.run_repl('examples/src/scala/com/pants/examples/hello/welcome', dedent("""\
+      import com.pants.examples.hello.welcome.WelcomeEverybody
       println(WelcomeEverybody("World" :: Nil).head)
       """))
     self.assertEquals(len(output_lines), 12)

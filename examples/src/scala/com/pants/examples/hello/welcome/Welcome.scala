@@ -1,7 +1,7 @@
 // Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-package com.pants.example.hello.welcome
+package com.pants.examples.hello.welcome
 
 import com.pants.examples.hello.greet.Greeting
 

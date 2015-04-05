@@ -10,6 +10,6 @@ junit_tests(name='greet',
     'examples/src/java/com/pants/examples/hello/greet',
   ],
   resources=[
-    'examples/src/resources/com/pants/example/hello',
+    'examples/src/resources/com/pants/examples/hello',
   ],
 )

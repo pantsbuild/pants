@@ -50,8 +50,8 @@ class ZincAnalysisTest(unittest.TestCase):
     full_analysis = parse_analyis('simple_analysis')
 
     analysis_splits = full_analysis.split([
-      ['/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala'],
-      ['/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala'],
+      ['/src/pants/examples/src/scala/com/pants/examples/hello/welcome/Welcome.scala'],
+      ['/src/pants/examples/src/scala/com/pants/examples/hello/exe/Exe.scala'],
     ])
     self.assertEquals(len(analysis_splits), 2)
 
@@ -62,7 +62,7 @@ class ZincAnalysisTest(unittest.TestCase):
       # text comparison because in some cases there can be small text differences that don't
       # affect logical equivalence.
       expected_analyis = parse_analyis(expected_filename)
-      self.assertTrue(expected_analyis == analysis_splits[i])
+      self.assertEquals(expected_analyis,analysis_splits[i])
 
       # Then compare as text.  In this simple case we expect them to be byte-for-byte equal.
       expected = get_analysis_text(expected_filename)

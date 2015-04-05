@@ -1,11 +1,11 @@
 // Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-package com.pants.example.hello.exe
+package com.pants.examples.hello.exe
 
 import java.io.{BufferedReader, InputStreamReader}
 
-import com.pants.example.hello.welcome
+import com.pants.examples.hello.welcome
 
 // A simple jvm binary to illustrate Scala BUILD targets
 
@@ -14,7 +14,7 @@ object Exe {
   def getWorld: String = {
     val is =
       this.getClass.getClassLoader.getResourceAsStream(
-        "com/pants/example/hello/world.txt"
+        "com/pants/examples/hello/world.txt"
       )
     try {
       new BufferedReader(new InputStreamReader(is)).readLine()

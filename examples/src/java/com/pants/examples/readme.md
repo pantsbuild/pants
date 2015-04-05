@@ -397,7 +397,7 @@ Further Reading
 ---------------
 
 If you use Scala, see
-[[Scala Projects with Pants|pants('examples/src/scala/com/pants/example:readme')]].
+[[Scala Projects with Pants|pants('examples/src/scala/com/pants/examples:readme')]].
 
 If you know Maven and want to know Pants equivalents, see
 [[Pants for Maven Experts|pants('examples/src/java/com/pants/examples:from_maven')]].

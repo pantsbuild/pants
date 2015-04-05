@@ -33,4 +33,4 @@ class EnsimeIntegrationTest(PantsRunIntegrationTest):
 
   # Testing Ensime integration on a sample project
   def test_ensime_on_all_examples(self):
-    self._ensime_test(['examples/src/scala/com/pants/example::'])
+    self._ensime_test(['examples/src/scala/com/pants/examples::'])

@@ -80,7 +80,7 @@ class ScroogeGenTest(TaskTestBase):
       ScroogeGen._validate(options, [self.target('test_validate:three')])
 
   def test_smoke(self):
-    contents = dedent('''namespace java com.pants.example
+    contents = dedent('''namespace java com.pants.examples
       struct Example {
       1: optional i64 number
       }

@@ -47,7 +47,7 @@ Use the recursive wildcard: `list ::`
     TransitiveLookupError: great was not found in BUILD file examples/src/java/com/pants/examples/h
     ello/greet/BUILD. Perhaps you meant:
       :greet
-      referenced from examples/src/scala/com/pants/example/hello/welcome:welcome
+      referenced from examples/src/scala/com/pants/examples/hello/welcome:welcome
     $ # Instead of listing all targets, an error message. We found a problem
 
 *Do I pull in the dependencies I expect?* Use `depmap` (JVM languages only):
@@ -60,7 +60,7 @@ Use the recursive wildcard: `list ::`
           org.hamcrest-hamcrest-core-1.3
         junit-junit-dep-4.11
       internal-examples.src.java.com.pants.examples.hello.greet.greet
-      internal-examples.src.resources.com.pants.example.hello.hello
+      internal-examples.src.resources.com.pants.examples.hello.hello
       junit-junit-dep-4.11
       org.hamcrest-hamcrest-core-1.3
 
@@ -68,11 +68,11 @@ Use the recursive wildcard: `list ::`
 
     :::bash
     $ ./pants filedeps examples/src/java/com/pants/examples/hello/main
-    ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/BUILD
+    ~archie/workspace/pants/examples/src/resources/com/pants/examples/hello/BUILD
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/BUILD
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/config/greetee.txt
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/Greeting.java
-    ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/world.txt
+    ~archie/workspace/pants/examples/src/resources/com/pants/examples/hello/world.txt
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/HelloMain.java
     ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/BUILD
 

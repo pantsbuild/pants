@@ -21,14 +21,14 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_junit_output(self, workdir):
     self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
-    self._assert_junit_output_exists_for_class(workdir, 'com.pants.example.hello.welcome.WelSpec')
+    self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.welcome.WelSpec')
 
   def test_junit_test(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           'examples/tests/java/com/pants/examples/hello/greet',
-          'examples/tests/scala/com/pants/example/hello/welcome',
+          'examples/tests/scala/com/pants/examples/hello/welcome',
           '--interpreter=CPython>=2.6,<3',
           '--interpreter=CPython>=3.3'],
           workdir)
@@ -41,7 +41,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           'test',
           '--test-junit-test=examples/tests/java/com/pants/examples/hello/greet/GreetingTest.java',
           'examples/tests/java/com/pants/examples/hello/greet',
-          'examples/tests/scala/com/pants/example/hello/welcome'],
+          'examples/tests/scala/com/pants/examples/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
@@ -52,7 +52,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           'test',
           '--test-junit-test=./examples/tests/java/com/pants/examples/hello/greet/GreetingTest.java',
           'examples/tests/java/com/pants/examples/hello/greet',
-          'examples/tests/scala/com/pants/example/hello/welcome'],
+          'examples/tests/scala/com/pants/examples/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
@@ -63,7 +63,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           'test',
           '--test-junit-test=com.pants.examples.hello.greet.GreetingTest',
           'examples/tests/java/com/pants/examples/hello/greet',
-          'examples/tests/scala/com/pants/example/hello/welcome'],
+          'examples/tests/scala/com/pants/examples/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output_exists_for_class(workdir, 'com.pants.examples.hello.greet.GreetingTest')
@@ -73,7 +73,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir([
           'test',
           'examples/tests/java//com/pants/examples/hello/greet',
-          'examples/tests/scala/com/pants/example/hello/welcome',
+          'examples/tests/scala/com/pants/examples/hello/welcome',
           '--interpreter=CPython>=2.6,<3',
           '--interpreter=CPython>=3.3',
           '--test-junit-coverage-processor=emma',
@@ -105,7 +105,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       if in_package_report:
         package_report += line
 
-    self.assertIn('com.pants.example.hello.welcome', package_report)
+    self.assertIn('com.pants.examples.hello.welcome', package_report)
     self.assertIn('com.pants.examples.hello.greet', package_report)
 
   def test_junit_test_with_coberta(self):
@@ -113,7 +113,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir([
           'test',
           'examples/tests/java//com/pants/examples/hello/greet',
-          'examples/tests/scala/com/pants/example/hello/welcome',
+          'examples/tests/scala/com/pants/examples/hello/welcome',
           '--interpreter=CPython>=2.6,<3',
           '--interpreter=CPython>=3.3',
           '--test-junit-coverage-processor=cobertura',
@@ -164,7 +164,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
   def test_junit_test_requiring_cwd_fails_when_target_not_first(self):
     pants_run = self.run_pants([
         'test',
-        'examples/tests/scala/com/pants/example/hello/welcome',
+        'examples/tests/scala/com/pants/examples/hello/welcome',
         'testprojects/tests/java/com/pants/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',

@@ -3,8 +3,8 @@
 
 jvm_binary(name='exe',
   dependencies=[
-    'examples/src/scala/com/pants/example/hello/welcome:welcome',
+    'examples/src/scala/com/pants/examples/hello/welcome:welcome',
   ],
   source='Exe.scala',
-  main='com.pants.example.hello.exe.Exe',
+  main='com.pants.examples.hello.exe.Exe',
 )

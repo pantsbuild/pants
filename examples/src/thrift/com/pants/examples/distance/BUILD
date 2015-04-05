@@ -6,7 +6,7 @@
 
 java_thrift_library(name='distance-java',
   sources=['distance.thrift'],
-  provides = artifact(org='com.pants.example',
+  provides = artifact(org='com.pants.examples',
                       name='distance-thrift-scala',
                       repo=public),
 )
