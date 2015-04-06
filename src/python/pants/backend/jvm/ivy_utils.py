@@ -96,14 +96,22 @@ class IvyInfo(object):
     :param jar_library A JarLibrary to collect the transitive artifacts for.
     :param memo see `traverse_dependency_graph`
     """
-    modules = OrderedSet()
+    artifacts = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      for module_ref in self.traverse_dependency_graph(jar, create_collection, memo):
+      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+      valid_classifiers = jar.artifact_classifiers
+      artifacts_for_jar = []
+      for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
-        modules.update(self._artifacts_by_ref[unversioned_ref])
-    return modules
+        artifacts_for_jar.extend(
+          artifact for artifact in self._artifacts_by_ref[unversioned_ref]
+          if artifact.classifier in valid_classifiers
+        )
+
+      artifacts.update(artifacts_for_jar)
+    return artifacts
 
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar
@@ -111,13 +119,14 @@ class IvyInfo(object):
     :param memo see `traverse_dependency_graph`
     """
 
-    ref = jar
+    ref = IvyModuleRef(jar.org, jar.name, jar.rev)
     def create_collection(dep):
       s = OrderedSet()
       if ref != dep:
         s.add(dep)
       return s
-    return self.traverse_dependency_graph(jar, create_collection, memo)
+    return self.traverse_dependency_graph(ref, create_collection, memo)
+
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
@@ -292,7 +301,7 @@ class IvyUtils(object):
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
     # strategy generally.
     def add_jar(jar):
-      coordinate = (jar.org, jar.name, jar.classifier)
+      coordinate = jar.coordinate_without_rev
       existing = jars.get(coordinate)
       jars[coordinate] = jar if not existing else (
         cls._resolve_conflict(existing=existing, proposed=jar)
