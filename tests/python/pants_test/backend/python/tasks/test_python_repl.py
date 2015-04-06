@@ -10,7 +10,6 @@ import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -37,9 +36,7 @@ class PythonReplTest(PythonTaskTest):
   @property
   def alias_groups(self):
     return super(PythonReplTest, self).alias_groups.merge(
-        BuildFileAliases.create(targets={'jvm_target': self.JvmTarget,
-                                         'python_requirement_library': PythonRequirementLibrary},
-                                objects={'python_requirement': PythonRequirement}))
+        BuildFileAliases.create(targets={'jvm_target': self.JvmTarget}))
 
   def create_non_python_target(self, relpath, name):
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
@@ -50,38 +47,24 @@ class PythonReplTest(PythonTaskTest):
 
     return self.target(SyntheticAddress(relpath, name).spec)
 
-  def create_python_requirement_library(self, relpath, name, *requirements):
-    def make_requirement(req):
-      return 'python_requirement("{}")'.format(req)
-
-    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
-    python_requirement_library(
-      name='{name}',
-      requirements=[
-        {requirements}
-      ]
-    )
-    """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
-
-    return self.target(SyntheticAddress(relpath, name).spec)
-
   def setUp(self):
     super(PythonReplTest, self).setUp()
 
     SourceRoot.register('3rdparty', PythonRequirementLibrary)
     SourceRoot.register('src', PythonBinary, PythonLibrary)
 
-    self.six = self.create_python_requirement_library('3rdparty/six', 'six', 'six==1.9.0')
+    self.six = self.create_python_requirement_library('3rdparty/six', 'six',
+                                                      requirements=['six==1.9.0'])
     self.requests = self.create_python_requirement_library('3rdparty/requests', 'requests',
-                                                           'requests==2.6.0')
+                                                           requirements=['requests==2.6.0'])
 
-    self.library = self.create_python_library('src/lib', 'lib', 'lib.py', dedent("""
+    self.library = self.create_python_library('src/lib', 'lib', {'lib.py': dedent("""
     import six
 
 
     def go():
       six.print_('go', 'go', 'go!', sep='')
-    """), dependencies=['//3rdparty/six'])
+    """)}, dependencies=['//3rdparty/six'])
 
     self.binary = self.create_python_binary('src/bin', 'bin', 'lib.go', dependencies=['//src/lib'])
 
@@ -107,8 +90,11 @@ class PythonReplTest(PythonTaskTest):
         finally:
           sys.stdin, sys.stdout, sys.stderr = orig_stdin, orig_stdout, orig_stderr
 
-  def do_test_repl(self, code, expected, targets, args=None):
-    python_repl = self.prepare_task(args=args, targets=targets, build_graph=self.build_graph)
+  def do_test_repl(self, code, expected, targets, options=None):
+    if options:
+      self.set_options(**options)
+    python_repl = self.create_task(self.context(target_roots=targets))
+
     with self.new_io('\n'.join(code)) as (inp, out, err):
       python_repl.execute(stdin=inp, stdout=out, stderr=err)
       with open(out.name) as fp:
@@ -168,4 +154,4 @@ class PythonReplTest(PythonTaskTest):
       self.do_test_repl(code=['!head -1 {}'.format(__file__)],
                         expected=[me],
                         targets=[self.six],  # Just to get the repl to pop up.
-                        args=['--test-ipython'])
+                        options={'ipython': True})
