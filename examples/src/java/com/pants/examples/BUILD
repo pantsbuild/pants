@@ -4,7 +4,7 @@ page(
   links=[
     ':3rdparty_jvm',
     ':from_maven',
-    'examples/src/scala/com/pants/example:readme',
+    'examples/src/scala/com/pants/examples:readme',
     'src/docs:publish',
     'src/docs:first_concepts',
     'src/docs:first_tutorial',

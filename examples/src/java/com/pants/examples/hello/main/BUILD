@@ -20,7 +20,7 @@ jvm_binary(name = 'main-bin',
     'examples/src/java/com/pants/examples/hello/greet',
   ],
   resources=[
-    'examples/src/resources/com/pants/example/hello',
+    'examples/src/resources/com/pants/examples/hello',
   ],
   source = 'HelloMain.java',
   main = 'com.pants.examples.hello.main.HelloMain',

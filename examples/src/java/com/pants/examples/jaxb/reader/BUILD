@@ -3,7 +3,7 @@
 
 java_library(name='reader',
   dependencies=[
-    'examples/src/resources/com/pants/example/jaxb',
+    'examples/src/resources/com/pants/examples/jaxb',
   ],
   sources=['VegetableReader.java'],
 )

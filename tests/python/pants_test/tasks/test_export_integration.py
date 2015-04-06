@@ -91,14 +91,14 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
 
   def test_dep_map_for_java_sources(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/src/scala/com/pants/example/scala_with_java_sources'
+      test_target = 'examples/src/scala/com/pants/examples/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir)
       targets = json_data.get('targets')
       self.assertIn('examples/src/java/com/pants/examples/java_sources:java_sources', targets)
 
   def test_sources_and_javadocs(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/src/scala/com/pants/example/scala_with_java_sources'
+      test_target = 'examples/src/scala/com/pants/examples/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir, self._resolve_args)
       scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.4')
       self.assertIsNotNone(scala_lang_lib)

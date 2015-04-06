@@ -5,7 +5,7 @@ jvm_binary(name='main',
   basename='jaxb-example',
   dependencies=[
     'examples/src/java/com/pants/examples/jaxb/reader',
-    'examples/src/resources/com/pants/example/names',
+    'examples/src/resources/com/pants/examples/names',
   ],
   source='ExampleJaxb.java',
   main='com.pants.examples.jaxb.main.ExampleJaxb',

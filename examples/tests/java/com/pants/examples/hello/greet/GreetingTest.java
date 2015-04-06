@@ -19,7 +19,7 @@ public class GreetingTest {
 
   @Test
   public void mentionGreeteeFromResource() throws Exception {
-    String greeting = Greeting.greetFromResource("com/pants/example/hello/world.txt");
+    String greeting = Greeting.greetFromResource("com/pants/examples/hello/world.txt");
     assertTrue(greeting.contains("Resource World"));
   }
 

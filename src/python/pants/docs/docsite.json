@@ -31,7 +31,7 @@
     "publish": "dist/markdown/html/src/docs/publish.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
     "release": "dist/markdown/html/src/python/pants/docs/release.html",
-    "scala": "dist/markdown/html/examples/src/scala/com/pants/example/readme.html",
+    "scala": "dist/markdown/html/examples/src/scala/com/pants/examples/readme.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
     "tshoot": "dist/markdown/html/src/docs/tshoot.html",

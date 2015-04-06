@@ -3,6 +3,6 @@
 
 target(name='hello',
   dependencies = [
-   'examples/src/scala/com/pants/example/hello/exe:exe',
+   'examples/src/scala/com/pants/examples/hello/exe:exe',
   ]
 )

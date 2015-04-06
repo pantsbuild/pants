@@ -3,16 +3,16 @@
 
 scala_library(name = 'jvm-run-example-lib',
   dependencies = [
-    'examples/src/scala/com/pants/example/hello/welcome',
+    'examples/src/scala/com/pants/examples/hello/welcome',
   ],
   sources = ['JvmRunExample.scala'],
-  provides = artifact(org='com.pants.example',
+  provides = artifact(org='com.pants.examples',
                       name='jvm-example-lib',
                       repo=public,)
 )
 
 jvm_binary(name ='jvm-run-example',
-  main = 'com.pants.example.JvmRunExample',
+  main = 'com.pants.examples.JvmRunExample',
   dependencies = [
     ':jvm-run-example-lib',
   ]

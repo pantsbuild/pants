@@ -597,7 +597,7 @@ class Cobertura(_Coverage):
         # the class in @cls
         #    (e.g., 'com/pants/example/hello/welcome/WelcomeEverybody.class')
         # was compiled from the file in @source_file
-        #    (e.g., 'src/scala/com/pants/example/hello/welcome/Welcome.scala')
+        #    (e.g., 'src/scala/com/pants/examples/hello/welcome/Welcome.scala')
         # Note that, in the case of scala files, the path leading up to Welcome.scala does not
         # have to match the path in the corresponding .class file AT ALL. In this example,
         # @source_file could very well have been 'src/hello-kitty/Welcome.scala'.

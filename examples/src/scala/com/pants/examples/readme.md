@@ -12,7 +12,7 @@ Hello Pants Scala
 -----------------
 
 The sample code
-[examples/src/scala/com/pants/example/hello/welcome/](https://github.com/pantsbuild/pants/blob/master/examples/src/scala/com/pants/example/hello/welcome/)
+[examples/src/scala/com/pants/examples/hello/welcome/](https://github.com/pantsbuild/pants/blob/master/examples/src/scala/com/pants/examples/hello/welcome/)
 shows how you can define a library of Scala code.
 
 Its `BUILD` file looks like that for a Java library, but contains a
@@ -21,14 +21,14 @@ Its `BUILD` file looks like that for a Java library, but contains a
 !inc[start-at=scala_library](hello/welcome/BUILD)
 
 There's a sample test in
-[examples/tests/scala/com/pants/example/hello/welcome](https://github.com/pantsbuild/pants/tree/master/examples/tests/scala/com/pants/example/hello/welcome).
+[examples/tests/scala/com/pants/examples/hello/welcome](https://github.com/pantsbuild/pants/tree/master/examples/tests/scala/com/pants/examples/hello/welcome).
 It's a <a xref="bdict_junit_tests">`junit_tests`</a> with `.scala` sources.
 (You might have thought JUnit was only for Java testing, but it also works great
 for Scala. Pants also has a
 <a xref="bdict_scala_specs">`scala_specs`</a> target type for testing with
 Specs.)
 
-!inc[start-at=junit_tests](../../../../../tests/scala/com/pants/example/hello/welcome/BUILD)
+!inc[start-at=junit_tests](../../../../../tests/scala/com/pants/examples/hello/welcome/BUILD)
 
 Scala/Java Circular Dependencies
 --------------------------------
@@ -47,7 +47,7 @@ Do not put the `java_library` in the `scala_library`'s `dependencies` or Pants w
 circular dependencies check. Instead, put the `java_library` in `java_sources` to work around this
 check.
 
-The [`scala_with_java_sources`](https://github.com/pantsbuild/pants/tree/master/examples/src/scala/com/pants/example/scala_with_java_sources)
+The [`scala_with_java_sources`](https://github.com/pantsbuild/pants/tree/master/examples/src/scala/com/pants/examples/scala_with_java_sources)
 example shows how this can work:
 
 !inc[start-at=scala_library](scala_with_java_sources/BUILD)
@@ -70,7 +70,7 @@ To bring up Scala's interactive console, use Pants'
 In the resulting console, you can `import` code from the Pants invocation's
 targets and their dependencies.
 
-    $ ./pants repl examples/src/scala/com/pants/example/hello/welcome
+    $ ./pants repl examples/src/scala/com/pants/examples/hello/welcome
        ...much build output...
     15:08:13 00:11   [resources]
     15:08:13 00:11     [prepare]
@@ -83,13 +83,13 @@ targets and their dependencies.
     Type in expressions to have them evaluated.
     Type :help for more information.
 
-    scala> import com.pants.example.hello.welcome
-    import com.pants.example.hello.welcome
+    scala> import com.pants.examples.hello.welcome
+    import com.pants.examples.hello.welcome
 
     scala> val folks = List("Abel", "Baker", "Charlie", "Delta")
     folks: List[java.lang.String] = List(Abel, Baker, Charlie, Delta)
 
-    scala> com.pants.example.hello.welcome.WelcomeEverybody(folks)
+    scala> com.pants.examples.hello.welcome.WelcomeEverybody(folks)
     res0: Seq[String] = List(Hello, Abel!, Hello, Baker!, Hello, Charlie!, Hello, Delta!)
 
     scala> exit

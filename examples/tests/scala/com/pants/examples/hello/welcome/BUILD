@@ -3,7 +3,7 @@
 
 junit_tests(name='welcome',
   dependencies=[
-    'examples/src/scala/com/pants/example/hello/welcome:welcome',
+    'examples/src/scala/com/pants/examples/hello/welcome:welcome',
     '3rdparty:junit',
     '3rdparty:specs',
   ],

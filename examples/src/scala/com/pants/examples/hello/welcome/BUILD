@@ -9,9 +9,9 @@ scala_library(name='welcome',
   ],
   sources=globs('*.scala'),
   resources = [
-    'examples/src/resources/com/pants/example/hello',
+    'examples/src/resources/com/pants/examples/hello',
   ],
-  provides = artifact(org='com.pants.example.hello',
+  provides = artifact(org='com.pants.examples.hello',
                       name='welcome',
                       repo=public,),
 )

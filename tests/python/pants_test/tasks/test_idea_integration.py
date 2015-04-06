@@ -101,11 +101,11 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
       expected_paths = ["file://" + os.path.join(get_buildroot(), path) for path in [
-        'examples/src/java/com/pants/example/hello',
+        'examples/src/java/com/pants/examples/hello',
         'examples/src/java/com/pants/examples/hello/greet',
         'examples/src/java/com/pants/examples/hello/main',
         'examples/src/java/com/pants/examples/hello/simple',
-        'examples/src/resources/com/pants/example/hello',
+        'examples/src/resources/com/pants/examples/hello',
       ]]
       remaining = set(expected_paths)
       for sourceFolder in self._get_sourceFolders(dom):
