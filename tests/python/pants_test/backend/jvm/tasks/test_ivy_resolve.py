@@ -7,8 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
@@ -82,6 +84,20 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     self.assertNotIn(sources_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
     self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
+
+  def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
+
+    compile_classpath = self.resolve([junit_jar_lib, excluding_target])
+
+    junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
+    excluding_cp = compile_classpath.get_for_target(excluding_target)
+
+    self.assertEquals(0, len(junit_jar_cp))
+    self.assertEquals(0, len(excluding_cp))
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.

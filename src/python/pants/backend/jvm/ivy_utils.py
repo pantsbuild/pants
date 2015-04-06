@@ -110,9 +110,6 @@ class IvyInfo(object):
           if artifact.classifier in valid_classifiers
         )
 
-      if {a.classifier for a in artifacts_for_jar} != valid_classifiers:
-        raise TaskError('Failed to get all artifacts for {}. Found {}'. format(jar, artifacts_for_jar))
-
       artifacts.update(artifacts_for_jar)
     return artifacts
 
