@@ -101,18 +101,19 @@ class IvyInfo(object):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
       jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev)
-      if jar.artifacts:
-        valid_classifiers = [a.classifier for a in jar.artifacts]
-      else:
-        valid_classifiers = [None]
+      valid_classifiers = jar.artifact_classifiers
+      artifacts_for_jar = []
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
-        artifacts_for_ref = [
-                              artifact for artifact in self._artifacts_by_ref[unversioned_ref]
-                              if artifact.classifier in valid_classifiers
-                            ]
+        artifacts_for_jar.extend(
+          artifact for artifact in self._artifacts_by_ref[unversioned_ref]
+          if artifact.classifier in valid_classifiers
+        )
 
-        artifacts.update(artifacts_for_ref)
+      if {a.classifier for a in artifacts_for_jar} != valid_classifiers:
+        raise TaskError('Failed to get all artifacts for {}. Found {}'. format(jar, artifacts_for_jar))
+
+      artifacts.update(artifacts_for_jar)
     return artifacts
 
   def get_jars_for_ivy_module(self, jar, memo=None):

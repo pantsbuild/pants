@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -75,11 +77,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     sources_jar = 'junit-4.12-sources.jar'
     regular_jar = 'junit-4.12.jar'
-    self.assertTrue(any(sources_jar in j[-1] for j in classifier_and_no_classifier_cp), 'expected {} in {}'.format(sources_jar, classifier_and_no_classifier_cp))
-    self.assertTrue(any(regular_jar in j[-1] for j in classifier_and_no_classifier_cp), 'expected {} in {}'.format(regular_jar, classifier_and_no_classifier_cp))
+    self.assertIn(sources_jar, (os.path.basename(j[-1]) for j in classifier_and_no_classifier_cp))
+    self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in classifier_and_no_classifier_cp))
 
-    self.assertTrue(all(sources_jar not in j[-1] for j in no_classifier_cp), 'expected {} to not be in {}'.format(regular_jar, no_classifier_cp))
-    self.assertTrue(any(regular_jar in j[-1] for j in no_classifier_cp), 'expected {} in {}'.format(regular_jar, no_classifier_cp))
+    self.assertNotIn(sources_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
+    self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.

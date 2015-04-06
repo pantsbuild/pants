@@ -222,6 +222,15 @@ class JarDependency(object):
   def coordinate_without_rev(self):
     return (self.org, self.name, self.classifier)
 
+  @property
+  def artifact_classifiers(self):
+      if self.artifacts:
+        return {a.classifier for a in self.artifacts}
+      else:
+        # If there are no artifacts, there's one implicit artifact with the
+        # classifier None.
+        return {None}
+
   def cache_key(self):
     key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
     key += ''.join(sorted(self._configurations))
