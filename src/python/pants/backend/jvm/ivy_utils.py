@@ -128,7 +128,7 @@ class IvyInfo(object):
       if ref != dep:
         s.add(dep)
       return s
-    return self.traverse_dependency_graph(jar, create_collection, memo)
+    return self.traverse_dependency_graph(ref, create_collection, memo)
 
 
 class IvyUtils(object):
