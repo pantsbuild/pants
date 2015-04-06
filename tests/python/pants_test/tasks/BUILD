@@ -183,8 +183,8 @@ python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
   dependencies = [
-    ':base',
     'src/python/pants/backend/core/tasks:console_task',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
