@@ -45,7 +45,7 @@ class WireGenTest(TaskTestBase):
       task,
       'temperatures.proto',
       '''
-        package com.pants.examples.temperature;
+        package org.pantsbuild.example.temperature;
 
         /**
          * Structure for expressing temperature: 75 Fahrenheit, 12 Celsius, etc.
@@ -57,12 +57,12 @@ class WireGenTest(TaskTestBase):
         }
       ''',
       None,
-      ['com/pants/examples/temperature/Temperature.java'])
+      ['org/pantsbuild/example/temperature/Temperature.java'])
 
     self.assert_java_files(
       task,
       'temperatures.proto',
-      'package com.pants.examples.temperature',
+      'package org.pantsbuild.example.temperature',
       None,
       [])
 
@@ -121,7 +121,7 @@ class WireGenTest(TaskTestBase):
       '''
         package pants.preferences;
         option java_multiple_files = true;
-        option java_package = "com.pants.protos.preferences";
+        option java_package = "org.pantsbuild.protos.preferences";
         service SomeService {
           rpc SomeRpc();
           rpc AnotherRpc() {
@@ -130,7 +130,7 @@ class WireGenTest(TaskTestBase):
         }
       ''',
       'com.squareup.wire.SimpleServiceWriter',
-      ['com/pants/protos/preferences/SomeService.java'])
+      ['org/pantsbuild/protos/preferences/SomeService.java'])
 
   def test_calculate_sources(self):
     self.add_to_build_file('wire-lib', dedent('''

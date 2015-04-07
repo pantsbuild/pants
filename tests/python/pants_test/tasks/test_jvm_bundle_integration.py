@@ -13,7 +13,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_of_nonascii_classes(self):
     """JVM classes can have non-ASCII names. Make sure we don't assume ASCII."""
 
-    stdout = self.bundle_and_run('testprojects/src/java/com/pants/testproject/unicode/main',
+    stdout = self.bundle_and_run('testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                  'unicode-testproject')
     self.assertIn("Have a nice day!", stdout)
     self.assertIn("shapeless success", stdout)
@@ -24,7 +24,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     """
     for name in ['a', 'b', 'c']:
       target = ('testprojects/maven_layout/resource_collision/example_{name}/'
-                'src/main/java/com/pants/duplicateres/example{name}/'
+                'src/main/java/org/pantsbuild/duplicateres/example{name}/'
                 .format(name=name))
       bundle_name='example{proj}'.format(proj=name)
       stdout = self.bundle_and_run(target, bundle_name)

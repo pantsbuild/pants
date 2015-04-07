@@ -17,7 +17,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
   def test_ivy_resolve_gives_correct_exception_on_cycles(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
-          'compile', 'testprojects/src/java/com/pants/testproject/cycle1'], workdir)
+          'compile', 'testprojects/src/java/org/pantsbuild/testproject/cycle1'], workdir)
       self.assert_failure(pants_run)
       self.assertIn('Cycle detected', pants_run.stderr_data)
 
@@ -27,7 +27,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       ivy_report_dir = '{workdir}/ivy-report'.format(workdir=workdir)
       pants_run = self.run_pants_with_workdir([
           'compile',
-          'testprojects/src/java/com/pants/testproject/unicode/main',
+          'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
           '--resolve-ivy-report',
           '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)],
           workdir)

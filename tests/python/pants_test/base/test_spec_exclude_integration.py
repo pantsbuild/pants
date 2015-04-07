@@ -18,7 +18,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class Bundles(object):
   """Container class to hold test bundle specifications."""
 
-  phrase_path = 'testprojects/src/java/com/pants/testproject/phrases'
+  phrase_path = 'testprojects/src/java/org/pantsbuild/testproject/phrases'
 
   class Bundle(object):
     def __init__(self, spec, text):
@@ -153,13 +153,13 @@ class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
                                  '--minimize-output-file={0}'.format(tmp_output)])
     self.assert_success(run_result)
     results = output_to_list(tmp_output)
-    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:ten-thousand',
+    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:ten-thousand',
                   results)
-    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:once-upon-a-time',
+    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:once-upon-a-time',
                   results)
-    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:lesser-of-two',
+    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:lesser-of-two',
                   results)
-    self.assertIn('testprojects/src/java/com/pants/testproject/phrases:there-was-a-duck',
+    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
                   results)
 
     tmp_output = os.path.join(tempdir, 'minimize-output2.txt')
@@ -171,17 +171,17 @@ class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
                                 config={
                                     'DEFAULT': {
                                         'spec_excludes': [
-                                            'testprojects/src/java/com/pants/testproject/phrases'
+                                            'testprojects/src/java/org/pantsbuild/testproject/phrases'
                                         ]
                                     }
                                 })
     self.assert_success(run_result)
     results = output_to_list(tmp_output)
-    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:ten-thousand',
+    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:ten-thousand',
                      results)
-    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:once-upon-a-time',
+    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:once-upon-a-time',
                      results)
-    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:lesser-of-two',
+    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:lesser-of-two',
                      results)
-    self.assertNotIn('testprojects/src/java/com/pants/testproject/phrases:there-was-a-duck',
+    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
                      results)

@@ -137,7 +137,7 @@ class ProtobufGenTest(TaskTestBase):
       task,
       'inner_class.proto',
       '''
-        package com.pants.protos;
+        package org.pantsbuild.protos;
         option java_multiple_files = true;
         message Foo {
           enum Bar {
@@ -145,35 +145,35 @@ class ProtobufGenTest(TaskTestBase):
           }
         }
       ''',
-      ['com/pants/protos/InnerClass.java',
-       'com/pants/protos/Foo.java',
-       'com/pants/protos/FooOrBuilder.java'])
+      ['org/pantsbuild/protos/InnerClass.java',
+       'org/pantsbuild/protos/Foo.java',
+       'org/pantsbuild/protos/FooOrBuilder.java'])
 
     self.assert_java_files(
       task,
       'Camel-case.proto',
       '''
         package pants.preferences;
-        option java_package = "com.pants.protos.preferences";
+        option java_package = "org.pantsbuild.protos.preferences";
       ''',
-      ['com/pants/protos/preferences/CamelCase.java'])
+      ['org/pantsbuild/protos/preferences/CamelCase.java'])
 
     self.assert_java_files(
       task,
       'curly_braces.proto',
       '''
         package pants.preferences;
-        option java_package = "com.pants.protos.preferences";
+        option java_package = "org.pantsbuild.protos.preferences";
         option java_multiple_files = true;
         message Wat { message Inner { option meh = true; }
           option Inner field = 1;
         }
         service SomeService { rpc AndAnother() {} }
       ''',
-      ['com/pants/protos/preferences/CurlyBraces.java',
-       'com/pants/protos/preferences/SomeService.java',
-       'com/pants/protos/preferences/Wat.java',
-       'com/pants/protos/preferences/WatOrBuilder.java'])
+      ['org/pantsbuild/protos/preferences/CurlyBraces.java',
+       'org/pantsbuild/protos/preferences/SomeService.java',
+       'org/pantsbuild/protos/preferences/Wat.java',
+       'org/pantsbuild/protos/preferences/WatOrBuilder.java'])
 
     self.assert_java_files(
       task,
@@ -181,7 +181,7 @@ class ProtobufGenTest(TaskTestBase):
       '''
         package pants.preferences;
         option java_multiple_files = true;
-        option java_package = "com.pants.protos.preferences";
+        option java_package = "org.pantsbuild.protos.preferences";
         message AnotherMessage {
           BAZ = 0;
         }
@@ -197,12 +197,12 @@ class ProtobufGenTest(TaskTestBase):
           MEH = 0;
         }
       ''',
-      ['com/pants/protos/preferences/Pants.java',
-       'com/pants/protos/preferences/AnotherMessage.java',
-       'com/pants/protos/preferences/AnotherMessageOrBuilder.java',
-       'com/pants/protos/preferences/SomeService.java',
-       'com/pants/protos/preferences/MessageAfterService.java',
-       'com/pants/protos/preferences/MessageAfterServiceOrBuilder.java'])
+      ['org/pantsbuild/protos/preferences/Pants.java',
+       'org/pantsbuild/protos/preferences/AnotherMessage.java',
+       'org/pantsbuild/protos/preferences/AnotherMessageOrBuilder.java',
+       'org/pantsbuild/protos/preferences/SomeService.java',
+       'org/pantsbuild/protos/preferences/MessageAfterService.java',
+       'org/pantsbuild/protos/preferences/MessageAfterServiceOrBuilder.java'])
 
   def test_same_contents(self):
     dup1 = self.create_file('src/dup1.proto', dedent('''

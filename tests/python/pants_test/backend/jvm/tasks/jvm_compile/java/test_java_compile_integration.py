@@ -23,7 +23,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
     pants_run = self.run_pants_with_workdir([
         'compile',
-        'testprojects/src/java/com/pants/testproject/unicode/main'],
+        'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
         workdir)
     self.assert_success(pants_run)
 
@@ -56,7 +56,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
           ['compile', 'compile.java', '--strategy={}'.format(strategy), '--partition-size-hint=1',
-           'testprojects/src/java/com/pants/testproject/publish/hello/main:',
+           'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main:',
          ],
           workdir, config)
         self.assert_success(pants_run)
@@ -65,14 +65,14 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
   def test_nocache(self, strategy):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
-                                  'testprojects.src.java.com.pants.testproject.nocache.nocache')
+                                  'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
       good_artifact_dir = os.path.join(cache_dir, 'JavaCompile',
-                                  'testprojects.src.java.com.pants.testproject.nocache.cache_me')
+                                  'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(['compile.java',
                                   '--strategy={}'.format(strategy),
-                                  'testprojects/src/java/com/pants/testproject/nocache::'],
+                                  'testprojects/src/java/org/pantsbuild/testproject/nocache::'],
                                  config)
       self.assert_success(pants_run)
 
@@ -89,12 +89,12 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, 'JavaCompile',
-                                  'testprojects.src.java.com.pants.testproject.unicode.main.main')
+                                  'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(['compile.java',
                                   '--strategy={}'.format(strategy),
-                                  'testprojects/src/java/com/pants/testproject/unicode/main'],
+                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
 
@@ -105,7 +105,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(['compile.java',
                                   '--target=1.7',
                                   '--strategy={}'.format(strategy),
-                                  'testprojects/src/java/com/pants/testproject/unicode/main'],
+                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
 
@@ -119,14 +119,14 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, 'JavaCompile',
-                                  'testprojects.src.java.com.pants.testproject.annotation.main.main')
+                                  'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main')
       config = {'compile.java': {'write_artifact_caches': [cache_dir]}}
 
       pants_run = self.run_pants(['compile.java',
                                   '--strategy={}'.format(strategy),
                                   'compile.apt',
                                   '--strategy={}'.format(strategy),
-                                  'testprojects/src/java/com/pants/testproject/annotation/main'],
+                                  'testprojects/src/java/org/pantsbuild/testproject/annotation/main'],
                                  config)
       self.assert_success(pants_run)
 
@@ -152,8 +152,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
         with open(reports[0]) as fp:
           annotated_classes = [line.rstrip() for line in fp.read().splitlines()]
           self.assertEquals(
-            {'com.pants.testproject.annotation.main.Main',
-             'com.pants.testproject.annotation.main.Main$TestInnerClass'},
+            {'org.pantsbuild.testproject.annotation.main.Main',
+             'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))
 
   def _whitelist_test(self, target, fatal_flag, whitelist):
@@ -175,14 +175,14 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
   def test_java_compile_missing_dep_analysis_whitelist(self):
     self._whitelist_test(
-      'testprojects/src/java/com/pants/testproject/missingdepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist',
       '--compile-java-missing-deps=fatal',
-      'testprojects/src/java/com/pants/testproject/missingdepswhitelist2'
+      'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2'
     )
 
   def test_java_compile_missing_direct_dep_analysis_whitelist(self):
     self._whitelist_test(
-      'testprojects/src/java/com/pants/testproject/missingdirectdepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
       '--compile-java-missing-direct-deps=fatal',
-      'testprojects/src/java/com/pants/testproject/missingdirectdepswhitelist'
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist'
     )

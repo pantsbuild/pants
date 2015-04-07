@@ -21,14 +21,14 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(self.run_pants(['clean-all']))
 
     pants_run = self.run_pants(['compile',
-                                'examples/src/java/com/pants/examples/wire/temperature'])
+                                'examples/src/java/org/pantsbuild/example/wire/temperature'])
     self.assert_success(pants_run)
 
     expected_outputs = [
       'Compiling proto source file',
       'Created output directory',
       'Writing generated code',
-      '/gen/wire/gen-java/com/pants/examples/temperature/Temperature.java',
+      '/gen/wire/gen-java/org/pantsbuild/example/temperature/Temperature.java',
     ]
     for expected_output in expected_outputs:
       self.assertIn(expected_output, pants_run.stdout_data)
@@ -36,12 +36,12 @@ class WireIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_wire_normal(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',
-                                'examples/src/java/com/pants/examples/wire/temperature'])
+                                'examples/src/java/org/pantsbuild/example/wire/temperature'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-temperature-example-bundle')
 
     java_run = subprocess.Popen(['java', '-cp', 'wire-temperature-example.jar',
-                                 'com.pants.examples.wire.temperature.WireTemperatureExample'],
+                                 'org.pantsbuild.example.wire.temperature.WireTemperatureExample'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()
@@ -52,12 +52,12 @@ class WireIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_wire_dependent_targets(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',
-                                'examples/src/java/com/pants/examples/wire/element'])
+                                'examples/src/java/org/pantsbuild/example/wire/element'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-element-example-bundle')
 
     java_run = subprocess.Popen(['java', '-cp', 'wire-element-example.jar',
-                                 'com.pants.examples.wire.element.WireElementExample'],
+                                 'org.pantsbuild.example.wire.element.WireElementExample'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()

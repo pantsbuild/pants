@@ -26,8 +26,8 @@ class ZincAnalysisElement(object):
 
   products:
   123 items
-  com/pants/Foo.scala -> com/pants/Foo.class
-  com/pants/Foo.scala -> com/pants/Foo$.class
+  org/pantsbuild/Foo.scala -> org/pantsbuild/Foo.class
+  org/pantsbuild/Foo.scala -> org/pantsbuild/Foo$.class
   ...
 
   Related consecutive sections are bundled together in "elements". E.g., the Stamps element
@@ -43,7 +43,7 @@ class ZincAnalysisElement(object):
     # self.args is a list of maps from key to list of values. Each map corresponds to a
     # section in the analysis file. E.g.,
     #
-    # 'com/pants/Foo.scala': ['com/pants/Foo.class', 'com/pants/Foo$.class']
+    # 'org/pantsbuild/Foo.scala': ['org/pantsbuild/Foo.class', 'org/pantsbuild/Foo$.class']
     #
     # Subclasses can alias the elements of self.args in their own __init__, for convenience.
     self.args = []

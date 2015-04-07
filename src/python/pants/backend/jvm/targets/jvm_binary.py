@@ -246,7 +246,7 @@ class JvmBinary(JvmTarget):
                **kwargs):
     """
     :param string main: The name of the ``main`` class, e.g.,
-      ``'com.pants.examples.hello.main.HelloMain'``. This class may be
+      ``'org.pantsbuild.example.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
     :param string basename: Base name for the generated ``.jar`` file, e.g.,
       ``'hello'``. (By default, uses ``name`` param)

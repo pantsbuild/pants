@@ -40,35 +40,35 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
 
   def test_export_code_gen(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
+      test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir)
-      thrift_target_name = 'examples.src.thrift.com.pants.examples.precipitation.precipitation-java'
+      thrift_target_name = 'examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java'
       codegen_target = os.path.join(os.path.relpath(workdir, get_buildroot()),
                                     'gen/thrift/combined/gen-java:%s' % thrift_target_name)
       self.assertIn(codegen_target, json_data.get('targets'))
 
   def test_export_json_transitive_jar(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
+      test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir)
       targets = json_data.get('targets')
       self.assertIn('org.hamcrest:hamcrest-core:1.3', targets[test_target]['libraries'])
 
   def test_export_jar_path_with_excludes(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'testprojects/src/java/com/pants/testproject/exclude:foo'
+      test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
       json_data = self.run_export(test_target, workdir, ['resolve'])
       self.assertIsNone(json_data.get('libraries').get('com.typesafe.sbt:incremental-compiler:0.13.7'))
 
   def test_export_jar_path_with_excludes_soft(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'testprojects/src/java/com/pants/testproject/exclude:'
+      test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
       json_data = self.run_export(test_target, workdir, ['resolve', '--resolve-ivy-soft-excludes'])
       self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
 
   def test_export_jar_path(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/tests/java/com/pants/examples/usethrift:usethrift'
+      test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, self._resolve_args)
       # Hack because Bootstrapper.instance() reads config from cache. Will go away after we plumb
       # options into IvyUtil properly.
@@ -91,14 +91,14 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
 
   def test_dep_map_for_java_sources(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/src/scala/com/pants/example/scala_with_java_sources'
+      test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir)
       targets = json_data.get('targets')
-      self.assertIn('examples/src/java/com/pants/examples/java_sources:java_sources', targets)
+      self.assertIn('examples/src/java/org/pantsbuild/example/java_sources:java_sources', targets)
 
   def test_sources_and_javadocs(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      test_target = 'examples/src/scala/com/pants/example/scala_with_java_sources'
+      test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir, self._resolve_args)
       scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.4')
       self.assertIsNotNone(scala_lang_lib)

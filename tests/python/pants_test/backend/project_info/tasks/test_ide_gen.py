@@ -20,8 +20,8 @@ class IdeGenTest(BaseTest):
     SourceRoot.register("src/java", JavaLibrary)
     SourceRoot.register("tests/java", JavaTests)
     source_sets = [
-      SourceSet("/repo-root", "src/java", "com/pants/app", False),
-      SourceSet("/repo-root", "tests/java", "com/pants/app", True),
+      SourceSet("/repo-root", "src/java", "org/pantsbuild/app", False),
+      SourceSet("/repo-root", "tests/java", "org/pantsbuild/app", True),
       SourceSet("/repo-root", "some/other", "path", False),
     ]
 
@@ -36,9 +36,9 @@ class IdeGenTest(BaseTest):
     self.assertFalse(results[2].is_test)
 
   def test_source_set(self):
-    source_set1 = SourceSet("repo-root", "path/to/build", "com/pants/project", False)
+    source_set1 = SourceSet("repo-root", "path/to/build", "org/pantsbuild/project", False)
     # only the first 3 parameters are considered keys
-    self.assertEquals(("repo-root", "path/to/build", "com/pants/project"), source_set1._key_tuple)
-    source_set2 = SourceSet("repo-root", "path/to/build", "com/pants/project", True)
+    self.assertEquals(("repo-root", "path/to/build", "org/pantsbuild/project"), source_set1._key_tuple)
+    source_set2 = SourceSet("repo-root", "path/to/build", "org/pantsbuild/project", True)
     # Don't consider the test flag
     self.assertEquals(source_set1, source_set2)

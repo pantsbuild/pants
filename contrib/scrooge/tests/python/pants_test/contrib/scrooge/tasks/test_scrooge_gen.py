@@ -80,7 +80,7 @@ class ScroogeGenTest(TaskTestBase):
       ScroogeGen._validate(options, [self.target('test_validate:three')])
 
   def test_smoke(self):
-    contents = dedent('''namespace java com.pants.example
+    contents = dedent('''namespace java org.pantsbuild.example
       struct Example {
       1: optional i64 number
       }
@@ -106,7 +106,7 @@ class ScroogeGenTest(TaskTestBase):
       task._outdir.return_value = self.task_outdir
 
       task.gen = MagicMock()
-      sources = [os.path.join(self.task_outdir, 'com/pants/example/Example.scala')]
+      sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
       task.gen.return_value = {'test_smoke/a.thrift': sources}
 
       saved_add_new_target = Context.add_new_target
