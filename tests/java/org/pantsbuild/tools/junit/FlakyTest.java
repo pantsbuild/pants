@@ -4,11 +4,10 @@
 package org.pantsbuild.tools.junit;
 
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
-
-import junit.framework.Assert;
 
 /**
  * Contains tests that pass only after some number of retries. Used in

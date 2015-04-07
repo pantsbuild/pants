@@ -4,6 +4,7 @@
 java_tests(
   name='junit',
   dependencies=[
+    '3rdparty:junit',
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit',
   ],

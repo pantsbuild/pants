@@ -48,6 +48,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 
+import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
 /**
@@ -496,65 +497,38 @@ public class ConsoleRunner {
      * Command line option bean.
      */
     class Options {
-      private boolean failFast = false;
-      private boolean suppressOutput = false;
-      private boolean xmlReport = false;
-      private boolean perTestTimer = false;
-      private boolean defaultParallel = false;
-      private int parallelThreads = 0;
-      private int testShard = 0;
-      private int numTestShards = 0;
-      private int numRetries = 0;
-      private File outdir = new File(System.getProperty("java.io.tmpdir"));
-      private List<String> tests = Lists.newArrayList();
-
-      private CmdLineParser parser;
-
-      void setParser(CmdLineParser parser) {
-        this.parser = parser;
-      }
-
       @Option(name = "-fail-fast", usage = "Causes the test suite run to fail fast.")
-      public void setFailFast(boolean failFast) {
-        this.failFast = failFast;
-      }
+      private boolean failFast;
 
       @Option(name = "-suppress-output", usage = "Suppresses test output.")
-      public void setSuppressOutput(boolean suppressOutput) {
-        this.suppressOutput = suppressOutput;
-      }
+      private boolean suppressOutput;
 
       @Option(name = "-xmlreport",
               usage = "Create ant compatible junit xml report files in -outdir.")
-      public void setXmlReport(boolean xmlReport) {
-        this.xmlReport = xmlReport;
-      }
+      private boolean xmlReport;
 
       @Option(name = "-outdir",
               usage = "Directory to output test captures too.  Only used if -suppress-output or "
                       + "-xmlreport is set.")
-      public void setOutdir(File outdir) {
-        this.outdir = outdir;
-      }
+      private File outdir = new File(System.getProperty("java.io.tmpdir"));
 
       @Option(name = "-per-test-timer",
           usage = "Show progress and timer for each test class.")
-      public void setPerTestTimer(boolean perTestTimer) {
-        this.perTestTimer = perTestTimer;
-      }
+      private boolean perTestTimer;
 
       @Option(name = "-default-parallel",
           usage = "Whether to run test classes without @TestParallel or @TestSerial in parallel.")
-      public void setDefaultParallel(boolean defaultParallel) {
-        this.defaultParallel = defaultParallel;
-      }
+      private boolean defaultParallel;
+
+      private int parallelThreads = 0;
 
       @Option(name = "-parallel-threads",
           usage = "Number of threads to execute tests in parallel. Must be positive, "
               + "or 0 to set automatically.")
-      public void setParallelThreads(int parallelThreads) throws CmdLineException {
+      public void setParallelThreads(int parallelThreads) {
         if (parallelThreads < 0) {
-          throw new CmdLineException(parser, "-parallel-threads cannot be negative");
+          throw new InvalidCmdLineArgumentException(
+              "-parallel-threads", parallelThreads, "-parallel-threads cannot be negative");
         }
         this.parallelThreads = parallelThreads;
         if (parallelThreads == 0) {
@@ -562,31 +536,38 @@ public class ConsoleRunner {
         }
       }
 
+      private int testShard;
+      private int numTestShards;
+
       @Option(name = "-test-shard",
           usage = "Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means "
                   + "run tests number 2, 5, 8, 11, ...")
-      public void setTestShard(String shard) throws CmdLineException {
+      public void setTestShard(String shard) {
         String errorMsg = "-test-shard should be in the form M/N";
         int slashIdx = shard.indexOf('/');
         if (slashIdx < 0) {
-          throw new CmdLineException(parser, errorMsg);
+          throw new InvalidCmdLineArgumentException("-test-shard", shard, errorMsg);
         }
         try {
           this.testShard = Integer.parseInt(shard.substring(0, slashIdx));
           this.numTestShards = Integer.parseInt(shard.substring(slashIdx + 1));
         } catch (NumberFormatException ex) {
-          throw new CmdLineException(parser, errorMsg);
+          throw new InvalidCmdLineArgumentException("-test-shard", shard, errorMsg);
         }
         if (testShard < 0 || numTestShards <= 0 || testShard >= numTestShards) {
-          throw new CmdLineException(parser, "0 <= M < N is required in -test-shard M/N");
+          throw new InvalidCmdLineArgumentException(
+              "-test-shard", shard, "0 <= M < N is required in -test-shard M/N");
         }
       }
 
+      private int numRetries;
+
       @Option(name = "-num-retries",
           usage = "Number of attempts to retry each failing test, 0 by default")
-      public void setNumRetries(int numRetries) throws CmdLineException {
+      public void setNumRetries(int numRetries) {
         if (numRetries < 0) {
-          throw new CmdLineException(parser, "-num-retries cannot be negative");
+          throw new InvalidCmdLineArgumentException(
+              "-num-retries", numRetries, "-num-retries cannot be negative");
         }
         this.numRetries = numRetries;
       }
@@ -597,18 +578,18 @@ public class ConsoleRunner {
                 required = true,
                 metaVar = "TESTS",
                 handler = StringArrayOptionHandler.class)
-      public void setTests(String[] tests) {
-        this.tests = Arrays.asList(tests);
-      }
+      private String[] tests = {};
     }
 
     Options options = new Options();
     CmdLineParser parser = new CmdLineParser(options);
-    options.setParser(parser);
     try {
       parser.parseArgument(args);
     } catch (CmdLineException e) {
-      e.getParser().printUsage(System.out);
+      parser.printUsage(System.out);
+      exit(1);
+    } catch(InvalidCmdLineArgumentException e) {
+      parser.printUsage(System.out);
       exit(1);
     }
 
