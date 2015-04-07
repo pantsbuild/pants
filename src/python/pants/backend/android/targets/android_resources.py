@@ -17,7 +17,6 @@ class AndroidResources(AndroidTarget):
   def __init__(self,
                resource_dir=None,
                **kwargs):
-    #TODO(mateor) change resource_dir from string into list
     """
     :param string resource_dir: path/to/directory containing Android resource files,
      often named 'res'.

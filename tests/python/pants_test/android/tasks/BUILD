@@ -4,7 +4,9 @@
 target(
   name='tasks',
   dependencies=[
+    ':aapt_builder',
     ':aapt_gen',
+    ':aapt_task',
     ':sign_apk',
     ':zipalign',
   ],
@@ -14,9 +16,22 @@ target(
   name = 'integration',
   dependencies = [
     ':aapt_builder_integration',
+    ':aapt_gen_integration',
     ':dx_compile_integration',
     ':sign_apk_integration',
     ':zipalign_integration',
+  ],
+)
+
+python_tests(
+  name = 'aapt_builder',
+  sources = [
+    'test_aapt_builder.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android/tasks:aapt_builder',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/android:android_base',
   ],
 )
 
@@ -26,6 +41,7 @@ python_tests(
     'test_aapt_builder_integration.py',
   ],
   dependencies = [
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/android:android_integration_test',
   ],
 )
@@ -37,6 +53,29 @@ python_tests(
   ],
   dependencies = [
     'src/python/pants/backend/android/tasks:all',
+    'tests/python/pants_test/android:android_base',
+  ],
+)
+
+python_tests(
+  name = 'aapt_gen_integration',
+  sources = [
+    'test_aapt_gen_integration.py',
+  ],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/android:android_integration_test',
+  ],
+)
+
+python_tests(
+  name = 'aapt_task',
+  sources = [
+    'test_aapt_task.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android/tasks:all',
+    'tests/python/pants_test/android:android_base',
   ],
 )
 
