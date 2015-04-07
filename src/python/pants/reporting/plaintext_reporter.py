@@ -79,8 +79,8 @@ class PlainTextReporter(Reporter):
         all([not x.has_label(WorkUnit.MULTITOOL) and not x.has_label(WorkUnit.BOOTSTRAP)
              for x in workunit.parent.ancestors()]):
       # Bootstrapping can be chatty, so don't show anything for its sub-workunits.
-      self.emit(b'\n%s %s %s[%s]' %
-                       (workunit.start_time_string(),
+      self.emit(b'\n{} {} {}[{}]'.format(
+                        workunit.start_time_string(),
                         workunit.start_delta_string(),
                         self._indent(workunit),
                         workunit.name if self.settings.indent else workunit.path()))
@@ -99,7 +99,7 @@ class PlainTextReporter(Reporter):
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
       # Emit the suppressed workunit output, if any, to aid in debugging the problem.
       for name, outbuf in workunit.outputs().items():
-        self.emit(self._prefix(workunit, b'\n==== %s ====\n' % name))
+        self.emit(self._prefix(workunit, b'\n==== {} ====\n'.format(name)))
         self.emit(self._prefix(workunit, outbuf.read_from(0)))
         self.flush()
 
@@ -149,12 +149,12 @@ class PlainTextReporter(Reporter):
     return workunit.has_label(WorkUnit.REPL) or workunit.has_label(WorkUnit.RUN)
 
   def _format_aggregated_timings(self, aggregated_timings):
-    return b'\n'.join([b'%(timing).3f %(label)s' % x for x in aggregated_timings.get_all()])
+    return b'\n'.join([b'{timing:.3} {label}'.format(**x) for x in aggregated_timings.get_all()])
 
   def _format_artifact_cache_stats(self, artifact_cache_stats):
     stats = artifact_cache_stats.get_all()
     return b'No artifact cache reads.' if not stats else \
-    b'\n'.join([b'%(cache_name)s - Hits: %(num_hits)d Misses: %(num_misses)d' % x
+    b'\n'.join([b'{cache_name} - Hits: {num_hits} Misses: {num_misses}'.format(**x)
                 for x in stats])
 
   def _indent(self, workunit):

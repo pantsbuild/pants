@@ -48,7 +48,7 @@ def resolve_multi(python_setup,
   distributions = dict()
   interpreter = interpreter or PythonInterpreter.get()
   if not isinstance(interpreter, PythonInterpreter):
-    raise TypeError('Expected interpreter to be a PythonInterpreter, got %s' % type(interpreter))
+    raise TypeError('Expected interpreter to be a PythonInterpreter, got {}'.format(type(interpreter)))
 
   cache = os.path.join(python_setup.scratch_dir, 'eggs')
   platforms = get_platforms(platforms or python_setup.platforms)

@@ -81,8 +81,8 @@ class RunTracker(object):
 
     # run_id is safe for use in paths.
     millis = (self.run_timestamp * 1000) % 1000
-    run_id = 'pants_run_%s_%d' % \
-             (time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
+    run_id = 'pants_run_{}_{}'.format(
+               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 
     self.run_info_dir = os.path.join(info_dir, run_id)
     self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
@@ -237,7 +237,7 @@ class RunTracker(object):
     """Send timing results to URL specified in pants.ini"""
     def error(msg):
       # Report aleady closed, so just print error.
-      print("WARNING: Failed to upload stats to %s due to %s" % (self.stats_url, msg), file=sys.stderr)
+      print("WARNING: Failed to upload stats to {} due to {}".format(self.stats_url, msg), file=sys.stderr)
 
     if self.stats_url:
       params = {
@@ -257,9 +257,9 @@ class RunTracker(object):
         http_conn.request('POST', url.path, urllib.urlencode(params), headers)
         resp = http_conn.getresponse()
         if resp.status != 200:
-          error("HTTP error code: %d" % resp.status)
+          error("HTTP error code: {}".format(resp.status))
       except Exception as e:
-        error("Error: %s" % e)
+        error("Error: {}".format(e))
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 

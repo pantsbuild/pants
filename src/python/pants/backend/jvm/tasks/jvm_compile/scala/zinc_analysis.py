@@ -94,13 +94,13 @@ class ZincAnalysisElement(object):
     items = []
     for k, vals in rep.items():
       for v in vals:
-        item = rebase('%s -> %s%s' % (k, '' if inline_vals else '\n', v))
+        item = rebase('{} -> {}{}'.format(k, '' if inline_vals else '\n', v))
         if item:
           items.append(item)
 
     items.sort()
     outfile.write(header + ':\n')
-    outfile.write('%d items\n' % len(items))
+    outfile.write('{} items\n'.format(len(items)))
     for item in items:
       outfile.write(item)
       outfile.write('\n')
@@ -231,7 +231,7 @@ class ZincAnalysis(Analysis):
     compilation_vals = sorted(set([x[0] for a in analyses for x in a.compilations.compilations.itervalues()]))
     compilations_dict = defaultdict(list)
     for i, v in enumerate(compilation_vals):
-      compilations_dict['%03d' % i] = [v]
+      compilations_dict['{:03}'.format(int(i))] = [v]
     compilations = Compilations((compilations_dict, ))
 
     return ZincAnalysis(compile_setup, relations, stamps, apis, source_infos, compilations)

@@ -58,7 +58,7 @@ class RootedProducts(object):
   def add_abs_paths(self, abs_paths):
     for abs_path in abs_paths:
       if not abs_path.startswith(self._root):
-        raise Exception('%s is not under %s' % (abs_path, self._root))
+        raise Exception('{} is not under {}'.format(abs_path, self._root))
       self._rel_paths.add(os.path.relpath(abs_path, self._root))
 
   def add_rel_paths(self, rel_paths):
@@ -203,10 +203,10 @@ class Products(object):
       return keys
 
     def __repr__(self):
-      return 'ProductMapping(%s) {\n  %s\n}' % (self.typename, '\n  '.join(
-        '%s => %s\n    %s' % (str(target), basedir, outputs)
-                              for target, outputs_by_basedir in self.by_target.items()
-                              for basedir, outputs in outputs_by_basedir.items()))
+      return 'ProductMapping({}) {{\n  {}\n}}'.format(self.typename, '\n  '.join(
+          '{} => {}\n    {}'.format(str(target), basedir, outputs)
+          for target, outputs_by_basedir in self.by_target.items()
+          for basedir, outputs in outputs_by_basedir.items()))
 
     def __bool__(self):
       return not self.empty()

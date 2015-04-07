@@ -51,4 +51,4 @@ class AptCompile(JavaCompile):
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:
       for processor in processors:
-        f.write('%s\n' % processor.strip())
+        f.write('{}\n'.format(processor.strip()))

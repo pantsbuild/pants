@@ -108,5 +108,5 @@ class JvmRun(JvmTask):
         with safe_open(expand_path(self.only_write_cmd_line), 'w') as outfile:
           outfile.write(' '.join(executor.cmd))
       elif result != 0:
-        raise TaskError('java %s ... exited non-zero (%i)' % (binary.main, result),
+        raise TaskError('java {} ... exited non-zero ({})'.format(binary.main, result),
                         exit_code=result)

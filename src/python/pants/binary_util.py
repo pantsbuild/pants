@@ -198,7 +198,7 @@ def safe_args(args,
     def create_argfile(fp):
       fp.write(delimiter.join(args))
       fp.close()
-      return [quoter(fp.name) if quoter else '@%s' % fp.name]
+      return [quoter(fp.name) if quoter else '@{}'.format(fp.name)]
 
     if argfile:
       try:
@@ -221,8 +221,8 @@ def _mac_open(files):
 def _linux_open(files):
   cmd = "xdg-open"
   if not _cmd_exists(cmd):
-    raise TaskError("The program '%s' isn't in your PATH. Please install and re-run this "
-                    "goal." % cmd)
+    raise TaskError("The program '{}' isn't in your PATH. Please install and re-run this "
+                    "goal.".format(cmd))
   for f in list(files):
     subprocess.call([cmd, f])
 

@@ -45,7 +45,7 @@ class BundleCreate(JvmBinaryTask):
       return isinstance(target, (JvmApp, JvmBinary))
 
     def __init__(self, target):
-      assert self.is_app(target), '%s is not a valid app target' % target
+      assert self.is_app(target), '{} is not a valid app target'.format(target)
 
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
@@ -63,7 +63,7 @@ class BundleCreate(JvmBinaryTask):
             app.basename,
             prefix=app.basename if self._prefix else None
           )
-          self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
+          self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
   def bundle(self, app):
     """Create a self-contained application bundle.
@@ -80,7 +80,7 @@ class BundleCreate(JvmBinaryTask):
         raise e
 
     bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
-    self.context.log.info('creating %s' % os.path.relpath(bundle_dir, get_buildroot()))
+    self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
 

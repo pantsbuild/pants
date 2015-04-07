@@ -35,7 +35,7 @@ class AggregatedTimings(object):
     if self._path and os.path.exists(os.path.dirname(self._path)):
       with open(self._path, 'w') as f:
         for x in self.get_all():
-          f.write('%(label)s: %(timing)s\n' % x)
+          f.write('{label}: {timing}\n'.format(**x))
 
   def get_all(self):
     """Returns all the timings, sorted in decreasing order.

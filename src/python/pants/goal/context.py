@@ -155,7 +155,7 @@ class Context(object):
 
   def __str__(self):
     ident = Target.identify(self.targets())
-    return 'Context(id:%s, targets:%s)' % (ident, self.targets())
+    return 'Context(id:{}, targets:{})'.format(ident, self.targets())
 
   def submit_foreground_work_and_wait(self, work, workunit_parent=None):
     """Returns the pool to which tasks can submit foreground (blocking) work."""

@@ -90,16 +90,16 @@ class Filter(ConsoleTask):
       try:
         # Try to do a fully qualified import 1st for filtering on custom types.
         from_list, module, type_name = name.rsplit('.', 2)
-        module = __import__('%s.%s' % (from_list, module), fromlist=[from_list])
+        module = __import__('{}.{}'.format(from_list, module), fromlist=[from_list])
         target_type = getattr(module, type_name)
       except (ImportError, ValueError):
         # Fall back on pants provided target types.
         registered_aliases = self.context.build_file_parser.registered_aliases()
         if name not in registered_aliases.targets:
-          raise TaskError('Invalid type name: %s' % name)
+          raise TaskError('Invalid type name: {}'.format(name))
         target_type = registered_aliases.targets[name]
       if not issubclass(target_type, Target):
-        raise TaskError('Not a Target type: %s' % name)
+        raise TaskError('Not a Target type: {}'.format(name))
       return lambda target: isinstance(target, target_type)
     self._filters.extend(_create_filters(self.get_options().type, filter_for_type))
 

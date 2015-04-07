@@ -42,7 +42,7 @@ class _Exiter(object):
     if self._is_print_backtrace:
       msg = '\nException caught:\n' + ''.join(self._format_tb(tb))
     if str(exception):
-      msg += '\nException message: %s\n' % str(exception)
+      msg += '\nException message: {!s}\n'.format(exception)
     else:
       msg += '\nNo specific exception message.\n'
     # TODO(Jin Feng) Always output the unhandled exception details into a log file.
@@ -66,7 +66,7 @@ def _run(exiter):
 
   root_dir = get_buildroot()
   if not os.path.exists(root_dir):
-    exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: %s' % root_dir)
+    exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: {}'.format(root_dir))
 
   goal_runner = GoalRunner(root_dir)
   goal_runner.setup()

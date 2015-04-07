@@ -413,4 +413,4 @@ class Parser(object):
     self._frozen = True
 
   def __str__(self):
-    return 'Parser(%s)' % self._scope
+    return 'Parser({})'.format(self._scope)

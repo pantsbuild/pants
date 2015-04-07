@@ -16,8 +16,8 @@ _PREFIX = r'(https?://)?/?' # http://, https:// or / or nothing.
 _OPTIONAL_PORT = r'(:\d+)?'
 _REL_PATH_COMPONENT = r'(\w|[-.])+'  # One or more alphanumeric, underscore, dash or dot.
 _ABS_PATH_COMPONENT = r'/' + _REL_PATH_COMPONENT
-_ABS_PATH_COMPONENTS = r'(%s)+' % _ABS_PATH_COMPONENT
-_OPTIONAL_TARGET_SUFFIX = r'(:%s)?' % _REL_PATH_COMPONENT  # For /foo/bar:target.
+_ABS_PATH_COMPONENTS = r'({})+'.format(_ABS_PATH_COMPONENT)
+_OPTIONAL_TARGET_SUFFIX = r'(:{})?'.format(_REL_PATH_COMPONENT)  # For /foo/bar:target.
 
 # Note that we require at least two path components.
 # We require the last characgter to be alphanumeric or underscore, because some tools print an
@@ -48,10 +48,10 @@ def linkify(buildroot, s):
         path = build_file.relpath
     if os.path.exists(os.path.join(buildroot, path)):
       # The reporting server serves file content at /browse/<path_from_buildroot>.
-      return '/browse/%s' % path
+      return '/browse/{}'.format(path)
     else:
       return None
 
   def maybe_add_link(url, text):
-    return '<a target="_blank" href="%s">%s</a>' % (url, text) if url else text
+    return '<a target="_blank" href="{}">{}</a>'.format(url, text) if url else text
   return _PATH_RE.sub(lambda m: maybe_add_link(to_url(m), m.group(0)), s)

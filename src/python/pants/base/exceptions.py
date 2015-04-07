@@ -27,7 +27,7 @@ class TargetDefinitionException(Exception):
     :param target: the target in question
     :param string msg: a description of the target misconfiguration
     """
-    super(Exception, self).__init__('Invalid target %s: %s' % (target, msg))
+    super(Exception, self).__init__('Invalid target {}: {}'.format(target, msg))
 
 
 class BuildConfigurationError(Exception):

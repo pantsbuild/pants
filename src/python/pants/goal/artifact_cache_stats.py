@@ -49,6 +49,6 @@ class ArtifactCacheStats(object):
     self.stats_per_cache[cache_name][hit_or_miss].append(tgt.address.reference())
     if self._dir and os.path.exists(self._dir):  # Check existence in case of a clean-all.
       suffix = 'misses' if hit_or_miss else 'hits'
-      with open(os.path.join(self._dir, '%s.%s' % (cache_name, suffix)), 'a') as f:
+      with open(os.path.join(self._dir, '{}.{}'.format(cache_name, suffix)), 'a') as f:
         f.write(tgt.address.reference())
         f.write('\n')
