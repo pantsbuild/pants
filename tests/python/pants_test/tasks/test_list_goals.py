@@ -11,7 +11,7 @@ from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.task import Task
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ListGoalsTest(ConsoleTaskTestBase):

@@ -1,1 +1,0 @@
-package com.pants.testproject.packageinfo;

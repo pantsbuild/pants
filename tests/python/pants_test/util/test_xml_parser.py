@@ -21,12 +21,12 @@ class TestXmlBase(unittest.TestCase):
   def xml_file(self,
                manifest_element='manifest',
                package_attribute='package',
-               package_value='com.pants.examples.hello',
+               package_value='org.pantsbuild.example.hello',
                uses_sdk_element='uses-sdk',
                android_attribute='android:targetSdkVersion',
                activity_element='activity',
                android_name_attribute='android:name',
-               application_name_value='com.pants.examples.hello.HelloWorld'):
+               application_name_value='org.pantsbuild.example.hello.HelloWorld'):
     """Represent an .xml file (Here an AndroidManifest.xml is used)."""
     with temporary_file() as fp:
       fp.write(textwrap.dedent(
@@ -86,7 +86,7 @@ class TestXmlParser(TestXmlBase):
   def test_get_attribute(self):
     with self.xml_file() as xml:
       parser = XmlParser.from_file(xml)
-      self.assertEqual('com.pants.examples.hello', parser.get_attribute('manifest', 'package'))
+      self.assertEqual('org.pantsbuild.example.hello', parser.get_attribute('manifest', 'package'))
 
   def test_missing_attribute(self):
     with self.assertRaises(XmlParser.XmlError):

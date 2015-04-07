@@ -1,0 +1,22 @@
+// Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+package org.pantsbuild.example.temperature;
+
+/**
+ * Structure for expressing temperature: 75 Fahrenheit, 12 Celsius, etc.
+ * Not so useful on its own.
+ */
+message Temperature {
+  optional string unit = 1;
+  required int64 number = 2;
+}
+
+message TemperatureRequest {
+  optional string msg = 1;
+}
+
+service TemperatureService {
+  rpc GetTemperature (TemperatureRequest) returns (Temperature);
+  rpc PredictTemperature (TemperatureRequest) returns (Temperature);
+}

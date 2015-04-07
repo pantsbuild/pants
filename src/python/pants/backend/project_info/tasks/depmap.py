@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -300,7 +301,7 @@ class Depmap(ConsoleTask):
         info['targets'].append(self._address(dep.address))
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
-            target_libraries.add(jar)
+            target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
           # Add all the jars pulled in by this jar_library
           target_libraries.update(get_transitive_jars(dep))
         if isinstance(dep, Resources):

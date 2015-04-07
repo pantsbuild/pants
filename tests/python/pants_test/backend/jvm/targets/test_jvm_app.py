@@ -12,18 +12,19 @@ import pytest
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.jvm_app import DirectoryReMapper
+from pants.base.address import BuildFileAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
 
-class BinaryTest(BaseTest):
+class JvmAppTest(BaseTest):
   @property
   def alias_groups(self):
     return register_jvm()
 
   def setUp(self):
-    super(BinaryTest, self).setUp()
+    super(JvmAppTest, self).setUp()
     self.create_dir('src/java/org/archimedes/buoyancy/config')
     self.create_file('src/java/org/archimedes/buoyancy/config/densities.xml')
     self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
@@ -32,6 +33,34 @@ class BinaryTest(BaseTest):
     self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
       jvm_binary(name='bin2')
     '''))
+
+  def test_simple(self):
+    self.add_to_build_file('BUILD', dedent('''
+    jvm_app(name='foo',
+      basename='foo-app',
+      binary = ':foo-binary',
+    )
+    jvm_binary(name='foo-binary',
+      main='com.example.Foo',
+    )
+    '''))
+
+    app_target = self.target('//:foo')
+    binary_target = self.target('//:foo-binary')
+    self.assertEquals('foo-app', app_target.payload.basename)
+    self.assertEquals('foo-app', app_target.basename)
+    self.assertEquals(binary_target, app_target.binary)
+    self.assertEquals([':foo-binary'], list(app_target.traversable_dependency_specs))
+
+  def test_bad_basename(self):
+    build_file = self.add_to_build_file('BUILD', dedent('''
+    jvm_app(name='foo',
+      basename='foo',
+    )
+    '''))
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Invalid target JvmApp.* foo.*basename must not equal name.'):
+      self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
 
   def test_binary_via_binary(self):
     self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
@@ -82,7 +111,9 @@ class BinaryTest(BaseTest):
       )
     '''))
     app = self.target('src/java/org/archimedes/buoyancy')
-    with pytest.raises(TargetDefinitionException):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'buoyancy.*A JvmApp must define exactly one'):
       app.binary
 
   def test_too_many_binaries_mixed(self):
@@ -96,7 +127,9 @@ class BinaryTest(BaseTest):
       )
     '''))
     app = self.target('src/java/org/archimedes/buoyancy')
-    with pytest.raises(TargetDefinitionException):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'buoyancy.*A JvmApp must define exactly one'):
       app.binary
 
   def test_too_many_binaries_via_deps(self):
@@ -109,7 +142,10 @@ class BinaryTest(BaseTest):
       )
     '''))
     app = self.target('src/java/org/archimedes/buoyancy')
-    with pytest.raises(TargetDefinitionException):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'buoyancy.*A JvmApp must define exactly one'):
+
       app.binary
 
   def test_not_a_binary(self):
@@ -131,7 +167,9 @@ class BinaryTest(BaseTest):
       )
     '''))
     app = self.target('src/java/org/archimedes/buoyancy:buoyancy2')
-    with pytest.raises(TargetDefinitionException):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                r'buoyancy2.* Expected JvmApp binary dependency'):
       app.binary
 
 

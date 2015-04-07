@@ -126,6 +126,12 @@ jar_library(name='slf4j-api',
             ]
 )
 
+jar_library(name = 'spindle-runtime',
+            jars = [
+              jar(org = 'com.foursquare', name = 'spindle-runtime_2.10', rev = '3.0.0-M7'),
+            ],
+)
+
 jar_library(name='libthrift-0.5.0',
             jars = [
               jar(org='org.apache.thrift', name='libthrift', rev='0.5.0-1'),

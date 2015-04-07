@@ -20,8 +20,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_rmtree
-from pants_test.task_test_base import TaskTestBase
-from pants_test.tasks.test_base import is_exe
+from pants_test.tasks.task_test_base import TaskTestBase, is_exe
 
 
 ragel_file_contents = dedent("""

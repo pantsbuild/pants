@@ -26,9 +26,9 @@ The `artifact` specifies an "address" similar to
 what you might see in `3rdparty` `BUILD` files: an artifact's location.
 It does *not* specify a version; that changes each time you publish.
 For an example, see
-[examples/src/java/com/pants/examples/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/greet/BUILD):
+[examples/src/java/org/pantsbuild/example/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/org/pantsbuild/example/hello/greet/BUILD):
 
-!inc[start-at=java_library](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
+!inc[start-at=java_library](../../examples/src/java/org/pantsbuild/example/hello/greet/BUILD)
 
 (That `repo=` parameter assumes someone has set up your Pants configuration to know about that
 artifact repository. If that assumption is false, keep reading to find out how to set this up.)

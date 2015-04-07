@@ -14,7 +14,7 @@ from twitter.common.collections import maybe_list
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class TestAndroidBase(TaskTestBase):
@@ -27,7 +27,7 @@ class TestAndroidBase(TaskTestBase):
       fp.write(textwrap.dedent(
         """<?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-            package="com.pants.examples.hello" >
+            package="org.pantsbuild.example.hello" >
             <uses-sdk
                 android:minSdkVersion="8"
                 android:targetSdkVersion="19" />

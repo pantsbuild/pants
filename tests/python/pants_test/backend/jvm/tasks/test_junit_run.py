@@ -34,7 +34,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner(self):
 
     # Create the temporary base test directory
-    test_rel_path = 'tests/java/com/pants/foo'
+    test_rel_path = 'tests/java/org/pantsbuild/foo'
     test_abs_path = os.path.join(self.build_root, test_rel_path)
     self.create_dir(test_rel_path)
 

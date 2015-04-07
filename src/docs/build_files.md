@@ -31,8 +31,8 @@ techniques can be especially helpful:
 *Did I define the targets I meant to?* Use `list`:
 
     :::bash
-    $ ./pants list examples/src/java/com/pants/examples/hello/greet
-    examples/src/java/com/pants/examples/hello/greet:greet
+    $ ./pants list examples/src/java/org/pantsbuild/example/hello/greet
+    examples/src/java/org/pantsbuild/example/hello/greet:greet
 
 *Did a change in one `BUILD` file break others?*
 List **every** target to find out:
@@ -44,37 +44,37 @@ Use the recursive wildcard: `list ::`
       File "pants/commands/command.py", line 79, in __init__
       File "pants/commands/goal_runner.py", line 144, in setup_parser
       File "pants/base/build_graph.py", line 351, in inject_address_closure
-    TransitiveLookupError: great was not found in BUILD file examples/src/java/com/pants/examples/h
+    TransitiveLookupError: great was not found in BUILD file examples/src/java/org/pantsbuild/example/h
     ello/greet/BUILD. Perhaps you meant:
       :greet
-      referenced from examples/src/scala/com/pants/example/hello/welcome:welcome
+      referenced from examples/src/scala/org/pantsbuild/example/hello/welcome:welcome
     $ # Instead of listing all targets, an error message. We found a problem
 
 *Do I pull in the dependencies I expect?* Use `depmap` (JVM languages only):
 
     :::bash
-    $ ./pants depmap examples/tests/java/com/pants/examples/hello/greet
-    internal-examples.tests.java.com.pants.examples.hello.greet.greet
+    $ ./pants depmap examples/tests/java/org/pantsbuild/example/hello/greet
+    internal-examples.tests.java.org.pantsbuild.example.hello.greet.greet
       internal-3rdparty.junit
         internal-3rdparty.hamcrest-core
           org.hamcrest-hamcrest-core-1.3
         junit-junit-dep-4.11
-      internal-examples.src.java.com.pants.examples.hello.greet.greet
-      internal-examples.src.resources.com.pants.example.hello.hello
+      internal-examples.src.java.org.pantsbuild.example.hello.greet.greet
+      internal-examples.src.resources.org.pantsbuild.example.hello.hello
       junit-junit-dep-4.11
       org.hamcrest-hamcrest-core-1.3
 
 *What source files do I depend on?* Use `filedeps`:
 
     :::bash
-    $ ./pants filedeps examples/src/java/com/pants/examples/hello/main
-    ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/BUILD
-    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/BUILD
-    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/config/greetee.txt
-    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/Greeting.java
-    ~archie/workspace/pants/examples/src/resources/com/pants/example/hello/world.txt
-    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/main/HelloMain.java
-    ~archie/workspace/pants/examples/src/java/com/pants/examples/hello/greet/BUILD
+    $ ./pants filedeps examples/src/java/org/pantsbuild/example/hello/main
+    ~archie/workspace/pants/examples/src/resources/org/pantsbuild/example/hello/BUILD
+    ~archie/workspace/pants/examples/src/java/org/pantsbuild/example/hello/main/BUILD
+    ~archie/workspace/pants/examples/src/java/org/pantsbuild/example/hello/main/config/greetee.txt
+    ~archie/workspace/pants/examples/src/java/org/pantsbuild/example/hello/greet/Greeting.java
+    ~archie/workspace/pants/examples/src/resources/org/pantsbuild/example/hello/world.txt
+    ~archie/workspace/pants/examples/src/java/org/pantsbuild/example/hello/main/HelloMain.java
+    ~archie/workspace/pants/examples/src/java/org/pantsbuild/example/hello/greet/BUILD
 
 Default Target
 --------------
@@ -112,8 +112,8 @@ Default targets are more convenient to reference on the command line. There are 
 It's especially convenient to refer to a default target on the command line. Consider these two
 ways to refer to the same target:
 
-    //src/java/com/pants/tugboat:tugboat  # absolute target name
-    src/java/com/pants/tugboat/           # convenient command-line-completion syntax
+    //src/java/org/pantsbuild/tugboat:tugboat  # absolute target name
+    src/java/org/pantsbuild/tugboat/           # convenient command-line-completion syntax
 
 By providing a default-name target, you make it easier for people to refer to it on the command
 line. This gives them a better experience. BUILD files dependencies can be less verbose,
@@ -360,11 +360,11 @@ Though your repo might contain many `BUILD` files, Pants might not
 execute all of them. If you invoke:
 
     :::bash
-    ./pants test examples/tests/java/com/pants/examples/hello/greet:greet
+    ./pants test examples/tests/java/org/pantsbuild/example/hello/greet:greet
 
 Pants executes the source tree's top-level `BUILD` file (executed on
 every Pants run) and
-`examples/tests/java/com/pants/examples/hello/greet/BUILD`. The `greet`
+`examples/tests/java/org/pantsbuild/example/hello/greet/BUILD`. The `greet`
 target depends on targets from other `BUILD` files, so Pants executes
 those `BUILD` files, too; it iterates over the dependency tree,
 executing `BUILD` files as it goes. It does *not* execute `BUILD` files

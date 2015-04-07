@@ -12,7 +12,7 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants_test.tasks.test_base import BaseTest
+from pants_test.base_test import BaseTest
 
 
 class DummyTask(Task):

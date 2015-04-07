@@ -76,9 +76,9 @@ Each goal option also has a corresponding environment variable. For example, eit
 commands opens a coverage report in your browser:
 
     :::bash
-    $ ./pants test.junit --coverage-html-open examples/tests/java/com/pants/examples::
+    $ ./pants test.junit --coverage-html-open examples/tests/java/org/pantsbuild/example::
 
-    $ PANTS_TEST_JUNIT_COVERAGE_HTML_OPEN=1 ./pants test examples/tests/java/com/pants/examples::
+    $ PANTS_TEST_JUNIT_COVERAGE_HTML_OPEN=1 ./pants test examples/tests/java/org/pantsbuild/example::
 
 Pants checks for an environment variable whose name is `PANTS` + the goal name (or goal+task name)
 + the option name; all of these in all-caps, joined by underscores (instead of dots or hyphens).

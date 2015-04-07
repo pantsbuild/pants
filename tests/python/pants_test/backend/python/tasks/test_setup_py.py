@@ -14,66 +14,17 @@ from mock import Mock
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.tasks.setup_py import SetupPy
-from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants_test.task_test_base import TaskTestBase
+from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
 
-class TestSetupPy(TaskTestBase):
+class TestSetupPy(PythonTaskTest):
   @classmethod
   def task_type(cls):
     return SetupPy
-
-  @property
-  def alias_groups(self):
-    return register_python()
-
-  def create_target(self, relpath, name, contents):
-    self.create_file(relpath=self.build_path(relpath), contents=contents)
-    return self.target(SyntheticAddress(relpath, name).spec)
-
-  def create_python_requirement_library(self, relpath, name, requirements):
-    def make_requirement(req):
-      return 'python_requirement("{}")'.format(req)
-
-    return self.create_target(relpath=relpath, name=name, contents=dedent("""
-    python_requirement_library(
-      name='{name}',
-      requirements=[
-        {requirements}
-      ]
-    )
-    """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
-
-  def create_python_library(self, relpath, name, dependencies=(), provides=None):
-    return self.create_target(relpath=relpath, name=name, contents=dedent("""
-    python_library(
-      name='{name}',
-      dependencies=[
-        {dependencies}
-      ],
-      provides={provides}
-    )
-    """).format(name=name, dependencies=','.join(map(repr, dependencies)), provides=provides))
-
-  def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None):
-    return self.create_target(relpath=relpath, name=name, contents=dedent("""
-    python_binary(
-      name='{name}',
-      entry_point='{entry_point}',
-      dependencies=[
-        {dependencies}
-      ],
-      provides={provides}
-    )
-    """).format(name=name,
-                entry_point=entry_point,
-                dependencies=','.join(map(repr, dependencies)),
-                provides=provides))
 
   def setUp(self):
     super(TestSetupPy, self).setUp()

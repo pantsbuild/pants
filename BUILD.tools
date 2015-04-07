@@ -145,6 +145,11 @@ jar_library(name = 'scrooge-linter',
               jar(org='com.twitter', name='scrooge-linter_2.10', rev='3.16.3')
             ])
 
+jar_library(name = 'spindle-codegen',
+            jars = [
+              jar(org = 'com.foursquare', name = 'spindle-codegen-binary_2.10', rev = '3.0.0-M7'),
+            ])
+
 jar_library(name = 'jar-tool',
             jars = [
               jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.9')

@@ -6,25 +6,36 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
+from hashlib import sha1
 
 from six import string_types
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
+                                      PrimitiveField)
 from pants.base.validation import assert_list
 from pants.util.meta import AbstractClass
 
 
-class JarRule(AbstractClass):
+class JarRule(FingerprintedMixin, AbstractClass):
   def __init__(self, apply_pattern):
     if not isinstance(apply_pattern, string_types):
-      raise ValueError('The supplied apply_pattern is not a string, given: %s' % apply_pattern)
+      raise ValueError('The supplied apply_pattern is not a string, given: {}'
+                       .format(apply_pattern))
     try:
       self._apply_pattern = re.compile(apply_pattern)
     except re.error as e:
-      raise ValueError('The supplied apply_pattern - %s - is not a valid regular expression: %s'
-                       % (apply_pattern, e))
+      raise ValueError('The supplied apply_pattern: {pattern} '
+                       'is not a valid regular expression: {msg}'
+                       .format(pattern=apply_pattern, msg=e))
+
+  def fingerprint(self):
+    hasher = sha1()
+    hasher.update(self._apply_pattern.pattern)
+    return hasher.hexdigest()
 
   @property
   def apply_pattern(self):
@@ -34,6 +45,9 @@ class JarRule(AbstractClass):
 
 class Skip(JarRule):
   """A rule that skips adding matched entries to a jar."""
+
+  def __repr__(self):
+    return "Skip(apply_pattern={})".format(self._apply_pattern.pattern)
 
 
 class Duplicate(JarRule):
@@ -47,7 +61,7 @@ class Duplicate(JarRule):
       :param str path: The path of the duplicate entry.
       """
       assert path and isinstance(path, string_types), 'A non-empty path must be supplied.'
-      super(Duplicate.Error, self).__init__('Duplicate entry encountered for path %s' % path)
+      super(Duplicate.Error, self).__init__('Duplicate entry encountered for path {}'.format(path))
       self._path = path
 
     @property
@@ -55,16 +69,16 @@ class Duplicate(JarRule):
       """The path of the duplicate entry."""
       return self._path
 
-  SKIP = object()
+  SKIP = 'SKIP'
   """Retains the 1st entry and skips subsequent duplicates."""
 
-  REPLACE = object()
+  REPLACE = 'REPLACE'
   """Retains the most recent entry and skips prior duplicates."""
 
-  CONCAT = object()
+  CONCAT = 'CONCAT'
   """Concatenates the contents of all duplicate entries encountered in the order encountered."""
 
-  FAIL = object()
+  FAIL = 'FAIL'
   """Raises a :class:``Duplicate.Error`` when a duplicate entry is
   encountered.
   """
@@ -79,8 +93,8 @@ class Duplicate(JarRule):
     :raises: ``ValueError`` if the action is invalid.
     """
     if action not in cls._VALID_ACTIONS:
-      raise ValueError('The supplied action must be one of %s, given: %s'
-                       % (cls._VALID_ACTIONS, action))
+      raise ValueError('The supplied action must be one of {valid}, given: {given}'
+                       .format(valid=cls._VALID_ACTIONS, given=action))
     return action
 
   def __init__(self, apply_pattern, action):
@@ -100,8 +114,18 @@ class Duplicate(JarRule):
     """The action to take for any duplicate entries that match this rule's ``apply_pattern``."""
     return self._action
 
+  def fingerprint(self):
+    hasher = sha1()
+    hasher.update(super(Duplicate, self).fingerprint())
+    hasher.update(self._action)
+    return hasher.hexdigest()
 
-class JarRules(object):
+  def __repr__(self):
+    return "Duplicate(apply_pattern={0}, action={1})".format(self._apply_pattern.pattern,
+                                                             self._action)
+
+
+class JarRules(FingerprintedMixin):
   """A set of rules for packaging up a deploy jar.
 
   Deploy jars are executable jars with fully self-contained classpaths and as such, assembling them
@@ -144,7 +168,7 @@ class JarRules(object):
              Skip(r'^META-INF/[^/]+\.RSA$'),  # default signature alg. file
              Duplicate(r'^META-INF/services/', Duplicate.CONCAT)]  # 1 svc fqcn per line
 
-    return cls(rules=rules + additional_rules, default_dup_action=default_dup_action)
+    return JarRules(rules=rules + additional_rules, default_dup_action=default_dup_action)
 
   _DEFAULT = None
 
@@ -184,8 +208,19 @@ class JarRules(object):
 
   @property
   def rules(self):
-    """The list of explicit entry rules in effect."""
-    return self._rules
+    """A copy of the list of explicit entry rules in effect."""
+    return list(self._rules)
+
+  def fingerprint(self):
+    hasher = sha1()
+    hasher.update(self.default_dup_action)
+    for rule in self.rules:
+      hasher.update(rule.fingerprint())
+    return hasher.hexdigest()
+
+  @property
+  def value(self):
+    return self._jar_rules
 
 
 class JvmBinary(JvmTarget):
@@ -200,7 +235,9 @@ class JvmBinary(JvmTarget):
   * ``run`` - Executes the main class of this binary locally.
   """
   def __init__(self,
+               name=None,
                address=None,
+               payload=None,
                main=None,
                basename=None,
                source=None,
@@ -209,7 +246,7 @@ class JvmBinary(JvmTarget):
                **kwargs):
     """
     :param string main: The name of the ``main`` class, e.g.,
-      ``'com.pants.examples.hello.main.HelloMain'``. This class may be
+      ``'org.pantsbuild.example.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
     :param string basename: Base name for the generated ``.jar`` file, e.g.,
       ``'hello'``. (By default, uses ``name`` param)
@@ -238,18 +275,37 @@ class JvmBinary(JvmTarget):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
     if source and not isinstance(source, string_types):
       raise TargetDefinitionException(self, 'source must be a single relative file path')
-    sources = [source] if source else None
-    super(JvmBinary, self).__init__(address=address, sources=self.assert_list(sources), **kwargs)
-
-    # Consider an alias mechanism (target) that acts like JarLibrary but points to a single item
-    # and admits any pointee type.  Its very likely folks will want to share jar_rules but they
-    # cannot today and it seems heavy-handed to force jar_rules to be a target just to get an
-    # address in the off chance its needed.
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
-      raise TargetDefinitionException(self, 'deploy_jar_rules must be a JarRules specification')
+      raise TargetDefinitionException(self,
+                                      'deploy_jar_rules must be a JarRules specification. got {}'
+                                      .format(type(deploy_jar_rules).__name__))
+    sources = [source] if source else None
+    payload = payload or Payload()
+    payload.add_fields({
+      'basename' : PrimitiveField(basename or name),
+      'deploy_excludes' : ExcludesField(self.assert_list(deploy_excludes, expected_type=Exclude)),
+      'deploy_jar_rules' :  FingerprintedField(deploy_jar_rules or JarRules.default()),
+      'main': PrimitiveField(main),
+      })
 
-    # TODO(pl): These should all live in payload fields
-    self.main = main
-    self.basename = basename or self.name
-    self.deploy_excludes = self.assert_list(deploy_excludes, expected_type=Exclude)
-    self.deploy_jar_rules = deploy_jar_rules or JarRules.default()
+    super(JvmBinary, self).__init__(name=name,
+                                    address=address,
+                                    payload=payload,
+                                    sources=self.assert_list(sources),
+                                    **kwargs)
+
+  @property
+  def basename(self):
+    return self.payload.basename
+
+  @property
+  def deploy_excludes(self):
+    return self.payload.deploy_excludes
+
+  @property
+  def deploy_jar_rules(self):
+    return self.payload.deploy_jar_rules
+
+  @property
+  def main(self):
+    return self.payload.main

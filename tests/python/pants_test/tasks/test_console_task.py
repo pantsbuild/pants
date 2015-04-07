@@ -12,10 +12,10 @@ from Queue import Empty, Queue
 import pytest
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants_test.tasks.test_base import TaskTest
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class ConsoleTaskTest(TaskTest):
+class ConsoleTaskTest(TaskTestBase):
   class Infinite(ConsoleTask):
     def __init__(self, *args, **kwargs):
       super(ConsoleTaskTest.Infinite, self).__init__(*args, **kwargs)
@@ -35,9 +35,7 @@ class ConsoleTaskTest(TaskTest):
   def test_sigpipe(self):
     r, w = os.pipe()
     outstream = os.fdopen(w, 'w')
-    task = self.prepare_task(build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser,
-                             console_outstream=outstream)
+    task = self.create_task(self.context(console_outstream=outstream))
     raised = Queue(maxsize=1)
 
     def execute():

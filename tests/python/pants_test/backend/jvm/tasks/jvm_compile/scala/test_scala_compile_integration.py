@@ -12,37 +12,37 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class ScalaCompileIntegrationTest(BaseCompileIT):
   def test_scala_compile(self):
-    with self.do_test_compile('testprojects/src/scala/com/pants/testproject/unicode/shapeless',
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless',
                               expected_files=['ShapelessExample.class']) as found:
 
       self.assertTrue(
           self.get_only(found, 'ShapelessExample.class').endswith(
-              'com/pants/testproject/unicode/shapeless/ShapelessExample.class'))
+              'org/pantsbuild/testproject/unicode/shapeless/ShapelessExample.class'))
 
   def test_scala_with_java_sources_compile(self):
-    with self.do_test_compile('testprojects/src/scala/com/pants/testproject/javasources',
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/javasources',
                               expected_files=['ScalaWithJavaSources.class',
                                               'JavaSource.class']) as found:
 
       self.assertTrue(
           self.get_only(found, 'ScalaWithJavaSources.class').endswith(
-              'com/pants/testproject/javasources/ScalaWithJavaSources.class'))
+              'org/pantsbuild/testproject/javasources/ScalaWithJavaSources.class'))
 
       self.assertTrue(
           self.get_only(found, 'JavaSource.class').endswith(
-              'com/pants/testproject/javasources/JavaSource.class'))
+              'org/pantsbuild/testproject/javasources/JavaSource.class'))
 
   def test_scalac_plugin_compile(self):
-    with self.do_test_compile('testprojects/src/scala/com/pants/testproject/scalac/plugin',
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
                               expected_files=['HelloScalac.class', 'scalac-plugin.xml']) as found:
 
       self.assertTrue(
           self.get_only(found, 'HelloScalac.class').endswith(
-              'com/pants/testproject/scalac/plugin/HelloScalac.class'))
+              'org/pantsbuild/testproject/scalac/plugin/HelloScalac.class'))
 
       tree = ET.parse(self.get_only(found, 'scalac-plugin.xml'))
       root = tree.getroot()
       self.assertEqual('plugin', root.tag)
       self.assertEqual('hello_scalac', root.find('name').text)
-      self.assertEqual('com.pants.testproject.scalac.plugin.HelloScalac',
+      self.assertEqual('org.pantsbuild.testproject.scalac.plugin.HelloScalac',
                        root.find('classname').text)

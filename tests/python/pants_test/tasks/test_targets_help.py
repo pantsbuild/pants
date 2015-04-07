@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os.path
 
 from pants.backend.core.tasks.targets_help import TargetsHelp
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 # The build_file_parser doesn't have any symbols defined; all we have
