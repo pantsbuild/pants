@@ -1,0 +1,55 @@
+Testing ConsoleRunner and other classes in src/java/org/pantsbuild/junit
+is non-trivial because of bootstrapping issues. It should become somewhat easier
+in the future, but in the mean time, here are the steps one needs to perform
+if they change anything under src/java/org/pantsbuild/junit:
+
+I.) On the dev branch:
+1) Publish to the local maven cache
+$ yes | ./pants clean-all publish --no-publish-dryrun src/java/org/pantsbuild/junit --publish-local=~/.m2/repository
+
+< lots of output... >
+
+published junit-runner to /home/jsirois/.m2/repository/org/pantsbuild/junit-runner/0.0.32-SNAPSHOT/junit-runner-0.0.32-SNAPSHOT.jar
+published junit-runner to /home/jsirois/.m2/repository/org/pantsbuild/junit-runner/0.0.32-SNAPSHOT/junit-runner-0.0.32-SNAPSHOT.pom
+published junit-runner to /home/jsirois/.m2/repository/org/pantsbuild/junit-runner/0.0.32-SNAPSHOT/junit-runner-0.0.32-SNAPSHOT-sources.jar
+published junit-runner to /home/jsirois/.m2/repository/org/pantsbuild/junit-runner/0.0.32-SNAPSHOT/junit-runner-0.0.32-SNAPSHOT-javadoc.jar
+published ivy to /home/jsirois/.m2/repository/org/pantsbuild/junit-runner/0.0.32-SNAPSHOT/ivy-0.0.32-SNAPSHOT.xml
+
+2) Edit the profile ivy.xml to pick up the local SNAPSHOT you created in 1,
+so that the end result looks like (modulo concrete rev numbers):
+
+$ git diff
+diff --git a/build-support/profiles/junit.ivy.xml b/build-support/profiles/junit.ivy.xml
+index c33ab3e..86f4197 100644
+--- a/build-support/profiles/junit.ivy.xml
++++ b/build-support/profiles/junit.ivy.xml
+@@ -27,6 +27,6 @@ limitations under the License.
+   <dependencies>
+     <dependency org="junit" name="junit-dep" rev="4.10"/>
+     <dependency org="org.hamcrest" name="hamcrest-core" rev="1.2"/>
+-    <dependency org="com.twitter.common" name="junit-runner" rev="0.0.31"/>
++    <dependency org="com.twitter.common" name="junit-runner" rev="0.0.32-SNAPSHOT" changing="true"/>
+   </dependencies>
+ </ivy-module>
+
+3) Kill the profile cache so this get picked up
+$ rm -rf build-support/profiles/junit.libs*
+
+As you edit the source files, you repeat steps 1 and 3 to re-publish and pick up the change.
+
+II.) Revert the change made in I-2 above, mark with @Ignore the tests that rely on
+code changes in the runner (or the entire test class), and submit changes from I
+to master
+
+III.) The operation below should be done on MASTER. Publish a jar with:
+
+1) git checkout master; git pull
+
+2) dry run:
+./pants clean-all publish src/java/org/pantsbuild/junit
+
+3) looks ok? do it:
+yes | ./pants publish --no-publish-dryrun src/java/org/pantsbuild/junit
+
+IV.) Switch back to a dev branch. Make a change that bumps the revision number in
+build-support/profiles/junit.ivy.xml and un-@Ignores any tests temporarily ignored in step I.

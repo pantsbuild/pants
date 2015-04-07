@@ -20,6 +20,11 @@ def add_log4j_excludes(jar):
             .exclude(org='com.sun.jdmk', name='jmxtools')
             .exclude(org='com.sun.jmx', name='jmxri'))
 
+jar_library(name='args4j',
+            jars=[
+              jar(org='args4j', name='args4j', rev='2.32')
+            ])
+
 jar_library(name='checkstyle',
             jars = [
               jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
