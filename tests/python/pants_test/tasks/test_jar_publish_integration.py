@@ -14,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.tasks.test_base import is_exe
+from pants_test.tasks.task_test_base import is_exe
 
 
 def shared_artifacts(version, extra_jar=None):

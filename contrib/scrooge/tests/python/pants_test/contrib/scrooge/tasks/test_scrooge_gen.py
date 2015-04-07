@@ -19,7 +19,7 @@ from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
 from pants_test.base.context_utils import create_options
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen

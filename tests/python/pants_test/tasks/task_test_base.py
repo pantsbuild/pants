@@ -7,109 +7,71 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
+import tempfile
+import uuid
 from contextlib import closing
 from StringIO import StringIO
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.core.tasks.task import Task
-from pants.base.config import Config
-from pants.base.target import Target
-from pants.goal.context import Context
 from pants.goal.goal import Goal
-from pants.option.global_options import register_global_options
-from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
-from pants_test.base.context_utils import create_config, create_run_tracker
 from pants_test.base_test import BaseTest
-from pants_test.task_test_base import TaskTestBase
 
 
+# TODO: Find a better home for this?
 def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
   return result == 0
 
 
-class TaskTest(BaseTest):
-  """A baseclass useful for testing Tasks."""
+class TaskTestBase(BaseTest):
+  """A baseclass useful for testing a single Task type."""
 
   @classmethod
   def task_type(cls):
-    """Subclasses must return the type of the ConsoleTask subclass under test."""
+    """Subclasses must return the type of the Task subclass under test."""
     raise NotImplementedError()
 
   def setUp(self):
-    super(TaskTest, self).setUp()
+    super(TaskTestBase, self).setUp()
+    self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
+    # We locate the workdir below the pants_workdir, which BaseTest locates within
+    # the BuildRoot.
+    self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
+    self._test_workdir = os.path.join(self._tmpdir, 'workdir')
+    os.mkdir(self._test_workdir)
 
-    # The prepare_task method engages a series of objects that use option values so we ensure they
-    # are uniformly set here before calls to prepare_task occur in test methods.
-    Config.reset_default_bootstrap_option_values()
+  @property
+  def test_workdir(self):
+    return self._test_workdir
 
-  def prepare_task(self,
-                   config=None,
-                   args=None,
-                   targets=None,
-                   build_graph=None,
-                   build_file_parser=None,
-                   address_mapper=None,
-                   console_outstream=None,
-                   workspace=None):
-    """Prepares a Task for execution.
+  def synthesize_task_subtype(self, task_type):
+    """Creates a synthetic subclass of the task type.
 
-    task_type: The class of the Task to create.
-    config: An optional string representing the contents of a pants.ini config.
-    args: optional list of command line flags, these should be prefixed with '--test-'.
-    targets: optional list of Target objects passed on the command line.
+    The returned type has a unique options scope, to ensure proper test isolation (unfortunately
+    we currently rely on class-level state in Task.)
 
-    Returns a new Task ready to execute.
+    # TODO: Get rid of this once we re-do the Task lifecycle.
+
+    :param task_type: The task type to subtype.
+    :return: A pair (type, options_scope)
     """
+    options_scope = uuid.uuid4().hex
+    subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    return type(subclass_name, (task_type,), {'options_scope': options_scope}), options_scope
 
-    task_type = self.task_type()
-    assert issubclass(task_type, Task), 'task_type must be a Task subclass, got %s' % task_type
+  def set_options(self, **kwargs):
+    self.set_options_for_scope(self.options_scope, **kwargs)
 
-    config = create_config(config or '')
-    workdir = os.path.join(config.getdefault('pants_workdir'), 'test', task_type.__name__)
+  def context(self, config='', options=None, target_roots=None, **kwargs):
+    # Add in our task type.
+    return super(TaskTestBase, self).context(for_task_types=[self._testing_task_type],
+                                             config=config,
+                                             options=options,
+                                             target_roots=target_roots,
+                                             **kwargs)
 
-    bootstrap_options = OptionsBootstrapper().get_bootstrap_options()
-
-    options = Options(env={}, config=config, known_scopes=['', 'test'], args=args or [])
-    # A lot of basic code uses these options, so always register them.
-    register_bootstrap_options(options.register_global)
-
-    # We need to wrap register_global (can't set .bootstrap attr on the bound instancemethod).
-    def register_global_wrapper(*args, **kwargs):
-      return options.register_global(*args, **kwargs)
-
-    register_global_wrapper.bootstrap = bootstrap_options.for_global_scope()
-    register_global_options(register_global_wrapper)
-
-    task_type.options_scope = 'test'
-    task_type.register_options_on_scope(options)
-
-    run_tracker = create_run_tracker()
-
-    context = Context(config,
-                      options,
-                      run_tracker,
-                      targets or [],
-                      build_graph=build_graph,
-                      build_file_parser=build_file_parser,
-                      address_mapper=address_mapper,
-                      console_outstream=console_outstream,
-                      workspace=workspace)
-    return task_type(context, workdir)
-
-  def assertDeps(self, target, expected_deps=None):
-    """Check that actual and expected dependencies of the given target match.
-
-    :param target: :class:`pants.base.target.Target` to check
-      dependencies of.
-    :param expected_deps: :class:`pants.base.target.Target` or list of
-      ``Target`` instances that are expected dependencies of ``target``.
-    """
-    expected_deps_list = maybe_list(expected_deps or [], expected_type=Target)
-    self.assertEquals(set(expected_deps_list), set(target.dependencies))
+  def create_task(self, context, workdir=None):
+    return self._testing_task_type(context, workdir or self._test_workdir)
 
 
 class ConsoleTaskTestBase(TaskTestBase):

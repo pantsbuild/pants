@@ -20,7 +20,7 @@ from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class ProtobufGenTest(TaskTestBase):

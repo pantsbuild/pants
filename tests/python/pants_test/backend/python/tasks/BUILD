@@ -16,7 +16,7 @@ python_library(
     'src/python/pants/base:address',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base'
+    'tests/python/pants_test/tasks:task_test_base'
   ]
 )
 

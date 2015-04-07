@@ -15,7 +15,7 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_file
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class WireGenTest(TaskTestBase):
