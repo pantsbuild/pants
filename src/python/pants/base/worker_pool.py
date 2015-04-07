@@ -181,7 +181,7 @@ class SubprocPool(object):
   @staticmethod
   def worker_init():
     # Exit quietly on sigint, otherwise we get {num_procs} keyboardinterrupt stacktraces spewn
-    signal.signal(signal.SIGINT, lambda *args: os._exit(0))
+    signal.signal(signal.SIGINT, lambda *args: sys.exit())
 
   @classmethod
   def foreground(cls):
