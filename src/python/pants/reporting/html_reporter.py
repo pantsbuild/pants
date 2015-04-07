@@ -116,13 +116,13 @@ class HtmlReporter(Reporter):
     """Implementation of Reporter callback."""
     # Create the template arguments.
     duration = workunit.duration()
-    timing = '{:.3}'.format(duration)
+    timing = '{:.3f}'.format(duration)
     unaccounted_time = None
     # Background work may be idle a lot, no point in reporting that as unaccounted.
     if self.is_under_main_root(workunit):
       unaccounted_time_secs = workunit.unaccounted_time()
       if unaccounted_time_secs >= 1 and unaccounted_time_secs > 0.05 * duration:
-        unaccounted_time = '{:.3}'.format(unaccounted_time_secs)
+        unaccounted_time = '{:.3f}'.format(unaccounted_time_secs)
     args = { 'workunit': workunit.to_dict(),
              'status': HtmlReporter._outcome_css_classes[workunit.outcome()],
              'timing': timing,
@@ -139,7 +139,7 @@ class HtmlReporter(Reporter):
     def render_timings(timings):
       timings_dict = timings.get_all()
       for item in timings_dict:
-        item['timing_string'] = '{:.3}'.format(item['timing'])
+        item['timing_string'] = '{:.3f}'.format(item['timing'])
       args = {
         'timings': timings_dict
       }

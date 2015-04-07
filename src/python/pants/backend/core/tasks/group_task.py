@@ -250,7 +250,7 @@ class GroupTask(Task):
     if group_task.product_types() != product_type:
       raise ValueError('The group {!r} was already registered with product type: {!r} - refusing to '
                        'overwrite with new product type: {!r}'.format(name, group_task.product_types(),
-                                                                         product_type))
+                                                                      product_type))
 
     return group_task
 

@@ -187,7 +187,7 @@ class Fetcher(object):
 
     def finished(self):
       if self.chunks > 0:
-        sys.stdout.write(' {:.3}s\n'.format(time.time() - self._start))
+        sys.stdout.write(' {:.3f}s\n'.format(time.time() - self._start))
         sys.stdout.flush()
 
   def __init__(self, requests_api=None):

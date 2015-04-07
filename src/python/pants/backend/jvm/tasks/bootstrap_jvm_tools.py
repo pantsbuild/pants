@@ -70,7 +70,7 @@ class BootstrapJvmTools(IvyTaskMixin, Task):
       with cache_lock:
         if 'classpath' not in cache:
           targets = list(self._resolve_tool_targets(tools, key, scope))
-          workunit_name = 'bootstrap-{!s}'.format(key)
+          workunit_name = 'bootstrap-{}'.format(key)
           cache['classpath'] = self.ivy_resolve(targets,
                                                 silent=True,
                                                 workunit_name=workunit_name)[0]

@@ -82,14 +82,14 @@ class Distribution(object):
         dist = cls(bin_path=path, minimum_version=minimum_version,
                    maximum_version=maximum_version, jdk=jdk)
         dist.validate()
-        logger.debug('Located {} for constraints: minimum_version {}, '
-                     'maximum_version {}, jdk {}'.format(dist, minimum_version, maximum_version, jdk))
+        logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
+                     .format(dist, minimum_version, maximum_version, jdk))
         return dist
       except (ValueError, cls.Error):
         pass
 
-    raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'.format(
-                      'JDK' if jdk else 'JRE', minimum_version, maximum_version))
+    raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
+                    .format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
 
   @staticmethod
   def _parse_java_version(name, version):

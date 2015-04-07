@@ -42,7 +42,7 @@ class _Exiter(object):
     if self._is_print_backtrace:
       msg = '\nException caught:\n' + ''.join(self._format_tb(tb))
     if str(exception):
-      msg += '\nException message: {!s}\n'.format(exception)
+      msg += '\nException message: {}\n'.format(exception)
     else:
       msg += '\nNo specific exception message.\n'
     # TODO(Jin Feng) Always output the unhandled exception details into a log file.

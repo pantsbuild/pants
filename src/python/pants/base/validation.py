@@ -26,15 +26,19 @@ def assert_list(obj, expected_type=string_types, can_be_none=True, default=(),
     if can_be_none:
       val = list(default)
     else:
-      raise raise_type('Expected an object of acceptable type {}, received None and can_be_none is False'
-                       .format(allowable))
+      raise raise_type(
+        'Expected an object of acceptable type {}, received None and can_be_none is False'
+        .format(allowable))
 
   if [typ for typ in allowable if isinstance(val, typ)]:
     lst = list(val)
     for e in lst:
       if not isinstance(e, expected_type):
-        raise raise_type('Expected a list containing values of type {}, instead got a value {} of {}'
-                         .format(expected_type, e, e.__class__))
+        raise raise_type(
+            'Expected a list containing values of type {}, instead got a value {} of {}'
+            .format(expected_type, e, e.__class__))
     return lst
   else:
-    raise raise_type('Expected an object of acceptable type {}, received {} instead'.format(allowable, val))
+    raise raise_type(
+        'Expected an object of acceptable type {}, received {} instead'
+        .format(allowable, val))

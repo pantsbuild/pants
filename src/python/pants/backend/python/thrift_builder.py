@@ -73,7 +73,8 @@ class PythonThriftBuilder(CodeGenerator):
 
     for src in copied_sources:
       if not self._run_thrift(src):
-        raise PythonThriftBuilder.CodeGenerationException("Could not generate .py from {}!".format(src))
+        raise PythonThriftBuilder.CodeGenerationException(
+          "Could not generate .py from {}!".format(src))
 
   def _run_thrift(self, source):
     args = [

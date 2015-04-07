@@ -149,7 +149,7 @@ class PlainTextReporter(Reporter):
     return workunit.has_label(WorkUnit.REPL) or workunit.has_label(WorkUnit.RUN)
 
   def _format_aggregated_timings(self, aggregated_timings):
-    return b'\n'.join([b'{timing:.3} {label}'.format(**x) for x in aggregated_timings.get_all()])
+    return b'\n'.join([b'{timing:.3f} {label}'.format(**x) for x in aggregated_timings.get_all()])
 
   def _format_artifact_cache_stats(self, artifact_cache_stats):
     stats = artifact_cache_stats.get_all()

@@ -131,7 +131,7 @@ class DuplicateDetector(JvmBinaryTask):
     for artifacts, duplicate_files in conflicts_by_artifacts.items():
       if len(artifacts) < 2: continue
       self.context.log.warn(
-          'Duplicate classes and/or resources detected in artifacts: {!s}'.format(artifacts))
+          'Duplicate classes and/or resources detected in artifacts: {}'.format(artifacts))
       dup_list = list(duplicate_files)
       for duplicate_file in dup_list[:self._max_dups]:
         self.context.log.warn('     {}'.format(duplicate_file))
