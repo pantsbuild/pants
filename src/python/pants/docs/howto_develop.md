@@ -86,7 +86,7 @@ A user can just copy this pex to the top of their Pants workspace and use it:
 
     :::bash
     $ cp /mnt/fd0/pants.pex .
-    $ ./pants.pex goal test examples/tests/java/com/pants/examples/hello/greet:
+    $ ./pants.pex goal test examples/tests/java/org/pantsbuild/example/hello/greet:
 
 There are some parameters in `src/python/pants/bin/BUILD` that you may want to tweak for your
 production distribution. For example, you may want to force the Python interpreter to be a

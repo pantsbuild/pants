@@ -289,9 +289,9 @@ class _Coverage(_JUnitRunner):
     register('--coverage-patterns', action='append',
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
-                  'example, to include all code in com.pants.raven except claws and the eye you '
-                  'would use: {flag}=com.pants.raven.* {flag}=-com.pants.raven.claw '
-                  '{flag}=-com.pants.raven.Eye.'.format(flag='--coverage_patterns'))
+                  'example, to include all code in org.pantsbuild.raven except claws and the eye you '
+                  'would use: {flag}=org.pantsbuild.raven.* {flag}=-org.pantsbuild.raven.claw '
+                  '{flag}=-org.pantsbuild.raven.Eye.'.format(flag='--coverage_patterns'))
     register('--coverage-jvm-options', action='append',
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
@@ -595,9 +595,9 @@ class Cobertura(_Coverage):
       source_file = sources_by_class.get(cls)
       if source_file:
         # the class in @cls
-        #    (e.g., 'com/pants/example/hello/welcome/WelcomeEverybody.class')
+        #    (e.g., 'org/pantsbuild/example/hello/welcome/WelcomeEverybody.class')
         # was compiled from the file in @source_file
-        #    (e.g., 'src/scala/com/pants/example/hello/welcome/Welcome.scala')
+        #    (e.g., 'src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala')
         # Note that, in the case of scala files, the path leading up to Welcome.scala does not
         # have to match the path in the corresponding .class file AT ALL. In this example,
         # @source_file could very well have been 'src/hello-kitty/Welcome.scala'.
@@ -606,7 +606,7 @@ class Cobertura(_Coverage):
         # while it still gets the source file basename from the .class file.
         # Here we create a fake hierachy under coverage_dir/src to mimic what cobertura expects.
 
-        class_dir = os.path.dirname(cls)   # e.g., 'com/pants/example/hello/welcome'
+        class_dir = os.path.dirname(cls)   # e.g., 'org/pantsbuild/example/hello/welcome'
         fake_source_directory = os.path.join(coverage_source_root_dir, class_dir)
         safe_mkdir(fake_source_directory)
         fake_source_file = os.path.join(fake_source_directory, os.path.basename(source_file))

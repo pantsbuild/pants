@@ -21,7 +21,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
     return '14cc5bc23561918dc7134427bfcb268506fcbcaa'
 
   def greet_classfile(self, workdir, filename):
-    path = 'compile/jvm/java/classes/com/pants/examples/hello/greet'.split('/')
+    path = 'compile/jvm/java/classes/org/pantsbuild/example/hello/greet'.split('/')
     return os.path.join(workdir, *(path + [filename]))
 
   @pytest.mark.xfail
@@ -57,7 +57,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       cmd = ['test-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
       junit_out = os.path.join(workdir, 'test', 'junit',
-        'com.pants.examples.hello.greet.GreetingTest.out.txt')
+        'org.pantsbuild.example.hello.greet.GreetingTest.out.txt')
 
       self.assertFalse(os.path.exists(junit_out))
 

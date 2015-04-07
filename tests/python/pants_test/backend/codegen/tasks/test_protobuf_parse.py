@@ -23,7 +23,7 @@ class ProtobufParseTest(unittest.TestCase):
       filename = 'temperatures.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
         fd.write(dedent('''
-            package com.pants.examples.temperature;
+            package org.pantsbuild.example.temperature;
             message Temperature {
               optional string unit = 1;
               required int64 number = 2;
@@ -33,7 +33,7 @@ class ProtobufParseTest(unittest.TestCase):
 
         proto_parser =  ProtobufParse(fd.name, filename)
         proto_parser.parse()
-        self.assertEqual('com.pants.examples.temperature', proto_parser.package)
+        self.assertEqual('org.pantsbuild.example.temperature', proto_parser.package)
         self.assertEqual(set(), proto_parser.enums)
         self.assertEqual(set(['Temperature']), proto_parser.messages)
         self.assertEqual(set(), proto_parser.services)
@@ -98,7 +98,7 @@ class ProtobufParseTest(unittest.TestCase):
       os.makedirs(os.path.join(workdir, 'foobar'))
       with open(os.path.join(workdir, filename), 'w') as fd:
         fd.write(dedent('''
-            package com.pants.protos;
+            package org.pantsbuild.protos;
             message Foo {
                optional string name = 1;
             }
@@ -112,7 +112,7 @@ class ProtobufParseTest(unittest.TestCase):
       filename = 'testextend.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
         fd.write(dedent('''
-            package com.pants.protos;
+            package org.pantsbuild.protos;
             extend Foo {
               optional int32 bar = 126;
             }
@@ -130,7 +130,7 @@ class ProtobufParseTest(unittest.TestCase):
       filename = 'inner_class_no_newline.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
         fd.write(dedent('''
-            package com.pants.protos;
+            package org.pantsbuild.protos;
             option java_multiple_files = true;
             message Foo {
                enum Bar { BAZ = 0; }
@@ -139,7 +139,7 @@ class ProtobufParseTest(unittest.TestCase):
         fd.close()
         proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
-        self.assertEqual('com.pants.protos', proto_parse.package)
+        self.assertEqual('org.pantsbuild.protos', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)
         self.assertEqual(set(['Foo']), proto_parse.messages)
         self.assertEqual(set(), proto_parse.services)
@@ -150,12 +150,12 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'no_newline_at_all1.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write('package com.pants.protos; option java_multiple_files = true; message Foo {'
+        fd.write('package org.pantsbuild.protos; option java_multiple_files = true; message Foo {'
                  + ' enum Bar { BAZ = 0; } } message FooBar { }')
         fd.close()
         proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
-        self.assertEqual('com.pants.protos', proto_parse.package)
+        self.assertEqual('org.pantsbuild.protos', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)
         self.assertEqual(set(['Foo', 'FooBar']), proto_parse.messages)
         self.assertEqual(set(), proto_parse.services)
@@ -166,12 +166,12 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'no_newline_at_all2.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write('package com.pants.protos; message Foo {'
+        fd.write('package org.pantsbuild.protos; message Foo {'
                  + 'enum Bar { BAZ = 0; } } message FooBar { }')
         fd.close()
         proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
-        self.assertEqual('com.pants.protos', proto_parse.package)
+        self.assertEqual('org.pantsbuild.protos', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)
         self.assertEqual(set(['Foo', 'FooBar']), proto_parse.messages)
         self.assertEqual(set(), proto_parse.services)
@@ -182,7 +182,7 @@ class ProtobufParseTest(unittest.TestCase):
     with temporary_dir() as workdir:
       filename = 'no_newline_at_all3.proto'
       with open(os.path.join(workdir, filename), 'w') as fd:
-        fd.write('package com.pants.protos; option java_package = "com.example.foo.bar"; message Foo { }')
+        fd.write('package org.pantsbuild.protos; option java_package = "com.example.foo.bar"; message Foo { }')
         fd.close()
         proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
@@ -199,7 +199,7 @@ class ProtobufParseTest(unittest.TestCase):
       with open(os.path.join(workdir, filename), 'w') as fd:
         fd.write(dedent('''
             package
-               com.pants.protos; option
+               org.pantsbuild.protos; option
                    java_multiple_files
                    = true; option java_package =
                    "com.example.foo.bar"; message

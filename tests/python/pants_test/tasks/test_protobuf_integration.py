@@ -17,11 +17,11 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_protobuf_normal(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',
-                                'examples/src/java/com/pants/examples/protobuf/distance'])
+                                'examples/src/java/org/pantsbuild/example/protobuf/distance'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-example-bundle')
     java_run = subprocess.Popen(['java', '-cp', 'protobuf-example.jar',
-                                 'com.pants.examples.protobuf.distance.ExampleProtobuf'],
+                                 'org.pantsbuild.example.protobuf.distance.ExampleProtobuf'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()
@@ -32,11 +32,11 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_protobuf_imports(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',
-                                'examples/src/java/com/pants/examples/protobuf/imports'])
+                                'examples/src/java/org/pantsbuild/example/protobuf/imports'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-imports-example-bundle')
     java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports-example.jar',
-                                 'com.pants.examples.protobuf.imports.ExampleProtobufImports'],
+                                 'org.pantsbuild.example.protobuf.imports.ExampleProtobufImports'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()
@@ -46,7 +46,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_unpacked_jars(self):
     pants_run = self.run_pants(
-      [ 'bundle', 'examples/src/java/com/pants/examples/protobuf/unpacked_jars',
+      [ 'bundle', 'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars',
         '--bundle-deployjar',])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
@@ -56,7 +56,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                                   pants_run.stdout_data))
     out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-unpacked-jars-example-bundle')
     java_run = subprocess.Popen(['java', '-cp', 'protobuf-unpacked-jars-example.jar',
-                                 'com.pants.examples.protobuf.unpacked_jars.ExampleProtobufExternalArchive'],
+                                 'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()
@@ -72,7 +72,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     # has no terminal attached - ie: colors should be turned off by default in this case.
     pants_run = self.run_pants(['gen.protoc',
                                 '--lang=java',
-                                'testprojects/src/java/com/pants/testproject/proto-ordering',
+                                'testprojects/src/java/org/pantsbuild/testproject/proto-ordering',
                                 '--level=debug',
                                 '--no-colors'])
     self.assert_success(pants_run)

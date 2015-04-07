@@ -15,9 +15,9 @@ configure build-able things in BUILD files.
 + [[Pants Conceptual Overview|pants('src/docs:first_concepts')]]
 + [[First Tutorial|pants('src/docs:first_tutorial')]]
 + [[Target Addresses|pants('src/docs:target_addresses')]]
-+ [[JVM Projects|pants('examples/src/java/com/pants/examples:readme')]]
++ [[JVM Projects|pants('examples/src/java/org/pantsbuild/example:readme')]]
 + [[Python Projects|pants('examples/src/python/example:readme')]]
-+ [[README Files and Markdown|pants('examples/src/java/com/pants/examples:page')]]
++ [[README Files and Markdown|pants('examples/src/java/org/pantsbuild/example:page')]]
 + [[BUILD Files|pants('src/docs:build_files')]]
 + [[Invoking Pants Build|pants('src/docs:invoking')]]
 + [[Troubleshooting|pants('src/docs:tshoot')]]
@@ -36,7 +36,7 @@ Pants Patterns
 Common Pants build idioms.
 
 + [[Third-Party Dependencies|pants('src/docs:3rdparty')]]
-+ [[Thrift|pants('examples/src/thrift/com/pants/examples:readme')]]
++ [[Thrift|pants('examples/src/thrift/org/pantsbuild/example:readme')]]
 + [[Publishing Artifacts|pants('src/docs:publish')]]
 
 Using Pants With...

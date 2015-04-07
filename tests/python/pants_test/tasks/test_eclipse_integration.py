@@ -38,31 +38,31 @@ class EclipseIntegrationTest(PantsRunIntegrationTest):
   # Test Eclipse generation on example targets; ideally should test that the build "works"
 
   def test_eclipse_on_protobuf(self):
-    self._eclipse_test(['examples/src/java/com/pants/examples/protobuf::'])
+    self._eclipse_test(['examples/src/java/org/pantsbuild/example/protobuf::'])
 
   def test_eclipse_on_jaxb(self):
-    self._eclipse_test(['examples/src/java/com/pants/examples/jaxb/main'])
+    self._eclipse_test(['examples/src/java/org/pantsbuild/example/jaxb/main'])
 
   def test_eclipse_on_unicode(self):
-    self._eclipse_test(['testprojects/src/java/com/pants/testproject/unicode::'])
+    self._eclipse_test(['testprojects/src/java/org/pantsbuild/testproject/unicode::'])
 
   def test_eclipse_on_hello(self):
-    self._eclipse_test(['examples/src/java/com/pants/examples/hello::'])
+    self._eclipse_test(['examples/src/java/org/pantsbuild/example/hello::'])
 
   def test_eclipse_on_annotations(self):
-    self._eclipse_test(['examples/src/java/com/pants/examples/annotation::'])
+    self._eclipse_test(['examples/src/java/org/pantsbuild/example/annotation::'])
 
   def test_eclipse_on_all_examples(self):
-    self._eclipse_test(['examples/src/java/com/pants/examples::'])
+    self._eclipse_test(['examples/src/java/org/pantsbuild/example::'])
 
   def test_eclipse_on_java_sources(self):
-    classpath = self._eclipse_test(['testprojects/src/scala/com/pants/testproject/javasources::'])
+    classpath = self._eclipse_test(['testprojects/src/scala/org/pantsbuild/testproject/javasources::'])
     self.assertIn('path="testprojects.src.java"', classpath)
 
   def test_eclipse_on_thriftdeptest(self):
-    self._eclipse_test(['testprojects/src/java/com/pants/testproject/thriftdeptest::'])
+    self._eclipse_test(['testprojects/src/java/org/pantsbuild/testproject/thriftdeptest::'])
 
   def test_eclipse_on_scaladepsonboth(self):
-    classpath = self._eclipse_test(['testprojects/src/scala/com/pants/testproject/scaladepsonboth::'])
+    classpath = self._eclipse_test(['testprojects/src/scala/org/pantsbuild/testproject/scaladepsonboth::'])
     # Previously Java dependencies didn't get included
     self.assertIn('path="testprojects.src.java"', classpath)

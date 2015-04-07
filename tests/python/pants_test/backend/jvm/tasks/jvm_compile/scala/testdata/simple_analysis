@@ -25,22 +25,22 @@ name hashing:
 0 -> false
 products:
 6 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/exe/Exe$$anonfun$main$1.class
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/exe/Exe$.class
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/exe/Exe.class
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/welcome/Welcome$$anonfun$apply$1.class
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/welcome/Welcome$.class
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/welcome/Welcome.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$$anonfun$main$1.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$$anonfun$apply$1.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome.class
 binary dependencies:
 5 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> /src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/java/classes/com/pants/examples/hello/greet/Greeting.class
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/hello/greet/Greeting.class
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> /src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar
 direct source dependencies:
 1 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> /src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> /src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala
 direct external dependencies:
 0 items
 public inherited source dependencies:
@@ -57,49 +57,49 @@ inheritance external dependencies:
 0 items
 class names:
 6 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> com.pants.example.hello.exe.Exe
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> com.pants.example.hello.exe.Exe$
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> com.pants.example.hello.exe.Exe$$anonfun$main$1
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> com.pants.example.hello.welcome.Welcome
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> com.pants.example.hello.welcome.Welcome$
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> com.pants.example.hello.welcome.Welcome$$anonfun$apply$1
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe$
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> org.pantsbuild.example.hello.exe.Exe$$anonfun$main$1
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> org.pantsbuild.example.hello.welcome.Welcome
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> org.pantsbuild.example.hello.welcome.Welcome$
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> org.pantsbuild.example.hello.welcome.Welcome$$anonfun$apply$1
 used names:
 0 items
 product stamps:
 6 items
-/src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/exe/Exe$$anonfun$main$1.class -> lastModified(1426908125000)
-/src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/exe/Exe$.class -> lastModified(1426908125000)
-/src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/exe/Exe.class -> lastModified(1426908124000)
-/src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/welcome/Welcome$$anonfun$apply$1.class -> lastModified(1426908125000)
-/src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/welcome/Welcome$.class -> lastModified(1426908125000)
-/src/pants/.pants.d/compile/jvm/scala/classes/com/pants/example/hello/welcome/Welcome.class -> lastModified(1426908125000)
+/src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$$anonfun$main$1.class -> lastModified(1426908125000)
+/src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe$.class -> lastModified(1426908125000)
+/src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/exe/Exe.class -> lastModified(1426908124000)
+/src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$$anonfun$apply$1.class -> lastModified(1426908125000)
+/src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome$.class -> lastModified(1426908125000)
+/src/pants/.pants.d/compile/jvm/scala/classes/org/pantsbuild/example/hello/welcome/Welcome.class -> lastModified(1426908125000)
 source stamps:
 2 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> hash(7c960d05aac5b607c6e0619bb6b81b6ca580550e)
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> hash(2245c9e68457b389bac32ccaa0dca5ddadd8f1da)
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> hash(7c960d05aac5b607c6e0619bb6b81b6ca580550e)
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> hash(2245c9e68457b389bac32ccaa0dca5ddadd8f1da)
 binary stamps:
 3 items
 /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar -> lastModified(1422417173000)
-/src/pants/.pants.d/compile/jvm/java/classes/com/pants/examples/hello/greet/Greeting.class -> lastModified(1426908117000)
+/src/pants/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/hello/greet/Greeting.class -> lastModified(1426908117000)
 /src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar -> lastModified(1395179187000)
 class names:
 3 items
 /Library/Java/JavaVirtualMachines/jdk1.8.0_40.jdk/Contents/Home/jre/lib/rt.jar -> java.lang.Object
-/src/pants/.pants.d/compile/jvm/java/classes/com/pants/examples/hello/greet/Greeting.class -> com.pants.examples.hello.greet.Greeting
+/src/pants/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/hello/greet/Greeting.class -> org.pantsbuild.example.hello.greet.Greeting
 /src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.4.jar -> scala.collection.TraversableLike
 internal apis:
 2 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> 
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> 
 FakeApiForExe
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> 
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> 
 FakeApiForWelcome
 external apis:
 0 items
 source infos:
 2 items
-/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala -> 
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala -> 
 FakeSourceInfoForExe
-/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala -> 
+/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala -> 
 FakeSourceInfoForWelcome
 compilations:
 0 items

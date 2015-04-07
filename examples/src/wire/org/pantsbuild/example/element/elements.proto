@@ -1,0 +1,18 @@
+// Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+package org.pantsbuild.example.element;
+
+import "org/pantsbuild/example/temperature/temperatures.proto";
+
+/**
+ * Describes an element in the Periodic table
+ */
+message Element {
+  required string symbol = 1;
+  optional string name = 2;
+  required uint32 atomic_number = 3;
+  optional org.pantsbuild.example.temperature.Temperature melting_point = 4;
+  optional org.pantsbuild.example.temperature.Temperature boiling_point = 5;
+}
+

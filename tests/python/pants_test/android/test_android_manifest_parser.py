@@ -27,19 +27,19 @@ class TestAndroidManifestParser(TestXmlBase):
   def test_package_name(self):
     with self.xml_file() as xml:
       manifest = AndroidManifestParser.parse_manifest(xml)
-      self.assertEqual(manifest.package_name, 'com.pants.examples.hello')
+      self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 
   def test_missing_manifest_element(self):
     with self.assertRaises(AndroidManifestParser.BadManifestError):
       with self.xml_file(manifest_element='some_other_element') as xml:
         manifest = AndroidManifestParser.parse_manifest(xml)
-        self.assertEqual(manifest.package_name, 'com.pants.examples.hello')
+        self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 
   def test_missing_package_attribute(self):
     with self.assertRaises(AndroidManifestParser.BadManifestError):
       with self.xml_file(package_attribute='bad_value') as xml:
         manifest = AndroidManifestParser.parse_manifest(xml)
-        self.assertEqual(manifest.package_name, 'com.pants.examples.hello')
+        self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 
   def test_weird_package_name(self):
     # Should accept unexpected package names, the info gets verified in classes that consume it.
@@ -81,7 +81,7 @@ class TestAndroidManifestParser(TestXmlBase):
   def test_application_name(self):
     with self.xml_file() as xml:
       manifest = AndroidManifestParser.parse_manifest(xml)
-      self.assertEqual(manifest.app_name, 'com.pants.examples.hello.HelloWorld')
+      self.assertEqual(manifest.app_name, 'org.pantsbuild.example.hello.HelloWorld')
 
   # These next tests show AndroidManifest.app_name fails silently and returns None.
   def test_no_activity_element(self):

@@ -260,10 +260,10 @@ shown in
 
 `BUILD` targets can use this Repository's alias as the `repo` parameter to an <a
 pantsref="bdict_artifact">`artifact`</a>. For example,
-[examples/src/java/com/pants/examples/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/com/pants/examples/hello/greet/BUILD)
+[examples/src/java/org/pantsbuild/example/hello/greet/BUILD](https://github.com/pantsbuild/pants/blob/master/examples/src/java/org/pantsbuild/example/hello/greet/BUILD)
 refers to the `public` repository defined above. (Notice it's a Python object, not a string.)
 
-!inc[start-at=java_library](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
+!inc[start-at=java_library](../../examples/src/java/org/pantsbuild/example/hello/greet/BUILD)
 
 If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.

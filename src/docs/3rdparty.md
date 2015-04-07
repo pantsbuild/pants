@@ -29,6 +29,6 @@ depends on the version specified in `3rdparty/`, you might depend on
 something which, in turn, depends on some other version.
 
 * For see how this works in JVM languages, see
-  [[JVM 3rdparty Pattern|pants('examples/src/java/com/pants/examples:3rdparty_jvm')]]
+  [[JVM 3rdparty Pattern|pants('examples/src/java/org/pantsbuild/example:3rdparty_jvm')]]
 * For see how this works in Python, see
   [[Python 3rdparty Pattern|pants('examples/src/python/example:3rdparty_py')]]

@@ -6,8 +6,8 @@
 python_tests(name='usethrift',
   sources=['use_thrift_test.py',],
   dependencies=[
-    'examples/src/thrift/com/pants/examples/distance:distance-python',
-    'examples/src/thrift/com/pants/examples/precipitation:precipitation-python',
+    'examples/src/thrift/org/pantsbuild/example/distance:distance-python',
+    'examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-python',
   ],
 )
 

@@ -71,13 +71,13 @@ unique name. With the above config in your pants.ini, invoke pants like
 this, to do a test publish:
 
     :::bash
-    WRAPPER_SRCPATH=examples/src/python PANTS_DEV=1 ./pants publish examples/src/java/com/pants/examples/hello/greet --no-dryrun --local=~/tmp
+    WRAPPER_SRCPATH=examples/src/python PANTS_DEV=1 ./pants publish examples/src/java/org/pantsbuild/example/hello/greet --no-dryrun --local=~/tmp
 
 Now if you examine the `/tmp` directory, you'll notice that an extra jar
 has been published for the `greet` target:
 
     :::bash
-    $ ls -1 /tmp/com/pants/examples/hello-greet/0.0.1-SNAPSHOT/|grep example
+    $ ls -1 /tmp/org/pantsbuild/example/hello-greet/0.0.1-SNAPSHOT/|grep example
     hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar
     hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar.md5
     hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar.sha1

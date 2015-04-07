@@ -24,7 +24,7 @@ def shared_artifacts(version, extra_jar=None):
                          'hello-greet-{0}-sources.jar'.format(version)]
   if extra_jar:
     published_file_list.append(extra_jar)
-  return {'com/pants/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
+  return {'org/pantsbuild/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
 
 
 def publish_extra_config(unique_config):
@@ -64,21 +64,21 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
                       reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
-    unique_artifacts = {'com/pants/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
+    unique_artifacts = {'org/pantsbuild/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'jvm-example-lib-0.0.1-SNAPSHOT.jar',
                          'jvm-example-lib-0.0.1-SNAPSHOT.pom',
                          'jvm-example-lib-0.0.1-SNAPSHOT-sources.jar'],
-                        'com/pants/testproject/publish/hello/welcome/0.0.1-SNAPSHOT':
+                        'org/pantsbuild/testproject/publish/hello/welcome/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'welcome-0.0.1-SNAPSHOT.jar',
                          'welcome-0.0.1-SNAPSHOT.pom',
                          'welcome-0.0.1-SNAPSHOT-sources.jar'],}
-    self.publish_test('testprojects/src/scala/com/pants/testproject/publish:jvm-run-example-lib',
+    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish:jvm-run-example-lib',
                       dict(unique_artifacts.items() + shared_artifacts('0.0.1-SNAPSHOT').items()),
-                      ['com.pants.testproject.publish/hello-greet/publish.properties',
-                       'com.pants.testproject.publish/jvm-example-lib/publish.properties',
-                       'com.pants.testproject.publish.hello/welcome/publish.properties'],
+                      ['org.pantsbuild.testproject.publish/hello-greet/publish.properties',
+                       'org.pantsbuild.testproject.publish/jvm-example-lib/publish.properties',
+                       'org.pantsbuild.testproject.publish.hello/welcome/publish.properties'],
                       extra_options=['--doc-scaladoc-skip'],
                       expected_primary_artifact_count=3,
                       assert_publish_config_contents=True)
@@ -86,47 +86,47 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
                       reason='No javadoc binary on the PATH.')
   def test_java_publish(self):
-    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
-                      ['com.pants.testproject.publish/hello-greet/publish.properties'],)
+                      ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],)
 
   def test_protobuf_publish(self):
-    unique_artifacts = {'com/pants/testproject/publish/protobuf/protobuf-java/0.0.1-SNAPSHOT':
+    unique_artifacts = {'org/pantsbuild/testproject/publish/protobuf/protobuf-java/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'protobuf-java-0.0.1-SNAPSHOT.jar',
                          'protobuf-java-0.0.1-SNAPSHOT.pom',
                          'protobuf-java-0.0.1-SNAPSHOT-sources.jar'],
-                        'com/pants/testproject/protobuf/distance/0.0.1-SNAPSHOT/':
+                        'org/pantsbuild/testproject/protobuf/distance/0.0.1-SNAPSHOT/':
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'distance-0.0.1-SNAPSHOT.jar',
                          'distance-0.0.1-SNAPSHOT.pom',
                          'distance-0.0.1-SNAPSHOT-sources.jar'],}
-    self.publish_test('testprojects/src/java/com/pants/testproject/publish/protobuf:protobuf-java',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/protobuf:protobuf-java',
                       unique_artifacts,
-                      ['com.pants.testproject.publish.protobuf/protobuf-java/publish.properties',
-                       'com.pants.testproject.protobuf/distance/publish.properties'],
+                      ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/publish.properties',
+                       'org.pantsbuild.testproject.protobuf/distance/publish.properties'],
                       extra_options=['--doc-javadoc-skip'],
                       expected_primary_artifact_count=2)
 
   def test_named_snapshot(self):
     name = "abcdef0123456789"
-    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts(name),
-                      ['com.pants.testproject.publish/hello-greet/publish.properties'],
+                      ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--publish-named-snapshot=%s' % name])
 
   def test_publish_override_flag_succeeds(self):
     override = "com.twitter.foo#baz=0.1.0"
-    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
-                      ['com.pants.testproject.publish/hello-greet/publish.properties'],
+                      ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--publish-override=%s' % override])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
   def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
-    self.publish_test('testprojects/src/java/com/pants/testproject/publish/hello/greet',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT', artifact_name),
-                      ['com.pants.testproject.publish/hello-greet/publish.properties'],
+                      ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--doc-javadoc-skip'],
                       extra_config=extra_config,
                       extra_env={'WRAPPER_SRCPATH': 'examples/src/python'},

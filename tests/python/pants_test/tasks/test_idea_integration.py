@@ -78,20 +78,20 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   # checking if they exist.
   def test_idea_on_alternate_project_dir(self):
     alt_dir = os.path.join('.pants.d', 'tmp', 'some', 'random', 'directory', 'for', 'idea', 'stuff')
-    self._idea_test(['examples/src/java/com/pants/examples/hello::'], project_dir=alt_dir)
+    self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], project_dir=alt_dir)
 
   def test_idea_alternate_name(self):
     alt_name = "alt-name"
-    self._idea_test(['examples/src/java/com/pants/examples/hello::'], project_name=alt_name)
+    self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], project_name=alt_name)
 
   def test_idea_on_protobuf(self):
-    self._idea_test(['examples/src/java/com/pants/examples/protobuf::'])
+    self._idea_test(['examples/src/java/org/pantsbuild/example/protobuf::'])
 
   def test_idea_on_jaxb(self): # Make sure it works without ::, pulling deps as necessary.
-    self._idea_test(['examples/src/java/com/pants/examples/jaxb/main'])
+    self._idea_test(['examples/src/java/org/pantsbuild/example/jaxb/main'])
 
   def test_idea_on_unicode(self):
-    self._idea_test(['testprojects/src/java/com/pants/testproject/unicode::'])
+    self._idea_test(['testprojects/src/java/org/pantsbuild/testproject/unicode::'])
 
   def test_idea_on_hello(self):
     def do_check(path):
@@ -101,11 +101,11 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
       expected_paths = ["file://" + os.path.join(get_buildroot(), path) for path in [
-        'examples/src/java/com/pants/example/hello',
-        'examples/src/java/com/pants/examples/hello/greet',
-        'examples/src/java/com/pants/examples/hello/main',
-        'examples/src/java/com/pants/examples/hello/simple',
-        'examples/src/resources/com/pants/example/hello',
+        'examples/src/java/org/pantsbuild/example/hello',
+        'examples/src/java/org/pantsbuild/example/hello/greet',
+        'examples/src/java/org/pantsbuild/example/hello/main',
+        'examples/src/java/org/pantsbuild/example/hello/simple',
+        'examples/src/resources/org/pantsbuild/example/hello',
       ]]
       remaining = set(expected_paths)
       for sourceFolder in self._get_sourceFolders(dom):
@@ -118,13 +118,13 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         remaining.remove(url)
       self.assertTrue(found_source_content)
 
-    self._idea_test(['examples/src/java/com/pants/examples/hello::'], check_func=do_check)
+    self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], check_func=do_check)
 
   def test_idea_on_annotations(self):
-    self._idea_test(['examples/src/java/com/pants/examples/annotation::'])
+    self._idea_test(['examples/src/java/org/pantsbuild/example/annotation::'])
 
   def test_idea_on_all_examples(self):
-    self._idea_test(['examples/src/java/com/pants/examples::'])
+    self._idea_test(['examples/src/java/org/pantsbuild/example::'])
 
   def _check_javadoc_and_sources(self, path, library_name, with_sources=True, with_javadoc=True):
     """
@@ -199,25 +199,25 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     def do_check_no_javadoc(path):
       self._check_javadoc_and_sources(path, 'guava', with_javadoc=False)
 
-    self._idea_test(['examples/src/java/com/pants/examples/annotation::'],
+    self._idea_test(['examples/src/java/org/pantsbuild/example/annotation::'],
                     check_func=do_check)
-    self._idea_test(['examples/src/java/com/pants/examples/annotation::', '--idea-no-source-jars'],
+    self._idea_test(['examples/src/java/org/pantsbuild/example/annotation::', '--idea-no-source-jars'],
                     check_func=do_check_no_sources)
-    self._idea_test(['examples/src/java/com/pants/examples/annotation::', '--idea-no-javadoc-jars'],
+    self._idea_test(['examples/src/java/org/pantsbuild/example/annotation::', '--idea-no-javadoc-jars'],
                     check_func=do_check_no_javadoc)
 
   def test_idea_on_java_sources(self):
-    self._idea_test(['testprojects/src/scala/com/pants/testproject/javasources::'])
+    self._idea_test(['testprojects/src/scala/org/pantsbuild/testproject/javasources::'])
 
   def test_idea_missing_sources(self):
     """Test what happens if we try to fetch sources from a jar that doesn't have any."""
-    self._idea_test(['testprojects/src/java/com/pants/testproject/missing_sources'])
+    self._idea_test(['testprojects/src/java/org/pantsbuild/testproject/missing_sources'])
 
   def test_idea_on_thriftdeptest(self):
-    self._idea_test(['testprojects/src/java/com/pants/testproject/thriftdeptest::'])
+    self._idea_test(['testprojects/src/java/org/pantsbuild/testproject/thriftdeptest::'])
 
   def test_idea_on_scaladepsonboth(self):
-    self._idea_test(['testprojects/src/scala/com/pants/testproject/scaladepsonboth::'])
+    self._idea_test(['testprojects/src/scala/org/pantsbuild/testproject/scaladepsonboth::'])
 
   def test_idea_on_maven_layout(self):
     def do_check(path):
@@ -314,8 +314,8 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     def do_check_override(path):
       assertExpectedInExcludeFolders(path, ["exclude-folder-sentinel"])
 
-    self._idea_test(['examples/src/java/com/pants/examples/hello::'], check_func=do_check_default)
-    self._idea_test(['examples/src/java/com/pants/examples/hello::'], check_func=do_check_override,
+    self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], check_func=do_check_default)
+    self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], check_func=do_check_override,
                     config= {
                       'idea': {'exclude_folders': ['exclude-folder-sentinel']}
                     })
