@@ -5,82 +5,101 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
 <ivysettings>
-  <property name="root.dir" value="${ivy.settings.dir}/../.." override="false"/>
-  <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
-  <properties file="${root.dir}/build.properties" override="false"/>
+    <property name="root.dir" value="${ivy.settings.dir}/../.." override="false"/>
+    <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
+    <properties file="${root.dir}/build.properties" override="false"/>
+    <properties environment="env" />
 
-  <settings defaultResolver="chain-repos"/>
+    <settings defaultResolver="chain-repos"/>
 
-  <macrodef name="_remote_resolvers">
-    <chain returnFirst="true">
-      <ibiblio name="maven2"
-               m2compatible="true"
-               usepoms="true"
-               root="https://repo1.maven.org/maven2/"/>
+    <macrodef name="_remote_resolvers">
+        <chain returnFirst="true">
+            <ibiblio name="maven2"
+                     m2compatible="true"
+                     usepoms="true"
+                     root="https://repo1.maven.org/maven2/"/>
 
-      <!-- This is just for jvm tools used by Pants and not yet published to maven central.
-           Kill once they are published to maven central. -->
-      <ibiblio name="pantsbuild-maven-repo"
-               m2compatible="true"
-               usepoms="true"
-               root="https://dl.bintray.com/pantsbuild/maven/"/>
-    </chain>
-  </macrodef>
+            <!-- This is just for jvm tools used by Pants and not yet published to maven central.
+                 Kill once they are published to maven central. -->
+            <ibiblio name="pantsbuild-maven-repo"
+                     m2compatible="true"
+                     usepoms="true"
+                     root="https://dl.bintray.com/pantsbuild/maven/"/>
+        </chain>
+    </macrodef>
 
-  <property name="sbt.repo.relpath" value="[organization]/[module]/[revision]"/>
-  <property name="sbt.repo.artifact" value="${sbt.repo.relpath}/[type]s/[module].[ext]"/>
-  <property name="sbt.repo.pom" value="${sbt.repo.relpath}/poms/[module].pom"/>
-  <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
-  <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
-  <property name="m2.repo.artifact"
-            value="${m2.repo.relpath}/[artifact]-[revision](-[classifier]).[ext]"/>
+    <property name="sbt.repo.relpath" value="[organization]/[module]/[revision]"/>
+    <property name="sbt.repo.artifact" value="${sbt.repo.relpath}/[type]s/[module].[ext]"/>
+    <property name="sbt.repo.pom" value="${sbt.repo.relpath}/poms/[module].pom"/>
+    <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
+    <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
+    <property name="m2.repo.artifact"
+              value="${m2.repo.relpath}/[artifact]-[revision](-[classifier]).[ext]"/>
 
-  <property name="sbt.repo.dir" value="${user.home}/.ivy2/local" override="false"/>
-  <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
+    <property name="pants-android.repo.artifact"
+              value="[organization]/[artifact]-[revision](-[classifier]).[ext]"/>
 
-  <resolvers>
-    <chain name="chain-repos" returnFirst="true">
-      <_remote_resolvers name="remote-repos"/>
+    <property name="sbt.repo.dir" value="${user.home}/.ivy2/local" override="false"/>
+    <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
+    <property name="pants-android.repo.dir" value="${root.dir}/3rdparty/android" override="false"/>
+    <property name="android.sdk"
+              value="${env.ANDROID_HOME}/extras/android/m2repository/com/android/support" />
+    <property name="android.repo.artifact-pattern"
+              value="[module]/[revision]/[artifact]-[revision]"/>
+    <resolvers>
+        <chain name="chain-repos" returnFirst="true">
+            <_remote_resolvers name="remote-repos"/>
 
-      <!-- Fall back to local repositories
+            <!-- Fall back to local repositories
+                 The <filesystem> entries below are examples of how you can have ivy read from your
+                 local maven or sbt repos, primarily for getting -SNAPSHOTs to work when working
+                 with two different build systems.  If you don't need this feature, you might be
+                 better off leaving them commented out.  They can cause problems when your local
+                 repository diverges from remote repositories.
+                 NB: there is deep ivy magic working here and many stars must align to get -SNAPSHOTs
+                 picked up as they change:
+                 1.) A filesystem resolver must be used (as opposed to an ibiblio resolver with a file
+                     url).
+                 2.) The filesystem resolver ivy pattern must be a pom pattern and [module] must be used
+                     as the name (<artifactId>) component in the pom basename (as opposed to [artifact]).
+                     Its this bit that correctly gets transitive resolution working.
+                 3.) A custom cache with useOrigin="true" must be rigged - the default cache and the cache
+                     create via the ivy CLI with -cache do not useOrigin.  Its this bit combined with 1
+                     that provides a direct link to the local repo pom and jar.
+            -->
 
-           The <filesystem> entries below are examples of how you can have ivy read from your
-           local maven or sbt repos, primarily for getting -SNAPSHOTs to work when working
-           with two different build systems.  If you don't need this feature, you might be
-           better off leaving them commented out.  They can cause problems when your local
-           repository diverges from remote repositories.
+            <!-- sbt standard -->
+            <!--
+            <filesystem name="local.sbt" m2compatible="false" local="true" checkmodified="true">
+              <ivy pattern="${sbt.repo.dir}/${sbt.repo.pom}"/>
+              <artifact pattern="${sbt.repo.dir}/${sbt.repo.artifact}"/>
+            </filesystem>
+            -->
 
-           NB: there is deep ivy magic working here and many stars must align to get -SNAPSHOTs
-           picked up as they change:
-           1.) A filesystem resolver must be used (as opposed to an ibiblio resolver with a file
-               url).
-           2.) The filesystem resolver ivy pattern must be a pom pattern and [module] must be used
-               as the name (<artifactId>) component in the pom basename (as opposed to [artifact]).
-               Its this bit that correctly gets transitive resolution working.
-           3.) A custom cache with useOrigin="true" must be rigged - the default cache and the cache
-               create via the ivy CLI with -cache do not useOrigin.  Its this bit combined with 1
-               that provides a direct link to the local repo pom and jar.
-      -->
+            <!-- mvn standard -->
+            <!--
+            <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
+              <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
+              <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
+            </filesystem>
+            -->
+            <!-- 3rdparty/android, checked-in android jars. -->
+            <filesystem name="local.pants-android" m2compatible="true" local="true" checkmodified="true">
+                <ivy pattern="${pants-android.repo.dir}/${m2.repo.pom}"/>
+                <artifact pattern="${pants-android.repo.dir}/${pants-android.repo.artifact}"/>
+            </filesystem>
 
-      <!-- sbt standard -->
-      <!--
-      <filesystem name="local.sbt" m2compatible="false" local="true" checkmodified="true">
-        <ivy pattern="${sbt.repo.dir}/${sbt.repo.pom}"/>
-        <artifact pattern="${sbt.repo.dir}/${sbt.repo.artifact}"/>
-      </filesystem>
-      -->
+            <!-- Local Android SDK, as pointed to by the ANDROID_HOME environmental variable. -->
+            <filesystem name="local.android" m2compatible="true" local="true" checkmodified="true">
+                <ivy pattern="${android.sdk}/${android.repo.artifact-pattern}.[ext]" />
+                <artifact pattern="${android.sdk}/${android.repo.artifact-pattern}.[ext]" />
+                <artifact pattern="${android.sdk}/${android.repo.artifact-pattern}-sources.[ext]" />
+                <artifact pattern="${android.sdk}/[${android.repo.artifact-pattern}-javadoc.[ext]" />
+            </filesystem>
+        </chain>
+    </resolvers>
 
-      <!-- mvn standard -->
-      <!--
-      <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
-        <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
-        <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
-      </filesystem>
-      -->
-    </chain>
-  </resolvers>
-
-  <caches default="default" lockStrategy="no-lock" useOrigin="true">
-    <cache name="default" basedir="${ivy.cache.dir}"/>
-  </caches>
+    <caches default="default" lockStrategy="no-lock" useOrigin="true">
+        <cache name="default" basedir="${ivy.cache.dir}"/>
+    </caches>
 </ivysettings>

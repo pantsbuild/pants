@@ -61,7 +61,7 @@ class SignApkTask(Task):
   @classmethod
   def signed_package_name(cls, target, build_type):
     """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""
-    return '{0}.{1}.signed.apk'.format(target.app_name, build_type)
+    return '{0}.{1}.signed.apk'.format(target.manifest.package_name, build_type)
 
   def __init__(self, *args, **kwargs):
     super(SignApkTask, self).__init__(*args, **kwargs)

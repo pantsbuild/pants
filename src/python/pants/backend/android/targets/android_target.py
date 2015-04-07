@@ -37,7 +37,6 @@ class AndroidTarget(JvmTarget):
 
     self._manifest_path = manifest
     self._manifest = None
-    self._app_name = None
 
   @property
   def manifest(self):
@@ -56,11 +55,3 @@ class AndroidTarget(JvmTarget):
                                               "path.".format(manifest))
       self._manifest = AndroidManifestParser.parse_manifest(manifest)
     return self._manifest
-
-  @property
-  def app_name(self):
-    """Return application name from the target's manifest or target.name if that cannot be found."""
-    if self._app_name is None:
-      app_name = self.manifest.app_name or self.name
-      self._app_name = app_name.split(".")[-1]
-    return self._app_name
