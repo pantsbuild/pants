@@ -11,24 +11,23 @@ from collections import defaultdict
 from textwrap import dedent
 
 
-class ResourceMappingFormatException(Exception):
-  pass
-
-class MissingItemsLineException(ResourceMappingFormatException):
-  pass
-
-class TooLongFileException(ResourceMappingFormatException):
-  pass
-
-class TruncatedFileException(ResourceMappingFormatException):
-  pass
-
-class UnparseableLineException(ResourceMappingFormatException):
-  pass
-
-
 class ResourceMapping(object):
   RESOURCES_BY_CLASS_NAME_RE = re.compile(r'^(?P<classname>[\w+.\$]+) -> (?P<path>.+)$')
+
+  class ResourceMappingFormatException(Exception):
+    pass
+
+  class MissingItemsLineException(ResourceMappingFormatException):
+    pass
+
+  class TooLongFileException(ResourceMappingFormatException):
+    pass
+
+  class TruncatedFileException(ResourceMappingFormatException):
+    pass
+
+  class UnparseableLineException(ResourceMappingFormatException):
+    pass
 
   def __init__(self, classes_dir):
     self._classes_dir = classes_dir
@@ -40,7 +39,7 @@ class ResourceMapping(object):
         n, items = line.split(" ")
         return int(n)
       except ValueError as error:
-        raise MissingItemsLineException(dedent('''
+        raise self.MissingItemsLineException(dedent('''
           Unable to parse resource mappings.
           Expected "N items", got "{line}: {error}"'''.format(line=line, error=error)))
 
@@ -68,17 +67,17 @@ class ResourceMapping(object):
         items_left -= 1
         match = ResourceMapping.RESOURCES_BY_CLASS_NAME_RE.match(line)
         if not match:
-          raise UnparseableLineException(dedent('''
+          raise self.UnparseableLineException(dedent('''
             Unable to parse resource mappings.
             Expected classname -> path, got "{line}"'''.format(line=line)))
         classname, path = match.group('classname'), match.group('path')
         mappings[classname].append(path)
       else:
-        raise TooLongFileException('Unexpected line "{line}" in section {section}.'.format(
+        raise self.TooLongFileException('Unexpected line "{line}" in section {section}.'.format(
           line=line, section=section))
 
     if items_left:
-      raise TruncatedFileException(dedent('''
+      raise self.TruncatedFileException(dedent('''
         Unable to parse resource mappings.
         Found EOF while still missing {items_left} lines'''.format(items_left=items_left)))
 
