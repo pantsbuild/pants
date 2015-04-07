@@ -34,7 +34,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
   @pytest.mark.skipif('not AaptBuilderIntegrationTest.tools',
                       reason='Android integration test requires tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
-  def skip_test_aapt_bundle(self):
+  def test_aapt_bundle(self):
     self.bundle_test(AndroidIntegrationTest.TEST_TARGET)
 
   def bundle_test(self, target):
