@@ -1,0 +1,4 @@
+resources by class name:
+2 items
+org.pantsbuild.example.Morx -> /home/user/project/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/resource1.txt
+#comment

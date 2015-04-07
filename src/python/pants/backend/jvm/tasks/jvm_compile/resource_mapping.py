@@ -57,6 +57,14 @@ class ResourceMapping(object):
             Expected classname -> path, got "{line}"'''.format(line=line)))
         classname, path = match.group('classname'), match.group('path')
         mappings[classname].append(path)
+      else:
+        raise ValueError('Unexpected line "{line}" in section {section}.'.format(
+          line=line, section=section))
+
+    if items_left:
+      raise ValueError(dedent('''
+        Unable to parse resource mappings.
+        Found EOF while still missing {items_left} lines'''.format(items_left=items_left)))
 
   @property
   def mappings(self):

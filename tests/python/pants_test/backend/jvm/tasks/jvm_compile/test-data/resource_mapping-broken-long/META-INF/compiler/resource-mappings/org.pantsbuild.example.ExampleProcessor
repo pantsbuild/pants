@@ -1,0 +1,6 @@
+resources by class name:
+1 items
+org.pantsbuild.example.Morx -> /home/user/project/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/resource1.txt
+#comment
+org.pantsbuild.example.Fleem -> /home/user/project/.pants.d/compile/jvm/java/classes/org/pantsbuild/example/resource1.txt
+#comment
