@@ -8,7 +8,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,12 +32,15 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -48,17 +50,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteProcessor;
-import com.google.common.io.ByteStreams;
+import com.google.common.io.ByteSource;
 import com.google.common.io.Closer;
 import com.google.common.io.Files;
-import com.google.common.io.InputSupplier;
-
-import org.apache.commons.lang.StringUtils;
-
-import com.twitter.common.base.ExceptionalClosure;
-import com.twitter.common.base.Function;
-import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.io.FileUtils;
 
 /**
  * A utility than can create or update jar archives with special handling of duplicate entries.
@@ -118,7 +112,7 @@ public class JarBuilder implements Closeable {
     /**
      * Returns the contents of the duplicate entry.
      */
-    public InputSupplier<? extends InputStream> getSource() {
+    public ByteSource getSource() {
       return entry.contents;
     }
   }
@@ -191,6 +185,14 @@ public class JarBuilder implements Closeable {
     @Override
     public boolean apply(CharSequence jarPath) {
       return selector.apply(jarPath);
+    }
+
+    @Override
+    public String toString() {
+      return MoreObjects.toStringHelper(this)
+          .add("action", action)
+          .add("selector", selector)
+          .toString();
     }
   }
 
@@ -345,28 +347,24 @@ public class JarBuilder implements Closeable {
     };
   }
 
-  private static final class NamedInputSupplier<T> implements InputSupplier<T> {
-    static <I> NamedInputSupplier<I> create(
-        Source source,
-        String name,
-        InputSupplier<I> inputSupplier) {
-
-      return new NamedInputSupplier<I>(source, name, inputSupplier);
+  private static final class NamedByteSource extends ByteSource {
+    static NamedByteSource create(Source source, String name, ByteSource inputSupplier) {
+      return new NamedByteSource(source, name, inputSupplier);
     }
 
     private final Source source;
     private final String name;
-    private final InputSupplier<T> inputSupplier;
+    private final ByteSource inputSupplier;
 
-    private NamedInputSupplier(Source source, String name, InputSupplier<T> tInputSupplier) {
+    private NamedByteSource(Source source, String name, ByteSource inputSupplier) {
       this.source = source;
       this.name = name;
-      this.inputSupplier = tInputSupplier;
+      this.inputSupplier = inputSupplier;
     }
 
     @Override
-    public T getInput() throws IOException {
-      return inputSupplier.getInput();
+    public InputStream openStream() throws IOException {
+      return inputSupplier.openStream();
     }
   }
 
@@ -391,17 +389,17 @@ public class JarBuilder implements Closeable {
   }
 
   private static class ReadableEntry implements Entry {
-    static final Function<ReadableEntry, NamedInputSupplier<? extends InputStream>> GET_CONTENTS =
-        new Function<ReadableEntry, NamedInputSupplier<? extends InputStream>>() {
-          @Override public NamedInputSupplier<? extends InputStream> apply(ReadableEntry item) {
+    static final Function<ReadableEntry, NamedByteSource> GET_CONTENTS =
+        new Function<ReadableEntry, NamedByteSource>() {
+          @Override public NamedByteSource apply(ReadableEntry item) {
             return item.contents;
           }
         };
 
-    private final NamedInputSupplier<? extends InputStream> contents;
+    private final NamedByteSource contents;
     private final String path;
 
-    ReadableEntry(NamedInputSupplier<? extends InputStream> contents, String path) {
+    ReadableEntry(NamedByteSource contents, String path) {
       this.contents = contents;
       this.path = path;
     }
@@ -425,7 +423,7 @@ public class JarBuilder implements Closeable {
   private static  class ReadableJarEntry extends ReadableEntry {
     private final JarEntry jarEntry;
 
-    public ReadableJarEntry(NamedInputSupplier<? extends InputStream> contents, JarEntry jarEntry) {
+    public ReadableJarEntry(NamedByteSource contents, JarEntry jarEntry) {
       super(contents, jarEntry.getName());
       this.jarEntry = jarEntry;
     }
@@ -492,9 +490,9 @@ public class JarBuilder implements Closeable {
     void onWrite(Entry entry);
   }
 
-  private static InputSupplier<InputStream> manifestSupplier(final Manifest mf) {
-    return new InputSupplier<InputStream>() {
-      @Override public InputStream getInput() throws IOException {
+  private static ByteSource manifestSupplier(final Manifest mf) {
+    return new ByteSource() {
+      @Override public InputStream openStream() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         mf.write(out);
         return new ByteArrayInputStream(out.toByteArray());
@@ -517,8 +515,12 @@ public class JarBuilder implements Closeable {
     return ensureDefaultManifestEntries(new Manifest());
   }
 
-  private static final InputSupplier<InputStream> DEFAULT_MANIFEST =
-      manifestSupplier(createDefaultManifest());
+  private static final ByteSource DEFAULT_MANIFEST = manifestSupplier(createDefaultManifest());
+
+  // TODO(John Sirois): XXX
+  private interface InputSupplier<T> {
+    T getInput() throws IOException;
+  }
 
   private static class JarSupplier implements InputSupplier<JarFile>, Closeable {
     private final Closer closer;
@@ -559,10 +561,8 @@ public class JarBuilder implements Closeable {
   /*
    * Implementations should add jar entries to the given {@code Multimap} index when executed.
    */
-  private interface EntryIndexer
-      extends ExceptionalClosure<Multimap<String, ReadableEntry>, JarBuilderException> {
-
-    // typedef
+  private interface EntryIndexer {
+    void execute(Multimap<String, ReadableEntry> entries) throws JarBuilderException;
   }
 
   private final File target;
@@ -570,7 +570,7 @@ public class JarBuilder implements Closeable {
   private final Closer closer = Closer.create();
   private final List<EntryIndexer> additions = Lists.newLinkedList();
 
-  @Nullable private InputSupplier<InputStream> manifest;
+  @Nullable private ByteSource manifest;
 
   /**
    * Creates a JarBuilder that will write scheduled jar additions to {@code target} upon
@@ -612,16 +612,13 @@ public class JarBuilder implements Closeable {
    * @param jarPath The path of the entry to add.
    * @return This builder for chaining.
    */
-  public JarBuilder add(
-      final InputSupplier<? extends InputStream> contents,
-      final String jarPath) {
-
+  public JarBuilder add(final ByteSource contents, final String jarPath) {
     Preconditions.checkNotNull(contents);
     Preconditions.checkNotNull(jarPath);
 
     additions.add(new EntryIndexer() {
       @Override public void execute(Multimap<String, ReadableEntry> entries) {
-        add(entries, NamedInputSupplier.create(memorySource(), jarPath, contents), jarPath);
+        add(entries, NamedByteSource.create(memorySource(), jarPath, contents), jarPath);
       }
     });
     return this;
@@ -640,7 +637,7 @@ public class JarBuilder implements Closeable {
   public JarBuilder addDirectory(final File directory, final Optional<String> jarPath) {
     Preconditions.checkArgument(directory.isDirectory(),
         "Expected a directory, given a file: %s", directory);
-    Preconditions.checkArgument(!jarPath.isPresent() || StringUtils.isNotBlank(jarPath.get()));
+    Preconditions.checkArgument(!jarPath.isPresent() || !jarPath.or("").trim().isEmpty());
 
     additions.add(new EntryIndexer() {
       @Override public void execute(Multimap<String, ReadableEntry> entries)
@@ -650,21 +647,21 @@ public class JarBuilder implements Closeable {
         Iterable<String> jarBasePath = jarPath.isPresent()
             ? JAR_PATH_SPLITTER.split(jarPath.get()) : ImmutableList.<String>of();
 
-        Collection<File> files =
-            org.apache.commons.io.FileUtils.listFiles(
-                directory,
-                null /* any extension */,
-                true /* recursive */);
+        Iterable<File> files =
+            Files.fileTreeTraverser()
+                .preOrderTraversal(directory)
+                .filter(Files.isFile());
+
         for (File child : files) {
           Iterable<String> relpathComponents = relpathComponents(child, directory);
           Iterable<String> path = Iterables.concat(jarBasePath, relpathComponents);
           String entryPath = JAR_PATH_JOINER.join(relpathComponents);
           if (!JarFile.MANIFEST_NAME.equals(entryPath)) {
-            NamedInputSupplier<FileInputStream> contents =
-                NamedInputSupplier.create(
+            NamedByteSource contents =
+                NamedByteSource.create(
                     directorySource,
                     entryPath,
-                    Files.newInputStreamSupplier(child));
+                    Files.asByteSource(child));
             add(entries, contents, JAR_PATH_JOINER.join(path));
           }
         }
@@ -685,21 +682,22 @@ public class JarBuilder implements Closeable {
   public JarBuilder addFile(final File file, final String jarPath) {
     Preconditions.checkArgument(!file.isDirectory(),
         "Expected a file, given a directory: %s", file);
-    MorePreconditions.checkNotBlank(jarPath);
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(jarPath));
 
     additions.add(new EntryIndexer() {
-      @Override public void execute(Multimap<String, ReadableEntry> entries)
+      @Override
+      public void execute(Multimap<String, ReadableEntry> entries)
           throws JarBuilderException {
 
         if (JarFile.MANIFEST_NAME.equals(jarPath)) {
           throw new JarBuilderException(
               "A custom manifest entry should be added via the useCustomManifest methods");
         }
-        NamedInputSupplier<FileInputStream> contents =
-            NamedInputSupplier.create(
+        NamedByteSource contents =
+            NamedByteSource.create(
                 fileSource(file),
                 file.getName(),
-                Files.newInputStreamSupplier(file));
+                Files.asByteSource(file));
         add(entries, contents, jarPath);
       }
     });
@@ -717,17 +715,18 @@ public class JarBuilder implements Closeable {
     Preconditions.checkNotNull(file);
 
     additions.add(new EntryIndexer() {
-      @Override public void execute(final Multimap<String, ReadableEntry> entries)
+      @Override
+      public void execute(final Multimap<String, ReadableEntry> entries)
           throws IndexingException {
 
         final InputSupplier<JarFile> jarSupplier = closer.register(new JarSupplier(file));
         final Source jarSource = jarSource(file);
         try {
-          enumerateJarEntries(file, new ExceptionalClosure<JarEntry, IOException>() {
-            @Override public void execute(JarEntry entry) throws IOException {
+          enumerateJarEntries(file, new JarEntryVisitor() {
+            @Override public void visit(JarEntry entry) throws IOException {
               if (!entry.isDirectory() && !JarFile.MANIFEST_NAME.equals(entry.getName())) {
-                NamedInputSupplier<InputStream> contents =
-                    NamedInputSupplier.create(
+                NamedByteSource contents =
+                    NamedByteSource.create(
                         jarSource,
                         entry.getName(),
                         entrySupplier(jarSupplier, entry));
@@ -745,16 +744,16 @@ public class JarBuilder implements Closeable {
 
   private static void add(
       Multimap<String, ReadableEntry> entries,
-      final NamedInputSupplier<? extends InputStream> contents,
-      final String jarPath) {
+      NamedByteSource contents,
+      String jarPath) {
 
     entries.put(jarPath, new ReadableEntry(contents, jarPath));
   }
 
   private static void add(
       Multimap<String, ReadableEntry> entries,
-      final NamedInputSupplier<? extends InputStream> contents,
-      final JarEntry jarEntry) {
+      NamedByteSource contents,
+      JarEntry jarEntry) {
 
     entries.put(jarEntry.getName(), new ReadableJarEntry(contents, jarEntry));
   }
@@ -781,11 +780,11 @@ public class JarBuilder implements Closeable {
   public JarBuilder useCustomManifest(File customManifest) {
     Preconditions.checkNotNull(customManifest);
 
-    NamedInputSupplier<FileInputStream> contents =
-        NamedInputSupplier.create(
+    NamedByteSource contents =
+        NamedByteSource.create(
             fileSource(customManifest),
             customManifest.getPath(),
-            Files.newInputStreamSupplier(customManifest));
+            Files.asByteSource(customManifest));
     return useCustomManifest(contents);
   }
 
@@ -799,11 +798,10 @@ public class JarBuilder implements Closeable {
     Preconditions.checkNotNull(customManifest);
 
     return useCustomManifest(
-        NamedInputSupplier.create(
+        NamedByteSource.create(
             memorySource(),
             JarFile.MANIFEST_NAME,
-            ByteStreams.newInputStreamSupplier(
-                customManifest.toString().getBytes(Charsets.UTF_8))));
+            ByteSource.wrap(customManifest.toString().getBytes(Charsets.UTF_8))));
   }
 
   /**
@@ -812,15 +810,13 @@ public class JarBuilder implements Closeable {
    * @param customManifest The manifest to use for the built jar.
    * @return This builder for chaining.
    */
-  public JarBuilder useCustomManifest(
-      final NamedInputSupplier<? extends InputStream> customManifest) {
-
+  public JarBuilder useCustomManifest(final NamedByteSource customManifest) {
     Preconditions.checkNotNull(customManifest);
     return useCustomManifest(new InputSupplier<Manifest>() {
       @Override public Manifest getInput() throws IOException {
         Manifest mf = new Manifest();
         try {
-          mf.read(customManifest.getInput());
+          mf.read(customManifest.openStream());
           return mf;
         } catch (IOException e) {
           throw new JarCreationException(
@@ -831,9 +827,9 @@ public class JarBuilder implements Closeable {
   }
 
   private JarBuilder useCustomManifest(final InputSupplier<Manifest> manifestSource) {
-    manifest = new InputSupplier<InputStream>() {
-      @Override public InputStream getInput() throws IOException {
-        return manifestSupplier(manifestSource.getInput()).getInput();
+    manifest = new ByteSource() {
+      @Override public InputStream openStream() throws IOException {
+        return manifestSupplier(manifestSource.getInput()).openStream();
       }
     };
     return this;
@@ -919,35 +915,35 @@ public class JarBuilder implements Closeable {
 
     final Iterable<ReadableEntry> entries = getEntries(skipPath, duplicateHandler);
 
-    FileUtils.SYSTEM_TMP.doWithFile(new ExceptionalClosure<File, IOException>() {
-      @Override public void execute(File tmp) throws IOException {
-        try {
-          JarWriter writer = jarWriter(tmp, compress);
-          writer.write(JarFile.MANIFEST_NAME, manifest == null ? DEFAULT_MANIFEST : manifest);
-          List<ReadableJarEntry> jarEntries = Lists.newArrayList();
-          for (ReadableEntry entry : entries) {
-            if (entry instanceof ReadableJarEntry) {
-              jarEntries.add((ReadableJarEntry) entry);
-            } else {
-              writer.write(entry.getJarPath(), entry.contents);
-            }
+    File tmp = File.createTempFile(target.getName(), ".tmp", target.getParentFile());
+    try {
+      try {
+        JarWriter writer = jarWriter(tmp, compress);
+        writer.write(JarFile.MANIFEST_NAME, manifest == null ? DEFAULT_MANIFEST : manifest);
+        List<ReadableJarEntry> jarEntries = Lists.newArrayList();
+        for (ReadableEntry entry : entries) {
+          if (entry instanceof ReadableJarEntry) {
+            jarEntries.add((ReadableJarEntry) entry);
+          } else {
+            writer.write(entry.getJarPath(), entry.contents);
           }
-          copyJarFiles(writer, jarEntries);
-
-          // Close all open files, the moveFile below might need to copy instead of just rename.
-          closer.close();
-
-          // Rename the file (or copy if it can't be renamed)
-          target.delete();
-          org.apache.commons.io.FileUtils.moveFile(tmp, target);
-        } catch (IOException e) {
-          throw closer.rethrow(e);
-        } finally {
-          closer.close();
         }
+        copyJarFiles(writer, jarEntries);
 
+        // Close all open files, the moveFile below might need to copy instead of just rename.
+        closer.close();
+
+        // Rename the file (or copy if it can't be renamed)
+        target.delete();
+        Files.move(tmp, target);
+      } catch (IOException e) {
+        throw closer.rethrow(e);
+      } finally {
+        closer.close();
       }
-    });
+    } finally {
+      tmp.delete();
+    }
     return target;
   }
 
@@ -1034,12 +1030,12 @@ public class JarBuilder implements Closeable {
         return Optional.of(replacement);
 
       case CONCAT:
-        InputSupplier<InputStream> concat =
-            ByteStreams.join(Iterables.transform(itemEntries, ReadableEntry.GET_CONTENTS));
+        ByteSource concat =
+            ByteSource.concat(Iterables.transform(itemEntries, ReadableEntry.GET_CONTENTS));
 
         ReadableEntry concatenatedEntry =
             new ReadableEntry(
-                NamedInputSupplier.create(memorySource(), jarPath, concat),
+                NamedByteSource.create(memorySource(), jarPath, concat),
                 jarPath);
 
         listener.onConcat(jarPath, itemEntries);
@@ -1058,10 +1054,10 @@ public class JarBuilder implements Closeable {
     if (target.exists() && target.length() > 0) {
       final InputSupplier<JarFile> jarSupplier = closer.register(new JarSupplier(target));
       try {
-        enumerateJarEntries(target, new ExceptionalClosure<JarEntry, IOException>() {
-          @Override public void execute(JarEntry jarEntry) throws IOException {
+        enumerateJarEntries(target, new JarEntryVisitor() {
+          @Override public void visit(JarEntry jarEntry) throws IOException {
             String entryPath = jarEntry.getName();
-            InputSupplier<InputStream> contents = entrySupplier(jarSupplier, jarEntry);
+            ByteSource contents = entrySupplier(jarSupplier, jarEntry);
             if (JarFile.MANIFEST_NAME.equals(entryPath)) {
               if (manifest == null) {
                 manifest = contents;
@@ -1070,7 +1066,7 @@ public class JarBuilder implements Closeable {
               entries.put(
                   entryPath,
                   new ReadableJarEntry(
-                      NamedInputSupplier.create(jarSource(target), entryPath, contents),
+                      NamedByteSource.create(jarSource(target), entryPath, contents),
                       jarEntry));
             }
           }
@@ -1079,21 +1075,24 @@ public class JarBuilder implements Closeable {
         throw new IndexingException(target, e);
       }
     }
-    for (ExceptionalClosure<Multimap<String, ReadableEntry>,
-                            JarBuilderException> addition : additions) {
+    for (EntryIndexer addition : additions) {
       addition.execute(entries);
     }
     return entries;
   }
 
-  private void enumerateJarEntries(File jarFile, ExceptionalClosure<JarEntry, IOException> work)
+  private interface JarEntryVisitor {
+    void visit(JarEntry item) throws IOException;
+  }
+
+  private void enumerateJarEntries(File jarFile, JarEntryVisitor visitor)
       throws IOException {
 
     Closer jarFileCloser = Closer.create();
     JarFile jar = JarFileUtil.openJarFile(jarFileCloser, jarFile);
     try {
       for (Enumeration<JarEntry> entries = jar.entries(); entries.hasMoreElements();) {
-        work.execute(entries.nextElement());
+        visitor.visit(entries.nextElement());
       }
     } catch (IOException e) {
       throw jarFileCloser.rethrow(e);
@@ -1110,7 +1109,7 @@ public class JarBuilder implements Closeable {
         this.compress = compress;
       }
 
-      JarEntry createEntry(String path, InputSupplier<? extends InputStream> contents)
+      JarEntry createEntry(String path, ByteSource contents)
           throws IOException {
 
         JarEntry entry = new JarEntry(path);
@@ -1121,20 +1120,22 @@ public class JarBuilder implements Closeable {
         return entry;
       }
 
-      private void prepareEntry(JarEntry entry, InputSupplier<? extends InputStream> contents)
+      private void prepareEntry(JarEntry entry, ByteSource contents)
           throws IOException {
 
         final CRC32 crc32 = new CRC32();
-        long size = ByteStreams.readBytes(contents, new ByteProcessor<Long>() {
+        long size = contents.read(new ByteProcessor<Long>() {
           private long size = 0;
 
-          @Override public boolean processBytes(byte[] buf, int off, int len) throws IOException {
+          @Override
+          public boolean processBytes(byte[] buf, int off, int len) throws IOException {
             size += len;
             crc32.update(buf, off, len);
             return true;
           }
 
-          @Override public Long getResult() {
+          @Override
+          public Long getResult() {
             return size;
           }
         });
@@ -1154,12 +1155,10 @@ public class JarBuilder implements Closeable {
       this.entryFactory = new EntryFactory(compress);
     }
 
-    public void write(String path, InputSupplier<? extends InputStream> contents)
-        throws IOException {
-
+    public void write(String path, ByteSource contents) throws IOException {
       ensureParentDir(path);
       out.putNextEntry(entryFactory.createEntry(path, contents));
-      ByteStreams.copy(contents, out);
+      contents.copyTo(out);
     }
 
     public void copy(String path, JarFile jarIn, JarEntry srcJarEntry) throws IOException {
@@ -1195,12 +1194,9 @@ public class JarBuilder implements Closeable {
     return new JarWriter(jar, compress);
   }
 
-  private static InputSupplier<InputStream> entrySupplier(
-      final InputSupplier<JarFile> jar,
-      final JarEntry entry) {
-
-    return new InputSupplier<InputStream>() {
-      @Override public InputStream getInput() throws IOException {
+  private static ByteSource entrySupplier(final InputSupplier<JarFile> jar, final JarEntry entry) {
+    return new ByteSource() {
+      @Override public InputStream openStream() throws IOException {
         return jar.getInput().getInputStream(entry);
       }
     };

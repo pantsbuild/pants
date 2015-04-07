@@ -38,7 +38,7 @@ public class JarEntryCopierTest {
    *     13 hello-world.txt      # Hello World! 1 time  (STORED)
    * </PRE>
    */
-  static final String A_JAR = "tests/resources/org.pantsbuild.tools.jar/tool/a.jar";
+  static final String A_JAR = "tests/resources/org/pantsbuild/tools/jar/a.jar";
 
   /**
    * Contains:
@@ -49,7 +49,7 @@ public class JarEntryCopierTest {
    *     15 goodbye-world.txt      # Hello World! 1 time (STORED)
    * </PRE>
    */
-  static final String B_JAR = "tests/resources/org.pantsbuild.tools.jar/tool/b.jar";
+  static final String B_JAR = "tests/resources/org/pantsbuild/tools/jar/b.jar";
 
   /**
    * Contains:
@@ -61,7 +61,7 @@ public class JarEntryCopierTest {
    *     20 dir/jar-with-a-dir.txt
    * </PRE>
    */
-  static final String C_JAR = "tests/resources/org.pantsbuild.tools.jar/tool/c.jar";
+  static final String C_JAR = "tests/resources/org/pantsbuild/tools/jar/c.jar";
 
   @Test
   public void testSuperShadySimple() throws Exception {

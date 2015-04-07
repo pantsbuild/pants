@@ -15,9 +15,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import com.google.common.base.Preconditions;
+import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
-
-import org.apache.commons.io.IOUtils;
 
 /**
  * Copies jar entries from one jar to another without de-compressing and re-compressing when the
@@ -133,7 +132,7 @@ final class JarEntryCopier {
       try {
         InputStream is = closer.register(jarIn.getInputStream(jarEntry));
         jarOut.putNextEntry(outEntry);
-        IOUtils.copy(is, jarOut);
+        ByteStreams.copy(is, jarOut);
       } catch (IOException e) {
         throw closer.rethrow(e);
       } finally {
@@ -154,7 +153,7 @@ final class JarEntryCopier {
         // This works because ZipFile doesn't make a defensive copy.
         outEntry.setMethod(ZipEntry.STORED);
         outEntry.setSize(jarEntry.getCompressedSize());
-        IOUtils.copy(is, jarOut);
+        ByteStreams.copy(is, jarOut);
       } catch (IOException e) {
         throw closer.rethrow(e);
       } finally {

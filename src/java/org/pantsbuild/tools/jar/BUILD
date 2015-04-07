@@ -5,9 +5,10 @@ java_library(
   name='jar',
   sources=globs('*.java'),
   dependencies=[
-    '3rdparty:commons-io',
+    '3rdparty:args4j',
     '3rdparty:guava',
     '3rdparty:jsr305',
+    'src/java/org/pantsbuild/args4j'
   ],
   provides=artifact(
     org='org.pantsbuild',
@@ -19,7 +20,7 @@ java_library(
 jvm_binary(
   name='main',
   basename='jar-tool',
-  main='org.pantsbuild.tool.jar.Main',
+  main='org.pantsbuild.tools.jar.Main',
   dependencies=[
     ':jar',
   ]

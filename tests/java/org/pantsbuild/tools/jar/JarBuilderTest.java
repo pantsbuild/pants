@@ -16,43 +16,45 @@ import java.util.jar.Manifest;
 import java.util.regex.Pattern;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
-import com.google.common.io.InputSupplier;
+import com.google.common.io.Files;
+import com.google.common.reflect.TypeToken;
 import com.google.common.testing.TearDown;
-import com.google.common.testing.junit4.TearDownTestCase;
+import com.google.common.testing.TearDownStack;
 
-import org.apache.commons.io.FileUtils;
 import org.easymock.Capture;
+import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
-import com.twitter.common.base.ExceptionalClosure;
-import com.twitter.common.base.ExceptionalFunction;
-import com.twitter.common.base.Function;
-import org.pantsbuild.tools.jar.tool.JarBuilder.DuplicateAction;
-import org.pantsbuild.tools.jar.tool.JarBuilder.DuplicateEntryException;
-import org.pantsbuild.tools.jar.tool.JarBuilder.DuplicateHandler;
-import org.pantsbuild.tools.jar.tool.JarBuilder.DuplicatePolicy;
-import org.pantsbuild.tools.jar.tool.JarBuilder.Entry;
-import org.pantsbuild.tools.jar.tool.JarBuilder.Listener;
-import com.twitter.common.testing.easymock.EasyMockTest;
-
-import static com.google.common.testing.junit4.JUnitAsserts.assertNotEqual;
+import org.pantsbuild.tools.jar.JarBuilder.DuplicateAction;
+import org.pantsbuild.tools.jar.JarBuilder.DuplicateEntryException;
+import org.pantsbuild.tools.jar.JarBuilder.DuplicateHandler;
+import org.pantsbuild.tools.jar.JarBuilder.DuplicatePolicy;
+import org.pantsbuild.tools.jar.JarBuilder.Entry;
+import org.pantsbuild.tools.jar.JarBuilder.Listener;
 
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.newCapture;
 import static org.easymock.EasyMock.replay;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -60,13 +62,62 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class JarBuilderTest {
+  interface ExceptionalClosure<T, E extends Exception> {
+    void execute(T input) throws E;
+  }
+
+  interface ExceptionalFunction<S, T, E extends Exception> {
+    T apply(S input) throws E;
+  }
+
+  public static class TearDownTestCase {
+
+    private TearDownStack tearDowns;
+
+    @Before
+    public final void setUpTearDowns() {
+      tearDowns = new TearDownStack();
+    }
+
+    @After
+    public final void runTearDowns() {
+      tearDowns.runTearDown();
+    }
+
+    protected final void addTearDown(TearDown tearDown) {
+      Preconditions.checkState(tearDowns != null);
+      tearDowns.addTearDown(tearDown);
+    }
+  }
+
+  public static class EasyMockTest extends TearDownTestCase {
+    protected IMocksControl control;
+
+    @Before
+    public final void setupControl() {
+      control = createControl();
+      addTearDown(new TearDown() {
+        @Override
+        public void tearDown() {
+          control.verify();
+        }
+      });
+    }
+
+    protected <T> T createMock(TypeToken<T> token) {
+      @SuppressWarnings("unchecked")
+      Class<T> rawType = (Class<T>) token.getRawType();
+      return control.createMock(rawType);
+    }
+  }
 
   public static class DuplicatePolicyTests {
 
     public static class DelegateTest extends EasyMockTest {
       @Test
       public void testPassDelegates() {
-        Predicate<CharSequence> predicate = createMock(new Clazz<Predicate<CharSequence>>() { });
+        Predicate<CharSequence> predicate =
+            createMock(new TypeToken<Predicate<CharSequence>>() { });
         expect(predicate.apply("foo")).andReturn(true);
         expect(predicate.apply("foo")).andReturn(false);
         control.replay();
@@ -123,8 +174,7 @@ public class JarBuilderTest {
       public static Collection<Object[]> data() {
         return FluentIterable.from(ImmutableList.copyOf(DuplicateAction.values()))
             .transform(new Function<DuplicateAction, Object[]>() {
-              @Override
-              public Object[] apply(DuplicateAction item) {
+              @Override public Object[] apply(DuplicateAction item) {
                 return new Object[]{item};
               }
             }).toList();
@@ -148,8 +198,10 @@ public class JarBuilderTest {
     public static class DuplicateHandlerTest extends EasyMockTest {
       @Test
       public void test() {
-        Predicate<CharSequence> predicate1 = createMock(new Clazz<Predicate<CharSequence>>() { });
-        Predicate<CharSequence> predicate2 = createMock(new Clazz<Predicate<CharSequence>>() { });
+        Predicate<CharSequence> predicate1 =
+            createMock(new TypeToken<Predicate<CharSequence>>() { });
+        Predicate<CharSequence> predicate2 =
+            createMock(new TypeToken<Predicate<CharSequence>>() { });
 
         // test1
         expect(predicate1.apply("a")).andReturn(true);
@@ -177,59 +229,47 @@ public class JarBuilderTest {
 
   public static class WriteTestBase extends TearDownTestCase {
 
-    protected static InputSupplier<? extends InputStream> content(String content) {
-      return ByteStreams.newInputStreamSupplier(content.getBytes(Charsets.UTF_8));
+    protected static ByteSource content(String content) {
+      return ByteSource.wrap(content.getBytes(Charsets.UTF_8));
     }
 
-    protected static String content(InputSupplier<? extends InputStream> content)
-        throws IOException {
-
-      return new String(ByteStreams.toByteArray(content), Charsets.UTF_8);
+    protected static String content(ByteSource content) throws IOException {
+      return new String(content.read(), Charsets.UTF_8);
     }
 
-    private com.twitter.common.io.FileUtils.Temporary temporary;
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
     private Closer tearDownCloser;
 
     @Before
     public void setUpCloser() {
-      temporary = com.twitter.common.io.FileUtils.SYSTEM_TMP;
       tearDownCloser = Closer.create();
-    }
-
-    @After
-    public void tearDownCloser() throws IOException {
-      tearDownCloser.close();
+      addTearDown(new TearDown() {
+        @Override public void tearDown() throws IOException {
+          tearDownCloser.close();
+        }
+      });
     }
 
     protected File newFile() throws IOException {
-      final File file = temporary.createFile();
-      addTearDown(new TearDown() {
-        @Override public void tearDown() {
-          file.delete();
-        }
-      });
-      org.apache.commons.io.FileUtils.touch(file);
+      File file = temporary.newFile();
+      Files.touch(file);
       return file;
     }
 
     protected File newFile(String name) throws IOException {
       File file = new File(newFolder(), name);
-      org.apache.commons.io.FileUtils.touch(file);
+      Files.touch(file);
       return file;
     }
 
-    protected File newFolder(String path) {
+    protected File newFolder(String path) throws IOException {
       return new File(newFolder(), path);
     }
 
-    protected File newFolder() {
-      final File dir = temporary.createDir();
-      addTearDown(new TearDown() {
-        @Override public void tearDown() {
-          FileUtils.deleteQuietly(dir);
-        }
-      });
-      return dir;
+    protected File newFolder() throws IOException {
+      return temporary.newFolder();
     }
 
     protected JarBuilder jarBuilder() throws IOException {
@@ -242,6 +282,11 @@ public class JarBuilderTest {
 
     protected JarBuilder jarBuilder(File destinationJar, Listener listener) {
       return tearDownCloser.register(new JarBuilder(destinationJar, listener));
+    }
+
+    protected void write(File file, String contents) throws IOException {
+      Files.createParentDirs(file);
+      Files.write(contents, file, Charsets.UTF_8);
     }
   }
 
@@ -394,7 +439,7 @@ public class JarBuilderTest {
         @Override public void execute(JarFile updated) throws IOException {
           assertListing(updated);
           Manifest updatedManifest = updated.getManifest();
-          assertNotEqual(manifest, updatedManifest);
+          assertFalse(manifest.equals(updatedManifest));
           assertEquals(customManifest, updatedManifest);
         }
       });
@@ -415,8 +460,8 @@ public class JarBuilderTest {
     @Test
     public void testAddDirectory() throws IOException {
       File dir = newFolder("life/of/brian");
-      FileUtils.write(new File(dir, "is"), "42");
-      FileUtils.write(new File(dir, "used/to/be"), "1/137");
+      write(new File(dir, "is"), "42");
+      write(new File(dir, "used/to/be"), "1/137");
 
       File destinationJar = jarBuilder()
           .addDirectory(dir, Optional.<String>absent())
@@ -473,8 +518,8 @@ public class JarBuilderTest {
     @Test
     public void testSkip() throws IOException {
       File dir = newFolder("life/of/brian");
-      FileUtils.write(new File(dir, "is"), "42");
-      FileUtils.write(new File(dir, "used/to/be"), "4");
+      write(new File(dir, "is"), "42");
+      write(new File(dir, "used/to/be"), "4");
 
       File sourceJar =
           jarBuilder()
@@ -526,7 +571,7 @@ public class JarBuilderTest {
       File jar = jarBuilder().add(content("more\n"), "meaning/of/life").write();
 
       File dir = newFolder("life/of");
-      FileUtils.write(new File(dir, "life"), "jane");
+      write(new File(dir, "life"), "jane");
 
       jarBuilder(destinationJar)
           .addJar(jar)
@@ -656,7 +701,7 @@ public class JarBuilderTest {
     @Test
     public void testOnSkip() throws IOException {
       Listener listener = createMock(Listener.class);
-      Capture<Iterable<? extends Entry>> skipped = new Capture<Iterable<? extends Entry>>();
+      Capture<Iterable<? extends Entry>> skipped = newCapture();
       listener.onSkip(eq(Optional.<Entry>absent()), capture(skipped));
       replay(listener);
 
@@ -673,7 +718,8 @@ public class JarBuilderTest {
     @Test
     public void testOnWrite() throws IOException {
       Listener listener = createMock(Listener.class);
-      Capture<Entry> written = new Capture<Entry>();
+      Capture<Entry> written = newCapture();
+
       listener.onWrite(capture(written));
       replay(listener);
 
@@ -687,8 +733,8 @@ public class JarBuilderTest {
     @Test
     public void testOnDuplicateSkip() throws IOException {
       Listener listener = createMock(Listener.class);
-      Capture<Optional<Entry>> retained = new Capture<Optional<Entry>>();
-      Capture<Iterable<? extends Entry>> skipped = new Capture<Iterable<? extends Entry>>();
+      Capture<Optional<Entry>> retained = newCapture();
+      Capture<Iterable<? extends Entry>> skipped = newCapture();
       listener.onSkip(capture(retained), capture(skipped));
       replay(listener);
 
@@ -711,7 +757,7 @@ public class JarBuilderTest {
     @Test
     public void testOnDuplicateConcat() throws IOException {
       Listener listener = createMock(Listener.class);
-      Capture<Iterable<? extends Entry>> concatenated = new Capture<Iterable<? extends Entry>>();
+      Capture<Iterable<? extends Entry>> concatenated = newCapture();
       listener.onConcat(eq("concatenated/write"), capture(concatenated));
       replay(listener);
 
@@ -732,8 +778,8 @@ public class JarBuilderTest {
     @Test
     public void testOnDuplicateReplace() throws IOException {
       Listener listener = createMock(Listener.class);
-      Capture<Iterable<? extends Entry>> originals = new Capture<Iterable<? extends Entry>>();
-      Capture<Entry> replacement = new Capture<Entry>();
+      Capture<Iterable<? extends Entry>> originals = newCapture();
+      Capture<Entry> replacement = newCapture();
       listener.onReplace(capture(originals), capture(replacement));
       replay(listener);
 

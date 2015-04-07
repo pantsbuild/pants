@@ -5,13 +5,13 @@ junit_tests(
   name='jar',
   sources=globs('*.java'),
   dependencies=[
-    '3rdparty:commons-io',
+    '3rdparty:easymock',
     '3rdparty:guava',
     '3rdparty:guava-testlib',
     '3rdparty:junit',
     'src/java/org/pantsbuild/tools/jar',
   ],
   resources=[
-    'tests/resources/org/pantsbuild/tool/jar',
+    'tests/resources/org/pantsbuild/tools/jar',
   ],
 )
