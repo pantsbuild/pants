@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants.backend.core.tasks.minimal_cover import MinimalCover
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseMinimalCovertTest(ConsoleTaskTestBase):

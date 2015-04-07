@@ -10,7 +10,7 @@ from textwrap import dedent
 
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.address import SyntheticAddress
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class PythonTaskTest(TaskTestBase):

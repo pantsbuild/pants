@@ -16,7 +16,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseFilterTest(ConsoleTaskTestBase):

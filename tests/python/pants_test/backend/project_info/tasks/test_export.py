@@ -22,7 +22,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import Export
 from pants.base.exceptions import TaskError
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ProjectInfoTest(ConsoleTaskTestBase):

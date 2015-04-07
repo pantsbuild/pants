@@ -14,7 +14,7 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseListTargetsTest(ConsoleTaskTestBase):

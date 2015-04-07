@@ -13,7 +13,7 @@ from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_rmtree, touch
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class DuplicateDetectorTest(TaskTestBase):

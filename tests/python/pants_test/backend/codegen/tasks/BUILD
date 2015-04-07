@@ -20,7 +20,6 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:antlr_gen',
-    'tests/python/pants_test/tasks:base',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
 )
@@ -32,7 +31,6 @@ python_tests(
     'src/python/pants/backend/codegen/tasks:jaxb_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:base',
   ],
 )
 
@@ -44,7 +42,7 @@ python_tests(
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )
 
@@ -54,7 +52,6 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/codegen/tasks:protobuf_parse',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:base',
   ],
 )
 
@@ -70,8 +67,7 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal:context',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/tasks:base',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )
 
@@ -86,6 +82,6 @@ python_tests(
     'src/python/pants/base:source_root',
     'src/python/pants/base:validation',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )

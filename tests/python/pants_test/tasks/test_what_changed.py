@@ -18,7 +18,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.goal.workspace import Workspace
-from pants_test.tasks.test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseWhatChangedTest(ConsoleTaskTestBase):

@@ -49,15 +49,6 @@ python_library(
 )
 
 python_library(
-  name = 'task_test_base',
-  sources = ['task_test_base.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    ':base_test',
-  ]
-)
-
-python_library(
   name = 'int-test',
   sources = ['pants_run_integration_test.py'],
   dependencies = [

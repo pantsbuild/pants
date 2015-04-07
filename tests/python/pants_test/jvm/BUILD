@@ -20,7 +20,7 @@ python_library(
     'src/python/pants/base:config',
     'src/python/pants/base:extension_loader',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
