@@ -11,6 +11,22 @@ from collections import defaultdict
 from textwrap import dedent
 
 
+class ResourceMappingFormatException(Exception):
+  pass
+
+class MissingItemsLineException(ResourceMappingFormatException):
+  pass
+
+class TooLongFileException(ResourceMappingFormatException):
+  pass
+
+class TruncatedFileException(ResourceMappingFormatException):
+  pass
+
+class UnparseableLineException(ResourceMappingFormatException):
+  pass
+
+
 class ResourceMapping(object):
   RESOURCES_BY_CLASS_NAME_RE = re.compile(r'^(?P<classname>[\w+.\$]+) -> (?P<path>.+)$')
 
@@ -24,7 +40,7 @@ class ResourceMapping(object):
         n, items = line.split(" ")
         return int(n)
       except ValueError as error:
-        raise ValueError(dedent('''
+        raise MissingItemsLineException(dedent('''
           Unable to parse resource mappings.
           Expected "N items", got "{line}: {error}"'''.format(line=line, error=error)))
 
@@ -52,17 +68,17 @@ class ResourceMapping(object):
         items_left -= 1
         match = ResourceMapping.RESOURCES_BY_CLASS_NAME_RE.match(line)
         if not match:
-          raise ValueError(dedent('''
+          raise UnparseableLineException(dedent('''
             Unable to parse resource mappings.
             Expected classname -> path, got "{line}"'''.format(line=line)))
         classname, path = match.group('classname'), match.group('path')
         mappings[classname].append(path)
       else:
-        raise ValueError('Unexpected line "{line}" in section {section}.'.format(
+        raise TooLongFileException('Unexpected line "{line}" in section {section}.'.format(
           line=line, section=section))
 
     if items_left:
-      raise ValueError(dedent('''
+      raise TruncatedFileException(dedent('''
         Unable to parse resource mappings.
         Found EOF while still missing {items_left} lines'''.format(items_left=items_left)))
 
