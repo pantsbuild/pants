@@ -30,17 +30,19 @@ class AaptGenIntegrationTest(AndroidIntegrationTest):
 
   tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @pytest.mark.skipif('not AaptGenIntegrationTest.tools',
-                      reason='Android integration test requires tools {0!r} '
-                             'and ANDROID_HOME set in path.'.format(TOOLS))
-
   def aapt_gen_test(self, target):
     pants_run = self.run_pants(['gen', target])
     self.assert_success(pants_run)
 
+  @pytest.mark.skipif('not AaptGenIntegrationTest.tools',
+                      reason='Android integration test requires tools {0!r} '
+                             'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_aapt_gen(self):
     self.aapt_gen_test(AndroidIntegrationTest.TEST_TARGET)
 
+  @pytest.mark.skipif('not AaptGenIntegrationTest.tools',
+                     reason='Android integration test requires tools {0!r} '
+                            'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_android_library_dep(self):
     # Doing the work under a tempdir gives us a handle for the workdir and guarantees a clean build.
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
