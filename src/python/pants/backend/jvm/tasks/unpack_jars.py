@@ -56,6 +56,7 @@ class UnpackJars(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(UnpackJars, cls).prepare(options, round_manager)
     round_manager.require_data('ivy_imports')
 
   def _unpack_dir(self, unpacked_jars):
