@@ -31,7 +31,7 @@ class PythonBinaryCreate(PythonTask):
       name = binary.name
       if name in names:
         raise TaskError('Cannot build two binaries with the same name in a single invocation. '
-                        '%s and %s both have the name %s.' % (binary, names[name], name))
+                        '{} and {} both have the name {}.'.format(binary, names[name], name))
       names[name] = binary
 
     for binary in binaries:
@@ -49,5 +49,5 @@ class PythonBinaryCreate(PythonTask):
     pexinfo.build_properties = build_properties
 
     with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo, targets=[binary], platforms=binary.platforms) as chroot:
-      pex_path = os.path.join(self._distdir, '%s.pex' % binary.name)
+      pex_path = os.path.join(self._distdir, '{}.pex'.format(binary.name))
       chroot.builder.build(pex_path)

@@ -257,8 +257,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       if len(sources) != len(de_duped_sources):
         counts = [(src, len(list(srcs))) for src, srcs in itertools.groupby(sorted(sources))]
         self.context.log.warn(
-            'De-duped the following sources:\n\t%s' %
-            '\n\t'.join(sorted('%d %s' % (cnt, src) for src, cnt in counts if cnt > 1)))
+            'De-duped the following sources:\n\t{}'
+            .format('\n\t'.join(sorted('{} {}'.format(cnt, src) for src, cnt in counts if cnt > 1))))
       analysis_file = os.path.join(partition_tmpdir, 'analysis')
       partitions.append((vts, de_duped_sources, analysis_file))
 

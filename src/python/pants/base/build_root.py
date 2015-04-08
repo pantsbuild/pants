@@ -47,7 +47,7 @@ class BuildRoot(Singleton):
     """Manually establishes the build root for the current workspace."""
     path = os.path.realpath(root_dir)
     if not os.path.exists(path):
-      raise ValueError('Build root does not exist: %s' % root_dir)
+      raise ValueError('Build root does not exist: {}'.format(root_dir))
     self._root_dir = path
 
   def reset(self):
@@ -55,7 +55,7 @@ class BuildRoot(Singleton):
     self._root_dir = None
 
   def __str__(self):
-    return 'BuildRoot(%s)' % self._root_dir
+    return 'BuildRoot({})'.format(self._root_dir)
 
   @contextmanager
   def temporary(self, path):

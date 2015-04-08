@@ -88,7 +88,7 @@ class ZincAnalysisParser(AnalysisParser):
     if expected_header:
       line = lines_iter.next()
       if expected_header + ':\n' != line:
-        raise ParseError('Expected: "%s:". Found: "%s"' % (expected_header, line))
+        raise ParseError('Expected: "{}:". Found: "{}"'.format(expected_header, line))
     n = self.parse_num_items(lines_iter.next())
     relation = defaultdict(list)  # Values are lists, to accommodate relations.
     for i in range(n):

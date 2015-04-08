@@ -31,7 +31,7 @@ class FilesetRelPathWrapper(object):
 
     for glob in args:
       if(self._is_glob_dir_outside_root(glob, root)):
-        raise ValueError('Invalid glob %s, points outside BUILD file root dir %s' % (glob, root))
+        raise ValueError('Invalid glob {}, points outside BUILD file root dir {}'.format(glob, root))
 
     result = self.wrapped_fn(root=root, *args, **kwargs)
 

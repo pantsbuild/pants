@@ -78,9 +78,9 @@ class JarCreate(JarTask):
   def create_jar(self, target, path):
     existing = self._jars.setdefault(path, target)
     if target != existing:
-      raise TaskError('Duplicate name: target %s tried to write %s already mapped to target %s' % (
-        target, path, existing
-      ))
+      raise TaskError(
+          'Duplicate name: target {} tried to write {} already mapped to target {}'
+          .format(target, path, existing))
     self._jars[path] = target
     with self.open_jar(path, overwrite=True, compressed=self.compressed) as jar:
       yield jar

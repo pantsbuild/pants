@@ -82,14 +82,14 @@ class Distribution(object):
         dist = cls(bin_path=path, minimum_version=minimum_version,
                    maximum_version=maximum_version, jdk=jdk)
         dist.validate()
-        logger.debug('Located %s for constraints: minimum_version %s, '
-                     'maximum_version %s, jdk %s' % (dist, minimum_version, maximum_version, jdk))
+        logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
+                     .format(dist, minimum_version, maximum_version, jdk))
         return dist
       except (ValueError, cls.Error):
         pass
 
-    raise cls.Error('Failed to locate a %s distribution with minimum_version %s, maximum_version %s'
-                    % ('JDK' if jdk else 'JRE', minimum_version, maximum_version))
+    raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
+                    .format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
 
   @staticmethod
   def _parse_java_version(name, version):
@@ -101,7 +101,7 @@ class Distribution(object):
     if isinstance(version, string_types):
       version = Revision.semver(version.replace('_', '-'))
     if version and not isinstance(version, Revision):
-      raise ValueError('%s must be a string or a Revision object, given: %s' % (name, version))
+      raise ValueError('{} must be a string or a Revision object, given: {}'.format(name, version))
     return version
 
   @staticmethod
@@ -118,7 +118,7 @@ class Distribution(object):
     """
 
     if not os.path.isdir(bin_path):
-      raise ValueError('The specified distribution path is invalid: %s' % bin_path)
+      raise ValueError('The specified distribution path is invalid: {}'.format(bin_path))
     self._bin_path = bin_path
 
     self._minimum_version = self._parse_java_version("minimum_version", minimum_version)
@@ -177,7 +177,7 @@ class Distribution(object):
     If this distribution has no valid command of the given name raises Distribution.Error.
     """
     if not isinstance(name, string_types):
-      raise ValueError('name must be a binary name, given %s of type %s' % (name, type(name)))
+      raise ValueError('name must be a binary name, given {} of type {}'.format(name, type(name)))
     self.validate()
     return self._validated_executable(name)
 
@@ -194,13 +194,13 @@ class Distribution(object):
       if self._minimum_version:
         version = self._get_version(java)
         if version < self._minimum_version:
-          raise self.Error('The java distribution at %s is too old; expecting at least %s and'
-                           ' got %s' % (java, self._minimum_version, version))
+          raise self.Error('The java distribution at {} is too old; expecting at least {} and'
+                           ' got {}'.format(java, self._minimum_version, version))
       if self._maximum_version:
         version = self._get_version(java)
         if version > self._maximum_version:
-          raise self.Error('The java distribution at %s is too new; expecting no older than'
-                           ' %s and got %s' % (java, self._maximum_version, version))
+          raise self.Error('The java distribution at {} is too new; expecting no older than'
+                           ' {} and got {}'.format(java, self._maximum_version, version))
 
     try:
       self._validated_executable('javac')  # Calling purely for the check and cache side effects
@@ -224,8 +224,8 @@ class Distribution(object):
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:
-          raise self.Error('Failed to determine java system properties for %s with %s - exit code'
-                           ' %d: %s' % (java, ' '.join(cmd), process.returncode, stderr))
+          raise self.Error('Failed to determine java system properties for {} with {} - exit code'
+                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr))
 
       props = {}
       for line in stdout.split(os.linesep):
@@ -238,8 +238,8 @@ class Distribution(object):
   def _validate_executable(self, name):
     exe = os.path.join(self._bin_path, name)
     if not self._is_executable(exe):
-      raise self.Error('Failed to locate the %s executable, %s does not appear to be a'
-                       ' valid %s distribution' % (name, self, 'JDK' if self._jdk else 'JRE'))
+      raise self.Error('Failed to locate the {} executable, {} does not appear to be a'
+                       ' valid {} distribution'.format(name, self, 'JDK' if self._jdk else 'JRE'))
     return exe
 
   def _validated_executable(self, name):
@@ -256,5 +256,5 @@ class Distribution(object):
     self._validated_binaries[name] = exe
 
   def __repr__(self):
-    return ('Distribution(%r, minimum_version=%r, maximum_version=%r jdk=%r)'
-           % (self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
+    return ('Distribution({!r}, minimum_version={!r}, maximum_version={!r} jdk={!r})'.format(
+             self._bin_path, self._minimum_version, self._maximum_version, self._jdk))

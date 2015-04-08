@@ -71,10 +71,10 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self._handle_runs('', {})
         return
 
-      self._send_content('Invalid GET request %s' % self.path, 'text/html')
+      self._send_content('Invalid GET request {}'.format(self.path), 'text/html')
     except (IOError, ValueError):
       pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
-      #sys.stderr.write('Invalid GET request %s' % self.path)
+      #sys.stderr.write('Invalid GET request {}'.format(self.path))
 
   def _handle_runs(self, relpath, params):
     """Show a listing of all pants runs since the last clean-all."""
@@ -130,7 +130,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       with open(abspath, 'r') as infile:
         content = infile.read()
     else:
-      content = 'No file found at %s' % abspath
+      content = 'No file found at {}'.format(abspath)
     content_type = mimetypes.guess_type(abspath)[0] or 'text/plain'
     if not content_type.startswith('text/') and not content_type == 'application/xml':
       # Binary file. Display it as hex, split into lines.
@@ -281,7 +281,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     client_ip = self._client_address[0]
     if not client_ip in self._settings.allowed_clients and \
        not 'ALL' in self._settings.allowed_clients:
-      self._send_content('Access from host %s forbidden.' % client_ip, 'text/html')
+      self._send_content('Access from host {} forbidden.'.format(client_ip), 'text/html')
       return False
     return True
 

@@ -407,9 +407,9 @@ class Target(AbstractTarget):
       as its single argument and returns True if the target should passed to ``work``.
     """
     if not callable(work):
-      raise ValueError('work must be callable but was %s' % work)
+      raise ValueError('work must be callable but was {}'.format(work))
     if predicate and not callable(predicate):
-      raise ValueError('predicate must be callable but was %s' % predicate)
+      raise ValueError('predicate must be callable but was {}'.format(predicate))
     self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
 
   def closure(self):
@@ -442,7 +442,7 @@ class Target(AbstractTarget):
 
   def __repr__(self):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
-    return "%s(%s)" % (type(self).__name__, addr)
+    return "{}({})".format(type(self).__name__, addr)
 
   def create_sources_field(self, sources, sources_rel_path, address=None, build_graph=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.

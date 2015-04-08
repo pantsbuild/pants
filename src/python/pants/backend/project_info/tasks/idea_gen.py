@@ -101,11 +101,11 @@ class IdeaGen(IdeGen):
     self.java_maximum_heap_size = self.get_options().java_maximum_heap_size_mb
 
     idea_version = _VERSIONS[self.get_options().version]
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % idea_version)
-    self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-%s.mustache' % idea_version)
+    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-{}.mustache'.format(idea_version))
+    self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-{}.mustache'.format(idea_version))
 
-    self.project_filename = os.path.join(self.cwd, '%s.ipr' % self.project_name)
-    self.module_filename = os.path.join(self.gen_project_workdir, '%s.iml' % self.project_name)
+    self.project_filename = os.path.join(self.cwd, '{}.ipr'.format(self.project_name))
+    self.module_filename = os.path.join(self.gen_project_workdir, '{}.iml'.format(self.project_name))
 
   @staticmethod
   def _maven_targets_excludes(repo_root):
@@ -214,7 +214,7 @@ class IdeaGen(IdeGen):
         encoding=self.java_encoding,
         maximum_heap_size=self.java_maximum_heap_size,
         jdk=self.java_jdk,
-        language_level = 'JDK_1_%d' % self.java_language_level
+        language_level ='JDK_1_{}'.format(self.java_language_level)
       ),
       resource_extensions=list(project.resource_extensions),
       scala=scala,

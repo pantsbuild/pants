@@ -54,8 +54,8 @@ class IvyArtifact(PayloadField):
     return ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
 
   def __repr__(self):
-    return ('IvyArtifact(%r, type_=%r, ext=%r, conf=%r, url=%r, classifier=%r)'
-            % (self.name, self.type_, self.ext, self.conf, self.url, self.classifier))
+    return ('IvyArtifact({!r}, type_={!r}, ext={!r}, conf={!r}, url={!r}, classifier={!r})'
+            .format(self.name, self.type_, self.ext, self.conf, self.url, self.classifier))
 
 
 

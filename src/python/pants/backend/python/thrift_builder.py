@@ -73,7 +73,8 @@ class PythonThriftBuilder(CodeGenerator):
 
     for src in copied_sources:
       if not self._run_thrift(src):
-        raise PythonThriftBuilder.CodeGenerationException("Could not generate .py from %s!" % src)
+        raise PythonThriftBuilder.CodeGenerationException(
+          "Could not generate .py from {}!".format(src))
 
   def _run_thrift(self, source):
     args = [
@@ -124,4 +125,4 @@ class PythonThriftBuilder(CodeGenerator):
         pass
 
     if not self.created_packages:
-      raise self.CodeGenerationException('No Thrift structures declared in %s!' % self.target)
+      raise self.CodeGenerationException('No Thrift structures declared in {}!'.format(self.target))

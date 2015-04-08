@@ -39,4 +39,4 @@ class Repository(object):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "%s -> %s (%s)" % (self.name, self.url, self.push_db_basedir)
+    return "{} -> {} ({})".format(self.name, self.url, self.push_db_basedir)

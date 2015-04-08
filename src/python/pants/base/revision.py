@@ -59,7 +59,7 @@ class Revision(object):
       components.extend(parse_components(build))
       return cls(*components)
     except ValueError:
-      raise cls.BadRevision("Failed to parse '%s' as a semantic version number" % rev)
+      raise cls.BadRevision("Failed to parse '{}' as a semantic version number".format(rev))
 
   @classmethod
   def lenient(cls, rev):
@@ -86,4 +86,4 @@ class Revision(object):
     return 0
 
   def __repr__(self):
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(map(repr, self._components)))
+    return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr, self._components)))

@@ -49,7 +49,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
 
       def run_tests(tests):
         args = ['--color'] if self.get_options().colors else []
-        args.append('--specs=%s' % ','.join(tests))
+        args.append('--specs={}'.format(','.join(tests)))
         specs_runner_main = 'com.twitter.common.testing.ExplicitSpecsRunnerMain'
 
         bootstrapped_cp = self.tool_classpath('specs')
@@ -65,7 +65,7 @@ class SpecsRun(JvmTask, JvmToolTaskMixin):
           workunit_labels=[WorkUnit.TEST]
         )
         if result != 0:
-          raise TaskError('java %s ... exited non-zero (%i)' % (specs_runner_main, result))
+          raise TaskError('java {} ... exited non-zero ({})'.format(specs_runner_main, result))
 
       if self.tests:
         run_tests(self.tests)

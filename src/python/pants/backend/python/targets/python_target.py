@@ -72,8 +72,8 @@ class PythonTarget(Target):
 
     if provides and not isinstance(provides, PythonArtifact):
       raise TargetDefinitionException(self,
-        "Target must provide a valid pants setup_py object. Received a '%s' object instead." %
-          provides.__class__.__name__)
+        "Target must provide a valid pants setup_py object. Received a '{}' object instead.".format(
+          provides.__class__.__name__))
 
     self._provides = provides
 
@@ -118,7 +118,7 @@ class PythonTarget(Target):
       def get_target(spec):
         tgt = self._build_graph.get_target_from_spec(spec)
         if tgt is None:
-          raise TargetDefinitionException(self, 'No such resource target: %s' % spec)
+          raise TargetDefinitionException(self, 'No such resource target: {}'.format(spec))
         return tgt
       resource_targets.extend(map(get_target, self._resource_target_specs))
 
