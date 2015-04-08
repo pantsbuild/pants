@@ -532,7 +532,10 @@ public class ConsoleRunner {
         }
         this.parallelThreads = parallelThreads;
         if (parallelThreads == 0) {
-          this.parallelThreads = Runtime.getRuntime().availableProcessors();
+          int availableProcessors = Runtime.getRuntime().availableProcessors();
+          this.parallelThreads = availableProcessors;
+          System.err.printf("Auto-detected %d processors, using -parallel-threads=%d\n",
+              availableProcessors, this.parallelThreads);
         }
       }
 
@@ -586,10 +589,10 @@ public class ConsoleRunner {
     try {
       parser.parseArgument(args);
     } catch (CmdLineException e) {
-      parser.printUsage(System.out);
+      parser.printUsage(System.err);
       exit(1);
     } catch (InvalidCmdLineArgumentException e) {
-      parser.printUsage(System.out);
+      parser.printUsage(System.err);
       exit(1);
     }
 
