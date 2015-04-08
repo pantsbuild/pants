@@ -588,7 +588,7 @@ public class ConsoleRunner {
     } catch (CmdLineException e) {
       parser.printUsage(System.out);
       exit(1);
-    } catch(InvalidCmdLineArgumentException e) {
+    } catch (InvalidCmdLineArgumentException e) {
       parser.printUsage(System.out);
       exit(1);
     }

@@ -37,9 +37,9 @@ public class InvalidCmdLineArgumentException extends RuntimeException {
    * @param message A message describing how the {@code optionValue} is invalid.
    */
   public InvalidCmdLineArgumentException(
-        String optionName,
-        @Nullable Object optionValue,
-        String message) {
+      String optionName,
+      @Nullable Object optionValue,
+      String message) {
 
     super(String.format("Invalid option value '%s' for option '%s': %s",
         optionName, optionValue, message));
