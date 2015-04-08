@@ -120,7 +120,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     invalid_vts_count = len(invalidation_check.invalid_vts_partitioned)
     for idx, vts in enumerate(invalidation_check.invalid_vts_partitioned):
       # Invalidated targets are a subset of relevant targets: get the context for this one.
-      assert len(vts.targets) == 1, ("Requested one target per partition, got %s" % vts)
+      assert len(vts.targets) == 1, ("Requested one target per partition, got {}".format(vts))
       compile_context = compile_contexts[vts.targets[0]]
 
       # Generate a classpath specific to this compile and target, and include analysis

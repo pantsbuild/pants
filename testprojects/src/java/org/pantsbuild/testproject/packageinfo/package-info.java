@@ -1,0 +1,1 @@
+package org.pantsbuild.testproject.packageinfo;

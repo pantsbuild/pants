@@ -14,7 +14,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class JvmToolTaskTestBase(TaskTestBase):

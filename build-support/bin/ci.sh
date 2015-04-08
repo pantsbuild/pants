@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrlpncieat)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpncieat)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -19,6 +19,7 @@ function usage() {
   echo "              files"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
+  echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
   echo " -n           skip contrib python tests"
@@ -43,7 +44,7 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrlpnci:eat" opt; do
+while getopts "hfxbkmsrjlpnci:eat" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -53,6 +54,7 @@ while getopts "hfxbkmsrlpnci:eat" opt; do
     m) skip_sanity_checks="true" ;;
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
+    j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     n) skip_contrib="true" ;;
@@ -158,6 +160,13 @@ if [[ "${skip_docs:-false}" == "false" ]]; then
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
 fi
 
+if [[ "${skip_jvm:-false}" == "false" ]]; then
+  banner "Running core jvm tests"
+  (
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java::
+  ) || die "Core jvm test failure"
+fi
+
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
@@ -199,16 +208,16 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   # Targets that fail but shouldn't
   known_failing_targets=(
-    testprojects/maven_layout/resource_collision/example_a/src/test/java/com/pants/duplicateres/examplea:examplea
-    testprojects/maven_layout/resource_collision/example_b/src/test/java/com/pants/duplicateres/exampleb:exampleb
+    testprojects/maven_layout/resource_collision/example_a/src/test/java/org/pantsbuild/duplicateres/examplea:examplea
+    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb
   )
 
   # Targets that are intended to fail
   negative_test_targets=(
-    testprojects/src/thrift/com/pants/thrift_linter:
-    testprojects/src/java/com/pants/testproject/missingdepswhitelist.*
-    testprojects/src/java/com/pants/testproject/cycle1
-    testprojects/src/java/com/pants/testproject/cycle2
+    testprojects/src/thrift/org/pantsbuild/thrift_linter:
+    testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
+    testprojects/src/java/org/pantsbuild/testproject/cycle1
+    testprojects/src/java/org/pantsbuild/testproject/cycle2
     testprojects/src/antlr/pants/backend/python/test:antlr_failure
     testprojects/src/python/antlr:test_antlr_failure
   )

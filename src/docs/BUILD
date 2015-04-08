@@ -2,7 +2,7 @@ page(
   name='3rdparty',
   source='3rdparty.md',
   links=[
-    'examples/src/java/com/pants/examples:3rdparty_jvm',
+    'examples/src/java/org/pantsbuild/example:3rdparty_jvm',
     'examples/src/python/example:3rdparty_py',
   ],
 )
@@ -34,7 +34,7 @@ page(
   links=[
     ':first_concepts',
     ':invoking',
-    'examples/src/java/com/pants/examples:readme',
+    'examples/src/java/org/pantsbuild/example:readme',
     'examples/src/python/example:readme',
   ]
 )
@@ -56,10 +56,10 @@ page(
     ':tshoot',
     ':with_emacs',
     ':with_intellij',
-    'examples/src/java/com/pants/examples:page',
-    'examples/src/java/com/pants/examples:readme',
+    'examples/src/java/org/pantsbuild/example:page',
+    'examples/src/java/org/pantsbuild/example:readme',
     'examples/src/python/example:readme',
-    'examples/src/thrift/com/pants/examples:readme',
+    'examples/src/thrift/org/pantsbuild/example:readme',
     'src/python/pants/docs:readme',
     ])
 

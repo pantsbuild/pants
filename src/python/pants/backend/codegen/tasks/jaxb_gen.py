@@ -52,7 +52,7 @@ class JaxbGen(CodeGen, NailgunTask):
 
   def genlang(self, lang, targets):
     if lang != 'java':
-      raise TaskError('Unrecognized jaxb language: %s' % lang)
+      raise TaskError('Unrecognized jaxb language: {}'.format(lang))
     output_dir = os.path.join(self.workdir, 'gen-java')
     safe_mkdir(output_dir)
     cache = []
@@ -137,7 +137,7 @@ class JaxbGen(CodeGen, NailgunTask):
     package = re.sub(r'^\.+', '', package)
     package = re.sub(r'\.+$', '', package)
     if re.search(r'\.{2,}', package) is not None:
-      raise ValueError('Package name cannot have consecutive periods! (%s)' % package)
+      raise ValueError('Package name cannot have consecutive periods! ({})'.format(package))
     return package
 
   @classmethod
@@ -170,4 +170,4 @@ class JaxbGen(CodeGen, NailgunTask):
 
     names.append('ObjectFactory')
     outdir = package.replace('.', '/')
-    return [os.path.join(outdir, '%s.java' % name) for name in names]
+    return [os.path.join(outdir, '{}.java'.format(name)) for name in names]

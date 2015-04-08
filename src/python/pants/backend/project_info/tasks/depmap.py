@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -135,13 +136,13 @@ class Depmap(ConsoleTask):
       params.update(org='internal', name=dependency.id)
 
     if params.get('rev'):
-      return "%(org)s%(sep)s%(name)s%(sep)s%(rev)s" % params, False
+      return "{org}{sep}{name}{sep}{rev}".format(**params), False
     else:
-      return "%(org)s%(sep)s%(name)s" % params, True
+      return "{org}{sep}{name}".format(**params), True
 
   def _output_dependency_tree(self, target):
     def output_dep(dep, indent):
-      return "%s%s" % (indent * "  ", dep)
+      return "{}{}".format(indent * "  ", dep)
 
     def check_path_to(jar_dep_id):
       """
@@ -153,7 +154,7 @@ class Depmap(ConsoleTask):
     def output_deps(dep, indent=0, outputted=set()):
       dep_id, _ = self._dep_id(dep)
       if dep_id in outputted:
-        return [output_dep("*%s" % dep_id, indent)] if not self.is_minimal else []
+        return [output_dep("*{}".format(dep_id), indent)] if not self.is_minimal else []
       else:
         output = []
         if not self.is_external_only:
@@ -198,12 +199,12 @@ class Depmap(ConsoleTask):
     def output_dep(dep):
       dep_id, internal = self._dep_id(dep)
       if internal:
-        fmt = '  "%(id)s" [style=filled, fillcolor="%(color)d"];'
+        fmt = '  "{id}" [style=filled, fillcolor="{color}"];'
       else:
-        fmt = '  "%(id)s" [style=filled, fillcolor="%(color)d", shape=ellipse];'
+        fmt = '  "{id}" [style=filled, fillcolor="{color}", shape=ellipse];'
       if type(dep) not in color_by_type:
         color_by_type[type(dep)] = len(color_by_type.keys()) + 1
-      return fmt % {'id': dep_id, 'color': color_by_type[type(dep)]}
+      return fmt.format(id=dep_id, color=color_by_type[type(dep)])
 
     def output_deps(outputted, dep, parent=None):
       output = []
@@ -212,7 +213,7 @@ class Depmap(ConsoleTask):
         outputted.add(dep)
         output.append(output_dep(dep))
         if parent:
-          output.append('  "%s" -> "%s";' % (self._dep_id(parent)[0], self._dep_id(dep)[0]))
+          output.append('  "{}" -> "{}";'.format(self._dep_id(parent)[0], self._dep_id(dep)[0]))
 
         # TODO: This is broken. 'dependency' doesn't exist here, and we don't have
         # internal_dependencies any more anyway.
@@ -232,11 +233,11 @@ class Depmap(ConsoleTask):
             left_id = target_id if self.is_external_only else dep_id
             if (left_id, jar_id) not in outputted:
               styled = internal and not self.is_internal_only
-              output += ['  "%s" -> "%s"%s;' % (left_id, jar_id,
-                                                ' [style="dashed"]' if styled else '')]
+              output += ['  "{}" -> "{}"{};'.format(left_id, jar_id,
+                                                    ' [style="dashed"]' if styled else '')]
               outputted.add((left_id, jar_id))
       return output
-    header = ['digraph "%s" {' % target.id]
+    header = ['digraph "{}" {{'.format(target.id)]
     graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']
     return header + graph_attr + output_deps(set(), target) + ['}']
 
@@ -300,7 +301,7 @@ class Depmap(ConsoleTask):
         info['targets'].append(self._address(dep.address))
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
-            target_libraries.add(jar)
+            target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
           # Add all the jars pulled in by this jar_library
           target_libraries.update(get_transitive_jars(dep))
         if isinstance(dep, Resources):

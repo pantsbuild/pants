@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_manual import manual
 from pants.base.payload_field import PayloadField, stable_json_sha1
+from pants.base.validation import assert_list
 
 
 class IvyArtifact(PayloadField):
@@ -53,8 +54,8 @@ class IvyArtifact(PayloadField):
     return ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
 
   def __repr__(self):
-    return ('IvyArtifact(%r, type_=%r, ext=%r, conf=%r, url=%r, classifier=%r)'
-            % (self.name, self.type_, self.ext, self.conf, self.url, self.classifier))
+    return ('IvyArtifact({!r}, type_={!r}, ext={!r}, conf={!r}, url={!r}, classifier={!r})'
+            .format(self.name, self.type_, self.ext, self.conf, self.url, self.classifier))
 
 
 
@@ -105,18 +106,16 @@ class JarDependency(object):
     self.transitive = not intransitive
     self.apidocs = apidocs
     self.mutable = mutable
-    self._classifier = classifier
-    self.artifacts = tuple(artifacts or ())
+    self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact))
 
     if ext or url or type_ or classifier:
-      artifact = IvyArtifact(name or self.name,
+      artifact = IvyArtifact(name,
                              type_=type_,
                              ext=ext,
                              url=url,
                              classifier=classifier)
       self.artifacts += (artifact,)
 
-    self.id = "%s-%s-%s" % (self.org, self.name, self.rev)
     self._configurations = ('default',)
 
     # Support legacy method names
@@ -124,21 +123,20 @@ class JarDependency(object):
     self.withSources = self.with_sources
     self.withDocs = self.with_docs
 
-  @property
-  def classifier(self):
-    """Returns the maven classifier for this jar dependency.
-
-    If the classifier is ambiguous; ie: there was no classifier set in the constructor and the jar
-    dependency has multiple attached artifacts, a :class:`ValueError` is raised.
-    """
-    if self._classifier or len(self.artifacts) == 0:
-      return self._classifier
+    if classifier:
+      self.classifier = classifier
     elif len(self.artifacts) == 1:
-      return self.artifacts[0].classifier
+      self.classifier = self.artifacts[0].classifier
     else:
+      self.classifier = None
+
+    self._coordinates = (self.org, self.name, self.rev)
+    if self.classifier:
+      self._coordinates += (self.classifier,)
+
+    if not self.classifier and len(self.artifacts) > 1:
       raise ValueError('Cannot determine classifier. No explicit classifier is set and this jar '
-                       'has more than 1 artifact: %s\n\t%s'
-                       % (self, '\n\t'.join(map(str, self.artifacts))))
+                       'has more than 1 artifact: {}\n\t{}'.format(self, '\n\t'.join(map(str, self.artifacts))))
 
   @manual.builddict()
   def exclude(self, org, name=None):
@@ -202,22 +200,36 @@ class JarDependency(object):
     return self
 
   def __eq__(self, other):
-    result = (self.org == other.org
-              and self.name == other.name
-              and self.rev == other.rev)
-    return result
+    return self._coordinates == other._coordinates
 
   def __hash__(self):
-    return hash((self.org, self.name, self.rev))
+    return hash(self._coordinates)
 
   def __lt__(self, other):
-    return (self.org, self.name, self.rev) < (other.org, other.name, other.rev)
+    return self._coordinates < other._coordinates
 
   def __ne__(self, other):
     return not self.__eq__(other)
 
   def __repr__(self):
     return self.id
+
+  @property
+  def id(self):
+    return "-".join(map(str, self._coordinates))
+
+  @property
+  def coordinate_without_rev(self):
+    return (self.org, self.name, self.classifier)
+
+  @property
+  def artifact_classifiers(self):
+      if self.artifacts:
+        return {a.classifier for a in self.artifacts}
+      else:
+        # If there are no artifacts, there's one implicit artifact with the
+        # classifier None.
+        return {None}
 
   def cache_key(self):
     key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)

@@ -26,8 +26,8 @@ class ZincAnalysisElement(object):
 
   products:
   123 items
-  com/pants/Foo.scala -> com/pants/Foo.class
-  com/pants/Foo.scala -> com/pants/Foo$.class
+  org/pantsbuild/Foo.scala -> org/pantsbuild/Foo.class
+  org/pantsbuild/Foo.scala -> org/pantsbuild/Foo$.class
   ...
 
   Related consecutive sections are bundled together in "elements". E.g., the Stamps element
@@ -43,7 +43,7 @@ class ZincAnalysisElement(object):
     # self.args is a list of maps from key to list of values. Each map corresponds to a
     # section in the analysis file. E.g.,
     #
-    # 'com/pants/Foo.scala': ['com/pants/Foo.class', 'com/pants/Foo$.class']
+    # 'org/pantsbuild/Foo.scala': ['org/pantsbuild/Foo.class', 'org/pantsbuild/Foo$.class']
     #
     # Subclasses can alias the elements of self.args in their own __init__, for convenience.
     self.args = []
@@ -94,13 +94,13 @@ class ZincAnalysisElement(object):
     items = []
     for k, vals in rep.items():
       for v in vals:
-        item = rebase('%s -> %s%s' % (k, '' if inline_vals else '\n', v))
+        item = rebase('{} -> {}{}'.format(k, '' if inline_vals else '\n', v))
         if item:
           items.append(item)
 
     items.sort()
     outfile.write(header + ':\n')
-    outfile.write('%d items\n' % len(items))
+    outfile.write('{} items\n'.format(len(items)))
     for item in items:
       outfile.write(item)
       outfile.write('\n')
@@ -231,7 +231,7 @@ class ZincAnalysis(Analysis):
     compilation_vals = sorted(set([x[0] for a in analyses for x in a.compilations.compilations.itervalues()]))
     compilations_dict = defaultdict(list)
     for i, v in enumerate(compilation_vals):
-      compilations_dict['%03d' % i] = [v]
+      compilations_dict['{:03}'.format(int(i))] = [v]
     compilations = Compilations((compilations_dict, ))
 
     return ZincAnalysis(compile_setup, relations, stamps, apis, source_infos, compilations)

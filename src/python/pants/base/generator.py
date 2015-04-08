@@ -29,7 +29,7 @@ class TemplateData(dict):
     return TemplateData(**props)
 
   def __setattr__(self, key, value):
-    raise AttributeError("Mutation not allowed - use %s.extend(%s = %s)" % (self, key, value))
+    raise AttributeError("Mutation not allowed - use {}.extend({} = {})".format(self, key, value))
 
   def __getattr__(self, key):
     if key in self:
@@ -38,7 +38,7 @@ class TemplateData(dict):
       return object.__getattribute__(self, key)
 
   def __str__(self):
-    return 'TemplateData(%s)' % pprint.pformat(self)
+    return 'TemplateData({})'.format(pprint.pformat(self))
 
 
 class Generator(object):

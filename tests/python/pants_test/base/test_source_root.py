@@ -201,23 +201,23 @@ class SourceRootTest(unittest.TestCase):
     self.assertEquals(["src/java", "src/resources"],
                       tree.get_root_siblings("src/resources"))
     self.assertEquals(["src/java", "src/resources"],
-                      tree.get_root_siblings("src/java/com/pants/foo"))
+                      tree.get_root_siblings("src/java/org/pantsbuild/foo"))
     self.assertEquals(["src/java", "src/resources"],
-                      tree.get_root_siblings("src/resources/com/pants/foo"))
+                      tree.get_root_siblings("src/resources/org/pantsbuild/foo"))
     self.assertEquals([], tree.get_root_siblings("src/foo/bar/baz"))
     self.assertEquals(["tests/java", "tests/resources"],
-                      tree.get_root_siblings("tests/java/com/pants/foo"))
+                      tree.get_root_siblings("tests/java/org/pantsbuild/foo"))
     self.assertEquals(["tests/java", "tests/resources"],
-                      tree.get_root_siblings("tests/resources/com/pants/foo"))
+                      tree.get_root_siblings("tests/resources/org/pantsbuild/foo"))
     self.assertEquals([], tree.get_root_siblings("tests/foo/bar/baz"))
 
     self._add_siblings1(tree, "examples")
     self.assertEquals([], tree.get_root_siblings("foo/bar/baz"))
     self.assertEquals(["src/java", "src/resources"],
-                      tree.get_root_siblings("src/java/com/pants/foo"))
+                      tree.get_root_siblings("src/java/org/pantsbuild/foo"))
     self.assertEquals(["tests/java", "tests/resources"],
-                      tree.get_root_siblings("tests/resources/com/pants/foo"))
+                      tree.get_root_siblings("tests/resources/org/pantsbuild/foo"))
     self.assertEquals(["examples/src/java", "examples/src/resources"],
-                      tree.get_root_siblings("examples/src/java/com/pants/foo"))
+                      tree.get_root_siblings("examples/src/java/org/pantsbuild/foo"))
     self.assertEquals(["examples/tests/java", "examples/tests/resources"],
-                      tree.get_root_siblings("examples/tests/resources/com/pants/foo"))
+                      tree.get_root_siblings("examples/tests/resources/org/pantsbuild/foo"))

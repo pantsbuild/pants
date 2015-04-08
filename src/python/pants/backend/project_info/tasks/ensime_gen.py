@@ -72,7 +72,7 @@ class EnsimeGen(IdeGen):
 
     def create_sourcepath(base_id, sources):
       def normalize_path_pattern(path):
-        return '%s/' % path if not path.endswith('/') else path
+        return '{}/'.format(path) if not path.endswith('/') else path
 
       includes = [normalize_path_pattern(src_set.path) for src_set in sources if src_set.path]
       excludes = []
@@ -107,7 +107,7 @@ class EnsimeGen(IdeGen):
       name=self.project_name,
       java=TemplateData(
         jdk=self.java_jdk,
-        language_level=('1.%d' % self.java_language_level)
+        language_level=('1.{}'.format(self.java_language_level))
       ),
       scala=scala,
       source_bases=source_bases.values(),
@@ -130,4 +130,4 @@ class EnsimeGen(IdeGen):
         Generator(pkgutil.get_data(__name__, template_relpath), **template_data).write(output)
 
     apply_template(self.project_filename, self.project_template, project=configured_project)
-    print('\nGenerated ensime project at %s%s' % (self.gen_project_workdir, os.sep))
+    print('\nGenerated ensime project at {}{}'.format(self.gen_project_workdir, os.sep))

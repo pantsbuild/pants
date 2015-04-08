@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from com.pants.examples.distance.ttypes import Distance
-from com.pants.examples.precipitation.ttypes import Precipitation
+from org.pantsbuild.example.distance.ttypes import Distance
+from org.pantsbuild.example.precipitation.ttypes import Precipitation
 
 
 # Illustrate using Thrift-generated code from Python.

@@ -35,6 +35,8 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
 
+# TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
+# for tests, not a test of a thing called 'Base'.
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 

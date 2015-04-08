@@ -6,58 +6,78 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 from textwrap import dedent
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.address import SyntheticAddress
-from pants.base.build_file_aliases import BuildFileAliases
-from pants.util.dirutil import safe_mkdir
-from pants_test.tasks.test_base import TaskTest
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
-# TODO(John Sirois): Convert to TaskTestBase - note this will require a good bit of option plumbing
-# to get the main pants cache re-use for speed-ups bit in setUp below.
-class PythonTaskTest(TaskTest):
+class PythonTaskTest(TaskTestBase):
   def setUp(self):
     super(PythonTaskTest, self).setUp()
-
-    # Re-use the main pants python cache to speed up interpreter selection and artifact resolution.
-    safe_mkdir(os.path.join(self.build_root, '.pants.d'))
-    shutil.copytree(os.path.join(self.real_build_root, '.pants.d', 'python'),
-                    os.path.join(self.build_root, '.pants.d', 'python'),
-                    symlinks=True)
+    self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'python_library': PythonLibrary,
-                                            'python_binary': PythonBinary})
+    return register_python()
 
-  def create_python_library(self, relpath, name, source, contents, dependencies=()):
+  def create_python_library(self, relpath, name, source_contents_map=None,
+                            dependencies=(), provides=None):
+    sources = ['__init__.py'] + source_contents_map.keys() if source_contents_map else None
+    sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_library(
       name='{name}',
-      sources=['__init__.py', '{source}'],
+      {sources_clause}
       dependencies=[
         {dependencies}
-      ]
+      ],
+      {provides_clause}
     )
-    """).format(name=name, source=source, dependencies=','.join(map(repr, dependencies))))
-
-    self.create_file(relpath=os.path.join(relpath, '__init__.py'))
-    self.create_file(relpath=os.path.join(relpath, source), contents=contents)
+    """).format(
+      name=name,
+      sources_clause='sources=[{0}],'.format(','.join(sources_strs)) if sources_strs else '',
+      dependencies=','.join(map(repr, dependencies)),
+      provides_clause='provides={0},'.format(provides) if provides else ''))
+    if source_contents_map:
+      self.create_file(relpath=os.path.join(relpath, '__init__.py'))
+      for source, contents in source_contents_map.items():
+        self.create_file(relpath=os.path.join(relpath, source), contents=contents)
     return self.target(SyntheticAddress(relpath, name).spec)
 
-  def create_python_binary(self, relpath, name, entry_point, dependencies=()):
+  def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None):
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_binary(
       name='{name}',
       entry_point='{entry_point}',
       dependencies=[
         {dependencies}
+      ],
+      {provides_clause}
+    )
+    """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies)),
+                provides_clause='provides={0},'.format(provides) if provides else ''))
+    return self.target(SyntheticAddress(relpath, name).spec)
+
+  def create_python_requirement_library(self, relpath, name, requirements):
+    def make_requirement(req):
+      return 'python_requirement("{}")'.format(req)
+
+    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
+    python_requirement_library(
+      name='{name}',
+      requirements=[
+        {requirements}
       ]
     )
-    """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies))))
-
+    """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
     return self.target(SyntheticAddress(relpath, name).spec)
+
+  def context(self, config='', options=None, target_roots=None, **kwargs):
+    # Our python tests don't pass on Python 3 yet.
+    # TODO: Clean up this hard-coded interpreter constraint once we have subsystems
+    # and can simplify InterpreterCache and PythonSetup.
+    self.set_options(interpreter=['CPython>=2.7,<3'])
+    return super(PythonTaskTest, self).context(config=config, options=options,
+                                               target_roots=target_roots, **kwargs)

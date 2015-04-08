@@ -32,7 +32,7 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     """
     for name in ['a', 'b', 'c']:
       target = ('testprojects/maven_layout/resource_collision/example_{name}'
-                '/src/main/java/com/pants/duplicateres/example{name}/'
+                '/src/main/java/org/pantsbuild/duplicateres/example{name}/'
                 .format(name=name))
       stdout = self._exec_run(target)
       expected = 'Hello world!: resource from example {name}\n'.format(name=name)
@@ -43,19 +43,19 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
 
     # Make sure the test fails if you don't specify a directory
     pants_run = self.run_pants(['run',
-                                'testprojects/src/java/com/pants/testproject/cwdexample',
+                                'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
                                 '--interpreter=CPython>=2.6,<3',
                                 '--interpreter=CPython>=3.3'])
     self.assert_failure(pants_run)
     self.assertIn('Neither ExampleCwd.java nor readme.txt found.', pants_run.stdout_data)
 
     # Implicit cwd based on target
-    stdout_data = self._exec_run('testprojects/src/java/com/pants/testproject/cwdexample',
+    stdout_data = self._exec_run('testprojects/src/java/org/pantsbuild/testproject/cwdexample',
                                  '--run-jvm-cwd')
     self.assertIn('Found ExampleCwd.java', stdout_data)
 
     # Explicit cwd specified
-    stdout_data = self._exec_run('testprojects/src/java/com/pants/testproject/cwdexample',
+    stdout_data = self._exec_run('testprojects/src/java/org/pantsbuild/testproject/cwdexample',
                                  '--run-jvm-cwd='
-                                 'testprojects/src/java/com/pants/testproject/cwdexample/subdir')
+                                 'testprojects/src/java/org/pantsbuild/testproject/cwdexample/subdir')
     self.assertIn('Found readme.txt', stdout_data)

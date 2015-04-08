@@ -21,34 +21,34 @@ The following target addresses all specify the same single target.
 -   Fully qualified target address is `//` plus the BUILD file's directory path plus target name:
 
         :::bash
-        $ ./pants list //examples/src/java/com/pants/examples/hello/main:main
-        examples/src/java/com/pants/examples/hello/main:main
+        $ ./pants list //examples/src/java/org/pantsbuild/example/hello/main:main
+        examples/src/java/org/pantsbuild/example/hello/main:main
 
 -   The starting double-slash is optional if the target isn't in the top directory:
 
         :::bash
-        $ ./pants list examples/src/java/com/pants/examples/hello/main:main
-        examples/src/java/com/pants/examples/hello/main:main
+        $ ./pants list examples/src/java/org/pantsbuild/example/hello/main:main
+        examples/src/java/org/pantsbuild/example/hello/main:main
 
 -   Specify the default target (the target whose name matches the parent directory name):
 
         :::bash
-        $ ./pants list examples/src/java/com/pants/examples/hello/main
-        examples/src/java/com/pants/examples/hello/main:main
+        $ ./pants list examples/src/java/org/pantsbuild/example/hello/main
+        examples/src/java/org/pantsbuild/example/hello/main:main
 
 -   Relative paths and trailing forward slashes are ignored on the
     command-line to accommodate tab completion:
 
         :::bash
-        $ ./pants list ./examples/src/java/com/pants/examples/hello/main/
-        examples/src/java/com/pants/examples/hello/main:main
+        $ ./pants list ./examples/src/java/org/pantsbuild/example/hello/main/
+        examples/src/java/org/pantsbuild/example/hello/main:main
 
     Absolute paths are also allowed to support flexibility in scripting
     and command line use:
 
         :::bash
-        $ pants goal list $REPO_ROOT/src/java/com/pants/examples/hello/main
-        src/java/com/pants/examples/hello/main:main
+        $ pants goal list $REPO_ROOT/src/java/org/pantsbuild/example/hello/main
+        src/java/org/pantsbuild/example/hello/main:main
 
 *NB: Neither the `./` or any other relative or absolute path forms nor the trailing slash are
 allowed in target addresses in ``BUILD`` files. These are just for command-line convenience.*

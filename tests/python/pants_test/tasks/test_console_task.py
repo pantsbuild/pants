@@ -12,7 +12,7 @@ from Queue import Empty, Queue
 import pytest
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class ConsoleTaskTest(TaskTestBase):

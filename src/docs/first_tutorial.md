@@ -20,11 +20,11 @@ Now you're ready to invoke pants for more useful things.
 
 You invoke pants with *goals* (like `test` or `bundle`) and the *build
 targets* to use (like
-`examples/tests/java/com/pants/examples/hello/greet:greet`). For
+`examples/tests/java/org/pantsbuild/example/hello/greet:greet`). For
 example,
 
     :::bash
-    $ ./pants test examples/tests/java/com/pants/examples/hello/greet:greet
+    $ ./pants test examples/tests/java/org/pantsbuild/example/hello/greet:greet
 
 Goals (the "verbs" of Pants) produce new files from Targets (the
 "nouns").
@@ -44,7 +44,7 @@ Pants knows about goals ("verbs" like `bundle` and `test`) and targets
 invocation looks like
 
     :::bash
-    $ ./pants test examples/tests/java/com/pants/examples/hello/greet:greet
+    $ ./pants test examples/tests/java/org/pantsbuild/example/hello/greet:greet
 
 Looking at the pieces of this we see
 
@@ -66,7 +66,7 @@ example, before it run tests, it must compile the code.
 You can specify more than one goal on a command line. E.g., to run
 tests *and* run a binary, we could have said `./pants test run ...`
 
-`examples/tests/java/com/pants/examples/hello/greet:greet`<br>
+`examples/tests/java/org/pantsbuild/example/hello/greet:greet`<br>
 This is a *build target*, a "build-able" thing in your source code. To
 define these, you set up configuration files named `BUILD` in your
 source code file tree. (You'll see more about these later.)
@@ -129,7 +129,7 @@ tell Pants to "fail fast" on the first `junit` test failure instead of running a
 `junit` tests like so:
 
     :::bash
-    $ ./pants test.junit --fail-fast examples/tests/java/com/pants/examples/hello/greet:greet
+    $ ./pants test.junit --fail-fast examples/tests/java/org/pantsbuild/example/hello/greet:greet
 
 Here, `test` has become `test.junit`. The `test` goal is made up of parts, or *tasks*: `test.junit`,
 `test.pytest`, and `test.specs`. We want to specify a flag to the `test.junit` task, so we
@@ -151,7 +151,7 @@ If you pass the global `-ldebug` flag after the word `goal` but before any parti
 task, you get verbose debug-level logging for all goals:
 
     :::bash
-    $ ./pants -ldebug test examples/tests/java/com/pants/examples/hello/greet:
+    $ ./pants -ldebug test examples/tests/java/org/pantsbuild/example/hello/greet:
     09:18:53 00:00 [main]
                    (To run a reporting server: ./pants server)
     09:18:53 00:00   [bootstrap]
@@ -214,22 +214,22 @@ BUILD Files
 
 When we ran the `pants test` goal, we told pants what target to build, but where are these
 targets defined? Scattered around the source tree are `BUILD` files. These `BUILD` files
-define targets. For example, this code snippet of `java/com/pants/examples/hello/main/BUILD`
+define targets. For example, this code snippet of `java/org/pantsbuild/example/hello/main/BUILD`
 defines two targets: the app we ran and the binary that contains its code.
 These targets are named `main` (of type `jvm_app`) and and `main-bin` (of type `jvm_binary`):
 
-!inc[start-after=Like Hello World&end-before=README page](../../examples/src/java/com/pants/examples/hello/main/BUILD)
+!inc[start-after=Like Hello World&end-before=README page](../../examples/src/java/org/pantsbuild/example/hello/main/BUILD)
 
 Those `dependencies` statements are interesting.
 The `main-bin` build target depends on other build targets;
 its `dependencies` lists those.
 To build a runnable Java binary, we need to first compile its dependencies.
 The `main-bin` binary's dependency,
-`'examples/src/java/com/pants/examples/hello/greet'`, is the *address* of
+`'examples/src/java/org/pantsbuild/example/hello/greet'`, is the *address* of
 another target. Addresses look, roughly, like `path/to/dir:targetname`. We can see this build
 target in the `.../hello/greet/BUILD` file:
 
-!inc[start-after=see LICENSE](../../examples/src/java/com/pants/examples/hello/greet/BUILD)
+!inc[start-after=see LICENSE](../../examples/src/java/org/pantsbuild/example/hello/greet/BUILD)
 
 Pants uses dependency information to figure out how to build your code.
 You might find it useful for other purposes, too. For example, if you
@@ -279,7 +279,13 @@ will still compile them since it knows it must compile before it can
 test.
 
     :::bash
-    $ pants goal test src/java/com/myorg/myproject tests/java/com/myorg/myproject
+    $ pants test src/java/com/myorg/myproject tests/java/com/myorg/myproject
+
+**Run a binary**<br>
+Use pants to execute a binary target.  Compiles the code first if it is not up to date.
+
+    :::bash
+    $ ./pants run examples/src/java/org/pantsbuild/example/hello/simple
 
 **Get Help**<br>
 Get the list of goals:
@@ -299,4 +305,4 @@ To learn more about working with Python projects, see the
 [[Python Tutorial|pants('examples/src/python/example:readme')]].
 
 To learn more about working with Java/JVM projects, see the
-[[Java Tutorial|pants('examples/src/java/com/pants/examples:readme')]]
+[[Java Tutorial|pants('examples/src/java/org/pantsbuild/example:readme')]]

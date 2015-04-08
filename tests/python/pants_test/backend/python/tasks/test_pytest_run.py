@@ -12,28 +12,18 @@ from textwrap import dedent
 
 import coverage
 
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.pytest_run import PytestRun, PythonTestFailure
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import environment_as, pushd
-from pants_test.task_test_base import TaskTestBase
+from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
 
-class PythonTestBuilderTestBase(TaskTestBase):
+class PythonTestBuilderTestBase(PythonTaskTest):
   @classmethod
   def task_type(cls):
     return PytestRun
 
-  def setUp(self):
-    super(PythonTestBuilderTestBase, self).setUp()
-    self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
-
   def run_tests(self, targets):
     options = {
-      # TODO: Clean up this hard-coded interpreter constraint once we have subsystems
-      # and can simplify InterpreterCache and PythonSetup.
-      'interpreter': ['CPython>=2.7,<3'],  # These tests don't pass on Python 3 yet.
       'colors': False,
       'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
     }
@@ -47,20 +37,15 @@ class PythonTestBuilderTestBase(TaskTestBase):
     with self.assertRaises(PythonTestFailure):
       self.run_tests(targets=targets)
 
+
 class PythonTestBuilderTestEmpty(PythonTestBuilderTestBase):
   def test_empty(self):
     self.run_tests(targets=[])
 
 
 class PythonTestBuilderTest(PythonTestBuilderTestBase):
-  @property
-  def alias_groups(self):
-    return BuildFileAliases.create(targets={
-      'python_tests': PythonTests, 'python_library': PythonLibrary})
-
   def setUp(self):
     super(PythonTestBuilderTest, self).setUp()
-
     self.create_file(
         'lib/core.py',
         dedent("""

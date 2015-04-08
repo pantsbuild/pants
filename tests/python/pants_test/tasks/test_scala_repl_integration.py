@@ -25,15 +25,15 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
     return pants_run.stdout_data.rstrip().split('\n')
 
   def test_run_repl_direct(self):
-    output_lines = self.run_repl('examples/src/scala/com/pants/example/hello/welcome', dedent("""\
-      import com.pants.example.hello.welcome.WelcomeEverybody
+    output_lines = self.run_repl('examples/src/scala/org/pantsbuild/example/hello/welcome', dedent("""\
+      import org.pantsbuild.example.hello.welcome.WelcomeEverybody
       println(WelcomeEverybody("World" :: Nil).head)
       """))
     self.assertEquals(len(output_lines), 12)
     self.assertEquals('Hello, World!', output_lines[-3])
 
   def test_run_repl_transitive(self):
-    output_lines = self.run_repl('testprojects/src/scala/com/pants/testproject/unicode', dedent("""\
-      println(com.pants.testproject.unicode.shapeless.ShapelessExample.greek())
+    output_lines = self.run_repl('testprojects/src/scala/org/pantsbuild/testproject/unicode', dedent("""\
+      println(org.pantsbuild.testproject.unicode.shapeless.ShapelessExample.greek())
       """))
     self.assertTrue("shapeless success" in output_lines)

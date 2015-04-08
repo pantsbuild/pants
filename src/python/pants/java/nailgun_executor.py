@@ -44,7 +44,7 @@ class NailgunExecutor(Executor):
       """Parses an endpoint from a string of the form exe:fingerprint:pid:port"""
       components = endpoint.split(':')
       if len(components) != 4:
-        raise ValueError('Invalid endpoint spec %s' % endpoint)
+        raise ValueError('Invalid endpoint spec {}'.format(endpoint))
       exe, fingerprint, pid, port = components
       return cls(exe, fingerprint, int(pid), int(port))
 

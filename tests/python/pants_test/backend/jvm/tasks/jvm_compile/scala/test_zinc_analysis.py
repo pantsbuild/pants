@@ -50,8 +50,8 @@ class ZincAnalysisTest(unittest.TestCase):
     full_analysis = parse_analyis('simple_analysis')
 
     analysis_splits = full_analysis.split([
-      ['/src/pants/examples/src/scala/com/pants/example/hello/welcome/Welcome.scala'],
-      ['/src/pants/examples/src/scala/com/pants/example/hello/exe/Exe.scala'],
+      ['/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala'],
+      ['/src/pants/examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala'],
     ])
     self.assertEquals(len(analysis_splits), 2)
 

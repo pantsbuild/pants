@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class DummyJvmTask(JvmTask):

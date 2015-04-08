@@ -17,7 +17,7 @@ from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprin
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_walk
-from pants_test.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class UnpackJarsTest(TaskTestBase):

@@ -14,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import BundleField
+from pants.base.payload_field import BundleField, PrimitiveField
 from pants.base.target import Target
 
 
@@ -29,7 +29,7 @@ class RelativeToMapper(object):
     return os.path.relpath(file, self.base)
 
   def __repr__(self):
-    return 'IdentityMapper(%s)' % self.base
+    return 'IdentityMapper({})'.format(self.base)
 
   def __hash__(self):
     return hash(self.base)
@@ -116,7 +116,7 @@ class Bundle(object):
     if relative_to:
       base = os.path.join(get_buildroot(), self._rel_path, relative_to)
       if not os.path.isdir(os.path.join(get_buildroot(), base)):
-        raise ValueError('Could not find a directory to bundle relative to at %s' % base)
+        raise ValueError('Could not find a directory to bundle relative to at {}'.format(base))
       self.mapper = RelativeToMapper(base)
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
@@ -134,13 +134,13 @@ class Bundle(object):
         if not os.path.isabs(abspath):
           abspath = os.path.join(get_buildroot(), self._rel_path, path)
         if not os.path.exists(abspath):
-          raise ValueError('Given path: %s with absolute path: %s which does not exist'
-                           % (path, abspath))
+          raise ValueError('Given path: {} with absolute path: {} which does not exist'
+                           .format(path, abspath))
         self.filemap[abspath] = self.mapper(abspath)
     return self
 
   def __repr__(self):
-    return 'Bundle(%s, %s)' % (self.mapper, self.filemap)
+    return 'Bundle({}, {})'.format(self.mapper, self.filemap)
 
 
 class JvmApp(Target):
@@ -165,22 +165,25 @@ class JvmApp(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
+      'basename' : PrimitiveField(basename or name),
+      'binary' : PrimitiveField(binary),
       'bundles': BundleField(bundles or []),
       })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)
 
     if name == basename:
       raise TargetDefinitionException(self, 'basename must not equal name.')
-    self._basename = basename or name
-    self._binary = binary
 
   @property
   def traversable_dependency_specs(self):
-    return [self._binary] if self._binary else []
+    for spec in super(JvmApp, self).traversable_dependency_specs:
+      yield spec
+    if self.payload.binary:
+      yield self.payload.binary
 
   @property
   def basename(self):
-    return self._basename
+    return self.payload.basename
 
   @property
   def bundles(self):
@@ -188,19 +191,19 @@ class JvmApp(Target):
 
   @property
   def binary(self):
+    """:returns: The JvmBinary instance this JvmApp references.
+    :rtype: JvmBinary
+    """
     dependencies = self.dependencies
     if len(dependencies) != 1:
       raise TargetDefinitionException(self, 'A JvmApp must define exactly one JvmBinary '
-                                            'dependency, have: %s' % dependencies)
+                                            'dependency, have: {}'.format(dependencies))
     binary = dependencies[0]
     if not isinstance(binary, JvmBinary):
       raise TargetDefinitionException(self, 'Expected JvmApp binary dependency to be a JvmBinary '
-                                            'target, found %s' % binary)
+                                            'target, found {}'.format(binary))
     return binary
 
   @property
   def jar_dependencies(self):
     return self.binary.jar_dependencies
-
-  def is_jvm_app(self):
-    return True

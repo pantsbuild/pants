@@ -44,8 +44,8 @@ python_tests(
   name = 'test_thrift_namespace_packages',
   sources = ['test_thrift_namespace_packages.py'],
   dependencies = [
-    'testprojects/src/thrift/com/pants/testing:duck-py',
-    'testprojects/src/thrift/com/pants/testing:goose-py',
+    'testprojects/src/thrift/org/pantsbuild/testing:duck-py',
+    'testprojects/src/thrift/org/pantsbuild/testing:goose-py',
   ],
 )
 

@@ -20,6 +20,11 @@ def add_log4j_excludes(jar):
             .exclude(org='com.sun.jdmk', name='jmxtools')
             .exclude(org='com.sun.jmx', name='jmxri'))
 
+jar_library(name='args4j',
+            jars=[
+              jar(org='args4j', name='args4j', rev='2.32')
+            ])
+
 jar_library(name='checkstyle',
             jars = [
               jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
@@ -124,6 +129,12 @@ jar_library(name='slf4j-api',
             jars = [
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
             ]
+)
+
+jar_library(name = 'spindle-runtime',
+            jars = [
+              jar(org = 'com.foursquare', name = 'spindle-runtime_2.10', rev = '3.0.0-M7'),
+            ],
 )
 
 jar_library(name='libthrift-0.5.0',

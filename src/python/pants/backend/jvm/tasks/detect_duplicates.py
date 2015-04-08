@@ -77,7 +77,7 @@ class DuplicateDetector(JvmBinaryTask):
     if len(conflicts_by_artifacts) > 0:
       self._log_conflicts(conflicts_by_artifacts, binary_target)
       if self._fail_fast:
-        raise TaskError('Failing build for target %s.' % binary_target)
+        raise TaskError('Failing build for target {}.'.format(binary_target))
       return True
     return False
 
@@ -104,7 +104,7 @@ class DuplicateDetector(JvmBinaryTask):
     artifacts_by_file_name = defaultdict(set)
     for basedir, externaljar in  self.list_external_jar_dependencies(binary_target):
       external_dep = os.path.join(basedir, externaljar)
-      self.context.log.debug('  scanning %s' % external_dep)
+      self.context.log.debug('  scanning {}'.format(external_dep))
       with open_zip(external_dep) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
           # Zip entry names can come in any encoding and in practice we find some jars that have
@@ -127,14 +127,14 @@ class DuplicateDetector(JvmBinaryTask):
     return conflicts_by_artifacts
 
   def _log_conflicts(self, conflicts_by_artifacts, target):
-    self.context.log.warn('\n ===== For target %s:' % target)
+    self.context.log.warn('\n ===== For target {}:'.format(target))
     for artifacts, duplicate_files in conflicts_by_artifacts.items():
       if len(artifacts) < 2: continue
       self.context.log.warn(
-        'Duplicate classes and/or resources detected in artifacts: %s' % str(artifacts))
+          'Duplicate classes and/or resources detected in artifacts: {}'.format(artifacts))
       dup_list = list(duplicate_files)
       for duplicate_file in dup_list[:self._max_dups]:
-        self.context.log.warn('     %s' % duplicate_file)
+        self.context.log.warn('     {}'.format(duplicate_file))
       if len(dup_list) > self._max_dups:
         self.context.log.warn('     ... {remaining} more ...'
                               .format(remaining=(len(dup_list)-self._max_dups)))

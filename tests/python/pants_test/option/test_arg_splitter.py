@@ -50,7 +50,7 @@ class ArgSplitterTest(unittest.TestCase):
   def test_arg_splitting(self):
     # Various flag combos.
     self._split('./pants --compile-java-long-flag -f compile -g compile.java -x test.junit -i '
-                'src/java/com/pants/foo src/java/com/pants/bar:baz',
+                'src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz',
                 ['compile', 'test'],
                 {
                   '': ['-f'],
@@ -58,9 +58,9 @@ class ArgSplitterTest(unittest.TestCase):
                   'compile': ['-g'],
                   'test.junit': ['-i']
                 },
-                ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'])
+                ['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'])
     self._split('./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii '
-                '--compile-java-long-flag src/java/com/pants/foo src/java/com/pants/bar:baz',
+                '--compile-java-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz',
                 ['compile', 'test'],
                 {
                   '': ['-farg', '--fff=arg'],
@@ -68,7 +68,7 @@ class ArgSplitterTest(unittest.TestCase):
                   'test.junit': ['--iii'],
                   'compile.java': ['--long-flag'],
                 },
-                ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'])
+                ['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'])
 
     # Distinguishing goals and target specs.
     self._split('./pants compile test foo::', ['compile', 'test'],
@@ -99,7 +99,7 @@ class ArgSplitterTest(unittest.TestCase):
                 expected_passthru=['-t', 'arg'],
                 expected_passthru_owner='test')
     self._split('./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii '
-                '--compile-java-long-flag src/java/com/pants/foo src/java/com/pants/bar:baz '
+                '--compile-java-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz '
                 '-- passthru1 passthru2',
                 ['compile', 'test'],
                 {
@@ -108,7 +108,7 @@ class ArgSplitterTest(unittest.TestCase):
                   'compile.java': ['--long-flag'],
                   'test.junit': ['--iii']
                 },
-                ['src/java/com/pants/foo', 'src/java/com/pants/bar:baz'],
+                ['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
                 expected_passthru=['passthru1', 'passthru2'],
                 expected_passthru_owner='test.junit')
 
@@ -156,7 +156,7 @@ class ArgSplitterTest(unittest.TestCase):
     self._split_version('./pants --version')
 
     # --version in a non-global scope is OK, and not a version request.
-    self._split('./pants compile --version src/java/com/pants/foo',
+    self._split('./pants compile --version src/java/org/pantsbuild/foo',
                 ['compile'],
                 { '': [], 'compile': ['--version'], },
-                ['src/java/com/pants/foo'])
+                ['src/java/org/pantsbuild/foo'])

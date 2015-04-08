@@ -31,7 +31,7 @@ class Executor(AbstractClass):
   def _scrub_args(classpath, main, jvm_options, args, cwd):
     classpath = maybe_list(classpath)
     if not isinstance(main, string_types) or not main:
-      raise ValueError('A non-empty main classname is required, given: %s' % main)
+      raise ValueError('A non-empty main classname is required, given: {}'.format(main))
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
     return classpath, main, jvm_options, args, cwd
@@ -70,7 +70,7 @@ class Executor(AbstractClass):
     """
     if distribution:
       if not isinstance(distribution, Distribution):
-        raise ValueError('A valid distribution is required, given: %s' % distribution)
+        raise ValueError('A valid distribution is required, given: {}'.format(distribution))
       distribution.validate()
     else:
       distribution = Distribution.cached()

@@ -144,8 +144,8 @@ class IvyTaskMixin(object):
             confs=confs)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
-          raise TaskError('Ivy failed to create classpath file at %s'
-                          % raw_target_classpath_file_tmp)
+          raise TaskError('Ivy failed to create classpath file at {}'
+                          .format(raw_target_classpath_file_tmp))
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
         logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
@@ -206,8 +206,8 @@ class IvyTaskMixin(object):
     mapdir = self.mapjar_workdir(target)
     safe_mkdir(mapdir, clean=True)
     ivyargs = [
-      '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
-                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
+      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
       '-symlink',
     ]
     confs = maybe_list(target.payload.get_field_value('configurations') or [])
@@ -275,7 +275,7 @@ class IvyTaskMixin(object):
         result = execute_runner(runner, workunit_factory=self.context.new_workunit,
                                 workunit_name=workunit_name)
         if result != 0:
-          raise TaskError('Ivy returned %d' % result)
+          raise TaskError('Ivy returned {}'.format(result))
       except runner.executor.Error as e:
         raise TaskError(e)
 

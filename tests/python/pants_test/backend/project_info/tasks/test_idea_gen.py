@@ -24,13 +24,13 @@ class IdeaGenTest(BaseTest):
     src_java = SourceSet("repo-root", "src/java/com/pats", "project/lib", False)
     self.assertFalse(IdeaGen._sibling_is_test(src_java))
 
-    src_resources = SourceSet("repo-root", "src/resources/com/pants", "project/lib", False)
+    src_resources = SourceSet("repo-root", "src/resources/org/pantsbuild", "project/lib", False)
     self.assertFalse(IdeaGen._sibling_is_test(src_resources))
 
     # Surprise! It doesn't matter what you pass for is_test when constructing the source set,
     # its detecting that one of the siblings under /tests/ is configured with a JavaTests target.
-    tests_java = SourceSet("repo-root", "tests/java/com/pants", "project/lib", False)
+    tests_java = SourceSet("repo-root", "tests/java/org/pantsbuild", "project/lib", False)
     self.assertTrue(IdeaGen._sibling_is_test(tests_java))
 
-    tests_resources = SourceSet("repo-root", "tests/resources/com/pants", "project/lib", False)
+    tests_resources = SourceSet("repo-root", "tests/resources/org/pantsbuild", "project/lib", False)
     self.assertTrue(IdeaGen._sibling_is_test(tests_resources))

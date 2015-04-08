@@ -36,12 +36,12 @@ def find_includes(basedirs, source, log=None):
           include = os.path.join(basedir, capture)
           if os.path.exists(include):
             if log:
-              log.debug('%s has include %s' % (source, include))
+              log.debug('{} has include {}'.format(source, include))
             includes.add(include)
             added = True
         if not added:
-          raise ValueError("%s included in %s not found in bases %s"
-                           % (include, source, all_basedirs))
+          raise ValueError("{} included in {} not found in bases {}"
+                           .format(include, source, all_basedirs))
   return includes
 
 
