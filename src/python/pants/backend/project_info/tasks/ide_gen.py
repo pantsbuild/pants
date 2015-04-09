@@ -376,7 +376,7 @@ class ClasspathEntry(object):
 class SourceSet(object):
   """Models a set of source files."""
 
-  def __init__(self, root_dir, source_base, path, is_test, content_type):
+  def __init__(self, root_dir, source_base, path, is_test, content_type=''):
     """
     :param string root_dir: full path to the root of the project containing this source set
     :param string source_base: the relative path from root_dir to the base of this source set
