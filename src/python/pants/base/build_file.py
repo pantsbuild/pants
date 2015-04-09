@@ -186,9 +186,7 @@ class BuildFile(object):
       descendants.discard(sibling)
     return descendants
 
-  def ancestors(self):
-    """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
-
+  def _ancestors(self):
     def find_parent(dir):
       parent = os.path.dirname(dir)
       for parent_buildfile in BuildFile._get_all_build_files(parent):
@@ -197,8 +195,6 @@ class BuildFile(object):
           return parent, BuildFile.from_cache(self.root_dir,
                                               os.path.relpath(buildfile, self.root_dir))
       return parent, None
-
-    parent_buildfiles = OrderedSet()
 
     def is_root(path):
       return os.path.abspath(self.root_dir) == os.path.abspath(path)
@@ -209,9 +205,19 @@ class BuildFile(object):
       visited.add(parentdir)
       parentdir, buildfile = find_parent(parentdir)
       if buildfile:
-        parent_buildfiles.update(buildfile.family())
+        for f in buildfile.family():
+          yield f
 
-    return parent_buildfiles
+  def ancestors(self):
+    """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
+    return OrderedSet(self._ancestors())
+
+  def parent(self):
+    """Returns the first BUILD file in ancestor directories of this BUILD file."""
+    for ancestor in self._ancestors():
+      return ancestor
+    else:
+      return None
 
   def siblings(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including

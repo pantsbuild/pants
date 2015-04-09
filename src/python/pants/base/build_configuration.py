@@ -142,6 +142,9 @@ class BuildConfiguration(object):
 
     parse_globals = type_aliases.copy()
     for alias, object_factory in self._exposed_context_aware_object_factories.items():
-      parse_globals[alias] = object_factory(parse_context)
+      factory = object_factory(parse_context)
+      if not callable(factory):
+        raise TypeError('The factory for the {} returned None for {}'.format(alias, parse_context))
+      parse_globals[alias] = factory
 
     return self.ParseState(registered_addressable_instances, parse_globals)

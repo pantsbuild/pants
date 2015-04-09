@@ -100,6 +100,14 @@ class BuildConfigurationTest(unittest.TestCase):
     with self.do_test_exposed_context_aware_object(func) as context_aware_object:
       self.assertEqual('george', context_aware_object(*args, **kwargs))
 
+  @staticmethod
+  def not_georgemethod(parse_context):
+    pass
+
+  def test_register_exposed_context_aware_staticmethod_returning_none(self):
+    with self.assertRaises(TypeError):
+      self.do_test_exposed_context_aware_object(self.not_georgemethod)
+
   def test_register_exposed_context_aware_class(self):
     class George(object):
       def __init__(self, parse_context):

@@ -29,6 +29,7 @@ python_library(
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/fs',
     'src/python/pants/util:dirutil',
   ]
 )

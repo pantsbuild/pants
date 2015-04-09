@@ -125,6 +125,14 @@ class BuildFileAddressMapper(object):
     _, addressable = self.resolve(address)
     return addressable
 
+  def _build_file_for_spec_path(self, spec_path):
+    try:
+      return BuildFile.from_cache(self._build_file_parser._root_dir, spec_path)
+    except BuildFile.BuildFileError as e:
+      raise BuildFileParser.BuildFileScanError("{message}\n searching {spec_path}"
+                                               .format(message=e,
+                                                       spec_path=spec_path))
+
   def _address_map_from_spec_path(self, spec_path):
     """Returns a resolution map of all addresses in a "directory" in the virtual address space.
 
@@ -132,7 +140,17 @@ class BuildFileAddressMapper(object):
     """
     if spec_path not in self._spec_path_to_address_map_map:
       try:
-        mapping = self._build_file_parser.address_map_from_spec_path(spec_path)
+        # Parse and cache addresses for parent BUILD files
+        # Some BUILD files may have side-effecting declarations that
+        # change the constraints of child BUILD files, eg source_roots
+        #
+        # TODO handle excludes
+        build_file = self._build_file_for_spec_path(spec_path)
+        build_file_parent = build_file.parent()
+        if build_file_parent and build_file_parent.exists():
+          self._address_map_from_spec_path(build_file_parent.spec_path)
+
+        mapping = self._build_file_parser.address_map_from_build_file(build_file)
       except BuildFileParser.BuildFileParserError as e:
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
                                  .format(message=e, spec_path=spec_path))
