@@ -522,6 +522,11 @@ class Project(object):
         targeted.add(absolute_path)
         source_set = SourceSet(self.root_dir, relative_base, path, is_test, content_type)
         if source_set in self.sources and content_type:
+         # Note, same resource can be added twice.
+         # 1. Once with the content_type attached with target.has_resources loop
+         # 2. Second without content_type from command line target.
+         # We do not want to skip resources in flow 2 as we can have resources on the command line
+         # which are not attached to any target.
          self.sources.remove(source_set)
         self.sources.add(source_set)
 
