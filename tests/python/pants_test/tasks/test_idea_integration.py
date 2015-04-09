@@ -130,7 +130,6 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         remaining.remove(url)
       self.assertTrue(found_source_content)
 
-
     self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], check_func=do_check)
 
   def test_idea_on_annotations(self):
