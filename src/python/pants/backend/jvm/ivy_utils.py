@@ -27,12 +27,28 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev'])
 IvyArtifact = namedtuple('IvyArtifact', ['path', 'classifier'])
 IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
 
 
 logger = logging.getLogger(__name__)
+
+
+class IvyModuleRef(object):
+  def __init__(self, org, name, rev):
+    self.org = org
+    self.name = name
+    self.rev = rev
+
+  def __eq__(self, other):
+    return self.org == other.org and self.name == other.name and self.rev == other.rev
+
+  def __hash__(self):
+    return hash((self.org, self.name, self.rev))
+
+  @property
+  def unversioned(self):
+    return IvyModuleRef(self.org, self.name, '__unversioned')
 
 
 class IvyInfo(object):
@@ -45,11 +61,12 @@ class IvyInfo(object):
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
+    if not module.artifacts:
+      # Module was evicted, so do not record information about it
+      return
     for caller in module.callers:
-      self._deps_by_caller[caller].add(module.ref)
-    # Strip the version from the ref before recording artifacts.
-    unversioned_ref = IvyModuleRef(module.ref.org, module.ref.name, "")
-    self._artifacts_by_ref[unversioned_ref].update(module.artifacts)
+      self._deps_by_caller[caller.unversioned].add(module.ref)
+    self._artifacts_by_ref[module.ref.unversioned].update(module.artifacts)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
@@ -79,7 +96,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref, ()):
+    for dep in self._deps_by_caller.get(ref.unversioned, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc
@@ -104,9 +121,8 @@ class IvyInfo(object):
       valid_classifiers = jar.artifact_classifiers
       artifacts_for_jar = []
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-        unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
         artifacts_for_jar.extend(
-          artifact for artifact in self._artifacts_by_ref[unversioned_ref]
+          artifact for artifact in self._artifacts_by_ref[module_ref.unversioned]
           if artifact.classifier in valid_classifiers
         )
 
