@@ -34,12 +34,12 @@ class PythonArtifact(PayloadField):
     def has(name):
       value = self._kw.get(name)
       if value is None:
-        raise self.MissingArgument('PythonArtifact requires %s to be specified!' % name)
+        raise self.MissingArgument('PythonArtifact requires {} to be specified!'.format(name))
       return value
 
     def misses(name):
       if name in self._kw:
-        raise self.UnsupportedArgument('PythonArtifact prohibits %s from being specified' % name)
+        raise self.UnsupportedArgument('PythonArtifact prohibits {} from being specified'.format(name))
 
     self._version = has('version')
     self._name = has('name')
@@ -56,7 +56,7 @@ class PythonArtifact(PayloadField):
 
   @property
   def key(self):
-    return '%s==%s' % (self._name, self._version)
+    return '{}=={}'.format(self._name, self._version)
 
   @property
   def setup_py_keywords(self):

@@ -54,7 +54,7 @@ class Bootstrapper(object):
   _DEFAULT_VERSION = '2.3.0'
   _DEFAULT_URL = ('https://repo1.maven.org/maven2/'
                   'org/apache/ivy/ivy/'
-                  '%(version)s/ivy-%(version)s.jar' % {'version': _DEFAULT_VERSION})
+                  '{version}/ivy-{version}.jar'.format(version=_DEFAULT_VERSION))
 
   _INSTANCE = None
 
@@ -196,7 +196,7 @@ class Bootstrapper(object):
         digest.update(fp.read())
     else:
       digest.update(self._version_or_ivyxml)
-    classpath = os.path.join(ivy_bootstrap_dir, '%s.classpath' % digest.hexdigest())
+    classpath = os.path.join(ivy_bootstrap_dir, '{}.classpath'.format(digest.hexdigest()))
 
     if not os.path.exists(classpath):
       ivy = self._bootstrap_ivy(os.path.join(ivy_bootstrap_dir, 'bootstrap.jar'))
@@ -210,7 +210,7 @@ class Bootstrapper(object):
         ivy.execute(args=args, workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
       except ivy.Error as e:
         safe_delete(classpath)
-        raise self.Error('Failed to bootstrap an ivy classpath! %s' % e)
+        raise self.Error('Failed to bootstrap an ivy classpath! {}'.format(e))
 
     with open(classpath) as fp:
       cp = fp.read().strip().split(os.pathsep)
@@ -218,7 +218,7 @@ class Bootstrapper(object):
         safe_delete(classpath)
         if retry:
           return self._bootstrap_ivy_classpath(workunit_factory, retry=False)
-        raise self.Error('Ivy bootstrapping failed - invalid classpath: %s' % ':'.join(cp))
+        raise self.Error('Ivy bootstrapping failed - invalid classpath: {}'.format(':'.join(cp)))
       return cp
 
   def _bootstrap_ivy(self, bootstrap_jar_path):
@@ -227,19 +227,19 @@ class Bootstrapper(object):
         fetcher = Fetcher()
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
         try:
-          logger.info('\nDownloading %s' % self._bootstrap_jar_url)
+          logger.info('\nDownloading {}'.format(self._bootstrap_jar_url))
           # TODO: Capture the stdout of the fetcher, instead of letting it output
           # to the console directly.
           fetcher.download(self._bootstrap_jar_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
                            timeout_secs=self._timeout_secs)
-          logger.info('sha1: %s' % checksummer.checksum)
+          logger.info('sha1: {}'.format(checksummer.checksum))
           bootstrap_jar.close()
           touch(bootstrap_jar_path)
           shutil.move(bootstrap_jar.name, bootstrap_jar_path)
         except fetcher.Error as e:
-          raise self.Error('Problem fetching the ivy bootstrap jar! %s' % e)
+          raise self.Error('Problem fetching the ivy bootstrap jar! {}'.format(e))
 
     return Ivy(bootstrap_jar_path,
                ivy_settings=self._ivy_settings,

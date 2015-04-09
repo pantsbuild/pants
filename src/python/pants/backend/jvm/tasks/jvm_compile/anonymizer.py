@@ -63,9 +63,9 @@ class TokenTranslator(object):
   # upper-case letters.
   _DELIMITER = r'\d|\s|/|-|_|\$|\.'
   _UPPER = r'[A-Z]'
-  _UPPER_CASE_RE = re.compile(r'^%s$' % _UPPER)
-  _DELIMITER_RE = re.compile(r'^%s$' % _DELIMITER)
-  _BREAK_ON_RE = re.compile(r'(%s|%s)' % (_DELIMITER, _UPPER))  # Capture what we broke on.
+  _UPPER_CASE_RE = re.compile(r'^{}$'.format(_UPPER))
+  _DELIMITER_RE = re.compile(r'^{}$'.format(_DELIMITER))
+  _BREAK_ON_RE = re.compile(r'({}|{})'.format(_DELIMITER, _UPPER))  # Capture what we broke on.
 
   # Valid replacement words must be all lower-case ASCII letters, with no apostrophes etc, and must be
   # at least 5 characters.
@@ -101,7 +101,7 @@ class TokenTranslator(object):
 
   def check_for_comprehensiveness(self):
     if self._words_needed:
-      raise Exception('Need %d more words in word_list for full anonymization.' % self._words_needed)
+      raise Exception('Need {} more words in word_list for full anonymization.'.format(self._words_needed))
 
   def convert(self, s):
     parts = TokenTranslator._BREAK_ON_RE.split(s)
@@ -154,9 +154,9 @@ class TokenTranslator(object):
 
   def _add_translation(self, frm, to):
     if frm in self._translations:
-      raise Exception('Word already has translation: %s -> %s' % (frm, self._translations[frm]))
+      raise Exception('Word already has translation: {} -> {}'.format(frm, self._translations[frm]))
     if to in self._reverse_translations:
-      raise Exception('Translation target already used: %s -> %s' % (self._reverse_translations[to], to))
+      raise Exception('Translation target already used: {} -> {}'.format(self._reverse_translations[to], to))
     self._translations[frm] = to
     self._reverse_translations[to] = frm
 

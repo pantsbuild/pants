@@ -115,10 +115,10 @@ class CodeGen(Task):
         forced = True
       gentargets_bylang[lang] = gentargets if self.is_forced(lang) else find_gentargets(predicate)
     if not forced and gentargets_by_dependee:
-      self.context.log.warn('Left with unexpected unconsumed gen targets:\n\t%s' % '\n\t'.join(
-        '%s -> %s' % (dependee, gentargets)
-        for dependee, gentargets in gentargets_by_dependee.items()
-      ))
+      self.context.log.warn('Left with unexpected unconsumed gen targets:\n\t{}'.format('\n\t'.join(
+          '{} -> {}'.format(dependee, gentargets)
+          for dependee, gentargets in gentargets_by_dependee.items()
+      )))
 
     if gentargets:
       self.prepare_gen(gentargets)

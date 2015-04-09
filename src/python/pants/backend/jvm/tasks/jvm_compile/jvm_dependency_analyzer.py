@@ -159,14 +159,14 @@ class JvmDependencyAnalyzer(object):
 
       if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
         for (tgt_pair, evidence) in missing_tgt_deps:
-          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1]))
+          evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
           self._context.log.error(
-              'Missing BUILD dependency %s -> %s because:\n%s'
-              % (tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
+              'Missing BUILD dependency {} -> {} because:\n{}'
+              .format(tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
         for (src_tgt, dep) in missing_file_deps:
-          self._context.log.error('Missing BUILD dependency %s -> %s'
-                                  % (src_tgt.address.reference(), shorten(dep)))
+          self._context.log.error('Missing BUILD dependency {} -> {}'
+                                  .format(src_tgt.address.reference(), shorten(dep)))
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
 
@@ -176,10 +176,10 @@ class JvmDependencyAnalyzer(object):
       if self._check_missing_direct_deps and missing_direct_tgt_deps:
 
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['    %s uses %s' % (shorten(e[0]), shorten(e[1]))
+          evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
-          self._context.log.warn('Missing direct BUILD dependency %s -> %s because:\n%s' %
-                                  (tgt_pair[0].address, tgt_pair[1].address, evidence_str))
+          self._context.log.warn('Missing direct BUILD dependency {} -> {} because:\n{}'
+                                 .format(tgt_pair[0].address, tgt_pair[1].address, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
           raise TaskError('Missing direct deps.')
 
@@ -266,7 +266,7 @@ class JvmDependencyAnalyzer(object):
                 missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
                     (src, actual_dep))
         else:
-          raise TaskError('Requested dep info for unknown source file: %s' % src)
+          raise TaskError('Requested dep info for unknown source file: {}'.format(src))
 
     return (list(missing_file_deps),
             missing_tgt_deps_map.items(),

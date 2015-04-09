@@ -125,7 +125,7 @@ class WorkUnit(object):
     those of its subunits. The right thing happens: The outcome of a work unit is the
     worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome not in range(0, 5):
-      raise Exception('Invalid outcome: %s' % outcome)
+      raise Exception('Invalid outcome: {}'.format(outcome))
 
     if outcome < self._outcome:
       self._outcome = outcome
@@ -137,7 +137,7 @@ class WorkUnit(object):
     """Returns the output buffer for the specified output name (e.g., 'stdout'), creating it if necessary."""
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
-      raise Exception('Invalid output name: %s' % name)
+      raise Exception('Invalid output name: {}'.format(name))
     if name not in self._outputs:
       workunit_name = re.sub(r'\W', '_', self.name)
       path = os.path.join(self.run_info_dir,
@@ -169,7 +169,7 @@ class WorkUnit(object):
   def start_delta_string(self):
     """A convenient string representation of how long after the run started we started."""
     delta = int(self.start_time) - int(self.root().start_time)
-    return '%02d:%02d' % (delta / 60, delta % 60)
+    return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
 
   def root(self):
     ret = self

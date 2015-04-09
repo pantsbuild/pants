@@ -94,7 +94,7 @@ class WorkerPool(object):
 
     def error(e):
       done()
-      self._run_tracker.log(Report.ERROR, '%s' % e)
+      self._run_tracker.log(Report.ERROR, '{}'.format(e))
 
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
@@ -112,7 +112,7 @@ class WorkerPool(object):
       submit_next()
     except Exception as e:  # Handles errors in the submission code.
       done()
-      self._run_tracker.log(Report.ERROR, '%s' % e)
+      self._run_tracker.log(Report.ERROR, '{}'.format(e))
       raise
 
   def submit_work_and_wait(self, work, workunit_parent=None):

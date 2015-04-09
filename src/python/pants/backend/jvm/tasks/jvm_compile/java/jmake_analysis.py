@@ -71,7 +71,7 @@ class JMakeAnalysis(Analysis):
       return path
 
     outfile.write('pcd entries:\n')
-    outfile.write('%d items\n' % len(self.pcd_entries))
+    outfile.write('{} items\n'.format(len(self.pcd_entries)))
     for pcd_entry in self.pcd_entries:
       rebased_src = rebase_path(pcd_entry[1])
       if rebased_src:
@@ -84,7 +84,7 @@ class JMakeAnalysis(Analysis):
           # Note that last element already includes \n.
 
     outfile.write('dependencies:\n')
-    outfile.write('%d items\n' % len(self.src_to_deps))
+    outfile.write('{} items\n'.format(len(self.src_to_deps)))
     for src, deps in self.src_to_deps.items():
       rebased_src = rebase_path(src)
       if rebased_src:

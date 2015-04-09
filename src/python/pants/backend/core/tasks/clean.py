@@ -17,7 +17,7 @@ def _cautious_rmtree(root):
   real_buildroot = os.path.realpath(os.path.abspath(get_buildroot()))
   real_root = os.path.realpath(os.path.abspath(root))
   if not real_root.startswith(real_buildroot):
-    raise TaskError('DANGER: Attempting to delete %s, which is not under the build root!')
+    raise TaskError('DANGER: Attempting to delete {}, which is not under the build root!'.format(real_root))
   safe_rmtree(real_root)
 
 

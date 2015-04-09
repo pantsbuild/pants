@@ -385,7 +385,7 @@ class BuildGraph(object):
 class CycleException(Exception):
   """Thrown when a circular dependency is detected."""
   def __init__(self, cycle):
-    Exception.__init__(self, 'Cycle detected:\n\t%s' % (
+    Exception.__init__(self, 'Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 

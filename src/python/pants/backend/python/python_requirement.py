@@ -84,4 +84,4 @@ class PythonRequirement(object):
     return str(self._requirement)
 
   def __repr__(self):
-    return 'PythonRequirement(%s)' % self._requirement
+    return 'PythonRequirement({})'.format(self._requirement)

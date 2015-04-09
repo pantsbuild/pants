@@ -134,7 +134,7 @@ class PytestRun(PythonTask):
       xml_base = os.path.realpath(xml_base)
       xml_path = os.path.join(xml_base, Target.maybe_readable_identify(targets) + '.xml')
       safe_mkdir(os.path.dirname(xml_path))
-      args.append('--junitxml=%s' % xml_path)
+      args.append('--junitxml={}'.format(xml_path))
     yield args
 
   DEFAULT_COVERAGE_CONFIG = dedent(b"""

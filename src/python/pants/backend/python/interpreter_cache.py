@@ -83,7 +83,7 @@ class PythonInterpreterCache(object):
       path = os.path.join(self._cache_dir, interpreter_dir)
       pi = self._interpreter_from_path(path, filters)
       if pi:
-        self._logger('Detected interpreter %s: %s' % (pi.binary, str(pi.identity)))
+        self._logger('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
         self._interpreters.add(pi)
 
   def _setup_paths(self, paths, filters):
@@ -165,7 +165,7 @@ class PythonInterpreterCache(object):
     if egg:
       return interpreter.with_extra(egg.name, egg.raw_version, egg.path)
     else:
-      self._logger('Failed to resolve requirement %s for %s' % (requirement, interpreter))
+      self._logger('Failed to resolve requirement {} for {}'.format(requirement, interpreter))
 
   def _resolve_and_link(self, requirement, target_link, installer_provider):
     # Short-circuit if there is a local copy.
@@ -180,13 +180,13 @@ class PythonInterpreterCache(object):
     links = [link for link in iterator.iter(requirement) if isinstance(link, SourcePackage)]
 
     for link in links:
-      self._logger('    fetching %s' % link.url)
+      self._logger('    fetching {}'.format(link.url))
       sdist = context.fetch(link)
-      self._logger('    installing %s' % sdist)
+      self._logger('    installing {}'.format(sdist))
       installer = installer_provider(sdist)
       dist_location = installer.bdist()
       target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
       shutil.move(dist_location, target_location)
       _safe_link(target_location, target_link)
-      self._logger('    installed %s' % target_location)
+      self._logger('    installed {}'.format(target_location))
       return EggPackage(target_location)

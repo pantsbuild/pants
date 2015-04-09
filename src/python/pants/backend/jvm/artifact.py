@@ -27,15 +27,15 @@ class Artifact(PayloadField):
     :param string description: Description of this artifact.
     """
     if not isinstance(org, string_types):
-      raise ValueError("org must be %s but was %s" % (string_types, org))
+      raise ValueError("org must be {} but was {}".format(string_types, org))
     if not isinstance(name, string_types):
-      raise ValueError("name must be %s but was %s" % (string_types, name))
+      raise ValueError("name must be {} but was {}".format(string_types, name))
     if not isinstance(repo, Repository):
       raise ValueError("repo must be an instance of Repository")
 
     if description is not None and not isinstance(description, string_types):
-      raise ValueError("description must be None or %s but was %s"
-                       % (string_types, description))
+      raise ValueError("description must be None or {} but was {}"
+                       .format(string_types, description))
 
     self.org = org
     self.name = name
@@ -58,4 +58,4 @@ class Artifact(PayloadField):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "%s-%s -> %s" % (self.org, self.name, self.repo)
+    return "{}-{} -> {}".format(self.org, self.name, self.repo)

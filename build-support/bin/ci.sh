@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrlpncieat)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpncieat)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -19,6 +19,7 @@ function usage() {
   echo "              files"
   echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
+  echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
   echo " -n           skip contrib python tests"
@@ -43,7 +44,7 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrlpnci:eat" opt; do
+while getopts "hfxbkmsrjlpnci:eat" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -53,6 +54,7 @@ while getopts "hfxbkmsrlpnci:eat" opt; do
     m) skip_sanity_checks="true" ;;
     s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
+    j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     n) skip_contrib="true" ;;
@@ -156,6 +158,13 @@ fi
 if [[ "${skip_docs:-false}" == "false" ]]; then
   banner "Running site doc generation test"
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
+fi
+
+if [[ "${skip_jvm:-false}" == "false" ]]; then
+  banner "Running core jvm tests"
+  (
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java::
+  ) || die "Core jvm test failure"
 fi
 
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then

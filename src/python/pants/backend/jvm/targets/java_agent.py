@@ -52,12 +52,12 @@ class JavaAgent(JavaLibrary):
                                             "defined.")
     if premain and not isinstance(premain, string_types):
       raise TargetDefinitionException(self, 'The premain must be a fully qualified class name, '
-                                            'given %s of type %s' % (premain, type(premain)))
+                                            'given {} of type {}'.format(premain, type(premain)))
 
     if agent_class and not isinstance(agent_class, string_types):
       raise TargetDefinitionException(self,
                                       'The agent_class must be a fully qualified class name, given '
-                                      '%s of type %s' % (agent_class, type(agent_class)))
+                                      '{} of type {}'.format(agent_class, type(agent_class)))
 
     self._premain = premain
     self._agent_class = agent_class

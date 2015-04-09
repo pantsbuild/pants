@@ -69,7 +69,7 @@ class ZincUtils(object):
   def _zinc_jar_args(self):
     zinc_jars = self.identify_zinc_jars(self._zinc_classpath)
     # The zinc jar names are also the flag names.
-    return (list(chain.from_iterable([['-%s' % name, jarpath]
+    return (list(chain.from_iterable([['-{}'.format(name), jarpath]
                                      for (name, jarpath) in sorted(zinc_jars.items())])) +
             ['-scala-path', ':'.join(self._compiler_classpath)])
 
@@ -86,9 +86,9 @@ class ZincUtils(object):
     active_plugins = self.find_plugins()
     ret = []
     for name, jar in active_plugins.items():
-      ret.append('-S-Xplugin:%s' % jar)
+      ret.append('-S-Xplugin:{}'.format(jar))
       for arg in plugin_args.get(name, []):
-        ret.append('-S-P:%s:%s' % (name, arg))
+        ret.append('-S-P:{}:{}'.format(name, arg))
     return ret
 
   def plugin_jars(self):
@@ -150,7 +150,7 @@ class ZincUtils(object):
     args += self._plugin_args()
     if upstream_analysis_files:
       args.extend(
-        ['-analysis-map', ','.join(['%s:%s' % kv for kv in upstream_analysis_files.items()])])
+        ['-analysis-map', ','.join(['{}:{}'.format(*kv) for kv in upstream_analysis_files.items()])])
 
     args += extra_args
 
@@ -172,10 +172,10 @@ class ZincUtils(object):
     with safe_open(plugin_info_file, 'w') as f:
       f.write(textwrap.dedent('''
         <plugin>
-          <name>%s</name>
-          <classname>%s</classname>
+          <name>{}</name>
+          <classname>{}</classname>
         </plugin>
-      ''' % (target.plugin, target.classname)).strip())
+      '''.format(target.plugin, target.classname)).strip())
     return root, plugin_info_file
 
   # These are the names of the various jars zinc needs. They are, conveniently and
@@ -198,7 +198,7 @@ class ZincUtils(object):
           jar_for_name = jar
           break
       if jar_for_name is None:
-        raise TaskError('Couldn\'t find jar named %s' % name)
+        raise TaskError('Couldn\'t find jar named {}'.format(name))
       else:
         jars_by_name[name] = jar_for_name
     return jars_by_name
@@ -217,11 +217,11 @@ class ZincUtils(object):
             plugin_info = ElementTree.parse(plugin_info_file).getroot()
           if plugin_info.tag != 'plugin':
             raise TaskError(
-              'File %s in %s is not a valid scalac plugin descriptor' % (_PLUGIN_INFO_FILE, jar))
+                'File {} in {} is not a valid scalac plugin descriptor'.format(_PLUGIN_INFO_FILE, jar))
           name = plugin_info.find('name').text
           if name in plugin_names:
             if name in plugins:
-              raise TaskError('Plugin %s defined in %s and in %s' % (name, plugins[name], jar))
+              raise TaskError('Plugin {} defined in {} and in {}'.format(name, plugins[name], jar))
             # It's important to use relative paths, as the compiler flags get embedded in the zinc
             # analysis file, and we port those between systems via the artifact cache.
             plugins[name] = os.path.relpath(jar, buildroot)
@@ -230,12 +230,12 @@ class ZincUtils(object):
 
     unresolved_plugins = plugin_names - set(plugins.keys())
     if unresolved_plugins:
-      raise TaskError('Could not find requested plugins: %s' % list(unresolved_plugins))
+      raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
     return plugins
 
   def log_zinc_file(self, analysis_file):
-    self.context.log.debug('Calling zinc on: %s (%s)' %
-                           (analysis_file,
-                            hash_file(analysis_file).upper()
-                            if os.path.exists(analysis_file)
-                            else 'nonexistent'))
+    self.context.log.debug('Calling zinc on: {} ({})'
+                           .format(analysis_file,
+                                   hash_file(analysis_file).upper()
+                                   if os.path.exists(analysis_file)
+                                   else 'nonexistent'))

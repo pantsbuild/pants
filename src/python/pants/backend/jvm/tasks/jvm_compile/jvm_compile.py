@@ -286,13 +286,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                    compiled individually.
     """
     if not sources:
-      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
-                            % (self.name(), vts.targets))
+      self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
+                            .format(self.name(), vts.targets))
     else:
       # Do some reporting.
       self.context.log.info(
         'Compiling ',
-        items_to_report_element(sources, '%s source' % self.name()),
+        items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',

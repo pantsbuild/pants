@@ -149,7 +149,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     if self.get_options().java_jdk_name:
       self.java_jdk = self.get_options().java_jdk_name
     else:
-      self.java_jdk = '1.%d' % self.java_language_level
+      self.java_jdk = '1.{}'.format(self.java_language_level)
 
     # Always tack on the project name to the work dir so each project gets its own linked jars,
     # etc. See https://github.com/pantsbuild/pants/issues/564
@@ -238,9 +238,9 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     self.jar_dependencies = jars
 
-    self.context.log.debug('pruned to cp:\n\t%s' % '\n\t'.join(
-      str(t) for t in self.context.targets())
-    )
+    self.context.log.debug('pruned to cp:\n\t{}'.format(
+      '\n\t'.join(str(t) for t in self.context.targets())
+    ))
 
   def map_internal_jars(self, targets):
     internal_jar_dir = os.path.join(self.gen_project_workdir, 'internal-libs')
@@ -256,7 +256,7 @@ class IdeGen(JvmToolTaskMixin, Task):
       if mappings:
         for base, jars in mappings.items():
           if len(jars) != 1:
-            raise IdeGen.Error('Unexpected mapping, multiple jars for %s: %s' % (target, jars))
+            raise IdeGen.Error('Unexpected mapping, multiple jars for {}: {}'.format(target, jars))
 
           jar = jars[0]
           cp_jar = os.path.join(internal_jar_dir, jar)
@@ -268,7 +268,7 @@ class IdeGen(JvmToolTaskMixin, Task):
             for base, jars in mappings.items():
               if len(jars) != 1:
                 raise IdeGen.Error(
-                  'Unexpected mapping, multiple source jars for %s: %s' % (target, jars)
+                  'Unexpected mapping, multiple source jars for {}: {}'.format(target, jars)
                 )
               jar = jars[0]
               cp_source_jar = os.path.join(internal_source_jar_dir, jar)

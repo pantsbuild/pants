@@ -38,7 +38,7 @@ class GoalExecutor(object):
       for name, task_type in reversed(self._tasktypes_by_name.items()):
         with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
           if explain:
-            self._context.log.debug('Skipping execution of %s in explain mode' % name)
+            self._context.log.debug('Skipping execution of {} in explain mode'.format(name))
           else:
             task_workdir = os.path.join(goal_workdir, name)
             task = task_type(self._context, task_workdir)
@@ -47,7 +47,7 @@ class GoalExecutor(object):
       if explain:
         reversed_tasktypes_by_name = reversed(self._tasktypes_by_name.items())
         goal_to_task = ', '.join(
-            '%s->%s' % (name, task_type.__name__) for name, task_type in reversed_tasktypes_by_name)
+            '{}->{}'.format(name, task_type.__name__) for name, task_type in reversed_tasktypes_by_name)
         print('{goal} [{goal_to_task}]'.format(goal=self._goal.name, goal_to_task=goal_to_task))
 
 
@@ -199,7 +199,7 @@ class RoundEngine(Engine):
 
     explain = context.options.for_global_scope().explain
     if explain:
-      print('Goal Execution Order:\n\n%s\n' % execution_goals)
+      print('Goal Execution Order:\n\n{}\n'.format(execution_goals))
       print('Goal [TaskRegistrar->Task] Order:\n')
 
     serialized_goals_executors = [ge for ge in goal_executors if ge.goal.serialize]

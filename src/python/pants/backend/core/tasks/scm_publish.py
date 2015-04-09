@@ -73,8 +73,8 @@ class Semver(Version):
       try:
         return int(component)
       except (TypeError, ValueError):
-        raise ValueError('Invalid revision component %s in %s - '
-                         'must be an integer' % (component, version))
+        raise ValueError('Invalid revision component {} in {} - '
+                         'must be an integer'.format(component, version))
     return Semver(to_i(major), to_i(minor), to_i(patch))
 
   def __init__(self, major, minor, patch, snapshot=False):
@@ -91,11 +91,9 @@ class Semver(Version):
     return Semver(self.major, self.minor, self.patch, snapshot=True)
 
   def version(self):
-    return '%s.%s.%s' % (
-      self.major,
-      self.minor,
-      ('%s-SNAPSHOT' % self.patch) if self.snapshot else self.patch
-    )
+    return '{}.{}.{}'.format(self.major,
+                             self.minor,
+                             ('{}-SNAPSHOT'.format(self.patch)) if self.snapshot else self.patch)
 
   def __eq__(self, other):
     return self.__cmp__(other) == 0
@@ -116,7 +114,7 @@ class Semver(Version):
     return diff
 
   def __repr__(self):
-    return 'Semver(%s)' % self.version()
+    return 'Semver({})'.format(self.version())
 
 
 class ScmPublishMixin(object):
