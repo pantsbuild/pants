@@ -129,6 +129,7 @@ class GitTest(unittest.TestCase):
 
     tip_sha = self.git.commit_id
     self.assertTrue(tip_sha)
+    self.assertRegexpMatches(tip_sha, '^[0-9a-f]{40}$')
 
     self.assertTrue(tip_sha in self.git.changelog())
 
@@ -432,3 +433,12 @@ class DetectWorktreeFakeGitTest(unittest.TestCase):
         fp.write('echo ' + expected_worktree_dir)
       self.assertEqual(expected_worktree_dir, Git.detect_worktree())
       self.assertEqual(expected_worktree_dir, Git.detect_worktree(binary=git))
+
+  def test_detect_worktree_somewhere_else(self):
+    with temporary_dir() as somewhere_else:
+      with pushd(somewhere_else):
+        loc = Git.detect_worktree(dir=somewhere_else)
+        self.assertEquals(None, loc)
+        subprocess.check_call(['git', 'init'])
+        loc = Git.detect_worktree(dir=somewhere_else)
+        self.assertEquals(os.path.realpath(somewhere_else), loc)

@@ -10,7 +10,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, Skip
+from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, ManifestEntries, Skip
 from pants.base.address import BuildFileAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
@@ -76,6 +76,7 @@ class JvmBinaryTest(BaseTest):
     self.assertEquals([], target.payload.deploy_excludes)
     self.assertEquals(JarRules.default(), target.deploy_jar_rules)
     self.assertEquals(JarRules.default(), target.payload.deploy_jar_rules)
+    self.assertEquals({}, target.payload.manifest_entries.entries);
 
   def test_default_base(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -138,7 +139,7 @@ class JvmBinaryTest(BaseTest):
     build_file = self.add_to_build_file('BUILD', dedent('''
         jvm_binary(name='foo',
           main='com.example.Foo',
-          deploy_jar_rules= 'invalid',
+          deploy_jar_rules='invalid',
         )
         '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
@@ -146,12 +147,12 @@ class JvmBinaryTest(BaseTest):
                                   r'deploy_jar_rules must be a JarRules specification. got str'):
       self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
 
-  def _assert_fingerprints_not_equal(self, rules):
-    for rule in rules:
-      for other_rule in rules:
-        if rule == other_rule:
+  def _assert_fingerprints_not_equal(self, fields):
+    for field in fields:
+      for other_field in fields:
+        if field == other_field:
           continue
-        self.assertNotEquals(rule.fingerprint(), other_rule.fingerprint())
+        self.assertNotEquals(field.fingerprint(), other_field.fingerprint())
 
   def test_jar_rules_field(self):
     field1 = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.SKIP)]))
@@ -173,3 +174,50 @@ class JvmBinaryTest(BaseTest):
     self.assertEquals(field6.fingerprint(), field6_same.fingerprint())
     self.assertEquals(field8.fingerprint(), field8_same.fingerprint())
     self._assert_fingerprints_not_equal([field1, field2, field3, field4, field5, field6, field7])
+
+  def test_manifest_entries(self):
+    self.add_to_build_file('BUILD', dedent('''
+        jvm_binary(name='foo',
+          main='com.example.Foo',
+          manifest_entries= {
+            'Foo-Field' : 'foo',
+          }
+        )
+        '''))
+    target = self.target('//:foo')
+    self.assertTrue(isinstance(target.payload.manifest_entries, ManifestEntries))
+    entries = target.payload.manifest_entries.entries
+    self.assertEquals({ 'Foo-Field' : 'foo'}, entries)
+
+  def test_manifest_not_dict(self):
+    self.add_to_build_file('BUILD', dedent('''
+        jvm_binary(name='foo',
+          main='com.example.Foo',
+          manifest_entries= 'foo',
+        )
+        '''))
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Invalid target JvmBinary\(BuildFileAddress\(.*BUILD, foo\)\): '
+                                 r'manifest_entries must be a dict. got str'):
+       self.target('//:foo')
+
+  def test_manifest_bad_key(self):
+    self.add_to_build_file('BUILD', dedent('''
+        jvm_binary(name='foo',
+          main='com.example.Foo',
+          manifest_entries= {
+            jar(org='bad', name='bad', rev='bad') : 'foo',
+          }
+        )
+        '''))
+    with self.assertRaisesRegexp(ManifestEntries.ExpectedDictionaryError,
+                                 r'entries must be dictionary of strings, got key bad-bad-bad type JarDependency'):
+      self.target('//:foo')
+
+  def test_manifest_entries_fingerprint(self):
+    field1 = ManifestEntries()
+    field2 = ManifestEntries({'Foo-Field' : 'foo'})
+    field2_same = ManifestEntries({'Foo-Field' : 'foo'})
+    field3 = ManifestEntries({'Foo-Field' : 'foo', 'Bar-Field' : 'bar'})
+    self.assertEquals(field2.fingerprint(), field2_same.fingerprint())
+    self._assert_fingerprints_not_equal([field1, field2, field3])
