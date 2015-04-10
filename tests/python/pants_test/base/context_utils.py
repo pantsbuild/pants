@@ -10,7 +10,6 @@ import logging
 import os
 from contextlib import contextmanager
 
-from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.config import Config, SingleFileConfig
@@ -47,16 +46,10 @@ def create_options(options):
   return TestOptions()
 
 
-def create_config(sample_ini=''):
-  """Creates a ``Config`` from the ``sample_ini`` file contents.
-
-  :param string sample_ini: The contents of the ini file containing the config values.
-  """
-  if not isinstance(sample_ini, string_types):
-    raise ValueError('The sample_ini supplied must be a string, given: %s' % sample_ini)
-
+def create_empty_config():
+  """Creates an empty ``Config``."""
   parser = Config.create_parser()
-  with io.BytesIO(sample_ini.encode('utf-8')) as ini:
+  with io.BytesIO(b'') as ini:
     parser.readfp(ini)
   return SingleFileConfig('dummy/path', parser)
 
@@ -89,8 +82,15 @@ class TestContext(Context):
     def set_outcome(self, outcome):
       pass
 
-  def __init__(self, *args, **kwargs):
-    super(TestContext, self).__init__(*args, **kwargs)
+  def __init__(self, options, target_roots, build_graph=None, build_file_parser=None,
+               address_mapper=None, console_outstream=None, workspace=None):
+    # Some code still reads config directly. We have no tests left that actually care
+    # about the values, but we still need something to read from so we don't crash.
+    # TODO: Get rid of this once all direct config accesses are gone.
+    empty_config = create_empty_config()
+    super(TestContext, self).__init__(config=empty_config, options=options, run_tracker=None,
+        target_roots=target_roots, build_graph=build_graph, build_file_parser=build_file_parser,
+        address_mapper=address_mapper, console_outstream=console_outstream, workspace=workspace)
     try:
       from subprocess import DEVNULL # Python 3.
     except ImportError:
@@ -106,20 +106,18 @@ class TestContext(Context):
     return logging.getLogger('test')
 
 
-def create_context(config='', options=None, target_roots=None, **kwargs):
+# TODO: Make Console and Workspace into subsystems, and simplify this signature.
+def create_context(options=None, target_roots=None, build_graph=None,
+                   build_file_parser=None, address_mapper=None,
+                   console_outstream=None, workspace=None):
   """Creates a ``Context`` with no config values, options, or targets by default.
 
-  :param config: Either a ``Context`` object or else a string representing the contents of the
-    pants.ini to parse the config from.
-  :param options: An optional dict of scope -> (dict of name -> new-style option values).
-  :param target_roots: An optional list of target roots to seed the context target graph from.
-  :param ``**kwargs``: Any additional keyword arguments to pass through to the Context constructor.
-  """
-  config = config if isinstance(config, Config) else create_config(config)
-  # TODO: Get rid of this temporary hack after we plumb options through everywhere and can get
-  # rid of the config cache.
-  Config.cache(config)
+  :param options: A map of scope -> (map of key to value).
 
+  Other params are as for ``Context``.
+  """
+  options = create_options(options or {})
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return TestContext(config=config, options=create_options(options or {}),
-                     run_tracker=None, target_roots=target_roots, **kwargs)
+  return TestContext(options=options, target_roots=target_roots, build_graph=build_graph,
+                     build_file_parser=build_file_parser, address_mapper=address_mapper,
+                     console_outstream=console_outstream, workspace=workspace)
