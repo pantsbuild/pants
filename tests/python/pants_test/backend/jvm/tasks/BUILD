@@ -4,12 +4,28 @@
 target(
   name = 'tasks',
   dependencies = [
+    ':bootstrap_jvm_tools',
     ':checkstyle',
     ':ivy_imports',
     ':junit_run',
     ':scalastyle',
     ':unpack_jars',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
+  ]
+)
+
+python_tests(
+  name = 'bootstrap_jvm_tools',
+  sources = ['test_bootstrap_jvm_tools.py'],
+  dependencies = [
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
+    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/java:executor',
+    'src/python/pants/java/jar:shader',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
 
