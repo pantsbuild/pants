@@ -8,19 +8,24 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import xml.etree.ElementTree as ET
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+from pants_test.backend.jvm.tasks.jvm_compile.utils import provide_compile_strategies
 
 
 class ScalaCompileIntegrationTest(BaseCompileIT):
-  def test_scala_compile(self):
+  @provide_compile_strategies
+  def test_scala_compile(self, strategy):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless',
+                              strategy,
                               expected_files=['ShapelessExample.class']) as found:
 
       self.assertTrue(
           self.get_only(found, 'ShapelessExample.class').endswith(
               'org/pantsbuild/testproject/unicode/shapeless/ShapelessExample.class'))
 
-  def test_scala_with_java_sources_compile(self):
+  @provide_compile_strategies
+  def test_scala_with_java_sources_compile(self, strategy):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/javasources',
+                              strategy,
                               expected_files=['ScalaWithJavaSources.class',
                                               'JavaSource.class']) as found:
 
@@ -32,8 +37,10 @@ class ScalaCompileIntegrationTest(BaseCompileIT):
           self.get_only(found, 'JavaSource.class').endswith(
               'org/pantsbuild/testproject/javasources/JavaSource.class'))
 
-  def test_scalac_plugin_compile(self):
+  @provide_compile_strategies
+  def test_scalac_plugin_compile(self, strategy):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
+                              strategy,
                               expected_files=['HelloScalac.class', 'scalac-plugin.xml']) as found:
 
       self.assertTrue(

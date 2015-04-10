@@ -15,9 +15,17 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class BaseCompileIT(PantsRunIntegrationTest):
   @contextmanager
-  def do_test_compile(self, target, expected_files=None):
+  def do_test_compile(self, target, strategy, expected_files=None):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      pants_run = self.run_pants_with_workdir(['clean-all', 'compile', target], workdir)
+      args = [
+          'clean-all',
+          'compile',
+          '--compile-apt-strategy={}'.format(strategy),
+          '--compile-java-strategy={}'.format(strategy),
+          '--compile-scala-strategy={}'.format(strategy),
+          target,
+        ]
+      pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
       if expected_files:
         to_find = set(expected_files)
