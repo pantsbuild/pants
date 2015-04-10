@@ -98,7 +98,7 @@ class GoalRunner(object):
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
     if url:
-      self.run_tracker.log(Report.INFO, 'See a report at: %s' % url)
+      self.run_tracker.log(Report.INFO, 'See a report at: {}'.format(url))
     else:
       self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
@@ -236,7 +236,7 @@ class GoalRunner(object):
         unknown.append(goal)
 
     if unknown:
-      context.log.error('Unknown goal(s): %s\n' % ' '.join(goal.name for goal in unknown))
+      context.log.error('Unknown goal(s): {}\n'.format(' '.join(goal.name for goal in unknown)))
       return 1
 
     engine = RoundEngine()

@@ -6,7 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import io
-import sys
+import logging
+import os
+from contextlib import contextmanager
 
 from six import string_types
 from twitter.common.collections import maybe_list
@@ -14,10 +16,6 @@ from twitter.common.collections import maybe_list
 from pants.base.config import Config, SingleFileConfig
 from pants.base.target import Target
 from pants.goal.context import Context
-from pants.goal.run_tracker import RunTracker
-from pants.reporting.plaintext_reporter import PlainTextReporter
-from pants.reporting.report import Report
-from pants.util.dirutil import safe_mkdtemp
 
 
 def create_option_values(option_values):
@@ -71,29 +69,49 @@ def create_config(sample_ini=''):
   return SingleFileConfig('dummy/path', parser)
 
 
-def create_run_tracker():
-  """Creates a ``RunTracker`` and starts it."""
-  # TODO(John Sirois): Rework uses around a context manager for cleanup of the info_dir in a more
-  # disciplined manner.
-  # The RunTracker writes its info into <pants_workdir>/run-tracker.  But it's not important that
-  # it be under the pants_workdir the rest of the code sees, so here we just give it a tmpdir
-  # for this (but no other) purpose.
-  # TODO(benjy): Some more regular way to set up a temporary buildroot and pants_workdir for tests.
-  # TODO(benjy): Find a way to get rid of this? Tests shouldn't require a run tracker or reporter.
-  workdir = safe_mkdtemp()
-  run_tracker = RunTracker('run-tracker', create_option_values({
-    'pants_workdir': workdir,
-  }))
-  report = Report()
-  settings = PlainTextReporter.Settings(outfile=sys.stdout,
-                                        log_level=Report.INFO,
-                                        color=False,
-                                        indent=True,
-                                        timing=False,
-                                        cache_stats=False)
-  report.add_reporter('test_debug', PlainTextReporter(run_tracker, settings))
-  run_tracker.start(report)
-  return run_tracker
+class TestContext(Context):
+  """A Context to use during unittesting.
+
+  Stubs out various dependencies that we don't want to introduce in unit tests.
+
+  TODO: Instead of extending the runtime Context class, create a Context interface and have
+  TestContext and a runtime Context implementation extend that. This will also allow us to
+  isolate the parts of the interface that a Task is allowed to use vs. the parts that the
+  task-running machinery is allowed to use.
+  """
+  class DummyWorkunit(object):
+    """A workunit stand-in that sends all output to /dev/null.
+
+    These outputs are typically only used by subprocesses spawned by code under test, not
+    the code under test itself, and would otherwise go into some reporting black hole anyway.
+
+    Provides no other tracking/labeling/reporting functionality. Does not require "opening"
+    or "closing".
+    """
+    def __init__(self, devnull):
+      self._devnull = devnull
+
+    def output(self, name):
+      return self._devnull
+
+    def set_outcome(self, outcome):
+      pass
+
+  def __init__(self, *args, **kwargs):
+    super(TestContext, self).__init__(*args, **kwargs)
+    try:
+      from subprocess import DEVNULL # Python 3.
+    except ImportError:
+      DEVNULL = open(os.devnull, 'wb')
+    self._devnull = DEVNULL
+
+  @contextmanager
+  def new_workunit(self, name, labels=None, cmd=''):
+    yield TestContext.DummyWorkunit(self._devnull)
+
+  @property
+  def log(self):
+    return logging.getLogger('test')
 
 
 def create_context(config='', options=None, target_roots=None, **kwargs):
@@ -110,7 +128,6 @@ def create_context(config='', options=None, target_roots=None, **kwargs):
   # rid of the config cache.
   Config.cache(config)
 
-  run_tracker = create_run_tracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return Context(config, create_options(options or {}),
-                 run_tracker, target_roots, **kwargs)
+  return TestContext(config=config, options=create_options(options or {}),
+                     run_tracker=None, target_roots=target_roots, **kwargs)

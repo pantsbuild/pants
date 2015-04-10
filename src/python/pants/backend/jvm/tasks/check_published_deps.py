@@ -55,6 +55,6 @@ class CheckPublishedDeps(ConsoleTask):
             artifact_target = self._artifacts_to_targets[artifact]
             semver, sha = get_version_and_sha(artifact_target)
             if semver.version() != dep.rev:
-              yield 'outdated %s#%s %s latest %s' % (dep.org, dep.name, dep.rev, semver.version())
+              yield 'outdated {}#{} {} latest {}'.format(dep.org, dep.name, dep.rev, semver.version())
             elif self._print_uptodate:
-              yield 'up-to-date %s#%s %s' % (dep.org, dep.name, semver.version())
+              yield 'up-to-date {}#{} {}'.format(dep.org, dep.name, semver.version())

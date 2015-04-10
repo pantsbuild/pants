@@ -29,7 +29,7 @@ class RelativeToMapper(object):
     return os.path.relpath(file, self.base)
 
   def __repr__(self):
-    return 'IdentityMapper(%s)' % self.base
+    return 'IdentityMapper({})'.format(self.base)
 
   def __hash__(self):
     return hash(self.base)
@@ -116,7 +116,7 @@ class Bundle(object):
     if relative_to:
       base = os.path.join(get_buildroot(), self._rel_path, relative_to)
       if not os.path.isdir(os.path.join(get_buildroot(), base)):
-        raise ValueError('Could not find a directory to bundle relative to at %s' % base)
+        raise ValueError('Could not find a directory to bundle relative to at {}'.format(base))
       self.mapper = RelativeToMapper(base)
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
@@ -134,13 +134,13 @@ class Bundle(object):
         if not os.path.isabs(abspath):
           abspath = os.path.join(get_buildroot(), self._rel_path, path)
         if not os.path.exists(abspath):
-          raise ValueError('Given path: %s with absolute path: %s which does not exist'
-                           % (path, abspath))
+          raise ValueError('Given path: {} with absolute path: {} which does not exist'
+                           .format(path, abspath))
         self.filemap[abspath] = self.mapper(abspath)
     return self
 
   def __repr__(self):
-    return 'Bundle(%s, %s)' % (self.mapper, self.filemap)
+    return 'Bundle({}, {})'.format(self.mapper, self.filemap)
 
 
 class JvmApp(Target):

@@ -68,5 +68,5 @@ class ScalaLibrary(ExportableJvmLibrary):
       address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(address)
       if target is None:
-        raise TargetDefinitionException(self, 'No such java target: %s' % spec)
+        raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
       yield target

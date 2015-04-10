@@ -236,7 +236,7 @@ class Options(object):
     if goals:
       for goal in goals:
         if not goal.ordered_task_names():
-          print('\nUnknown goal: %s' % goal.name)
+          print('\nUnknown goal: {}'.format(goal.name))
         else:
           print('\n{0}: {1}\n'.format(goal.name, goal.description))
           for scope in goal.known_scopes():

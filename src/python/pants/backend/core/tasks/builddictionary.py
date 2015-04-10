@@ -82,7 +82,7 @@ class BuildBuildDictionary(Task):
     # generate rst
     template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
     filename = os.path.join(self._outdir, 'build_dictionary.rst')
-    self.context.log.info('Generating %s' % filename)
+    self.context.log.info('Generating {}'.format(filename))
     with safe_open(filename, 'wb') as outfile:
       generator = Generator(template,
                             tocs=tocs,
@@ -91,7 +91,7 @@ class BuildBuildDictionary(Task):
     # generate html
     template = resource_string(__name__, os.path.join(self._templates_dir, 'bdict_html.mustache'))
     filename = os.path.join(self._outdir, 'build_dictionary.html')
-    self.context.log.info('Generating %s' % filename)
+    self.context.log.info('Generating {}'.format(filename))
     with safe_open(filename, 'wb') as outfile:
       generator = Generator(template,
                             tocs=tocs,
@@ -113,7 +113,7 @@ class BuildBuildDictionary(Task):
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'options_reference.mustache'))
     filename = os.path.join(self._outdir, 'options_reference.rst')
-    self.context.log.info('Generating %s' % filename)
+    self.context.log.info('Generating {}'.format(filename))
     with safe_open(filename, 'wb') as outfile:
       generator = Generator(template, goals=filtered_goals, glopts=glopts)
       generator.write(outfile)
@@ -122,7 +122,7 @@ class BuildBuildDictionary(Task):
     template = resource_string(__name__,
                                os.path.join(self._templates_dir, 'oref_html.mustache'))
     filename = os.path.join(self._outdir, 'options_reference.html')
-    self.context.log.info('Generating %s' % filename)
+    self.context.log.info('Generating {}'.format(filename))
     with safe_open(filename, 'wb') as outfile:
       generator = Generator(template, goals=filtered_goals, glopts=glopts)
       generator.write(outfile)

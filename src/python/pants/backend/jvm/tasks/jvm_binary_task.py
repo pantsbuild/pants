@@ -78,7 +78,7 @@ class JvmBinaryTask(JarTask):
           with self.context.new_workunit(name='add-dependency-jars'):
             for basedir, external_jar in self.list_external_jar_dependencies(binary):
               external_jar_path = os.path.join(basedir, external_jar)
-              self.context.log.debug('  dumping %s' % external_jar_path)
+              self.context.log.debug('  dumping {}'.format(external_jar_path))
               jar.writejar(external_jar_path)
 
         yield jar
@@ -117,7 +117,7 @@ class JvmBinaryTask(JarTask):
           for jar in jars:
             excludes.add((basedir, jar))
     if excludes:
-      self.context.log.debug('Calculated excludes:\n\t%s' % '\n\t'.join(str(e) for e in excludes))
+      self.context.log.debug('Calculated excludes:\n\t{}'.format('\n\t'.join(str(e) for e in excludes)))
 
     externaljars = OrderedSet()
 
@@ -129,7 +129,7 @@ class JvmBinaryTask(JarTask):
             if (basedir, externaljar) not in excludes:
               externaljars.add((basedir, externaljar))
             else:
-              self.context.log.debug('Excluding %s from binary' % externaljar)
+              self.context.log.debug('Excluding {} from binary'.format(externaljar))
 
     binary.walk(add_jars)
     return externaljars

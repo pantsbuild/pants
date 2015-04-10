@@ -366,8 +366,8 @@ def entry_for_one(nom, sym):
   if inspect.ismethod(sym) or inspect.isfunction(sym):
     return entry_for_one_func(nom, sym)
   return msg_entry(nom,
-                   "TODO! no doc gen for %s %s" % (str(type(sym)), str(sym)),
-                   "TODO! no doc gen for %s %s" % (str(type(sym)), str(sym)))
+                   "TODO! no doc gen for {} {}".format(str(type(sym)), str(sym)),
+                   "TODO! no doc gen for {} {}".format(str(type(sym)), str(sym)))
 
 
 PREDEFS = {  # some hardwired entries

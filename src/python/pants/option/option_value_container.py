@@ -101,7 +101,7 @@ class OptionValueContainer(object):
       # In case we get called in copy/deepcopy, which don't invoke the ctor.
       raise AttributeError
     if key not in self._forwardings:
-      raise AttributeError('No such forwarded attribute: %s' % key)
+      raise AttributeError('No such forwarded attribute: {}'.format(key))
     val = getattr(self, self._forwardings[key])
     if isinstance(val, RankedValue):
       return val.value

@@ -94,4 +94,4 @@ class RankedValue(object):
     return self._rank == self._rank and self._value == self._value
 
   def __repr__(self):
-    return '(%s, %s)' % (self._RANK_NAMES.get(self._rank, 'UNKNOWN'), self._value)
+    return '({}, {})'.format(self._RANK_NAMES.get(self._rank, 'UNKNOWN'), self._value)

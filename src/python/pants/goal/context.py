@@ -155,12 +155,7 @@ class Context(object):
 
   def __str__(self):
     ident = Target.identify(self.targets())
-    return 'Context(id:%s, targets:%s)' % (ident, self.targets())
-
-  def submit_foreground_work_and_wait(self, work, workunit_parent=None):
-    """Returns the pool to which tasks can submit foreground (blocking) work."""
-    return self.run_tracker.foreground_worker_pool().submit_work_and_wait(
-      work, workunit_parent=workunit_parent)
+    return 'Context(id:{}, targets:{})'.format(ident, self.targets())
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     background_root_workunit = self.run_tracker.get_background_root_workunit()

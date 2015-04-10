@@ -69,8 +69,8 @@ class RunTracker(Subsystem):
 
     # run_id is safe for use in paths.
     millis = (self.run_timestamp * 1000) % 1000
-    run_id = 'pants_run_%s_%d' % \
-             (time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
+    run_id = 'pants_run_{}_{}'.format(
+               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
@@ -118,10 +118,6 @@ class RunTracker(Subsystem):
 
     # For main thread work. Created on start().
     self._main_root_workunit = None
-
-    # For concurrent foreground work.  Created lazily if needed.
-    # Associated with the main thread's root workunit.
-    self._foreground_worker_pool = None
 
     # For background work.  Created lazily if needed.
     self._background_worker_pool = None
@@ -226,7 +222,7 @@ class RunTracker(Subsystem):
     """Send timing results to URL specified in pants.ini"""
     def error(msg):
       # Report aleady closed, so just print error.
-      print("WARNING: Failed to upload stats to %s due to %s" % (self.stats_url, msg), file=sys.stderr)
+      print("WARNING: Failed to upload stats to {} due to {}".format(self.stats_url, msg), file=sys.stderr)
 
     if self.stats_url:
       params = {
@@ -246,9 +242,9 @@ class RunTracker(Subsystem):
         http_conn.request('POST', url.path, urllib.urlencode(params), headers)
         resp = http_conn.getresponse()
         if resp.status != 200:
-          error("HTTP error code: %d" % resp.status)
+          error("HTTP error code: {}".format(resp.status))
       except Exception as e:
-        error("Error: %s" % e)
+        error("Error: {}".format(e))
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
@@ -266,14 +262,6 @@ class RunTracker(Subsystem):
         self.log(Report.INFO, "Waiting for background workers to finish.")
         self._background_worker_pool.shutdown()
       self.end_workunit(self._background_root_workunit)
-
-    if self._foreground_worker_pool:
-      if self._aborted:
-        self.log(Report.INFO, "Aborting foreground workers.")
-        self._foreground_worker_pool.abort()
-      else:
-        self.log(Report.INFO, "Waiting for foreground workers to finish.")
-        self._foreground_worker_pool.shutdown()
 
     SubprocPool.shutdown(self._aborted)
 
@@ -300,13 +288,6 @@ class RunTracker(Subsystem):
     path, duration, self_time, is_tool = workunit.end()
     self.cumulative_timings.add_timing(path, duration, is_tool)
     self.self_timings.add_timing(path, self_time, is_tool)
-
-  def foreground_worker_pool(self):
-    if self._foreground_worker_pool is None:  # Initialize lazily.
-      self._foreground_worker_pool = WorkerPool(parent_workunit=self._main_root_workunit,
-                                                run_tracker=self,
-                                                num_workers=self._num_foreground_workers)
-    return self._foreground_worker_pool
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:

@@ -45,13 +45,13 @@ class EclipseGen(IdeGen):
     super(EclipseGen, self).__init__(*args, **kwargs)
 
     version = _VERSIONS[self.get_options().version]
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-%s.mustache' % version)
-    self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-%s.mustache' % version)
-    self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-%s.mustache' % version)
-    self.pydev_template = os.path.join(_TEMPLATE_BASEDIR, 'pydevproject-%s.mustache' % version)
-    self.debug_template = os.path.join(_TEMPLATE_BASEDIR, 'debug-launcher-%s.mustache' % version)
+    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-{}.mustache'.format(version))
+    self.classpath_template = os.path.join(_TEMPLATE_BASEDIR, 'classpath-{}.mustache'.format(version))
+    self.apt_template = os.path.join(_TEMPLATE_BASEDIR, 'factorypath-{}.mustache'.format(version))
+    self.pydev_template = os.path.join(_TEMPLATE_BASEDIR, 'pydevproject-{}.mustache'.format(version))
+    self.debug_template = os.path.join(_TEMPLATE_BASEDIR, 'debug-launcher-{}.mustache'.format(version))
     self.coreprefs_template = os.path.join(_TEMPLATE_BASEDIR,
-                                           'org.eclipse.jdt.core.prefs-%s.mustache' % version)
+                                           'org.eclipse.jdt.core.prefs-{}.mustache'.format(version))
 
     self.project_filename = os.path.join(self.cwd, '.project')
     self.classpath_filename = os.path.join(self.cwd, '.classpath')
@@ -87,7 +87,7 @@ class EclipseGen(IdeGen):
 
     def create_sourcepath(base_id, sources):
       def normalize_path_pattern(path):
-        return '%s/' % path if not path.endswith('/') else path
+        return '{}/'.format(path) if not path.endswith('/') else path
 
       includes = [normalize_path_pattern(src_set.path) for src_set in sources if src_set.path]
       excludes = []
@@ -101,7 +101,7 @@ class EclipseGen(IdeGen):
       for source_set in project.py_sources:
         pythonpaths.append(create_source_template(linked_folder_id(source_set)))
       for source_set in project.py_libs:
-        lib_path = source_set.path if source_set.path.endswith('.egg') else '%s/' % source_set.path
+        lib_path = source_set.path if source_set.path.endswith('.egg') else '{}/'.format(source_set.path)
         pythonpaths.append(create_source_template(linked_folder_id(source_set),
                                                   includes=[lib_path]))
 
@@ -109,7 +109,7 @@ class EclipseGen(IdeGen):
       name=self.project_name,
       java=TemplateData(
         jdk=self.java_jdk,
-        language_level=('1.%d' % self.java_language_level)
+        language_level=('1.{}'.format(self.java_language_level))
       ),
       python=project.has_python,
       scala=project.has_scala and not project.skip_scala,
@@ -146,7 +146,7 @@ class EclipseGen(IdeGen):
     apply_template(self.project_filename, self.project_template, project=configured_project)
     apply_template(self.classpath_filename, self.classpath_template, classpath=configured_classpath)
     apply_template(os.path.join(self.gen_project_workdir,
-                                'Debug on port %d.launch' % project.debug_port),
+                                'Debug on port {}.launch'.format(project.debug_port)),
                    self.debug_template, project=configured_project)
     apply_template(self.coreprefs_filename, self.coreprefs_template, project=configured_project)
 
@@ -168,4 +168,4 @@ class EclipseGen(IdeGen):
     else:
       safe_delete(self.pydev_filename)
 
-    print('\nGenerated project at %s%s' % (self.gen_project_workdir, os.sep))
+    print('\nGenerated project at {}{}'.format(self.gen_project_workdir, os.sep))

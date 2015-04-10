@@ -69,27 +69,33 @@ class JarCreateExecuteTest(JarCreateTestBase):
   def setUp(self):
     super(JarCreateExecuteTest, self).setUp()
 
+    def test_path(path):
+      return os.path.join(self.__class__.__name__, path)
+
     def get_source_root_fs_path(path):
-      return os.path.realpath(os.path.join(self.build_root, path))
+      return os.path.realpath(os.path.join(self.build_root, test_path(path)))
 
     SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
     SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
-    self.res = self.create_resources('src/resources/com/twitter', 'spam', 'r.txt')
-    self.jl = self.java_library('src/java/com/twitter', 'foo', ['a.java'],
-                                resources='src/resources/com/twitter:spam')
-    self.sl = self.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
-    self.jtl = self.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
-    self.java_lib_foo = self.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
-    self.scala_lib = self.scala_library('src/scala/com/twitter/foo',
+    self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
+    self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],
+                                resources=test_path('src/resources/com/twitter:spam'))
+    self.sl = self.scala_library(test_path('src/scala/com/twitter'), 'bar', ['c.scala'])
+    self.jtl = self.java_thrift_library(test_path('src/thrift/com/twitter'), 'baz', 'd.thrift')
+    self.java_lib_foo = self.java_library(test_path('src/java/com/twitter/foo'),
+                                          'java_foo',
+                                          ['java_foo.java'])
+    self.scala_lib = self.scala_library(test_path('src/scala/com/twitter/foo'),
                                         'scala_foo',
                                         ['scala_foo.scala'],
-                                        java_sources=['src/java/com/twitter/foo:java_foo'])
-    self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
-                                  resources='src/resources/com/twitter:spam')
-    self.empty_sl = self.scala_library('src/scala/com/foo', 'foo', ['dupe.scala'])
+                                        java_sources=[
+                                          test_path('src/java/com/twitter/foo:java_foo')])
+    self.binary = self.jvm_binary(test_path('src/java/com/twitter/baz'), 'baz', source='b.java',
+                                  resources=test_path('src/resources/com/twitter:spam'))
+    self.empty_sl = self.scala_library(test_path('src/scala/com/foo'), 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):
     return super(JarCreateExecuteTest, self).context(
@@ -114,9 +120,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
         with self.add_data(context.products, 'classes_by_target', self.binary, 'b.class'):
-          with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
-            with self.add_data(context.products, 'classes_by_target', self.scala_lib, 'scala_foo.class',
-                               'java_foo.class'):
+          with self.add_data(context.products,
+                             'resources_by_target',
+                             self.res,
+                             'r.txt.transformed'):
+            with self.add_data(context.products, 'classes_by_target', self.scala_lib,
+                               'scala_foo.class', 'java_foo.class'):
               self.execute(context)
 
               self.assert_jar_contents(context, 'jars', self.jl,

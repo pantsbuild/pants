@@ -105,7 +105,7 @@ class Page(Target):
     super(Page, self).__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
-      raise ValueError('Page must provide a wiki_artifact. Found instead: %s' % provides)
+      raise ValueError('Page must provide a wiki_artifact. Found instead: {}'.format(provides))
 
   @property
   def source(self):

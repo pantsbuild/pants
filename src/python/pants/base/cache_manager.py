@@ -38,8 +38,8 @@ class VersionedTargetSet(object):
     # feels hacky; see if there's a cleaner way for callers to handle awareness of the CacheManager.
     for versioned_target in versioned_targets:
       if versioned_target._cache_manager != cache_manager:
-        raise ValueError("Attempting to combine versioned targets %s and %s with different"
-                         " CacheManager instances: %s and %s" % (first_target, versioned_target,
+        raise ValueError("Attempting to combine versioned targets {} and {} with different"
+                         " CacheManager instances: {} and {}".format(first_target, versioned_target,
                                                                  cache_manager,
                                                                  versioned_target._cache_manager))
     return VersionedTargetSet(cache_manager, versioned_targets)
@@ -61,8 +61,8 @@ class VersionedTargetSet(object):
     self._cache_manager.force_invalidate(self)
 
   def __repr__(self):
-    return 'VTS(%s, %s)' % (','.join(target.id for target in self.targets),
-                            'valid' if self.valid else 'invalid')
+    return 'VTS({}, {})'.format(','.join(target.id for target in self.targets),
+                                'valid' if self.valid else 'invalid')
 
 
 class VersionedTarget(VersionedTargetSet):
@@ -71,7 +71,7 @@ class VersionedTarget(VersionedTargetSet):
   """
   def __init__(self, cache_manager, target, cache_key):
     if not isinstance(target, Target):
-      raise ValueError("The target %s must be an instance of Target but is not." % target.id)
+      raise ValueError("The target {} must be an instance of Target but is not.".format(target.id))
 
     self.target = target
     self.cache_key = cache_key
@@ -265,7 +265,7 @@ class InvalidationCacheManager(object):
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.
       exc_info = sys.exc_info()
-      new_exception = self.CacheValidationError("Problem validating target %s in %s: %s" %
-                                                (target.id, target.address.spec_path, e))
+      new_exception = self.CacheValidationError("Problem validating target {} in {}: {}"
+                                                .format(target.id, target.address.spec_path, e))
 
       raise self.CacheValidationError, new_exception, exc_info[2]

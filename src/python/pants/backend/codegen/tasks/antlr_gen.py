@@ -51,7 +51,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   def genlang(self, lang, targets):
     if lang != 'java':
-      raise TaskError('Unrecognized antlr gen lang: %s' % lang)
+      raise TaskError('Unrecognized antlr gen lang: {}'.format(lang))
 
     # TODO: Instead of running the compiler for each target, collect the targets
     # by type and invoke it twice, once for antlr3 and once for antlr4.
@@ -87,7 +87,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       result = self.runjava(classpath=antlr_classpath, main=java_main,
                             args=args, workunit_name='antlr')
       if result != 0:
-        raise TaskError('java %s ... exited non-zero (%i)' % (java_main, result))
+        raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the
@@ -111,7 +111,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   def createtarget(self, lang, gentarget, dependees):
     if lang != 'java':
-      raise TaskError('Unrecognized antlr gen lang: %s' % lang)
+      raise TaskError('Unrecognized antlr gen lang: {}'.format(lang))
     return self._create_java_target(gentarget, dependees)
 
   def _create_java_target(self, target, dependees):

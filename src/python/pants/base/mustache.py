@@ -64,7 +64,7 @@ class MustacheRenderer(object):
 
       if template == None:
         raise self.MustacheError(
-          "could not find template %s in package %s" % (path, self._package_name))
+          "could not find template {} in package {}".format(path, self._package_name))
 
       return self.render(template, args)
 
