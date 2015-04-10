@@ -142,7 +142,8 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, options=None, target_roots=None,
+              console_outstream=None, workspace=None):
     for_task_types = for_task_types or []
     options = options or {}
 
@@ -207,7 +208,8 @@ class BaseTest(unittest.TestCase):
                              build_graph=self.build_graph,
                              build_file_parser=self.build_file_parser,
                              address_mapper=self.address_mapper,
-                             **kwargs)
+                             console_outstream=console_outstream,
+                             workspace=workspace)
     Subsystem._options = context.options
     return context
 

@@ -154,7 +154,8 @@ class IdeaGen(IdeGen):
       sources = TemplateData(
         path=root_relative_path,
         package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
-        is_test=is_test
+        is_test=is_test,
+        content_type=source_set.content_type
       )
 
       return TemplateData(

@@ -215,7 +215,7 @@ class JarBuilderTest(BaseJarTaskTest):
         )''').strip())
     java_agent = self.target('src/java/pants/agents:fake_agent')
 
-    context = self.context(target_roots=java_agent)
+    context = self.context(target_roots=[java_agent])
     jar_task = self.prepare_jar_task(context)
 
     class_products = context.products.get_data('classes_by_target',

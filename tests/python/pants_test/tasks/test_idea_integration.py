@@ -16,6 +16,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class IdeaIntegrationTest(PantsRunIntegrationTest):
 
+  RESOURCE = 'java-resource'
+  TEST_RESOURCE = 'java-test-resource'
+
   def _idea_test(self, specs, project_dir=os.path.join('.pants.d', 'idea', 'idea', 'IdeaGen'),
                  project_name=None, check_func=None, config=None):
     """Helper method that tests idea generation on the input spec list.
@@ -107,11 +110,20 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         'examples/src/java/org/pantsbuild/example/hello/simple',
         'examples/src/resources/org/pantsbuild/example/hello',
       ]]
+      expected_java_resource = ["file://" + os.path.join(get_buildroot(), path) for path in [
+        'examples/src/resources/org/pantsbuild/example/hello',
+      ]]
       remaining = set(expected_paths)
       for sourceFolder in self._get_sourceFolders(dom):
         found_source_content = True
         self.assertEquals("False", sourceFolder.getAttribute('isTestSource'))
         url = sourceFolder.getAttribute('url')
+        # Check is resource attribute is set correctly
+        if url in expected_java_resource:
+          self.assertEquals(sourceFolder.getAttribute('type'), IdeaIntegrationTest.RESOURCE,
+                            msg="Type {c_type} does not match expected type {a_type} "
+                                "for {url}".format(c_type=IdeaIntegrationTest.RESOURCE, url=url,
+                                                   a_type=sourceFolder.getAttribute('type')))
         self.assertIn(url, remaining,
                        msg="Couldn't find url={url} in {expected}".format(url=url,
                                                                           expected=expected_paths))
