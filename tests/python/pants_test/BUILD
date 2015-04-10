@@ -29,7 +29,6 @@ python_library(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_configuration',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_address_mapper',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:build_file_parser',

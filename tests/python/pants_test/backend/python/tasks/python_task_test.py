@@ -74,10 +74,9 @@ class PythonTaskTest(TaskTestBase):
     """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
     return self.target(SyntheticAddress(relpath, name).spec)
 
-  def context(self, config='', options=None, target_roots=None, **kwargs):
+  def context(self, options=None, target_roots=None, **kwargs):
     # Our python tests don't pass on Python 3 yet.
     # TODO: Clean up this hard-coded interpreter constraint once we have subsystems
     # and can simplify InterpreterCache and PythonSetup.
     self.set_options(interpreter=['CPython>=2.7,<3'])
-    return super(PythonTaskTest, self).context(config=config, options=options,
-                                               target_roots=target_roots, **kwargs)
+    return super(PythonTaskTest, self).context(options=options, target_roots=target_roots, **kwargs)
