@@ -4,7 +4,7 @@
 target(
   name = 'jar',
   dependencies = [
-    ':manifest'
+    ':manifest',
     ':shader'
   ]
 )
