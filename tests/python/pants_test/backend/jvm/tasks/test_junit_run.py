@@ -24,7 +24,10 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(JUnitRunnerTest, self).setUp()
-    self.set_options_for_scope('', pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+
+    # JUnitRun uses the safe_args context manager to guard long command lines, and it needs this
+    # option set
+    self.set_options_for_scope('', max_subprocess_args=100)
 
   @classmethod
   def task_type(cls):

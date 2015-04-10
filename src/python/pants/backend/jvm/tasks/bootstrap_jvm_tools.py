@@ -39,15 +39,21 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
       return None
 
     hasher.update(base_fingerprint)
+
+    # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
+    # to ensure proper invalidation.
     hasher.update(self._key)
     hasher.update(self._scope)
     hasher.update(self._main)
     if self._custom_rules:
       for rule in self._custom_rules:
         hasher.update(rule.render())
+
     return hasher.hexdigest()
 
   def _tuple(self):
+    # NB: this tuple's slots - used for `==/hash()` - must be kept in agreement with the hashed
+    # fields in `compute_fingerprint` to ensure proper invalidation.
     return self._key, self._scope, self._main, tuple(self._custom_rules or ())
 
   def __hash__(self):
@@ -69,7 +75,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     cls.register_jvm_tool(register, 'jarjar')
 
   def __init__(self, *args, **kwargs):
-    super(JarTask, self).__init__(*args, **kwargs)
+    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
     self._shader = None
     self._tool_cache_path = os.path.join(self.workdir, 'tool_cache')
 
@@ -86,11 +92,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
-      for scope, key, main, exclusions in JvmToolTaskMixin.get_registered_tools():
+      for scope, key, main, custom_rules in JvmToolTaskMixin.get_registered_tools():
         option = key.replace('-', '_')
         deplist = self.context.options.for_scope(scope)[option]
         callback_product_map[scope][key] = self.cached_bootstrap_classpath_callback(
-            key, scope, deplist, main=main, exclusions=exclusions)
+            key, scope, deplist, main=main, custom_rules=custom_rules)
       context.products.safe_create_data('jvm_build_tools_classpath_callbacks',
                                         lambda: callback_product_map)
 
@@ -104,12 +110,12 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         targets = list(self.context.resolve(tool))
         if not targets:
           raise KeyError
-      except (KeyError, AddressLookupError) as e:
+      except (KeyError, AddressLookupError):
         self.context.log.error("Failed to resolve target for tool: {tool}.\n"
                                "This target was obtained from option {option} in scope {scope}.\n"
                                "You probably need to add this target to your tools "
                                "BUILD file(s), usually located in the workspace root.\n"
-                               "".format(tool=tool, e=e, scope=scope, option=key))
+                               "".format(tool=tool, scope=scope, option=key))
         raise TaskError()
       for target in targets:
         yield target
@@ -133,14 +139,15 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       self._shader = Shader(jarjar_classpath.pop())
     return self._shader
 
-  def _bootstrap_shaded_jvm_tool(self, key, scope, tools, main, exclusions=None):
+  def _bootstrap_shaded_jvm_tool(self, key, scope, tools, main, custom_rules=None):
     shaded_jar = os.path.join(self._tool_cache_path,
                               'shaded_jars', scope, key, '{}.jar'.format(main))
 
     targets = list(self._resolve_tool_targets(tools, key, scope))
-    fingerprint_strategy = ShadedToolFingerprintStrategy(key, scope, main, custom_rules=exclusions)
+    fingerprint_strategy = ShadedToolFingerprintStrategy(key, scope, main,
+                                                         custom_rules=custom_rules)
     with self.invalidated(targets,
-                          # We're the only dependent in reality since we shade
+                          # We're the only dependent in reality since we shade.
                           invalidate_dependents=False,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
 
@@ -163,7 +170,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
       # Now shade the binary jar and return that single jar as the safe tool classpath.
       safe_mkdir_for(shaded_jar)
-      with self.shader.binary_shader(shaded_jar, main, binary_jar, custom_rules=exclusions) as shader:
+      with self.shader.binary_shader(shaded_jar, main, binary_jar,
+                                     custom_rules=custom_rules) as shader:
         try:
           result = util.execute_runner(shader,
                                        workunit_factory=self.context.new_workunit,
@@ -177,13 +185,13 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
       return [shaded_jar]
 
-  def _bootstrap_jvm_tool(self, key, scope, tools, main, exclusions=None):
+  def _bootstrap_jvm_tool(self, key, scope, tools, main, custom_rules=None):
     if main is None:
       return self._bootstrap_tool_classpath(key, scope, tools)
     else:
-      return self._bootstrap_shaded_jvm_tool(key, scope, tools, main, exclusions=exclusions)
+      return self._bootstrap_shaded_jvm_tool(key, scope, tools, main, custom_rules=custom_rules)
 
-  def cached_bootstrap_classpath_callback(self, key, scope, tools, main=None, exclusions=None):
+  def cached_bootstrap_classpath_callback(self, key, scope, tools, main=None, custom_rules=None):
     cache = {}
     cache_lock = threading.Lock()
 
@@ -191,6 +199,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       with cache_lock:
         if 'classpath' not in cache:
           cache['classpath'] = self._bootstrap_jvm_tool(key, scope, tools,
-                                                        main=main, exclusions=exclusions)
+                                                        main=main, custom_rules=custom_rules)
         return cache['classpath']
     return bootstrap_classpath
