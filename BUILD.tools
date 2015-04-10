@@ -155,6 +155,12 @@ jar_library(name = 'jar-tool',
               jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.9')
             ])
 
+jar_library(name = 'jarjar',
+            jars=[
+              jar(org = 'com.googlecode.jarjar', name = 'jarjar', rev = '1.4',
+                  url='file:///home/jsirois/Desktop/jarjar-1.4.jar')
+            ])
+
 jar_library(name = 'wire-runtime',
             jars = [
               jar(org = 'com.squareup.wire', name = 'wire-runtime', rev = '1.6.0')

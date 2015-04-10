@@ -2,9 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'manifest',
-  sources = [ 'manifest.py' ],
-  dependencies = [
+  name='manifest',
+  sources=['manifest.py'],
+  dependencies=[
     '3rdparty/python:six',
+  ]
+)
+
+python_library(
+  name='shader',
+  sources=['shader.py'],
+  dependencies=[
+    'src/python/pants/java:executor',
+    'src/python/pants/util:contextutil'
   ]
 )
