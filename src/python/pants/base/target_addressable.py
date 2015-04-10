@@ -20,7 +20,8 @@ class TargetAddressable(Addressable):
   def addressable_name(self):
     return self.name
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, source_root, args, kwargs):
+    self.source_root = source_root
     self.target_type = self.get_target_type()
 
     if 'name' not in kwargs:
@@ -49,6 +50,12 @@ class TargetAddressable(Addressable):
 
   def with_description(self, description):
     self.kwargs['description'] = description
+
+  def to_target(self, build_graph, address):
+    return self.get_target_type()(build_graph=build_graph,
+                                  address=address,
+                                  source_root=self.source_root,
+                                  **self.kwargs)
 
   def __str__(self):
     format_str = 'TargetAddressable(target_type={target_type}, name={name}, **kwargs=...)'

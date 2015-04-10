@@ -23,7 +23,6 @@ from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.java import util
 
 
@@ -75,9 +74,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
       sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
       relative_sources = OrderedSet()
       for source in sources:
-        source_root = SourceRoot.find_by_path(source)
-        if not source_root:
-          source_root = SourceRoot.find(target)
+        source_root = self.context.layout.find_source_root_by_path_or_target(source, target)
         relative_source = os.path.relpath(source, source_root)
         relative_sources.add(relative_source)
       check_duplicate_conflicting_protos(self, sources_by_base, relative_sources, self.context.log)
@@ -107,7 +104,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
         args.append('--enum_options={0}'.format(enum_option))
 
       args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
-                                                         SourceRoot.find(target))))
+                                                         self.context.layout.find_source_root_by_target(target))))
 
       args.extend(relative_sources)
 

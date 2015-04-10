@@ -12,6 +12,10 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
+# for tests, not a test of a thing called 'Base'.
+from tests.python.pants_test.base.layout_utils import TestLayout
+
+from pants.backend.build_file_layout.source_root import SourceRoot
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
@@ -24,7 +28,6 @@ from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
@@ -35,7 +38,8 @@ from pants_test.base.context_utils import create_context
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
-# for tests, not a test of a thing called 'Base'.
+
+
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 
@@ -127,11 +131,13 @@ class BaseTest(unittest.TestCase):
     BuildRoot().path = self.build_root
 
     self.create_file('pants.ini')
-    build_configuration = BuildConfiguration()
+    self.layout = TestLayout(self.build_root)
+    build_configuration = BuildConfiguration(layout=self.layout)
     build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
+
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
@@ -196,7 +202,8 @@ class BaseTest(unittest.TestCase):
                           build_file_parser=self.build_file_parser,
                           address_mapper=self.address_mapper,
                           console_outstream=console_outstream,
-                          workspace=workspace)
+                          workspace=workspace,
+                          layout=self.layout)
 
   def tearDown(self):
     BuildRoot().reset()

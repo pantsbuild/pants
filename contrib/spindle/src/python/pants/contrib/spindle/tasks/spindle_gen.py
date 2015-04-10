@@ -17,7 +17,6 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.option.options import Options
 from twitter.common.dirutil import safe_mkdir
 
@@ -136,7 +135,7 @@ class SpindleGen(NailgunTask):
         java_target_base = os.path.join(get_buildroot(), java_synthetic_address.spec_path)
         if not os.path.exists(java_target_base):
           os.makedirs(java_target_base)
-        SourceRoot.register(java_synthetic_address.spec_path)
+        self.context.layout.register(java_synthetic_address.spec_path)
         build_graph.inject_synthetic_target(
           address=java_synthetic_address,
           target_type=JavaLibrary,
@@ -144,6 +143,7 @@ class SpindleGen(NailgunTask):
           derived_from=target,
           sources_rel_path=java_sources_rel_path,
           sources=java_relative_generated_sources,
+          source_root=java_synthetic_address.spec_path
         )
         java_synthetic_target = build_graph.get_target(java_synthetic_address)
 

@@ -79,7 +79,6 @@ python_tests(
     'src/python/pants/backend/codegen/tasks:wire_gen',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
-    'src/python/pants/base:source_root',
     'src/python/pants/base:validation',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',

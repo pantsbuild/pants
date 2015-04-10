@@ -19,7 +19,6 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -428,7 +427,7 @@ class Project(object):
         yield ext
 
   @staticmethod
-  def _collapse_by_source_root(source_sets):
+  def _collapse_by_source_root(source_sets, layout):
     """Collapse SourceSets with common source roots into one SourceSet instance.
 
     Use the registered source roots to collapse all source paths under a root.
@@ -443,7 +442,7 @@ class Project(object):
     collapsed_source_sets = []
     for source in source_sets:
       query = os.path.join(source.source_base, source.path)
-      source_root = SourceRoot.find_by_path(query)
+      source_root = layout.find_source_root_by_path(query)
       if not source_root:
         collapsed_source_sets.append(source)
       elif not source_root in roots_found:
@@ -663,7 +662,7 @@ class Project(object):
     self.sources.update(SourceSet(get_buildroot(), p, None, False) for p in extra_source_paths)
     self.sources.update(SourceSet(get_buildroot(), p, None, True) for p in extra_test_paths)
     if self.use_source_root:
-      self.sources = Project._collapse_by_source_root(self.sources)
+      self.sources = Project._collapse_by_source_root(self.sources, self.context.layout)
     self.sources = dedup_sources(self.sources)
 
     return targets

@@ -4,6 +4,7 @@
 target(
   name = 'backend',
   dependencies = [
+    'tests/python/pants_test/backend/build_file_layout',
     'tests/python/pants_test/backend/codegen',
     'tests/python/pants_test/backend/core',
     'tests/python/pants_test/backend/jvm',

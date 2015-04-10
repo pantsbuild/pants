@@ -11,12 +11,12 @@ from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.build_file_layout.source_root import SourceRoot
 from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.tasks.protobuf_gen import (ProtobufGen, _same_contents,
                                                       check_duplicate_conflicting_protos)
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir

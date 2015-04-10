@@ -19,7 +19,6 @@ from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import DeferredSourcesField, SourcesField
-from pants.base.source_root import SourceRoot
 from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
 
@@ -139,11 +138,6 @@ class Target(AbstractTarget):
         return target_cls
     return ConcreteTargetAddressable
 
-  @property
-  def target_base(self):
-    """:returns: the source root path for this target."""
-    return SourceRoot.find(self)
-
   @classmethod
   def identify(cls, targets):
     """Generates an id for a set of targets."""
@@ -167,7 +161,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
+  def __init__(self, name, address, build_graph, source_root=None, payload=None, tags=None, description=None):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -195,6 +189,7 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+    self.target_base = source_root or address.spec_path
 
   @property
   def tags(self):

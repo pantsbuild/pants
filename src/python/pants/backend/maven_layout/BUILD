@@ -22,6 +22,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:source_root',
+    'src/python/pants/backend/build_file_layout:source_root',
   ],
 )

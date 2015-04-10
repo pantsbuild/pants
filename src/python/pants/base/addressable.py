@@ -12,13 +12,14 @@ from pants.util.meta import AbstractClass
 class AddressableCallProxy(object):
   """A registration proxy for objects to be captured and addressed from BUILD files."""
 
-  def __init__(self, addressable_type, build_file, registration_callback):
+  def __init__(self, addressable_type, build_file, source_root, registration_callback):
+    self._source_root = source_root
     self._addressable_type = addressable_type
     self._build_file = build_file
     self._registration_callback = registration_callback
 
   def __call__(self, *args, **kwargs):
-    addressable = self._addressable_type(*args, **kwargs)
+    addressable = self._addressable_type(self._source_root, args, kwargs)
     addressable_name = addressable.addressable_name
     if addressable_name:
       address = BuildFileAddress(self._build_file, addressable_name)

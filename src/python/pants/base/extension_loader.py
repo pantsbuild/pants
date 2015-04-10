@@ -81,6 +81,11 @@ def load_plugins(build_configuration, plugins, load_from=None):
     if 'register_goals' in entries:
       entries['register_goals'].load()()
 
+    if 'register_layouts' in entries:
+      layouts = entries['register_layouts'].load()()
+      for layout in layouts:
+        build_configuration.register_layout(layout)
+
     loaded[dist.as_requirement().key] = dist
 
 
@@ -98,6 +103,7 @@ def load_build_configuration_from_source(build_configuration, additional_backend
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.codegen',
+                      'pants.backend.build_file_layout',
                       'pants.backend.maven_layout',
                       'pants.backend.project_info',
                       'pants.backend.android']
@@ -135,5 +141,10 @@ def load_backend(build_configuration, backend_package):
   build_file_aliases = invoke_entrypoint('build_file_aliases')
   if build_file_aliases:
     build_configuration.register_aliases(build_file_aliases)
+
+  layouts = invoke_entrypoint('register_layouts')
+  if layouts:
+    for layout in layouts:
+      build_configuration.register_layout(layout)
 
   invoke_entrypoint('register_goals')

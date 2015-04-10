@@ -10,6 +10,7 @@ import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.backend.build_file_layout.source_root import SourceRoot
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -17,7 +18,6 @@ from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.base.address import SyntheticAddress
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest

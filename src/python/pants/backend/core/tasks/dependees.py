@@ -14,7 +14,6 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 
 
 class ReverseDepmap(ConsoleTask):
@@ -53,7 +52,7 @@ class ReverseDepmap(ConsoleTask):
         target_type = target_aliases[dependees_type]
         # Try to find the SourceRoot for the given input type
         try:
-          roots = SourceRoot.roots(target_type)
+          roots = self.context.layout.source_roots(target_type)
           base_paths.update(roots)
         except KeyError:
           pass

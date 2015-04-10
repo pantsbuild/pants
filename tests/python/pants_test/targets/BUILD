@@ -113,7 +113,6 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/base:target',
   ]
 )

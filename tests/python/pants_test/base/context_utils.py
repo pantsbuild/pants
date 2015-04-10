@@ -10,6 +10,7 @@ import logging
 import os
 from contextlib import contextmanager
 
+from tests.python.pants_test.base.layout_utils import TestLayout
 from twitter.common.collections import maybe_list
 
 from pants.base.config import Config, SingleFileConfig
@@ -83,14 +84,15 @@ class TestContext(Context):
       pass
 
   def __init__(self, options, target_roots, build_graph=None, build_file_parser=None,
-               address_mapper=None, console_outstream=None, workspace=None):
+               address_mapper=None, console_outstream=None, workspace=None, layout=None):
     # Some code still reads config directly. We have no tests left that actually care
     # about the values, but we still need something to read from so we don't crash.
     # TODO: Get rid of this once all direct config accesses are gone.
     empty_config = create_empty_config()
     super(TestContext, self).__init__(config=empty_config, options=options, run_tracker=None,
         target_roots=target_roots, build_graph=build_graph, build_file_parser=build_file_parser,
-        address_mapper=address_mapper, console_outstream=console_outstream, workspace=workspace)
+        address_mapper=address_mapper, layout=layout,
+        console_outstream=console_outstream, workspace=workspace)
     try:
       from subprocess import DEVNULL # Python 3.
     except ImportError:
@@ -109,6 +111,7 @@ class TestContext(Context):
 # TODO: Make Console and Workspace into subsystems, and simplify this signature.
 def create_context(options=None, target_roots=None, build_graph=None,
                    build_file_parser=None, address_mapper=None,
+                   layout=None,
                    console_outstream=None, workspace=None):
   """Creates a ``Context`` with no config values, options, or targets by default.
 
@@ -117,7 +120,9 @@ def create_context(options=None, target_roots=None, build_graph=None,
   Other params are as for ``Context``.
   """
   options = create_options(options or {})
+  layout = layout or TestLayout()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return TestContext(options=options, target_roots=target_roots, build_graph=build_graph,
                      build_file_parser=build_file_parser, address_mapper=address_mapper,
+                     layout=layout,
                      console_outstream=console_outstream, workspace=workspace)

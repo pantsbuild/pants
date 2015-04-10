@@ -21,6 +21,7 @@ from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
+from pants.base.layout import Layout
 from pants.base.workunit import WorkUnit
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
@@ -88,6 +89,8 @@ class GoalRunner(object):
     else:
       self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
+
+    self.layout = build_configuration.layout
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
                                              run_tracker=self.run_tracker)
@@ -214,6 +217,7 @@ class GoalRunner(object):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
+      layout=self.layout,
       spec_excludes=self.spec_excludes
     )
 

@@ -368,9 +368,7 @@ class BuildGraph(object):
     :param Address address:
     """
     try:
-      target = addressable.get_target_type()(build_graph=self,
-                                             address=address,
-                                             **addressable.kwargs)
+      target = addressable.to_target(build_graph=self, address=address)
       return target
     except Exception:
       traceback.print_exc()

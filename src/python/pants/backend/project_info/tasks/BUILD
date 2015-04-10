@@ -108,7 +108,6 @@ python_library(
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
   ],
