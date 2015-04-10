@@ -276,6 +276,10 @@ class RunTracker(object):
 
     SubprocPool.shutdown(self._aborted)
 
+    # Run a dummy work unit to write out one last timestamp
+    with self.new_workunit("complete"):
+      pass
+
     self.end_workunit(self._main_root_workunit)
 
     outcome = self._main_root_workunit.outcome()
