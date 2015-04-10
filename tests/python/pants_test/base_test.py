@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 from textwrap import dedent
 
 # for tests, not a test of a thing called 'Base'.
-from tests.python.pants_test.base.layout_utils import TestLayout
+from pants_test.base.layout_utils import TestLayout
 
 from pants.backend.build_file_layout.source_root import SourceRoot
 from pants.backend.core.targets.dependencies import Dependencies

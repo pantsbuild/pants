@@ -10,7 +10,7 @@ import logging
 import os
 from contextlib import contextmanager
 
-from tests.python.pants_test.base.layout_utils import TestLayout
+from pants_test.base.layout_utils import TestLayout
 from twitter.common.collections import maybe_list
 
 from pants.base.config import Config, SingleFileConfig
