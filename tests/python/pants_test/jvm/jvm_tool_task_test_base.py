@@ -27,7 +27,7 @@ class JvmToolTaskTestBase(TaskTestBase):
   def setUp(self):
     # Ensure we get a read of the real pants.ini config
     Config.reset_default_bootstrap_option_values()
-    real_config = self.config()
+    real_config = Config.from_cache()
 
     super(JvmToolTaskTestBase, self).setUp()
 
