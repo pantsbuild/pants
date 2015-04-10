@@ -155,6 +155,19 @@ jar_library(name = 'jar-tool',
               jar(org = 'com.twitter.common', name = 'jar-tool', rev = '0.1.9')
             ])
 
+jar_library(name = 'jarjar',
+            jars=[
+              # This jarjar is hosted at https://dl.bintray.com/pantsbuild/maven/ and was
+              # established as described here: https://github.com/pantsbuild/maven-repo/commit/782e0cb4
+              #
+              # Pants will need to import jarjar from googlecode (since googlecode is going away)
+              # and publish jarjar properly to maven central, but this serves as a bridge to get
+              # shading concepts vetted in review and established.
+              # The adoption/publishing work is tracked here:
+              #   https://github.com/pantsbuild/pants/issues/1395
+              jar(org = 'com.googlecode.jarjar', name = 'jarjar', rev = '1.5.0-pantsbuild+svn.r142')
+            ])
+
 jar_library(name = 'wire-runtime',
             jars = [
               jar(org = 'com.squareup.wire', name = 'wire-runtime', rev = '1.6.0')
