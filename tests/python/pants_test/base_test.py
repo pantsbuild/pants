@@ -15,7 +15,6 @@ from textwrap import dedent
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_aliases import BuildFileAliases
@@ -31,7 +30,7 @@ from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
 from pants.option.options import Options
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
@@ -140,21 +139,10 @@ class BaseTest(unittest.TestCase):
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
-  def config(self, overrides=''):
-    """Returns a config valid for the test build root."""
-    ini_file = os.path.join(get_buildroot(), 'pants.ini')
-    if overrides:
-      with temporary_file(cleanup=False) as fp:
-        fp.write(overrides)
-        fp.close()
-        return Config.load([ini_file, fp.name])
-    else:
-      return Config.load([ini_file])
-
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, config='', options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, options=None, target_roots=None, **kwargs):
     for_task_types = for_task_types or []
     options = options or {}
 
@@ -214,8 +202,7 @@ class BaseTest(unittest.TestCase):
           if key not in opts:  # Inner scope values override the inherited ones.
             opts[key] = val
 
-    context = create_context(config=self.config(overrides=config),
-                             options=option_values,
+    context = create_context(options=option_values,
                              target_roots=target_roots,
                              build_graph=self.build_graph,
                              build_file_parser=self.build_file_parser,

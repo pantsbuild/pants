@@ -31,12 +31,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):
-    ini = dedent("""
-          [DEFAULT]
-          pants_supportdir: /tmp/build-support
-          """).strip()
-
-    self.create_task(self.context(config=ini), '/tmp/workdir')
+    self.create_task(self.context(), '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
