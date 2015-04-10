@@ -24,7 +24,8 @@ class IdeaGenTest(BaseTest):
     src_java = SourceSet("repo-root", "src/java/com/pats", "project/lib", False)
     self.assertFalse(IdeaGen._sibling_is_test(src_java))
 
-    src_resources = SourceSet("repo-root", "src/resources/org/pantsbuild", "project/lib", False)
+    src_resources = SourceSet("repo-root", "src/resources/org/pantsbuild", "project/lib", False,
+                             'java-resource')
     self.assertFalse(IdeaGen._sibling_is_test(src_resources))
 
     # Surprise! It doesn't matter what you pass for is_test when constructing the source set,
