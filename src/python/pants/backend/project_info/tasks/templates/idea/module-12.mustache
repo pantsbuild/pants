@@ -34,28 +34,15 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     {{#module.content_roots}}
       {{#sources}}
         {{#package_prefix}}
-          {{#content_type}}
       <sourceFolder url="file://{{module.root_dir}}/{{path}}"
                     isTestSource="{{is_test}}"
-                    type="{{content_type}}"
+                    {{#content_type}}type="{{content_type}}"{{/content_type}}
                     packagePrefix="{{package_prefix}}"/>
-          {{/content_type}}
-          {{^content_type}}
-      <sourceFolder url="file://{{module.root_dir}}/{{path}}"
-                    isTestSource="{{is_test}}"
-                    packagePrefix="{{package_prefix}}"/>
-          {{/content_type}}
         {{/package_prefix}}
         {{^package_prefix}}
-          {{#content_type}}
       <sourceFolder url="file://{{module.root_dir}}/{{path}}"
                     isTestSource="{{is_test}}"
-                    type="{{content_type}}"/>
-          {{/content_type}}
-          {{^content_type}}
-      <sourceFolder url="file://{{module.root_dir}}/{{path}}"
-                    isTestSource="{{is_test}}"/>
-          {{/content_type}}
+                    {{#content_type}}type="{{content_type}}"{{/content_type}}/>
         {{/package_prefix}}
       {{/sources}}
     {{/module.content_roots}}
