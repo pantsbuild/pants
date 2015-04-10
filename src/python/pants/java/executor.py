@@ -46,11 +46,12 @@ class Executor(AbstractClass):
     def executor(self):
       """Returns the executor this runner uses to run itself."""
 
+    @property
     def cmd(self):
       """Returns a string representation of the command that will be run."""
       return ' '.join(self.command)
 
-    @property
+    @abstractproperty
     def command(self):
       """Returns a copy of the command line that will be run as a list of command line tokens."""
 
@@ -135,7 +136,7 @@ class CommandLineGrabber(Executor):
         return self
 
       @property
-      def command(self):
+      def command(_):
         return list(self._command)
 
       def run(_, stdout=None, stderr=None, cwd=None):
@@ -191,7 +192,7 @@ class SubprocessExecutor(Executor):
         return self
 
       @property
-      def command(self):
+      def command(_):
         return list(command)
 
       def run(_, stdout=None, stderr=None, cwd=None):
