@@ -66,6 +66,13 @@ class BuildFileParser(object):
     """Returns a copy of the registered build file aliases this build file parser uses."""
     return self._build_configuration.registered_aliases()
 
+  def address_map_from_build_file(self, build_file):
+    family_address_map_by_build_file = self.parse_build_file_family(build_file)
+    address_map = {}
+    for build_file, sibling_address_map in family_address_map_by_build_file.items():
+      address_map.update(sibling_address_map)
+    return address_map
+
   def address_map_from_spec_path(self, spec_path):
     try:
       build_file = BuildFile.from_cache(self._root_dir, spec_path)
@@ -73,11 +80,7 @@ class BuildFileParser(object):
       raise self.BuildFileScanError("{message}\n searching {spec_path}"
                                     .format(message=e,
                                             spec_path=spec_path))
-    family_address_map_by_build_file = self.parse_build_file_family(build_file)
-    address_map = {}
-    for build_file, sibling_address_map in family_address_map_by_build_file.items():
-      address_map.update(sibling_address_map)
-    return address_map
+    return self.address_map_from_build_file(build_file)
 
   def parse_build_file_family(self, build_file):
     family_address_map_by_build_file = {}  # {build_file: {address: addressable}}

@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
+from pants.fs.fs import is_dir_outside_root
 
 
 class SourceRootTree(object):
@@ -186,6 +187,9 @@ class SourceRoot(object):
   def __call__(self, basedir, *allowed_target_types):
     allowed_target_types = [proxy._addressable_type.get_target_type()
                             for proxy in allowed_target_types]
+    if is_dir_outside_root(dir=basedir, root=self.rel_path):
+      raise ValueError("Invalid source root: {} is not a subdirectory of {}".format(basedir, self.rel_path))
+
     SourceRoot.register(os.path.join(self.rel_path, basedir), *allowed_target_types)
 
   def here(self, *allowed_target_types):

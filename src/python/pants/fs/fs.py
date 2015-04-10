@@ -52,3 +52,11 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
 def expand_path(path):
   """Returns ``path`` as an absolute path with ~user and env var expansion applied."""
   return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
+
+def is_dir_outside_root(dir, root):
+  # The assumption is that a correct subdir starts with the root,
+  # even after normalizing.
+  dir_path = os.path.normpath(os.path.join(root, dir))
+
+  # Check if the dir path has the correct root.
+  return os.path.commonprefix([root, dir_path]) != root

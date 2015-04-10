@@ -10,7 +10,9 @@ import os
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
+
 from pants.base.build_environment import get_buildroot
+from pants.fs.fs import is_dir_outside_root
 
 
 class FilesetRelPathWrapper(object):
@@ -30,7 +32,7 @@ class FilesetRelPathWrapper(object):
         excludes[i] = [exclude]
 
     for glob in args:
-      if(self._is_glob_dir_outside_root(glob, root)):
+      if is_dir_outside_root(glob, root):
         raise ValueError('Invalid glob {}, points outside BUILD file root dir {}'.format(glob, root))
 
     result = self.wrapped_fn(root=root, *args, **kwargs)

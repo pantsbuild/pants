@@ -86,6 +86,10 @@ class SourceRootTest(unittest.TestCase):
     SourceRoot("mock/foo").here(proxy)
     self.assertEqual("mock/foo", SourceRoot.find(target))
 
+  def test_call_source_root_with_directory_outside_current_path(self):
+    with self.assertRaises(ValueError):
+      SourceRoot("mock/foo")("../other/directory")
+
   def test_find(self):
     # When no source_root is registered, it should just return the path from the address
     self.assertEqual("tests/foo/bar", SourceRoot.find(TestTarget("//tests/foo/bar:baz")))
