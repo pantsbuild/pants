@@ -229,10 +229,10 @@ class JarBuilderTest(BaseJarTaskTest):
     context.products.safe_create_data('resources_by_target',
                                       lambda: defaultdict(MultipleRootedProducts))
 
-    jar_builder = jar_task.prepare_jar_builder()
     with self.jarfile() as existing_jarfile:
       with jar_task.open_jar(existing_jarfile) as jar:
-        jar_builder.add_target(jar, java_agent)
+        jar_builder = jar_task.create_jar_builder(jar)
+        jar_builder.add_target(java_agent)
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'FakeAgent.class')

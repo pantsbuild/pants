@@ -35,10 +35,7 @@ class JvmBinaryTask(JarTask):
   def prepare(cls, options, round_manager):
     super(JvmBinaryTask, cls).prepare(options, round_manager)
     round_manager.require('jar_dependencies', predicate=cls.is_binary)
-
-  def __init__(self, *args, **kwargs):
-    super(JvmBinaryTask, self).__init__(*args, **kwargs)
-    self._jar_builder = self.prepare_jar_builder()
+    cls.JarBuilder.prepare(round_manager)
 
   def list_external_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.
@@ -72,7 +69,7 @@ class JvmBinaryTask(JarTask):
                          compressed=True) as jar:
 
         with self.context.new_workunit(name='add-internal-classes'):
-          self._jar_builder.add_target(jar, binary, recursive=True)
+          self.create_jar_builder(jar).add_target(binary, recursive=True)
 
         if with_external_deps:
           with self.context.new_workunit(name='add-dependency-jars'):

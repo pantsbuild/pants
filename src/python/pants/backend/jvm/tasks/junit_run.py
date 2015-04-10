@@ -22,6 +22,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
@@ -90,7 +91,14 @@ class _JUnitRunner(object):
              help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the first target path.')
-    register_jvm_tool(register, 'junit')
+    register_jvm_tool(register,
+                      'junit',
+                      main=JUnitRun._MAIN,
+                      # TODO(John Sirois): Investigate how much less we can get away with.
+                      # Clearly both tests and the runner need access to the same @Test, @Before,
+                      # as well as other annotations, but there is also the Assert class and some
+                      # subset of the @Rules, @Theories and @RunWith APIs.
+                      custom_rules=[Shader.exclude_package('org.junit', recursive=True)])
 
   def __init__(self, task_exports, context):
     self._task_exports = task_exports

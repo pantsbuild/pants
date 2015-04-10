@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-import sys
 from collections import defaultdict
 from textwrap import dedent
 
@@ -25,7 +24,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(JUnitRunnerTest, self).setUp()
-    self.set_options(pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+    self.set_options_for_scope('', pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
 
   @classmethod
   def task_type(cls):
