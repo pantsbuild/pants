@@ -23,7 +23,7 @@ class Shader(object):
     """Indicates an error shading a jar."""
 
   class Rule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
-    """Represents an exclusion rule for a jar shading session."""
+    """Represents a transformation rule for a jar shading session."""
 
     def render(self):
       return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
@@ -158,10 +158,10 @@ class Shader(object):
     support classes but that everything else will be shaded.
 
     Any `custom_rules` are given highest precedence and so they can interfere with this automatic
-    binary shading.  In general its safe to add exclusion rules to open up classes that need to be
+    binary shading.  In general it's safe to add exclusion rules to open up classes that need to be
     shared between the binary and the code it runs over.  An example would be excluding the
-    `org.junit.Test` annotation class from shading since both a tool running junit needs to be able
-    to scan for this annotation applied to the user code it tests.
+    `org.junit.Test` annotation class from shading since a tool running junit needs to be able
+    to scan for this annotation inside the user code it tests.
 
     :param unicode main: The main class to preserve as the entry point.
     :param unicode jar: The path of the binary jar the `main` class lives in.
