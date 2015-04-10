@@ -108,6 +108,24 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_options=['--doc-javadoc-skip'],
                       expected_primary_artifact_count=2)
 
+  def test_protobuf_publish(self):
+    unique_artifacts = {'com/pants/testproject/publish/protobuf/protobuf-java/0.0.1-SNAPSHOT':
+                        ['ivy-0.0.1-SNAPSHOT.xml',
+                         'protobuf-java-0.0.1-SNAPSHOT.jar',
+                         'protobuf-java-0.0.1-SNAPSHOT.pom',
+                         'protobuf-java-0.0.1-SNAPSHOT-sources.jar'],
+                        'com/pants/testproject/protobuf/distance/0.0.1-SNAPSHOT/':
+                        ['ivy-0.0.1-SNAPSHOT.xml',
+                         'distance-0.0.1-SNAPSHOT.jar',
+                         'distance-0.0.1-SNAPSHOT.pom',
+                         'distance-0.0.1-SNAPSHOT-sources.jar'],}
+    self.publish_test('testprojects/src/java/com/pants/testproject/publish/protobuf:protobuf-java',
+                      unique_artifacts,
+                      ['com.pants.testproject.publish.protobuf/protobuf-java/publish.properties',
+                       'com.pants.testproject.protobuf/distance/publish.properties'],
+                      extra_options=['--doc-javadoc-skip'],
+                      expected_primary_artifact_count=2)
+
   def test_named_snapshot(self):
     name = "abcdef0123456789"
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
