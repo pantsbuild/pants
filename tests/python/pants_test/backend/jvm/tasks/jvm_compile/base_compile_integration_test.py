@@ -15,10 +15,25 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class BaseCompileIT(PantsRunIntegrationTest):
   @contextmanager
-  def do_test_compile(self, target, expected_files=None):
+  def do_test_compile(self, target, strategy, expected_files=None, iterations=2):
+    """Runs a configurable number of iterations of compilation for the given target.
+
+    By default, runs twice to shake out errors related to noops.
+    """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      pants_run = self.run_pants_with_workdir(['clean-all', 'compile', target], workdir)
-      self.assert_success(pants_run)
+      for i in xrange(0, iterations):
+        args = [
+            'compile',
+            '--compile-apt-strategy={}'.format(strategy),
+            '--compile-java-strategy={}'.format(strategy),
+            '--compile-scala-strategy={}'.format(strategy),
+            target,
+          ]
+        # Clean-all on the first iteration.
+        if i == 0:
+          args.insert(0, 'clean-all')
+        pants_run = self.run_pants_with_workdir(args, workdir)
+        self.assert_success(pants_run)
       if expected_files:
         to_find = set(expected_files)
         found = defaultdict(set)
