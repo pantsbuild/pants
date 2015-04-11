@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.core.tasks.what_changed import ChangedFileTaskMixin
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -16,7 +17,7 @@ class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinter(NailgunTask, JvmToolTaskMixin):
+class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
   """Print linter warnings for thrift files.
   """
 
@@ -38,6 +39,14 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
                   'this value if it is set.')
     register('--linter-args', default=[], advanced=True, type=Options.list,
              help='Additional options passed to the linter.')
+    register('--fast', default=False, action='store_true',
+             help='used for changed targets.')
+    register('--changes_since', default=None, action='store_true',
+             help='used for changed targets.')
+    register('--diffspec', default=None, action='store_true',
+             help='used for changed targets.')
+    register('--include_dependees', default='none', action='store_true',
+             help='used for changed targets.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
@@ -100,12 +109,33 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
       raise ThriftLintError(
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
+  def _changed_target_addresses(self):
+    change_calculator = self.change_calculator(self.get_options(),
+      self.context.address_mapper,
+      self.context.build_graph,
+      scm=self.context.scm,
+      workspace=self.context.workspace,
+      spec_excludes=self.context.options.for_global_scope().spec_excludes)
+    return change_calculator.changed_target_addresses()
+
+  def _changed_thrift_targets(self):
+    thrift_targets_by_address = {}
+    for target in self.context.targets(self._is_thrift):
+      thrift_targets_by_address[target.address] = target
+
+    changed_addresses = self._changed_target_addresses()
+    changed_thrift_addresses = set(thrift_targets_by_address.keys()).intersection(changed_addresses)
+    changed_thrift_targets_by_address = {
+      address: thrift_targets_by_address[address] for address in changed_thrift_addresses}
+    return set(changed_thrift_targets_by_address.values())
+
   def execute(self):
     if self.get_options().skip:
       return
 
-    thrift_targets = self.context.targets(self._is_thrift)
-    with self.invalidated(thrift_targets) as invalidation_check:
+    changed_thrift_targets = self._changed_thrift_targets()
+
+    with self.invalidated(changed_thrift_targets) as invalidation_check:
       errors = []
       for vt in invalidation_check.invalid_vts:
         try:
