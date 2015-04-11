@@ -12,9 +12,6 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-# for tests, not a test of a thing called 'Base'.
-from pants_test.base.layout_utils import TestLayout
-
 from pants.backend.build_file_layout.source_root import SourceRoot
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
@@ -35,10 +32,11 @@ from pants.option.options import Options
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
+from pants_test.base.layout_utils import TestLayout
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
-
+# for tests, not a test of a thing called 'Base'.
 
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""

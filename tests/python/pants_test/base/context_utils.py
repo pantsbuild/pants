@@ -10,12 +10,12 @@ import logging
 import os
 from contextlib import contextmanager
 
-from pants_test.base.layout_utils import TestLayout
 from twitter.common.collections import maybe_list
 
 from pants.base.config import Config, SingleFileConfig
 from pants.base.target import Target
 from pants.goal.context import Context
+from pants_test.base.layout_utils import TestLayout
 
 
 def create_options(options):
