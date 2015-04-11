@@ -51,7 +51,6 @@ class BuildConfiguration(object):
         context_aware_object_factories=self._exposed_context_aware_object_factories)
 
   def register_layout(self, layout):
-    print("layout registered!!!!")
     if not isinstance(layout, SourceRootLookup):
       raise TypeError("expected {} to be an instance of {}".format(layout, SourceRootLookup))
 
