@@ -47,7 +47,7 @@ before_script: |
 
 script: |
   uname -a
-  java -version
+  java -XX:+PrintFlagsFinal -version | grep HeapSize
   ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
