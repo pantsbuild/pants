@@ -232,5 +232,5 @@ class Shader(object):
       fp.close()
 
       yield self._executor.runner(classpath=[self._jarjar],
-                                  main='com.tonicsystems.jarjar.Main',
+                                  main='org.pantsbuild.jarjar.Main',
                                   args=['process', fp.name, jar, output_jar])

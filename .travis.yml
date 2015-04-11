@@ -49,7 +49,7 @@ before_script: |
 script: |
   uname -a
   java -version
-  ./build-support/bin/ci.sh -x ${CI_FLAGS}
+  PANTS_CONFIG_OVERRIDE=pants.travis-ci.ini ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
 # for now which is enabled even with no `notifications` config.
