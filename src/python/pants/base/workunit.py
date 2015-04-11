@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+import sys
 import time
 import uuid
 
@@ -63,7 +64,7 @@ class WorkUnit(object):
 
   PREP = 13      # Running a prep command
 
-  def __init__(self, run_info_dir, parent, name, labels=None, cmd=''):
+  def __init__(self, run_info_dir, parent, name, labels=None, unbuffered=False, cmd=''):
     """
     - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
@@ -93,6 +94,8 @@ class WorkUnit(object):
     # E.g., a tool invocation may have 'stdout', 'stderr', 'debug_log' etc.
     self._outputs = {}  # name -> output buffer.
     self._output_paths = {}
+
+    self._unbuffered = unbuffered
 
     # Do this last, as the parent's _self_time() might get called before we're
     # done initializing ourselves.
@@ -138,6 +141,10 @@ class WorkUnit(object):
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: {}'.format(name))
+
+    if self._unbuffered and name in ('stdout', 'stderr'):
+      return getattr(sys, name)
+
     if name not in self._outputs:
       workunit_name = re.sub(r'\W', '_', self.name)
       path = os.path.join(self.run_info_dir,

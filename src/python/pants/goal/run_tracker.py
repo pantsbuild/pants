@@ -21,6 +21,7 @@ from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
+from pants.option.options import Options
 from pants.reporting.report import Report
 
 
@@ -59,6 +60,8 @@ class RunTracker(object):
              help='Number of threads for foreground work.')
     register('--num-background-workers', advanced=True, type=int, default=8,
              help='Number of threads for background work.')
+    register('--unbuffered-workunits', advanced=True, type=Options.list, default=None,
+             help='Send writes from named workunits directly to output instead of buffering it')
 
   @classmethod
   def from_options(cls, options):
@@ -68,14 +71,16 @@ class RunTracker(object):
                stats_upload_url=my_opts.stats_upload_url,
                stats_upload_timeout=my_opts.stats_upload_timeout,
                num_foreground_workers=my_opts.num_foreground_workers,
-               num_background_workers=my_opts.num_background_workers)
+               num_background_workers=my_opts.num_background_workers,
+               unbuffered_workunits=my_opts.unbuffered_workunits)
 
   def __init__(self,
                info_dir,
                stats_upload_url=None,
                stats_upload_timeout=2,
                num_foreground_workers=8,
-               num_background_workers=8):
+               num_background_workers=8,
+               unbuffered_workunits=None):
     self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
     cmd_line = ' '.join(['./pants'] + sys.argv[1:])
 
@@ -119,6 +124,8 @@ class RunTracker(object):
 
     # Number of threads for background work.
     self._num_background_workers = num_background_workers
+
+    self._unbuffered_workunits = unbuffered_workunits or []
 
     # We report to this Report.
     self.report = None
@@ -172,7 +179,7 @@ class RunTracker(object):
     self._main_root_workunit.set_outcome(outcome)
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', unbuffered=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -192,7 +199,7 @@ class RunTracker(object):
     outcome explicitly if you want to set it to warning.
     """
     parent = self._threadlocal.current_workunit
-    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd) as workunit:
+    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd, unbuffered=unbuffered) as workunit:
       self._threadlocal.current_workunit = workunit
       try:
         yield workunit
@@ -200,7 +207,7 @@ class RunTracker(object):
         self._threadlocal.current_workunit = parent
 
   @contextmanager
-  def new_workunit_under_parent(self, name, parent, labels=None, cmd=''):
+  def new_workunit_under_parent(self, name, parent, labels=None, cmd='', unbuffered=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -212,7 +219,11 @@ class RunTracker(object):
 
     Task code should not typically call this directly.
     """
-    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels, cmd=cmd)
+
+    if unbuffered is None:
+      unbuffered = name in self._unbuffered_workunits
+
+    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels, cmd=cmd, unbuffered=unbuffered)
     workunit.start()
     try:
       self.report.start_workunit(workunit)
