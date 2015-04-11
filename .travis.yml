@@ -47,8 +47,8 @@ before_script: |
 
 script: |
   uname -a
-  java -XX:+PrintFlagsFinal -version | grep HeapSize
-  ./build-support/bin/ci.sh -x ${CI_FLAGS}
+  java -version
+  PANTS_CONFIG_OVERRIDE=pants.travis-ci.ini ./build-support/bin/ci.sh -x ${CI_FLAGS}
 
 # We accept the default travis-ci email author+comitter notification
 # for now which is enabled even with no `notifications` config.
