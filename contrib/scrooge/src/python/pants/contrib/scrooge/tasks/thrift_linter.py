@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.core.tasks.what_changed import ChangedFileTaskMixin
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -16,7 +17,7 @@ class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinter(NailgunTask, JvmToolTaskMixin):
+class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
   """Print linter warnings for thrift files.
   """
 
@@ -36,9 +37,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     register('--strict-default', default=False, advanced=True, action='store_true',
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
+    register('--lint-all-thrift', default=False, advanced=True, action='store_true',
+             help='Runs Linter on all thrift files within a target.')
     register('--linter-args', default=[], advanced=True, type=Options.list,
              help='Additional options passed to the linter.')
     cls.register_jvm_tool(register, 'scrooge-linter')
+    cls.register_change_file_options(register)
 
   @classmethod
   def product_types(cls):
@@ -100,12 +104,39 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
       raise ThriftLintError(
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
+  def _all_thrift_targets(self):
+    return self.context.targets(self._is_thrift)
+
+  def _changed_target_addresses(self):
+    change_calculator = self.change_calculator(self.get_options(),
+      self.context.address_mapper,
+      self.context.build_graph,
+      scm=self.context.scm,
+      workspace=self.context.workspace,
+      spec_excludes=self.context.options.for_global_scope().spec_excludes)
+    return change_calculator.changed_target_addresses()
+
+  def _changed_thrift_targets(self):
+    thrift_targets_by_address = {}
+    for target in self._all_thrift_targets():
+      thrift_targets_by_address[target.address] = target
+
+    changed_addresses = self._changed_target_addresses()
+    changed_thrift_addresses = set(thrift_targets_by_address.keys()).intersection(changed_addresses)
+    changed_thrift_targets_by_address = {
+      address: thrift_targets_by_address[address] for address in changed_thrift_addresses}
+    return set(changed_thrift_targets_by_address.values())
+
   def execute(self):
     if self.get_options().skip:
       return
 
-    thrift_targets = self.context.targets(self._is_thrift)
-    with self.invalidated(thrift_targets) as invalidation_check:
+    if self.get_options().lint_all_thrift:
+      targets = self._all_thrift_targets()
+    else:
+      targets = self._changed_thrift_targets()
+
+    with self.invalidated(targets) as invalidation_check:
       errors = []
       for vt in invalidation_check.invalid_vts:
         try:

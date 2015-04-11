@@ -14,7 +14,7 @@ from operator import eq, ne
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.dirutil import safe_mkdir, safe_open, touch
 
 
 PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data', 'stderr_data'])
