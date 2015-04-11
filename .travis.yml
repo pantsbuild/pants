@@ -17,44 +17,6 @@ language: python
 python:
   - "2.7"
 
-install:
-  - pip --quiet install coveralls
-
-env:
-  global:
-    - CXX=g++
-    # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
-    # These are encrypted with a public key for our repo that only
-    # Travis-CI has the private key for.  We are trusting Travis-CI
-    # here but no-one else.
-    #
-    # See: http://docs.travis-ci.com/user/encryption-keys/
-    - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
-  matrix:
-    - CI_FLAGS="-cjlpnet 'Various pants self checks'"  # (fkmsr)
-    - CI_FLAGS="-fkmsrcjlpn 'Test examples and testprojects'"  # (et)
-    - CI_FLAGS="-fkmsrcnet 'Unit tests for pants and pants-plugins'"  # (jlp)
-    - CI_FLAGS="-fkmsrcjlpet 'Python contrib tests'"  # (n)
-    - CI_FLAGS="-fkmsrjlpnet -i 6:0 'Python integration tests for pants - shard 1'"  # (c)
-    - CI_FLAGS="-fkmsrjlpnet -i 6:1 'Python integration tests for pants - shard 2'"
-    - CI_FLAGS="-fkmsrjlpnet -i 6:2 'Python integration tests for pants - shard 3'"
-    - CI_FLAGS="-fkmsrjlpnet -i 6:3 'Python integration tests for pants - shard 4'"
-    - CI_FLAGS="-fkmsrjlpnet -i 6:4 'Python integration tests for pants - shard 5'"
-    - CI_FLAGS="-fkmsrjlpnet -i 6:5 'Python integration tests for pants - shard 6'"
-
-before_script: |
-  ./build-support/bin/ci-sync.sh
-
 script: |
-  uname -a
-  java -version
-  ./build-support/bin/ci.sh -x ${CI_FLAGS}
-
-# We accept the default travis-ci email author+comitter notification
-# for now which is enabled even with no `notifications` config.
-# notifications:
-#   email: ...
-
-after_success:
-  coveralls
+  PANTS_DEV=1 ./pants test tests/python/pants_test/backend/jvm/tasks/:bootstrap_jvm_tools -- -vs
 

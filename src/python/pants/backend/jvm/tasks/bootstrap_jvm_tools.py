@@ -173,9 +173,10 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       with self.shader.binary_shader(shaded_jar, main, binary_jar,
                                      custom_rules=custom_rules) as shader:
         try:
-          result = util.execute_runner(shader,
-                                       workunit_factory=self.context.new_workunit,
-                                       workunit_name='shade-{}'.format(key))
+          result = shader.run()
+          # result = util.execute_runner(shader,
+          #                              workunit_factory=self.context.new_workunit,
+          #                              workunit_name='shade-{}'.format(key))
           if result != 0:
             raise TaskError("Shading of tool '{key}' with main class {main} for {scope} failed "
                             "with exit code {result}".format(key=key, main=main, scope=scope,
