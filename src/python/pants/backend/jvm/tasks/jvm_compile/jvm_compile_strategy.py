@@ -21,11 +21,27 @@ class JvmCompileStrategy(object):
 
   __metaclass__ = ABCMeta
 
-  # A context for the compilation of a target.
-  #
-  # This can be used to differentiate between a partially completed compile in a temporary location
-  # and a finalized compile in its permanent location.
-  CompileContext = namedtuple('CompileContext', ['target', 'analysis_file', 'classes_dir', 'sources'])
+  class CompileContext(object):
+    """A context for the compilation of a target.
+    
+    This can be used to differentiate between a partially completed compile in a temporary location
+    and a finalized compile in its permanent location.
+    """
+    def __init__(self, target, analysis_file, classes_dir, sources):
+      self.target = target
+      self.analysis_file = analysis_file
+      self.classes_dir = classes_dir
+      self.sources = sources
+
+    @property
+    def _id(self):
+      return (self.target, self.analysis_file, self.classes_dir)
+
+    def __eq__(self, other):
+      return self._id == other._id
+
+    def __hash__(self):
+      return hash(self._id)
 
   # Common code.
   # ------------
@@ -78,9 +94,10 @@ class JvmCompileStrategy(object):
 
   @abstractmethod
   def compute_classes_by_source(self, compile_contexts):
-    """Compute src->classes for the given compile_contexts.
+    """Compute a map of (context->(src->classes)) for the given compile_contexts.
 
-    Srcs are relative to buildroot. Classes are absolute paths.
+    It's possible (although unfortunate) for multiple targets to own the same sources, hence
+    the top level division. Srcs are relative to buildroot. Classes are absolute paths.
     """
     pass
 

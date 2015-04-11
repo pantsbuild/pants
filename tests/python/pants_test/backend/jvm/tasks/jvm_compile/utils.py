@@ -18,6 +18,7 @@ These methods work around the fact that pytest.mark.parametrize does not support
 _STRATEGIES = ['global', 'isolated']
 _SCOPES = ['apt', 'java', 'scala']
 
+
 def _wrap(testmethod, setupfun):
   def wrapped(self):
     for strategy in _STRATEGIES:
@@ -28,9 +29,16 @@ def _wrap(testmethod, setupfun):
         raise e
   return wrapped
 
+
+def compile_strategies():
+  """An iterator over compile strategies."""
+  return _STRATEGIES
+
+
 def provide_compile_strategies(testmethod):
   """A decorator for test methods that provides the compilation strategy as a parameter."""
   return _wrap(testmethod, lambda self, testmethod, strategy: testmethod(self, strategy))
+
 
 def set_compile_strategies(testmethod):
   """A decorator for BaseTests which sets strategy options differently for each invoke."""
