@@ -143,6 +143,20 @@ class Options(object):
     """Register an option in the global scope, using argparse params."""
     self.register(GLOBAL_SCOPE, *args, **kwargs)
 
+  def registration_function_for_global_scope(self):
+    """Returns a function for registering argparse args on the global scope."""
+    return self.registration_function_for_scope(GLOBAL_SCOPE)
+
+  def registration_function_for_scope(self, scope):
+    """Returns a function for registering argparse args on the given scope."""
+    def register(*args, **kwargs):
+      self.register(scope, *args, **kwargs)
+    # Clients can access the bootstrap option values as register.bootstrap.
+    register.bootstrap = self.bootstrap_option_values()
+    # Clients can access the scope as register.scope.
+    register.scope = scope
+    return register
+
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
     return self._parser_hierarchy.get_parser_by_scope(scope)
