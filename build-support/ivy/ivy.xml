@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<ivy-module version="2.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
+
+  <info organisation="pants" module="ivy"/>
+
+  <dependencies defaultconf="default">
+    <dependency org="org.apache.ivy" name="ivy" rev="2.4.0"/>
+
+    <!-- support for the pgp signer -->
+    <dependency org="org.bouncycastle" name="bcpg-jdk14" rev="1.45"/>
+    <dependency org="org.bouncycastle" name="bcprov-jdk14" rev="1.45"/>
+  </dependencies>
+</ivy-module>

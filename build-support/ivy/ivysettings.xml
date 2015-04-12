@@ -5,9 +5,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
 <ivysettings>
-  <property name="root.dir" value="${ivy.settings.dir}/../.." override="false"/>
   <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
-  <properties file="${root.dir}/build.properties" override="false"/>
 
   <settings defaultResolver="chain-repos"/>
 
