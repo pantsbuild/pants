@@ -485,6 +485,7 @@ def gen_tasks_options_reference_data():
       def register(*args, **kwargs):
         option_parser.register(*args, **kwargs)
       register.bootstrap = bootstrap_option_values()
+      register.scope = ''
       task_type.register_options(register)
       argparser = option_parser._help_argparser
       scope = Goal.scope(goal.name, task_name)

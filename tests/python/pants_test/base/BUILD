@@ -10,7 +10,6 @@ python_library(
     'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
-    'src/python/pants/option',
   ]
 )
 
