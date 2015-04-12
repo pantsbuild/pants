@@ -150,6 +150,8 @@ class GoalRunner(object):
     # But for now this is useful for kicking the tires.
     RunTracker.register_options(self.options.registration_function_for_scope('run-tracker'))
 
+    # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
+    # be a subsystem?
     for goal in Goal.all():
       # Register task options (including per-task subsystem options).
       goal.register_options(self.options)
