@@ -207,7 +207,7 @@ class Shader(object):
     return rules
 
   @contextmanager
-  def binary_shader(self, output_jar, main, jar, custom_rules=None):
+  def binary_shader(self, output_jar, main, jar, custom_rules=None, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.
 
     The default rules will ensure the `main` class name is un-changed along with a minimal set of
@@ -224,6 +224,7 @@ class Shader(object):
     :param unicode main: The main class in the `jar` to preserve as the entry point.
     :param unicode jar: The path to the jar file to shade.
     :param list custom_rules: An optional list of custom `Shader.Rule`s.
+    :param list jvm_options: an optional sequence of options for the underlying jvm
     :returns: An `Executor.Runner` that can be `run()` to shade the given `jar`.
     """
     with temporary_file() as fp:
@@ -233,4 +234,5 @@ class Shader(object):
 
       yield self._executor.runner(classpath=[self._jarjar],
                                   main='org.pantsbuild.jarjar.Main',
+                                  jvm_options=jvm_options,
                                   args=['process', fp.name, jar, output_jar])
