@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
@@ -8,7 +8,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
             xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
 
-  <info organisation="pants" module="ivy"/>
+  <info organisation="org.pantsbuild" module="ivy"/>
 
   <dependencies defaultconf="default">
     <dependency org="org.apache.ivy" name="ivy" rev="2.4.0"/>

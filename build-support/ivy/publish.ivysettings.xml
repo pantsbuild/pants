@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
@@ -17,24 +17,24 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   <!-- The ${login} and ${password} values below come from a credentials() object,
        which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which
-       matches a resolver in the "[publish]repos" object in 'pants.ini', which also 
+       matches a resolver in the "[publish]repos" object in 'pants.ini', which also
        matches the 'host' in this XML block. -->
   <credentials host="oss.sonatype.org"
                realm="Sonatype Nexus Repository Manager"
                username="${login}"
                passwd="${password}"/>
- 
+
   <resolvers>
     <!-- For resolving foreign deps only (to create a poms for publishing). -->
     <_remote_resolvers name="remote-repos"/>
-    
+
     <!-- For publishing to maven central only. -->
     <ibiblio name="oss.sonatype.org"
              m2compatible="true"
              root="https://oss.sonatype.org/service/local/staging/deploy/maven2/"
              signer="pgp"/>
   </resolvers>
-  
+
   <signers>
     <pgp name="pgp"
          secring="${pgp.secring}"
