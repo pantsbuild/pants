@@ -72,6 +72,15 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   @classmethod
   def register_options(cls, register):
     super(BootstrapJvmTools, cls).register_options(register)
+
+    # TODO(John Sirois): Adopt subsystems for IvyTaskMixin and JarTask (JarTool).
+    # This task uses 3 jvm subsystems!: IvyUtil, JarTask (should be a subsystem), and Shader.
+    # Right now there is no clean way to grab jvm_options for each's needs without dragging
+    # configuration away from the `jvm_options` standard (we need subsystem scopes).  As a result,
+    # we don't and just use this one option for now.
+    register('--jvm-options', action='append', metavar='<option>...',
+             help='Run the tool shader with these extra jvm options.')
+
     cls.register_jvm_tool(register, 'jarjar')
 
   def __init__(self, *args, **kwargs):
@@ -170,8 +179,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
       # Now shade the binary jar and return that single jar as the safe tool classpath.
       safe_mkdir_for(shaded_jar)
-      with self.shader.binary_shader(shaded_jar, main, binary_jar,
-                                     custom_rules=custom_rules) as shader:
+      with self.shader.binary_shader(shaded_jar,
+                                     main,
+                                     binary_jar,
+                                     custom_rules=custom_rules,
+                                     jvm_options=self.get_options().jvm_options) as shader:
         try:
           result = util.execute_runner(shader,
                                        workunit_factory=self.context.new_workunit,
