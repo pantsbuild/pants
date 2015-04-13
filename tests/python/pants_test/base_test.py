@@ -15,7 +15,6 @@ from textwrap import dedent
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_aliases import BuildFileAliases
@@ -30,7 +29,8 @@ from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
 from pants.option.options import Options
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.subsystem.subsystem import Subsystem
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
 
@@ -139,27 +139,20 @@ class BaseTest(unittest.TestCase):
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
-  def config(self, overrides=''):
-    """Returns a config valid for the test build root."""
-    ini_file = os.path.join(get_buildroot(), 'pants.ini')
-    if overrides:
-      with temporary_file(cleanup=False) as fp:
-        fp.write(overrides)
-        fp.close()
-        return Config.load([ini_file, fp.name])
-    else:
-      return Config.load([ini_file])
-
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, config='', options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, options=None, target_roots=None,
+              console_outstream=None, workspace=None):
     for_task_types = for_task_types or []
     options = options or {}
 
     option_values = defaultdict(dict)
 
+    registered_global_subsystems = set()
+
     # Get default values for all options registered by the tasks in for_task_types.
+    # TODO: This is clunky and somewhat repetitive of the real registration code.
     for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
@@ -168,16 +161,25 @@ class BaseTest(unittest.TestCase):
       # We provide our own test-only registration implementation, bypassing argparse.
       # When testing we set option values directly, so we don't care about cmd-line flags, config,
       # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
-      def register(*rargs, **rkwargs):
-        scoped_options = option_values[scope]
-        default = rkwargs.get('default')
-        if default is None and rkwargs.get('action') == 'append':
-          default = []
-        for flag_name in rargs:
-          option_name = flag_name.lstrip('-').replace('-', '_')
-          scoped_options[option_name] = default
+      def register_func(on_scope):
+        def register(*rargs, **rkwargs):
+          scoped_options = option_values[on_scope]
+          default = rkwargs.get('default')
+          if default is None and rkwargs.get('action') == 'append':
+            default = []
+          for flag_name in rargs:
+            option_name = flag_name.lstrip('-').replace('-', '_')
+            scoped_options[option_name] = default
+        register.scope = on_scope
+        return register
 
-      task_type.register_options(register)
+      task_type.register_options(register_func(scope))
+      for subsystem in task_type.global_subsystems():
+        if subsystem not in registered_global_subsystems:
+          subsystem.register_options(register_func(subsystem.qualify_scope(Options.GLOBAL_SCOPE)))
+          registered_global_subsystems.add(subsystem)
+      for subsystem in task_type.task_subsystems():
+        subsystem.register_options(register_func(subsystem.qualify_scope(scope)))
 
     # Now override with any caller-specified values.
 
@@ -201,13 +203,15 @@ class BaseTest(unittest.TestCase):
           if key not in opts:  # Inner scope values override the inherited ones.
             opts[key] = val
 
-    return create_context(config=self.config(overrides=config),
-                          options=option_values,
-                          target_roots=target_roots,
-                          build_graph=self.build_graph,
-                          build_file_parser=self.build_file_parser,
-                          address_mapper=self.address_mapper,
-                          **kwargs)
+    context = create_context(options=option_values,
+                             target_roots=target_roots,
+                             build_graph=self.build_graph,
+                             build_file_parser=self.build_file_parser,
+                             address_mapper=self.address_mapper,
+                             console_outstream=console_outstream,
+                             workspace=workspace)
+    Subsystem._options = context.options
+    return context
 
   def tearDown(self):
     BuildRoot().reset()

@@ -215,7 +215,7 @@ class JarBuilderTest(BaseJarTaskTest):
         )''').strip())
     java_agent = self.target('src/java/pants/agents:fake_agent')
 
-    context = self.context(target_roots=java_agent)
+    context = self.context(target_roots=[java_agent])
     jar_task = self.prepare_jar_task(context)
 
     class_products = context.products.get_data('classes_by_target',
@@ -229,10 +229,10 @@ class JarBuilderTest(BaseJarTaskTest):
     context.products.safe_create_data('resources_by_target',
                                       lambda: defaultdict(MultipleRootedProducts))
 
-    jar_builder = jar_task.prepare_jar_builder()
     with self.jarfile() as existing_jarfile:
       with jar_task.open_jar(existing_jarfile) as jar:
-        jar_builder.add_target(jar, java_agent)
+        jar_builder = jar_task.create_jar_builder(jar)
+        jar_builder.add_target(java_agent)
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'FakeAgent.class')

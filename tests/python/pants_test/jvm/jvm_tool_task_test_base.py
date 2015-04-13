@@ -27,19 +27,30 @@ class JvmToolTaskTestBase(TaskTestBase):
   def setUp(self):
     # Ensure we get a read of the real pants.ini config
     Config.reset_default_bootstrap_option_values()
-    real_config = self.config()
+    real_config = Config.from_cache()
 
     super(JvmToolTaskTestBase, self).setUp()
 
     # Use a synthetic subclass for bootstrapping within the test, to isolate this from
     # any bootstrapping the pants run executing the test might need.
     self.bootstrap_task_type, bootstrap_scope = self.synthesize_task_subtype(BootstrapJvmTools)
-    # TODO: We assume that no added jvm_options are necessary to bootstrap successfully in a test.
-    # This may not be true forever.  But getting the 'real' value here is tricky, as we have no
-    # access to the enclosing pants run's options here.
-    self.set_options_for_scope(bootstrap_scope, jvm_options=[])
-    self.set_options_for_scope(bootstrap_scope, soft_excludes=False)
+
     JvmToolTaskMixin.reset_registered_tools()
+
+    def register(*args, **kwargs):
+      name = args[0].lstrip('-').replace('-', '_')
+      value = kwargs.pop('default', None)
+      if value is None:
+        action = kwargs.pop('action', None)
+        if action == 'append':
+          value = []
+        if action == 'store_true':
+          value = False
+        if action == 'store_false':
+          value = True
+      self.set_options_for_scope(bootstrap_scope, **{name: value})
+
+    self.bootstrap_task_type.register_options(register)
 
     def link_or_copy(src, dest):
       try:

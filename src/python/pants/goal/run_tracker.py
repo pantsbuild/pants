@@ -80,7 +80,7 @@ class RunTracker(object):
     cmd_line = ' '.join(['./pants'] + sys.argv[1:])
 
     # run_id is safe for use in paths.
-    millis = (self.run_timestamp * 1000) % 1000
+    millis = int((self.run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}'.format(
                time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 
@@ -129,10 +129,6 @@ class RunTracker(object):
 
     # For main thread work. Created on start().
     self._main_root_workunit = None
-
-    # For concurrent foreground work.  Created lazily if needed.
-    # Associated with the main thread's root workunit.
-    self._foreground_worker_pool = None
 
     # For background work.  Created lazily if needed.
     self._background_worker_pool = None
@@ -278,15 +274,11 @@ class RunTracker(object):
         self._background_worker_pool.shutdown()
       self.end_workunit(self._background_root_workunit)
 
-    if self._foreground_worker_pool:
-      if self._aborted:
-        self.log(Report.INFO, "Aborting foreground workers.")
-        self._foreground_worker_pool.abort()
-      else:
-        self.log(Report.INFO, "Waiting for foreground workers to finish.")
-        self._foreground_worker_pool.shutdown()
-
     SubprocPool.shutdown(self._aborted)
+
+    # Run a dummy work unit to write out one last timestamp
+    with self.new_workunit("complete"):
+      pass
 
     self.end_workunit(self._main_root_workunit)
 
@@ -311,13 +303,6 @@ class RunTracker(object):
     path, duration, self_time, is_tool = workunit.end()
     self.cumulative_timings.add_timing(path, duration, is_tool)
     self.self_timings.add_timing(path, self_time, is_tool)
-
-  def foreground_worker_pool(self):
-    if self._foreground_worker_pool is None:  # Initialize lazily.
-      self._foreground_worker_pool = WorkerPool(parent_workunit=self._main_root_workunit,
-                                                run_tracker=self,
-                                                num_workers=self._num_foreground_workers)
-    return self._foreground_worker_pool
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
