@@ -47,7 +47,7 @@ class Subsystem(AbstractClass):
     """
 
   @classmethod
-  def _register_options_on_scope(cls, options, scope):
+  def register_options_on_scope(cls, options, scope):
     """Trigger registration of this subsystem's options under a given scope."""
     cls.register_options(options.registration_function_for_scope(cls.qualify_scope(scope)))
 
