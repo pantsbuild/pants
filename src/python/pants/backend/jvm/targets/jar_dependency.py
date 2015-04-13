@@ -138,10 +138,6 @@ class JarDependency(object):
       raise ValueError('Cannot determine classifier. No explicit classifier is set and this jar '
                        'has more than 1 artifact: {}\n\t{}'.format(self, '\n\t'.join(map(str, self.artifacts))))
 
-  @property
-  def unversioned(self):
-    return JarDependency(name=self.name, org=self.org, rev='__unversioned')
-
   @manual.builddict()
   def exclude(self, org, name=None):
     """Adds a transitive dependency of this jar to the exclude list."""

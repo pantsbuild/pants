@@ -35,11 +35,6 @@ class JarDependencyTest(BaseTest):
 
     self.assertNotEqual(jar_dep_c1, jar_dep_c2)
 
-  def test_unversioned(self):
-    jar_dep_versioned_1 = JarDependency('com.example', 'dependency', rev='5')
-    jar_dep_versioned_2 = JarDependency('com.example', 'dependency', rev='6')
-    self.assertEqual(jar_dep_versioned_1.unversioned, jar_dep_versioned_2.unversioned)
-
   def test_jars_with_no_classifiers_are_equal(self):
     jar_dep_1 = JarDependency('com.example', 'dependency')
     jar_dep_2 = JarDependency('com.example', 'dependency')
