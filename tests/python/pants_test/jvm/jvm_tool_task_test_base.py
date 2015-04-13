@@ -52,6 +52,11 @@ class JvmToolTaskTestBase(TaskTestBase):
 
     self.bootstrap_task_type.register_options(register)
 
+    # Cap BootstrapJvmTools memory usage in tests.  The Xmx was empirically arrived upon using
+    # -Xloggc and verifying no full gcs for a test using the full gamut of resolving a multi-jar
+    # tool, constructing a fat jar and then shading that fat jar.
+    self.set_options_for_scope(bootstrap_scope, jvm_options=['-Xmx128m'])
+
     def link_or_copy(src, dest):
       try:
         os.link(src, dest)
