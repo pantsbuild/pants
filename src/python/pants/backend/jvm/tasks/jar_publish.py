@@ -14,7 +14,6 @@ import shutil
 import sys
 from collections import OrderedDict, defaultdict
 
-from six.moves import range
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 
@@ -405,6 +404,8 @@ class JarPublish(ScmPublishMixin, JarTask):
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
     register('--individual-plugins', advanced=True, default=False, type=bool,
              help='Extra products to publish as a individual artifact.')
+    register('--push-postscript', advanced=True, default=None,
+             help='A post-script to add to pushdb commit messages and push tag commit messages.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -448,6 +449,7 @@ class JarPublish(ScmPublishMixin, JarTask):
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
       self.commit = self.get_options().commit
+      self.push_postscript = self.get_options().push_postscript or ''
       self.local_snapshot = False
 
     self.named_snapshot = self.get_options().named_snapshot
@@ -858,8 +860,9 @@ class JarPublish(ScmPublishMixin, JarTask):
               tag_message='Publish of {coordinate} initiated by {user} {cause}'.format(
                 coordinate=coord,
                 user=getpass.getuser(),
-                cause='with forced revision' if (org, name) in self.overrides else '(autoinc)'
-              )
+                cause='with forced revision' if (org, name) in self.overrides else '(autoinc)',
+              ),
+              postscript=self.push_postscript
             )
 
   def artifact_path(self, jar, version, name=None, suffix='', extension='jar', artifact_ext=''):
