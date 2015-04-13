@@ -225,12 +225,6 @@ class JarTask(NailgunTask):
       raise ValueError('Unrecognized duplicate action: {}'.format(action))
     return name
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JarTask, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
-
   def __init__(self, *args, **kwargs):
     super(JarTask, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
