@@ -67,15 +67,13 @@ jar_library(name='finagle-thrift',
               jar(org='com.twitter', name='finagle-thrift_2.10', rev=FINAGLE_REV),
             ])
 
-def add_log4j_excludes(jar):
-  return (jar.exclude(org='jline', name='jline')
-            .exclude(org='javax.jms', name='jms')
-            .exclude(org='com.sun.jdmk', name='jmxtools')
-            .exclude(org='com.sun.jmx', name='jmxri'))
-
 jar_library(name='log4j',
             jars = [
-              add_log4j_excludes(jar(org='log4j', name='log4j', rev='1.2.15')),
+              jar(org='log4j', name='log4j', rev='1.2.15')
+                .exclude(org='jline', name='jline')
+                .exclude(org='javax.jms', name='jms')
+                .exclude(org='com.sun.jdmk', name='jmxtools')
+                .exclude(org='com.sun.jmx', name='jmxri'),
             ])
 
 jar_library(name='protobuf-2.4.1',
