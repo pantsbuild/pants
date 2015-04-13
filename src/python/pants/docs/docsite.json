@@ -49,6 +49,7 @@
     "images/intellij-run.png": "src/python/pants/docs/images/intellij-run.png",
     "images/intellij-select-venv.png": "src/python/pants/docs/images/intellij-select-venv.png",
     "images/report-server-page.png": "src/docs/images/report-server-page.png",
+    "robots.txt": "src/docs/robots.txt",
     "logo.ico": "src/python/pants/docs/pants-logo.ico",
     "s.js": "src/python/pants/docs/docsite.js",
     "s.css": "src/python/pants/docs/docsite.css"

@@ -12,13 +12,13 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_manual import manual
 
 
-public_repo = Repository(name = 'public',
-                         url = 'https://dl.bintray.com/pantsbuild/maven',
-                         push_db_basedir = os.path.join('build-support', 'ivy', 'pushdb'))
+public_repo = Repository(name='public',
+                         url='https://oss.sonatype.org/#stagingRepositories',
+                         push_db_basedir=os.path.join('build-support', 'ivy', 'pushdb'))
 
-testing_repo = Repository(name = 'testing',
-                          url = 'https://dl.bintray.com/pantsbuild/maven',
-                          push_db_basedir = os.path.join('testprojects', 'ivy', 'pushdb'))
+testing_repo = Repository(name='testing',
+                          url='https://dl.bintray.com/pantsbuild/maven',
+                          push_db_basedir=os.path.join('testprojects', 'ivy', 'pushdb'))
 
 
 # Your repositories don't need this manual.builddict magic.

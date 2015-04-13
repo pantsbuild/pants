@@ -6,6 +6,7 @@ java_library(
   sources=globs('*.java'),
   dependencies=[
     '3rdparty:args4j',
+    '3rdparty:guava',
     '3rdparty:jsr305',
   ],
   provides=artifact(

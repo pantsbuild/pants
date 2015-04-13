@@ -80,7 +80,7 @@ class RunTracker(object):
     cmd_line = ' '.join(['./pants'] + sys.argv[1:])
 
     # run_id is safe for use in paths.
-    millis = (self.run_timestamp * 1000) % 1000
+    millis = int((self.run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}'.format(
                time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 

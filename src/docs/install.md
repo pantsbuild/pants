@@ -60,3 +60,21 @@ prohibit software installation), some sites fetch a pre-build `pants.pex` whose 
 checked-into `pants.ini`. To upgrade pants, generate a `pants.pex` and upload it to a file
 server at a location computable from the version number. Set up the workspace's `./pants` script
 to check the `.ini` file for a version number and download from the correct spot.
+
+Troubleshooting
+---------------
+
+While pants is written in pure Python, some of it's dependencies contain native code. Therefore,
+you'll need to make sure you have the appropriate compiler infrastructure installed on the machine
+where you are attempting to bootstrap pants. In particular, if you see an error similar to this:
+
+    :::bash
+    Installing setuptools, pip...done.
+        Command "/Users/someuser/workspace/pants/build-support/pants_deps.venv/bin/python2.7 -c "import setuptools, tokenize;__file__='/private/var/folders/zc/0jhjvzy56s723lpq23q89f6c0000gn/T/pip-build-mZzSSA/psutil/setup.py';exec(compile(getattr(tokenize, 'open', open)(__file__).read().replace('\r\n', '\n'), __file__, 'exec'))" install --record /var/folders/zc/0jhjvzy56s723lpq23q89f6c0000gn/T/pip-iONF8p-record/install-record.txt --single-version-externally-managed --compile --install-headers /Users/someuser/workspace/pants/build-support/pants_deps.venv/bin/../include/site/python2.7/psutil" failed with error code 1 in /private/var/folders/zc/0jhjvzy56s723lpq23q89f6c0000gn/T/pip-build-mZzSSA/psutil
+
+    Failed to install requirements from /Users/someuser/workspace/pants/3rdparty/python/requirements.txt.
+
+This indicates that pants was attempting to `pip install` the `psutil` dependency into it's private
+virtualenv, and that install failed due to a compiler issue. On Mac OS X, we recommend running
+`xcode-select --install` to make sure you have the latest compiler infrastructure installed, and
+unset any compiler-related environment variables (i.e. run `unset CC`).

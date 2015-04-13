@@ -73,16 +73,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def compute_classes_by_source(self, compile_contexts):
     buildroot = get_buildroot()
-    classes_by_src = {}
+    classes_by_src_by_context = defaultdict(dict)
     for compile_context in compile_contexts:
       if not os.path.exists(compile_context.analysis_file):
         continue
       products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
                                                                 compile_context.classes_dir)
+      classes_by_src = classes_by_src_by_context[compile_context]
       for src, classes in products.items():
         relsrc = os.path.relpath(src, buildroot)
         classes_by_src[relsrc] = classes
-    return classes_by_src
+    return classes_by_src_by_context
 
   def compile_chunk(self,
                     invalidation_check,

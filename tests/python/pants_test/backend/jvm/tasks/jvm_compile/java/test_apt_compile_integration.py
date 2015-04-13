@@ -6,11 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+from pants_test.backend.jvm.tasks.jvm_compile.utils import provide_compile_strategies
 
 
 class AptCompileIntegrationTest(BaseCompileIT):
-  def test_apt_compile(self):
+  @provide_compile_strategies
+  def test_apt_compile(self, strategy):
     with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/processor',
+                              strategy,
                               expected_files=['ResourceMappingProcessor.class',
                                               'javax.annotation.processing.Processor']) as found:
 
@@ -28,8 +31,10 @@ class AptCompileIntegrationTest(BaseCompileIT):
         self.assertEqual('org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor',
                           fp.read().strip())
 
-  def test_apt_compile_and_run(self):
+  @provide_compile_strategies
+  def test_apt_compile_and_run(self, strategy):
     with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/main',
+                              strategy,
                               expected_files=['Main.class',
                                               'deprecation_report.txt']) as found:
 
