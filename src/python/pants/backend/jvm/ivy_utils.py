@@ -47,12 +47,12 @@ class IvyModuleRef(object):
     return hash((self.org, self.name, self.rev))
 
 def unversioned(obj):
-  """This returns an identifier for an IvyModuleRef or a JarDependency
-     without version information (or any other classifier, artifact,
-     etc information).  It's useful because ivy might return
-     information about a different version of a dependency than the
-     one we request, and we want to ensure that all requesters of any
-     version of that dependency are able to learn about it.
+  """This returns an identifier for an IvyModuleRef without version
+     information (or any other classifier, artifact, etc information).
+     It's useful because ivy might return information about a
+     different version of a dependency than the one we request, and we
+     want to ensure that all requesters of any version of that
+     dependency are able to learn about it.
   """
   obj.__class__(name=obj.name, org=obj.org, rev='latest.integration')
 
