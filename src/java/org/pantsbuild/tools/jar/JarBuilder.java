@@ -517,7 +517,6 @@ public class JarBuilder implements Closeable {
 
   private static final ByteSource DEFAULT_MANIFEST = manifestSupplier(createDefaultManifest());
 
-  // TODO(John Sirois): XXX
   private interface InputSupplier<T> {
     T getInput() throws IOException;
   }
