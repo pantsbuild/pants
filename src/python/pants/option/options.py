@@ -149,6 +149,8 @@ class Options(object):
 
   def registration_function_for_scope(self, scope):
     """Returns a function for registering argparse args on the given scope."""
+    # TODO(benjy): Make this an instance of a class that implements __call__, so we can
+    # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
       self.register(scope, *args, **kwargs)
     # Clients can access the bootstrap option values as register.bootstrap.

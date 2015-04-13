@@ -140,7 +140,7 @@ class GoalRunner(object):
 
     # Options for global-level subsystems.
     for subsystem_type in Goal.global_subsystem_types():
-      subsystem_type.register_options_for_global_instance(self.options)
+      subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
 
     # This is the first case we have of non-task, non-global options.
     # The current implementation special-cases RunTracker, and is temporary.
@@ -148,6 +148,8 @@ class GoalRunner(object):
     # But for now this is useful for kicking the tires.
     RunTracker.register_options(self.options.registration_function_for_scope('run-tracker'))
 
+    # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
+    # be a subsystem?
     for goal in Goal.all():
       # Register task options (including per-task subsystem options).
       goal.register_options(self.options)

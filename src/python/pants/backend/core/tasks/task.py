@@ -92,11 +92,11 @@ class TaskBase(AbstractClass):
     """
     cls.register_options(options.registration_function_for_scope(cls.options_scope))
     for subsystem_type in cls.task_subsystems():
-      subsystem_type.register_options_for_task_instance(options, task=cls)
+      subsystem_type.register_options_on_scope(options, cls.options_scope)
 
   @classmethod
   def register_options(cls, register):
-    """Register options for this subsystem.
+    """Register options for this task.
 
     Subclasses may override and call register(*args, **kwargs) with argparse arguments.
     """

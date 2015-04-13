@@ -360,16 +360,20 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
           raise TaskError('Inconsistent analysis file for the global strategy: {} vs {}'.format(
             compile_context.analysis_file, analysis_file))
 
-    # Parse the global analysis once.
-    buildroot = get_buildroot()
-    classes_by_src = {}
+    classes_by_src_by_context = defaultdict(dict)
     if os.path.exists(analysis_file):
+      # Parse the global analysis once.
+      buildroot = get_buildroot()
       products = self._analysis_parser.parse_products_from_path(analysis_file,
                                                                 self._classes_dir)
-      for src, classes in products.items():
-        relsrc = os.path.relpath(src, buildroot)
-        classes_by_src[relsrc] = classes
-    return classes_by_src
+
+      # Then iterate over contexts (targets), and add the classes for their sources.
+      for compile_context in compile_contexts:
+        classes_by_src = classes_by_src_by_context[compile_context]
+        for source in compile_context.sources:
+          absolute_source = os.path.join(buildroot, source)
+          classes_by_src[source] = products.get(absolute_source, [])
+    return classes_by_src_by_context
 
   def post_process_cached_vts(self, cached_vts):
     """Special post processing for global scala analysis files.
@@ -451,16 +455,18 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Compute the classes and resources for each vts.
     compile_contexts = [self.compile_context(t) for t in vts_targets]
     vts_artifactfiles_pairs = []
-    classes_by_source = self.compute_classes_by_source(compile_contexts)
+    classes_by_source_by_context = self.compute_classes_by_source(compile_contexts)
     resources_by_target = self.context.products.get_data('resources_by_target')
-    for target, sources in self._sources_for_targets(vts_targets).items():
+    for compile_context in compile_contexts:
+      target = compile_context.target
       if target.has_label('no_cache'):
         continue
       artifacts = []
       if resources_by_target is not None:
         for _, paths in resources_by_target[target].abs_paths():
           artifacts.extend(paths)
-      for source in sources:
+      classes_by_source = classes_by_source_by_context[compile_context]
+      for source in compile_context.sources:
         classes = classes_by_source.get(source, [])
         artifacts.extend(classes)
 

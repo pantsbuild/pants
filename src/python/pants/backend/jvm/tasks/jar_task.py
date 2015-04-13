@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import tempfile
-from abc import abstractmethod, abstractproperty
+from abc import abstractmethod
 from contextlib import contextmanager
 
 from six import binary_type, string_types
@@ -196,6 +196,7 @@ class Jar(object):
 
             yield args
 
+
 class JarTask(NailgunTask):
   """A baseclass for tasks that need to create or update jars.
 
@@ -302,14 +303,26 @@ class JarTask(NailgunTask):
         manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
       jar.writestr(Manifest.PATH, manifest.contents())
 
-    @abstractproperty
-    def _context(self):
-      """Implementations must supply a context."""
+    @staticmethod
+    def prepare(round_manager):
+      """Prepares the products needed to use `create_jar_builder`.
 
-    def add_target(self, jar, target, recursive=False):
+      This method should be called during task preparation to ensure the classes and resources
+      needed for jarring targets are mapped by upstream tasks that generate these.
+
+      Later, in execute context, the `create_jar_builder` method can be called to get back a
+      prepared ``JarTask.JarBuilder`` ready for use.
+      """
+      round_manager.require_data('resources_by_target')
+      round_manager.require_data('classes_by_target')
+
+    def __init__(self, context, jar):
+      self._context = context
+      self._jar = jar
+
+    def add_target(self, target, recursive=False):
       """Adds the classes and resources for a target to an open jar.
 
-      :param jar: An open jar to add to.
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
@@ -341,14 +354,14 @@ class JarTask(NailgunTask):
             if target_products:
               for root, products in target_products.rel_paths():
                 for prod in products:
-                  jar.write(os.path.join(root, prod), prod)
+                  self._jar.write(os.path.join(root, prod), prod)
 
           add_products(target_classes)
           for resources_target in target_resources:
             add_products(resources_target)
 
           if isinstance(tgt, JavaAgent):
-            self._write_agent_manifest(tgt, jar)
+            self._write_agent_manifest(tgt, self._jar)
 
       if recursive:
         target.walk(add_to_jar)
@@ -357,15 +370,12 @@ class JarTask(NailgunTask):
 
       return targets_added
 
-  def prepare_jar_builder(self):
-    """Prepares a ``JarTask.JarBuilder`` for use during ``execute``.
+  def create_jar_builder(self, jar):
+    """Creates a ``JarTask.JarBuilder`` ready for use.
 
-    This method should be called during task preparation to ensure the classes and resources needed
-    for jarring targets are mapped by upstream tasks that generate these.
+    This method should be called during in `execute` context and only after ensuring
+    `JarTask.JarBuilder.prepare` has already been called in `prepare` context.
+
+    :param jar: An opened ``pants.backend.jvm.tasks.jar_task.Jar`.
     """
-    class PreparedJarBuilder(self.JarBuilder):
-      @property
-      def _context(me):
-        return self.context
-
-    return PreparedJarBuilder()
+    return self.JarBuilder(self.context, jar)

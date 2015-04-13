@@ -176,8 +176,8 @@ class NailgunExecutor(Executor):
         return self
 
       @property
-      def cmd(this):
-        return ' '.join(command)
+      def command(self):
+        return list(command)
 
       def run(this, stdout=None, stderr=None, cwd=None):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)

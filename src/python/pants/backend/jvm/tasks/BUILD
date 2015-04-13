@@ -67,10 +67,14 @@ python_library(
   sources = ['bootstrap_jvm_tools.py'],
   dependencies = [
     ':ivy_task_mixin',
+    ':jar_task',
     ':jvm_tool_task_mixin',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/java:executor',
+    'src/python/pants/java:util',
+    'src/python/pants/java/jar:shader',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -249,6 +253,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/java:util',
+    'src/python/pants/java/jar:shader',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants:binary_util',

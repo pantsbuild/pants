@@ -125,6 +125,7 @@ target(
     'tests/python/pants_test/python',
     'tests/python/pants_test/reporting',
     'tests/python/pants_test/scm',
+    'tests/python/pants_test/subsystem',
     'tests/python/pants_test/targets',
     'tests/python/pants_test/tasks',
     'tests/python/pants_test/util',

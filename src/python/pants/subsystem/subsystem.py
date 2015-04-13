@@ -40,32 +40,16 @@ class Subsystem(AbstractClass):
     """
 
   @classmethod
-  def register_options_for_global_instance(cls, options):
-    """Register options for a global instance of this subsystem.
-
-    Subclasses should not generally need to override this method.
-    """
-    cls._register_options_on_scope(options, Options.GLOBAL_SCOPE)
-
-  @classmethod
-  def register_options_for_task_instance(cls, options, task):
-    """Register options for a per-task instance of this subsystem.
-
-    Subclasses should not generally need to override this method.
-    """
-    cls._register_options_on_scope(options, task.options_scope)
-
-  @classmethod
-  def _register_options_on_scope(cls, options, scope):
-    """Trigger registration of this subsystem's options under a given scope."""
-    cls.register_options(options.registration_function_for_scope(cls.qualify_scope(scope)))
-
-  @classmethod
   def register_options(cls, register):
     """Register options for this subsystem.
 
     Subclasses may override and call register(*args, **kwargs) with argparse arguments.
     """
+
+  @classmethod
+  def _register_options_on_scope(cls, options, scope):
+    """Trigger registration of this subsystem's options under a given scope."""
+    cls.register_options(options.registration_function_for_scope(cls.qualify_scope(scope)))
 
   @classmethod
   def qualify_scope(cls, scope):

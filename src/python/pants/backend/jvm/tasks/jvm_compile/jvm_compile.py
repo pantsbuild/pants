@@ -329,9 +329,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Register class products.
     if classes_by_source is not None or classes_by_target is not None:
-      computed_classes_by_source = self._strategy.compute_classes_by_source(compile_contexts)
+      computed_classes_by_source_by_context = self._strategy.compute_classes_by_source(
+          compile_contexts)
       resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
       for compile_context in compile_contexts:
+        computed_classes_by_source = computed_classes_by_source_by_context[compile_context]
         target = compile_context.target
         classes_dir = compile_context.classes_dir
         target_products = classes_by_target[target] if classes_by_target is not None else None

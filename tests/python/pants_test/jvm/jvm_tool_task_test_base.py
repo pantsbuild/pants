@@ -41,6 +41,21 @@ class JvmToolTaskTestBase(TaskTestBase):
     self.set_options_for_scope(bootstrap_scope, soft_excludes=False)
     JvmToolMixin.reset_registered_tools()
 
+    def register(*args, **kwargs):
+      name = args[0].lstrip('-').replace('-', '_')
+      value = kwargs.pop('default', None)
+      if value is None:
+        action = kwargs.pop('action', None)
+        if action == 'append':
+          value = []
+        if action == 'store_true':
+          value = False
+        if action == 'store_false':
+          value = True
+      self.set_options_for_scope(bootstrap_scope, **{name: value})
+
+    self.bootstrap_task_type.register_options(register)
+
     def link_or_copy(src, dest):
       try:
         os.link(src, dest)
