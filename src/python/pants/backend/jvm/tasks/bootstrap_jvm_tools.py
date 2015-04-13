@@ -190,8 +190,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                                        workunit_name='shade-{}'.format(key))
           if result != 0:
             raise TaskError("Shading of tool '{key}' with main class {main} for {scope} failed "
-                            "with exit code {result}".format(key=key, main=main, scope=scope,
-                                                             result=result))
+                            "with exit code {result}, command run was:\n\t{cmd}"
+                            .format(key=key, main=main, scope=scope, result=result, cmd=shader.cmd))
         except Executor.Error as e:
           raise TaskError("Shading of tool '{key}' with main class {main} for {scope} failed "
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
