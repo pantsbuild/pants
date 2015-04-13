@@ -5,6 +5,7 @@ package org.pantsbuild.args4j;
 
 import java.util.List;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Booleans;
@@ -58,6 +59,12 @@ public class CollectionOptionHandlerTest {
     assertParseEquals("false", false);
     assertParseEquals("true,", true);
     assertParseEquals("false,", false);
+
+    // TODO(John Sirois): This syntax should probably result in a InvalidCmdLineArgumentException
+    // but currently CollectionOptionHandler leverages DelimitedOptionHandler and we have no control
+    // over parsing.  Consider ditching the base class and just parsing ourselves.
+    // See: https://github.com/pantsbuild/pants/issues/1418
+    assertParseEquals(",");
   }
 
   @Test
@@ -65,5 +72,11 @@ public class CollectionOptionHandlerTest {
     assertParseEquals("true,false", true, false);
     assertParseEquals("true,false,", true, false);
     assertParseEquals("true,false,true", true, false, true);
+
+    // TODO(John Sirois): This syntax should probably result in a InvalidCmdLineArgumentException
+    // but currently CollectionOptionHandler leverages DelimitedOptionHandler and we have no control
+    // over parsing.  Consider ditching the base class and just parsing ourselves.
+    // See: https://github.com/pantsbuild/pants/issues/1418
+    assertParseEquals(",false,true", false, false, true);
   }
 }

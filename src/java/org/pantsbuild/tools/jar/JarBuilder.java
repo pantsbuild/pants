@@ -40,7 +40,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -623,6 +622,10 @@ public class JarBuilder implements Closeable {
     return this;
   }
 
+  private static boolean isEmpty(@Nullable String value) {
+    return value == null || value.trim().isEmpty();
+  }
+
   /**
    * Schedules recursive addition of all files contained within {@code directory} to the resulting
    * jar.  The path of each file relative to {@code directory} will be used for the corresponding
@@ -636,7 +639,7 @@ public class JarBuilder implements Closeable {
   public JarBuilder addDirectory(final File directory, final Optional<String> jarPath) {
     Preconditions.checkArgument(directory.isDirectory(),
         "Expected a directory, given a file: %s", directory);
-    Preconditions.checkArgument(!jarPath.isPresent() || !jarPath.or("").trim().isEmpty());
+    Preconditions.checkArgument(!jarPath.isPresent() || !isEmpty(jarPath.get()));
 
     additions.add(new EntryIndexer() {
       @Override public void execute(Multimap<String, ReadableEntry> entries)
@@ -681,7 +684,7 @@ public class JarBuilder implements Closeable {
   public JarBuilder addFile(final File file, final String jarPath) {
     Preconditions.checkArgument(!file.isDirectory(),
         "Expected a file, given a directory: %s", file);
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(jarPath));
+    Preconditions.checkArgument(!isEmpty(jarPath));
 
     additions.add(new EntryIndexer() {
       @Override
