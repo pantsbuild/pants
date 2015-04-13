@@ -167,7 +167,7 @@ class JarPublishTest(TaskTestBase):
 
   def test_publish_remote(self):
     targets = self._prepare_for_publishing()
-    self.set_options(dryrun=False, repos=self._get_repos())
+    self.set_options(dryrun=False, repos=self._get_repos(), push_postscript='\nPS')
     task = self.create_task(self.context(target_roots=targets))
     self._prepare_mocks(task)
     task.execute()
@@ -183,12 +183,27 @@ class JarPublishTest(TaskTestBase):
                       "Expected one call to confirm_push per artifact")
     self.assertEquals(len(targets), task.publish.call_count,
                       "Expected one call to publish per artifact")
+
     self.assertEquals(len(targets), task.scm.commit.call_count,
                       "Expected one call to scm.commit per artifact")
+    args, kwargs = task.scm.commit.call_args
+    message = args[0]
+    message_lines = message.splitlines()
+    self.assertTrue(len(message_lines) > 1,
+                    'Expected at least one commit message line in addition to the post script.')
+    self.assertEquals('PS', message_lines[-1])
+
     self.assertEquals(len(targets), task.scm.add.call_count,
                       "Expected one call to scm.add per artifact")
+
     self.assertEquals(len(targets), task.scm.tag.call_count,
                       "Expected one call to scm.tag per artifact")
+    args, kwargs = task.scm.tag.call_args
+    tag_name, tag_message = args
+    tag_message_splitlines = tag_message.splitlines()
+    self.assertTrue(len(tag_message_splitlines) > 1,
+                    'Expected at least one tag message line in addition to the post script.')
+    self.assertEquals('PS', tag_message_splitlines[-1])
 
   def test_publish_retry_works(self):
     targets = self._prepare_for_publishing()
