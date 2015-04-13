@@ -17,23 +17,31 @@ from pants.base.target import Target
 from pants.goal.context import Context
 
 
+def create_option_values(option_values):
+  """Create a fake OptionValues object for testing.
+
+  :param dict option_values: A dict of option name -> value.
+  """
+  class TestOptionValues(object):
+    def __init__(self):
+      self.__dict__ = option_values
+    def __getitem__(self, key):
+      return getattr(self, key)
+  return TestOptionValues()
+
+
 def create_options(options):
-  """Create a fake new-style options object for testing.
+  """Create a fake Options object for testing.
 
   Note that the returned object only provides access to the provided options values. There is
-  no registration mechanism on this object. Code under test shouldn't care  about resolving
+  no registration mechanism on this object. Code under test shouldn't care about resolving
   cmd-line flags vs. config vs. env vars etc. etc.
 
-  :param dict options: An optional dict of scope -> (dict of option name -> value).
+  :param dict options: A dict of scope -> (dict of option name -> value).
   """
   class TestOptions(object):
     def for_scope(self, scope):
-      class TestOptionValues(object):
-        def __init__(self):
-          self.__dict__ = options[scope]
-        def __getitem__(self, key):
-          return getattr(self, key)
-      return TestOptionValues()
+      return create_option_values(options[scope])
 
     def for_global_scope(self):
       return self.for_scope('')
