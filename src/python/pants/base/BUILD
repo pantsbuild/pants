@@ -262,6 +262,7 @@ python_library(
   name = 'layout',
   sources = ['layout.py'],
   dependencies = [
+    ':build_environment',
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
 )

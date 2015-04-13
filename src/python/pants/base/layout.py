@@ -10,10 +10,13 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.build_environment import get_buildroot
+
 
 class Layout(object):
 
   def __init__(self):
+    self._build_root = get_buildroot()
     self.synthetic_lookup = SyntheticTargetLayout()
     self._lookups = [self.synthetic_lookup]
 
@@ -21,9 +24,11 @@ class Layout(object):
     self._lookups.append(lookup)
 
   def register(self, path, *types):
+    path = self._normalize_path(path)
     self.synthetic_lookup.register(path, False, *types)
 
   def register_mutable(self, path):
+    path = self._normalize_path(path)
     self.synthetic_lookup.register(path, True)
 
   def _lookup_root(self, path):
@@ -41,12 +46,14 @@ class Layout(object):
     return result
 
   def find_source_root_by_path(self, path):
+    path = self._normalize_path(path)
     lookup_result = self._lookup_root(path)
     if lookup_result:
       return lookup_result[0]
     return lookup_result
 
   def find_source_root_by_path_or_target(self, source, target):
+    source = self._normalize_path(source)
     source_root = self.find_source_root_by_path(source)
     if not source_root:
       source_root = self.find_source_root_by_target(target)
@@ -81,6 +88,7 @@ class Layout(object):
     return result
 
   def find_sibling_source_roots_by_path(self, path):
+    path = self._normalize_path(path)
     # only used by idea generation
     #
     # options
@@ -104,6 +112,7 @@ class Layout(object):
     return result
 
   def types(self, path):
+    path = self._normalize_path(path)
     result = self._lookup_root(path)
     if result and result[0] == path:
       return result[1]
@@ -113,6 +122,14 @@ class Layout(object):
 
   #def allowed(self, path, type):
   #  pass
+
+  def _normalize_path(self, path):
+    #print("path {} buildroot {}".format(path, self._build_root))
+    path = path or '.'
+    path_relpath = os.path.relpath(path, self._build_root)
+    path_normpath = os.path.normpath(path_relpath)
+    return path_normpath
+
 
 # - get all path -> types
 # - lookup paths by types

@@ -19,6 +19,7 @@ python_library(
   name = 'layout_utils',
   sources = ['layout_utils.py'],
   dependencies = [
+    'src/python/pants/base:layout',
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ]
 )
