@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.ivy_utils import IvyArtifact as IvyUtilArtifact
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
 from pants.backend.jvm.targets.exclude import Exclude
@@ -66,7 +68,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Confirm that the same artifact was added to each target.
     context = self.context(target_roots=[losing_lib, winning_lib])
 
-    symlink_map = dict(bogus0='bogus0', bogus1='bogus1')
+    symlink_map = dict(bogus0='bogus0', bogus1='bogus1', unused='unused')
     context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
     task.ivy_resolve = lambda targets, *args, **kw: (None, targets)
@@ -82,6 +84,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       # generate some resolution data.
 
       artifact_1 = IvyUtilArtifact('bogus0', 'default')
+      unused_artifact = IvyUtilArtifact('unused', 'default')
 
       # Because guava 16.0 was evicted, it has no artifacts
       guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
@@ -103,6 +106,12 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_info.add_module(guava_dep_0)
       ivy_info.add_module(guava_dep_1)
 
+      # Add an unrelated module to ensure that it's not returned
+      unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0')
+      unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0'),
+                            [unused_artifact], [unrelated_parent])
+      ivy_info.add_module(unrelated)
+
       ivy_products['default'] = [ivy_info]
       return ivy_products
 
@@ -112,7 +121,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
     self.assertEquals(losing_cp, winning_cp)
-    self.assertEquals(2, len(winning_cp))
+    self.assertEquals(OrderedSet([(u'default', u'bogus0'), (u'default', u'bogus1')]), winning_cp)
 
   def test_resolve_multiple_artifacts(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')

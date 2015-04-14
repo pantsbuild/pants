@@ -48,7 +48,7 @@ class IvyModuleRef(object):
 
 def unversioned(obj):
   """This returns an identifier for an IvyModuleRef without version
-     information (or any other classifier, artifact, etc information).
+     information.
      It's useful because ivy might return information about a
      different version of a dependency than the one we request, and we
      want to ensure that all requesters of any version of that
@@ -56,7 +56,7 @@ def unversioned(obj):
   """
 
   # latest.integration is ivy magic meaning "just get the latest version"
-  obj.__class__(name=obj.name, org=obj.org, rev='latest.integration')
+  return obj.__class__(name=obj.name, org=obj.org, rev='latest.integration')
 
 class IvyInfo(object):
   def __init__(self):
