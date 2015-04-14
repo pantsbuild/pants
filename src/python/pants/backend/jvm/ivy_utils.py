@@ -54,6 +54,8 @@ def unversioned(obj):
      want to ensure that all requesters of any version of that
      dependency are able to learn about it.
   """
+
+  # latest.integration is ivy magic meaning "just get the latest version"
   obj.__class__(name=obj.name, org=obj.org, rev='latest.integration')
 
 class IvyInfo(object):
