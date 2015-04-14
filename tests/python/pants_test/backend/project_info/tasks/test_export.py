@@ -63,6 +63,14 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
     self.make_target(
+      'project_info:globular',
+      target_type=ScalaLibrary,
+      dependencies=[jar_lib],
+      java_sources=['java/project_info:java_lib'],
+      sources=['com/foo/*.scala'],
+    )
+
+    self.make_target(
       'project_info:jvm_app',
       target_type=JvmApp,
       dependencies=[jar_lib],
@@ -127,6 +135,31 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
     self.assertEqual({}, result['libraries'])
 
+  def test_sources(self):
+    result = get_json(self.execute_console_task(
+      options=dict(sources=True),
+      targets=[self.target('project_info:third')]
+    ))
+
+    self.assertEqual(
+      ['project_info/com/foo/Bar.scala',
+       'project_info/com/foo/Baz.scala',
+      ],
+      sorted(result['targets']['project_info:third']['sources'])
+    )
+
+  def test_source_globs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('project_info:globular')]
+    ))
+
+    self.assertEqual(
+      ['project_info/com/foo/*.scala',
+      ],
+      sorted(result['targets']['project_info:globular']['globs'])
+    )
+
   def test_with_dependencies(self):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:third')]
@@ -176,6 +209,14 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       'pants_target_type': 'scala_library'
     }
     self.assertEqual(jvm_target, expected_jmv_target)
+
+  def test_no_libraries(self):
+    result = get_json(self.execute_console_task(
+      options=dict(libraries=False),
+      targets=[self.target('project_info:java_test')]
+    ))
+    self.assertEqual([],
+                     result['targets']['project_info:java_test']['libraries'])
 
   def test_java_test(self):
     result = get_json(self.execute_console_task(

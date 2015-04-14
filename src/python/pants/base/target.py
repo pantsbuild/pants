@@ -299,6 +299,13 @@ class Target(AbstractTarget):
         abs_source = os.path.join(get_buildroot(), source)
         yield os.path.relpath(abs_source, abs_source_root)
 
+  def globs_relative_to_buildroot(self):
+    sources_field = self.payload.get_field('sources')
+    if sources_field:
+      return sources_field.spec
+    else:
+      return []
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
@@ -462,4 +469,11 @@ class Target(AbstractTarget):
       referenced_address = SyntheticAddress.parse(sources.addresses[0],
                                                   relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
-    return SourcesField(sources=sources, sources_rel_path=sources_rel_path)
+
+    spec = getattr(sources, 'spec', None)
+    if spec is None:
+      sources = sources or []
+      assert_list(sources)
+      spec = (os.path.join(sources_rel_path, src) for src in (sources or []))
+
+    return SourcesField(sources=sources, sources_rel_path=sources_rel_path, spec=spec)

@@ -322,5 +322,6 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/backend/core:wrapped_globs',
   ],
 )

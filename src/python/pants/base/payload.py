@@ -114,3 +114,6 @@ class Payload(object):
       return field.value
     else:
       return None
+
+  def __hasattr__(self, attr):
+    return attr in self._fields

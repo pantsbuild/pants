@@ -61,11 +61,17 @@ class Export(ConsoleTask):
     super(Export, cls).register_options(register)
     register('--formatted', default=True, action='store_false',
              help='Causes output to be a single line of JSON.')
-
+    register('--libraries', default=True, action='store_true',
+             help='Causes libraries to be output.')
+    register('--sources', default=False, action='store_true',
+             help='Causes sources to be output.')
+    register('--globs', default=False, action='store_true',
+             help='Causes source and resource globs to be output.')
   @classmethod
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
-    round_manager.require_data('ivy_jar_products')
+    if options.libraries:
+      round_manager.require_data('ivy_jar_products')
 
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
@@ -107,6 +113,8 @@ class Export(ConsoleTask):
             return Export.SourceRootTypes.SOURCE
 
       def get_transitive_jars(jar_lib):
+        if not self.get_options().libraries:
+          return []
         if not ivy_info:
           return OrderedSet()
         transitive_jars = OrderedSet()
@@ -122,6 +130,12 @@ class Export(ConsoleTask):
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
+
+      if self.get_options().sources and not current_target.is_synthetic:
+        info['sources'] = list(current_target.sources_relative_to_buildroot())
+
+      if self.get_options().globs and not current_target.is_synthetic:
+        info['globs'] = list(current_target.globs_relative_to_buildroot())
 
       target_libraries = set()
       if isinstance(current_target, JarLibrary):
@@ -146,7 +160,8 @@ class Export(ConsoleTask):
         'package_prefix': package_prefix
       }, self._source_roots_for_target(current_target))
 
-      info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
+      if self.get_options().libraries:
+        info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[self._address(current_target.address)] = info
 
     for target in targets:

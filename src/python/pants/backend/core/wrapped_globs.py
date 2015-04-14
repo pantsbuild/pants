@@ -13,6 +13,19 @@ from twitter.common.dirutil.fileset import Fileset
 from pants.base.build_environment import get_buildroot
 
 
+class FilesetWithSpec(object):
+  """A set of files with that keeps track of how we got it.
+
+  The spec is what globs or file list it came from.
+  """
+  def __init__(self, result, spec):
+    self._result = result
+    self.spec = spec
+
+  def __iter__(self):
+    return self._result.__iter__()
+
+
 class FilesetRelPathWrapper(object):
   def __init__(self, parse_context):
     self.rel_path = parse_context.rel_path
@@ -37,7 +50,11 @@ class FilesetRelPathWrapper(object):
 
     for exclude in excludes:
       result -= exclude
-    return result
+
+    buildroot = get_buildroot()
+    rel_root = os.path.relpath(root, buildroot)
+    filespec = self.to_filespec(args, root=rel_root)
+    return FilesetWithSpec(result, filespec)
 
   def _is_glob_dir_outside_root(self, glob, root):
     # The assumption is that a correct glob starts with the root,
@@ -47,6 +64,16 @@ class FilesetRelPathWrapper(object):
     # Check if the glob path has the correct root.
     return os.path.commonprefix([root, glob_path]) != root
 
+  def to_filespec(self, args, root=''):
+    """Return a list of globs, relative to the root.
+
+    This list does not consider excludes, because there is no safe way
+    to combine lists containing excludes into a single lists (when the
+    lists are not necessarily mutually exclusive).
+
+    :returns a list of strings
+    """
+    return [os.path.join(root, arg) for arg in args]
 
 class Globs(FilesetRelPathWrapper):
   """Returns Fileset containing matching files in same directory as this BUILD file.
@@ -64,8 +91,8 @@ class Globs(FilesetRelPathWrapper):
   instead, since pants is moving to make BUILD files easier to parse,
   and the new grammar will not support arithmetic.
 
-  :returns Fileset containing matching files in same directory as this BUILD file.
-  :rtype Fileset
+  :returns FilesetWithSpec containing matching files in same directory as this BUILD file.
+  :rtype FilesetWithSpec
 
   """
   wrapped_fn = Fileset.globs
@@ -86,8 +113,8 @@ class RGlobs(FilesetRelPathWrapper):
   ``rglobs('config/*') - rglobs('config/foo/*')`` gives all files under `config` *except*
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
-  :returns Fileset matching files in this directory and its descendents.
-  :rtype Fileset
+  :returns FilesetWithSpec matching files in this directory and its descendents.
+  :rtype FilesetWithSpec
   """
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
@@ -97,9 +124,11 @@ class RGlobs(FilesetRelPathWrapper):
 
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
+  def to_filespec(self, args, root='', excludes=None):
+    return [os.path.join(root, '**', arg) for arg in args]
 
 class ZGlobs(FilesetRelPathWrapper):
-  """Returns a Fileset that matches zsh-style globs, including ``**/`` for recursive globbing.
+  """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.
 
   Uses ``BUILD`` file's directory as the "working directory".
   """
