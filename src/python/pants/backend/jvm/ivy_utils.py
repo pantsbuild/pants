@@ -46,17 +46,18 @@ class IvyModuleRef(object):
   def __hash__(self):
     return hash((self.org, self.name, self.rev))
 
-def unversioned(obj):
-  """This returns an identifier for an IvyModuleRef without version
-     information.
-     It's useful because ivy might return information about a
-     different version of a dependency than the one we request, and we
-     want to ensure that all requesters of any version of that
-     dependency are able to learn about it.
-  """
+  @property
+  def unversioned(self):
+    """This returns an identifier for an IvyModuleRef without version information.
 
-  # latest.integration is ivy magic meaning "just get the latest version"
-  return obj.__class__(name=obj.name, org=obj.org, rev='latest.integration')
+       It's useful because ivy might return information about a
+       different version of a dependency than the one we request, and we
+       want to ensure that all requesters of any version of that
+       dependency are able to learn about it.
+    """
+
+    # latest.integration is ivy magic meaning "just get the latest version"
+    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration')
 
 class IvyInfo(object):
   def __init__(self):
@@ -72,8 +73,8 @@ class IvyInfo(object):
       # Module was evicted, so do not record information about it
       return
     for caller in module.callers:
-      self._deps_by_caller[unversioned(caller)].add(module.ref)
-    self._artifacts_by_ref[unversioned(module.ref)].update(module.artifacts)
+      self._deps_by_caller[caller.unversioned].add(module.ref)
+    self._artifacts_by_ref[module.ref.unversioned].update(module.artifacts)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
@@ -103,7 +104,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(unversioned(ref), ()):
+    for dep in self._deps_by_caller.get(ref.unversioned, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc
@@ -129,7 +130,7 @@ class IvyInfo(object):
       artifacts_for_jar = []
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         artifacts_for_jar.extend(
-          artifact for artifact in self._artifacts_by_ref[unversioned(module_ref)]
+          artifact for artifact in self._artifacts_by_ref[module_ref.unversioned]
           if artifact.classifier in valid_classifiers
         )
 
