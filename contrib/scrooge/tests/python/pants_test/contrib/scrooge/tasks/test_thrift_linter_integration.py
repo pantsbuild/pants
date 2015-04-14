@@ -102,8 +102,8 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertTrue('Lint errors found!' in pants_run.stdout_data)
 
-  def test_linter_runs_on_changed_files(self):
-    # thrift-linter runs on changed files only by default
+  def test_linter_runs_on_modified_thrift(self):
+    # thrift-linter runs on modified files only by default
 
     # Before any thrift files are modified
     unmodified_cmd = ['thrift-linter', self.thrift_test_target('unmodified-thrift')]
@@ -128,7 +128,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
       os.remove(file)
 
 
-  def test_linter_doesnt_run_on_unchanged_files(self):
+  def test_linter_doesnt_run_on_unmodified_thrift(self):
     # thrift-linter doesnt run on un-modified thrift files, by default
     cmd = ['thrift-linter', self.thrift_test_target('unmodified-thrift')]
     pants_run = self.run_pants(cmd)

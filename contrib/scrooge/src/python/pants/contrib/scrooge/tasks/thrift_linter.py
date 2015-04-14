@@ -38,7 +38,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
     register('--lint-all-targets', default=False, advanced=True, action='store_true',
-             help='Runs Linter only on changed targets.')
+             help='Runs Linter on all thrift files within a target.')
     register('--linter-args', default=[], advanced=True, type=Options.list,
              help='Additional options passed to the linter.')
     cls.register_jvm_tool(register, 'scrooge-linter')
