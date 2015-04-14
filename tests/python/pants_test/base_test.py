@@ -170,6 +170,7 @@ class BaseTest(unittest.TestCase):
           for flag_name in rargs:
             option_name = flag_name.lstrip('-').replace('-', '_')
             scoped_options[option_name] = default
+        # TODO: Set register.bootstrap here, for good measure?
         register.scope = on_scope
         return register
 

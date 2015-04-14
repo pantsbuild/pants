@@ -53,6 +53,7 @@ class JvmToolTaskTestBase(TaskTestBase):
         if action == 'store_false':
           value = True
       self.set_options_for_scope(bootstrap_scope, **{name: value})
+    register.scope = bootstrap_scope
 
     self.bootstrap_task_type.register_options(register)
 
