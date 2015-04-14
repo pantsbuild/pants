@@ -24,3 +24,12 @@ java_thrift_library(
   sources = ['good.thrift'],
   thrift_linter_strict=True,
 )
+java_thrift_library(
+  name = 'unmodified-thrift',
+  sources = ['good.thrift'],
+)
+
+java_thrift_library(
+  name = 'modified-thrift',
+  sources = ['modified.thrift', 'good.thrift'],
+)

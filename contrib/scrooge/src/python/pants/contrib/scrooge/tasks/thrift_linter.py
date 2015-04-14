@@ -37,17 +37,12 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
     register('--strict-default', default=False, advanced=True, action='store_true',
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
+    register('--lint-all-targets', default=False, advanced=True, action='store_true',
+             help='Runs Linter only on changed targets.')
     register('--linter-args', default=[], advanced=True, type=Options.list,
              help='Additional options passed to the linter.')
-    register('--fast', default=False, action='store_true',
-             help='used for changed targets.')
-    register('--changes_since', default=None, action='store_true',
-             help='used for changed targets.')
-    register('--diffspec', default=None, action='store_true',
-             help='used for changed targets.')
-    register('--include_dependees', default='none', action='store_true',
-             help='used for changed targets.')
     cls.register_jvm_tool(register, 'scrooge-linter')
+    cls.register_change_file_options(register)
 
   @classmethod
   def product_types(cls):
@@ -109,6 +104,11 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
       raise ThriftLintError(
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
+    return returncode
+
+  def _all_thrift_targets(self):
+    return self.context.targets(self._is_thrift)
+
   def _changed_target_addresses(self):
     change_calculator = self.change_calculator(self.get_options(),
       self.context.address_mapper,
@@ -120,7 +120,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
 
   def _changed_thrift_targets(self):
     thrift_targets_by_address = {}
-    for target in self.context.targets(self._is_thrift):
+    for target in self._all_thrift_targets():
       thrift_targets_by_address[target.address] = target
 
     changed_addresses = self._changed_target_addresses()
@@ -133,16 +133,23 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
     if self.get_options().skip:
       return
 
-    changed_thrift_targets = self._changed_thrift_targets()
+    if self.get_options().lint_all_targets:
+      targets = self._all_thrift_targets()
+    else:
+      targets = self._changed_thrift_targets()
 
-    with self.invalidated(changed_thrift_targets) as invalidation_check:
+    linter_count = 0
+    with self.invalidated(targets) as invalidation_check:
       errors = []
       for vt in invalidation_check.invalid_vts:
         try:
           self._lint(vt.target)
+          linter_count += 1
         except ThriftLintError as e:
           errors.append(str(e))
         else:
           vt.update()
       if errors:
         raise TaskError('\n'.join(errors))
+
+    return linter_count
