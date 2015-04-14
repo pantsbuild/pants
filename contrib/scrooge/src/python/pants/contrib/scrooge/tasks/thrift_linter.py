@@ -104,8 +104,6 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
       raise ThriftLintError(
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
-    return returncode
-
   def _all_thrift_targets(self):
     return self.context.targets(self._is_thrift)
 
@@ -138,18 +136,14 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin, ChangedFileTaskMixin):
     else:
       targets = self._changed_thrift_targets()
 
-    linter_count = 0
     with self.invalidated(targets) as invalidation_check:
       errors = []
       for vt in invalidation_check.invalid_vts:
         try:
           self._lint(vt.target)
-          linter_count += 1
         except ThriftLintError as e:
           errors.append(str(e))
         else:
           vt.update()
       if errors:
         raise TaskError('\n'.join(errors))
-
-    return linter_count
