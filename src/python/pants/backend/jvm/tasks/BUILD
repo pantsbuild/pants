@@ -68,12 +68,12 @@ python_library(
   dependencies = [
     ':ivy_task_mixin',
     ':jar_task',
-    ':jvm_tool_task_mixin',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
 )
