@@ -68,12 +68,12 @@ python_library(
   dependencies = [
     ':ivy_task_mixin',
     ':jar_task',
-    ':jvm_tool_task_mixin',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -222,9 +222,9 @@ python_library(
     ':nailgun_task',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/subsystems:jar_tool',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
     'src/python/pants/java/jar:manifest',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
@@ -300,8 +300,7 @@ python_library(
   name = 'jvm_tool_task_mixin',
   sources = ['jvm_tool_task_mixin.py'],
   dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/option',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
   ],
 )
 

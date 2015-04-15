@@ -36,7 +36,7 @@ class Subsystem(AbstractClass):
   def scope_qualifier(self):
     """Qualifies the options scope of this Subsystem type.
 
-    E.g., for SubsystemFoo this might return 'foo'.
+    E.g., for SubsystemFoo this should return 'foo'.
     """
 
   @classmethod
@@ -48,7 +48,7 @@ class Subsystem(AbstractClass):
 
   @classmethod
   def register_options_on_scope(cls, options, scope):
-    """Trigger registration of this subsystem's options, qualified under the given scope."""
+    """Trigger registration of this subsystem's options under a given scope."""
     cls.register_options(options.registration_function_for_scope(cls.qualify_scope(scope)))
 
   @classmethod

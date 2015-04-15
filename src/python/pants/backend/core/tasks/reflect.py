@@ -438,6 +438,7 @@ def gen_glopts_reference_data():
   def register(*args, **kwargs):
     option_parser.register(*args, **kwargs)
   register.bootstrap = bootstrap_option_values()
+  register.scope = ''
   register_bootstrap_options(register, buildroot='<buildroot>')
   register_global_options(register)
   argparser = option_parser._help_argparser

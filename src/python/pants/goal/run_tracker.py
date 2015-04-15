@@ -22,9 +22,10 @@ from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
+from pants.subsystem.subsystem import Subsystem
 
 
-class RunTracker(object):
+class RunTracker(Subsystem):
   """Tracks and times the execution of a pants run.
 
   Also manages background work.
@@ -42,6 +43,7 @@ class RunTracker(object):
   Can track execution against multiple 'roots', e.g., one for the main thread and another for
   background threads.
   """
+  scope_qualifier = 'run-tracker'
 
   # The name of the tracking root for the main thread (and the foreground worker threads).
   DEFAULT_ROOT_NAME = 'main'
@@ -60,22 +62,8 @@ class RunTracker(object):
     register('--num-background-workers', advanced=True, type=int, default=8,
              help='Number of threads for background work.')
 
-  @classmethod
-  def from_options(cls, options):
-    info_dir = os.path.join(options.for_global_scope().pants_workdir, 'runs')
-    my_opts = options.for_scope('run-tracker')
-    return cls(info_dir,
-               stats_upload_url=my_opts.stats_upload_url,
-               stats_upload_timeout=my_opts.stats_upload_timeout,
-               num_foreground_workers=my_opts.num_foreground_workers,
-               num_background_workers=my_opts.num_background_workers)
-
-  def __init__(self,
-               info_dir,
-               stats_upload_url=None,
-               stats_upload_timeout=2,
-               num_foreground_workers=8,
-               num_background_workers=8):
+  def __init__(self, *args, **kwargs):
+    super(RunTracker, self).__init__(*args, **kwargs)
     self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
     cmd_line = ' '.join(['./pants'] + sys.argv[1:])
 
@@ -84,12 +72,13 @@ class RunTracker(object):
     run_id = 'pants_run_{}_{}'.format(
                time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
 
+    info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
     self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
     self.run_info.add_basic_info(run_id, self.run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
-    self.stats_url = stats_upload_url
-    self.stats_timeout = stats_upload_timeout
+    self.stats_url = self.get_options().stats_upload_url
+    self.stats_timeout = self.get_options().stats_upload_timeout
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
@@ -115,10 +104,10 @@ class RunTracker(object):
       ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
 
     # Number of threads for foreground work.
-    self._num_foreground_workers = num_foreground_workers
+    self._num_foreground_workers = self.get_options().num_foreground_workers
 
     # Number of threads for background work.
-    self._num_background_workers = num_background_workers
+    self._num_background_workers = self.get_options().num_background_workers
 
     # We report to this Report.
     self.report = None
