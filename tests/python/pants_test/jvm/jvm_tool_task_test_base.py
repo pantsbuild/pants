@@ -9,8 +9,8 @@ import errno
 import os
 import shutil
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
@@ -34,23 +34,7 @@ class JvmToolTaskTestBase(TaskTestBase):
     # Use a synthetic subclass for bootstrapping within the test, to isolate this from
     # any bootstrapping the pants run executing the test might need.
     self.bootstrap_task_type, bootstrap_scope = self.synthesize_task_subtype(BootstrapJvmTools)
-
-    JvmToolTaskMixin.reset_registered_tools()
-
-    def register(*args, **kwargs):
-      name = args[0].lstrip('-').replace('-', '_')
-      value = kwargs.pop('default', None)
-      if value is None:
-        action = kwargs.pop('action', None)
-        if action == 'append':
-          value = []
-        if action == 'store_true':
-          value = False
-        if action == 'store_false':
-          value = True
-      self.set_options_for_scope(bootstrap_scope, **{name: value})
-
-    self.bootstrap_task_type.register_options(register)
+    JvmToolMixin.reset_registered_tools()
 
     # Cap BootstrapJvmTools memory usage in tests.  The Xmx was empirically arrived upon using
     # -Xloggc and verifying no full gcs for a test using the full gamut of resolving a multi-jar
@@ -99,6 +83,16 @@ class JvmToolTaskTestBase(TaskTestBase):
     link('BUILD.tools', force=True)
     support_dir = real_config.getdefault('pants_supportdir')
     link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root), force=True)
+
+  def context(self, for_task_types=None, options=None, target_roots=None,
+              console_outstream=None, workspace=None):
+    # Add in the bootstrapper task type, so its options get registered and set.
+    for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
+    return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types,
+                                                    options=options,
+                                                    target_roots=target_roots,
+                                                    console_outstream=console_outstream,
+                                                    workspace=workspace)
 
   def prepare_execute(self, context, workdir):
     """Prepares a jvm tool using task for execution, ensuring any required jvm tools are

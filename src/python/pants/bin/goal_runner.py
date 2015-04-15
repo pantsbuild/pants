@@ -42,7 +42,7 @@ class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
   # Subsytems used outside of any task.
-  subsystems = ()
+  subsystems = (RunTracker, )
 
   def __init__(self, root_dir):
     """
@@ -74,13 +74,10 @@ class GoalRunner(object):
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
 
-    # TODO: Create a 'Subsystem' abstraction instead of special-casing run-tracker here
-    # and in register_options().
-    known_scopes = ['', 'run-tracker']
+    known_scopes = ['']
 
     # Add scopes for global subsystem instances.
-    global_subsystems = set(self.subsystems) | Goal.global_subsystem_types()
-    for subsystem_type in global_subsystems:
+    for subsystem_type in set(self.subsystems) | Goal.global_subsystem_types():
       known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
 
     # Add scopes for all tasks in all goals.
@@ -95,7 +92,8 @@ class GoalRunner(object):
     # Make the options values available to all subsystems.
     Subsystem._options = self.options
 
-    self.run_tracker = RunTracker.from_options(self.options)
+    # Now that we have options we can instantiate subsystems.
+    self.run_tracker = RunTracker.global_instance()
     report = initial_reporting(self.config, self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
@@ -141,14 +139,8 @@ class GoalRunner(object):
     register_global_options(self.options.registration_function_for_global_scope())
 
     # Options for global-level subsystems.
-    for subsystem_type in Goal.global_subsystem_types():
+    for subsystem_type in set(self.subsystems) | Goal.global_subsystem_types():
       subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
-
-    # This is the first case we have of non-task, non-global options.
-    # The current implementation special-cases RunTracker, and is temporary.
-    # In the near future it will be replaced with a 'Subsystem' abstraction.
-    # But for now this is useful for kicking the tires.
-    RunTracker.register_options(self.options.registration_function_for_scope('run-tracker'))
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
     # be a subsystem?
