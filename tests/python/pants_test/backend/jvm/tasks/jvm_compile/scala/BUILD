@@ -4,7 +4,6 @@
 target(
   name='scala',
   dependencies=[
-    ':scala_compile_integration',
     ':zinc_analysis',
   ],
 )
