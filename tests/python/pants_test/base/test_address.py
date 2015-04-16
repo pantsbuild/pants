@@ -130,3 +130,20 @@ class BuildFileAddressTest(BaseAddressTest):
       build_file = BuildFile(root_dir, relpath='')
       self.assert_address('', 'foo', BuildFileAddress(build_file, target_name='foo'))
       self.assertEqual(':foo', BuildFileAddress(build_file, target_name='foo').spec)
+
+  def test_path_safe_spec(self):
+    # Without attaching the spec's hash, these two specs would have collided when transformed.
+    with self.workspace('foo/bar/BUILD') as first_path:
+      with self.workspace('foo/BUILD') as second_path:
+        first_build_file = BuildFile(first_path, relpath='foo/bar')
+        second_build_file = BuildFile(second_path, relpath='foo')
+        first = BuildFileAddress(first_build_file, target_name='baz')
+        second = BuildFileAddress(second_build_file, target_name='bar.baz')
+        self.assertNotEqual(first.path_safe_spec, second.path_safe_spec)
+
+  def test_hash_path_safe_spec(self):
+    with self.workspace('a/b/c/BUILD') as root_dir:
+      build_file = BuildFile(root_dir, relpath='a/b/c')
+      first = BuildFileAddress(build_file, target_name='foo')
+      _ = first.path_safe_spec
+      self.assertIn(first.spec, first._hashed_path_safe_specs)
