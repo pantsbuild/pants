@@ -6,10 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import StringIO
 import subprocess
 import traceback
+from contextlib import contextmanager
 
 from pants.scm.scm import Scm
+from pants.util.strutil import ensure_binary
 
 
 class Git(Scm):
@@ -82,6 +85,8 @@ class Git(Scm):
     else:
       import logging
       self._log = logging.getLogger(__name__)
+
+    self._cat_file = None
 
   def current_rev_identifier(self):
     return 'HEAD'
@@ -242,3 +247,91 @@ class Git(Scm):
 
   def _log_call(self, cmd):
     self._log.debug('Executing: ' + ' '.join(cmd))
+
+  def _maybe_start_cat_file(self):
+    if not self._cat_file:
+      self._cat_file = subprocess.Popen(self._create_git_cmdline(['cat-file', '--batch']),
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+  class MissingFileException(Exception):
+    def __init__(self, relpath, rev):
+      self.relpath = relpath
+      self.rev = rev
+
+    def __str__(self):
+      return "MissingFileException({}, {})".format(self.relpath, self.rev)
+
+  class IsDirException(Exception):
+    def __init__(self, relpath, rev):
+      self.relpath = relpath
+      self.rev = rev
+
+    def __str__(self):
+      return "IsDirException({}, {})".format(self.relpath, self.rev)
+
+  class BadModeException(Exception):
+    def __init__(self, mode):
+      self.mode = mode
+
+    def __str__(self):
+      return "BadModeException({})".format(self.mode)
+
+  def exists(self, relpath, rev):
+    try:
+      with self.open(relpath, rev):
+        return True
+    except self.IsDirException:
+      return True
+    except self.MissingFileException:
+      return False
+
+  def isfile(self, relpath, rev):
+    try:
+      with self.open(relpath, rev):
+        return True
+    except self.IsDirException:
+      return False
+    except self.MissingFileException:
+      return False
+
+  def isdir(self, relpath, rev):
+    try:
+      with self.open(relpath, rev):
+        return False
+    except self.IsDirException:
+      return True
+    except self.MissingFileException:
+      return False
+
+  @contextmanager
+  def open(self, relpath, rev, mode='rb'):
+    if relpath == '.':
+      # git cat-file has a bug where '.' is marked non-existent.
+      # Use '', which works, instead.
+      relpath = ''
+
+    if mode != 'rb':
+      raise self.BadModeException(relpath, rev, mode)
+
+    self._maybe_start_cat_file()
+    self._cat_file.stdin.write('{}:{}\n'.format(rev, relpath))
+    self._cat_file.stdin.flush()
+    header = None
+    while not header:
+      header = self._cat_file.stdout.readline()
+    header = header.rstrip()
+    parts = header.rsplit(ensure_binary(' '), 2)
+    if len(parts) == 2:
+      assert parts[1] == 'missing'
+      raise self.MissingFileException(relpath, rev)
+
+    _, blobtype, bloblen = parts
+
+    #even for trees, we have to read the data to clear it from the stream
+    blob = self._cat_file.stdout.read(int(bloblen))
+    #read the trailing newline
+    assert self._cat_file.stdout.read(1) == '\n'
+    assert len(blob) == int(bloblen)
+    if blobtype == 'tree':
+      raise self.IsDirException(relpath, rev)
+    yield StringIO.StringIO(blob)

@@ -94,6 +94,8 @@ class GoalRunner(object):
 
     # Now that we have options we can instantiate subsystems.
     self.run_tracker = RunTracker.global_instance()
+    BuildFile.set_rev(self.options.bootstrap_option_values().build_file_rev)
+
     report = initial_reporting(self.config, self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')

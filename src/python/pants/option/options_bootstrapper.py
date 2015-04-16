@@ -51,6 +51,8 @@ def register_bootstrap_options(register, buildroot=None):
            help='Add these directories to PYTHONPATH to search for plugins.')
   register('--target-spec-file', action='append', dest='target_spec_files',
            help='Read additional specs from this file, one per line')
+  register('--build-file-rev', advanced=True,
+           help='Read BUILD files from this scm rev instead of the from working tree')
 
   # These logging options are registered in the bootstrap phase so that plugins can log during
   # registration and not so that their values can be interpolated in configs.

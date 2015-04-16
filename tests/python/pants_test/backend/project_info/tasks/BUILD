@@ -69,6 +69,8 @@ python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/base:build_file',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/python:plugin',
