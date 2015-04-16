@@ -5,14 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from copy import deepcopy
 import os
+from copy import deepcopy
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
-from pants.base.deprecated import deprecated
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 
 
 class FilesetWithSpec(object):
