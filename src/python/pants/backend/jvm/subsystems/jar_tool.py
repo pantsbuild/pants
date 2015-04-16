@@ -12,7 +12,9 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class JarTool(JvmToolMixin, Subsystem):
-  scope_qualifier = 'jar-tool'
+  @classmethod
+  def scope_qualifier(cls):
+    return 'jar-tool'
 
   @classmethod
   def register_options(cls, register):

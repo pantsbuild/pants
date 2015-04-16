@@ -11,7 +11,9 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class DummySubsystem(Subsystem):
-  scope_qualifier = 'dummy'
+  @classmethod
+  def scope_qualifier(cls):
+    return 'dummy'
 
 
 class DummyOptions(object):

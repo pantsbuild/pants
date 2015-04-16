@@ -6,6 +6,5 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     'src/python/pants/option',
-    'src/python/pants/util:meta',
   ],
 )
