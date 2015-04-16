@@ -65,8 +65,7 @@ class Export(ConsoleTask):
              help='Causes libraries to be output.')
     register('--sources', default=False, action='store_true',
              help='Causes sources to be output.')
-    register('--globs', default=False, action='store_true',
-             help='Causes source and resource globs to be output.')
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
@@ -131,11 +130,10 @@ class Export(ConsoleTask):
         'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
 
-      if self.get_options().sources and not current_target.is_synthetic:
-        info['sources'] = list(current_target.sources_relative_to_buildroot())
-
-      if self.get_options().globs and not current_target.is_synthetic:
-        info['globs'] = list(current_target.globs_relative_to_buildroot())
+      if not current_target.is_synthetic:
+        info['globs'] = current_target.globs_relative_to_buildroot()
+        if self.get_options().sources:
+          info['sources'] = list(current_target.sources_relative_to_buildroot())
 
       target_libraries = set()
       if isinstance(current_target, JarLibrary):

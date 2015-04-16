@@ -63,8 +63,23 @@ class ExportIntegrationTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      ['src/x/*.py',],
+      {'globs' : ['src/x/*.py',]},
       result['targets']['src/x:x']['globs']
+    )
+
+  def test_source_exclude(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/exclude')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/exclude/*.py',],
+       'exclude' : [{
+         'globs' : ['src/exclude/foo.py']
+       }],
+     },
+      result['targets']['src/exclude:exclude']['globs']
     )
 
   def test_source_rglobs(self):
@@ -74,7 +89,7 @@ class ExportIntegrationTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      ['src/y/**/*.py',],
+      {'globs' : ['src/y/**/*.py',]},
       result['targets']['src/y:y']['globs']
     )
 
@@ -85,7 +100,7 @@ class ExportIntegrationTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      ['src/z/**/*.py',],
+      {'globs' : ['src/z/**/*.py',]},
       result['targets']['src/z:z']['globs']
     )
 

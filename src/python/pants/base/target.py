@@ -303,8 +303,6 @@ class Target(AbstractTarget):
     sources_field = self.payload.get_field('sources')
     if sources_field:
       return sources_field.spec
-    else:
-      return []
 
   @property
   def derived_from(self):
@@ -474,6 +472,6 @@ class Target(AbstractTarget):
     if spec is None:
       sources = sources or []
       assert_list(sources)
-      spec = (os.path.join(sources_rel_path, src) for src in (sources or []))
+      spec = {'globs' : [os.path.join(sources_rel_path, src) for src in (sources or [])]}
 
     return SourcesField(sources=sources, sources_rel_path=sources_rel_path, spec=spec)

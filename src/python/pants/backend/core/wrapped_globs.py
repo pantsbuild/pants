@@ -53,7 +53,7 @@ class FilesetRelPathWrapper(object):
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
-    filespec = self.to_filespec(args, root=rel_root)
+    filespec = self.to_json(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(result, filespec)
 
   def _is_glob_dir_outside_root(self, glob, root):
@@ -64,16 +64,23 @@ class FilesetRelPathWrapper(object):
     # Check if the glob path has the correct root.
     return os.path.commonprefix([root, glob_path]) != root
 
-  def to_filespec(self, args, root=''):
-    """Return a list of globs, relative to the root.
+  def to_json(self, args, root='', excludes=None):
+    """Return a dict representation of this glob list, relative to the buildroot.
 
-    This list does not consider excludes, because there is no safe way
-    to combine lists containing excludes into a single lists (when the
-    lists are not necessarily mutually exclusive).
+    The format of the dict is {'globs': [ 'list', 'of' , 'strings' ]
+                    (optional) 'exclude' : [{'globs' : ... }, ...] }
 
-    :returns a list of strings
+    The globs are in zglobs format.
     """
-    return [os.path.join(root, arg) for arg in args]
+    result = {'globs' : [os.path.join(root, arg) for arg in args]}
+    if excludes:
+      result['exclude'] = []
+      for exclude in excludes:
+        if hasattr(exclude, 'spec'):
+          result['exclude'].append(exclude.spec)
+        else:
+          result['exclude'].append({'globs' : [os.path.join(root, x) for x in exclude]})
+    return result
 
 class Globs(FilesetRelPathWrapper):
   """Returns Fileset containing matching files in same directory as this BUILD file.
@@ -124,8 +131,8 @@ class RGlobs(FilesetRelPathWrapper):
 
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
-  def to_filespec(self, args, root='', excludes=None):
-    return [os.path.join(root, '**', arg) for arg in args]
+  def to_json(self, args, root='', excludes=None):
+    return super(RGlobs, self).to_json([os.path.join('**', arg) for arg in args], root=root, excludes=excludes)
 
 class ZGlobs(FilesetRelPathWrapper):
   """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.

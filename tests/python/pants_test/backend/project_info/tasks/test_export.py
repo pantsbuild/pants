@@ -155,9 +155,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      ['project_info/com/foo/*.scala',
-      ],
-      sorted(result['targets']['project_info:globular']['globs'])
+      {'globs' : ['project_info/com/foo/*.scala']},
+      result['targets']['project_info:globular']['globs']
     )
 
   def test_with_dependencies(self):
@@ -196,6 +195,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
     jvm_target = result['targets']['project_info:jvm_target']
     expected_jmv_target = {
+      'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
+                          'project_info/this/is/a/source/Bar.scala']},
       'libraries': ['org.apache:apache-jar:12.12.2012'],
       'is_code_gen': False,
       'targets': ['project_info:jar_lib'],
