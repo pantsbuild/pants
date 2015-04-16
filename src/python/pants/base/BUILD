@@ -284,6 +284,7 @@ python_library(
     ':payload_field',
     ':source_root',
     ':target_addressable',
+    'src/python/pants/backend/core:wrapped_globs',
   ],
 )
 

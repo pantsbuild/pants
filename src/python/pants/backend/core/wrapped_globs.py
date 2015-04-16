@@ -16,11 +16,11 @@ from pants.base.build_environment import get_buildroot
 class FilesetWithSpec(object):
   """A set of files with that keeps track of how we got it.
 
-  The spec is what globs or file list it came from.
+  The filespec is what globs or file list it came from.
   """
-  def __init__(self, result, spec):
+  def __init__(self, result, filespec):
     self._result = result
-    self.spec = spec
+    self.filespec = filespec
 
   def __iter__(self):
     return self._result.__iter__()
@@ -53,7 +53,7 @@ class FilesetRelPathWrapper(object):
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
-    filespec = self.to_json(args, root=rel_root, excludes=excludes)
+    filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(result, filespec)
 
   def _is_glob_dir_outside_root(self, glob, root):
@@ -64,7 +64,7 @@ class FilesetRelPathWrapper(object):
     # Check if the glob path has the correct root.
     return os.path.commonprefix([root, glob_path]) != root
 
-  def to_json(self, args, root='', excludes=None):
+  def to_filespec(self, args, root='', excludes=None):
     """Return a dict representation of this glob list, relative to the buildroot.
 
     The format of the dict is {'globs': [ 'list', 'of' , 'strings' ]
@@ -76,8 +76,8 @@ class FilesetRelPathWrapper(object):
     if excludes:
       result['exclude'] = []
       for exclude in excludes:
-        if hasattr(exclude, 'spec'):
-          result['exclude'].append(exclude.spec)
+        if hasattr(exclude, 'filespec'):
+          result['exclude'].append(exclude.filespec)
         else:
           result['exclude'].append({'globs' : [os.path.join(root, x) for x in exclude]})
     return result
@@ -131,8 +131,8 @@ class RGlobs(FilesetRelPathWrapper):
 
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
-  def to_json(self, args, root='', excludes=None):
-    return super(RGlobs, self).to_json([os.path.join('**', arg) for arg in args], root=root, excludes=excludes)
+  def to_filespec(self, args, root='', excludes=None):
+    return super(RGlobs, self).to_filespec([os.path.join('**', arg) for arg in args], root=root, excludes=excludes)
 
 class ZGlobs(FilesetRelPathWrapper):
   """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.

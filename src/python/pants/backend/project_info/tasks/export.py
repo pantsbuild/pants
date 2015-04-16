@@ -80,18 +80,19 @@ class Export(ConsoleTask):
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
-    # This product is a list for historical reasons (exclusives groups) but in practice should
-    # have either 0 or 1 entries.
-    ivy_info_list = ivy_jar_products.get('default')
-    if ivy_info_list:
-      assert len(ivy_info_list) == 1, (
-        'The values in ivy_jar_products should always be length 1,'
-        ' since we no longer have exclusives groups.'
-      )
-      ivy_info = ivy_info_list[0]
-    else:
-      ivy_info = None
+    if self.get_options().libraries:
+      ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
+      # This product is a list for historical reasons (exclusives groups) but in practice should
+      # have either 0 or 1 entries.
+      ivy_info_list = ivy_jar_products.get('default')
+      if ivy_info_list:
+        assert len(ivy_info_list) == 1, (
+          'The values in ivy_jar_products should always be length 1,'
+          ' since we no longer have exclusives groups.'
+        )
+        ivy_info = ivy_info_list[0]
+      else:
+        ivy_info = None
 
     ivy_jar_memo = {}
     def process_target(current_target):
@@ -167,8 +168,10 @@ class Export(ConsoleTask):
 
     graph_info = {
       'targets': targets_map,
-      'libraries': self._resolve_jars_info()
     }
+    if self.get_options().libraries:
+      graph_info['libraries'] = self._resolve_jars_info()
+
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:

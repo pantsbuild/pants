@@ -29,7 +29,6 @@ class PythonTarget(Target):
                resource_targets=None,  # New-style resources (Resources target specs).
                provides=None,
                compatibility=None,
-               build_graph=None,
                **kwargs):
     """
     :param dependencies: Other targets that this target depends on.
@@ -58,14 +57,13 @@ class PythonTarget(Target):
       sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
-      'sources': self.create_sources_field(sources, sources_rel_path, address, build_graph),
+      'sources': self.create_sources_field(sources, sources_rel_path, address),
       'resources': self.create_sources_field(resources, address.spec_path),
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
     super(PythonTarget, self).__init__(address=address,
                                        payload=payload,
-                                       build_graph=build_graph,
                                        **kwargs)
     self._resource_target_specs = resource_targets
     self.add_labels('python')
