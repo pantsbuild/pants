@@ -6,7 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import defaultdict
 
+from twitter.common.collections import OrderedSet
+
+from pants.backend.jvm.ivy_utils import IvyArtifact as IvyUtilArtifact
+from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -54,16 +59,69 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Create jar_libraries with different versions of the same dep: this will cause
     # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
     # due to an ivy eviction where the declared version loses to a transitive version.
-    losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
-    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
+    losing_dep = JarDependency('com.google.guava', 'guava', '16.0',
+                               artifacts=[IvyArtifact('guava16.0', classifier='default')])
+    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1',
+                               artifacts=[IvyArtifact('guava16.0.1', classifier='default')])
     losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
     winning_lib = self.make_target('//:b', JarLibrary, jars=[winning_dep])
     # Confirm that the same artifact was added to each target.
-    compile_classpath = self.resolve([losing_lib, winning_lib])
+    context = self.context(target_roots=[losing_lib, winning_lib])
+
+    symlink_map = dict(bogus0='bogus0', bogus1='bogus1', unused='unused')
+    context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
+    task = self.create_task(context, 'unused')
+    task.ivy_resolve = lambda targets, *args, **kw: (None, targets)
+
+    def mock_generate_ivy_jar_products(targets):
+      ivy_products = defaultdict(list)
+      ivy_info = IvyInfo()
+      artifacts = []
+      callers = []
+
+      # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
+      # resolve, it's possible that before it was evicted, it would
+      # generate some resolution data.
+
+      artifact_1 = IvyUtilArtifact('bogus0', 'default')
+      unused_artifact = IvyUtilArtifact('unused', 'default')
+
+      # Because guava 16.0 was evicted, it has no artifacts
+      guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
+                          [], [])
+      guava_1 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0.1'),
+                          [artifact_1], [])
+      ivy_info.add_module(guava_0)
+      ivy_info.add_module(guava_1)
+
+      artifact_dep_1 = IvyUtilArtifact('bogus1', 'default')
+
+      # Because fake#dep 16.0 was evicted before it was resolved,
+      # its deps are never examined, so we don't call add_module.
+      guava_dep_0 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.0'),
+                              [], [guava_0.ref])
+      guava_dep_1 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.1'),
+                              [artifact_dep_1], [guava_1.ref])
+
+      ivy_info.add_module(guava_dep_0)
+      ivy_info.add_module(guava_dep_1)
+
+      # Add an unrelated module to ensure that it's not returned
+      unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0')
+      unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0'),
+                            [unused_artifact], [unrelated_parent])
+      ivy_info.add_module(unrelated)
+
+      ivy_products['default'] = [ivy_info]
+      return ivy_products
+
+    task._generate_ivy_jar_products = mock_generate_ivy_jar_products
+    task.execute()
+    compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
     self.assertEquals(losing_cp, winning_cp)
-    self.assertEquals(1, len(winning_cp))
+    self.assertEquals(OrderedSet([(u'default', u'bogus0'), (u'default', u'bogus1')]), winning_cp)
 
   def test_resolve_multiple_artifacts(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
