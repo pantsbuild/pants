@@ -10,7 +10,6 @@ import logging
 from pants.backend.core.tasks.task import Task
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.payload_field import DeferredSourcesField
-from pants.base.source_root import SourceRoot
 
 
 logger = logging.getLogger(__name__)
@@ -68,5 +67,5 @@ class DeferredSourcesMapper(Task):
           "Target {sources_spec} referenced from {target} field {name} did not unpack any sources"
           .format(spec=sources_target.address.spec, target=target.address.spec, name=name))
       sources, rel_unpack_dir = unpacked_sources[sources_target]
-      SourceRoot.register_mutable(rel_unpack_dir)
+      self.context.layout.register_mutable(rel_unpack_dir)
       payload_field.populate(sources, rel_unpack_dir)

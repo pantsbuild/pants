@@ -10,10 +10,10 @@ import unittest
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.build_file_layout.source_root import SourceRoot, SourceRootTree
 from pants.base.address import SyntheticAddress, parse_spec
 from pants.base.addressable import AddressableCallProxy
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.source_root import SourceRoot, SourceRootTree
 from pants.base.target import Target
 
 

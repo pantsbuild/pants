@@ -15,8 +15,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
-from pants.base.source_root import SourceRoot
-from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
@@ -70,10 +69,10 @@ class JarCreateExecuteTest(JarCreateTestBase):
     def get_source_root_fs_path(path):
       return os.path.realpath(os.path.join(self.build_root, test_path(path)))
 
-    SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
-    SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
-    SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
-    SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
+    self.layout.register(get_source_root_fs_path('src/resources'), Resources)
+    self.layout.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
+    self.layout.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
+    self.layout.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
     self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
     self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],

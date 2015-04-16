@@ -45,6 +45,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/base:layout_utils',
   ]
 )
 

@@ -10,7 +10,6 @@ python_library(
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:source_root',
     'src/python/pants/goal:task_registrar',
     ':core',
   ]

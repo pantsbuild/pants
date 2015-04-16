@@ -17,7 +17,6 @@ from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
-from pants.base.source_root import SourceRoot
 from pants.scm.git import Git
 from pants.util.dirutil import safe_mkdir, safe_walk
 
@@ -116,7 +115,7 @@ class IdeaGen(IdeGen):
     return excludes
 
   @staticmethod
-  def _sibling_is_test(source_set):
+  def _sibling_is_test(source_set, layout):
     """Determine if a SourceSet represents a test path.
 
     Non test targets that otherwise live in test target roots (say a java_library), must
@@ -135,9 +134,10 @@ class IdeaGen(IdeGen):
           return True
       return False
 
-    sibling_paths = SourceRoot.find_siblings_by_path(os.path.join(source_set.source_base, source_set.path))
+    sibling_paths = layout.find_sibling_source_roots_by_path(
+      os.path.join(source_set.source_base, source_set.path))
     for sibling_path in sibling_paths:
-      if has_test_type(SourceRoot.types(sibling_path)):
+      if has_test_type(layout.types(sibling_path)):
         return True
     return False
 
@@ -147,7 +147,7 @@ class IdeaGen(IdeGen):
                            if source_set.path else source_set.source_base
 
       if self.get_options().infer_test_from_siblings:
-        is_test = IdeaGen._sibling_is_test(source_set)
+        is_test = IdeaGen._sibling_is_test(source_set, self.context.layout)
       else:
         is_test = source_set.is_test
 

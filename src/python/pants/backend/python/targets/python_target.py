@@ -146,5 +146,6 @@ class PythonTarget(Target):
 
     self._build_graph.inject_synthetic_target(synthetic_address, Resources,
                                               sources=self.payload.resources.source_paths,
+                                              source_root=self.target_base,
                                               derived_from=self)
     return self._build_graph.get_target(synthetic_address)

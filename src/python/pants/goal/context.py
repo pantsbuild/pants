@@ -15,7 +15,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import BuildGraph
-from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit
@@ -60,8 +59,9 @@ class Context(object):
   # repository of attributes?
   def __init__(self, config, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
-               build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
-               workspace=None, spec_excludes=None):
+               build_file_parser=None, address_mapper=None, layout=None, console_outstream=None,
+               scm=None, workspace=None, spec_excludes=None):
+    self.layout = layout
     self._config = config
     self._options = options
     self.build_graph = build_graph
@@ -247,7 +247,7 @@ class Context(object):
     target_base = os.path.join(get_buildroot(), address.spec_path)
     if not os.path.exists(target_base):
       os.makedirs(target_base)
-    SourceRoot.register(address.spec_path)
+    self.layout.register(address.spec_path)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 
@@ -255,6 +255,7 @@ class Context(object):
                                              target_type=target_type,
                                              dependencies=dependencies,
                                              derived_from=derived_from,
+                                             source_root=address.spec_path,
                                              **kwargs)
     new_target = self.build_graph.get_target(address)
 

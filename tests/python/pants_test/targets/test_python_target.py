@@ -15,7 +15,6 @@ from pants.backend.jvm.repository import Repository
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.source_root import SourceRoot
 from pants_test.base_test import BaseTest
 
 
@@ -23,7 +22,7 @@ class PythonTargetTest(BaseTest):
 
   def setUp(self):
     super(PythonTargetTest, self).setUp()
-    SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'test_python_target')),
+    self.layout.register(os.path.realpath(os.path.join(self.build_root, 'test_python_target')),
                         PythonTarget)
 
     self.add_to_build_file('test_thrift_replacement', dedent('''

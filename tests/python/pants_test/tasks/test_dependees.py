@@ -18,7 +18,6 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -215,7 +214,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     )
 
   def test_dependees_type(self):
-    SourceRoot.register('tests', PythonTests)
+    self.layout.register('tests', PythonTests)
     self.assert_console_output(
       'tests/d:d',
       targets=[self.target('common/d')],

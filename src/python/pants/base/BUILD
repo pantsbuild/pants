@@ -33,6 +33,7 @@ python_library(
     ':build_file_aliases',
     ':parse_context',
     ':target',
+    ':layout',
   ],
 )
 
@@ -156,6 +157,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/android:plugin',
     'src/python/pants/backend/authentication:authentication',
+    'src/python/pants/backend/build_file_layout:plugin',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
@@ -257,13 +259,10 @@ python_library(
 )
 
 python_library(
-  name = 'source_root',
-  sources = ['source_root.py'],
+  name = 'layout',
+  sources = ['layout.py'],
   dependencies = [
     ':build_environment',
-    ':build_manual',
-    ':exceptions',
-    ':parse_context',
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
 )
@@ -282,7 +281,6 @@ python_library(
     ':lazy_source_mapper',
     ':payload',
     ':payload_field',
-    ':source_root',
     ':target_addressable',
   ],
 )

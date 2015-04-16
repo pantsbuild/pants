@@ -38,7 +38,6 @@ from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.source_root import SourceRoot
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -88,7 +87,6 @@ def build_file_aliases():
       'globs': Globs,
       'from_target': FromTarget,
       'rglobs': RGlobs,
-      'source_root': SourceRoot.factory,
       'zglobs': ZGlobs,
     }
   )

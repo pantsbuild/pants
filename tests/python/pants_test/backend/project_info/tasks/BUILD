@@ -83,7 +83,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/project_info/tasks:ide_gen',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:source_root',
+    'src/python/pants/base:layout',
     'tests/python/pants_test:base_test',
   ]
 )
@@ -96,7 +96,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:ide_gen',
     'src/python/pants/backend/project_info/tasks:idea_gen',
-    'src/python/pants/base:source_root',
+    'src/python/pants/base:layout',
     'tests/python/pants_test:base_test',
   ]
 )

@@ -11,6 +11,7 @@ from collections import namedtuple
 
 from pants.base.addressable import AddressableCallProxy
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.layout import Layout, SourceRootLookup
 from pants.base.parse_context import ParseContext
 from pants.base.target import Target
 
@@ -29,11 +30,12 @@ class BuildConfiguration(object):
   def _is_target_type(obj):
     return inspect.isclass(obj) and issubclass(obj, Target)
 
-  def __init__(self):
+  def __init__(self, layout=None):
     self._target_aliases = {}
     self._addressable_alias_map = {}
     self._exposed_objects = {}
     self._exposed_context_aware_object_factories = {}
+    self.layout = layout or Layout()
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -47,6 +49,12 @@ class BuildConfiguration(object):
         objects=self._exposed_objects,
         addressables=self._addressable_alias_map,
         context_aware_object_factories=self._exposed_context_aware_object_factories)
+
+  def register_layout(self, layout):
+    if not isinstance(layout, SourceRootLookup):
+      raise TypeError("expected {} to be an instance of {}".format(layout, SourceRootLookup))
+
+    self.layout.add_lookup(layout)
 
   def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files."""
@@ -132,10 +140,12 @@ class BuildConfiguration(object):
     def registration_callback(address, addressable):
       registered_addressable_instances.append((address, addressable))
 
+    source_root_for_current_build_file = self.layout.find_source_root_by_path(build_file.spec_path)
     for alias, addressable_type in self._addressable_alias_map.items():
       call_proxy = AddressableCallProxy(addressable_type=addressable_type,
                                         build_file=build_file,
-                                        registration_callback=registration_callback)
+                                        registration_callback=registration_callback,
+                                        source_root=source_root_for_current_build_file)
       type_aliases[alias] = call_proxy
 
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
