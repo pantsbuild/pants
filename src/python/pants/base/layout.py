@@ -39,7 +39,7 @@ class Layout(object):
       curr_result = lookup.find_root(path)
       if curr_result and result:
         raise Exception("found root in multiple layouts {}; {} {}".format(result, lookup, result_lookup))
-      else:
+      elif curr_result:
         result = curr_result
         result_lookup = lookup
 
@@ -65,7 +65,7 @@ class Layout(object):
       return target.address.spec_path
     else:
       allowed_types = lookup_result[1]
-      if allowed_types and not isinstance(target, allowed_types):
+      if allowed_types and not isinstance(target, tuple(allowed_types)):
         raise Exception("....")
       return lookup_result[0]
 
