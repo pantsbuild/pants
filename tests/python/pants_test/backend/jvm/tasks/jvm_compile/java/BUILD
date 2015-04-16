@@ -4,8 +4,6 @@
 target(
   name='java',
   dependencies=[
-    ':apt_compile_integration',
-    ':java_compile_integration',
   ],
 )
 
