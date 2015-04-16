@@ -5,11 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from copy import deepcopy
 import os
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
+from pants.base.deprecated import deprecated
 from pants.base.build_environment import get_buildroot
 
 
@@ -25,6 +27,36 @@ class FilesetWithSpec(object):
   def __iter__(self):
     return self._result.__iter__()
 
+  def __getitem__(self, index):
+    return self._result[index]
+
+  @deprecated(removal_version='0.0.35',
+              hint_message='Instead of glob arithmetic, use glob(..., excludes=[...])')
+  def __add__(self, other):
+    filespec = deepcopy(self.filespec)
+    if isinstance(other, FilesetWithSpec):
+      filespec['globs'] += other.filespec['globs']
+      other_result = other._result
+    else:
+      filespec['globs'] += other
+      other_result = other
+    result = list(set(self._result) + set(other_result))
+    return FilesetWithSpec(result, filespec)
+
+  @deprecated(removal_version='0.0.35',
+              hint_message='Instead of glob arithmetic, use glob(..., excludes=[...])')
+  def __sub__(self, other):
+    filespec = deepcopy(self.filespec)
+    exclude = filespec.get('exclude', [])
+    if isinstance(other, FilesetWithSpec):
+      exclude.append(other.filespec)
+      other_result = other._result
+    else:
+      exclude.append({'globs' : other})
+      other_result = other
+    filespec['exclude'] = exclude
+    result = list(set(self._result) - set(other_result))
+    return FilesetWithSpec(result, filespec)
 
 class FilesetRelPathWrapper(object):
   def __init__(self, parse_context):
