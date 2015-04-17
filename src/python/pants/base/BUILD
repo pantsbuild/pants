@@ -284,6 +284,7 @@ python_library(
     ':payload_field',
     ':source_root',
     ':target_addressable',
+    'src/python/pants/backend/core:wrapped_globs',
   ],
 )
 
@@ -322,5 +323,6 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/backend/core:wrapped_globs',
   ],
 )

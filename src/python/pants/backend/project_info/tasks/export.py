@@ -61,11 +61,16 @@ class Export(ConsoleTask):
     super(Export, cls).register_options(register)
     register('--formatted', default=True, action='store_false',
              help='Causes output to be a single line of JSON.')
+    register('--libraries', default=True, action='store_true',
+             help='Causes libraries to be output.')
+    register('--sources', default=False, action='store_true',
+             help='Causes sources to be output.')
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
-    round_manager.require_data('ivy_jar_products')
+    if options.libraries:
+      round_manager.require_data('ivy_jar_products')
 
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
@@ -75,18 +80,19 @@ class Export(ConsoleTask):
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
-    # This product is a list for historical reasons (exclusives groups) but in practice should
-    # have either 0 or 1 entries.
-    ivy_info_list = ivy_jar_products.get('default')
-    if ivy_info_list:
-      assert len(ivy_info_list) == 1, (
-        'The values in ivy_jar_products should always be length 1,'
-        ' since we no longer have exclusives groups.'
-      )
-      ivy_info = ivy_info_list[0]
-    else:
-      ivy_info = None
+    if self.get_options().libraries:
+      ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
+      # This product is a list for historical reasons (exclusives groups) but in practice should
+      # have either 0 or 1 entries.
+      ivy_info_list = ivy_jar_products.get('default')
+      if ivy_info_list:
+        assert len(ivy_info_list) == 1, (
+          'The values in ivy_jar_products should always be length 1,'
+          ' since we no longer have exclusives groups.'
+        )
+        ivy_info = ivy_info_list[0]
+      else:
+        ivy_info = None
 
     ivy_jar_memo = {}
     def process_target(current_target):
@@ -107,6 +113,8 @@ class Export(ConsoleTask):
             return Export.SourceRootTypes.SOURCE
 
       def get_transitive_jars(jar_lib):
+        if not self.get_options().libraries:
+          return []
         if not ivy_info:
           return OrderedSet()
         transitive_jars = OrderedSet()
@@ -122,6 +130,11 @@ class Export(ConsoleTask):
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
+
+      if not current_target.is_synthetic:
+        info['globs'] = current_target.globs_relative_to_buildroot()
+        if self.get_options().sources:
+          info['sources'] = list(current_target.sources_relative_to_buildroot())
 
       target_libraries = set()
       if isinstance(current_target, JarLibrary):
@@ -146,7 +159,8 @@ class Export(ConsoleTask):
         'package_prefix': package_prefix
       }, self._source_roots_for_target(current_target))
 
-      info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
+      if self.get_options().libraries:
+        info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[self._address(current_target.address)] = info
 
     for target in targets:
@@ -154,8 +168,10 @@ class Export(ConsoleTask):
 
     graph_info = {
       'targets': targets_map,
-      'libraries': self._resolve_jars_info()
     }
+    if self.get_options().libraries:
+      graph_info['libraries'] = self._resolve_jars_info()
+
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:

@@ -17,18 +17,30 @@ python_library(
 )
 
 python_library(
-  name = 'core',
+  name = 'wrapped_globs',
   sources = [
-    'from_target.py',
     'wrapped_globs.py',
   ],
   dependencies = [
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
+  ],
+)
+
+python_library(
+  name = 'core',
+  sources = [
+    'from_target.py',
+  ],
+  dependencies = [
+    '3rdparty/python:six',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
+    ':wrapped_globs',
   ]
 )

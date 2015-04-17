@@ -85,15 +85,21 @@ class FingerprintedField(PayloadField):
 
 class SourcesField(PayloadField):
   """A PayloadField encapsulating specified sources."""
-  def __init__(self, sources_rel_path, sources, ref_address=None):
+  def __init__(self, sources_rel_path, sources, ref_address=None, filespec=None):
     """
     :param sources_rel_path: path that sources parameter may be relative to
     :param sources: list of strings representing relative file paths
     :param ref_address: optional address spec of target that provides these sources
+    :param filespec: glob and exclude data that generated this set of sources
     """
     self._rel_path = sources_rel_path
     self._source_paths = assert_list(sources)
     self._ref_address = ref_address
+    self._filespec = filespec
+
+  @property
+  def filespec(self):
+    return self._filespec
 
   @property
   def rel_path(self):

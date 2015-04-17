@@ -11,6 +11,7 @@ from hashlib import sha1
 
 from six import string_types
 
+from pants.backend.core.wrapped_globs import FilesetWithSpec
 from pants.base.address import Addresses, SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import manual
@@ -299,6 +300,11 @@ class Target(AbstractTarget):
         abs_source = os.path.join(get_buildroot(), source)
         yield os.path.relpath(abs_source, abs_source_root)
 
+  def globs_relative_to_buildroot(self):
+    sources_field = self.payload.get_field('sources')
+    if sources_field:
+      return sources_field.filespec
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
@@ -444,7 +450,7 @@ class Target(AbstractTarget):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
     return "{}({})".format(type(self).__name__, addr)
 
-  def create_sources_field(self, sources, sources_rel_path, address=None, build_graph=None):
+  def create_sources_field(self, sources, sources_rel_path, address=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
     Note that this method is called before the call to Target.__init__ so don't expect fields to
@@ -462,4 +468,11 @@ class Target(AbstractTarget):
       referenced_address = SyntheticAddress.parse(sources.addresses[0],
                                                   relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
-    return SourcesField(sources=sources, sources_rel_path=sources_rel_path)
+    elif isinstance(sources, FilesetWithSpec):
+      filespec = sources.filespec
+    else:
+      sources = sources or []
+      assert_list(sources)
+      filespec = {'globs' : [os.path.join(sources_rel_path, src) for src in (sources or [])]}
+
+    return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)

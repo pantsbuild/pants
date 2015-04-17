@@ -30,3 +30,6 @@ class AndroidResources(AndroidTarget):
       raise TargetDefinitionException(self, 'An android_resources target must specify a '
                                             '\'resource_dir\' that contains the target\'s '
                                             'resource files.')
+
+  def globs_relative_to_buildroot(self):
+    return {'globs' : os.path.join(self.resource_dir, '**')}

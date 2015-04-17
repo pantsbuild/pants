@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.payload import Payload
-from pants.base.payload_field import SourcesField
 from pants.base.target import Target
 
 
@@ -28,8 +27,8 @@ class Resources(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=self.assert_list(sources),
-                              sources_rel_path=address.spec_path),
+      'sources': self.create_sources_field(sources=self.assert_list(sources),
+                                           sources_rel_path=address.spec_path),
     })
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 
