@@ -92,7 +92,7 @@ class ZincAnalysisParser(AnalysisParser):
     n = self.parse_num_items(lines_iter.next())
     relation = defaultdict(list)  # Values are lists, to accommodate relations.
     for i in range(n):
-      k, _, v = lines_iter.next().partition(' -> ')
+      k, _, v = lines_iter.next().decode('utf-8').partition(u' -> ')
       if len(v) == 1:  # Value on its own line.
         v = lines_iter.next()
       relation[k].append(v[:-1])

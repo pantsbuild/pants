@@ -5,17 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import contextlib
 import os
+import shutil
 import StringIO
-import tarfile
 import unittest
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import ParseError
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.contextutil import Timer, temporary_dir
+from pants.util.dirutil import safe_rmtree
 
+
+_TEST_DATA_SOURCE_ENV_VAR = 'ZINC_ANALYSIS_TEST_DATA_SOURCE'
 
 class ZincAnalysisTest(unittest.TestCase):
   def setUp(self):
@@ -33,7 +35,7 @@ class ZincAnalysisTest(unittest.TestCase):
   # Test a simple example that is non-trivial, but still small enough to verify manually.
   def test_split_merge(self):
     def get_test_analysis_path(name):
-      return os.path.join(os.path.dirname(__file__), 'testdata', name)
+      return os.path.join(os.path.dirname(__file__), 'testdata', 'simple', name)
 
     def get_analysis_text(name):
       with open(get_test_analysis_path(name), 'r') as fp:
@@ -84,18 +86,18 @@ class ZincAnalysisTest(unittest.TestCase):
 
   # Test on large-scale analysis files.
   def test_analysis_files(self):
+    if os.environ.get(_TEST_DATA_SOURCE_ENV_VAR):
+      print('\n>>>>>>>>> {} set: skipping test, generating canonical test data instead.'.format(
+        _TEST_DATA_SOURCE_ENV_VAR))
+      self._generate_testworthy_splits()
+      return
+
     parser = ZincAnalysisParser()
 
     with temporary_dir() as tmpdir:
-      # Extract analysis files from tarball.
-      analysis_tarball = os.path.join(os.path.dirname(__file__), 'testdata', 'analysis.tar.bz2')
-      analysis_dir = os.path.join(tmpdir, 'orig')
-      print('Extracting %s to %s' % (analysis_tarball, analysis_dir))
-      os.mkdir(analysis_dir)
-      with contextlib.closing(tarfile.open(analysis_tarball, 'r:bz2')) as tar:
-        tar.extractall(analysis_dir)
+      analysis_dir = os.path.join(os.path.dirname(__file__), 'testdata', 'complex')
 
-      # Parse them.
+      # Parse analysis files.
       analysis_files = [os.path.join(analysis_dir, f)
                         for f in os.listdir(analysis_dir) if f.endswith('.analysis')]
       num_analyses = len(analysis_files)
@@ -106,8 +108,11 @@ class ZincAnalysisTest(unittest.TestCase):
       analyses = self._time(lambda: [parse(f) for f in analysis_files],
                             'Parsed %d files' % num_analyses)
 
-      # Get the right exception on a busted file
-      f = analysis_files[0]
+      # Get the right exception on a busted file.
+      truncated_dir = os.path.join(tmpdir, 'truncated')
+      os.mkdir(truncated_dir)
+      f = os.path.join(truncated_dir, os.path.basename(analysis_files[0]))
+      shutil.copy(analysis_files[0], f)
       with open(f, 'r+b') as truncated:
         truncated.seek(-150, os.SEEK_END)
         truncated.truncate()
@@ -140,10 +145,26 @@ class ZincAnalysisTest(unittest.TestCase):
       merged_analysis2 = self._time(lambda: parser.parse_from_path(merged_analysis_path),
                                     'Read merged analysis from %s' % merged_analysis_path)
 
+      # Read the expected merged analysis from file.
+      expected_merged_analysis_path = os.path.join(analysis_dir, 'all.analysis.merged')
+      expected_merged_analysis = self._time(
+        lambda: parser.parse_from_path(expected_merged_analysis_path),
+        'Read expected merged analysis from %s' % expected_merged_analysis_path)
+
+      # Compare the merge result with the re-read one.
+      diffs = merged_analysis.diff(merged_analysis2)
+      self.assertEquals(merged_analysis, merged_analysis2, ''.join(
+        [unicode(diff) for diff in diffs]))
+
+      # Compare the merge result with the expected.
+      diffs = expected_merged_analysis.diff(merged_analysis2)
+      self.assertEquals(expected_merged_analysis, merged_analysis2, ''.join(
+        [unicode(diff) for diff in diffs]))
+
       # Split the merged analysis back to individual analyses.
       sources_per_analysis = [a.stamps.sources.keys() for a in analyses]
-      split_analyses = self._time(lambda: merged_analysis2.split(sources_per_analysis, catchall=True),
-                                  'Split back into %d analyses' % num_analyses)
+      split_analyses = self._time(lambda: merged_analysis2.split(
+        sources_per_analysis, catchall=True), 'Split back into %d analyses' % num_analyses)
 
       self.assertEquals(num_analyses + 1, len(split_analyses))  # +1 for the catchall.
       catchall_analysis = split_analyses[-1]
@@ -160,6 +181,49 @@ class ZincAnalysisTest(unittest.TestCase):
         outfile_path = os.path.join(splits_dir, os.path.basename(analysis_file))
         split_analysis.write_to_path(outfile_path)
         diffs = analysis.diff(split_analysis)
-        self.assertEquals(analysis, split_analysis, ''.join([str(diff) for diff in diffs]))
+        # Note that it's not true in general that merging splits and then splitting them back out
+        # should yield the exact same analysis. Some small differences are allowed. For example:
+        # splitA may have external dependencies on a class from a source file in splitB; When
+        # merging, that becomes a single source->source dependency; And when splitting back out
+        # that source dependency becomes a dependency on a representative class which may not be
+        # the original one depended on.
+        #
+        # This comparison works here only because we've taken care to prepare test data for which
+        # it should hold. See _generate_testworthy_splits below for how to do so.
+        self.assertEquals(analysis, split_analysis, ''.join([unicode(diff) for diff in diffs]))
 
     print('Total time: %f seconds' % self.total_time)
+
+
+  def _generate_testworthy_splits(self):
+    """Merge some splits and then split them back out.
+
+    The resulting files will be "canonical" and can be used as test data (after eyeballing them
+    to ensure no pathologies).
+
+    TODO: Yes, it's slightly problematic that we're using the very code we're testing to generate
+    the test inputs. Hence the need to spot-check for obvious pathologies.
+    """
+    original_splits_dir = os.environ.get(_TEST_DATA_SOURCE_ENV_VAR)
+
+    canonical_dir = os.path.join(original_splits_dir, 'canonical')
+    safe_rmtree(canonical_dir)
+    os.mkdir(canonical_dir)
+
+    original_split_filenames = [f.decode('utf-8') for f in os.listdir(original_splits_dir)]
+    original_splits_files = [os.path.join(original_splits_dir, f)
+                             for f in original_split_filenames if f.endswith('.analysis')]
+
+    parser = ZincAnalysisParser()
+    original_split_analyses = [parser.parse_from_path(f) for f in original_splits_files]
+    merged_analysis = ZincAnalysis.merge(original_split_analyses)
+    merged_analysis.write_to_path(os.path.join(canonical_dir, 'all.analysis.merged'))
+
+    # Split the merged analysis back to individual analyses.
+    sources_per_analysis = [a.stamps.sources.keys() for a in original_split_analyses]
+    split_analyses = merged_analysis.split(sources_per_analysis)
+    for original_split_file, split_analysis in zip(original_splits_files, split_analyses):
+      outpath = os.path.join(canonical_dir, os.path.basename(original_split_file))
+      split_analysis.write_to_path(outpath)
+
+    print('Wrote canonical analysis data to {}'.format(canonical_dir))
