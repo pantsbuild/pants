@@ -220,8 +220,10 @@ class _JUnitRunner(object):
       return get_buildroot()
 
   def _get_failed_targets(self, tests_and_targets):
-    """Return a list of failed targets. Analyzes JUnit XML files to figure out which
-    test had failed.
+    """Return a list of failed targets.
+
+
+    Analyzes JUnit XML files to figure out which test had failed.
 
     :tests_and_targets: {test: target} mapping.
     """
@@ -238,15 +240,16 @@ class _JUnitRunner(object):
 
       filename = get_test_filename(test)
 
-      try:
-        xml = XmlParser.from_file(filename)
-        str_failures = xml.get_attribute('testsuite', 'failures')
-        int_failures = int(str_failures)
+      if os.path.exists(filename):
+        try:
+          xml = XmlParser.from_file(filename)
+          str_failures = xml.get_attribute('testsuite', 'failures')
+          int_failures = int(str_failures)
 
-        if int_failures > 0:
-          failed_targets.append(target)
-      except (XmlParser.XmlError, ValueError) as e:
-        self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
+          if int_failures > 0:
+            failed_targets.append(target)
+        except (XmlParser.XmlError, ValueError) as e:
+          self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
 
     return failed_targets
 

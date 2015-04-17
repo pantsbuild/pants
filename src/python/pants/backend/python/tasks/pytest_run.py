@@ -386,7 +386,7 @@ class PytestRun(PythonTask):
 
   # Pattern for lines such as:
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'^F +(.+)::(.+)$')
+  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):

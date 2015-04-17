@@ -221,7 +221,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
     testprojects/src/python/antlr:test_antlr_failure
     testprojects/src/thrift/org/pantsbuild/thrift_linter:
     testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target
-    testprojects/tests/python/pants/dummies:failing_targe
+    testprojects/tests/python/pants/dummies:failing_target
   )
 
   targets_to_exclude=(
