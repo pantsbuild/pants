@@ -222,7 +222,6 @@ class _JUnitRunner(object):
   def _get_failed_targets(self, tests_and_targets):
     """Return a list of failed targets.
 
-
     Analyzes JUnit XML files to figure out which test had failed.
 
     :tests_and_targets: {test: target} mapping.
