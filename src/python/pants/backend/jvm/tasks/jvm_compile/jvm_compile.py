@@ -204,6 +204,22 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return [self._strategy.name()] + self._language_platform_version_info()
 
   @abstractmethod
+  def create_compiler_executable(self):
+    """Constructs the executable for the jvm compiler.
+
+    Subclasses must override this and return an Executor.Executable
+    """
+
+  def cache_compiler_executable(self):
+    """Creates and caches the compiler executable"""
+    self._cached_executable = self.create_compiler_executable()
+
+  def get_compiler_executable(self):
+    if not self._cached_executable:
+      self.cache_compiler_executable()
+    return self._cached_executable
+
+  @abstractmethod
   def _language_platform_version_info(self):
     """
     Provides extra platform information such as java version that will be used
@@ -232,6 +248,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
     self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
+
+    # When there's work to be done, instantiate the executable for this compilation task.
+    # If the task uses nailgun, this ensures that it reuses the same client
+    if cache_manager.check(targets_in_chunks).invalid_vts:
+      self.cache_compiler_executable()
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:

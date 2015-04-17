@@ -167,33 +167,45 @@ class NailgunExecutor(Executor):
 
     self._ins = ins
 
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
-    command = self._create_command(classpath, main, jvm_options, args)
+  def _executable(self, classpath, main, jvm_options):
+    nailgun = self._get_nailgun_client(jvm_options, classpath)
+    class Executable(self.Executable):
+      def __init__(this, *args, **kwargs):
+        super(Executable,this).__init__(*args, **kwargs)
 
-    class Runner(self.Runner):
       @property
-      def executor(this):
+      def executor(_):
         return self
 
-      @property
-      def command(self):
-        return list(command)
+      def _runner(_, args, cwd=None):
+        command = self._create_command(classpath, main, jvm_options, args)
 
-      def run(this, stdout=None, stderr=None, cwd=None):
-        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
-        try:
-          logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
-          return nailgun(main, cwd, *args)
-        except nailgun.NailgunError as e:
-          self.kill()
-          raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
-                           .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
+        class Runner(self.Runner):
+          @property
+          def executor(this):
+            return self
 
-    return Runner()
+          @property
+          def command(self):
+            return list(command)
+
+          def run(this, stdout=None, stderr=None, cwd=None):
+            try:
+              logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
+              return nailgun(main, cwd, stdout, stderr, *args)
+            except nailgun.NailgunError as e:
+              self.kill()
+              raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
+                               .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
+
+        return Runner()
+    return Executable(classpath, main, jvm_options)
 
   def kill(self):
     """Kills the nailgun server owned by this executor if its currently running."""
 
+    #TODO executors don't really own individual nailguns, which means I think that this could miss
+    # killing nailguns started in the workdir that aren't the first pulled up
     endpoint = self._get_nailgun_endpoint()
     if endpoint:
       self._log_kill(endpoint.pid, endpoint.port)
@@ -208,7 +220,7 @@ class NailgunExecutor(Executor):
       logger.debug('Found ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
     return endpoint
 
-  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
+  def _get_nailgun_client(self, jvm_options, classpath):
     classpath = self._nailgun_classpath + classpath
     new_fingerprint = self._fingerprint(jvm_options, classpath, self._distribution.version)
 
@@ -217,12 +229,12 @@ class NailgunExecutor(Executor):
     updated = endpoint and endpoint.fingerprint != new_fingerprint
     updated = updated or (endpoint and endpoint.exe != self._distribution.java)
     if running and not updated:
-      return self._create_ngclient(endpoint.port, stdout, stderr)
+      return self._create_ngclient(endpoint.port)
     else:
       if running and updated:
         logger.debug('Killing ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
         self.kill()
-      return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr)
+      return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath)
 
   # 'NGServer started on 127.0.0.1, port 53785.'
   _PARSE_NG_PORT = re.compile('.*\s+port\s+(\d+)\.$')
@@ -234,7 +246,7 @@ class NailgunExecutor(Executor):
                                        ' line: {line}'.format(line=line))
     return int(match.group(1))
 
-  def _await_nailgun_server(self, stdout, stderr, debug_desc):
+  def _await_nailgun_server(self, debug_desc):
     # TODO(Eric Ayers) Make these cmdline/config parameters once we have a global way to fetch
     # the global options scope.
     nailgun_timeout_seconds = 10
@@ -251,7 +263,7 @@ class NailgunExecutor(Executor):
           started = ng_out.readline()
         if started:
           port = self._parse_nailgun_port(started)
-          nailgun = self._create_ngclient(port, stdout, stderr)
+          nailgun = self._create_ngclient(port) #stdout / err
           logger.debug('Detected ng server up on port {port}'.format(port=port))
         elif time.time() - port_parse_start > nailgun_timeout_seconds:
           raise NailgunClient.NailgunError(
@@ -277,10 +289,10 @@ class NailgunExecutor(Executor):
       logger.debug('Failed to connect on attempt {count}'.format(count=attempt))
       time.sleep(0.1)
 
-  def _create_ngclient(self, port, stdout, stderr):
-    return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, workdir=get_buildroot())
+  def _create_ngclient(self, port):
+    return NailgunClient(port=port, ins=self._ins, workdir=get_buildroot())
 
-  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
+  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath):
     logger.debug('No ng server found with fingerprint {fingerprint}, spawning...'
                  .format(fingerprint=fingerprint))
 
@@ -290,7 +302,7 @@ class NailgunExecutor(Executor):
     pid = os.fork()
     if pid != 0:
       # In the parent tine - block on ng being up for connections
-      return self._await_nailgun_server(stdout, stderr,
+      return self._await_nailgun_server(#stdout, stderr,
                                         'jvm_options={jvm_options} classpath={classpath}'
                                         .format(jvm_options=jvm_options, classpath=classpath))
 

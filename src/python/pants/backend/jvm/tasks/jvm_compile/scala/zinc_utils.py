@@ -125,7 +125,7 @@ class ZincUtils(object):
   def relativize_classpath(classpath):
     return relativize_paths(classpath, get_buildroot())
 
-  def compile(self, extra_args, classpath, sources, output_dir,
+  def compile(self, executable, extra_args, classpath, sources, output_dir,
               analysis_file, upstream_analysis_files):
 
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
@@ -157,13 +157,16 @@ class ZincUtils(object):
     args.extend(sources)
 
     self.log_zinc_file(analysis_file)
-    if self._nailgun_task.runjava(classpath=self._zinc_classpath,
-                                  main=self._ZINC_MAIN,
-                                  jvm_options=self._jvm_options,
-                                  args=args,
-                                  workunit_name='zinc',
-                                  workunit_labels=[WorkUnit.COMPILER]):
+    if self._nailgun_task.run_java_executable(executable,
+                                              args=args,
+                                              cwd=None,
+                                              workunit_name='zinc',
+                                              workunit_labels=[WorkUnit.COMPILER]):
       raise TaskError('Zinc compile failed.')
+
+  def executable(self, executor):
+    """Creates a zinc executable from the passed executor."""
+    return executor.executable(self._zinc_classpath, self._ZINC_MAIN, self._jvm_options)
 
   @staticmethod
   def write_plugin_info(resources_dir, target):

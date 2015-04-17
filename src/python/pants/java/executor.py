@@ -29,12 +29,21 @@ class Executor(AbstractClass):
 
   @staticmethod
   def _scrub_args(classpath, main, jvm_options, args, cwd):
+    return Executor._scrub_executable_args(classpath, main, jvm_options) + \
+           Executor._scrub_runner_args(args, cwd)
+
+  @staticmethod
+  def _scrub_runner_args(args, cwd):
+    args = maybe_list(args or ())
+    return (args, cwd)
+
+  @staticmethod
+  def _scrub_executable_args(classpath, main, jvm_options):
     classpath = maybe_list(classpath)
     if not isinstance(main, string_types) or not main:
       raise ValueError('A non-empty main classname is required, given: {}'.format(main))
     jvm_options = maybe_list(jvm_options or ())
-    args = maybe_list(args or ())
-    return classpath, main, jvm_options, args, cwd
+    return classpath, main, jvm_options
 
   class Error(Exception):
     """Indicates an error launching a java program."""
@@ -67,6 +76,26 @@ class Executor(AbstractClass):
       :param string cwd: optionally set the working directory
       """
 
+  class Executable(object):
+    """A re-usable executable tha can run a java tool."""
+
+    def __init__(self, classpath, main, jvm_options):
+      self.jvm_options = jvm_options
+      self.main = main
+      self.classpath = classpath
+
+    @abstractproperty
+    def executor(self):
+      """Returns the executor this runner uses to run itself."""
+
+    def runner(self, args=None, cwd=None):
+      """Returns a Runner for the passed args / cwd """
+      return self._runner(*Executor._scrub_runner_args(args, cwd))
+
+    @abstractmethod
+    def _runner(self, args, cwd=None):
+      """Subclasses should return a `Runner` that can execute the given java main."""
+
   def __init__(self, distribution=None):
     """Constructs an Executor that can be used to launch java programs.
 
@@ -87,9 +116,20 @@ class Executor(AbstractClass):
     """Returns the `Distribution` this executor runs via."""
     return self._distribution
 
+  def executable(self, classpath, main, jvm_options=None):
+    """Returns an `Executor.Executable` for a given java classpath / main"""
+    return self._executable(*self._scrub_executable_args(classpath, main, jvm_options))
+
+  @abstractmethod
+  def _executable(self, classpath, main, jvm_options):
+    """Returns an `Executor.Executable` for a given java classpath / main
+
+    Subclasses override this to provide specialized executables
+    """
+
   def runner(self, classpath, main, jvm_options=None, args=None, cwd=None):
     """Returns an `Executor.Runner` for the given java command."""
-    return self._runner(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
+    return self.executable(classpath, main, jvm_options).runner(args, cwd)
 
   def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None,
       cwd=None):
@@ -108,10 +148,6 @@ class Executor(AbstractClass):
                            cwd=cwd)
     return executor.run(stdout=stdout, stderr=stderr, cwd=cwd)
 
-  @abstractmethod
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
-    """Subclasses should return a `Runner` that can execute the given java main."""
-
   def _create_command(self, classpath, main, jvm_options, args, cwd=None):
     cmd = [self._distribution.java]
     cmd.extend(jvm_options)
@@ -128,20 +164,27 @@ class CommandLineGrabber(Executor):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
-    self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
-    class Runner(self.Runner):
+  def _executable(self, classpath, main, jvm_options):
+    class Executable(self.Executable):
       @property
       def executor(_):
         return self
 
-      @property
-      def command(_):
-        return list(self._command)
+      def _runner(_, args, cwd=None):
+        self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
+        class Runner(self.Runner):
+          @property
+          def executor(_):
+            return self
 
-      def run(_, stdout=None, stderr=None, cwd=None):
-        return 0
-    return Runner()
+          @property
+          def command(_):
+            return list(self._command)
+
+          def run(_, stdout=None, stderr=None, cwd=None):
+            return 0
+        return Runner()
+    return Executable(classpath, main, jvm_options)
 
   @property
   def cmd(self):
@@ -183,22 +226,28 @@ class SubprocessExecutor(Executor):
     return super(SubprocessExecutor, self)._create_command(classpath, main, jvm_options,
                                                            args, cwd=cwd)
 
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
-    command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
-
-    class Runner(self.Runner):
-      @property
+  def _executable(self, classpath, main, jvm_options):
+    class Executable(self.Executable):
       def executor(_):
         return self
 
-      @property
-      def command(_):
-        return list(command)
+      def _runner(_, args, cwd=None):
+        command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
 
-      def run(_, stdout=None, stderr=None, cwd=None):
-        return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
+        class Runner(self.Runner):
+          @property
+          def executor(_):
+            return self
 
-    return Runner()
+          @property
+          def command(_):
+            return list(command)
+
+          def run(_, stdout=None, stderr=None, cwd=None):
+            return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
+
+        return Runner()
+    return Executable(classpath, main, jvm_options)
 
   def spawn(self, classpath, main, jvm_options=None, args=None, cwd=None, **subprocess_args):
     """Spawns the java program passing any extra subprocess kwargs on to subprocess.Popen.

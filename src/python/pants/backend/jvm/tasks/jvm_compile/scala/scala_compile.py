@@ -93,6 +93,9 @@ class ScalaCompile(JvmCompile):
       ret.append((root, [plugin_info_file]))
     return ret
 
+  def create_compiler_executable(self):
+    return self._zinc_utils.executable(self.create_java_executor())
+
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
-    return self._zinc_utils.compile(args, classpath, sources,
+    return self._zinc_utils.compile(self.get_compiler_executable(), args, classpath, sources,
                                     classes_output_dir, analysis_file, upstream_analysis)
