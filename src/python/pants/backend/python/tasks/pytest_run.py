@@ -27,7 +27,8 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
-from pants.util.contextutil import environment_as, temporary_dir, temporary_file, temporary_file_path
+from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
+                                    temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.strutil import safe_shlex_split
 
