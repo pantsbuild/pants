@@ -74,10 +74,9 @@ class FileDepsTest(ConsoleTaskTestBase):
                   definition=dedent("""
                     java_library(
                       name='core',
-                      sources=[
-                        'core1.java',
-                        'core2.java'
-                      ],
+                      sources=globs(
+                        'core*.java',
+                      ),
                       dependencies=[
                         'src/scala/core'
                       ]
@@ -167,6 +166,17 @@ class FileDepsTest(ConsoleTaskTestBase):
       'src/resources/lib/BUILD',
       'src/resources/lib/data.json',
       targets=[self.target('src/resources/lib')]
+    )
+
+  def test_globs(self):
+    self.assert_console_output(
+      'tools/BUILD',
+      'src/scala/core/BUILD',
+      'src/scala/core/core1.scala',
+      'src/java/core/BUILD',
+      'src/java/core/core*.java',
+      targets=[self.target('src/scala/core')],
+      options=dict(globs=True),
     )
 
   def test_scala_java_cycle_scala_end(self):

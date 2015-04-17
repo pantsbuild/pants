@@ -20,6 +20,11 @@ class FileDeps(ConsoleTask):
   Files are listed with absolute paths and any BUILD files implied in the transitive closure of
   targets are also included.
   """
+  @classmethod
+  def register_options(cls, register):
+    super(FileDeps, cls).register_options(register)
+    register('--globs', default=False, action='store_true',
+             help='Instead of outputting filenames, output globs (ignoring excludes)')
 
   def console_output(self, targets):
     concrete_targets = set()
@@ -36,10 +41,15 @@ class FileDeps(ConsoleTask):
 
     buildroot = get_buildroot()
     files = set()
+    output_globs = self.get_options().globs
     for target in concrete_targets:
       files.add(target.address.build_file.full_path)
       if target.has_sources():
-        files.update(os.path.join(buildroot, src) for src in target.sources_relative_to_buildroot())
+        if output_globs:
+          globs_obj = target.globs_relative_to_buildroot()
+          files.update(os.path.join(buildroot, src) for src in globs_obj['globs'])
+        else:
+          files.update(os.path.join(buildroot, src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to
       # SourcesPayload to allow this special-casing to go away.
       if isinstance(target, JvmApp):
