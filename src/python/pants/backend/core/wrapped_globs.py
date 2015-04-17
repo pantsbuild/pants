@@ -31,7 +31,7 @@ class FilesetWithSpec(object):
     return self._result[index]
 
   @deprecated(removal_version='0.0.35',
-              hint_message='Instead of glob arithmetic, use glob(..., exclude=[...])')
+              hint_message='Instead of globs(a) + globs(b), use globs(a, b)')
   def __add__(self, other):
     filespec = deepcopy(self.filespec)
     if isinstance(other, FilesetWithSpec):
