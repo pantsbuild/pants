@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import logging
 import os
+import re
 import shutil
 import time
 import traceback
@@ -26,7 +27,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
-from pants.util.contextutil import environment_as, temporary_dir, temporary_file
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.strutil import safe_shlex_split
 
@@ -36,7 +37,8 @@ logging.basicConfig()
 
 
 class PythonTestFailure(TaskError):
-  pass
+  def __init__(self, *args, **kwargs):
+    super(PythonTestFailure, self).__init__(*args, **kwargs)
 
 
 class PythonTestResult(object):
@@ -48,9 +50,13 @@ class PythonTestResult(object):
   def rc(value):
     return PythonTestResult('SUCCESS' if value == 0 else 'FAILURE', rc=value)
 
-  def __init__(self, msg, rc=None):
+  def with_failed_targets(self, failed_targets):
+    return PythonTestResult(self._msg, self._rc, failed_targets)
+
+  def __init__(self, msg, rc=None, failed_targets=None):
     self._rc = rc
     self._msg = msg
+    self._failed_targets = failed_targets or []
 
   def __str__(self):
     return self._msg
@@ -59,6 +65,9 @@ class PythonTestResult(object):
   def success(self):
     return self._rc == 0
 
+  @property
+  def failed_targets(self):
+    return self._failed_targets
 
 
 class PytestRun(PythonTask):
@@ -105,12 +114,13 @@ class PytestRun(PythonTask):
         # into thinking the terminal window is narrower than it is.
         cols = os.environ.get('COLUMNS', 80)
         with environment_as(COLUMNS=str(int(cols) - 30)):
-          if self.run_tests(test_targets, workunit):
-            raise PythonTestFailure()
+          self.run_tests(test_targets, workunit)
 
   def run_tests(self, targets, workunit):
     if self.get_options().fast:
-      return 0 if self._do_run_tests(targets, workunit).success else 1
+      result = self._do_run_tests(targets, workunit)
+      if not result.success:
+        raise PythonTestFailure(failed_targets=result.failed_targets)
     else:
       results = {}
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
@@ -119,12 +129,16 @@ class PytestRun(PythonTask):
       for target in targets:
         if isinstance(target, PythonTests):
           rv = self._do_run_tests([target], workunit)
-          results[target.id] = rv
+          results[target] = rv
           if not rv.success and fail_hard:
             break
-      for target_id in sorted(results):
-        self.context.log.info('{0:80}.....{1:>10}'.format(target_id, str(results[target_id])))
-      return 0 if all(rc.success for rc in results.values()) else 1
+
+      for target in sorted(results):
+        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
+
+      failed_targets = [target for target, rv in results.items() if not rv.success]
+      if failed_targets:
+        raise PythonTestFailure(failed_targets=failed_targets)
 
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):
@@ -345,6 +359,51 @@ class PytestRun(PythonTask):
     finally:
       chroot.delete()
 
+  def _do_run_tests_with_args(self, pex, workunit, args):
+    try:
+      # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
+      # session on any test failure.  In order to support use of this pass-through flag we must
+      # turn off stdin buffering that otherwise occurs.  Setting the PYTHONUNBUFFERED env var to
+      # any value achieves this in python2.7.  We'll need a different solution when we support
+      # running pants under CPython 3 which does not unbuffer stdin using this trick.
+      env = {
+        'PYTHONUNBUFFERED': '1',
+      }
+      # If profiling a test run, this will enable profiling on the test code itself.
+      # Note that tests may run in a different cwd, so it's best to set PANTS_PROFILE
+      # to an absolute path to make it easy to find the subprocess profiles later.
+      if 'PANTS_PROFILE' in os.environ:
+        env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(os.environ['PANTS_PROFILE'],
+                                                             time.time())
+      with environment_as(**env):
+        rc = self._pex_run(pex, workunit, args=args, setsid=True)
+        return PythonTestResult.rc(rc)
+    except Exception:
+      self.context.log.error('Failed to run test!')
+      self.context.log.info(traceback.format_exc())
+      return PythonTestResult.exception()
+
+  # Pattern for lines such as:
+  # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
+  RESULTLOG_FAILED_PATTERN = re.compile(r'^F +(.+)::(.+)$')
+
+  @classmethod
+  def _get_failed_targets_from_resultlogs(cls, filename, targets):
+    with open(filename, 'r') as fp:
+      lines = fp.read().split('\n')
+
+    failed_files = set([
+      m.groups()[0] for m in map(cls.RESULTLOG_FAILED_PATTERN.match, lines) if m and m.groups()
+    ])
+
+    failed_targets = set()
+    for failed_file in failed_files:
+      failed_targets.update([
+        t for t in targets if failed_file in t.sources_relative_to_buildroot()
+      ])
+
+    return list(failed_targets)
+
   def _do_run_tests(self, targets, workunit):
     if not targets:
       return PythonTestResult.rc(0)
@@ -364,28 +423,20 @@ class PytestRun(PythonTask):
       args.extend(test_args)
       args.extend(sources)
 
-      try:
-        # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
-        # session on any test failure.  In order to support use of this pass-through flag we must
-        # turn off stdin buffering that otherwise occurs.  Setting the PYTHONUNBUFFERED env var to
-        # any value achieves this in python2.7.  We'll need a different solution when we support
-        # running pants under CPython 3 which does not unbuffer stdin using this trick.
-        env = {
-          'PYTHONUNBUFFERED': '1',
-        }
-        # If profiling a test run, this will enable profiling on the test code itself.
-        # Note that tests may run in a different cwd, so it's best to set PANTS_PROFILE
-        # to an absolute path to make it easy to find the subprocess profiles later.
-        if 'PANTS_PROFILE' in os.environ:
-          env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(os.environ['PANTS_PROFILE'],
-                                                               time.time())
-        with environment_as(**env):
-          rc = self._pex_run(pex, workunit, args=args, setsid=True)
-          return PythonTestResult.rc(rc)
-      except Exception:
-        self.context.log.error('Failed to run test!')
-        self.context.log.info(traceback.format_exc())
-        return PythonTestResult.exception()
+      def run_and_analyze(resultlog_path):
+        result = self._do_run_tests_with_args(pex, workunit, args)
+        failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
+        return result.with_failed_targets(failed_targets)
+
+      # The user might have already specified the resultlog option. In such case, reuse it.
+      resultlogs = [arg.split('=', 1)[-1] for arg in args if arg.startswith('--resultlog=')]
+
+      if resultlogs:
+        return run_and_analyze(resultlogs[-1])
+      else:
+        with temporary_file_path() as resultlog_path:
+          args.append('--resultlog=%s' % resultlog_path)
+          return run_and_analyze(resultlog_path)
 
   def _pex_run(self, pex, workunit, args, setsid=False):
     return pex.run(args=args, setsid=setsid,

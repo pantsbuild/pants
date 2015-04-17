@@ -214,12 +214,14 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   # Targets that are intended to fail
   negative_test_targets=(
-    testprojects/src/thrift/org/pantsbuild/thrift_linter:
-    testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
+    testprojects/src/antlr/pants/backend/python/test:antlr_failure
     testprojects/src/java/org/pantsbuild/testproject/cycle1
     testprojects/src/java/org/pantsbuild/testproject/cycle2
-    testprojects/src/antlr/pants/backend/python/test:antlr_failure
+    testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
     testprojects/src/python/antlr:test_antlr_failure
+    testprojects/src/thrift/org/pantsbuild/thrift_linter:
+    testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target
+    testprojects/tests/python/pants/dummies:failing_targe
   )
 
   targets_to_exclude=(
