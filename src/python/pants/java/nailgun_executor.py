@@ -167,39 +167,33 @@ class NailgunExecutor(Executor):
 
     self._ins = ins
 
-  def _executable(self, classpath, main, jvm_options):
-    nailgun = self._get_nailgun_client(jvm_options, classpath)
-    class Executable(self.Executable):
-      def __init__(this, *args, **kwargs):
-        super(Executable,this).__init__(*args, **kwargs)
+  class Executable(Executor.Executable):
+    def __init__(self, executor, classpath, main, jvm_options):
+      super(NailgunExecutor.Executable, self).__init__(executor, classpath, main, jvm_options)
+      self.nailgun = executor._get_nailgun_client(jvm_options, classpath)
 
+  def _runner(self, executable, args, cwd=None):
+    command = self._create_command(executable.classpath, executable.main, executable.jvm_options, args)
+
+    class Runner(self.Runner):
       @property
-      def executor(_):
+      def executor(this):
         return self
 
-      def _runner(_, args, cwd=None):
-        command = self._create_command(classpath, main, jvm_options, args)
+      @property
+      def command(self):
+        return list(command)
 
-        class Runner(self.Runner):
-          @property
-          def executor(this):
-            return self
+      def run(this, stdout=None, stderr=None, cwd=None):
+        try:
+          logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=executable.nailgun, cmd=this.cmd))
+          return executable.nailgun(executable.main, cwd, stdout, stderr, *args)
+        except executable.nailgun.NailgunError as e:
+          self.kill()
+          raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
+                           .format(ng_desc=executable.nailgun, main=executable.main, args=' '.join(args), msg=e))
 
-          @property
-          def command(self):
-            return list(command)
-
-          def run(this, stdout=None, stderr=None, cwd=None):
-            try:
-              logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
-              return nailgun(main, cwd, stdout, stderr, *args)
-            except nailgun.NailgunError as e:
-              self.kill()
-              raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
-                               .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
-
-        return Runner()
-    return Executable(classpath, main, jvm_options)
+    return Runner()
 
   def kill(self):
     """Kills the nailgun server owned by this executor if its currently running."""
