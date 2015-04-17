@@ -11,9 +11,9 @@ import shutil
 import threading
 from collections import defaultdict
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
 from pants.backend.jvm.tasks.jar_task import JarTask
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.java import util
@@ -90,7 +90,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   def execute(self):
     context = self.context
-    if JvmToolTaskMixin.get_registered_tools():
+    if JvmToolMixin.get_registered_tools():
       # Map of scope -> (map of key -> callback).
       callback_product_map = (context.products.get_data('jvm_build_tools_classpath_callbacks') or
                               defaultdict(dict))
@@ -101,7 +101,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
-      for scope, key, main, custom_rules in JvmToolTaskMixin.get_registered_tools():
+      for scope, key, main, custom_rules in JvmToolMixin.get_registered_tools():
         option = key.replace('-', '_')
         deplist = self.context.options.for_scope(scope)[option]
         callback_product_map[scope][key] = self.cached_bootstrap_classpath_callback(

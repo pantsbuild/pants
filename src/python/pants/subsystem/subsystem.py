@@ -5,17 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractproperty
-
 from pants.option.options import Options
-from pants.util.meta import AbstractClass
 
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-class Subsystem(AbstractClass):
+class Subsystem(object):
   """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
@@ -32,12 +29,13 @@ class Subsystem(AbstractClass):
 
   TODO(benjy): Model dependencies between subsystems? Registration of subsystems?
   """
-  @abstractproperty
-  def scope_qualifier(self):
+  @classmethod
+  def scope_qualifier(cls):
     """Qualifies the options scope of this Subsystem type.
 
-    E.g., for SubsystemFoo this might return 'foo'.
+    E.g., for SubsystemFoo this should return 'foo'.
     """
+    raise NotImplementedError()
 
   @classmethod
   def register_options(cls, register):
@@ -48,12 +46,12 @@ class Subsystem(AbstractClass):
 
   @classmethod
   def register_options_on_scope(cls, options, scope):
-    """Trigger registration of this subsystem's options, qualified under the given scope."""
+    """Trigger registration of this subsystem's options under a given scope."""
     cls.register_options(options.registration_function_for_scope(cls.qualify_scope(scope)))
 
   @classmethod
   def qualify_scope(cls, scope):
-    return '{0}.{1}'.format(scope, cls.scope_qualifier) if scope else cls.scope_qualifier
+    return '{0}.{1}'.format(scope, cls.scope_qualifier()) if scope else cls.scope_qualifier()
 
   # The full Options object for this pants run.  Will be set after options are parsed.
   # TODO: A less clunky way to make option values available?
