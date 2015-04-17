@@ -414,6 +414,12 @@ class PytestRun(PythonTask):
       return PythonTestResult.rc(0)
 
     with self._test_runner(targets, workunit) as (pex, test_args):
+
+      def run_and_analyze(resultlog_path):
+        result = self._do_run_tests_with_args(pex, workunit, args)
+        failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
+        return result.with_failed_targets(failed_targets)
+
       args = []
       if self._debug:
         args.extend(['-s'])
@@ -423,11 +429,6 @@ class PytestRun(PythonTask):
         args.extend(safe_shlex_split(options))
       args.extend(test_args)
       args.extend(sources)
-
-      def run_and_analyze(resultlog_path):
-        result = self._do_run_tests_with_args(pex, workunit, args)
-        failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
-        return result.with_failed_targets(failed_targets)
 
       # The user might have already specified the resultlog option. In such case, reuse it.
       resultlogs = [arg.split('=', 1)[-1] for arg in args if arg.startswith('--resultlog=')]
