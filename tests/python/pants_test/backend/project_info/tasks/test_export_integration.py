@@ -66,9 +66,9 @@ class ExportIntegrationTest(ConsoleTaskTestBase):
 
     try:
       with pushd(self.build_root):
+        subprocess.check_call(['git', 'init'])
         subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
         subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
-        subprocess.check_call(['git', 'init'])
         subprocess.check_call(['git', 'add', '.'])
         subprocess.check_call(['git', 'commit', '-m' 'initial commit'])
         proc = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE)
