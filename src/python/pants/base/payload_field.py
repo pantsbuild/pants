@@ -63,7 +63,7 @@ class FingerprintedMixin(object):
     """Override this method to implement a fingerprint for your class.
 
     :returns: a sha1 hexdigest hashing the contents of this structure."""
-    raise NotImplementedError
+    raise NotImplementedError()
 
 
 class FingerprintedField(PayloadField):
