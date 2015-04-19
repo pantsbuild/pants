@@ -74,7 +74,7 @@ class BinaryUtil(object):
 
     Exposed for associated unit tests.
     :param supportdir: the path used to make a path under --pants_bootstrapdir.
-    :param version: the version number of the tool used to make a path under --pants-boostrapdir.
+    :param version: the version number of the tool used to make a path under --pants-bootstrapdir.
     :param name: name of the binary to search for. (e.g 'protoc')
     :returns: Base path used to select the binary file.
     """
