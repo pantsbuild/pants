@@ -60,6 +60,7 @@ class Ivy(object):
 
     Raises Ivy.Error if the command fails for any reason.
     """
+    executor = executor or SubprocessExecutor()
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
       result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)

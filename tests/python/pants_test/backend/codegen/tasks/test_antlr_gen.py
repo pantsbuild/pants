@@ -30,7 +30,6 @@ class AntlrGenTest(NailgunTaskTestBase):
 
   def setUp(self):
     super(AntlrGenTest, self).setUp()
-
     self.create_file(relpath='{srcroot}/{dir}/{prefix}.g4'.format(**self.PARTS),
                      contents=dedent('''
       grammar {prefix};
