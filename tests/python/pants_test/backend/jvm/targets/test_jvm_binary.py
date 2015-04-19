@@ -29,11 +29,11 @@ class JarRulesTest(unittest.TestCase):
     with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a string'):
       Skip(None)
     with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a string'):
-      Duplicate(None, None)
+      Duplicate(None, Duplicate.SKIP)
     with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern: \) is not a valid'):
       Skip(r')')
     with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern: \) is not a valid'):
-      Duplicate(r')', None)
+      Duplicate(r')', Duplicate.SKIP)
 
   def test_bad_action(self):
     with self.assertRaisesRegexp(ValueError, r'The supplied action must be one of'):

@@ -21,7 +21,8 @@ from pants.util.meta import AbstractClass
 
 
 class JarRule(FingerprintedMixin, AbstractClass):
-  def __init__(self, apply_pattern):
+  def __init__(self, apply_pattern, payload=None):
+    self.payload = payload or Payload()
     if not isinstance(apply_pattern, string_types):
       raise ValueError('The supplied apply_pattern is not a string, given: {}'
                        .format(apply_pattern))
@@ -31,15 +32,19 @@ class JarRule(FingerprintedMixin, AbstractClass):
       raise ValueError('The supplied apply_pattern: {pattern} '
                        'is not a valid regular expression: {msg}'
                        .format(pattern=apply_pattern, msg=e))
+    self.payload.add_fields({
+      'apply_pattern' : PrimitiveField(apply_pattern),
+    })
 
   def fingerprint(self):
-    hasher = sha1()
-    hasher.update(self._apply_pattern.pattern)
-    return hasher.hexdigest()
+    return self.payload.fingerprint()
 
   @property
   def apply_pattern(self):
-    """The pattern that matches jar entry paths this rule applies to."""
+    """The pattern that matches jar entry paths this rule applies to.
+
+    :rtype: re.RegexObject
+    """
     return self._apply_pattern
 
 
@@ -47,7 +52,7 @@ class Skip(JarRule):
   """A rule that skips adding matched entries to a jar."""
 
   def __repr__(self):
-    return "Skip(apply_pattern={})".format(self._apply_pattern.pattern)
+    return "Skip(apply_pattern={})".format(self.payload.apply_pattern)
 
 
 class Duplicate(JarRule):
@@ -105,24 +110,24 @@ class Duplicate(JarRule):
     :param action: An action to take to handle one or more duplicate entries.  Must be one of:
       ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT`` or ``Duplicate.FAIL``.
     """
-    super(Duplicate, self).__init__(apply_pattern)
+    payload = Payload()
+    payload.add_fields({
+      'action' :  PrimitiveField(self.validate_action(action)),
+    })
+    super(Duplicate, self).__init__(apply_pattern, payload=payload)
 
-    self._action = self.validate_action(action)
 
   @property
   def action(self):
     """The action to take for any duplicate entries that match this rule's ``apply_pattern``."""
-    return self._action
+    return self.payload.action
 
   def fingerprint(self):
-    hasher = sha1()
-    hasher.update(super(Duplicate, self).fingerprint())
-    hasher.update(self._action)
-    return hasher.hexdigest()
+    return self.payload.fingerprint()
 
   def __repr__(self):
-    return "Duplicate(apply_pattern={0}, action={1})".format(self._apply_pattern.pattern,
-                                                             self._action)
+    return "Duplicate(apply_pattern={0}, action={1})".format(self.payload.apply_pattern,
+                                                             self.payload.action)
 
 
 class JarRules(FingerprintedMixin):
@@ -152,6 +157,7 @@ class JarRules(FingerprintedMixin):
     has the following special handling:
 
     - jar signature metadata is dropped
+    - ``java.util.ServiceLoader`` provider-configuration files are concatenated in the order
     - ``java.util.ServiceLoader`` provider-configuration files are concatenated in the order
       encountered
 
@@ -198,13 +204,16 @@ class JarRules(FingerprintedMixin):
     :param default_dup_action: The default action to take when a duplicate entry is encountered and
       no explicit rules apply to the entry.
     """
-    self._default_dup_action = Duplicate.validate_action(default_dup_action)
+    self.payload = Payload()
+    self.payload.add_fields({
+      'default_dup_action' : PrimitiveField(Duplicate.validate_action(default_dup_action))
+    })
     self._rules = assert_list(rules, expected_type=JarRule)
 
   @property
   def default_dup_action(self):
     """The default action to take when a duplicate jar entry is encountered."""
-    return self._default_dup_action
+    return self.payload.default_dup_action
 
   @property
   def rules(self):
@@ -213,7 +222,7 @@ class JarRules(FingerprintedMixin):
 
   def fingerprint(self):
     hasher = sha1()
-    hasher.update(self.default_dup_action)
+    hasher.update(self.payload.fingerprint())
     for rule in self.rules:
       hasher.update(rule.fingerprint())
     return hasher.hexdigest()
