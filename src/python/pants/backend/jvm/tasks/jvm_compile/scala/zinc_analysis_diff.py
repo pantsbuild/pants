@@ -71,7 +71,7 @@ class ZincAnalysisElementDiff(object):
     for header, arg_diff in self._arg_diffs.items():
       if arg_diff.is_different():
         parts.append('Section "{}" differs:\n'.format(header))
-        parts.append(str(arg_diff))
+        parts.append(unicode(arg_diff))
         parts.append('\n\n')
     return ''.join(parts)  # '' is a unicode, so the entire result will be.
 
