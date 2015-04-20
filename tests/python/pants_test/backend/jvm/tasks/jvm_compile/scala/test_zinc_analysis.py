@@ -51,7 +51,7 @@ class ZincAnalysisTest(unittest.TestCase):
       analysis.write(buf)
       return buf.getvalue()
 
-    full_analysis = parse_analyis('simple_analysis')
+    full_analysis = parse_analyis('simple.analysis')
 
     analysis_splits = full_analysis.split([
       ['/src/pants/examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala'],
@@ -60,7 +60,7 @@ class ZincAnalysisTest(unittest.TestCase):
     self.assertEquals(len(analysis_splits), 2)
 
     def compare_split(i):
-      expected_filename = 'simple_analysis_split{0}'.format(i)
+      expected_filename = 'simple_split{0}.analysis'.format(i)
 
       # First compare as objects.  This verifies that __eq__ works, but is weaker than the
       # text comparison because in some cases there can be small text differences that don't
@@ -81,7 +81,7 @@ class ZincAnalysisTest(unittest.TestCase):
     # Check that they compare as objects.
     self.assertTrue(full_analysis == merged_analysis)
     # Check that they compare as text.
-    expected = get_analysis_text('simple_analysis')
+    expected = get_analysis_text('simple.analysis')
     actual = analysis_to_string(merged_analysis)
     self.assertMultiLineEqual(expected, actual)
 
@@ -101,7 +101,8 @@ class ZincAnalysisTest(unittest.TestCase):
 
       # Parse analysis files.
       analysis_files = [os.path.join(analysis_dir, f)
-                        for f in os.listdir(analysis_dir) if f.endswith('.analysis')]
+                        for f in os.listdir(analysis_dir)
+                        if f.endswith('.analysis') and not f.endswith('.merged.analysis')]
       num_analyses = len(analysis_files)
 
       def parse(f):
@@ -139,7 +140,7 @@ class ZincAnalysisTest(unittest.TestCase):
                                    'Merged %d files' % num_analyses)
 
       # Write merged analysis to file.
-      merged_analysis_path = os.path.join(tmpdir, 'analysis.merged')
+      merged_analysis_path = os.path.join(tmpdir, 'merged.analysis')
       self._time(lambda: merged_analysis.write_to_path(merged_analysis_path),
                  'Wrote merged analysis to %s' % merged_analysis_path)
 
@@ -148,7 +149,7 @@ class ZincAnalysisTest(unittest.TestCase):
                                     'Read merged analysis from %s' % merged_analysis_path)
 
       # Read the expected merged analysis from file.
-      expected_merged_analysis_path = os.path.join(analysis_dir, 'all.analysis.merged')
+      expected_merged_analysis_path = os.path.join(analysis_dir, 'all.merged.analysis')
       expected_merged_analysis = self._time(
         lambda: parser.parse_from_path(expected_merged_analysis_path),
         'Read expected merged analysis from %s' % expected_merged_analysis_path)
@@ -228,7 +229,7 @@ class ZincAnalysisTest(unittest.TestCase):
     parser = ZincAnalysisParser()
     original_split_analyses = [parser.parse_from_path(f) for f in original_splits_files]
     merged_analysis = ZincAnalysis.merge(original_split_analyses)
-    merged_analysis.write_to_path(os.path.join(canonical_dir, 'all.analysis.merged'))
+    merged_analysis.write_to_path(os.path.join(canonical_dir, 'all.merged.analysis'))
 
     # Split the merged analysis back to individual analyses.
     sources_per_analysis = [a.stamps.sources.keys() for a in original_split_analyses]
