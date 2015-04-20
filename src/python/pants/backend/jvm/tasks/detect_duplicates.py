@@ -42,7 +42,7 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(DuplicateDetector, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
+    round_manager.require_data('zipped_resources_by_target')
     round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):
@@ -84,7 +84,7 @@ class DuplicateDetector(JvmBinaryTask):
   def _get_internal_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
     classes_by_target = self.context.products.get_data('classes_by_target')
-    resources_by_target = self.context.products.get_data('resources_by_target')
+    resources_by_target = self.context.products.get_data('zipped_resources_by_target')
 
     target_products = classes_by_target.get(binary_target)
     if target_products:  # Will be None if binary_target has no sources.

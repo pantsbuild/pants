@@ -324,7 +324,7 @@ class JarTask(NailgunTask):
       Later, in execute context, the `create_jar_builder` method can be called to get back a
       prepared ``JarTask.JarBuilder`` ready for use.
       """
-      round_manager.require_data('resources_by_target')
+      round_manager.require_data('zipped_resources_by_target')
       round_manager.require_data('classes_by_target')
 
     def __init__(self, context, jar):
@@ -342,7 +342,7 @@ class JarTask(NailgunTask):
         jar.
       """
       classes_by_target = self._context.products.get_data('classes_by_target')
-      resources_by_target = self._context.products.get_data('resources_by_target')
+      resources_by_target = self._context.products.get_data('zipped_resources_by_target')
 
       targets_added = []
 
