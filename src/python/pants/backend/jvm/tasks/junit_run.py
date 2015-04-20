@@ -202,11 +202,20 @@ class _JUnitRunner(object):
     are included in targets. If self._tests_to_run is set, return {test: None}
     for these tests instead."""
 
+    java_tests_targets = list(self._test_target_candidates(targets))
+    tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
+
     if self._tests_to_run:
-      return dict([(test, None) for test in self._get_tests_to_run()])
+      # Find matching targets to any requested test.
+      tests_with_targets = {}
+      for test in self._get_tests_to_run():
+        target = tests_from_targets.get(test)
+        if not target:
+          raise TaskError('test {0} is not included in any given target'.format(test))
+        tests_with_targets[test] = target
+      return tests_with_targets
     else:
-      java_tests_targets = list(self._test_target_candidates(targets))
-      return dict(list(self._calculate_tests_from_targets(java_tests_targets)))
+      return tests_from_targets
 
   def _pick_working_dir(self, cwd_opt, context):
     if not cwd_opt and context.target_roots:
@@ -233,10 +242,6 @@ class _JUnitRunner(object):
     failed_targets = []
 
     for test, target in tests_and_targets.items():
-      if target is None:
-        self._context.log.error('No target associated with test {0}'.format(test))
-        continue
-
       filename = get_test_filename(test)
 
       if os.path.exists(filename):
