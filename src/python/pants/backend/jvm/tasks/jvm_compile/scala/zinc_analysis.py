@@ -102,7 +102,7 @@ class ZincAnalysisElement(object):
     outfile.write(header + ':\n')
     outfile.write('{} items\n'.format(len(items)))
     for item in items:
-      outfile.write(item)
+      outfile.write(item.encode('utf-8'))
       outfile.write('\n')
 
   def translate_keys(self, token_translator, arg):
@@ -134,14 +134,29 @@ class ZincAnalysis(Analysis):
   FORMAT_VERSION_LINE = 'format version: 5\n'
 
   @staticmethod
-  def merge_dicts(dicts):
-    """Merges multiple dicts into one.
+  def merge_disjoint_dicts(dicts):
+    """Merges multiple dicts with disjoint key sets into one.
 
-    Assumes keys don't overlap.
+    May also be used when we don't care which value is picked for a key that appears more than once.
     """
     ret = defaultdict(list)
     for d in dicts:
       ret.update(d)
+    return ret
+
+  @staticmethod
+  def merge_overlapping_dicts(dicts):
+    """Merges multiple, possibly overlapping, dicts into one.
+
+    If a key exists in more than one dict, takes the largest value in dictionary order.
+    This is useful when the values are singleton stamp lists of the form ['lastModified(XXXXXXXX)'],
+    as it will lead to taking the most recent modification time.
+    """
+    ret = defaultdict(list)
+    for d in dicts:
+      for k, v in d.items():
+        if k not in ret or ret[k] < v:
+          ret[k] = v
     return ret
 
   @classmethod
@@ -153,10 +168,10 @@ class ZincAnalysis(Analysis):
     compile_setup = analyses[0].compile_setup if len(analyses) > 0 else CompileSetup((defaultdict(list), ))
 
     # Merge relations.
-    src_prod = ZincAnalysis.merge_dicts([a.relations.src_prod for a in analyses])
-    binary_dep = ZincAnalysis.merge_dicts([a.relations.binary_dep for a in analyses])
-    classes = ZincAnalysis.merge_dicts([a.relations.classes for a in analyses])
-    used = ZincAnalysis.merge_dicts([a.relations.used for a in analyses])
+    src_prod = ZincAnalysis.merge_disjoint_dicts([a.relations.src_prod for a in analyses])
+    binary_dep = ZincAnalysis.merge_disjoint_dicts([a.relations.binary_dep for a in analyses])
+    classes = ZincAnalysis.merge_disjoint_dicts([a.relations.classes for a in analyses])
+    used = ZincAnalysis.merge_disjoint_dicts([a.relations.used for a in analyses])
 
     class_to_source = dict((v, k) for k, vs in classes.items() for v in vs)
 
@@ -164,22 +179,25 @@ class ZincAnalysis(Analysis):
       internal = defaultdict(list)
       external = defaultdict(list)
 
-      naive_internal = ZincAnalysis.merge_dicts(internals)
-      naive_external = ZincAnalysis.merge_dicts(externals)
+      naive_internal = ZincAnalysis.merge_disjoint_dicts(internals)
+      naive_external = ZincAnalysis.merge_disjoint_dicts(externals)
 
+      # Note that we take care not to create empty values in internal.
       for k, vs in naive_internal.items():
-        internal[k].extend(vs)  # Ensure a new list.
+        if vs:
+          internal[k].extend(vs)  # Ensure a new list.
 
       for k, vs in naive_external.items():
         # class->source is many->one, so make sure we only internalize a source once.
-        internal_k = OrderedSet(internal[k])
+        internal_k = OrderedSet(internal.get(k, []))
         for v in vs:
           vfile = class_to_source.get(v)
           if vfile and vfile in src_prod:
             internal_k.add(vfile)  # Internalized.
           else:
             external[k].append(v)  # Remains external.
-        internal[k] = list(internal_k)
+        if internal_k:
+          internal[k] = list(internal_k)
       return internal, external
 
     internal, external = merge_dependencies(
@@ -206,15 +224,15 @@ class ZincAnalysis(Analysis):
                            classes, used))
 
     # Merge stamps.
-    products = ZincAnalysis.merge_dicts([a.stamps.products for a in analyses])
-    sources = ZincAnalysis.merge_dicts([a.stamps.sources for a in analyses])
-    binaries = ZincAnalysis.merge_dicts([a.stamps.binaries for a in analyses])
-    classnames = ZincAnalysis.merge_dicts([a.stamps.classnames for a in analyses])
+    products = ZincAnalysis.merge_disjoint_dicts([a.stamps.products for a in analyses])
+    sources = ZincAnalysis.merge_disjoint_dicts([a.stamps.sources for a in analyses])
+    binaries = ZincAnalysis.merge_overlapping_dicts([a.stamps.binaries for a in analyses])
+    classnames = ZincAnalysis.merge_disjoint_dicts([a.stamps.classnames for a in analyses])
     stamps = Stamps((products, sources, binaries, classnames))
 
     # Merge APIs.
-    internal_apis = ZincAnalysis.merge_dicts([a.apis.internal for a in analyses])
-    naive_external_apis = ZincAnalysis.merge_dicts([a.apis.external for a in analyses])
+    internal_apis = ZincAnalysis.merge_disjoint_dicts([a.apis.internal for a in analyses])
+    naive_external_apis = ZincAnalysis.merge_disjoint_dicts([a.apis.external for a in analyses])
     external_apis = defaultdict(list)
     for k, vs in naive_external_apis.items():
       kfile = class_to_source.get(k)
@@ -225,7 +243,7 @@ class ZincAnalysis(Analysis):
     apis = APIs((internal_apis, external_apis))
 
     # Merge source infos.
-    source_infos = SourceInfos((ZincAnalysis.merge_dicts([a.source_infos.source_infos for a in analyses]), ))
+    source_infos = SourceInfos((ZincAnalysis.merge_disjoint_dicts([a.source_infos.source_infos for a in analyses]), ))
 
     # Merge compilations.
     compilation_vals = sorted(set([x[0] for a in analyses for x in a.compilations.compilations.itervalues()]))
@@ -295,8 +313,10 @@ class ZincAnalysis(Analysis):
         internal = defaultdict(list)
         external = defaultdict(list)
 
+        # Note that we take care not to create empty values in external.
         for k, vs in naive_external.items():
-          external[k].extend(vs)  # Ensure a new list.
+          if vs:
+            external[k].extend(vs)  # Ensure a new list.
 
         for k, vs in naive_internal.items():
           for v in vs:
