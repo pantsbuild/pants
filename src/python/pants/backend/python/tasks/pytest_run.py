@@ -437,7 +437,7 @@ class PytestRun(PythonTask):
         return run_and_analyze(resultlogs[-1])
       else:
         with temporary_file_path() as resultlog_path:
-          args.append('--resultlog=%s' % resultlog_path)
+          args.append('--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
   def _pex_run(self, pex, workunit, args, setsid=False):
