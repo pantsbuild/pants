@@ -13,7 +13,6 @@ target(
   dependencies = [
     ':jar_library',
     ':java_agent',
-    ':java_tests',
     ':python_binary',
     ':python_target',
     ':scala_library',
@@ -57,17 +56,6 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'java_tests',
-  sources = ['test_java_tests.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/backend/core',
-    'src/python/pants/backend/jvm/targets:java',
-    'tests/python/pants_test/base:context_utils',
   ]
 )
 

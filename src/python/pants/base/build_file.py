@@ -9,10 +9,12 @@ import logging
 import os
 import re
 from collections import defaultdict
+from contextlib import contextmanager
 from glob import glob1
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.util.dirutil import safe_walk
 
 
@@ -40,6 +42,14 @@ class BuildFile(object):
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
   _cache = {}
+  _rev = None
+  _scm = None
+
+  @classmethod
+  def set_rev(cls, rev):
+    if cls._rev != rev:
+      cls.clear_cache()
+    cls._rev = rev
 
   @classmethod
   def clear_cache(cls):
@@ -116,7 +126,7 @@ class BuildFile(object):
           buildfiles.append(BuildFile.from_cache(root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  def __init__(self, root_dir, relpath=None, must_exist=True):
+  def __init__(self, root_dir, relpath=None, must_exist=True, rev=None):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
 
     :param string root_dir: The base directory of the project
@@ -133,30 +143,38 @@ class BuildFile(object):
 
     path = os.path.join(root_dir, relpath) if relpath else root_dir
     self._build_basename = BuildFile._BUILD_FILE_PREFIX
-    buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
+
+    def exists(path):
+      if not self._rev:
+        return os.path.exists(path)
+      relpath = os.path.relpath(path, root_dir)
+      return get_scm().exists(relpath, self._rev)
+
+
+    buildfile = os.path.join(path, self._build_basename) if self._isdir(path) else path
 
     if must_exist:
       # If the build file must exist then we want to make sure it's not a dir.
       # In other cases we are ok with it being a dir, for example someone might have
       # repo/scripts/build/doit.sh.
-      if os.path.isdir(buildfile):
+      if self._isdir(buildfile):
         raise self.MissingBuildFileError(
           'Path to buildfile ({buildfile}) is a directory, but it must be a file.'
           .format(buildfile=buildfile))
 
-      if not os.path.exists(os.path.dirname(buildfile)):
+      if not exists(os.path.dirname(buildfile)):
         raise self.MissingBuildFileError('Path to BUILD file does not exist at: {path}'
                                          .format(path=os.path.dirname(buildfile)))
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not os.path.exists(buildfile) or os.path.isdir(buildfile):
+    if not self._isfile(buildfile):
       for build in BuildFile._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
         break
 
     if must_exist:
-      if not os.path.exists(buildfile):
+      if not exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
@@ -175,7 +193,26 @@ class BuildFile(object):
 
   def exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return os.path.exists(self.full_path) and not os.path.isdir(self.full_path)
+    return self._isfile(self.full_path)
+
+  def _isfile(self, path):
+    if self._rev:
+      relpath = os.path.relpath(path, get_buildroot())
+      return get_scm().isfile(relpath, self._rev)
+    return os.path.isfile(path)
+
+  def _isdir(self, path):
+    if self._rev:
+      relpath = os.path.relpath(path, get_buildroot())
+      return get_scm().isdir(relpath, self._rev)
+    return os.path.isdir(path)
+
+  def _open(self, path, mode):
+    if self._rev:
+      relpath = os.path.relpath(path, get_buildroot())
+      return get_scm().open(relpath, self._rev, mode)
+    else:
+      return open(path, mode)
 
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
@@ -193,7 +230,7 @@ class BuildFile(object):
       parent = os.path.dirname(dir)
       for parent_buildfile in BuildFile._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        if os.path.exists(buildfile) and not os.path.isdir(buildfile):
+        if self._isfile(buildfile):
           return parent, BuildFile.from_cache(self.root_dir,
                                               os.path.relpath(buildfile, self.root_dir))
       return parent, None
@@ -220,7 +257,7 @@ class BuildFile(object):
     for build in BuildFile._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        if not os.path.isdir(os.path.join(self.root_dir, siblingpath)):
+        if not self._isdir(os.path.join(self.root_dir, siblingpath)):
           yield BuildFile.from_cache(self.root_dir, siblingpath)
 
   def family(self):
@@ -234,7 +271,7 @@ class BuildFile(object):
 
   def code(self):
     """Returns the code object for this BUILD file."""
-    with open(self.full_path, 'rb') as source:
+    with self._open(self.full_path, 'rb') as source:
       return compile(source.read(), self.full_path, 'exec', flags=0, dont_inherit=True)
 
   def __eq__(self, other):

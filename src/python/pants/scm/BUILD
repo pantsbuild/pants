@@ -22,5 +22,6 @@ python_library(
   sources = ['git.py'],
   dependencies = [
     ':scm',
+    'src/python/pants/util:strutil',
   ],
 )
