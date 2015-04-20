@@ -209,9 +209,9 @@ class _JUnitRunner(object):
       # Find matching targets to any requested test.
       tests_with_targets = {}
       for test in self._get_tests_to_run():
-        target = tests_from_targets.get(test)
-        if not target:
-          raise TaskError('test {0} is not included in any given target'.format(test))
+        # A test might contain #specific_method, which is not needed to find a target.
+        test_class_name = test.partition('#')[0]
+        target = tests_from_targets.get(test_class_name)
         tests_with_targets[test] = target
       return tests_with_targets
     else:
@@ -242,6 +242,9 @@ class _JUnitRunner(object):
     failed_targets = []
 
     for test, target in tests_and_targets.items():
+      if target is None:
+        self._context.log.warning('Unknown target for test %{0}'.format(test))
+
       filename = get_test_filename(test)
 
       if os.path.exists(filename):
@@ -250,7 +253,7 @@ class _JUnitRunner(object):
           str_failures = xml.get_attribute('testsuite', 'failures')
           int_failures = int(str_failures)
 
-          if int_failures > 0:
+          if target and (int_failures > 0):
             failed_targets.append(target)
         except (XmlParser.XmlError, ValueError) as e:
           self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
