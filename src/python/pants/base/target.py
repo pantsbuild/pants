@@ -416,16 +416,15 @@ class Target(AbstractTarget):
       raise ValueError('work must be callable but was {}'.format(work))
     if predicate and not callable(predicate):
       raise ValueError('predicate must be callable but was {}'.format(predicate))
-    self._build_graph.walk_transitive_dependency_graph_dfs([self.address], work, predicate)
+    self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
 
-  def closure(self, bfs=False, postorder=False):
+  def closure(self, bfs=False):
     """Returns this target's transitive dependencies.
 
-    The walk will be depth-first in preorder unless bfs=True or postorder=True are specified
-    to request a breadth-first and/or postorder traversal.
+    The walk will be depth-first in preorder, or breadth first if bfs=True is specified.
     """
     if bfs:
-      return self._build_graph.transitive_subgraph_of_addresses([self.address], postorder)
+      return self._build_graph.transitive_subgraph_of_addresses_bfs([self.address])
     else:
       return self._build_graph.transitive_subgraph_of_addresses([self.address], postorder)
 
