@@ -38,8 +38,7 @@ logging.basicConfig()
 
 
 class PythonTestFailure(TaskError):
-  def __init__(self, *args, **kwargs):
-    super(PythonTestFailure, self).__init__(*args, **kwargs)
+  pass
 
 
 class PythonTestResult(object):
@@ -391,17 +390,17 @@ class PytestRun(PythonTask):
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):
     with open(filename, 'r') as fp:
-      lines = fp.read().split('\n')
+      lines = fp.readlines()
 
-    failed_files = set([
+    failed_files = {
       m.groups()[0] for m in map(cls.RESULTLOG_FAILED_PATTERN.match, lines) if m and m.groups()
-    ])
+    }
 
     failed_targets = set()
     for failed_file in failed_files:
-      failed_targets.update([
+      failed_targets.update(
         t for t in targets if failed_file in t.sources_relative_to_buildroot()
-      ])
+      )
 
     return list(failed_targets)
 
