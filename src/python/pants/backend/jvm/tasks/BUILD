@@ -251,10 +251,11 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
-    'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
+    'src/python/pants/java:util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:xml_parser',
     'src/python/pants:binary_util',
   ],
 )
