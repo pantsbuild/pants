@@ -426,7 +426,7 @@ class Target(AbstractTarget):
     if bfs:
       return self._build_graph.transitive_subgraph_of_addresses_bfs([self.address])
     else:
-      return self._build_graph.transitive_subgraph_of_addresses([self.address], postorder)
+      return self._build_graph.transitive_subgraph_of_addresses([self.address])
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):
