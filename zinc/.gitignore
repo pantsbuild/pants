@@ -1,0 +1,6 @@
+project/project
+project/local.sbt
+target
+.idea
+*.jar
+*.iml

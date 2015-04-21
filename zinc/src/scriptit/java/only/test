@@ -1,0 +1,5 @@
+# setting java only option
+
+zinc -debug -java-only A.java
+
+exists A.class

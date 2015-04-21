@@ -1,0 +1,23 @@
+# test reload analysis utility
+
+! zinc -status
+
+zinc -nailed -analysis-cache a2 -d c2 A.scala
+
+zinc -nailed -analysis-cache a1 -d c1 A.scala
+
+copy changes/A1.scala A.scala
+
+zinc -nailed -analysis-cache a1 -d c1 A.scala
+
+copy c1 c2
+
+zinc -nailed -analysis -cache a1 -rebase c1:c2
+
+copy a1 a2
+
+zinc -nailed -analysis -reload a2
+
+zinc -nailed -analysis-cache a2 -d c2 A.scala
+
+zinc -shutdown

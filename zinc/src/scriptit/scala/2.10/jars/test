@@ -1,0 +1,5 @@
+# use scala 2.10 jars
+
+zinc -debug -scala-library {{scala.2.10.library}} -scala-compiler {{scala.2.10.compiler}} -scala-extra {{scala.2.10.extra}} A.scala
+
+exists A.class

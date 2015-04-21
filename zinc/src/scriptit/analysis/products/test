@@ -1,0 +1,7 @@
+# set output products option
+
+zinc -debug -output-products products -d target/classes src/A.scala src/B.scala
+
+exists products
+
+show products

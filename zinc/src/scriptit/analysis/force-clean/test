@@ -1,0 +1,20 @@
+# test force-clean option
+
+zinc -debug -d classes src/A.scala src/B.scala
+
+exists classes/b/A.class classes/b/A$.class classes/b/B.class classes/b/B$.class
+
+copy changes/A1.scala src/A.scala
+copy changes/B1.scala src/B.scala
+
+delete cache/classes
+
+! zinc -debug -d classes src/A.scala src/B.scala
+
+exists classes/b/A.class classes/b/A$.class classes/b/B.class classes/b/B$.class
+
+zinc -debug -d classes -force-clean src/A.scala src/B.scala
+
+! exists classes/b/A.class classes/b/A$.class
+
+exists classes/a/A.class classes/a/A$.class classes/b/B.class classes/b/B$.class

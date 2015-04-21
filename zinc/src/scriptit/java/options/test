@@ -1,0 +1,5 @@
+# setting javac options
+
+zinc -debug -C-encoding -Cutf8 A.java
+
+exists A.class

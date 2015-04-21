@@ -1,0 +1,41 @@
+# test split analysis utility
+
+! zinc -status
+
+zinc -nailed -analysis-cache analysis/abc -d classes -output-relations relations/abc a/A1.scala b/B1.scala c/C1.scala
+
+zinc -nailed -analysis -cache analysis/abc -split a:analysis/a,b:analysis/b,c:analysis/c
+
+zinc -nailed -analysis-cache analysis/a -d classes -output-relations relations/a a/A1.scala
+zinc -nailed -analysis-cache analysis/b -d classes -output-relations relations/b b/B1.scala
+zinc -nailed -analysis-cache analysis/c -d classes -output-relations relations/c c/C1.scala
+
+show relations/abc
+show relations/a
+show relations/b
+show relations/c
+
+delete analysis classes relations
+
+zinc -nailed -analysis-cache analysis/abc -d classes -output-relations relations/abc a/A1.scala a/A2.scala b/B1.scala b/B2.scala c/C1.scala c/C2.scala
+
+! exists analysis/a.relations
+! exists analysis/b.relations
+! exists analysis/c.relations
+
+zinc -nailed -analysis -mirror-analysis -cache analysis/abc -split {a/A1.scala:a/A2.scala}:analysis/a,{b/B1.scala:b/B2.scala}:analysis/b,{c/C1.scala:c/C2.scala}:analysis/c
+
+exists analysis/a.relations
+exists analysis/b.relations
+exists analysis/c.relations
+
+zinc -nailed -analysis-cache analysis/a -d classes -output-relations relations/a a/A1.scala a/A2.scala
+zinc -nailed -analysis-cache analysis/b -d classes -output-relations relations/b b/B1.scala b/B2.scala
+zinc -nailed -analysis-cache analysis/c -d classes -output-relations relations/c c/C1.scala c/C2.scala
+
+show relations/abc
+show relations/a
+show relations/b
+show relations/c
+
+zinc -shutdown

@@ -1,0 +1,28 @@
+# test rebase analysis utility
+
+! zinc -status
+
+zinc -nailed -analysis-cache a1 -d c1 -output-relations r1 A.scala
+
+copy a1 a2
+
+copy c1 c2
+
+zinc -nailed -analysis -cache a2 -rebase c1:c2
+
+zinc -nailed -analysis-cache a2 -d c2 -output-relations r2 A.scala
+
+zinc -nailed -analysis-cache a1 -d c1 -output-relations r1 A.scala
+
+zinc -nailed -analysis-cache a2 -d c2 -output-relations r2 A.scala
+
+show r1
+
+show r2
+
+! exists a2.relations
+zinc -nailed -mirror-analysis -analysis -cache a2 -rebase c1:c2
+exists a2.relations
+
+
+zinc -shutdown
