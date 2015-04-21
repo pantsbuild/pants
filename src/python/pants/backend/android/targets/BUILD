@@ -13,6 +13,7 @@ python_library(
   name = 'android',
   sources = [
     'android_binary.py',
+    'android_library.py',
     'android_resources.py',
     'android_target.py',
   ],
@@ -20,6 +21,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:target',
     'src/python/pants/backend/android:android_manifest_parser',

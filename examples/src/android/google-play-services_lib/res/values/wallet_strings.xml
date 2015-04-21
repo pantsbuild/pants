@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright 2014 Google Inc. All Rights Reserved. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <!-- Text on a placeholder buy button when Google Play services is not
+         available or up-to-date -->
+    <string
+        translation_description="Text on a button that allows a user to make a payment with Google Wallet [CHAR LIMIT=30]"
+        name="wallet_buy_button_place_holder">Buy with Google</string>
+
+</resources>
