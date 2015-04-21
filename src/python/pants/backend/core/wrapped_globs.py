@@ -20,7 +20,8 @@ class FilesetWithSpec(object):
 
   The filespec is what globs or file list it came from.
   """
-  def __init__(self, result, filespec):
+  def __init__(self, rel_root, result, filespec):
+    self._rel_root = rel_root
     self._result = result
     self.filespec = filespec
 
@@ -38,10 +39,10 @@ class FilesetWithSpec(object):
       filespec['globs'] += other.filespec['globs']
       other_result = other._result
     else:
-      filespec['globs'] += other
+      filespec['globs'] += [os.path.join(self._rel_root, other_path) for other_path in other]
       other_result = other
-    result = list(set(self._result) + set(other_result))
-    return FilesetWithSpec(result, filespec)
+    result = list(set(self._result).union(set(other_result)))
+    return FilesetWithSpec(self._rel_root, result, filespec)
 
   @deprecated(removal_version='0.0.35',
               hint_message='Instead of glob arithmetic, use glob(..., exclude=[...])')
@@ -52,11 +53,11 @@ class FilesetWithSpec(object):
       exclude.append(other.filespec)
       other_result = other._result
     else:
-      exclude.append({'globs' : other})
+      exclude.append({'globs' : [os.path.join(self._rel_root, other_path) for other_path in other]})
       other_result = other
     filespec['exclude'] = exclude
     result = list(set(self._result) - set(other_result))
-    return FilesetWithSpec(result, filespec)
+    return FilesetWithSpec(self._rel_root, result, filespec)
 
 class FilesetRelPathWrapper(object):
   def __init__(self, parse_context):
@@ -86,7 +87,7 @@ class FilesetRelPathWrapper(object):
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
-    return FilesetWithSpec(result, filespec)
+    return FilesetWithSpec(rel_root, result, filespec)
 
   def _is_glob_dir_outside_root(self, glob, root):
     # The assumption is that a correct glob starts with the root,
