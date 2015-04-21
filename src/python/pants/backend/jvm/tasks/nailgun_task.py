@@ -90,6 +90,17 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
     except executor.Error as e:
       raise TaskError(e)
 
+  def run_java_executable(self, executable, args, cwd, workunit_name, workunit_labels):
+    """Runs the executable with the given arguments.
+    """
+    try:
+      return util.execute_runner(executable.runner(args, cwd),
+                                 workunit_factory=self.context.new_workunit,
+                                 workunit_name=workunit_name,
+                                 workunit_labels=workunit_labels)
+    except executable.executor.Error as e:
+      raise TaskError(e)
+
 
 class NailgunTask(NailgunTaskBase, Task):
   # TODO(John Sirois): This just prevents ripple - maybe inline

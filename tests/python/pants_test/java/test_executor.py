@@ -56,10 +56,10 @@ class SubprocessExecutorTest(unittest.TestCase):
   def test_scrubbed_java_tool_options(self):
     self.do_test_jre_env_var('JAVA_TOOL_OPTIONS', '-Xmx1g')
 
-  def do_test_executor_classpath_relativize(self, executor):
+  def do_test_executor_runners_classpath_relativize(self, executor):
     """Test that 'executor' relativizes the classpath."""
     here = os.path.abspath(".")
-    runner = executor.runner([here], "bogus")
+    runner = executor.executable([here], "bogus").runner()
     self.assertFalse(here in runner.cmd)
     parts = runner.cmd.split(" ")
     found = False
@@ -71,4 +71,5 @@ class SubprocessExecutorTest(unittest.TestCase):
 
   def test_subprocess_classpath_relativize(self):
     with self.jre("FOO") as jre:
-      self.do_test_executor_classpath_relativize(SubprocessExecutor(Distribution(bin_path=jre)))
+      self.do_test_executor_runners_classpath_relativize(
+        SubprocessExecutor(Distribution(bin_path=jre)))

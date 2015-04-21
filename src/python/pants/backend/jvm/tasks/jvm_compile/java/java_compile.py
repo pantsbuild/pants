@@ -98,9 +98,15 @@ class JavaCompile(JvmCompile):
   def _language_platform_version_info(self):
     return [self.get_options().target] if self.get_options().target else []
 
+  def create_compiler_executable(self):
+    jmake_classpath = self.tool_classpath('jmake')
+    executor = self.create_java_executor()
+    return executor.executable(classpath=jmake_classpath,
+                               main=JavaCompile._JMAKE_MAIN,
+                               jvm_options=self._jvm_options)
+
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
-    jmake_classpath = self.tool_classpath('jmake')
     args = [
       '-classpath', ':'.join(relative_classpath),
       '-d', classes_output_dir,
@@ -138,12 +144,11 @@ class JavaCompile(JvmCompile):
     args.append('-C{}'.format(self._depfile))
 
     args.extend(sources)
-    result = self.runjava(classpath=jmake_classpath,
-                          main=JavaCompile._JMAKE_MAIN,
-                          jvm_options=self._jvm_options,
-                          args=args,
-                          workunit_name='jmake',
-                          workunit_labels=[WorkUnit.COMPILER])
+    result = self.run_java_executable(self.get_compiler_executable(),
+                                      args=args,
+                                      cwd=None,
+                                      workunit_name='jmake',
+                                      workunit_labels=[WorkUnit.COMPILER])
     if result:
       default_message = 'Unexpected error - JMake returned {}'.format(result)
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))
