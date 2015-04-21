@@ -82,7 +82,7 @@ class PrepareResources(Task):
         for conf in self.confs:
           # TODO(John Sirois): Introduce the notion of RuntimeClasspath and populate that product
           # instead of mutating the compile_classpath.
-          compile_classpath.add_for_targets(targets, [(conf, target_dir)])
+          compile_classpath.add_for_target(resources_tgt, [(conf, target_dir)])
         if resources_by_target is not None:
           resources_by_target[resources_tgt].add_rel_paths(
             target_dir, resources_tgt.sources_relative_to_source_root())
