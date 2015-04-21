@@ -416,11 +416,18 @@ class Target(AbstractTarget):
       raise ValueError('work must be callable but was {}'.format(work))
     if predicate and not callable(predicate):
       raise ValueError('predicate must be callable but was {}'.format(predicate))
-    self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
+    self._build_graph.walk_transitive_dependency_graph_dfs([self.address], work, predicate)
 
-  def closure(self):
-    """Returns this target's transitive dependencies, in DFS preorder traversal."""
-    return self._build_graph.transitive_subgraph_of_addresses([self.address])
+  def closure(self, bfs=False, postorder=False):
+    """Returns this target's transitive dependencies.
+
+    The walk will be depth-first in preorder unless bfs=True or postorder=True are specified
+    to request a breadth-first and/or postorder traversal.
+    """
+    if bfs:
+      return self._build_graph.transitive_subgraph_of_addresses([self.address], postorder)
+    else:
+      return self._build_graph.transitive_subgraph_of_addresses([self.address], postorder)
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   def add_labels(self, *label):

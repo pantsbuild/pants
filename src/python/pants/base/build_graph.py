@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import traceback
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 

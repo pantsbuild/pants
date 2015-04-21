@@ -35,9 +35,9 @@ class UnionProducts(object):
     """Gets the transitive product deps for the given targets, in order."""
     products = OrderedSet()
     visited = set()
-    # Walk the targets transitively to aggregate their products.
+    # Walk the targets transitively to aggregate their products. We do a breadth-first
     for target in targets:
-      for dep in target.closure():
+      for dep in target.closure(bfs=True):
         if dep not in visited:
           products.update(self._products_by_target[dep])
           visited.add(dep)

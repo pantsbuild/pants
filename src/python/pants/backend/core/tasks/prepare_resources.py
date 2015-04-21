@@ -42,8 +42,8 @@ class PrepareResources(Task):
       self.context.products.safe_create_data('resources_by_target',
                                              lambda: defaultdict(MultipleRootedProducts))
 
-    # `targets` contains the transitive subgraph in pre-order, which is approximately how
-    # we want them ordered on the classpath. Thus, we preserve ordering here.
+    # NB: Ordering isn't relevant here, because it is applied during the dep walk to
+    # consume from the compile_classpath.
     targets = self.context.targets()
     if len(targets) == 0:
       return
