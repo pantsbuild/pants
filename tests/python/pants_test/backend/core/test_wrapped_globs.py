@@ -129,18 +129,20 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('z/w/BUILD', 'java_library(name="w", sources=rglobs("*.java"))')
     graph = self.context().scan(self.build_root)
     relative_sources = list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
-    assert ['y/fleem.java', 'y/morx.java', 'foo.java'] == relative_sources
+    self.assertEqual(['y/fleem.java', 'y/morx.java', 'foo.java'], relative_sources)
 
   def test_rglob_respects_follow_links_override(self):
     self.add_to_build_file('z/w/BUILD',
                            'java_library(name="w", sources=rglobs("*.java", follow_links=False))')
     graph = self.context().scan(self.build_root)
-    assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+    self.assertEqual(['foo.java'],
+                     list(graph.get_target_from_spec('z/w').sources_relative_to_source_root()))
 
   # Remove the following tests when operator support is dropped from globs
   def test_globs_add_globs_added_to_spec(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y",'
-                                      '             sources=globs("morx.java") + globs("fleem.java"))')
+    self.add_to_build_file('y/BUILD',
+                           'java_library(name="y",'
+                           '             sources=globs("morx.java") + globs("fleem.java"))')
     graph = self.context().scan(self.build_root)
     globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
     self.assertEquals({'globs': ['y/morx.java', 'y/fleem.java']},
