@@ -405,6 +405,17 @@ class PytestRun(PythonTask):
     return list(failed_targets)
 
   def _do_run_tests(self, targets, workunit):
+
+    def _extract_resultlog_filename(args):
+      resultlogs = [arg.split('=', 1)[-1] for arg in args if arg.startswith('--resultlog=')]
+      if resultlogs:
+        return resultlogs[0]
+      if not resultlogs:
+        try:
+          return args[args.index('--resultlog') + 1]
+        except ValueError:
+          return None
+
     if not targets:
       return PythonTestResult.rc(0)
 
@@ -430,13 +441,13 @@ class PytestRun(PythonTask):
       args.extend(sources)
 
       # The user might have already specified the resultlog option. In such case, reuse it.
-      resultlogs = [arg.split('=', 1)[-1] for arg in args if arg.startswith('--resultlog=')]
+      resultlog_arg = _extract_resultlog_filename(args)
 
-      if resultlogs:
-        return run_and_analyze(resultlogs[-1])
+      if resultlog_arg:
+        return run_and_analyze(resultlog_arg)
       else:
         with temporary_file_path() as resultlog_path:
-          args.append('--resultlog={0}'.format(resultlog_path))
+          args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
   def _pex_run(self, pex, workunit, args, setsid=False):
