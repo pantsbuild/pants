@@ -27,6 +27,12 @@ class TaskError(Exception):
     return self._failed_targets
 
 
+class TestRunFailedTaskError(TaskError):
+  """Raised when an actual test run failed.
+  This is used to distinguish test run failures from infrastructure failures.
+  """
+
+
 class TargetDefinitionException(Exception):
   """Indicates an invalid target definition."""
 

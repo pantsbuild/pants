@@ -20,7 +20,7 @@ from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TaskError, TestRunFailedTaskError
 from pants.base.workunit import WorkUnit
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
@@ -282,7 +282,7 @@ class _JUnitRunner(object):
 
     if result != 0:
       failed_targets = self._get_failed_targets(tests_and_targets)
-      raise TaskError(
+      raise TestRunFailedTaskError(
         'java {0} ... exited non-zero ({1})'.format(main, result),
         failed_targets=failed_targets
       )
