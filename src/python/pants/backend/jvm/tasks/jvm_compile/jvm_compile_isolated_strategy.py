@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import Queue as queue
 from collections import OrderedDict, defaultdict, namedtuple
+import traceback
 
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
@@ -63,6 +64,9 @@ class ExecutionGraph(object):
 
     def all_successful(self, keys):
       return all(stat == SUCCESS for stat in [self._statuses[k] for k in keys])
+
+    def failed_keys(self):
+      return [key for key, stat in self._statuses.items() if stat == FAILURE]
 
   def __init__(self, parent_work_unit, run_tracker, worker_count, log):
     self._log = log
@@ -145,7 +149,7 @@ class ExecutionGraph(object):
         try:
           finished_key, success, value = finished_queue.get(timeout=10)
         except queue.Empty:
-          self._log.debug("Waiting on \n  {}".format(
+          self._log.debug("Waiting on \n  {}\n".format(
             "\n  ".join(
               "{}: {}".format(key, state) for key, state in status_table.unfinished_work().items()
             )))
@@ -158,7 +162,7 @@ class ExecutionGraph(object):
           finished_work.run_success_callback()
 
           ready_dependees = [dependee for dependee in direct_dependees
-                             if status_table.all_successful(finished_work.dependencies)]
+                             if status_table.all_successful(self._work[dependee].dependencies)]
 
           submit_work(ready_dependees)
         else:
@@ -173,15 +177,16 @@ class ExecutionGraph(object):
                                                             status_table.get(finished_key)))
 
       pool.shutdown()
-      if status_table.has_failures():
-        raise self.ExecutionFailure("Compile failed")
     except Exception as e:
       pool.abort()
       # Call failure callbacks for work that's unfinished.
       for key in status_table.unfinished_work().keys():
         self._work[key].run_failure_callback()
+      self._log.debug(traceback.format_exc())
+      raise self.ExecutionFailure("Error running work: {}".format(e))
 
-      raise self.ExecutionFailure("Error running work: {}".format(e.message), e)
+    if status_table.has_failures():
+      raise self.ExecutionFailure("Failed tasks: {}".format(', '.join(status_table.failed_keys())))
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
@@ -223,7 +228,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
-    self.context.log.info([t.address.spec for t in relevant_targets])
+
     for target in relevant_targets:
       cc = self.compile_context(target)
       compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
@@ -364,8 +369,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     try:
       exec_graph.execute()
-    except ExecutionGraph.ExecutionFailure:
-      raise TaskError("Compilation failure")
+    except ExecutionGraph.ExecutionFailure as e:
+      raise TaskError("Compilation failure: {}".format(e))
 
   def compute_resource_mapping(self, compile_contexts):
     return ResourceMapping(self._classes_dir)
