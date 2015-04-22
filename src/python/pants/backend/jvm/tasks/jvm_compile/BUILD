@@ -105,6 +105,14 @@ python_library(
 )
 
 python_library(
+  name = 'execution_graph',
+  sources = ['execution_graph.py'],
+  dependencies = [
+    'src/python/pants/base:worker_pool',
+  ],
+)
+
+python_library(
   name = 'jvm_compile_strategy',
   sources = ['jvm_compile_strategy.py'],
   dependencies = [
