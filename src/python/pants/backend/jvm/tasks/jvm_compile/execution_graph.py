@@ -7,14 +7,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import Queue as queue
 import traceback
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
-from pants.base.worker_pool import Work, WorkerPool
+from pants.base.worker_pool import Work
 
 
-class ExecutionWork(
-  namedtuple('ExecutionWork', ['fn', 'dependencies', 'on_success', 'on_failure'])):
-  def __call__(self, *args, **kwargs):
+class Job(object):
+
+  def __init__(self, key, fn, dependencies, on_success, on_failure):
+    self.key = key
+    self.fn = fn
+    self.dependencies = dependencies
+    self.on_success = on_success
+    self.on_failure = on_failure
+
+  def __call__(self):
     self.fn()
 
   def run_success_callback(self):
@@ -27,13 +34,13 @@ class ExecutionWork(
 
 
 UNSTARTED = 'Unstarted'
-SUCCESS = 'Success'
-FAILURE = 'Failure'
 QUEUED = 'Queued'
+SUCCESSFUL = 'Successful'
+FAILED = 'Failed'
 
 
 class StatusTable(object):
-  DONE_STATES = {SUCCESS, FAILURE}
+  DONE_STATES = {SUCCESSFUL, FAILED}
 
   def __init__(self, keys):
     self._statuses = {key: UNSTARTED for key in keys}
@@ -41,24 +48,24 @@ class StatusTable(object):
   def mark_as(self, state, key):
     self._statuses[key] = state
 
-  def all_done(self):
-    return all(s in self.DONE_STATES for s in self._statuses.values())
+  def unfinished_items(self):
+    """Returns a list of (name, status) tuples, only including entries marked as unfinished."""
+    return [(key, stat) for key, stat in self._statuses.items() if stat not in self.DONE_STATES]
 
-  def unfinished_work(self):
-    """Returns a dict of name to current status, only including work that's not done"""
-    return {key: stat for key, stat in self._statuses.items() if stat not in self.DONE_STATES}
+  def failed_keys(self):
+    return [key for key, stat in self._statuses.items() if stat == FAILED]
 
   def get(self, key):
     return self._statuses.get(key)
 
+  def are_all_done(self):
+    return all(s in self.DONE_STATES for s in self._statuses.values())
+
+  def are_all_successful(self, keys):
+    return all(stat == SUCCESSFUL for stat in [self._statuses[k] for k in keys])
+
   def has_failures(self):
-    return any(stat == FAILURE for stat in self._statuses.values())
-
-  def all_successful(self, keys):
-    return all(stat == SUCCESS for stat in [self._statuses[k] for k in keys])
-
-  def failed_keys(self):
-    return [key for key, stat in self._statuses.items() if stat == FAILURE]
+    return any(stat == FAILED for stat in self._statuses.values())
 
 
 class ExecutionGraph(object):
@@ -67,48 +74,56 @@ class ExecutionGraph(object):
   class ExecutionFailure(Exception):
     """Raised when work units fail during execution"""
 
-  def __init__(self, parent_work_unit, run_tracker, worker_count, log):
-    """
-
-    :param parent_work_unit: The work unit for work scheduled within the graph
-    :param run_tracker: The run tracker used by the work pool during execution
-    :param worker_count: The number of worker threads
-    :param log: logger
-    """
-    self._log = log
-    self._parent_work_unit = parent_work_unit
-    self._run_tracker = run_tracker
-    self._worker_count = worker_count
+  def __init__(self):
     self._dependees = defaultdict(list)
-    self._work = {}
-    self._work_keys_as_scheduled = []
+    self._jobs = {}
+    self._job_keys_as_scheduled = []
 
-  def log_dot_graph(self):
-    for key in self._work_keys_as_scheduled:
-      self._log.debug("{} -> {{\n  {}\n}}".format(key, ',\n  '.join(self._dependees[key])))
+  def format_dependee_graph(self):
+    return "\n".join([
+      "{} -> {{\n  {}\n}}".format(key, ',\n  '.join(self._dependees[key]))
+      for key in self._job_keys_as_scheduled
+    ])
 
   def schedule(self, key, fn, dependency_keys, on_success=None, on_failure=None):
-    """Inserts work into the execution graph with its dependencies.
+    """Inserts a job into the execution graph with its dependencies.
 
-    Assumes dependencies have already been scheduled, and raises an error otherwise."""
-    self._work_keys_as_scheduled.append(key)
-    self._work[key] = ExecutionWork(fn, dependency_keys, on_success, on_failure)
+    Assumes dependencies have already been scheduled, and raises an error otherwise.
+    :param key: Key used to reference and look up jobs
+    :param fn callable: The work to perform
+    :param dependency_keys: List of keys for dependent jobs
+    :param on_success: Zero parameter callback to run if job completes successfully. Run on main
+                       thread.
+    :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
+                       thread.
+    """
+    job = Job(key, fn, dependency_keys, on_success, on_failure)
+    self._schedule(job)
+
+  def _schedule(self, job):
+    key = job.key
+    dependency_keys = job.dependencies
+    self._job_keys_as_scheduled.append(key)
+    self._jobs[key] = job
     for dep_name in dependency_keys:
-      if dep_name not in self._work:
-        raise Exception("Expected {} not scheduled before dependent {}".format(dep_name, key))
+      if dep_name not in self._jobs:
+        raise ValueError("Expected {} not scheduled before dependent {}".format(dep_name, key))
       self._dependees[dep_name].append(key)
 
-  def find_work_without_dependencies(self):
+  def find_job_without_dependencies(self):
     # Topo sort doesn't mean all no-dependency targets are listed first,
     # so we look for all work without dependencies
     return filter(
-      lambda key: len(self._work[key].dependencies) == 0, self._work_keys_as_scheduled)
+      lambda key: len(self._jobs[key].dependencies) == 0, self._job_keys_as_scheduled)
 
-  def execute(self):
+  def execute(self, pool, log):
+
     """Runs scheduled work, ensuring all dependencies for each element are done before execution.
 
-    spawns a work pool of the specified size.
-    submits all the work without any dependencies
+    :param pool: A WorkerPool to run jobs on
+    :param log: logger for logging debug information and progress
+
+    submits all the work without any dependencies to the worker pool
     when a unit of work finishes,
       if it is successful
         calls success callback
@@ -123,72 +138,66 @@ class ExecutionGraph(object):
       aborts work pool
       re-raises
     """
-    self.log_dot_graph()
+    log.debug(self.format_dependee_graph())
 
-    status_table = StatusTable(self._work_keys_as_scheduled)
+    status_table = StatusTable(self._job_keys_as_scheduled)
     finished_queue = queue.Queue()
 
-    work_without_dependencies = self.find_work_without_dependencies()
+    work_without_dependencies = self.find_job_without_dependencies()
     if len(work_without_dependencies) == 0:
       raise self.ExecutionFailure("No work without dependencies! There must be a "
                                   "circular dependency")
 
-    def worker(work_key, work):
-      try:
-        work()
-        result = (work_key, True, None)
-      except Exception as e:
-        result = (work_key, False, e)
-      finished_queue.put(result)
+    def submit_job(job_keys):
+      def worker(worker_key, work):
+        try:
+          work()
+          result = (worker_key, True, None)
+        except Exception as e:
+          result = (worker_key, False, e)
+        finished_queue.put(result)
 
-    pool = WorkerPool(self._parent_work_unit, self._run_tracker, self._worker_count)
-
-    def submit_work(work_keys):
-      for work_key in work_keys:
-        status_table.mark_as(QUEUED, work_key)
-        pool.submit_async_work(Work(worker, [(work_key, (self._work[work_key]))]))
+      for job_key in job_keys:
+        status_table.mark_as(QUEUED, job_key)
+        pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
     try:
-      submit_work(work_without_dependencies)
+      submit_job(work_without_dependencies)
 
-      while not status_table.all_done():
+      while not status_table.are_all_done():
         try:
           finished_key, success, value = finished_queue.get(timeout=10)
         except queue.Empty:
-          self._log.debug("Waiting on \n  {}\n".format(
+          log.debug("Waiting on \n  {}\n".format(
             "\n  ".join(
-              "{}: {}".format(key, state) for key, state in status_table.unfinished_work().items()
-            )))
+              "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
           continue
 
+        finished_job = self._jobs[finished_key]
         direct_dependees = self._dependees[finished_key]
-        finished_work = self._work[finished_key]
         if success:
-          status_table.mark_as(SUCCESS, finished_key)
-          finished_work.run_success_callback()
+          status_table.mark_as(SUCCESSFUL, finished_key)
+          finished_job.run_success_callback()
 
           ready_dependees = [dependee for dependee in direct_dependees
-                             if status_table.all_successful(self._work[dependee].dependencies)]
+                             if status_table.are_all_successful(self._jobs[dependee].dependencies)]
 
-          submit_work(ready_dependees)
+          submit_job(ready_dependees)
         else:
-          status_table.mark_as(FAILURE, finished_key)
-          finished_work.run_failure_callback()
+          status_table.mark_as(FAILED, finished_key)
+          finished_job.run_failure_callback()
 
           # propagate failures downstream
           for dependee in direct_dependees:
             finished_queue.put((dependee, False, None))
 
-        self._log.debug("{} finished with status {}".format(finished_key,
+        log.debug("{} finished with status {}".format(finished_key,
                                                             status_table.get(finished_key)))
-
-      pool.shutdown()
     except Exception as e:
-      pool.abort()
-      # Call failure callbacks for work that's unfinished.
-      for key in status_table.unfinished_work().keys():
-        self._work[key].run_failure_callback()
-      self._log.debug(traceback.format_exc())
+      # Call failure callbacks for jobs that are unfinished.
+      for key, state in status_table.unfinished_items():
+        self._jobs[key].run_failure_callback()
+      log.debug(traceback.format_exc())
       raise self.ExecutionFailure("Error running work: {}".format(e))
 
     if status_table.has_failures():

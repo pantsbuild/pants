@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict, namedtuple
+from collections import defaultdict, OrderedDict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_delete, safe_mkdir
+from pants.util.dirutil import safe_delete
 
 
 class JvmCompileStrategy(object):
@@ -220,3 +220,22 @@ class JvmCompileStrategy(object):
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
+
+  def _create_compile_contexts_for_targets(self, relevant_targets):
+    compile_contexts = OrderedDict()
+    for target in relevant_targets:
+      compile_context = self.compile_context(target)
+      compile_contexts[target] = compile_context
+    return compile_contexts
+
+  # Compute any extra compile-time-only classpath elements.
+  # TODO(benjy): Model compile-time vs. runtime classpaths more explicitly.
+  # TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,
+  # we can inject a dep on the scala runtime library and still have it ivy-resolve.
+  def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
+    def extra_compile_classpath_iter():
+      for conf in self._confs:
+        for jar in extra_compile_time_classpath_elements:
+          yield (conf, jar)
+
+    return list(extra_compile_classpath_iter())
