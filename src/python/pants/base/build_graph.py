@@ -276,8 +276,8 @@ class BuildGraph(object):
     to_walk = deque(addresses)
     while len(to_walk) > 0:
       address = to_walk.popleft()
-      if address not in walked:
-        target = self._target_by_address[address]
+      target = self._target_by_address[address]
+      if target not in walked:
         walked.add(target)
         if not predicate or predicate(target):
           to_walk.extend(self._target_dependencies_by_address[address])
