@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import Queue as queue
-from collections import OrderedDict, defaultdict, namedtuple
 import traceback
+from collections import OrderedDict, defaultdict, namedtuple
 
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
