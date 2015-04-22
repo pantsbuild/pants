@@ -17,7 +17,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import BuildFileAddress
-from pants.base.build_file import BuildFile
+from pants.base.build_file import BuildFileOnDisk
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.target import Target
@@ -35,13 +35,13 @@ class ErrorTarget(Target):
 class BuildFileParserBasicsTest(BaseTest):
   def test_addressable_exceptions(self):
     self.add_to_build_file('a/BUILD', 'target()')
-    build_file_a = BuildFile(self.build_root, 'a/BUILD')
+    build_file_a = BuildFileOnDisk(self.build_root, 'a/BUILD')
 
     with pytest.raises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file_a)
 
     self.add_to_build_file('b/BUILD', 'target(name="foo", "bad_arg")')
-    build_file_b = BuildFile(self.build_root, 'b/BUILD')
+    build_file_b = BuildFileOnDisk(self.build_root, 'b/BUILD')
     with pytest.raises(BuildFileParser.BuildFileParserError):
       self.build_file_parser.parse_build_file(build_file_b)
 
@@ -55,13 +55,13 @@ class BuildFileParserBasicsTest(BaseTest):
       )
       '''
     ))
-    build_file_d = BuildFile(self.build_root, 'd/BUILD')
+    build_file_d = BuildFileOnDisk(self.build_root, 'd/BUILD')
     with pytest.raises(BuildFileParser.BuildFileParserError):
       self.build_file_parser.parse_build_file(build_file_d)
 
   def test_noop_parse(self):
     self.add_to_build_file('BUILD', '')
-    build_file = BuildFile(self.build_root, '')
+    build_file = BuildFileOnDisk(self.build_root, '')
     address_map = set(self.build_file_parser.parse_build_file(build_file))
     self.assertEqual(len(address_map), 0)
 
@@ -73,7 +73,7 @@ class BuildFileParserTargetTest(BaseTest):
 
   def test_trivial_target(self):
     self.add_to_build_file('BUILD', '''fake(name='foozle')''')
-    build_file = BuildFile(self.build_root, 'BUILD')
+    build_file = BuildFileOnDisk(self.build_root, 'BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
 
     self.assertEqual(len(address_map), 1)
@@ -84,7 +84,7 @@ class BuildFileParserTargetTest(BaseTest):
 
   def test_trivial_target(self):
     self.add_to_build_file('BUILD', '''fake(name='foozle')''')
-    build_file = BuildFile(self.build_root, 'BUILD')
+    build_file = BuildFileOnDisk(self.build_root, 'BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     self.assertEqual(len(address_map), 1)
     address, addressable = address_map.popitem()
@@ -114,11 +114,11 @@ class BuildFileParserTargetTest(BaseTest):
       fake(name="bat")
       '''))
 
-    bar_build_file = BuildFile(self.build_root, 'BUILD.bar')
-    base_build_file = BuildFile(self.build_root, 'BUILD')
-    foo_build_file = BuildFile(self.build_root, 'BUILD.foo')
+    bar_build_file = BuildFileOnDisk(self.build_root, 'BUILD.bar')
+    base_build_file = BuildFileOnDisk(self.build_root, 'BUILD')
+    foo_build_file = BuildFileOnDisk(self.build_root, 'BUILD.foo')
 
-    address_map = self.build_file_parser.address_map_from_spec_path(bar_build_file.spec_path)
+    address_map = self.build_file_parser.address_map_from_build_file(bar_build_file)
     addresses = address_map.keys()
     self.assertEqual(set([bar_build_file, base_build_file, foo_build_file]),
                      set([address.build_file for address in addresses]))
@@ -131,7 +131,7 @@ class BuildFileParserTargetTest(BaseTest):
     self.add_to_build_file('BUILD', 'fake(name="foo")\n')
 
     with pytest.raises(BuildFileParser.AddressableConflictException):
-      base_build_file = BuildFile(self.build_root, 'BUILD')
+      base_build_file = BuildFileOnDisk(self.build_root, 'BUILD')
       self.build_file_parser.parse_build_file(base_build_file)
 
   def test_sibling_build_files_duplicates(self):
@@ -158,9 +158,9 @@ class BuildFileParserTargetTest(BaseTest):
       '''))
 
     with pytest.raises(BuildFileParser.SiblingConflictException):
-      base_build_file = BuildFile(self.build_root, 'BUILD')
+      base_build_file = BuildFileOnDisk(self.build_root, 'BUILD')
       bf_address = BuildFileAddress(base_build_file, 'base')
-      self.build_file_parser.address_map_from_spec_path(bf_address.spec_path)
+      self.build_file_parser.address_map_from_build_file(base_build_file)
 
 
 class BuildFileParserExposedObjectTest(BaseTest):
@@ -170,7 +170,7 @@ class BuildFileParserExposedObjectTest(BaseTest):
 
   def test_exposed_object(self):
     self.add_to_build_file('BUILD', '''fake_object''')
-    build_file = BuildFile(self.build_root, 'BUILD')
+    build_file = BuildFileOnDisk(self.build_root, 'BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     self.assertEqual(len(address_map), 0)
 
@@ -256,7 +256,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
                ''')
     self.create_file('3rdparty/BUILD', contents)
 
-    build_file = BuildFile(self.build_root, '3rdparty/BUILD')
+    build_file = BuildFileOnDisk(self.build_root, '3rdparty/BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     registered_proxies = set(address_map.values())
 
@@ -275,13 +275,9 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
     self.assertEqual(set(['3rdparty/baz']), self._paths)
 
-  def test_raises_build_file_scan_error(self):
-    with self.assertRaises(BuildFileParser.BuildFileScanError):
-      self.build_file_parser.address_map_from_spec_path('non-existent-path')
-
   def test_raises_parse_error(self):
     self.add_to_build_file('BUILD', 'foo(name = = "baz")')
-    build_file = BuildFile(self.build_root, 'BUILD')
+    build_file = BuildFileOnDisk(self.build_root, 'BUILD')
     with self.assertRaises(BuildFileParser.ParseError):
       self.build_file_parser.parse_build_file(build_file)
 
@@ -337,7 +333,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
   def test_raises_execute_error(self):
     self.add_to_build_file('BUILD', 'undefined_alias(name="baz")')
-    build_file = BuildFile(self.build_root, 'BUILD')
+    build_file = BuildFileOnDisk(self.build_root, 'BUILD')
     with self.assertRaises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file)
 

@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_file import BuildFile
+from pants.base.build_file import BuildFileOnDisk
 from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
@@ -32,7 +32,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=Fred), aliases.targets)
 
-    build_file = BuildFile('/tmp', 'fred', must_exist=False)
+    build_file = BuildFileOnDisk('/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -61,7 +61,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(jane=42), aliases.objects)
 
-    build_file = BuildFile('/tmp', 'jane', must_exist=False)
+    build_file = BuildFileOnDisk('/tmp', 'jane', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -125,7 +125,7 @@ class BuildConfigurationTest(unittest.TestCase):
     with temporary_dir() as root:
       build_file_path = os.path.join(root, 'george', 'BUILD')
       touch(build_file_path)
-      build_file = BuildFile(root, 'george')
+      build_file = BuildFileOnDisk(root, 'george')
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
       self.assertEqual(0, len(parse_state.registered_addressable_instances))

@@ -15,7 +15,7 @@ from textwrap import dedent
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_file import BuildFile
+from pants.base.build_file import BuildFileOnDisk
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
@@ -84,7 +84,8 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    return BuildFile(root_dir=self.build_root, relpath=self.build_path(relpath))
+    cls = self.address_mapper._build_file_class
+    return cls(root_dir=self.build_root, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',
@@ -131,12 +132,12 @@ class BaseTest(unittest.TestCase):
     build_configuration = BuildConfiguration()
     build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, BuildFileOnDisk)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, BuildFileOnDisk)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def set_options_for_scope(self, scope, **kwargs):
@@ -218,7 +219,7 @@ class BaseTest(unittest.TestCase):
     BuildRoot().reset()
     SourceRoot.reset()
     safe_rmtree(self.build_root)
-    BuildFile.clear_cache()
+    BuildFileOnDisk.clear_cache()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.
