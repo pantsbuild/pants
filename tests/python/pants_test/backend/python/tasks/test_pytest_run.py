@@ -37,9 +37,6 @@ class PythonTestBuilderTestBase(PythonTaskTest):
     with self.assertRaises(PythonTestFailure) as cm:
       self.run_tests(targets=targets)
 
-    failed_targets_from_exc = cm.exception.failed_targets
-    self.assertEqual(set(failed_targets_from_exc), set(failed_targets))
-
 
 class PythonTestBuilderTestEmpty(PythonTestBuilderTestBase):
   def test_empty(self):
