@@ -14,7 +14,7 @@ from pants.base.worker_pool import Work
 
 class Job(object):
 
-  def __init__(self, key, fn, dependencies, on_success, on_failure):
+  def __init__(self, key, fn, dependencies, on_success=None, on_failure=None):
     """
 
     :param key: Key used to reference and look up jobs
@@ -91,8 +91,19 @@ class ExecutionGraph(object):
     self._dependees = defaultdict(list)
     self._jobs = {}
     self._job_keys_as_scheduled = []
+    self._job_keys_with_no_dependencies = []
+
     for job in job_list:
       self._schedule(job)
+
+    unscheduled_dependencies = set(self._dependees.keys()) - set(self._job_keys_as_scheduled)
+    if unscheduled_dependencies:
+      raise ValueError("Unscheduled dependencies: {}"
+                       .format(", ".join(map(str,unscheduled_dependencies))))
+
+    if len(self._job_keys_with_no_dependencies) == 0:
+      raise ValueError("No jobs without dependencies! There must be a "
+                                "circular dependency")
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -100,31 +111,19 @@ class ExecutionGraph(object):
       for key in self._job_keys_as_scheduled
     ])
 
-  def schedule(self, key, fn, dependency_keys, on_success=None, on_failure=None):
-    """Inserts a job into the execution graph with its dependencies.
-
-    Assumes dependencies have already been scheduled, and raises an error otherwise.
-
-    """
-    job = Job(key, fn, dependency_keys, on_success, on_failure)
-    self._schedule(job)
-
   def _schedule(self, job):
     key = job.key
     dependency_keys = job.dependencies
     self._job_keys_as_scheduled.append(key)
     self._jobs[key] = job
+
+    if len(dependency_keys) == 0:
+      self._job_keys_with_no_dependencies.append(key)
+
     for dep_name in dependency_keys:
-      if dep_name not in self._jobs:
-        raise ValueError("Expected {} not scheduled before dependent {}".format(dep_name, key))
       self._dependees[dep_name].append(key)
 
-  def find_job_without_dependencies(self):
-    return filter(
-      lambda key: len(self._jobs[key].dependencies) == 0, self._job_keys_as_scheduled)
-
   def execute(self, pool, log):
-
     """Runs scheduled work, ensuring all dependencies for each element are done before execution.
 
     :param pool: A WorkerPool to run jobs on
@@ -150,11 +149,6 @@ class ExecutionGraph(object):
     status_table = StatusTable(self._job_keys_as_scheduled)
     finished_queue = queue.Queue()
 
-    work_without_dependencies = self.find_job_without_dependencies()
-    if len(work_without_dependencies) == 0:
-      raise self.ExecutionFailure("No work without dependencies! There must be a "
-                                  "circular dependency")
-
     def submit_jobs(job_keys):
       def worker(worker_key, work):
         try:
@@ -169,7 +163,7 @@ class ExecutionGraph(object):
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
     try:
-      submit_jobs(work_without_dependencies)
+      submit_jobs(self._job_keys_with_no_dependencies)
 
       while not status_table.are_all_done():
         try:
@@ -205,7 +199,7 @@ class ExecutionGraph(object):
       for key, state in status_table.unfinished_items():
         self._jobs[key].run_failure_callback()
       log.debug(traceback.format_exc())
-      raise self.ExecutionFailure("Error running work: {}".format(e))
+      raise self.ExecutionFailure("Error running job: {}".format(e))
 
     if status_table.has_failures():
-      raise self.ExecutionFailure("Failed tasks: {}".format(', '.join(status_table.failed_keys())))
+      raise self.ExecutionFailure("Failed jobs: {}".format(', '.join(status_table.failed_keys())))

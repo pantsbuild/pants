@@ -27,6 +27,7 @@ target(
     ':console_task',
     ':dependees',
     ':detect_duplicates',
+    ':execution_graph',
     ':filter',
     ':group_task',
     ':ivy_utils',
@@ -226,6 +227,14 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
+)
+
+python_tests(
+  name = 'execution_graph',
+  sources = ['test_execution_graph.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
+    ]
 )
 
 python_tests(
