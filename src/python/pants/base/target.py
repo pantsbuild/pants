@@ -121,17 +121,11 @@ class Target(AbstractTarget):
     'python': lambda t: t.is_python,
   }
 
-  _post_init_callbacks = []
+  _tags_validators = []
 
   @classmethod
-  def add_post_init_callback(cls, callback):
-    """Register a callback that will be run at the end of Target.__init__.
-
-    These can be used to perform validations, such as given tags.
-
-    :param callback: def callback(target): ...
-    """
-    self._post_init_callbacks.append(callback)
+  def add_tags_validator(cls, validator):
+    self._tags_validators.append(validator)
 
   @classmethod
   def lang_discriminator(cls, lang):
@@ -208,14 +202,14 @@ class Target(AbstractTarget):
     self.description = description
     self.labels = set()
 
-    self._tags = set(tags or [])
-    self._tags.update(ParameterTag(name=n, value=v) for n, v in kwargs.items())
-
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
 
-    for callback in self._post_init_callbacks:
-      callback(self)
+    self._tags = set(tags or [])
+    self._tags.update(ParameterTag(name=n, value=v) for n, v in kwargs.items())
+
+    for validator in self._tags_validators:
+      self._tags_validator(self._tags)
 
   @property
   def tags(self):
