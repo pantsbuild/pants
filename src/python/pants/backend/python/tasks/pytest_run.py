@@ -24,7 +24,7 @@ from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TaskError, TestRunFailedTaskError
+from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -116,7 +116,7 @@ class PytestRun(PythonTask):
     if self.get_options().fast:
       result = self._do_run_tests(targets, workunit)
       if not result.success:
-        raise TestRunFailedTaskError(failed_targets=result.failed_targets)
+        raise TestFailedTaskError(failed_targets=result.failed_targets)
     else:
       results = {}
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
@@ -134,7 +134,7 @@ class PytestRun(PythonTask):
 
       failed_targets = [target for target, rv in results.items() if not rv.success]
       if failed_targets:
-        raise TestRunFailedTaskError(failed_targets=failed_targets)
+        raise TestFailedTaskError(failed_targets=failed_targets)
 
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):

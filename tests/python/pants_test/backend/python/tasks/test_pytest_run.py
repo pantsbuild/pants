@@ -15,7 +15,7 @@ import coverage
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.util.contextutil import environment_as, pushd
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
-from pants.base.exceptions import TestRunFailedTaskError
+from pants.base.exceptions import TestFailedTaskError
 
 
 class PythonTestBuilderTestBase(PythonTaskTest):
@@ -35,7 +35,7 @@ class PythonTestBuilderTestBase(PythonTaskTest):
       pytest_run_task.execute()
 
   def run_failing_tests(self, targets, failed_targets):
-    with self.assertRaises(TestRunFailedTaskError) as cm:
+    with self.assertRaises(TestFailedTaskError) as cm:
       self.run_tests(targets=targets)
 
 
