@@ -95,6 +95,7 @@ python_library(
   name = 'jvm_compile_isolated_strategy',
   sources = ['jvm_compile_isolated_strategy.py'],
   dependencies = [
+    ':execution_graph',
     ':jvm_compile_strategy',
     ':resource_mapping',
     'src/python/pants/base:build_environment',
