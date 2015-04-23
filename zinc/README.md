@@ -1,44 +1,31 @@
 Zinc
 ====
 
-Zinc is a stand-alone version of [sbt]'s incremental compiler.
+Zinc is a stand-alone version of [sbt]'s incremental compiler meant to be run in nailgun. This version is derived from
 
-Download the [latest stable version][download].
+github.com/twitter-forks/zinc.git:
 
-[sbt]: http://github.com/sbt/sbt
-[download]: http://downloads.typesafe.com/zinc/0.3.5.3/zinc-0.3.5.3.tgz
+Add 'zinc/' from commit '609ee645c61dc7970b008c25c7a7dd94c21be865'
+
+git-subtree-dir: zinc
+git-subtree-mainline: 85fd6a4a0560fd4ab624ab12345e1087b51ce2f6
+git-subtree-split: 609ee645c61dc7970b008c25c7a7dd94c21be865
 
 
 Build
 -----
 
-Zinc is built using sbt 0.13. To create the full distribution:
+Zinc is built using pants:
 
-    sbt universal:packageZipTarball
-
-Previously published distributions up to 0.3.1-M1 relase can be found in the [old zinc repo].
-Newer distributions are hosted under [Typesafe downloads].
-
-[old zinc repo]: http://repo.typesafe.com/typesafe/zinc/com/typesafe/zinc/dist/
-[Typesafe downloads]: http://downloads.typesafe.com/zinc/
-
-Here's the table of final releases in 0.3.x series:
-
-| zinc version | sbt version | Download                                                                        |
-|--------------|-------------|---------------------------------------------------------------------------------|
-| 0.3.0        | 0.13.0      | [zinc-0.3.0.tgz](http://downloads.typesafe.com/zinc/0.3.0/zinc-0.3.0.tgz)       |
-| 0.3.1        | 0.13.1      | [zinc-0.3.1.tgz](http://downloads.typesafe.com/zinc/0.3.1/zinc-0.3.1.tgz)       |
-| 0.3.2        | 0.13.2      | [zinc-0.3.2.tgz](http://downloads.typesafe.com/zinc/0.3.1/zinc-0.3.2.tgz)       |
-| 0.3.5        | 0.13.5      | [zinc-0.3.5.tgz](http://downloads.typesafe.com/zinc/0.3.5/zinc-0.3.5.tgz)       |
-| 0.3.5.1      | 0.13.5      | [zinc-0.3.5.1.tgz](http://downloads.typesafe.com/zinc/0.3.5.1/zinc-0.3.5.1.tgz) |
-| 0.3.5.2      | 0.13.5      | [zinc-0.3.5.2.tgz](http://downloads.typesafe.com/zinc/0.3.5.2/zinc-0.3.5.2.tgz) |
-| 0.3.5.3      | 0.13.5      | [zinc-0.3.5.3.tgz](http://downloads.typesafe.com/zinc/0.3.5.3/zinc-0.3.5.3.tgz) |
+    ./pants test zinc/
 
 
 Options
 -------
 
-To get information about options run `zinc -help`.
+To get information about options
+
+    ./pants run.jvm zinc:bin --run-jvm-args=-help
 
 ### Compile
 
@@ -124,16 +111,6 @@ rather than forcing recompilation of larger parts of the source tree due to the
 error and deleted class files.
 
 See `zinc -help` for information about all options.
-
-
-Contributions
--------------------
-
-Contributions via GitHub pull requests are gladly accepted from their original
-author. Before we can accept pull requests, you will need to agree to the
-[Typesafe Contributor License Agreement][cla] online, using your GitHub account.
-
-[cla]: http://www.typesafe.com/contribute/cla
 
 
 License

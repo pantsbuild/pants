@@ -1,7 +1,0 @@
-# set output relations option
-
-zinc -debug -output-relations relations A.scala B.scala
-
-exists A.class B.class relations
-
-show relations
