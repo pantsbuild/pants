@@ -5,9 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import namedtuple
+from hashlib import sha1
 import functools
 import os
-from hashlib import sha1
 
 from six import string_types
 
@@ -113,10 +114,24 @@ class Target(AbstractTarget):
     """Internal error, too many elements in Addresses"""
     pass
 
+  ParameterTag = namedtuple('ParameterTag', ['name', 'value'])
+
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
   }
+
+  _post_init_callbacks = []
+
+  @classmethod
+  def add_post_init_callback(cls, callback):
+    """Register a callback that will be run at the end of Target.__init__.
+
+    These can be used to perform validations, such as given tags.
+
+    :param callback: def callback(target): ...
+    """
+    self._post_init_callbacks.append(callback)
 
   @classmethod
   def lang_discriminator(cls, lang):
@@ -168,7 +183,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -189,13 +204,18 @@ class Target(AbstractTarget):
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._tags = set(tags or [])
     self._build_graph = build_graph
     self.description = description
     self.labels = set()
 
+    self._tags = set(tags or [])
+    self._tags.update(ParameterTag(name=n, value=v) for n, v in kwargs.items())
+
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+
+    for callback in self._post_init_callbacks:
+      callback(self)
 
   @property
   def tags(self):
