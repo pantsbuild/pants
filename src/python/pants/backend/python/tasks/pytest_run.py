@@ -407,7 +407,7 @@ class PytestRun(PythonTask):
   def _do_run_tests(self, targets, workunit):
 
     def _extract_resultlog_filename(args):
-      resultlogs = [arg.split('=', 1)[-1] for arg in args if arg.startswith('--resultlog=')]
+      resultlogs = [arg[arg.find('=') + 1:] for arg in args if arg.startswith('--resultlog=')]
       if resultlogs:
         return resultlogs[0]
       if not resultlogs:
