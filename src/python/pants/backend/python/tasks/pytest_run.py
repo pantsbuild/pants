@@ -413,6 +413,9 @@ class PytestRun(PythonTask):
       else:
         try:
           return args[args.index('--resultlog') + 1]
+        except IndexError:
+          self.context.log.error('--resultlog specified without an argument')
+          return None
         except ValueError:
           return None
 
