@@ -46,15 +46,15 @@ class BuildFileAddressMapper(object):
   class BuildFileScanError(AddressLookupError):
     """ Raised when a problem was encountered scanning a tree of BUILD files."""
 
-  def __init__(self, build_file_parser, build_file_class):
+  def __init__(self, build_file_parser, build_file_type):
     """Create a BuildFileAddressMapper.
 
     :param build_file_parser: An instance of BuildFileParser
-    :param build_file_class: A subclass of BuildFile used to construct and cache BuildFile objects
+    :param build_file_type: A subclass of BuildFile used to construct and cache BuildFile objects
     """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
-    self._build_file_class = build_file_class
+    self._build_file_type = build_file_type
 
   @property
   def root_dir(self):
@@ -117,7 +117,7 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = self._build_file_class.from_cache(self.root_dir, address.spec_path, must_exist=False)
+      build_file = self._build_file_type.from_cache(self.root_dir, address.spec_path, must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
       return address_map[address]
@@ -139,7 +139,7 @@ class BuildFileAddressMapper(object):
     if spec_path not in self._spec_path_to_address_map_map:
       try:
         try:
-          build_file = self._build_file_class.from_cache(self.root_dir, spec_path)
+          build_file = self._build_file_type.from_cache(self.root_dir, spec_path)
         except BuildFile.BuildFileError as e:
           raise self.BuildFileScanError("{message}\n searching {spec_path}"
                                         .format(message=e,
@@ -162,7 +162,7 @@ class BuildFileAddressMapper(object):
 
     :returns: a BuildFile
     """
-    return self._build_file_class.from_cache(*args, **kwargs)
+    return self._build_file_type.from_cache(*args, **kwargs)
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct BuildFileAddress.
@@ -184,7 +184,7 @@ class BuildFileAddressMapper(object):
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return self._build_file_class.scan_buildfiles(root_dir, *args, **kwargs)
+    return self._build_file_type.scan_buildfiles(root_dir, *args, **kwargs)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
@@ -202,7 +202,7 @@ class BuildFileAddressMapper(object):
     addresses = set()
     root = root or get_buildroot()
     try:
-      for build_file in self._build_file_class.scan_buildfiles(root, spec_excludes=spec_excludes):
+      for build_file in self._build_file_type.scan_buildfiles(root, spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:

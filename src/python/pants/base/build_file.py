@@ -41,10 +41,7 @@ class BuildFile(AbstractClass):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
-  # TODO(dturner): this cache should really be in BuildFileAddressMapper, but unfortunately this
-  # class needs to access it, so it can't be moved yet.
-  _cache = {}
-
+  # Subclasses must have an _cache field.
   @classmethod
   def clear_cache(cls):
     cls._cache = {}
@@ -133,7 +130,6 @@ class BuildFile(AbstractClass):
   @abstractmethod
   def isdir(self, path):
     """Returns True if path is a directory"""
-    raise NotImplementedError()
 
   @abstractmethod
   def isfile(self, path):
@@ -280,10 +276,14 @@ class BuildFile(AbstractClass):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return self.full_path
+    return '{}({})'.format(self.__class__, self.full_path)
 
 
 class FilesystemBuildFile(BuildFile):
+  # TODO(dturner): this cache should really be in BuildFileAddressMapper, but unfortunately this
+  # class needs to access it, so it can't be moved yet.
+  _cache = {}
+
   @classmethod
   def glob1(cls, path, glob):
     return glob1(path, '{prefix}*'.format(prefix=cls._BUILD_FILE_PREFIX))
