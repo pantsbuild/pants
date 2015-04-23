@@ -286,7 +286,7 @@ class FilesystemBuildFile(BuildFile):
 
   @classmethod
   def glob1(cls, path, glob):
-    return glob1(path, '{prefix}*'.format(prefix=cls._BUILD_FILE_PREFIX))
+    return glob1(path, glob)
 
   def source(self):
     """Returns the source code for this BUILD file."""
