@@ -114,18 +114,35 @@ class Target(AbstractTarget):
     """Internal error, too many elements in Addresses"""
     pass
 
+  class UnknownParameters(Exception):
+    def __init__(self, names):
+      self._names = names
+      super(UnknownParameters, self).__init__('Unknown parameters: {0}'.format(', '.join(names)))
+
+    @property
+    def names(self):
+      return self.__names
+
   ParameterTag = namedtuple('ParameterTag', ['name', 'value'])
+
+  _registered_param_tags = {}
+
+  @classmethod
+  def register_param_tag(cls, name, convert):
+    tag = cls._registered_param_tags.get(name, {})
+
+    for kls in tag.keys():
+      if issubclass(cls, kls) or issubclass(kls, cls):
+        # TODO: specialized exception
+        raise Exception('{0} is already registered this hierarchy'.format(name))
+
+    tag[cls] = convert
+    cls._registered_param_tags[name] = tag
 
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
   }
-
-  _tags_validators = []
-
-  @classmethod
-  def add_tags_validator(cls, validator):
-    self._tags_validators.append(validator)
 
   @classmethod
   def lang_discriminator(cls, lang):
@@ -206,10 +223,27 @@ class Target(AbstractTarget):
     self._cached_transitive_fingerprint_map = {}
 
     self._tags = set(tags or [])
-    self._tags.update(ParameterTag(name=n, value=v) for n, v in kwargs.items())
 
-    for validator in self._tags_validators:
-      self._tags_validator(self._tags)
+    unknown_param_names = [k for k in kwargs if k is not in self._registered_param_tags]
+    if unknown_param_names:
+      raise UnknownParameters(unknown_param_names)
+
+    for name, value in kwargs.items():
+      tag = self._registered_param_tags[name]
+      clses = [k for k in tag if isinstance(self, k)]
+      assert len(clses) in (0, 1)
+      if not clses:
+        # TODO: this needs to be detected earlier.
+        raise UnknownParameters(name)
+      convertor = tag[clses[0]]
+      try:
+        v = convertor(value)
+      except ValueError:
+        # TODO: proper exception
+        raise
+
+      self._tags.add(ParameterTag(name=name, value=v)
+
 
   @property
   def tags(self):
