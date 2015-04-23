@@ -13,9 +13,9 @@ from textwrap import dedent
 import coverage
 
 from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import environment_as, pushd
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
-from pants.base.exceptions import TestFailedTaskError
 
 
 class PythonTestBuilderTestBase(PythonTaskTest):
