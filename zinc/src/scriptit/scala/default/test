@@ -1,5 +1,0 @@
-# default scala version
-
-zinc -debug A.scala
-
-exists A.class

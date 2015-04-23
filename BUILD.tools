@@ -169,3 +169,21 @@ jar_library(name = 'wire-compiler',
             jars = [
               jar(org = 'com.squareup.wire', name = 'wire-compiler', rev = '1.6.0')
             ])
+
+# zinc depedencies
+
+SBT_REV='0.13.7'
+
+jar_library(name = 'compiler-interface',
+            jars = [
+                jar(org = 'com.typesafe.sbt', name = 'compiler-interface', rev = SBT_REV)
+                ])
+jar_library(name = 'incremental-compiler',
+            jars = [
+                jar(org = 'com.typesafe.sbt', name = 'incremental-compiler', rev = SBT_REV)
+                ])
+jar_library(name = 'sbt-interface',
+            jars = [
+                jar(org = 'com.typesafe.sbt', name = 'sbt-interface', rev = SBT_REV)
+                ])
+

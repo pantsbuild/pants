@@ -1,9 +1,0 @@
-# test zinc idle timeout option
-
-! zinc -status
-
-zinc -start -idle-timeout 1s
-
-sleep 2s
-
-! zinc -status

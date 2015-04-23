@@ -1,9 +1,0 @@
-# setting compile order option
-
-zinc -debug -compile-order java-then-scala A.java B.scala
-
-exists A.class B.class
-
-delete A.class B.class
-
-! zinc -debug -compile-order scala-then-java A.java B.scala

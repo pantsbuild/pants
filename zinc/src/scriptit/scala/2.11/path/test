@@ -1,5 +1,0 @@
-# use scala 2.11 path
-
-zinc -debug -scala-path {{scala.2.11.path}} A.scala
-
-exists A.class

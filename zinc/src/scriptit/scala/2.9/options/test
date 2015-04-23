@@ -1,5 +1,0 @@
-# use scalac options
-
-zinc -debug -scala-home {{scala.2.9.home}} -S-deprecation -S-encoding -Sutf8 A.scala
-
-exists A.class
