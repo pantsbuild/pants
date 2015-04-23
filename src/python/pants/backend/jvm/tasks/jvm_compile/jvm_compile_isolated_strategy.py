@@ -23,7 +23,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   @classmethod
   def register_options(cls, register, language):
     register('--worker-count', type=int, default=1, advanced=True,
-             help='The number of worker threads to use to compile {lang} sources.'
+             help='The number of worker threads to use compiling {lang} sources. Some tools may not'
+                  ' support parallel execution, eg jmake+nailgun. This is a beta feature.'
                   .format(lang=language))
 
   def __init__(self, context, options, workdir, analysis_tools, sources_predicate,
