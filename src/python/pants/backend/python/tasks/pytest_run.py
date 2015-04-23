@@ -410,7 +410,7 @@ class PytestRun(PythonTask):
       resultlogs = [arg[arg.find('=') + 1:] for arg in args if arg.startswith('--resultlog=')]
       if resultlogs:
         return resultlogs[0]
-      if not resultlogs:
+      else:
         try:
           return args[args.index('--resultlog') + 1]
         except ValueError:
