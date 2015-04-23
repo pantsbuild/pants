@@ -120,8 +120,6 @@ class ExecutionGraph(object):
       self._dependees[dep_name].append(key)
 
   def find_job_without_dependencies(self):
-    # Topo sort doesn't mean all no-dependency targets are listed first,
-    # so we look for all work without dependencies
     return filter(
       lambda key: len(self._jobs[key].dependencies) == 0, self._job_keys_as_scheduled)
 
@@ -157,7 +155,7 @@ class ExecutionGraph(object):
       raise self.ExecutionFailure("No work without dependencies! There must be a "
                                   "circular dependency")
 
-    def submit_job(job_keys):
+    def submit_jobs(job_keys):
       def worker(worker_key, work):
         try:
           work()
@@ -171,7 +169,7 @@ class ExecutionGraph(object):
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
     try:
-      submit_job(work_without_dependencies)
+      submit_jobs(work_without_dependencies)
 
       while not status_table.are_all_done():
         try:
@@ -191,7 +189,7 @@ class ExecutionGraph(object):
           ready_dependees = [dependee for dependee in direct_dependees
                              if status_table.are_all_successful(self._jobs[dependee].dependencies)]
 
-          submit_job(ready_dependees)
+          submit_jobs(ready_dependees)
         else:
           status_table.mark_as(FAILED, finished_key)
           finished_job.run_failure_callback()
@@ -201,7 +199,7 @@ class ExecutionGraph(object):
             finished_queue.put((dependee, False, None))
 
         log.debug("{} finished with status {}".format(finished_key,
-                                                            status_table.get(finished_key)))
+                                                      status_table.get(finished_key)))
     except Exception as e:
       # Call failure callbacks for jobs that are unfinished.
       for key, state in status_table.unfinished_items():
