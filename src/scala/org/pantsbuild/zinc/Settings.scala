@@ -6,6 +6,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList }
+import org.pantsbuild.zinc.Main.MainLog
 import sbt.inc.ClassfileManager
 import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
 import sbt.Level
@@ -149,7 +150,7 @@ case class IncOptions(
 
   def classfileManager: () => ClassfileManager = {
     if (transactional && backup.isDefined)
-      ClassfileManager.transactional(backup.get)
+      ClassfileManager.transactional(backup.get, MainLog.log)
     else
       DefaultIncOptions.newClassfileManager
   }
