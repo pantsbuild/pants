@@ -103,7 +103,7 @@ class ExecutionGraphTest(unittest.TestCase):
     self.execute(exec_graph)
 
     self.assertEqual(["C", "B", "A"], self.jobs_run)
-  
+
   def test_one_failure_raises_exception(self):
     exec_graph = ExecutionGraph([self.job("A", raising_fn, [])])
     with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
@@ -116,7 +116,7 @@ class ExecutionGraphTest(unittest.TestCase):
                                  self.job("F", raising_fn, [])])
     with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
       self.execute(exec_graph)
-  
+
     self.assertEqual(["F"], self.jobs_run)
     self.assertEqual("Failed jobs: F", str(cm.exception))
 
