@@ -126,7 +126,7 @@ class Target(AbstractTarget):
   class ParamRegistrationConflict(Exception):
     def __init__(self, opponent):
       self._opponent = opponent
-      super(ParamRegistrationConflict, self).__init__(
+      super(Target.ParamRegistrationConflict, self).__init__(
         'Parameter already registered for class {0}'.format(opponent.__name__)
       )
 
@@ -160,7 +160,7 @@ class Target(AbstractTarget):
 
     for kls in classes.keys():
       if issubclass(cls, kls) or issubclass(kls, cls):
-        raise ParamRegistrationConflict(kls)
+        raise cls.ParamRegistrationConflict(kls)
 
     classes[cls] = convert
     cls._registered_parameters[name] = classes

@@ -119,3 +119,57 @@ class TargetTest(BaseTest):
         x_int='forty two'
       )
 
+  def test_multi_class(self):
+
+    class Target_(Target):
+      @classmethod
+      def create(cls, name, **kwargs):
+        return cls(
+          name=name,
+          address=SyntheticAddress.parse('//:{0}'.format(name)),
+          build_graph=self.build_graph,
+          **kwargs
+        )
+
+    class TargetA(Target_):
+      pass
+
+    class TargetB(Target_):
+      pass
+
+    class TargetC(TargetB):
+      pass
+
+    Target.clear_all_parameters()
+
+    Target.register_parameter('x', int)
+    TargetA.register_parameter('a', int)
+    TargetB.register_parameter('b', int)
+
+    with self.assertRaises(Target.ParamRegistrationConflict) as et:
+      Target.register_parameter('x', int)
+    self.assertEqual(et.exception.opponent, Target)
+
+    with self.assertRaises(Target.ParamRegistrationConflict) as ex:
+      TargetA.register_parameter('x', int)
+    self.assertEqual(ex.exception.opponent, Target)
+
+    with self.assertRaises(Target.ParamRegistrationConflict) as eb:
+      TargetC.register_parameter('b', int)
+    self.assertEqual(eb.exception.opponent, TargetB)
+
+    t = Target_.create(name='x', x=42)
+    self.assertEquals(t.params['x'], 42)
+
+    with self.assertRaises(Target.UnknownParameter) as t:
+      Target_.create(name='b', a=1)
+
+    t = TargetA.create(name='a', a=2)
+    self.assertEquals(t.params['a'], 2)
+
+    t = TargetB.create(name='b', b=3)
+    self.assertEquals(t.params['b'], 3)
+
+    t = TargetC.create(name='c', b=4)
+    self.assertEquals(t.params['b'], 4)
+
