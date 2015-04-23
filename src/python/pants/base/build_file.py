@@ -53,17 +53,15 @@ class BuildFile(AbstractClass):
       cls._cache[key] = cls(*key)
     return cls._cache[key]
 
-  @classmethod
   @abstractmethod
-  def glob1(cls, path, glob):
+  def glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
 
-  @classmethod
-  def _get_all_build_files(cls, path):
+  def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in cls.glob1(path, '{prefix}*'.format(prefix=cls._BUILD_FILE_PREFIX)):
-      if cls._is_buildfile_name(build):
+    for build in self.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+      if self._is_buildfile_name(build):
         results.append(build)
     return sorted(results)
 
@@ -284,8 +282,7 @@ class FilesystemBuildFile(BuildFile):
   # class needs to access it, so it can't be moved yet.
   _cache = {}
 
-  @classmethod
-  def glob1(cls, path, glob):
+  def glob1(self, path, glob):
     return glob1(path, glob)
 
   def source(self):
