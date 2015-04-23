@@ -77,16 +77,16 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     with self.context.new_workunit('isolation') as workunit:
       self._worker_pool = WorkerPool(workunit,
                                      self.context.run_tracker,
-                                     self._options.worker_count)
+                                     self._worker_count)
 
   def invalidation_hints(self, relevant_targets):
     # No partitioning.
     return (0, None)
 
-  def _upstream_analysis(self, compile_contexts, target):
+  def _upstream_analysis(self, compile_contexts, target_closure):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
     # If we have a compile context for the target, include it.
-    for dep in target.closure():
+    for dep in target_closure:
       if dep in compile_contexts:
         compile_context = compile_contexts[dep]
         yield compile_context.classes_dir, compile_context.analysis_file
@@ -123,43 +123,45 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                      invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,
                      update_artifact_cache_vts_work):
+    def create_work_for_vts(vts, compile_context, target_closure):
+      def work():
+        progress_message = vts.targets[0].address.spec
+        upstream_analysis = dict(self._upstream_analysis(compile_contexts,
+                                                         target_closure))
+        cp_entries = self._compute_classpath_entries(compile_classpaths, compile_context,
+                                                     extra_compile_time_classpath)
+        compile_vts(vts,
+                    compile_context.sources,
+                    compile_context.analysis_file,
+                    upstream_analysis,
+                    cp_entries,
+                    compile_context.classes_dir,
+                    progress_message)
+
+        # Update the products with the latest classes.
+        register_vts([compile_context])
+
+        # Kick off the background artifact cache write.
+        if update_artifact_cache_vts_work:
+          self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
+
+      return work
+
     jobs = []
-    invalid_vts_count = len(invalid_vts_partitioned)
-    for idx, vts in enumerate(invalid_vts_partitioned):
+    invalid_target_set = set(invalid_targets)
+    for vts in invalid_vts_partitioned:
       assert len(vts.targets) == 1, ("Requested one target per partition, got {}".format(vts))
+
       # Invalidated targets are a subset of relevant targets: get the context for this one.
       compile_target = vts.targets[0]
       compile_context = compile_contexts[compile_target]
+      compile_target_closure = compile_target.closure()
 
-      def create_work_for_vts(vts, compile_context, idx):
-        def work():
-          progress_message = 'target {} of {}'.format(idx + 1, invalid_vts_count)
-          upstream_analysis = dict(self._upstream_analysis(compile_contexts,
-                                                           compile_context.target))
-          cp_entries = self._compute_classpath_entries(compile_classpaths, compile_context,
-                                                       extra_compile_time_classpath)
-          compile_vts(vts,
-                      compile_context.sources,
-                      compile_context.analysis_file,
-                      upstream_analysis,
-                      cp_entries,
-                      compile_context.classes_dir,
-                      progress_message)
-
-          # Update the products with the latest classes.
-          register_vts([compile_context])
-
-          # Kick off the background artifact cache write.
-          if update_artifact_cache_vts_work:
-            self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
-
-        return work
-
-      invalid_dependencies = [target for target in compile_target.closure()
-                      if target in invalid_targets and target != compile_target]
+      # dependencies of the current target which are invalid for this chunk
+      invalid_dependencies = (compile_target_closure & invalid_target_set) - [compile_target]
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
-                      create_work_for_vts(vts, compile_context, idx),
+                      create_work_for_vts(vts, compile_context, compile_target_closure),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
                       # If compilation and analysis work succeeds, validate the vts.
                       # Otherwise, fail it.
