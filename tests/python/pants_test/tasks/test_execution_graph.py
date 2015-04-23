@@ -35,12 +35,12 @@ class ExecutionGraphTest(unittest.TestCase):
   def execute(self, exec_graph):
     exec_graph.execute(ImmediatelyExecutingPool(), PrintLogger())
 
-  def job(self, name, fn, dependencies):
+  def job(self, name, fn, dependencies, on_success=None, on_failure=None):
     def recording_fn():
       self.jobs_run.append(name)
       fn()
 
-    return Job(name, recording_fn, dependencies)
+    return Job(name, recording_fn, dependencies, on_success, on_failure)
 
   def test_single_job(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [])])
@@ -56,9 +56,7 @@ class ExecutionGraphTest(unittest.TestCase):
 
     self.assertEqual(self.jobs_run, ["B", "A"])
 
-  # simple binary tree
-  # A -> B
-  # A -> C
+
   def test_simple_binary_tree(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
                                  self.job("B", passing_fn, []),
@@ -67,9 +65,6 @@ class ExecutionGraphTest(unittest.TestCase):
 
     self.assertEqual(self.jobs_run, ["B", "C", "A"])
 
-  # simple linear
-  # A -> B
-  # B -> C
   def test_simple_linear_dependencies(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
                                  self.job("B", passing_fn, ["C"]),
@@ -79,8 +74,6 @@ class ExecutionGraphTest(unittest.TestCase):
 
     self.assertEqual(self.jobs_run, ["C", "B", "A"])
 
-  # A
-  # B
   def test_simple_unconnected(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, []),
                                  self.job("B", passing_fn, []),
@@ -90,9 +83,6 @@ class ExecutionGraphTest(unittest.TestCase):
 
     self.assertEqual(self.jobs_run, ["A", "B"])
 
-  # disconnected tree
-  # A -> B
-  # C
   def test_simple_unconnected_tree(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
                                  self.job("B", passing_fn, []),
@@ -104,11 +94,6 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual(self.jobs_run, ["B", "C", "A"])
 
 
-    # dependee depends on dependency of its dependency
-
-  # A -> B
-  # A -> C
-  # B -> C
   def test_dependee_depends_on_dependency_of_its_dependency(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
                                  self.job("B", passing_fn, ["C"]),
@@ -127,20 +112,34 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual("Failed jobs: A", str(cm.exception))
 
   def test_failure_of_dependency_does_not_run_dependents(self):
-    exec_graph = ExecutionGraph([self.job("A", raising_fn, ["F"]),
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, ["F"]),
                                  self.job("F", raising_fn, [])])
     with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
       self.execute(exec_graph)
   
     self.assertEqual(["F"], self.jobs_run)
+    self.assertEqual("Failed jobs: F", str(cm.exception))
 
-  #def test_failure_of_dependency_does_not_include_dependents_in_error_message(self):
-  #  exec_graph = ExecutionGraph([self.job("A", raising_fn, ["F"]),
-  #                               self.job("F", raising_fn, [])])
-  #  with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
-  #    self.execute(exec_graph)
-#
-  #  self.assertEqual("Failed jobs: F", str(cm.exception))
+  def test_failure_of_dependency_does_not_run_second_order_dependents(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
+                                 self.job("B", passing_fn, ["F"]),
+                                 self.job("F", raising_fn, [])])
+    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+      self.execute(exec_graph)
+
+    self.assertEqual(["F"], self.jobs_run)
+    self.assertEqual("Failed jobs: F", str(cm.exception))
+
+  def test_failure_of_one_leg_of_tree_does_not_cancel_other(self):
+    # TODO do we want this behavior, or do we want to fail fast on the first failed job?
+    exec_graph = ExecutionGraph([self.job("B", passing_fn, []),
+                                 self.job("F", raising_fn, ["B"]),
+                                 self.job("A", passing_fn, ["B"])])
+    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+      self.execute(exec_graph)
+
+    self.assertEqual(["B", "F", "A"], self.jobs_run)
+    self.assertEqual("Failed jobs: F", str(cm.exception))
 
   def test_failure_of_disconnected_job_does_not_cancel_non_dependents(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, []),
@@ -151,7 +150,6 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual(["A", "F"], self.jobs_run)
 
   def test_cycle_in_graph_causes_failure(self):
-
     with self.assertRaises(ValueError) as cm:
       ExecutionGraph([self.job("A", passing_fn, ["B"]),
                       self.job("B", passing_fn, ["A"])])
@@ -166,31 +164,27 @@ class ExecutionGraphTest(unittest.TestCase):
 
     self.assertEqual("Unscheduled dependencies: Z", str(cm.exception))
 
+  def test_on_success_callback_raises_error(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], on_success=raising_fn)])
 
-# simple binary tree, one dependency fails
-# A -> (B)
-# A -> C
-# C succeeds
-# A marked as transitive failure
-# B direct failure
+    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+      self.execute(exec_graph)
 
-# simple linear, inner dependency fails
-# A -> (B)
-# (B) -> C
+    self.assertEqual("Error in on_success for A: I'm an error", str(cm.exception))
+
+  def test_on_failure_callback_raises_error(self):
+    exec_graph = ExecutionGraph([self.job("A", raising_fn, [], on_failure=raising_fn)])
+
+    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+      self.execute(exec_graph)
+
+    self.assertEqual("Error in on_failure for A: I'm an error", str(cm.exception))
 
 
-# exception handling
-# unsorted scheduling, is fine if resolved by execution
-# A -> B
-# schedule A # blows up because B not scheduled yet
-# schedule B
 
-# cycles
-# A -> B
-# B -> A
-# scheduling should probably fail because it's impossible to have scheduled the other
+  def test_same_key_scheduled_twice_is_error(self):
+    with self.assertRaises(ValueError) as cm:
+      ExecutionGraph([self.job("Same", passing_fn, []),
+                      self.job("Same", passing_fn, [])])
 
-# on_success / failure raises
-# schedule job with existing key
-# do something with exceptions that bubble up from failed jobs
-# break out a transitive failure state called canceled
+    self.assertEqual("Job already scheduled: Same", str(cm.exception))

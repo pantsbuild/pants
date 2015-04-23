@@ -46,10 +46,11 @@ UNSTARTED = 'Unstarted'
 QUEUED = 'Queued'
 SUCCESSFUL = 'Successful'
 FAILED = 'Failed'
+CANCELED = 'Canceled'
 
 
 class StatusTable(object):
-  DONE_STATES = {SUCCESSFUL, FAILED}
+  DONE_STATES = {SUCCESSFUL, FAILED, CANCELED}
 
   def __init__(self, keys):
     self._statuses = {key: UNSTARTED for key in keys}
@@ -115,6 +116,8 @@ class ExecutionGraph(object):
     key = job.key
     dependency_keys = job.dependencies
     self._job_keys_as_scheduled.append(key)
+    if key in self._jobs:
+      raise ValueError("Job already scheduled: {}".format(key))
     self._jobs[key] = job
 
     if len(dependency_keys) == 0:
@@ -153,9 +156,9 @@ class ExecutionGraph(object):
       def worker(worker_key, work):
         try:
           work()
-          result = (worker_key, True, None)
+          result = (worker_key, SUCCESSFUL, None)
         except Exception as e:
-          result = (worker_key, False, e)
+          result = (worker_key, FAILED, e)
         finished_queue.put(result)
 
       for job_key in job_keys:
@@ -167,7 +170,7 @@ class ExecutionGraph(object):
 
       while not status_table.are_all_done():
         try:
-          finished_key, success, value = finished_queue.get(timeout=10)
+          finished_key, result_status, value = finished_queue.get(timeout=10)
         except queue.Empty:
           log.debug("Waiting on \n  {}\n".format(
             "\n  ".join(
@@ -176,24 +179,35 @@ class ExecutionGraph(object):
 
         finished_job = self._jobs[finished_key]
         direct_dependees = self._dependees[finished_key]
-        if success:
-          status_table.mark_as(SUCCESSFUL, finished_key)
-          finished_job.run_success_callback()
+        status_table.mark_as(result_status, finished_key)
+
+        if result_status == SUCCESSFUL:
+          try:
+            finished_job.run_success_callback()
+          except Exception as e:
+            raise ExecutionGraph.ExecutionFailure("Error in on_success for {}: {}"
+                                                  .format(finished_key, e))
+
 
           ready_dependees = [dependee for dependee in direct_dependees
                              if status_table.are_all_successful(self._jobs[dependee].dependencies)]
 
           submit_jobs(ready_dependees)
-        else:
-          status_table.mark_as(FAILED, finished_key)
-          finished_job.run_failure_callback()
+        else: # failed or canceled
+          try:
+            finished_job.run_failure_callback()
+          except Exception as e:
+            raise ExecutionGraph.ExecutionFailure("Error in on_failure for {}: {}"
+                                                  .format(finished_key, e))
 
           # propagate failures downstream
           for dependee in direct_dependees:
-            finished_queue.put((dependee, False, None))
+            finished_queue.put((dependee, CANCELED, None))
 
         log.debug("{} finished with status {}".format(finished_key,
                                                       status_table.get(finished_key)))
+    except self.ExecutionFailure:
+      raise
     except Exception as e:
       # Call failure callbacks for jobs that are unfinished.
       for key, state in status_table.unfinished_items():
