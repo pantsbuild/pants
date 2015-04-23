@@ -15,6 +15,15 @@ from pants.base.worker_pool import Work
 class Job(object):
 
   def __init__(self, key, fn, dependencies, on_success, on_failure):
+    """
+
+    :param key: Key used to reference and look up jobs
+    :param fn callable: The work to perform
+    :param dependency_keys: List of keys for dependent jobs
+    :param on_success: Zero parameter callback to run if job completes successfully. Run on main
+                       thread.
+    :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
+                       thread."""
     self.key = key
     self.fn = fn
     self.dependencies = dependencies
@@ -74,10 +83,16 @@ class ExecutionGraph(object):
   class ExecutionFailure(Exception):
     """Raised when work units fail during execution"""
 
-  def __init__(self):
+  def __init__(self, job_list):
+    """
+
+    :param job_list Job: list of Jobs to schedule and run.
+    """
     self._dependees = defaultdict(list)
     self._jobs = {}
     self._job_keys_as_scheduled = []
+    for job in job_list:
+      self._schedule(job)
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -89,13 +104,7 @@ class ExecutionGraph(object):
     """Inserts a job into the execution graph with its dependencies.
 
     Assumes dependencies have already been scheduled, and raises an error otherwise.
-    :param key: Key used to reference and look up jobs
-    :param fn callable: The work to perform
-    :param dependency_keys: List of keys for dependent jobs
-    :param on_success: Zero parameter callback to run if job completes successfully. Run on main
-                       thread.
-    :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
-                       thread.
+
     """
     job = Job(key, fn, dependency_keys, on_success, on_failure)
     self._schedule(job)
