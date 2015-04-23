@@ -84,3 +84,38 @@ class TargetTest(BaseTest):
                                        deferred_sources_address=SyntheticAddress.parse('//:foo'))
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
+
+  def test_unknown_arg(self):
+    Target.clear_all_parameters()
+    with self.assertRaises(Target.UnknownParameter) as t:
+      target = Target(name='t', address=SyntheticAddress.parse('//:t'), build_graph=self.build_graph, oops=1)
+    self.assertEqual(t.exception.name, 'oops')
+
+  def test_simple_arg(self):
+    Target.clear_all_parameters()
+    Target.register_parameter('x_str', str)
+    Target.register_parameter('x_int', int)
+
+    target = Target(
+      name='t',
+      address=SyntheticAddress.parse('//:t'),
+      build_graph=self.build_graph,
+      x_str='forty two',
+      x_int=42
+    )
+
+    self.assertEqual(target.params['x_str'], 'forty two')
+    self.assertEqual(target.params['x_int'], 42)
+
+  def test_bad_arg(self):
+    Target.clear_all_parameters()
+    Target.register_parameter('x_int', int)
+
+    with self.assertRaises(ValueError):
+      target = Target(
+        name='t',
+        address=SyntheticAddress.parse('//:t'),
+        build_graph=self.build_graph,
+        x_int='forty two'
+      )
+

@@ -114,30 +114,75 @@ class Target(AbstractTarget):
     """Internal error, too many elements in Addresses"""
     pass
 
-  class UnknownParameters(Exception):
-    def __init__(self, names):
-      self._names = names
-      super(UnknownParameters, self).__init__('Unknown parameters: {0}'.format(', '.join(names)))
+  class UnknownParameter(TypeError):
+    def __init__(self, name):
+      self._name = name
+      super(Target.UnknownParameter, self).__init__('Unknown parameter: {0}'.format(', '.join(name)))
 
     @property
-    def names(self):
-      return self.__names
+    def name(self):
+      return self._name
+
+  class ParamRegistrationConflict(Exception):
+    def __init__(self, opponent):
+      self._opponent = opponent
+      super(ParamRegistrationConflict, self).__init__(
+        'Parameter already registered for class {0}'.format(opponent.__name__)
+      )
+
+    @property
+    def opponent(self):
+      return self._opponent
 
   ParameterTag = namedtuple('ParameterTag', ['name', 'value'])
 
-  _registered_param_tags = {}
+  # { name: { cls: convert } } A mapping between a parameter name and the
+  # possible classes that registered it and their conversion functions.
+  _registered_parameters = {}
 
   @classmethod
-  def register_param_tag(cls, name, convert):
-    tag = cls._registered_param_tags.get(name, {})
+  def clear_all_parameters(cls):
+    cls._registered_parameters = {}
 
-    for kls in tag.keys():
+  @classmethod
+  def register_parameter(cls, name, convert):
+    """Register a parameter that might be given to __init__.
+
+    :param name: name of parameter.
+    :param convert: a function that takes the given argument and converts
+       it into its final format.
+    :raises ParamRegistrationConflict: when a parameter is attempted registration
+       for more than a single class which are not orthogonal (one is a subclass
+       of the other).
+    """
+
+    classes = cls._registered_parameters.get(name, {})
+
+    for kls in classes.keys():
       if issubclass(cls, kls) or issubclass(kls, cls):
-        # TODO: specialized exception
-        raise Exception('{0} is already registered this hierarchy'.format(name))
+        raise ParamRegistrationConflict(kls)
 
-    tag[cls] = convert
-    cls._registered_param_tags[name] = tag
+    classes[cls] = convert
+    cls._registered_parameters[name] = classes
+
+  @classmethod
+  def _get_registered_parameter_converter(cls, name):
+    """Given a name return the convertion function for said parameter.
+
+    :param name: name of parameter.
+    :raises UnknownParameter: if parameter is unknown for given class.
+    """
+    classes = cls._registered_parameters.get(name, None)
+    if not classes:
+      raise cls.UnknownParameter(name)
+
+    converters = [cvt for kls, cvt in classes.items() if issubclass(cls, kls)]
+    assert len(converters) in (0, 1), "Can't have more than one converter for class"
+
+    if not converters:
+      raise cls.UnknownParameter(name)
+
+    return converters[0]
 
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
@@ -223,27 +268,20 @@ class Target(AbstractTarget):
     self._cached_transitive_fingerprint_map = {}
 
     self._tags = set(tags or [])
+    self._tags.update(self._parse_registered_parameters(kwargs))
 
-    unknown_param_names = [k for k in kwargs if k is not in self._registered_param_tags]
-    if unknown_param_names:
-      raise UnknownParameters(unknown_param_names)
-
+  @classmethod
+  def _parse_registered_parameters(cls, kwargs):
+    parameter_tags = set()
     for name, value in kwargs.items():
-      tag = self._registered_param_tags[name]
-      clses = [k for k in tag if isinstance(self, k)]
-      assert len(clses) in (0, 1)
-      if not clses:
-        # TODO: this needs to be detected earlier.
-        raise UnknownParameters(name)
-      convertor = tag[clses[0]]
-      try:
-        v = convertor(value)
-      except ValueError:
-        # TODO: proper exception
-        raise
+      convert = cls._get_registered_parameter_converter(name)
+      converted_value = convert(value)
+      parameter_tags.add(cls.ParameterTag(name=name, value=converted_value))
+    return parameter_tags
 
-      self._tags.add(ParameterTag(name=name, value=v)
-
+  @property
+  def params(self):
+    return dict((p.name, p.value) for p in self.tags if isinstance(p, self.ParameterTag))
 
   @property
   def tags(self):
