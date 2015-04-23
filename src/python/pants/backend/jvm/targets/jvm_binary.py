@@ -309,7 +309,12 @@ class JvmBinary(JvmTarget):
     :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
       deploy jar.
     :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
-      for adding to MANIFEST.MF when packaging this binary.
+      for adding to MANIFEST.MF when packaging this binary.  Special strings that can be substituted
+      into the manifest values:
+
+        {{git_commit_id}}  The SHA1 value identifying the git commit for the directory where the
+          jvm_binary target is defined.
+
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings

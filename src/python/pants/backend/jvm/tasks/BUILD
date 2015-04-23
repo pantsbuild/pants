@@ -219,6 +219,7 @@ python_library(
   sources = ['jar_task.py'],
   dependencies = [
     ':nailgun_task',
+    '3rdparty/python:pystache',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jar_tool',
@@ -226,6 +227,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/jar:manifest',
+    'src/python/pants/scm/git:git',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
     'src/python/pants:binary_util',

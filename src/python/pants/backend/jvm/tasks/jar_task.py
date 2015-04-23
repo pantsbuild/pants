@@ -10,6 +10,7 @@ import tempfile
 from abc import abstractmethod
 from contextlib import contextmanager
 
+import pystache
 from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
@@ -21,6 +22,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
+from pants.scm.git import Git
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 
@@ -314,11 +316,22 @@ class JarTask(NailgunTask):
     def _add_manifest_entries(jvm_binary_target, manifest):
       """Add additional fields to MANIFEST.MF as declared in the ManifestEntries structure.
 
-      :param JvmBinary jvm_binary_target:
-      :param Manifest manifest:
+      :param JvmBinary jvm_binary_target: target that defines the `manifest_entries`
+      :param Manifest manifest: Current manifest to be updated with values from `manifest_entries`
+        in the target definition
       """
-      for header, value in jvm_binary_target.manifest_entries.entries.iteritems():
-        manifest.addentry(header, value)
+      if jvm_binary_target.manifest_entries.entries:
+        template_data = {}
+        buildroot = get_buildroot()
+        worktree = Git.detect_worktree(dir=os.path.join(buildroot,
+                                                        jvm_binary_target.address.spec_path))
+        if worktree:
+          git = Git(worktree=worktree)
+          if git:
+            template_data['git_commit_id'] = git.commit_id
+
+        for header, value in jvm_binary_target.manifest_entries.entries.iteritems():
+          manifest.addentry(header, pystache.render(value, template_data))
 
     @staticmethod
     def prepare(round_manager):

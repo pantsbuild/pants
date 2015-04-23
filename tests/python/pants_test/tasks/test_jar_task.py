@@ -292,3 +292,46 @@ class JarBuilderTest(BaseJarTaskTest):
           }
         self.assertEquals(set(expected_entries.items()),
                           set(expected_entries.items()).intersection(set(all_entries.items())))
+
+  def test_implementation_version_sha(self):
+    with pushd(self.build_root):
+      subprocess.check_call(['git', 'init' ])
+      sourcefile = 'src/java/hello/Hello.java'
+      self.create_file(sourcefile, 'package hello; public class Hello {}')
+      subprocess.check_call(['git', 'add', sourcefile])
+      subprocess.check_call(['git', '-c', 'user.name=Test', '-c', 'user.email="text@example.com"',
+                             'commit', '-a', '-m', 'Initial'])
+      proc = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE)
+      (out, err) = proc.communicate()
+      sha = out.strip()
+      self.assertRegexpMatches(sha, '^[0-9a-f]{40}$')
+
+    self.add_to_build_file('src/java/hello', dedent('''
+        jvm_binary(
+          name='hello-git',
+          main='hello.Hello',
+          source='Hello.java',
+          manifest_entries = {
+            'Implementation-Version': '{{git_commit_id}}',
+          },
+        )''').strip())
+    binary_target = self.target('src/java/hello:hello-git')
+    context = self.context(target_roots=[binary_target])
+
+    classfile = '.pants.d/javac/classes/hello/Hello.class'
+    self.create_file(classfile, '0xDEADBEEF')
+    self._add_to_classes_by_target(context, binary_target, classfile)
+    context.products.safe_create_data('resources_by_target',
+                                      lambda: defaultdict(MultipleRootedProducts))
+
+    jar_task = self.prepare_jar_task(context)
+
+    with self.jarfile() as existing_jarfile:
+      with jar_task.open_jar(existing_jarfile) as jar:
+        with jar_task.create_jar_builder(jar) as jar_builder:
+          jar_builder.add_target(binary_target)
+
+      with open_zip(existing_jarfile) as jar:
+        manifest = jar.read('META-INF/MANIFEST.MF').strip()
+        all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
+        self.assertEquals(all_entries['Implementation-Version'], sha)
