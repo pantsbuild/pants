@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import re
+from abc import abstractmethod
 from collections import defaultdict
 from glob import glob1
 
@@ -40,8 +41,8 @@ class BuildFile(AbstractClass):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
-  #TODO: this cache should really be in BuildFileAddressMapper, but unfortunately this
-  #class needs to access it, so it can't be moved yet.
+  # TODO(dturner): this cache should really be in BuildFileAddressMapper, but unfortunately this
+  # class needs to access it, so it can't be moved yet.
   _cache = {}
 
   @classmethod
@@ -56,8 +57,9 @@ class BuildFile(AbstractClass):
     return cls._cache[key]
 
   @classmethod
+  @abstractmethod
   def glob1(cls, path, glob):
-    raise NotImplementedError()
+    """Returns a list of paths in path that match glob"""
 
   @classmethod
   def _get_all_build_files(cls, path):
@@ -124,13 +126,22 @@ class BuildFile(AbstractClass):
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   @classmethod
+  @abstractmethod
   def walk(cls, path, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk"""
+
+  @abstractmethod
+  def isdir(self, path):
+    """Returns True if path is a directory"""
     raise NotImplementedError()
 
-  def isdir(self, path):
-    """Returns True if path is  a directory"""
-    raise NotImplementedError()
+  @abstractmethod
+  def isfile(self, path):
+    """Returns True if path is a file"""
+
+  @abstractmethod
+  def exists(self, path):
+    """Returns True if path exists"""
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
@@ -248,9 +259,9 @@ class BuildFile(AbstractClass):
     for sibling in self.siblings():
       yield sibling
 
+  @abstractmethod
   def source(self):
     """Returns the source code for this BUILD file."""
-    raise NotImplementedError()
 
   def code(self):
     """Returns the code object for this BUILD file."""
@@ -271,7 +282,8 @@ class BuildFile(AbstractClass):
   def __repr__(self):
     return self.full_path
 
-class BuildFileOnDisk(BuildFile):
+
+class FilesystemBuildFile(BuildFile):
   @classmethod
   def glob1(cls, path, glob):
     return glob1(path, '{prefix}*'.format(prefix=cls._BUILD_FILE_PREFIX))

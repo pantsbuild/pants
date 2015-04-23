@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.base.build_file import BuildFileOnDisk
+from pants.base.build_file import FilesystemBuildFile
 
 
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
@@ -44,7 +44,7 @@ def linkify(buildroot, s):
       else:
         putative_dir = path
       if os.path.isdir(os.path.join(buildroot, putative_dir)):
-        build_file = BuildFileOnDisk(buildroot, putative_dir, must_exist=False)
+        build_file = FilesystemBuildFile(buildroot, putative_dir, must_exist=False)
         path = build_file.relpath
     if os.path.exists(os.path.join(buildroot, path)):
       # The reporting server serves file content at /browse/<path_from_buildroot>.

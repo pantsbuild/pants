@@ -47,6 +47,11 @@ class BuildFileAddressMapper(object):
     """ Raised when a problem was encountered scanning a tree of BUILD files."""
 
   def __init__(self, build_file_parser, build_file_class):
+    """Create a BuildFileAddressMapper.
+
+    :param build_file_parser: An instance of BuildFileParser
+    :param build_file_class: A subclass of BuildFile used to construct and cache BuildFile objects
+    """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
     self._build_file_class = build_file_class
@@ -153,6 +158,10 @@ class BuildFileAddressMapper(object):
     return self._address_map_from_spec_path(spec_path).keys()
 
   def from_cache(self, *args, **kwargs):
+    """Return a BuildFile instance.  Args as per BuildFile.from_cache
+
+    :returns: a BuildFile
+    """
     return self._build_file_class.from_cache(*args, **kwargs)
 
   def spec_to_address(self, spec, relative_to=''):
@@ -170,8 +179,12 @@ class BuildFileAddressMapper(object):
                                            .format(message=e, spec=spec))
     return BuildFileAddress(build_file, name)
 
-  def scan_buildfiles(self, *args, **kwargs):
-    return self._build_file_class.scan_buildfiles(*args, **kwargs)
+  def scan_buildfiles(self, root_dir, *args, **kwargs):
+    """Looks for all BUILD files in root_dir or its descendant directories.
+
+    :returns: an OrderedSet of BuildFile instances.
+    """
+    return self._build_file_class.scan_buildfiles(root_dir, *args, **kwargs)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.

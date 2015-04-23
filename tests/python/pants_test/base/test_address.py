@@ -10,7 +10,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
-from pants.base.build_file import BuildFileOnDisk
+from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
@@ -121,12 +121,12 @@ class SyntheticAddressTest(BaseAddressTest):
 class BuildFileAddressTest(BaseAddressTest):
   def test_build_file_forms(self):
     with self.workspace('a/b/c/BUILD') as root_dir:
-      build_file = BuildFileOnDisk(root_dir, relpath='a/b/c')
+      build_file = FilesystemBuildFile(root_dir, relpath='a/b/c')
       self.assert_address('a/b/c', 'c', BuildFileAddress(build_file))
       self.assert_address('a/b/c', 'foo', BuildFileAddress(build_file, target_name='foo'))
       self.assertEqual('a/b/c:foo', BuildFileAddress(build_file, target_name='foo').spec)
 
     with self.workspace('BUILD') as root_dir:
-      build_file = BuildFileOnDisk(root_dir, relpath='')
+      build_file = FilesystemBuildFile(root_dir, relpath='')
       self.assert_address('', 'foo', BuildFileAddress(build_file, target_name='foo'))
       self.assertEqual(':foo', BuildFileAddress(build_file, target_name='foo').spec)

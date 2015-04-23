@@ -15,7 +15,7 @@ from textwrap import dedent
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_file import BuildFileOnDisk
+from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
@@ -132,12 +132,12 @@ class BaseTest(unittest.TestCase):
     build_configuration = BuildConfiguration()
     build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, BuildFileOnDisk)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, BuildFileOnDisk)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def set_options_for_scope(self, scope, **kwargs):
@@ -219,7 +219,7 @@ class BaseTest(unittest.TestCase):
     BuildRoot().reset()
     SourceRoot.reset()
     safe_rmtree(self.build_root)
-    BuildFileOnDisk.clear_cache()
+    FilesystemBuildFile.clear_cache()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.

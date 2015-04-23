@@ -14,7 +14,7 @@ import pkg_resources
 from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFileOnDisk
+from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
@@ -105,7 +105,7 @@ class GoalRunner(object):
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
                                              run_tracker=self.run_tracker)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, BuildFileOnDisk)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(run_tracker=self.run_tracker,
                                   address_mapper=self.address_mapper)
 
