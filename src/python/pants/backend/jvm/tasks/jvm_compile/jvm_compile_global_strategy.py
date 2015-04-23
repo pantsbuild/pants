@@ -59,7 +59,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, sources_predicate,
+               supports_concurrency):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
 
     # Various working directories.

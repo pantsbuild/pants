@@ -18,6 +18,7 @@ from pants.option.options import Options
 class ScalaCompile(JvmCompile):
   _language = 'scala'
   _file_suffix = '.scala'
+  _supports_concurrent_execution = True
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):

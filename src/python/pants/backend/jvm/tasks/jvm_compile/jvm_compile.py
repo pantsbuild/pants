@@ -100,6 +100,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   # --------------------------
   _language = None
   _file_suffix = None
+  _supports_concurrent_execution = None
 
   @classmethod
   def name(cls):
@@ -194,7 +195,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
-                                          lambda s: s.endswith(self._file_suffix))
+                                          lambda s: s.endswith(self._file_suffix),
+                                          self._supports_concurrent_execution)
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.

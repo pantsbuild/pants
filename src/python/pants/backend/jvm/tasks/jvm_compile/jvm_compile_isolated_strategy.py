@@ -23,18 +23,21 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   @classmethod
   def register_options(cls, register, language):
     register('--worker-count', type=int, default=1, advanced=True,
-             help='The number of worker threads to use to compile {lang} sources. Some tools may not'
-                  ' support parallel execution, eg jmake+nailgun'
+             help='The number of worker threads to use to compile {lang} sources.'
                   .format(lang=language))
 
-  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, sources_predicate,
+               task_supports_concurrency):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
                                                      sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
-    self._options = options
+
+    self._task_supports_concurrency = task_supports_concurrency
+    self._worker_count = options.worker_count
+    self._worker_pool = None
 
   def name(self):
     return 'isolated'
@@ -64,6 +67,10 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       safe_mkdir(cc.classes_dir)
       compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
       self.validate_analysis(cc.analysis_file)
+
+    if not self._task_supports_concurrency and self._worker_count > 1:
+      raise TaskError("Worker count {} specified for task that does not support concurrency."
+                      .format(self._worker_count))
 
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation') as workunit:
