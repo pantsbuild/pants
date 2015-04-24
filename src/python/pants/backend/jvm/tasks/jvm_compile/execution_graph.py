@@ -223,6 +223,7 @@ class ExecutionGraph(object):
           try:
             finished_job.run_success_callback()
           except Exception as e:
+            log.debug(traceback.format_exc())
             raise ExecutionFailure("Error in on_success for {}".format(finished_key), e)
 
           ready_dependees = [dependee for dependee in direct_dependees
@@ -233,6 +234,7 @@ class ExecutionGraph(object):
           try:
             finished_job.run_failure_callback()
           except Exception as e:
+            log.debug(traceback.format_exc())
             raise ExecutionFailure("Error in on_failure for {}".format(finished_key), e)
 
           # propagate failures downstream
