@@ -9,6 +9,7 @@ import hashlib
 import logging
 import os
 import re
+import threading
 import time
 from collections import namedtuple
 
@@ -208,17 +209,28 @@ class NailgunExecutor(Executor):
       logger.debug('Found ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
     return endpoint
 
-  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
-    classpath = self._nailgun_classpath + classpath
-    new_fingerprint = self._fingerprint(jvm_options, classpath, self._distribution.version)
-
+  def _find_and_stat_nailgun_server(self, new_fingerprint):
     endpoint = self._get_nailgun_endpoint()
     running = endpoint and self._check_pid(endpoint.pid)
     updated = endpoint and endpoint.fingerprint != new_fingerprint
     updated = updated or (endpoint and endpoint.exe != self._distribution.java)
+    return endpoint, running, updated
+
+  _nailgun_spawn_lock = threading.Lock()
+
+  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
+    classpath = self._nailgun_classpath + classpath
+    new_fingerprint = self._fingerprint(jvm_options, classpath, self._distribution.version)
+
+    endpoint, running, updated = self._find_and_stat_nailgun_server(new_fingerprint)
     if running and not updated:
       return self._create_ngclient(endpoint.port, stdout, stderr)
-    else:
+
+    with self._nailgun_spawn_lock:
+      endpoint, running, updated = self._find_and_stat_nailgun_server(new_fingerprint)
+      if running and not updated:
+        return self._create_ngclient(endpoint.port, stdout, stderr)
+
       if running and updated:
         logger.debug('Killing ng server launched with {endpoint}'.format(endpoint=repr(endpoint)))
         self.kill()

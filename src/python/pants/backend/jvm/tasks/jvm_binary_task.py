@@ -69,16 +69,15 @@ class JvmBinaryTask(JarTask):
                          compressed=True) as jar:
 
         with self.context.new_workunit(name='add-internal-classes'):
-          self.create_jar_builder(jar).add_target(binary, recursive=True)
-
-        if with_external_deps:
-          with self.context.new_workunit(name='add-dependency-jars'):
-            for basedir, external_jar in self.list_external_jar_dependencies(binary):
-              external_jar_path = os.path.join(basedir, external_jar)
-              self.context.log.debug('  dumping {}'.format(external_jar_path))
-              jar.writejar(external_jar_path)
-
-        yield jar
+          with self.create_jar_builder(jar) as jar_builder:
+            jar_builder.add_target(binary, recursive=True)
+            if with_external_deps:
+              with self.context.new_workunit(name='add-dependency-jars'):
+                for basedir, external_jar in self.list_external_jar_dependencies(binary):
+                  external_jar_path = os.path.join(basedir, external_jar)
+                  self.context.log.debug('  dumping {}'.format(external_jar_path))
+                  jar.writejar(external_jar_path)
+            yield jar
 
   def _mapped_dependencies(self, jardepmap, binary, confs):
     # TODO(John Sirois): rework product mapping towards well known types

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import io
 import logging
 import os
+import sys
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -73,22 +74,22 @@ class TestContext(Context):
   task-running machinery is allowed to use.
   """
   class DummyWorkunit(object):
-    """A workunit stand-in that sends all output to /dev/null.
+    """A workunit stand-in that sends all output to stderr
 
-    These outputs are typically only used by subprocesses spawned by code under test, not
-    the code under test itself, and would otherwise go into some reporting black hole anyway.
+   These outputs are typically only used by subprocesses spawned by code under test, not
+   the code under test itself, and would otherwise go into some reporting black hole.  The
+   testing framework will only display the stderr output when a test fails.
 
-    Provides no other tracking/labeling/reporting functionality. Does not require "opening"
-    or "closing".
-    """
-    def __init__(self, devnull):
-      self._devnull = devnull
+   Provides no other tracking/labeling/reporting functionality. Does not require "opening"
+   or "closing".
+   """
 
     def output(self, name):
-      return self._devnull
+      return sys.stderr
 
     def set_outcome(self, outcome):
-      pass
+      return sys.stderr.write('Outcome: {}'.format(outcome))
+
 
   def __init__(self, options, target_roots, build_graph=None, build_file_parser=None,
                address_mapper=None, console_outstream=None, workspace=None):
@@ -99,15 +100,10 @@ class TestContext(Context):
     super(TestContext, self).__init__(config=empty_config, options=options, run_tracker=None,
         target_roots=target_roots, build_graph=build_graph, build_file_parser=build_file_parser,
         address_mapper=address_mapper, console_outstream=console_outstream, workspace=workspace)
-    try:
-      from subprocess import DEVNULL # Python 3.
-    except ImportError:
-      DEVNULL = open(os.devnull, 'wb')
-    self._devnull = DEVNULL
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd=''):
-    yield TestContext.DummyWorkunit(self._devnull)
+    yield TestContext.DummyWorkunit()
 
   @property
   def log(self):

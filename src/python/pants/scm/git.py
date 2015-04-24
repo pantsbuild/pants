@@ -10,13 +10,14 @@ import subprocess
 import traceback
 
 from pants.scm.scm import Scm
+from pants.util.contextutil import pushd
 
 
 class Git(Scm):
   """An Scm implementation backed by git."""
 
   @classmethod
-  def detect_worktree(cls, binary='git'):
+  def detect_worktree(cls, binary='git', dir=None):
     """Detect the git working tree above cwd and return it; else, return None.
 
     binary: The path to the git binary to use, 'git' by default.
@@ -25,7 +26,11 @@ class Git(Scm):
     # pants.base.build_environment.get_scm, encapsulate in a true factory method.
     cmd = [binary, 'rev-parse', '--show-toplevel']
     try:
-      process, out = cls._invoke(cmd)
+      if dir:
+        with pushd(dir):
+          process, out = cls._invoke(cmd)
+      else:
+        process, out = cls._invoke(cmd)
       cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
     except Scm.ScmException:
       return None

@@ -12,6 +12,12 @@ from pants.java.jar.manifest import Manifest
 
 class TestManifest(unittest.TestCase):
 
+  def test_isempty(self):
+    manifest = Manifest()
+    self.assertTrue(manifest.is_empty())
+    manifest.addentry('Header', 'value')
+    self.assertFalse(manifest.is_empty())
+
   def test_addentry(self):
     manifest = Manifest()
     manifest.addentry('Header', 'value')

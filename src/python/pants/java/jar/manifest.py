@@ -42,8 +42,13 @@ class Manifest(object):
       raise ValueError('Header name must be 68 characters or less, given {}'.format(header))
     if self._contents:
       self._contents += '\n'
-    self._contents += '\n'.join(self._wrap('{}: {}'.format(header, value)))
+    self._contents += '\n'.join(self._wrap('{header}: {value}'.format(header=header, value=value)))
 
   def contents(self):
     padded = self._contents + '\n'
     return padded.encode('ascii')
+
+  def is_empty(self):
+    if self._contents.strip():
+      return False
+    return True
