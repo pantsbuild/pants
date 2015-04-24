@@ -23,7 +23,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
-from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -231,7 +231,7 @@ class IvyUtils(object):
   def xml_report_path(cls, targets, conf):
     """The path to the xml report ivy creates after a retrieve."""
     org, name = cls.identify(targets)
-    cachedir = Bootstrapper.instance().ivy_cache_dir
+    cachedir = IvySubsystem.global_instance().get_options().cache_dir
     return os.path.join(cachedir, '{}-{}-{}.xml'.format(org, name, conf))
 
   @classmethod

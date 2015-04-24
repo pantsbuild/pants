@@ -193,6 +193,7 @@ python_library(
   sources = ['generator.py'],
   dependencies = [
     ':mustache',
+    '3rdparty/python:pystache',
     '3rdparty/python:six',
   ]
 )

@@ -84,7 +84,9 @@ class OptionsBootstrapper(object):
     Config.cache(self._pre_bootstrap_config)
 
   def get_bootstrap_options(self):
-    """Returns an Options instance that only knows about the bootstrap options."""
+    """:returns: an Options instance that only knows about the bootstrap options.
+    :rtype: Options
+    """
     if not self._bootstrap_options:
       flags = set()
       short_flags = set()

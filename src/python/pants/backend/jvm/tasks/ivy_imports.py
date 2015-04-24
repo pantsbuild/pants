@@ -102,6 +102,5 @@ class IvyImports(IvyTaskMixin, NailgunTask):
         if jarfiles:
           imports_map.add(import_jars_target, root, jarfiles)
 
-
     # Returning the list of imported targets for testing purposes
     return imported_targets

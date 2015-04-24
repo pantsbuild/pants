@@ -29,6 +29,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # JUnitRun uses the safe_args context manager to guard long command lines, and it needs this
     # option set
     self.set_options_for_scope('', max_subprocess_args=100)
+    # Hack to make sure subsystems are initialized
+    self.context()
 
   @classmethod
   def task_type(cls):
