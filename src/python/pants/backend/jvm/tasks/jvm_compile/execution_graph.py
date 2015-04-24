@@ -13,7 +13,6 @@ from pants.base.worker_pool import Work
 
 
 class Job(object):
-
   def __init__(self, key, fn, dependencies, on_success=None, on_failure=None):
     """
 
@@ -100,11 +99,11 @@ class ExecutionGraph(object):
     unscheduled_dependencies = set(self._dependees.keys()) - set(self._job_keys_as_scheduled)
     if unscheduled_dependencies:
       raise ValueError("Unscheduled dependencies: {}"
-                       .format(", ".join(map(str,unscheduled_dependencies))))
+                       .format(", ".join(map(str, unscheduled_dependencies))))
 
     if len(self._job_keys_with_no_dependencies) == 0:
       raise ValueError("No jobs without dependencies! There must be a "
-                                "circular dependency")
+                       "circular dependency")
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -172,9 +171,8 @@ class ExecutionGraph(object):
         try:
           finished_key, result_status, value = finished_queue.get(timeout=10)
         except queue.Empty:
-          log.debug("Waiting on \n  {}\n".format(
-            "\n  ".join(
-              "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
+          log.debug("Waiting on \n  {}\n".format("\n  ".join(
+            "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
           continue
 
         finished_job = self._jobs[finished_key]
@@ -188,12 +186,11 @@ class ExecutionGraph(object):
             raise ExecutionGraph.ExecutionFailure("Error in on_success for {}: {}"
                                                   .format(finished_key, e))
 
-
           ready_dependees = [dependee for dependee in direct_dependees
                              if status_table.are_all_successful(self._jobs[dependee].dependencies)]
 
           submit_jobs(ready_dependees)
-        else: # failed or canceled
+        else:  # failed or canceled
           try:
             finished_job.run_failure_callback()
           except Exception as e:
