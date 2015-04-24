@@ -29,7 +29,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses a global classpath and analysis."""
 
   @classmethod
-  def register_options(cls, register, language):
+  def register_options(cls, register, language, supports_concurrent_execution):
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
                   'where there is no transitive BUILD file dependency path from A to B. If fatal, '
@@ -59,8 +59,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-  def __init__(self, context, options, workdir, analysis_tools, sources_predicate,
-               supports_concurrency):
+  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools, sources_predicate)
 
     # Various working directories.

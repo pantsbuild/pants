@@ -55,7 +55,7 @@ class JvmCompileStrategy(object):
 
   @classmethod
   @abstractmethod
-  def register_options(cls, register, language):
+  def register_options(cls, register, language, supports_concurrent_execution):
     """Registration for strategy-specific options.
 
     The abstract base class does not register any options itself: those are left to JvmCompile.

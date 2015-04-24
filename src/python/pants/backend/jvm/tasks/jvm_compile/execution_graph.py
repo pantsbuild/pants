@@ -13,6 +13,11 @@ from pants.base.worker_pool import Work
 
 
 class Job(object):
+  """A unit of scheduling for the ExecutionGraph.
+
+  The ExecutionGraph represents a DAG of dependent work. A Job a node in the graph along with the
+  keys of its dependent jobs.
+  """
   def __init__(self, key, fn, dependencies, on_success=None, on_failure=None):
     """
 
@@ -71,14 +76,18 @@ class StatusTable(object):
     return all(s in self.DONE_STATES for s in self._statuses.values())
 
   def are_all_successful(self, keys):
-    return all(stat == SUCCESSFUL for stat in [self._statuses[k] for k in keys])
+    return all(stat is SUCCESSFUL for stat in [self._statuses[k] for k in keys])
 
   def has_failures(self):
-    return any(stat == FAILED for stat in self._statuses.values())
+    return any(stat is FAILED for stat in self._statuses.values())
 
 
 class ExecutionGraph(object):
-  """A directed acyclic graph of work to execute."""
+  """A directed acyclic graph of work to execute.
+
+  This is currently only used within jvm compile, but the intent is to unify it with the future
+  global execution graph.
+  """
 
   class ExecutionFailure(Exception):
     """Raised when work units fail during execution"""
@@ -179,12 +188,11 @@ class ExecutionGraph(object):
         direct_dependees = self._dependees[finished_key]
         status_table.mark_as(result_status, finished_key)
 
-        if result_status == SUCCESSFUL:
+        if result_status is SUCCESSFUL:
           try:
             finished_job.run_success_callback()
           except Exception as e:
-            raise ExecutionGraph.ExecutionFailure("Error in on_success for {}: {}"
-                                                  .format(finished_key, e))
+            raise self.ExecutionFailure("Error in on_success for {}: {}".format(finished_key, e), e)
 
           ready_dependees = [dependee for dependee in direct_dependees
                              if status_table.are_all_successful(self._jobs[dependee].dependencies)]
@@ -194,8 +202,7 @@ class ExecutionGraph(object):
           try:
             finished_job.run_failure_callback()
           except Exception as e:
-            raise ExecutionGraph.ExecutionFailure("Error in on_failure for {}: {}"
-                                                  .format(finished_key, e))
+            raise self.ExecutionFailure("Error in on_failure for {}: {}".format(finished_key, e), e)
 
           # propagate failures downstream
           for dependee in direct_dependees:
@@ -210,7 +217,7 @@ class ExecutionGraph(object):
       for key, state in status_table.unfinished_items():
         self._jobs[key].run_failure_callback()
       log.debug(traceback.format_exc())
-      raise self.ExecutionFailure("Error running job: {}".format(e))
+      raise self.ExecutionFailure("Error running job: {}".format(e), e)
 
     if status_table.has_failures():
       raise self.ExecutionFailure("Failed jobs: {}".format(', '.join(status_table.failed_keys())))

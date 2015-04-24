@@ -68,8 +68,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
 
-    JvmCompileGlobalStrategy.register_options(register, cls._language)
-    JvmCompileIsolatedStrategy.register_options(register, cls._language)
+    JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
+    JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
 
   @classmethod
   def product_types(cls):
@@ -195,8 +195,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
-                                          lambda s: s.endswith(self._file_suffix),
-                                          self._supports_concurrent_execution)
+                                          lambda s: s.endswith(self._file_suffix))
 
   def _jvm_fingerprint_strategy(self):
     # Use a fingerprint strategy that allows us to also include java/scala versions.
