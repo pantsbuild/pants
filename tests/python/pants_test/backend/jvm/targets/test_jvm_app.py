@@ -112,7 +112,7 @@ class JvmAppTest(BaseTest):
     '''))
     app = self.target('src/java/org/archimedes/buoyancy')
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
                                  r'buoyancy.*A JvmApp must define exactly one'):
       app.binary
 
@@ -128,7 +128,7 @@ class JvmAppTest(BaseTest):
     '''))
     app = self.target('src/java/org/archimedes/buoyancy')
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
                                  r'buoyancy.*A JvmApp must define exactly one'):
       app.binary
 
@@ -143,7 +143,7 @@ class JvmAppTest(BaseTest):
     '''))
     app = self.target('src/java/org/archimedes/buoyancy')
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
                                  r'buoyancy.*A JvmApp must define exactly one'):
 
       app.binary
@@ -168,7 +168,7 @@ class JvmAppTest(BaseTest):
     '''))
     app = self.target('src/java/org/archimedes/buoyancy:buoyancy2')
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD, '
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
                                 r'buoyancy2.* Expected JvmApp binary dependency'):
       app.binary
 

@@ -274,7 +274,7 @@ class BuildFile(AbstractClass):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return '{}({})'.format(self.__class__, self.full_path)
+    return '{}({})'.format(self.__class__.__name__, self.full_path)
 
 
 class FilesystemBuildFile(BuildFile):
