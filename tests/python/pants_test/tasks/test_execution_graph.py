@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job)
+                                                                 Job, JobExistsError,
+                                                                 NoRootJobError, UnknownJobError)
 
 
 class ImmediatelyExecutingPool(object):
@@ -151,19 +152,21 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual(["A", "F"], self.jobs_run)
 
   def test_cycle_in_graph_causes_failure(self):
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(NoRootJobError) as cm:
       ExecutionGraph([self.job("A", passing_fn, ["B"]),
                       self.job("B", passing_fn, ["A"])])
 
-    self.assertEqual("No jobs without dependencies! There must be a circular dependency",
-                     str(cm.exception))
+    self.assertEqual(
+      "Unexecutable graph: All scheduled jobs have dependencies. "
+      "There must be a circular dependency.",
+      str(cm.exception))
 
   def test_non_existent_dependency_causes_failure(self):
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(UnknownJobError) as cm:
       ExecutionGraph([self.job("A", passing_fn, []),
                       self.job("B", passing_fn, ["Z"])])
 
-    self.assertEqual("Unscheduled dependencies: Z", str(cm.exception))
+    self.assertEqual("Unexecutable graph: Undefined dependencies u'Z'", str(cm.exception))
 
   def test_on_success_callback_raises_error(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], on_success=raising_fn)])
@@ -182,10 +185,9 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual("Error in on_failure for A: I'm an error", str(cm.exception))
 
 
-
   def test_same_key_scheduled_twice_is_error(self):
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(JobExistsError) as cm:
       ExecutionGraph([self.job("Same", passing_fn, []),
                       self.job("Same", passing_fn, [])])
 
-    self.assertEqual("Job already scheduled: Same", str(cm.exception))
+    self.assertEqual("Unexecutable graph: Job already scheduled u'Same'", str(cm.exception))

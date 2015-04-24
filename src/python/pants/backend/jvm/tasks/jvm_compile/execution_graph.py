@@ -18,6 +18,7 @@ class Job(object):
   The ExecutionGraph represents a DAG of dependent work. A Job a node in the graph along with the
   keys of its dependent jobs.
   """
+
   def __init__(self, key, fn, dependencies, on_success=None, on_failure=None):
     """
 
@@ -84,12 +85,37 @@ class StatusTable(object):
 
 class ExecutionFailure(Exception):
   """Raised when work units fail during execution"""
+
   def __init__(self, message, cause=None):
     if cause:
       message = "{}: {}".format(message, str(cause))
     super(ExecutionFailure, self).__init__(message)
     self.cause = cause
 
+
+class UnexecutableGraphError(Exception):
+  """Base exception class for errors that make an ExecutionGraph not executable"""
+
+  def __init__(self, msg):
+    super(UnexecutableGraphError, self).__init__("Unexecutable graph: {}".format(msg))
+
+
+class NoRootJobError(UnexecutableGraphError):
+  def __init__(self):
+    super(NoRootJobError, self).__init__(
+      "All scheduled jobs have dependencies. There must be a circular dependency.")
+
+
+class UnknownJobError(UnexecutableGraphError):
+  def __init__(self, undefined_dependencies):
+    super(UnknownJobError, self).__init__("Undefined dependencies {}"
+                                          .format(", ".join(map(repr, undefined_dependencies))))
+
+
+class JobExistsError(UnexecutableGraphError):
+  def __init__(self, key):
+    super(JobExistsError, self).__init__("Job already scheduled {!r}"
+                                          .format(key))
 
 
 class ExecutionGraph(object):
@@ -114,12 +140,10 @@ class ExecutionGraph(object):
 
     unscheduled_dependencies = set(self._dependees.keys()) - set(self._job_keys_as_scheduled)
     if unscheduled_dependencies:
-      raise ValueError("Unscheduled dependencies: {}"
-                       .format(", ".join(map(str, unscheduled_dependencies))))
+      raise UnknownJobError(unscheduled_dependencies)
 
     if len(self._job_keys_with_no_dependencies) == 0:
-      raise ValueError("No jobs without dependencies! There must be a "
-                       "circular dependency")
+      raise NoRootJobError()
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -132,7 +156,7 @@ class ExecutionGraph(object):
     dependency_keys = job.dependencies
     self._job_keys_as_scheduled.append(key)
     if key in self._jobs:
-      raise ValueError("Job already scheduled: {}".format(key))
+      raise JobExistsError(key)
     self._jobs[key] = job
 
     if len(dependency_keys) == 0:
