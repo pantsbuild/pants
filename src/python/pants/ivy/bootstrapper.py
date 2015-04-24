@@ -108,7 +108,6 @@ class Bootstrapper(object):
 
     ivy_bootstrap_dir = os.path.join(self._ivy_subsystem.get_options().pants_bootstrapdir,
                                      'tools', 'jvm', 'ivy')
-
     digest = hashlib.sha1()
     if os.path.isfile(self._version_or_ivyxml):
       with open(self._version_or_ivyxml) as fp:
@@ -152,7 +151,7 @@ class Bootstrapper(object):
           fetcher.download(self._ivy_subsystem.get_options().bootstrap_jar_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
-                           timeout_secs=self._ivy_subsystem.get_options().fetch_timeout_secs)
+                           timeout_secs=self._ivy_subsystem.get_options().bootstrap_fetch_timeout_secs)
           logger.info('sha1: {}'.format(checksummer.checksum))
           bootstrap_jar.close()
           touch(bootstrap_jar_path)

@@ -48,3 +48,5 @@ class BootstrapperTest(JvmToolTaskTestBase):
     ivy = Bootstrapper.default_ivy()
     self.assertIsNotNone(ivy.ivy_cache_dir)
     self.assertIsNotNone(ivy.ivy_settings)
+
+  # TODO(Eric Ayers) Test bootstrapper with a temporary dir for pants_bootstrapdir
