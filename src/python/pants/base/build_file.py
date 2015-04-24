@@ -152,6 +152,8 @@ class BuildFile(AbstractClass):
       raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
                                      .format(root_dir=root_dir))
 
+    self.root_dir = os.path.realpath(root_dir)
+
     path = os.path.join(root_dir, relpath) if relpath else root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
     buildfile = os.path.join(path, self._build_basename) if self.isdir(path) else path
@@ -185,7 +187,6 @@ class BuildFile(AbstractClass):
         raise self.MissingBuildFileError('{path} is not a BUILD file'
                                          .format(path=buildfile))
 
-    self.root_dir = os.path.realpath(root_dir)
     self.full_path = os.path.realpath(buildfile)
 
     self.name = os.path.basename(self.full_path)

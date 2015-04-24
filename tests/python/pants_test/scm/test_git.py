@@ -18,7 +18,7 @@ import pytest
 from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import chmod_plus_x, safe_mkdtemp, safe_open, safe_rmtree, touch
+from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
 
 
 class Version(object):
@@ -87,7 +87,24 @@ class GitTest(unittest.TestCase):
 
       touch(self.readme_file)
       subprocess.check_call(['git', 'add', 'README'])
+      safe_mkdir(os.path.join(self.worktree, 'dir'))
+      with open(os.path.join(self.worktree, 'dir', 'f'), 'w') as f:
+        f.write("file in subdir")
+
+      # Make some symlinks
+      os.symlink('f', os.path.join(self.worktree, 'dir', 'relative-symlink'))
+      os.symlink('no-such-file', os.path.join(self.worktree, 'dir', 'relative-nonexistent'))
+      os.symlink('dir/f', os.path.join(self.worktree, 'dir', 'not-absolute'))
+      os.symlink('../README', os.path.join(self.worktree, 'dir', 'relative-dotdot'))
+      os.symlink('dir', os.path.join(self.worktree, 'link-to-dir'))
+      os.symlink('README/f', os.path.join(self.worktree, 'not-a-dir'))
+      os.symlink('loop1', os.path.join(self.worktree, 'loop2'))
+      os.symlink('loop2', os.path.join(self.worktree, 'loop1'))
+
+      subprocess.check_call(['git', 'add', 'README', 'dir', 'loop1', 'loop2',
+                             'link-to-dir', 'not-a-dir'])
       subprocess.check_call(['git', 'commit', '-am', 'initial commit with decode -> \x81b'])
+      self.initial_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
       subprocess.check_call(['git', 'tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
       subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
@@ -95,6 +112,8 @@ class GitTest(unittest.TestCase):
       with safe_open(self.readme_file, 'w') as readme:
         readme.write('Hello World.')
       subprocess.check_call(['git', 'commit', '-am', 'Update README.'])
+
+      self.current_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
 
     self.clone2 = safe_mkdtemp()
     with pushd(self.clone2):
@@ -123,13 +142,86 @@ class GitTest(unittest.TestCase):
     safe_rmtree(self.worktree)
     safe_rmtree(self.clone2)
 
+  def test_listdir(self):
+
+    results = self.git.listdir(self.initial_rev, '.')
+    self.assertEquals(['README',
+                       'dir',
+                       'link-to-dir',
+                       'loop1',
+                       'loop2',
+                       'not-a-dir'],
+                      sorted(results))
+
+    results = self.git.listdir(self.initial_rev, 'dir')
+    self.assertEquals(['f',
+                       'not-absolute',
+                       'relative-dotdot',
+                       'relative-nonexistent',
+                       'relative-symlink'],
+                      sorted(results))
+
+    with self.assertRaises(self.git.MissingFileException):
+      with self.git.listdir(self.current_rev, 'bogus') as f:
+        pass
+
+  def test_open(self):
+    with self.git.open(self.initial_rev, 'README') as f:
+      self.assertEquals('', f.read())
+
+    with self.git.open(self.initial_rev, 'dir/f') as f:
+      self.assertEquals('file in subdir', f.read())
+
+    with self.assertRaises(self.git.MissingFileException):
+      with self.git.open(self.initial_rev, 'no-such-file') as f:
+        self.assertEquals('', f.read())
+
+    with self.assertRaises(self.git.MissingFileException):
+      with self.git.open(self.initial_rev, 'dir/no-such-file') as f:
+        pass
+
+    with self.assertRaises(self.git.IsDirException):
+      with self.git.open(self.initial_rev, 'dir') as f:
+        self.assertEquals('', f.read())
+
+    with self.git.open(self.current_rev, 'README') as f:
+      self.assertEquals('Hello World.', f.read())
+
+    with self.git.open(self.current_rev, 'link-to-dir/f') as f:
+      self.assertEquals('file in subdir', f.read())
+
+    with self.git.open(self.current_rev, 'dir/relative-symlink') as f:
+      self.assertEquals('file in subdir', f.read())
+
+    with self.assertRaises(self.git.SymlinkLoopException):
+      with self.git.open(self.current_rev, 'loop1') as f:
+        pass
+
+    with self.assertRaises(self.git.MissingFileException):
+      with self.git.open(self.current_rev, 'dir/relative-nonexistent') as f:
+        pass
+
+    with self.assertRaises(self.git.NotADirException):
+      with self.git.open(self.current_rev, 'not-a-dir') as f:
+        pass
+
+    with self.assertRaises(self.git.MissingFileException):
+      with self.git.open(self.current_rev, 'dir/not-absolute') as f:
+        pass
+
+    with self.assertRaises(self.git.MissingFileException):
+      with self.git.open(self.current_rev, 'dir/relative-nonexistent') as f:
+        pass
+
+    with self.git.open(self.current_rev, 'dir/relative-dotdot') as f:
+      self.assertEquals('Hello World.', f.read())
+
   def test_integration(self):
     self.assertEqual(set(), self.git.changed_files())
     self.assertEqual({'README'}, self.git.changed_files(from_commit='HEAD^'))
 
     tip_sha = self.git.commit_id
     self.assertTrue(tip_sha)
-    self.assertRegexpMatches(tip_sha, '^[0-9a-f]{40}$')
 
     self.assertTrue(tip_sha in self.git.changelog())
 
@@ -433,12 +525,3 @@ class DetectWorktreeFakeGitTest(unittest.TestCase):
         fp.write('echo ' + expected_worktree_dir)
       self.assertEqual(expected_worktree_dir, Git.detect_worktree())
       self.assertEqual(expected_worktree_dir, Git.detect_worktree(binary=git))
-
-  def test_detect_worktree_somewhere_else(self):
-    with temporary_dir() as somewhere_else:
-      with pushd(somewhere_else):
-        loc = Git.detect_worktree(dir=somewhere_else)
-        self.assertEquals(None, loc)
-        subprocess.check_call(['git', 'init'])
-        loc = Git.detect_worktree(dir=somewhere_else)
-        self.assertEquals(os.path.realpath(somewhere_else), loc)

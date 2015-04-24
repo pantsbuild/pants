@@ -300,6 +300,18 @@ python_tests(
 )
 
 python_tests(
+  name = 'scm_build_file',
+  sources = ['test_scm_build_file.py'],
+  dependencies = [
+    ':build_file',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:scm_build_file',
+    'src/python/pants/scm:git',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
   name = 'source_root',
   sources = ['test_source_root.py'],
   dependencies = [

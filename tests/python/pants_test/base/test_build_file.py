@@ -17,7 +17,7 @@ from pants.base.build_file import BuildFile, FilesystemBuildFile
 from pants.util.dirutil import safe_mkdir, safe_open, touch
 
 
-class BuildFileTest(unittest.TestCase):
+class BuildFileTestBase(unittest.TestCase):
 
   def fullpath(self, path):
     return os.path.join(self.root_dir, path)
@@ -54,10 +54,14 @@ class BuildFileTest(unittest.TestCase):
     self.touch('grandparent/parent/child5/BUILD')
     self.makedirs('path-that-does-exist')
     self.touch('path-that-does-exist/BUILD.invalid.suffix')
-    self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
   def tearDown(self):
     shutil.rmtree(self.base_dir)
+
+class BuildFileTest(BuildFileTestBase):
+  def setUp(self):
+    super(BuildFileTest, self).setUp()
+    self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
