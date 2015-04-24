@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph, Job
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
+                                                                 Job)
 
 
 class ImmediatelyExecutingPool(object):
@@ -106,7 +107,7 @@ class ExecutionGraphTest(unittest.TestCase):
 
   def test_one_failure_raises_exception(self):
     exec_graph = ExecutionGraph([self.job("A", raising_fn, [])])
-    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+    with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
     self.assertEqual("Failed jobs: A", str(cm.exception))
@@ -114,7 +115,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_failure_of_dependency_does_not_run_dependents(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["F"]),
                                  self.job("F", raising_fn, [])])
-    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+    with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
     self.assertEqual(["F"], self.jobs_run)
@@ -124,7 +125,7 @@ class ExecutionGraphTest(unittest.TestCase):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
                                  self.job("B", passing_fn, ["F"]),
                                  self.job("F", raising_fn, [])])
-    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+    with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
     self.assertEqual(["F"], self.jobs_run)
@@ -135,7 +136,7 @@ class ExecutionGraphTest(unittest.TestCase):
     exec_graph = ExecutionGraph([self.job("B", passing_fn, []),
                                  self.job("F", raising_fn, ["B"]),
                                  self.job("A", passing_fn, ["B"])])
-    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+    with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
     self.assertEqual(["B", "F", "A"], self.jobs_run)
@@ -144,7 +145,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_failure_of_disconnected_job_does_not_cancel_non_dependents(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, []),
                                  self.job("F", raising_fn, [])])
-    with self.assertRaises(ExecutionGraph.ExecutionFailure):
+    with self.assertRaises(ExecutionFailure):
       self.execute(exec_graph)
 
     self.assertEqual(["A", "F"], self.jobs_run)
@@ -167,7 +168,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_on_success_callback_raises_error(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], on_success=raising_fn)])
 
-    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+    with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
     self.assertEqual("Error in on_success for A: I'm an error", str(cm.exception))
@@ -175,7 +176,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_on_failure_callback_raises_error(self):
     exec_graph = ExecutionGraph([self.job("A", raising_fn, [], on_failure=raising_fn)])
 
-    with self.assertRaises(ExecutionGraph.ExecutionFailure) as cm:
+    with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
     self.assertEqual("Error in on_failure for A: I'm an error", str(cm.exception))

@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph, Job
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
+                                                                 Job)
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
@@ -201,7 +202,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     exec_graph = ExecutionGraph(jobs)
     try:
       exec_graph.execute(self._worker_pool, self.context.log)
-    except ExecutionGraph.ExecutionFailure as e:
+    except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
 
   def compute_resource_mapping(self, compile_contexts):

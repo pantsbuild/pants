@@ -82,15 +82,22 @@ class StatusTable(object):
     return any(stat is FAILED for stat in self._statuses.values())
 
 
+class ExecutionFailure(Exception):
+  """Raised when work units fail during execution"""
+  def __init__(self, message, cause=None):
+    if cause:
+      message = "{}: {}".format(message, str(cause))
+    super(ExecutionFailure, self).__init__(message)
+    self.cause = cause
+
+
+
 class ExecutionGraph(object):
   """A directed acyclic graph of work to execute.
 
   This is currently only used within jvm compile, but the intent is to unify it with the future
   global execution graph.
   """
-
-  class ExecutionFailure(Exception):
-    """Raised when work units fail during execution"""
 
   def __init__(self, job_list):
     """
@@ -192,7 +199,7 @@ class ExecutionGraph(object):
           try:
             finished_job.run_success_callback()
           except Exception as e:
-            raise self.ExecutionFailure("Error in on_success for {}: {}".format(finished_key, e), e)
+            raise ExecutionFailure("Error in on_success for {}".format(finished_key), e)
 
           ready_dependees = [dependee for dependee in direct_dependees
                              if status_table.are_all_successful(self._jobs[dependee].dependencies)]
@@ -202,7 +209,7 @@ class ExecutionGraph(object):
           try:
             finished_job.run_failure_callback()
           except Exception as e:
-            raise self.ExecutionFailure("Error in on_failure for {}: {}".format(finished_key, e), e)
+            raise ExecutionFailure("Error in on_failure for {}".format(finished_key), e)
 
           # propagate failures downstream
           for dependee in direct_dependees:
@@ -210,14 +217,14 @@ class ExecutionGraph(object):
 
         log.debug("{} finished with status {}".format(finished_key,
                                                       status_table.get(finished_key)))
-    except self.ExecutionFailure:
+    except ExecutionFailure:
       raise
     except Exception as e:
       # Call failure callbacks for jobs that are unfinished.
       for key, state in status_table.unfinished_items():
         self._jobs[key].run_failure_callback()
       log.debug(traceback.format_exc())
-      raise self.ExecutionFailure("Error running job: {}".format(e), e)
+      raise ExecutionFailure("Error running job", e)
 
     if status_table.has_failures():
-      raise self.ExecutionFailure("Failed jobs: {}".format(', '.join(status_table.failed_keys())))
+      raise ExecutionFailure("Failed jobs: {}".format(', '.join(status_table.failed_keys())))
