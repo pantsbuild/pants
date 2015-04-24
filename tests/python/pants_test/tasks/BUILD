@@ -209,7 +209,6 @@ python_tests(
   sources = ['test_depmap_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
     'src/python/pants/ivy:ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
@@ -233,7 +232,6 @@ python_tests(
   sources = ['test_export_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
     'src/python/pants/ivy:ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',

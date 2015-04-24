@@ -21,6 +21,7 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
 
@@ -63,6 +64,10 @@ class IvyTaskMixin(object):
   stable locations within the working copy. To consume the map, consume a parsed Ivy
   report which will give you IvyArtifact instances: the artifact path is key.
   """
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, )
 
   @classmethod
   def register_options(cls, register):
@@ -158,9 +163,12 @@ class IvyTaskMixin(object):
     with IvyTaskMixin.symlink_map_lock:
       products = self.context.products
       existing_symlinks_map = products.get_data('ivy_resolve_symlink_map', lambda: dict())
-      symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
-                                               symlink_dir, target_classpath_file,
-                                               existing_symlinks_map)
+      symlink_map = IvyUtils.symlink_cachepath(
+        IvySubsystem.global_instance().get_options().cache_dir,
+        raw_target_classpath_file,
+        symlink_dir,
+        target_classpath_file,
+        existing_symlinks_map)
       existing_symlinks_map.update(symlink_map)
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
@@ -275,7 +283,7 @@ class IvyTaskMixin(object):
         result = execute_runner(runner, workunit_factory=self.context.new_workunit,
                                 workunit_name=workunit_name)
         if result != 0:
-          raise TaskError('Ivy returned {}'.format(result))
+          raise TaskError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
       except runner.executor.Error as e:
         raise TaskError(e)
 

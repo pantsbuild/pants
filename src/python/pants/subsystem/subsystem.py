@@ -65,6 +65,15 @@ class Subsystem(object):
     return cls._instance_for_scope(Options.GLOBAL_SCOPE)
 
   @classmethod
+  def reset_instance_for_scope(cls, scope):
+    key = (cls, scope)
+    cls._scoped_instances.pop(key, None)
+
+  @classmethod
+  def reset_global_instance(cls):
+    cls.reset_instance_for_scope(Options.GLOBAL_SCOPE)
+
+  @classmethod
   def instance_for_task(cls, task):
     return cls._instance_for_scope(task.options_scope)
 

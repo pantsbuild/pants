@@ -49,11 +49,9 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:ivy_imports',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:task_test_base'
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )
-
-
 
 python_tests(
   name = 'ivy_resolve',

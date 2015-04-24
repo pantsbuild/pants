@@ -17,10 +17,10 @@ from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class IvyImportsTest(TaskTestBase):
+class IvyImportsTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
     return IvyImports
