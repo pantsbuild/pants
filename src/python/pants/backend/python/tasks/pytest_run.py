@@ -24,7 +24,7 @@ from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -35,10 +35,6 @@ from pants.util.strutil import safe_shlex_split
 
 # Initialize logging, since tests do not run via pants_exe (where it is usually done)
 logging.basicConfig()
-
-
-class PythonTestFailure(TaskError):
-  pass
 
 
 class PythonTestResult(object):
@@ -120,7 +116,7 @@ class PytestRun(PythonTask):
     if self.get_options().fast:
       result = self._do_run_tests(targets, workunit)
       if not result.success:
-        raise PythonTestFailure(failed_targets=result.failed_targets)
+        raise TestFailedTaskError(failed_targets=result.failed_targets)
     else:
       results = {}
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
@@ -138,7 +134,7 @@ class PytestRun(PythonTask):
 
       failed_targets = [target for target, rv in results.items() if not rv.success]
       if failed_targets:
-        raise PythonTestFailure(failed_targets=failed_targets)
+        raise TestFailedTaskError(failed_targets=failed_targets)
 
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):
@@ -405,6 +401,20 @@ class PytestRun(PythonTask):
     return list(failed_targets)
 
   def _do_run_tests(self, targets, workunit):
+
+    def _extract_resultlog_filename(args):
+      resultlogs = [arg[arg.find('=') + 1:] for arg in args if arg.startswith('--resultlog=')]
+      if resultlogs:
+        return resultlogs[0]
+      else:
+        try:
+          return args[args.index('--resultlog') + 1]
+        except IndexError:
+          self.context.log.error('--resultlog specified without an argument')
+          return None
+        except ValueError:
+          return None
+
     if not targets:
       return PythonTestResult.rc(0)
 
@@ -430,13 +440,13 @@ class PytestRun(PythonTask):
       args.extend(sources)
 
       # The user might have already specified the resultlog option. In such case, reuse it.
-      resultlogs = [arg.split('=', 1)[-1] for arg in args if arg.startswith('--resultlog=')]
+      resultlog_arg = _extract_resultlog_filename(args)
 
-      if resultlogs:
-        return run_and_analyze(resultlogs[-1])
+      if resultlog_arg:
+        return run_and_analyze(resultlog_arg)
       else:
         with temporary_file_path() as resultlog_path:
-          args.append('--resultlog={0}'.format(resultlog_path))
+          args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
   def _pex_run(self, pex, workunit, args, setsid=False):
