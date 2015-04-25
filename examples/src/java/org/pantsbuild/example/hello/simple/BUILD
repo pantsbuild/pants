@@ -4,5 +4,8 @@
 jvm_binary(name = 'simple',
   source = 'HelloWorld.java',
   main = 'org.pantsbuild.example.hello.simple.HelloWorld',
+  manifest_entries = {
+    'Implementation-Version' : '{{commit_id}}',
+  }
 )
 
