@@ -54,7 +54,6 @@ python_library(
     ':code_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:address',
     'src/python/pants/base:address_lookup_error',

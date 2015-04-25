@@ -68,8 +68,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
 
-    JvmCompileGlobalStrategy.register_options(register, cls._language)
-    JvmCompileIsolatedStrategy.register_options(register, cls._language)
+    JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
+    JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
 
   @classmethod
   def product_types(cls):
@@ -100,6 +100,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   # --------------------------
   _language = None
   _file_suffix = None
+  _supports_concurrent_execution = None
 
   @classmethod
   def name(cls):

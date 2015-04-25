@@ -49,7 +49,19 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:ivy_imports',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:task_test_base'
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'ivy_resolve',
+  sources = ['test_ivy_resolve.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:ivy_resolve',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )
 
@@ -68,6 +80,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'jvm_binary_integration',
+  sources = ['test_jvm_binary_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'scalastyle',
   sources = ['test_scalastyle.py'],
   dependencies = [
@@ -75,18 +96,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-  ]
-)
-
-python_tests(
-  name = 'ivy_resolve',
-  sources = ['test_ivy_resolve.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:ivy_resolve',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )

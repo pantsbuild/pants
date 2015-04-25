@@ -16,6 +16,7 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
 from pants.java.jar.shader import Shader
@@ -82,6 +83,10 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
              help='Run the tool shader with these extra jvm options.')
 
     cls.register_jvm_tool(register, 'jarjar')
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(BootstrapJvmTools, cls).global_subsystems() + (IvySubsystem, )
 
   def __init__(self, *args, **kwargs):
     super(BootstrapJvmTools, self).__init__(*args, **kwargs)

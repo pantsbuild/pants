@@ -67,25 +67,21 @@ class TokenTranslator(object):
   _DELIMITER_RE = re.compile(r'^{}$'.format(_DELIMITER))
   _BREAK_ON_RE = re.compile(r'({}|{})'.format(_DELIMITER, _UPPER))  # Capture what we broke on.
 
-  # Valid replacement words must be all lower-case ASCII letters, with no apostrophes etc, and must be
-  # at least 5 characters.
-  _WORD_RE = re.compile(r'^[a-z]{5}[a-z]*$')
-
   def __init__(self, word_list, word_map=None, keep=None, strict=False):
     self._translations = {}
-    self._reverse_translations = {}
+    self._base64_translations = {}
     self._word_map = _default_word_map if word_map is None else word_map
     self._keep = _default_keep_words if keep is None else keep
 
     # Init from args.
     for k, v in self._word_map.items():
-      self._add_translation(k, v)
+      self._translations[k] = v
     for w in self._keep:
-      self._add_translation(w, w)
+      self._translations[w] = w
 
     # Prepare list of candidate translations.
     self._unused_words = list(
-      set(filter(TokenTranslator._WORD_RE.match, word_list)) -
+      set(word_list) -
       set(self._translations.values()) -
       set(self._translations.keys()))
     random.shuffle(self._unused_words)
@@ -123,10 +119,10 @@ class TokenTranslator(object):
     return self.handle_conversion(s, ''.join(converted_parts))
 
   def convert_base64_string(self, s):
-    translation = self._translations.get(s)
+    translation = self._base64_translations.get(s)
     if translation is None:
       translation = TokenTranslator._random_base64_string()
-      self._add_translation(s, translation)
+      self._base64_translations[s] = translation
     return self.handle_conversion(s, translation)
 
   def handle_conversion(self, s, translation):
@@ -145,20 +141,12 @@ class TokenTranslator(object):
           translation = lower
       else:
         translation = self._unused_words.pop()
-      self._add_translation(lower, translation)
+      self._translations[lower] = translation
     # Use the same capitalization as the original word.
     if token[0].isupper():
       return translation.capitalize()
     else:
       return translation
-
-  def _add_translation(self, frm, to):
-    if frm in self._translations:
-      raise Exception('Word already has translation: {} -> {}'.format(frm, self._translations[frm]))
-    if to in self._reverse_translations:
-      raise Exception('Translation target already used: {} -> {}'.format(self._reverse_translations[to], to))
-    self._translations[frm] = to
-    self._reverse_translations[to] = frm
 
 
 class TranslationCapturer(TokenTranslator):
@@ -173,6 +161,9 @@ class TranslationCapturer(TokenTranslator):
 
   def get_order_preserving_anonymizer(self):
     """Returns an Anonymizer that preserves dictionary order.
+
+    The returned Anonymizer will not retain the base64 conversions from this TranslationCapturer,
+    and will create new ones. The dictionary order is preserved only for regular word translations.
 
     Must be run on the exact same sequence as this capturer.
     """
@@ -194,7 +185,7 @@ class TranslationCapturer(TokenTranslator):
 
     # This anonymizer should only be used on the exact same objects the capture was run on, and
     # it already contains translations for all those, so it needs no wordlist.
-    return TokenTranslator([], ordered_translations, self._keep, self._strict)
+    return Anonymizer([], ordered_translations, self._keep, self._strict)
 
 
 class Anonymizer(TokenTranslator):

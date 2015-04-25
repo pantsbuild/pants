@@ -158,7 +158,6 @@ class JarRules(FingerprintedMixin):
 
     - jar signature metadata is dropped
     - ``java.util.ServiceLoader`` provider-configuration files are concatenated in the order
-    - ``java.util.ServiceLoader`` provider-configuration files are concatenated in the order
       encountered
 
     :param default_dup_action: An optional default action to take for duplicates.  Defaults to
@@ -232,6 +231,39 @@ class JarRules(FingerprintedMixin):
     return self._jar_rules
 
 
+class ManifestEntries(FingerprintedMixin):
+  """Describes additional items to add to the app manifest."""
+
+  class ExpectedDictionaryError(Exception):
+    pass
+
+  def __init__(self, entries=None):
+    """
+    :param entries: Additional headers, value pairs to add to the MANIFEST.MF.
+      You can just add fixed string header / value pairs.
+    :type entries: dictionary of string : string
+    """
+    self.payload = Payload()
+    if entries:
+      if not isinstance(entries, dict):
+        raise self.ExpectedDictionaryError("entries must be a dictionary of strings.")
+      for key in entries.keys():
+        if not isinstance(key, string_types):
+          raise self.ExpectedDictionaryError(
+            "entries must be dictionary of strings, got key {} type {}"
+            .format(key, type(key).__name__))
+    self.payload.add_fields({
+      'entries' : PrimitiveField(entries or {}),
+      })
+
+  def fingerprint(self):
+    return self.payload.fingerprint()
+
+  @property
+  def entries(self):
+    return self.payload.entries
+
+
 class JvmBinary(JvmTarget):
   """Produces a JVM binary optionally identifying a launcher main class.
 
@@ -252,6 +284,7 @@ class JvmBinary(JvmTarget):
                source=None,
                deploy_excludes=None,
                deploy_jar_rules=None,
+               manifest_entries=None,
                **kwargs):
     """
     :param string main: The name of the ``main`` class, e.g.,
@@ -275,6 +308,8 @@ class JvmBinary(JvmTarget):
       code but exclude the conflicting ``jar`` when deploying.
     :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
       deploy jar.
+    :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
+      for adding to MANIFEST.MF when packaging this binary.
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings
@@ -288,12 +323,17 @@ class JvmBinary(JvmTarget):
       raise TargetDefinitionException(self,
                                       'deploy_jar_rules must be a JarRules specification. got {}'
                                       .format(type(deploy_jar_rules).__name__))
+    if manifest_entries and not isinstance(manifest_entries, dict):
+      raise TargetDefinitionException(self,
+                                      'manifest_entries must be a dict. got {}'
+                                      .format(type(manifest_entries).__name__))
     sources = [source] if source else None
     payload = payload or Payload()
     payload.add_fields({
       'basename' : PrimitiveField(basename or name),
       'deploy_excludes' : ExcludesField(self.assert_list(deploy_excludes, expected_type=Exclude)),
       'deploy_jar_rules' :  FingerprintedField(deploy_jar_rules or JarRules.default()),
+      'manifest_entries' : FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
       })
 
@@ -318,3 +358,7 @@ class JvmBinary(JvmTarget):
   @property
   def main(self):
     return self.payload.main
+
+  @property
+  def manifest_entries(self):
+    return self.payload.manifest_entries

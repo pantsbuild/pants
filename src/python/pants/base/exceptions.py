@@ -10,13 +10,28 @@ class TaskError(Exception):
   """Indicates a task has failed."""
 
   def __init__(self, *args, **kwargs):
-    """:param int exit_code: an optional exit code (1, by default)"""
+    """
+    :param int exit_code: an optional exit code (default=1)
+    :param list failed_targets: an optional list of failed targets (default=[])
+    """
     self._exit_code = kwargs.pop('exit_code', 1)
+    self._failed_targets = kwargs.pop('failed_targets', [])
     super(TaskError, self).__init__(*args, **kwargs)
 
   @property
   def exit_code(self):
     return self._exit_code
+
+  @property
+  def failed_targets(self):
+    return self._failed_targets
+
+
+class TestFailedTaskError(TaskError):
+  """Raised when an actual test run failed.
+
+  This is used to distinguish test run failures from infrastructure failures.
+  """
 
 
 class TargetDefinitionException(Exception):

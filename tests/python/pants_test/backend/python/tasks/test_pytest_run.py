@@ -12,7 +12,8 @@ from textwrap import dedent
 
 import coverage
 
-from pants.backend.python.tasks.pytest_run import PytestRun, PythonTestFailure
+from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import environment_as, pushd
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
@@ -33,8 +34,8 @@ class PythonTestBuilderTestBase(PythonTaskTest):
     with pushd(self.build_root):
       pytest_run_task.execute()
 
-  def run_failing_tests(self, targets):
-    with self.assertRaises(PythonTestFailure):
+  def run_failing_tests(self, targets, failed_targets):
+    with self.assertRaises(TestFailedTaskError) as cm:
       self.run_tests(targets=targets)
 
 
@@ -141,6 +142,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           )
         """))
     self.green = self.target('tests:green')
+
     self.red = self.target('tests:red')
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
@@ -149,10 +151,10 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.run_tests(targets=[self.green])
 
   def test_red(self):
-    self.run_failing_tests(targets=[self.red])
+    self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
 
   def test_mixed(self):
-    self.run_failing_tests(targets=[self.green, self.red])
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
 
   def test_junit_xml(self):
     # We expect xml of the following form:
@@ -165,7 +167,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     report_basedir = os.path.join(self.build_root, 'dist', 'junit')
     with environment_as(JUNIT_XML_BASE=report_basedir):
-      self.run_failing_tests(targets=[self.red, self.green])
+      self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red])
 
       files = glob.glob(os.path.join(report_basedir, '*.xml'))
       self.assertEqual(1, len(files))
@@ -205,24 +207,24 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([6], not_run_statements)
 
-      self.run_failing_tests(targets=[self.red])
+      self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([2], not_run_statements)
 
-      self.run_failing_tests(targets=[self.green, self.red])
+      self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([], not_run_statements)
 
       # The all target has no coverage attribute and the code under test does not follow the
       # auto-discover pattern so we should get no coverage.
-      self.run_failing_tests(targets=[self.all])
+      self.run_failing_tests(targets=[self.all], failed_targets=[self.all])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([1, 2, 5, 6], not_run_statements)
 
-      self.run_failing_tests(targets=[self.all_with_coverage])
+      self.run_failing_tests(targets=[self.all_with_coverage], failed_targets=[self.all_with_coverage])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([], not_run_statements)
@@ -232,13 +234,13 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
     with environment_as(PANTS_PY_COVERAGE='modules:does_not_exist,nor_does_this'):
       # modules: should trump .coverage
-      self.run_failing_tests(targets=[self.green, self.red])
+      self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([1, 2, 5, 6], not_run_statements)
 
     with environment_as(PANTS_PY_COVERAGE='modules:core'):
-      self.run_failing_tests(targets=[self.all])
+      self.run_failing_tests(targets=[self.all], failed_targets=[self.all])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([], not_run_statements)
@@ -248,13 +250,13 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
     with environment_as(PANTS_PY_COVERAGE='paths:does_not_exist/,nor_does_this/'):
       # paths: should trump .coverage
-      self.run_failing_tests(targets=[self.green, self.red])
+      self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([1, 2, 5, 6], not_run_statements)
 
     with environment_as(PANTS_PY_COVERAGE='paths:core.py'):
-      self.run_failing_tests(targets=[self.all])
+      self.run_failing_tests(targets=[self.all], failed_targets=[self.all])
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([], not_run_statements)

@@ -69,7 +69,8 @@ class JvmBinaryTask(JarTask):
                          compressed=True) as jar:
 
         with self.context.new_workunit(name='add-internal-classes'):
-          self.create_jar_builder(jar).add_target(binary, recursive=True)
+          with self.create_jar_builder(jar) as jar_builder:
+            jar_builder.add_target(binary, recursive=True)
 
         if with_external_deps:
           with self.context.new_workunit(name='add-dependency-jars'):

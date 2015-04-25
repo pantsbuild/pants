@@ -27,6 +27,7 @@ target(
     ':console_task',
     ':dependees',
     ':detect_duplicates',
+    ':execution_graph',
     ':filter',
     ':group_task',
     ':ivy_utils',
@@ -209,7 +210,6 @@ python_tests(
   sources = ['test_depmap_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
     'src/python/pants/ivy:ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
@@ -229,11 +229,18 @@ python_tests(
 )
 
 python_tests(
+  name = 'execution_graph',
+  sources = ['test_execution_graph.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
+    ]
+)
+
+python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
     'src/python/pants/ivy:ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',

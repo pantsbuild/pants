@@ -12,6 +12,7 @@ from textwrap import dedent
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.base.exceptions import TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.distribution.distribution import Distribution
@@ -28,22 +29,15 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # JUnitRun uses the safe_args context manager to guard long command lines, and it needs this
     # option set
     self.set_options_for_scope('', max_subprocess_args=100)
+    # Hack to make sure subsystems are initialized
+    self.context()
 
   @classmethod
   def task_type(cls):
     return JUnitRun
 
-  def test_junit_runner(self):
-
-    # Create the temporary base test directory
-    test_rel_path = 'tests/java/org/pantsbuild/foo'
-    test_abs_path = os.path.join(self.build_root, test_rel_path)
-    self.create_dir(test_rel_path)
-
-    # Generate the temporary java test source code.
-    test_java_file_rel_path = os.path.join(test_rel_path, 'FooTest.java')
-    test_java_file_abs_path = os.path.join(self.build_root, test_java_file_rel_path)
-    self.create_file(test_java_file_rel_path,
+  def test_junit_runner_success(self):
+    self.execute_junit_runner(
       dedent('''
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
@@ -53,7 +47,37 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(5 > 3);
           }
         }
-      '''))
+      ''')
+    )
+
+  def test_junit_runner_failure(self):
+    with self.assertRaises(TaskError) as cm:
+      self.execute_junit_runner(
+        dedent('''
+          import org.junit.Test;
+          import static org.junit.Assert.assertTrue;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              assertTrue(5 < 3);
+            }
+          }
+        ''')
+      )
+
+    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
+  def execute_junit_runner(self, content):
+
+    # Create the temporary base test directory
+    test_rel_path = 'tests/java/org/pantsbuild/foo'
+    test_abs_path = os.path.join(self.build_root, test_rel_path)
+    self.create_dir(test_rel_path)
+
+    # Generate the temporary java test source code.
+    test_java_file_rel_path = os.path.join(test_rel_path, 'FooTest.java')
+    test_java_file_abs_path = os.path.join(self.build_root, test_java_file_rel_path)
+    self.create_file(test_java_file_rel_path, content)
 
     # Invoke ivy to resolve classpath for junit.
     distribution = Distribution.cached(jdk=True)

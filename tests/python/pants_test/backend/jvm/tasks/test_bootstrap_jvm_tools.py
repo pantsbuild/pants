@@ -37,7 +37,7 @@ class BootstrapJvmToolsTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(BootstrapJvmToolsTest, self).setUp()
-    self.set_options_for_scope('', pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+    self.set_options_for_scope('', max_subprocess_args=100)
 
   def test_shaded_and_unshaded(self):
     # We know this version of ant has a dependency on org.apache.ant#ant-launcher;1.9.4
