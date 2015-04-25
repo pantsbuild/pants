@@ -189,6 +189,7 @@ class BaseTest(unittest.TestCase):
       if register_bootstrap_opts:
         register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
 
+
     # Now override with any caller-specified values.
 
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
