@@ -34,6 +34,9 @@ class ZincAnalysis(Analysis):
   def underlying_analysis(self):
     return self._underlying_analysis
 
+  def sources(self):
+    return self._underlying_analysis.sources()
+
   def split(self, splits, catchall=False):
     buildroot = get_buildroot()
     return [ZincAnalysis(s) for s in self.underlying_analysis.split(splits, buildroot, catchall)]

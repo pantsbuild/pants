@@ -165,7 +165,7 @@ class ZincAnalysisTest(unittest.TestCase):
         [unicode(diff) for diff in diffs]))
 
       # Split the merged analysis back to individual analyses.
-      sources_per_analysis = [a.underlying_analysis.stamps.sources.keys() for a in analyses]
+      sources_per_analysis = [a.sources() for a in analyses]
       split_analyses = self._time(lambda: merged_analysis2.split(
         sources_per_analysis, catchall=True), 'Split back into %d analyses' % num_analyses)
 

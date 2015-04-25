@@ -18,4 +18,4 @@ setuptools==5.4.1
 six==1.8.0
 thrift==0.9.1
 wheel==0.23.0
-zincutils==0.1
+zincutils==0.1.1
