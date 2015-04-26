@@ -166,7 +166,6 @@ class BuildGraphTest(BaseTest):
     self.build_graph.inject_address_closure(SyntheticAddress.parse(spec))
 
   def test_invalid_address(self):
-
     with self.assertRaisesRegexp(AddressLookupError,
                                  '^BUILD file does not exist at:.*/BUILD'):
       self.inject_address_closure('//:a')
