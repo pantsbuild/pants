@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.address import parse_spec, SyntheticAddress
+from pants.base.address import SyntheticAddress, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
