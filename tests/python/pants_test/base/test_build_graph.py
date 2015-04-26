@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import parse_spec, SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
@@ -17,6 +17,30 @@ from pants_test.base_test import BaseTest
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
 
 class BuildGraphTest(BaseTest):
+  def inject_graph(self, root_spec, graph_dict):
+    """Given a root spec, injects relevant targets from the graph represented by graph_dict.
+    
+    graph_dict should contain address specs, keyed by sources with lists of value destinations.
+    Each created target will be a simple `target` alias.
+
+    Returns the parsed Address for the root_spec.
+    """
+    for src, targets in graph_dict.items():
+      src_path, src_name = parse_spec(src)
+      if not src_path:
+        # The target is located in the root.
+        src_path = '.'
+      self.add_to_build_file(
+          '{}/BUILD'.format(src_path),
+          '''target(name='{}', dependencies=[{}])\n'''.format(
+            src_name,
+            "'{}'".format("','".join(targets)) if targets else ''
+          )
+      )
+    root_address = SyntheticAddress.parse(root_spec)
+    self.build_graph.inject_address_closure(root_address)
+    return root_address
+
   def test_target_invalid(self):
     self.add_to_build_file('a/BUILD', 'target(name="a")')
     with self.assertRaises(AddressLookupError):
@@ -29,26 +53,12 @@ class BuildGraphTest(BaseTest):
       self.build_graph.inject_address_closure(SyntheticAddress.parse('b:b'))
 
   def test_transitive_closure_address(self):
-    self.add_to_build_file('BUILD', dedent('''
-        target(name='foo',
-               dependencies=[
-                 'a',
-               ])
-      '''))
+    root_address = self.inject_graph('//:foo', {
+      "//:foo": ['a'],
+      "a": ['a/b:bat'],
+      "a/b:bat": [],
+    })
 
-    self.add_to_build_file('a/BUILD', dedent('''
-        target(name='a',
-               dependencies=[
-                 'a/b:bat',
-               ])
-      '''))
-
-    self.add_to_build_file('a/b/BUILD', dedent('''
-        target(name='bat')
-      '''))
-
-    root_address = SyntheticAddress.parse('//:foo')
-    self.build_graph.inject_address_closure(root_address)
     self.assertEqual(len(self.build_graph.transitive_subgraph_of_addresses([root_address])), 3)
 
   def test_no_targets(self):
