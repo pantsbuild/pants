@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from collections import defaultdict
+from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
@@ -15,7 +16,7 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_walk
 
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
@@ -121,6 +122,21 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def exec_graph_key_for_target(self, compile_target):
     return "compile-{}".format(compile_target.address.spec)
 
+  @contextmanager
+  def _empty_analysis_cleanup(self, compile_context):
+    """Addresses cases where failed compilations leave behind invalid analysis.
+    
+    If compilation was creating analysis for the first time, and it fails, then the analysis
+    will be empty/invalid.
+    """
+    preexisting_analysis = os.path.exists(compile_context.analysis_file)
+    try:
+      yield
+    except Exception as e:
+      if not preexisting_analysis:
+        safe_delete(compile_context.analysis_file)
+      raise e
+
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                      invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,
                      update_artifact_cache_vts_work):
@@ -131,13 +147,14 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                                          target_closure))
         cp_entries = self._compute_classpath_entries(compile_classpaths, compile_context,
                                                      extra_compile_time_classpath)
-        compile_vts(vts,
-                    compile_context.sources,
-                    compile_context.analysis_file,
-                    upstream_analysis,
-                    cp_entries,
-                    compile_context.classes_dir,
-                    progress_message)
+        with self._empty_analysis_cleanup(compile_context):
+          compile_vts(vts,
+                      compile_context.sources,
+                      compile_context.analysis_file,
+                      upstream_analysis,
+                      cp_entries,
+                      compile_context.classes_dir,
+                      progress_message)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
