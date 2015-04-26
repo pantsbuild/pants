@@ -152,6 +152,19 @@ class BuildGraphTest(BaseTest):
     d = self.make_target('d', dependencies=[a, c])
     self.assertEquals([d, a, c, b], d.closure())
 
+  def test_transitive_subgraph_of_addresses_bfs(self):
+    root = self.inject_graph('a', {
+      'a': ['d', 'b'],
+      'b': ['c'],
+      'c': [],
+      'd': [],
+    })
+
+    self.assertEquals(
+        [t.address.spec for t in self.build_graph.transitive_subgraph_of_addresses_bfs([root])],
+        ['a:a', 'd:d', 'b:b', 'c:c'],
+    )
+
   def test_target_walk(self):
     def assertWalk(expected, target):
       results = []
