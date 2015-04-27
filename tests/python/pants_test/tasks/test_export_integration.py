@@ -9,8 +9,7 @@ import json
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.config import Config
-from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -70,10 +69,10 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, self._resolve_args)
-      # Hack because Bootstrapper.instance() reads config from cache. Will go away after we plumb
-      # options into IvyUtil properly.
-      Config.cache(Config.load())
-      ivy_cache_dir = Bootstrapper.instance().ivy_cache_dir
+      # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
+      # to get in a test that isn't a subclass of TaskTestBase.
+      # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
+      ivy_cache_dir = os.path.expanduser('~/.ivy2/pants')
       common_lang_lib_info = json_data.get('libraries').get('commons-lang:commons-lang:2.5')
       self.assertIsNotNone(common_lang_lib_info)
       self.assertEquals(

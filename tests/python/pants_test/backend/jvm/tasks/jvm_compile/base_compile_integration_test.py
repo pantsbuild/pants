@@ -15,7 +15,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class BaseCompileIT(PantsRunIntegrationTest):
   @contextmanager
-  def do_test_compile(self, target, strategy, expected_files=None, iterations=2):
+  def do_test_compile(self, target, strategy,
+      expected_files=None, iterations=2, expect_failure=False):
     """Runs a configurable number of iterations of compilation for the given target.
 
     By default, runs twice to shake out errors related to noops.
@@ -33,7 +34,10 @@ class BaseCompileIT(PantsRunIntegrationTest):
         if i == 0:
           args.insert(0, 'clean-all')
         pants_run = self.run_pants_with_workdir(args, workdir)
-        self.assert_success(pants_run)
+        if expect_failure:
+          self.assert_failure(pants_run)
+        else:
+          self.assert_success(pants_run)
       if expected_files:
         to_find = set(expected_files)
         found = defaultdict(set)
@@ -42,8 +46,9 @@ class BaseCompileIT(PantsRunIntegrationTest):
             if file in to_find:
               found[file].add(os.path.join(root, file))
         to_find.difference_update(found)
-        self.assertEqual(set(), to_find,
-                         'Failed to find the following compiled files: {}'.format(to_find))
+        if not expect_failure:
+          self.assertEqual(set(), to_find,
+                          'Failed to find the following compiled files: {}'.format(to_find))
         yield found
 
   def get_only(self, found, name):

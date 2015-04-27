@@ -107,7 +107,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':common',
-    ':jvm_tool_task_mixin',
     ':nailgun_task',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
@@ -142,14 +141,14 @@ python_library(
   sources = ['ivy_resolve.py'],
   dependencies = [
     ':ivy_task_mixin',
-    ':jvm_tool_task_mixin',
     ':nailgun_task',
+    'src/python/pants:binary_util',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/ivy',
     'src/python/pants/goal:products',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
-    'src/python/pants:binary_util',
   ],
 )
 
@@ -303,6 +302,7 @@ python_library(
   sources = ['jvm_tool_task_mixin.py'],
   dependencies = [
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
+    'src/python/pants/ivy',
   ],
 )
 
@@ -358,7 +358,6 @@ python_library(
   sources = ['scalastyle.py'],
   dependencies = [
     ':common',
-    ':jvm_tool_task_mixin',
     ':nailgun_task',
     'src/python/pants/base:target',
     'src/python/pants/process',

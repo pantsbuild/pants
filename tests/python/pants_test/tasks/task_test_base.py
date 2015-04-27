@@ -14,6 +14,8 @@ from StringIO import StringIO
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.goal.goal import Goal
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants_test.base_test import BaseTest
 
 
@@ -39,6 +41,8 @@ class TaskTestBase(BaseTest):
     self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
     self._test_workdir = os.path.join(self._tmpdir, 'workdir')
     os.mkdir(self._test_workdir)
+    Bootstrapper.reset_instance()
+    IvySubsystem.reset_global_instance()
 
   @property
   def test_workdir(self):
@@ -63,14 +67,15 @@ class TaskTestBase(BaseTest):
     self.set_options_for_scope(self.options_scope, **kwargs)
 
   def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None):
+              console_outstream=None, workspace=None, register_bootstrap_opts=None):
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
     return super(TaskTestBase, self).context(for_task_types=for_task_types,
                                              options=options,
                                              target_roots=target_roots,
                                              console_outstream=console_outstream,
-                                             workspace=workspace)
+                                             workspace=workspace,
+                                             register_bootstrap_opts=register_bootstrap_opts)
 
   def create_task(self, context, workdir=None):
     return self._testing_task_type(context, workdir or self._test_workdir)

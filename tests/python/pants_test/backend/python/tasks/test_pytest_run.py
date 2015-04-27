@@ -12,7 +12,8 @@ from textwrap import dedent
 
 import coverage
 
-from pants.backend.python.tasks.pytest_run import PytestRun, PythonTestFailure
+from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import environment_as, pushd
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
@@ -34,7 +35,7 @@ class PythonTestBuilderTestBase(PythonTaskTest):
       pytest_run_task.execute()
 
   def run_failing_tests(self, targets, failed_targets):
-    with self.assertRaises(PythonTestFailure) as cm:
+    with self.assertRaises(TestFailedTaskError) as cm:
       self.run_tests(targets=targets)
 
 
@@ -141,6 +142,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           )
         """))
     self.green = self.target('tests:green')
+
     self.red = self.target('tests:red')
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')

@@ -37,6 +37,7 @@ target(
     ':build_file_address_mapper',
     ':build_file_aliases',
     ':build_file_parser',
+    ':build_graph',
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
@@ -109,6 +110,18 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:base_test',
   ]
+)
+
+python_tests(
+  name = 'build_graph',
+  sources = ['test_build_graph.py'],
+  dependencies = [
+    'src/python/pants/base:address',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:target',
+    'tests/python/pants_test:base_test'
+  ],
 )
 
 python_tests(

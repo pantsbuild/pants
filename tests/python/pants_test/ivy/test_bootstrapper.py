@@ -5,38 +5,48 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.core.tasks.task import Task
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.util.contextutil import environment_as
-from pants_test.base_test import BaseTest
+from pants.ivy.ivy_subsystem import IvySubsystem
+from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
-class BootstrapperTest(BaseTest):
+class DummyBootstrapperTask(Task):
+  """A placeholder task used as a hint to BaseTest to initialize the Bootstrapper subsystem."""
+  @classmethod
+  def options_scope(cls):
+    return 'dummy-bootstrapper'
 
-  def test_parse_proxy_string(self):
-    bootstrapper = Bootstrapper().instance()
+  @classmethod
+  def global_subsystems(cls):
+    return super(DummyBootstrapperTask, cls).global_subsystems() + (IvySubsystem, )
 
-    self.assertEquals(('example.com', 1234),
-                      bootstrapper._parse_proxy_string('http://example.com:1234'))
-    self.assertEquals(('secure-example.com', 999),
-                      bootstrapper._parse_proxy_string('http://secure-example.com:999'))
-    # trailing slash is ok
-    self.assertEquals(('example.com', 1234),
-                      bootstrapper._parse_proxy_string('http://example.com:1234/'))
 
-  def test_proxy_from_env(self):
-    bootstrapper = Bootstrapper().instance()
+class BootstrapperTest(JvmToolTaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return DummyBootstrapperTask
 
-    self.assertIsNone(bootstrapper._http_proxy())
-    self.assertIsNone(bootstrapper._https_proxy())
+  def setUp(self):
+    super(BootstrapperTest, self).setUp()
+    # Calling self.context() is a hack to make sure subsystems are initialized.
+    self.context()
 
-    with environment_as(HTTP_PROXY='http://proxy.example.com:456',
-                        HTTPS_PROXY='https://secure-proxy.example.com:789'):
-      self.assertEquals('http://proxy.example.com:456', bootstrapper._http_proxy())
-      self.assertEquals('https://secure-proxy.example.com:789', bootstrapper._https_proxy())
+  def test_simple(self):
+    bootstrapper = Bootstrapper.instance()
+    ivy = bootstrapper.ivy()
+    self.assertIsNotNone(ivy.ivy_cache_dir)
+    self.assertIsNotNone(ivy.ivy_settings)
 
-      self.assertEquals([
-        '-Dhttp.proxyHost=proxy.example.com',
-        '-Dhttp.proxyPort=456',
-        '-Dhttps.proxyHost=secure-proxy.example.com',
-        '-Dhttps.proxyPort=789',
-      ], bootstrapper._extra_jvm_options())
+  def test_reset(self):
+    bootstrapper1 = Bootstrapper.instance()
+    Bootstrapper.reset_instance()
+    bootstrapper2 = Bootstrapper.instance()
+    self.assertNotEqual(bootstrapper1, bootstrapper2)
+
+  def test_default_ivy(self):
+    ivy = Bootstrapper.default_ivy()
+    self.assertIsNotNone(ivy.ivy_cache_dir)
+    self.assertIsNotNone(ivy.ivy_settings)
+
+  # TODO(Eric Ayers) Test bootstrapper with a temporary dir for pants_bootstrapdir

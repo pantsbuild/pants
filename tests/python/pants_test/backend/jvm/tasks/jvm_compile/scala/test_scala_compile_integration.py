@@ -40,6 +40,16 @@ class ScalaCompileIntegrationTest(BaseCompileIT):
     # But the isolated strategy should result in a class per target.
     test('isolated', 2)
 
+  def test_scala_isolated_failure(self):
+    """With no initial analysis, a failed compilation shouldn't leave anything behind."""
+    analysis_file = 'testprojects.src.scala.' \
+        'org.pantsbuild.testproject.compilation_failure.compilation_failure.analysis'
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testprojects/compilation_failure',
+                              'isolated',
+                              expected_files=[analysis_file],
+                              expect_failure=True) as found:
+      self.assertEqual(0, len(found[analysis_file]))
+
   @provide_compile_strategies
   def test_scala_with_java_sources_compile(self, strategy):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/javasources',

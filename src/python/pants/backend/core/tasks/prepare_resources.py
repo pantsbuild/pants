@@ -42,8 +42,8 @@ class PrepareResources(Task):
       self.context.products.safe_create_data('resources_by_target',
                                              lambda: defaultdict(MultipleRootedProducts))
 
-    # `targets` contains the transitive subgraph in pre-order, which is approximately how
-    # we want them ordered on the classpath. Thus, we preserve ordering here.
+    # NB: Ordering isn't relevant here, because it is applied during the dep walk to
+    # consume from the compile_classpath.
     targets = self.context.targets()
     if len(targets) == 0:
       return
@@ -82,7 +82,7 @@ class PrepareResources(Task):
         for conf in self.confs:
           # TODO(John Sirois): Introduce the notion of RuntimeClasspath and populate that product
           # instead of mutating the compile_classpath.
-          compile_classpath.add_for_targets(targets, [(conf, target_dir)])
+          compile_classpath.add_for_target(resources_tgt, [(conf, target_dir)])
         if resources_by_target is not None:
           resources_by_target[resources_tgt].add_rel_paths(
             target_dir, resources_tgt.sources_relative_to_source_root())
