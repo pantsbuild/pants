@@ -110,7 +110,7 @@ class BuildFile(AbstractClass):
     else:
       exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
 
-    for root, dirs, files in cls.walk(os.path.join(root_dir, base_path or ''), topdown=True):
+    for root, dirs, files in cls.walk(root_dir, base_path or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       for subdir in to_remove:
         dirs.remove(subdir)
@@ -301,5 +301,6 @@ class FilesystemBuildFile(BuildFile):
     return os.path.exists(path)
 
   @classmethod
-  def walk(self, path, topdown=False):
+  def walk(self, root_dir, relpath, topdown=False):
+    path = os.path.join(root_dir, relpath)
     return safe_walk(path, topdown=True)

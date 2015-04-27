@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.scm_build_file import ScmBuildFile
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
-from pants_test.base.test_build_file import BuildFileTestBase
+from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
 class ScmBuildFileTest(BuildFileTestBase):

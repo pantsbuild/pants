@@ -6,57 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
-import tempfile
-import unittest
 
 import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile, FilesystemBuildFile
-from pants.util.dirutil import safe_mkdir, safe_open, touch
+from pants.util.dirutil import safe_open
+from pants_test.base.build_file_test_base import BuildFileTestBase
 
-
-class BuildFileTestBase(unittest.TestCase):
-
-  def fullpath(self, path):
-    return os.path.join(self.root_dir, path)
-
-  def makedirs(self, path):
-    safe_mkdir(self.fullpath(path))
-
-  def touch(self, path):
-    touch(self.fullpath(path))
-
-  def create_buildfile(self, path):
-    return FilesystemBuildFile(self.root_dir, path)
-
-  def setUp(self):
-    self.base_dir = tempfile.mkdtemp()
-
-    # Seed a BUILD outside the build root that should not be detected
-    touch(os.path.join(self.base_dir, 'BUILD'))
-
-    self.root_dir = os.path.join(self.base_dir, 'root')
-
-    self.touch('grandparent/parent/BUILD')
-    self.touch('grandparent/parent/BUILD.twitter')
-    # Tricky!  This is a directory
-    self.makedirs('grandparent/parent/BUILD.dir')
-    self.makedirs('grandparent/BUILD')
-    self.touch('BUILD')
-    self.touch('BUILD.twitter')
-    self.touch('grandparent/parent/child1/BUILD')
-    self.touch('grandparent/parent/child1/BUILD.twitter')
-    self.touch('grandparent/parent/child2/child3/BUILD')
-    self.makedirs('grandparent/parent/child2/BUILD')
-    self.makedirs('grandparent/parent/child4')
-    self.touch('grandparent/parent/child5/BUILD')
-    self.makedirs('path-that-does-exist')
-    self.touch('path-that-does-exist/BUILD.invalid.suffix')
-
-  def tearDown(self):
-    shutil.rmtree(self.base_dir)
 
 class BuildFileTest(BuildFileTestBase):
   def setUp(self):

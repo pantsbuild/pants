@@ -16,6 +16,10 @@ from pants.scm.scm import Scm
 from pants.util.strutil import ensure_binary
 
 
+# 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
+MAX_SYMLINKS_IN_REALPATH = 40
+
+
 class Git(Scm):
   """An Scm implementation backed by git."""
 
@@ -292,38 +296,36 @@ class Git(Scm):
     def __str__(self):
       return "SymlinkLoop({}, {})".format(self.relpath, self.rev)
 
-  class BadModeException(Exception):
-    pass
-
   class GitDiedException(Exception):
     pass
 
-  def exists(self, rev, relpath):
+  class UnexpectedGitObjectTypeException(Exception):
+    # Programmer error
+    pass
+
+  def _safe_realpath(self, rev, relpath):
     try:
-      self._realpath(rev, relpath)
-      return True
+      return self._realpath(rev, relpath)
     except self.MissingFileException:
-      return False
+      return None
     except self.NotADirException:
-      return False
+      return None
+
+  def exists(self, rev, relpath):
+    path = self._safe_realpath(rev, relpath)
+    return bool(path)
 
   def isfile(self, rev, relpath):
-    try:
-      path = self._realpath(rev, relpath)
+    path = self._safe_realpath(rev, relpath)
+    if path:
       return not path.endswith('/')
-    except self.MissingFileException:
-      return False
-    except self.NotADirException:
-      return False
+    return False
 
   def isdir(self, rev, relpath):
-    try:
-      path = self._realpath(rev, relpath)
+    path = self._safe_realpath(rev, relpath)
+    if path:
       return path.endswith('/')
-    except self.MissingFileException:
-      return False
-    except self.NotADirException:
-      return False
+    return False
 
   class Symlink:
     def __init__(self, name, sha):
@@ -354,7 +356,7 @@ class Git(Scm):
     return tree.keys()
 
   @contextmanager
-  def open(self, rev, relpath, mode='rb'):
+  def open(self, rev, relpath):
     """Read a file out of the repository at a certain revision.
 
     This is complicated because, unlike vanilla git cat-file, this follows symlinks in
@@ -362,15 +364,12 @@ class Git(Scm):
     that's because presumably whoever put that symlink there knew what they were doing.
     """
 
-    if mode != 'rb':
-      raise self.BadModeException(rev, relpath, mode)
-
     path = self._realpath(rev, relpath)
     if path.endswith('/'):
       raise self.IsDirException(rev, relpath)
 
     if path.startswith('../') or path[0] == '/':
-      yield open(path, mode)
+      yield open(path, 'rb')
 
     object_type, data = self._read_object_from_repo(rev=rev, relpath=path)
     if object_type == 'tree':
@@ -423,9 +422,8 @@ class Git(Scm):
           return path_so_far + '/'
         # A dir is OK; we just descend from here
       elif isinstance(obj, self.Symlink):
-        # 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
         symlinks += 1
-        if symlinks > 40:
+        if symlinks > MAX_SYMLINKS_IN_REALPATH:
           raise self.SymlinkLoopException(rev, relpath)
         # A git symlink is stored as a blob containing the name of the target.
         # Read that blob.
@@ -443,7 +441,7 @@ class Git(Scm):
         path_so_far = ''
       else:
         # Programmer error
-        assert False
+        raise self.UnexpectedGitObjectTypeException()
 
   def _read_tree(self, rev, path):
     """Given a revision and path, parse the tree data out of git cat-file output.
@@ -496,7 +494,6 @@ class Git(Scm):
     while not header:
       header = self._cat_file_process.stdout.readline()
       if self._cat_file_process.poll():
-        import pdb;pdb.set_trace()
         raise self.GitDiedException("Git cat-file died while trying to read '{}'.".format(spec))
     header = header.rstrip()
     parts = header.rsplit(ensure_binary(' '), 2)

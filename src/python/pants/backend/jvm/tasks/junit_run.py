@@ -759,7 +759,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
     if not self.get_options().skip:
       targets = self.context.targets()
       for target in targets:
-        if isinstance(target, junit_tests) and not target.payload.sources:
+        if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
           raise TargetDefinitionException(target, 'JavaTests must include a non-empty set of sources.')
 
       self._runner.execute(targets)

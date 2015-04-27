@@ -39,7 +39,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
-          'testprojects/tests/scala/org/pantsbuild/example/empty'],
+          'testprojects/tests/scala/org/pantsbuild/testproject/empty'],
           workdir)
       self.assert_failure(pants_run)
 
