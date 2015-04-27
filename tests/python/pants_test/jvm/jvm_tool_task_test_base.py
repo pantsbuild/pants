@@ -14,7 +14,6 @@ from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -86,25 +85,22 @@ class JvmToolTaskTestBase(TaskTestBase):
     link('BUILD.tools', force=True)
     support_dir = real_config.getdefault('pants_supportdir')
     link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root), force=True)
-    bootstrap_option_values = OptionsBootstrapper().get_bootstrap_options().for_global_scope()
-    self.set_bootstrap_options(bootstrap_option_values)
-    safe_mkdir(os.path.join(bootstrap_option_values.pants_supportdir, 'ivy'))
-    settings_file = os.path.join(bootstrap_option_values.pants_supportdir, 'ivy', 'ivysettings.xml')
+    safe_mkdir(os.path.join(self.bootstrap_option_values.pants_supportdir, 'ivy'))
+    settings_file = os.path.join(self.bootstrap_option_values.pants_supportdir, 'ivy', 'ivysettings.xml')
     if not os.path.exists(settings_file):
       shutil.copy('build-support/ivy/ivysettings.xml',
-                  os.path.join(bootstrap_option_values.pants_supportdir, 'ivy'))
+                  os.path.join(self.bootstrap_option_values.pants_supportdir, 'ivy'))
     Bootstrapper.reset_instance()
 
   def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None, register_bootstrap_opts=True):
+              console_outstream=None, workspace=None):
     # Add in the bootstrapper task type, so its options get registered and set.
     for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
     return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types,
                                                     options=options,
                                                     target_roots=target_roots,
                                                     console_outstream=console_outstream,
-                                                    workspace=workspace,
-                                                    register_bootstrap_opts=register_bootstrap_opts)
+                                                    workspace=workspace)
 
   def prepare_execute(self, context, workdir):
     """Prepares a jvm tool using task for execution, ensuring any required jvm tools are
