@@ -1,4 +1,4 @@
-jar_library(name='zinc',
+target(name='zinc',
   dependencies=[
     'src/scala/org/pantsbuild/zinc'
   ]

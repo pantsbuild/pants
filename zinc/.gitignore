@@ -1,7 +1,0 @@
-project/project
-project/local.sbt
-target
-.cache
-.idea
-*.jar
-*.iml
