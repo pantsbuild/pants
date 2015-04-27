@@ -28,6 +28,7 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants.subsystem.subsystem import Subsystem
