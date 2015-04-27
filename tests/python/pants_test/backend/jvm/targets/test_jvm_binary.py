@@ -197,7 +197,7 @@ class JvmBinaryTest(BaseTest):
         )
         '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmBinary\(BuildFileAddress\(.*BUILD, foo\)\): '
+                                 r'Invalid target JvmBinary\(BuildFileAddress\(.*BUILD\), foo\)\): '
                                  r'manifest_entries must be a dict. got str'):
        self.target('//:foo')
 

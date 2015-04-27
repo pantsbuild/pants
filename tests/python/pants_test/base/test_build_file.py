@@ -13,7 +13,7 @@ import unittest
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_file import BuildFile
+from pants.base.build_file import BuildFile, FilesystemBuildFile
 from pants.util.dirutil import safe_mkdir, safe_open, touch
 
 
@@ -29,7 +29,7 @@ class BuildFileTest(unittest.TestCase):
     touch(self.fullpath(path))
 
   def create_buildfile(self, path):
-    return BuildFile(self.root_dir, path)
+    return FilesystemBuildFile(self.root_dir, path)
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
@@ -98,16 +98,16 @@ class BuildFileTest(unittest.TestCase):
       self.buildfile.descendants(spec_excludes=['grandparent/parent/child1']))
 
   def testMustExistFalse(self):
-    buildfile = BuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
+    buildfile = FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
     self.assertEquals(OrderedSet([buildfile]), buildfile.family())
 
   def testMustExistTrue(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
+      FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, "path-that-does-exist/BUILD", must_exist=True)
+      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
+      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
 
   def testSuffixOnly(self):
     self.makedirs('suffix-test')
@@ -150,18 +150,18 @@ class BuildFileTest(unittest.TestCase):
   def test_buildfile_with_dir_must_exist_false(self):
     # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.
     # This is used in what_changed for example.
-    buildfile = BuildFile(self.root_dir, 'grandparent/BUILD', must_exist=False)
-    self.assertFalse(buildfile.exists())
+    buildfile = FilesystemBuildFile(self.root_dir, 'grandparent/BUILD', must_exist=False)
+    self.assertFalse(buildfile.file_exists())
 
   def test_buildfile_with_dir_must_exist_true(self):
     # We should NOT be able to create a BuildFile instance against a dir called BUILD
     # in the default case.
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, 'grandparent/BUILD')
+      FilesystemBuildFile(self.root_dir, 'grandparent/BUILD')
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
-    buildfiles = BuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
+    buildfiles = FilesystemBuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
 
     self.assertEquals(OrderedSet([
       self.create_buildfile('grandparent/parent/BUILD'),
@@ -174,7 +174,7 @@ class BuildFileTest(unittest.TestCase):
       ]), buildfiles)
 
   def test_scan_buildfiles_exclude_abspath(self):
-    buildfiles = BuildFile.scan_buildfiles(
+    buildfiles = FilesystemBuildFile.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')
@@ -189,7 +189,7 @@ class BuildFileTest(unittest.TestCase):
                       buildfiles)
 
   def test_scan_buildfiles_exclude_relpath(self):
-    buildfiles = BuildFile.scan_buildfiles(
+    buildfiles = FilesystemBuildFile.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'
@@ -206,7 +206,7 @@ class BuildFileTest(unittest.TestCase):
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
     with self.assertRaises(BuildFile.InvalidRootDirError):
-      BuildFile('tmp', 'grandparent/BUILD')
+      FilesystemBuildFile('tmp', 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are
