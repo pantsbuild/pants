@@ -114,7 +114,6 @@ target(
     'tests/python/pants_test/cache',
     'tests/python/pants_test/engine',
     'tests/python/pants_test/fs',
-    'tests/python/pants_test/graph',
     'tests/python/pants_test/goal',
     'tests/python/pants_test/ivy',
     'tests/python/pants_test/java',

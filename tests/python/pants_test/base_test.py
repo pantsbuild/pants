@@ -29,7 +29,7 @@ from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
 from pants.option.options import Options
-from pants.option.options_bootstrapper import register_bootstrap_options
+from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
@@ -135,7 +135,7 @@ class BaseTest(unittest.TestCase):
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
-    self.bootstrap_option_values = {}
+    self.bootstrap_option_values = OptionsBootstrapper().get_bootstrap_options().for_global_scope()
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
@@ -146,16 +146,12 @@ class BaseTest(unittest.TestCase):
     self.options[scope].update(kwargs)
 
   def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None, register_bootstrap_opts=False):
+              console_outstream=None, workspace=None):
     for_task_types = for_task_types or []
     options = options or {}
 
     option_values = defaultdict(dict)
     registered_global_subsystems = set()
-    if register_bootstrap_opts:
-      bootstrap_option_values = self.bootstrap_option_values
-    else:
-      bootstrap_option_values = {}
 
     # Get default values for all options registered by the tasks in for_task_types.
     # TODO: This is clunky and somewhat repetitive of the real registration code.
@@ -176,10 +172,10 @@ class BaseTest(unittest.TestCase):
           for flag_name in rargs:
             option_name = flag_name.lstrip('-').replace('-', '_')
             scoped_options[option_name] = default
-        register.bootstrap = bootstrap_option_values
+        register.bootstrap = self.bootstrap_option_values
         register.scope = on_scope
         return register
-
+      register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
       task_type.register_options(register_func(scope))
       for subsystem in task_type.global_subsystems():
         if subsystem not in registered_global_subsystems:
@@ -187,8 +183,7 @@ class BaseTest(unittest.TestCase):
           registered_global_subsystems.add(subsystem)
       for subsystem in task_type.task_subsystems():
         subsystem.register_options(register_func(subsystem.qualify_scope(scope)))
-      if register_bootstrap_opts:
-        register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
+
 
     # Now override with any caller-specified values.
 
@@ -349,10 +344,7 @@ class BaseTest(unittest.TestCase):
       product_mapping.add(target, outdir, map(create_product, products))
       yield temporary_dir
 
-  def set_bootstrap_options(self, values=None):
-    values = values or {}
-    self.bootstrap_option_values = values
-
-  def update_bootstrap_options(self, values=None):
-    values = values or {}
+  def set_bootstrap_options(self, **values):
+    """Override some of the bootstrap option values."""
     self.bootstrap_option_values.update(values)
+    self.set_options_for_scope(Options.GLOBAL_SCOPE, **values)

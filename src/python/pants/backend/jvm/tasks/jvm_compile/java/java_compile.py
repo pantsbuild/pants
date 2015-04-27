@@ -45,6 +45,7 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 class JavaCompile(JvmCompile):
   _language = 'java'
   _file_suffix = '.java'
+  _supports_concurrent_execution = False
 
   _JMAKE_MAIN = 'org.pantsbuild.jmake.Main'
 

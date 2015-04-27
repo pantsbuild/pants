@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import SyntheticAddress, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
@@ -17,6 +17,30 @@ from pants_test.base_test import BaseTest
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
 
 class BuildGraphTest(BaseTest):
+  def inject_graph(self, root_spec, graph_dict):
+    """Given a root spec, injects relevant targets from the graph represented by graph_dict.
+
+    graph_dict should contain address specs, keyed by sources with lists of value destinations.
+    Each created target will be a simple `target` alias.
+
+    Returns the parsed Address for the root_spec.
+    """
+    for src, targets in graph_dict.items():
+      src_path, src_name = parse_spec(src)
+      if not src_path:
+        # The target is located in the root.
+        src_path = '.'
+      self.add_to_build_file(
+          '{}/BUILD'.format(src_path),
+          '''target(name='{}', dependencies=[{}])\n'''.format(
+            src_name,
+            "'{}'".format("','".join(targets)) if targets else ''
+          )
+      )
+    root_address = SyntheticAddress.parse(root_spec)
+    self.build_graph.inject_address_closure(root_address)
+    return root_address
+
   def test_target_invalid(self):
     self.add_to_build_file('a/BUILD', 'target(name="a")')
     with self.assertRaises(AddressLookupError):
@@ -29,26 +53,12 @@ class BuildGraphTest(BaseTest):
       self.build_graph.inject_address_closure(SyntheticAddress.parse('b:b'))
 
   def test_transitive_closure_address(self):
-    self.add_to_build_file('BUILD', dedent('''
-        target(name='foo',
-               dependencies=[
-                 'a',
-               ])
-      '''))
+    root_address = self.inject_graph('//:foo', {
+      "//:foo": ['a'],
+      "a": ['a/b:bat'],
+      "a/b:bat": [],
+    })
 
-    self.add_to_build_file('a/BUILD', dedent('''
-        target(name='a',
-               dependencies=[
-                 'a/b:bat',
-               ])
-      '''))
-
-    self.add_to_build_file('a/b/BUILD', dedent('''
-        target(name='bat')
-      '''))
-
-    root_address = SyntheticAddress.parse('//:foo')
-    self.build_graph.inject_address_closure(root_address)
     self.assertEqual(len(self.build_graph.transitive_subgraph_of_addresses([root_address])), 3)
 
   def test_no_targets(self):
@@ -142,6 +152,35 @@ class BuildGraphTest(BaseTest):
     d = self.make_target('d', dependencies=[a, c])
     self.assertEquals([d, a, c, b], d.closure())
 
+  def test_transitive_subgraph_of_addresses_bfs(self):
+    root = self.inject_graph('a', {
+      'a': ['b', 'c'],
+      'b': ['d', 'e'],
+      'c': ['f', 'g'],
+      'd': ['h', 'i'],
+      'e': ['j', 'k'],
+      'f': ['l', 'm'],
+      'g': ['n', 'o'],
+      'h': [], 'i': [], 'j': [], 'k': [], 'l': [], 'm': [], 'n': [], 'o': [],
+    })
+
+    self.assertEquals(
+        [t.address.target_name for t in self.build_graph.transitive_subgraph_of_addresses_bfs([root])],
+        [str(unichr(x)) for x in xrange(ord('a'), ord('o') + 1)],
+    )
+
+  def test_transitive_subgraph_of_addresses_bfs_predicate(self):
+    root = self.inject_graph('a', {
+      'a': ['b', 'c'],
+      'b': ['d', 'e'],
+      'c': [], 'd': [], 'e': [],
+    })
+
+    predicate = lambda t: t.address.target_name != 'b'
+    filtered = self.build_graph.transitive_subgraph_of_addresses_bfs([root], predicate=predicate)
+
+    self.assertEquals([t.address.target_name for t in filtered], ['a', 'c'])
+
   def test_target_walk(self):
     def assertWalk(expected, target):
       results = []
@@ -166,7 +205,6 @@ class BuildGraphTest(BaseTest):
     self.build_graph.inject_address_closure(SyntheticAddress.parse(spec))
 
   def test_invalid_address(self):
-
     with self.assertRaisesRegexp(AddressLookupError,
                                  '^BUILD file does not exist at:.*/BUILD'):
       self.inject_address_closure('//:a')

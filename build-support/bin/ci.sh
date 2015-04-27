@@ -125,7 +125,7 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
-  banner "Sanity checking bootrapped pants and repo BUILD files"
+  banner "Sanity checking bootstrapped pants and repo BUILD files"
   ./pants.pex ${PANTS_ARGS[@]} clean-all || die "Failed to clean-all."
   ./pants.pex ${PANTS_ARGS[@]} goals || die "Failed to list goals."
   ./pants.pex ${PANTS_ARGS[@]} list :: || die "Failed to list all targets."
@@ -208,8 +208,10 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   # Targets that fail but shouldn't
   known_failing_targets=(
+    # The following two targets lose out due to a resource collision, because `example_b` happens
+    # to be first in the context, and test.junit mixes all classpaths.
     testprojects/maven_layout/resource_collision/example_a/src/test/java/org/pantsbuild/duplicateres/examplea:examplea
-    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb
+    testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec
   )
 
   # Targets that are intended to fail
@@ -219,6 +221,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
     testprojects/src/java/org/pantsbuild/testproject/cycle2
     testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
     testprojects/src/python/antlr:test_antlr_failure
+    testprojects/src/scala/org/pantsbuild/testproject/compilation_failure
     testprojects/src/thrift/org/pantsbuild/thrift_linter:
     testprojects/tests/java/org/pantsbuild/testproject/empty:
     testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target

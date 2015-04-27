@@ -5,9 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.core.tasks.task import Task
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -49,4 +52,12 @@ class BootstrapperTest(JvmToolTaskTestBase):
     self.assertIsNotNone(ivy.ivy_cache_dir)
     self.assertIsNotNone(ivy.ivy_settings)
 
-  # TODO(Eric Ayers) Test bootstrapper with a temporary dir for pants_bootstrapdir
+  def test_fresh_bootstrap(self):
+    with temporary_dir() as fresh_bootstrap_dir:
+      self.set_bootstrap_options(pants_bootstrapdir=fresh_bootstrap_dir)
+      # Initialize the Ivy subsystem
+      self.context()
+      Bootstrapper.default_ivy()
+      bootstrap_jar_path = os.path.join(fresh_bootstrap_dir,
+                                        'tools', 'jvm', 'ivy', 'bootstrap.jar')
+      self.assertTrue(os.path.exists(bootstrap_jar_path))

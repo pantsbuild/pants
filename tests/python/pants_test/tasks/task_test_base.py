@@ -67,15 +67,14 @@ class TaskTestBase(BaseTest):
     self.set_options_for_scope(self.options_scope, **kwargs)
 
   def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None, register_bootstrap_opts=None):
+              console_outstream=None, workspace=None):
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
     return super(TaskTestBase, self).context(for_task_types=for_task_types,
                                              options=options,
                                              target_roots=target_roots,
                                              console_outstream=console_outstream,
-                                             workspace=workspace,
-                                             register_bootstrap_opts=register_bootstrap_opts)
+                                             workspace=workspace)
 
   def create_task(self, context, workdir=None):
     return self._testing_task_type(context, workdir or self._test_workdir)
