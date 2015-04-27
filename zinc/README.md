@@ -17,13 +17,15 @@ Build
 
 Zinc is built using pants:
 
-    ./pants zinc/
+    ./pants test zinc/
 
 
 Options
 -------
 
-To get information about options run `zinc -help`.
+To get information about options
+
+    ./pants run.jvm zinc:bin --run-jvm-args=-help
 
 ### Compile
 

@@ -7,7 +7,7 @@ target(name='zinc',
 jvm_binary(
   name='bin',
   basename='zinc',
-  main='com.typesafe.zinc',
+  main='org.pantsbuild.zinc.Main',
   dependencies=[
     ':zinc'
   ]
