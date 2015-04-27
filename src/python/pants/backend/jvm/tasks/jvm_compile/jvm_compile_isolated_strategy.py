@@ -125,17 +125,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   @contextmanager
   def _empty_analysis_cleanup(self, compile_context):
     """Addresses cases where failed compilations leave behind invalid analysis.
-    
+
     If compilation was creating analysis for the first time, and it fails, then the analysis
     will be empty/invalid.
     """
     preexisting_analysis = os.path.exists(compile_context.analysis_file)
     try:
       yield
-    except Exception as e:
+    except:
       if not preexisting_analysis:
         safe_delete(compile_context.analysis_file)
-      raise e
+      raise
 
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                      invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,
