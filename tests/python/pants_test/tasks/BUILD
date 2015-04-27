@@ -30,7 +30,6 @@ target(
     ':execution_graph',
     ':filter',
     ':group_task',
-    ':ivy_utils',
     ':jar_create',
     ':jar_publish',
     ':jar_task',
@@ -306,20 +305,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
-)
-
-python_tests(
-  name = 'ivy_utils',
-  sources = ['test_ivy_utils.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/base:context_utils',
-  ]
 )
 
 python_tests(
