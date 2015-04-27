@@ -169,6 +169,18 @@ class BuildGraphTest(BaseTest):
         [str(unichr(x)) for x in xrange(ord('a'), ord('o') + 1)],
     )
 
+  def test_transitive_subgraph_of_addresses_bfs_predicate(self):
+    root = self.inject_graph('a', {
+      'a': ['b', 'c'],
+      'b': ['d', 'e'],
+      'c': [], 'd': [], 'e': [],
+    })
+
+    predicate = lambda t: t.address.target_name != 'b'
+    filtered = self.build_graph.transitive_subgraph_of_addresses_bfs([root], predicate=predicate)
+
+    self.assertEquals([t.address.target_name for t in filtered], ['a', 'c'])
+
   def test_target_walk(self):
     def assertWalk(expected, target):
       results = []

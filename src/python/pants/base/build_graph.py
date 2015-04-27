@@ -278,8 +278,8 @@ class BuildGraph(object):
       address = to_walk.popleft()
       target = self._target_by_address[address]
       if target not in walked:
-        walked.add(target)
         if not predicate or predicate(target):
+          walked.add(target)
           to_walk.extend(self._target_dependencies_by_address[address])
     return walked
 
