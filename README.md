@@ -20,3 +20,5 @@ At a minimum, pants requires the following to run properly:
 * Python 2.7 or later (2.7.8 recommended)
 * OpenJDK 7 or greater, Oracle JDK 6 or greater
 * Internet access (so that pants can fully bootstrap itself)
+
+
