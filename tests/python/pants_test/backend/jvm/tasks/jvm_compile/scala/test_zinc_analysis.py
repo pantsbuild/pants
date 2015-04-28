@@ -165,7 +165,7 @@ class ZincAnalysisTest(unittest.TestCase):
         [unicode(diff) for diff in diffs]))
 
       # Split the merged analysis back to individual analyses.
-      sources_per_analysis = [a.stamps.sources.keys() for a in analyses]
+      sources_per_analysis = [a.sources() for a in analyses]
       split_analyses = self._time(lambda: merged_analysis2.split(
         sources_per_analysis, catchall=True), 'Split back into %d analyses' % num_analyses)
 
@@ -173,7 +173,7 @@ class ZincAnalysisTest(unittest.TestCase):
       catchall_analysis = split_analyses[-1]
 
       # We expect an empty catchall.
-      self.assertEquals(0, len(catchall_analysis.stamps.sources))
+      self.assertEquals(0, len(catchall_analysis.underlying_analysis.stamps.sources))
 
       # Diff the original analyses and the split ones.
 
@@ -232,7 +232,8 @@ class ZincAnalysisTest(unittest.TestCase):
     merged_analysis.write_to_path(os.path.join(canonical_dir, 'all.merged.analysis'))
 
     # Split the merged analysis back to individual analyses.
-    sources_per_analysis = [a.stamps.sources.keys() for a in original_split_analyses]
+    sources_per_analysis = [a.underlying_analysis.stamps.sources.keys()
+                            for a in original_split_analyses]
     split_analyses = merged_analysis.split(sources_per_analysis)
     for original_split_file, split_analysis in zip(original_splits_files, split_analyses):
       outpath = os.path.join(canonical_dir, os.path.basename(original_split_file))
