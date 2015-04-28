@@ -181,8 +181,22 @@ class IvyUtils(object):
       with safe_open(path, 'r') as cp:
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
-  @staticmethod
-  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
+  @classmethod
+  def _find_new_symlinks(cls, existing_symlink_path, updated_symlink_path):
+    """Find the difference between the existing and updated symlink path.
+
+    :param existing_symlink_path: map from path : symlink
+    :param updated_symlink_path: map from path : symlink after new resolve
+    :return: the portion of updated_symlink_path that is not found in existing_symlink_path.
+    """
+    diff_map = OrderedDict()
+    for key, value in updated_symlink_path.iteritems():
+      if not key in existing_symlink_path:
+        diff_map[key] = value
+    return diff_map
+
+  @classmethod
+  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
     If there is an existing symlink for a file under inpath, it is used rather than creating
@@ -190,34 +204,51 @@ class IvyUtils(object):
     Returns a map of path -> symlink to that path.
     """
     safe_mkdir(symlink_dir)
+    # The ivy_cache_dir might itself be a symlink. In this case, ivy may return paths that
+    # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
+    # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
+    real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
+    updated_symlink_map = OrderedDict()
     with safe_open(inpath, 'r') as infile:
-      paths = filter(None, infile.read().strip().split(os.pathsep))
-    new_paths = []
+      inpaths = filter(None, infile.read().strip().split(os.pathsep))
+      paths = OrderedSet()
+      for path in inpaths:
+        paths.add(path)
+        realpath = os.path.realpath(path)
+        if path != realpath:
+          paths.add(realpath)
+          if realpath.startswith(real_ivy_cache_dir):
+            paths.add(os.path.join(ivy_cache_dir, realpath[len(real_ivy_cache_dir)+1:]))
+
     for path in paths:
-      if not path.startswith(ivy_cache_dir):
-        new_paths.append(path)
+      if path.startswith(ivy_cache_dir):
+        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
+      elif path.startswith(real_ivy_cache_dir):
+        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
+      else:
+        # This path is outside the cache. We won't symlink it.
+        updated_symlink_map[path] = path
+
+    # Create symlinks for paths in the ivy cache dir that we haven't seen before.
+    new_symlinks = cls._find_new_symlinks(existing_symlink_map, updated_symlink_map)
+
+    for path, symlink in new_symlinks.iteritems():
+      if path == symlink:
+        # Skip paths that aren't going to be symlinked.
         continue
-      if path in existing_symlink_map:
-        new_paths.append(existing_symlink_map[path])
-        continue
-      symlink = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
-      try:
-        os.makedirs(os.path.dirname(symlink))
-      except OSError as e:
-        if e.errno != errno.EEXIST:
-          raise
-      # Note: The try blocks cannot be combined. It may be that the dir exists but the link doesn't.
+      safe_mkdir(os.path.dirname(symlink))
       try:
         os.symlink(path, symlink)
       except OSError as e:
         # We don't delete and recreate the symlink, as this may break concurrently executing code.
         if e.errno != errno.EEXIST:
           raise
-      new_paths.append(symlink)
+
+    # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
-      outfile.write(':'.join(new_paths))
-    symlink_map = dict(zip(paths, new_paths))
-    return symlink_map
+      outfile.write(':'.join(OrderedSet(updated_symlink_map.values())))
+
+    return dict(updated_symlink_map)
 
   @staticmethod
   def identify(targets):
