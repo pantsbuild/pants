@@ -29,9 +29,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                help='The number of concurrent workers to use compiling {lang} sources with the isolated'
                     ' strategy. This is a beta feature.'.format(lang=language))
 
-  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                     sources_predicate)
+                                                     language, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
@@ -69,15 +69,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
 
-    for target in relevant_targets:
-      cc = self.compile_context(target)
-      safe_mkdir(cc.classes_dir)
-      compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
-      self.validate_analysis(cc.analysis_file)
+    with self.context.new_workunit('validate-{}-analysis'.format(self._language)):
+      for target in relevant_targets:
+        cc = self.compile_context(target)
+        safe_mkdir(cc.classes_dir)
+        compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
+        self.validate_analysis(cc.analysis_file)
 
     # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation') as workunit:
-      self._worker_pool = WorkerPool(workunit,
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._language)) \
+            as workunit:
+      self._worker_pool = WorkerPool(workunit.parent,
                                      self.context.run_tracker,
                                      self._worker_count)
 
