@@ -79,6 +79,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._language)) \
             as workunit:
+      # This uses workunit.parent as the WorkerPool's parent so that child workunits
+      # of different pools will show up in order in the html output. This way the current running
+      # workunit is on the bottom of the page rather than possibly in the middle.
       self._worker_pool = WorkerPool(workunit.parent,
                                      self.context.run_tracker,
                                      self._worker_count)
