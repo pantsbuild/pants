@@ -94,7 +94,7 @@ class GitTest(unittest.TestCase):
       # Make some symlinks
       os.symlink('f', os.path.join(self.worktree, 'dir', 'relative-symlink'))
       os.symlink('no-such-file', os.path.join(self.worktree, 'dir', 'relative-nonexistent'))
-      os.symlink('dir/f', os.path.join(self.worktree, 'dir', 'not-absolute'))
+      os.symlink('dir/f', os.path.join(self.worktree, 'dir', 'not-absolute\u2764'))
       os.symlink('../README', os.path.join(self.worktree, 'dir', 'relative-dotdot'))
       os.symlink('dir', os.path.join(self.worktree, 'link-to-dir'))
       os.symlink('README/f', os.path.join(self.worktree, 'not-a-dir'))
@@ -110,7 +110,7 @@ class GitTest(unittest.TestCase):
       subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
 
       with safe_open(self.readme_file, 'w') as readme:
-        readme.write('Hello World.')
+        readme.write('Hello World.\u2764'.encode('utf-8'))
       subprocess.check_call(['git', 'commit', '-am', 'Update README.'])
 
       self.current_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
@@ -155,7 +155,7 @@ class GitTest(unittest.TestCase):
 
     results = self.git.listdir(self.initial_rev, 'dir')
     self.assertEquals(['f',
-                       'not-absolute',
+                       'not-absolute\u2764'.encode('utf-8'),
                        'relative-dotdot',
                        'relative-nonexistent',
                        'relative-symlink'],
@@ -185,7 +185,7 @@ class GitTest(unittest.TestCase):
         self.assertEquals('', f.read())
 
     with self.git.open(self.current_rev, 'README') as f:
-      self.assertEquals('Hello World.', f.read())
+      self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
 
     with self.git.open(self.current_rev, 'link-to-dir/f') as f:
       self.assertEquals('file in subdir', f.read())
@@ -206,7 +206,7 @@ class GitTest(unittest.TestCase):
         pass
 
     with self.assertRaises(self.git.MissingFileException):
-      with self.git.open(self.current_rev, 'dir/not-absolute') as f:
+      with self.git.open(self.current_rev, 'dir/not-absolute\u2764') as f:
         pass
 
     with self.assertRaises(self.git.MissingFileException):
@@ -214,7 +214,7 @@ class GitTest(unittest.TestCase):
         pass
 
     with self.git.open(self.current_rev, 'dir/relative-dotdot') as f:
-      self.assertEquals('Hello World.', f.read())
+      self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
 
   def test_integration(self):
     self.assertEqual(set(), self.git.changed_files())

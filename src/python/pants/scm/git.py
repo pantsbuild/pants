@@ -430,6 +430,10 @@ class Git(Scm):
         object_type, path_data = self._read_object_from_repo(sha=obj.sha)
         assert object_type == 'blob'
 
+        if path_data[0] == '/':
+          # In the event of an absolute path, just return that path
+          return path_data
+
         link_to = os.path.normpath(os.path.join(parent_path, path_data))
         if link_to.startswith('../') or link_to[0] == '/':
           # If the link points outside the repo, then just return that file
@@ -464,7 +468,7 @@ class Git(Scm):
       mode = tree_data[start:i]
       i += 1 # skip space
       start = i
-      while tree_data[i] != '\0':
+      while tree_data[i] != ensure_binary('\0'):
         i += 1
       name = tree_data[start:i]
       sha = tree_data[i+1:i+21].encode('hex')
