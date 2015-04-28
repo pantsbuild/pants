@@ -7,7 +7,6 @@ target(
     ':bootstrap_jvm_tools',
     ':checkstyle',
     ':ivy_imports',
-    ':ivy_utils',
     ':junit_run',
     ':scalastyle',
     ':unpack_jars',
@@ -62,22 +61,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
-    'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
-  ]
-)
-
-python_tests(
-  name = 'ivy_utils',
-  sources = ['test_ivy_utils.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/base:context_utils',
   ]
 )
 

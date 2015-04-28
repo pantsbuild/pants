@@ -18,7 +18,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -162,23 +161,3 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', ScalaLibrary)
     self.assertTrue(self.resolve([target]))
-
-  def test_resolve_symkinked_cache(self):
-    """Test to make sure resolve works when --ivy-cache-dir is a symlinked path.
-
-    When ivy returns the path to a resolved jar file, it might be the realpath to the jar file,
-    not the symlink'ed path we are expecting for --ivy-cache-dir.  Make sure that resolve correctly
-    recognizes these as belonging in the cache dir and lookups for either the symlinked cache
-    dir or the realpath to the cache dir are recognized.
-    """
-    with temporary_dir() as realcachedir:
-      with temporary_dir() as symlinkdir:
-        symlink_cache_dir=os.path.join(symlinkdir, 'symlinkedcache')
-        os.symlink(realcachedir, symlink_cache_dir)
-        self.set_options_for_scope('ivy', cache_dir=symlink_cache_dir)
-
-        dep = JarDependency('commons-lang', 'commons-lang', '2.5')
-        jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
-        # Confirm that the deps were added to the appropriate targets.
-        compile_classpath = self.resolve([jar_lib])
-        self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
