@@ -165,7 +165,22 @@ class RGlobs(FilesetRelPathWrapper):
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
   def to_filespec(self, args, root='', excludes=None):
-    return super(RGlobs, self).to_filespec([os.path.join('**', arg) for arg in args], root=root, excludes=excludes)
+    # In rglobs, * at the beginning of a path component means
+    # **/*.  * anywhere else just means *.
+    rglobs = []
+    for arg in args:
+      components = arg.split(os.path.sep)
+      out = []
+      for component in components:
+        if component == '**':
+          out.append(component)
+        elif component[0] == '*':
+          out.append('**/' + component)
+        else:
+          out.append(component)
+
+      rglobs.append(os.path.join(*out))
+    return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
 
 class ZGlobs(FilesetRelPathWrapper):
   """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.

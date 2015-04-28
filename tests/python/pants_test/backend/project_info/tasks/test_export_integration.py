@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+from textwrap import dedent
 
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.backend.project_info.tasks.export import Export
@@ -44,9 +45,11 @@ class ExportIntegrationTest(ConsoleTaskTestBase):
        python_library(name="x", sources=globs("*.py"))
     '''.strip())
 
-    self.add_to_build_file('src/y/BUILD', '''
+    self.add_to_build_file('src/y/BUILD', dedent('''
       python_library(name="y", sources=rglobs("*.py"))
-    '''.strip())
+      python_library(name="y2", sources=rglobs("subdir/*.py"))
+      python_library(name="y3", sources=rglobs("Test*.py"))
+    '''))
 
     self.add_to_build_file('src/z/BUILD', '''
       python_library(name="z", sources=zglobs("**/*.py"))
@@ -91,6 +94,28 @@ class ExportIntegrationTest(ConsoleTaskTestBase):
     self.assertEqual(
       {'globs' : ['src/y/**/*.py',]},
       result['targets']['src/y:y']['globs']
+    )
+
+  def test_source_rglobs_subdir(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y:y2')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/subdir/**/*.py',]},
+      result['targets']['src/y:y2']['globs']
+    )
+
+  def test_source_rglobs_noninitial(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y:y3')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/Test*.py',]},
+      result['targets']['src/y:y3']['globs']
     )
 
   def test_source_zglobs(self):
