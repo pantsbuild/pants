@@ -146,7 +146,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         # Add the artifacts from each dependency module.
         artifact_paths = []
         for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
-          artifact_paths.append(symlink_map[artifact.path])
+          if artifact.path in symlink_map:
+            key = artifact.path
+          else:
+            key = os.path.realpath(artifact.path)
+          artifact_paths.append(symlink_map[key])
         compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
 
     if self._report:
