@@ -102,11 +102,6 @@ class Git(Scm):
       import logging
       self._log = logging.getLogger(__name__)
 
-    self._cat_file_process = None
-    # Trees is a dict from rev -> dict(path=[list of Dir, Symlink or File objects])
-    self._trees = defaultdict(dict)
-    self._realpath_cache = defaultdict(dict)
-
   def current_rev_identifier(self):
     return 'HEAD'
 
@@ -267,9 +262,23 @@ class Git(Scm):
   def _log_call(self, cmd):
     self._log.debug('Executing: ' + ' '.join(cmd))
 
+  def repo_reader(self, rev):
+    return GitRepositoryReader(self, rev)
+
+
+class GitRepositoryReader(object):
+  def __init__(self, scm, rev):
+    self.scm = scm
+    self.rev = rev
+    self._cat_file_process = None
+    # Trees is a dict from path to [list of Dir, Symlink or File objects]
+    self._trees = {}
+    self._realpath_cache = {}
+
   def _maybe_start_cat_file_process(self):
     if not self._cat_file_process:
-      self._cat_file_process = subprocess.Popen(self._create_git_cmdline(['cat-file', '--batch']),
+      cmdline = self.scm._create_git_cmdline(['cat-file', '--batch'])
+      self._cat_file_process = subprocess.Popen(cmdline,
                                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
   class MissingFileException(Exception):
@@ -311,26 +320,26 @@ class Git(Scm):
     # Programmer error
     pass
 
-  def _safe_realpath(self, rev, relpath):
+  def _safe_realpath(self, relpath):
     try:
-      return self._realpath(rev, relpath)
+      return self._realpath(relpath)
     except self.MissingFileException:
       return None
     except self.NotADirException:
       return None
 
-  def exists(self, rev, relpath):
-    path = self._safe_realpath(rev, relpath)
+  def exists(self, relpath):
+    path = self._safe_realpath(relpath)
     return bool(path)
 
-  def isfile(self, rev, relpath):
-    path = self._safe_realpath(rev, relpath)
+  def isfile(self, relpath):
+    path = self._safe_realpath(relpath)
     if path:
       return not path.endswith('/')
     return False
 
-  def isdir(self, rev, relpath):
-    path = self._safe_realpath(rev, relpath)
+  def isdir(self, relpath):
+    path = self._safe_realpath(relpath)
     if path:
       return path.endswith('/')
     return False
@@ -350,21 +359,21 @@ class Git(Scm):
       self.name = name
       self.sha = sha
 
-  def listdir(self, rev, relpath):
+  def listdir(self, relpath):
     """Like os.listdir, but reads from the git repository.
 
     :returns: a list of relative filenames
     """
 
-    path = self._realpath(rev, relpath)
+    path = self._realpath(relpath)
     if not path.endswith('/'):
-      raise self.NotADirException(rev, relpath)
+      raise self.NotADirException(self.rev, relpath)
 
-    tree = self._read_tree(rev, path[:-1])
+    tree = self._read_tree(path[:-1])
     return tree.keys()
 
   @contextmanager
-  def open(self, rev, relpath):
+  def open(self, relpath):
     """Read a file out of the repository at a certain revision.
 
     This is complicated because, unlike vanilla git cat-file, this follows symlinks in
@@ -372,20 +381,20 @@ class Git(Scm):
     that's because presumably whoever put that symlink there knew what they were doing.
     """
 
-    path = self._realpath(rev, relpath)
+    path = self._realpath(relpath)
     if path.endswith('/'):
-      raise self.IsDirException(rev, relpath)
+      raise self.IsDirException(self.rev, relpath)
 
     if path.startswith('../') or path[0] == '/':
       yield open(path, 'rb')
 
-    object_type, data = self._read_object_from_repo(rev=rev, relpath=path)
+    object_type, data = self._read_object_from_repo(rev=self.rev, relpath=path)
     if object_type == 'tree':
-      raise self.IsDirException(rev, relpath)
+      raise self.IsDirException(self.rev, relpath)
     assert object_type == 'blob'
     yield StringIO.StringIO(data)
 
-  def _realpath(self, rev, relpath):
+  def _realpath(self, relpath):
     """Follow symlinks to find the real path to a file or directory in the repo.
 
     :returns: if the expanded path points to a file, the relative path
@@ -397,13 +406,13 @@ class Git(Scm):
       # The root is never a symlink, so we don't need to process it further
       return '/'
 
-    realpath = self._realpath_cache[rev].get(relpath)
+    realpath = self._realpath_cache.get(relpath)
     if not realpath:
-      realpath = self._realpath_uncached(rev, relpath)
-      self._realpath_cache[rev][relpath] = realpath
+      realpath = self._realpath_uncached(relpath)
+      self._realpath_cache[relpath] = realpath
     return realpath
 
-  def _realpath_uncached(self, rev, relpath):
+  def _realpath_uncached(self, relpath):
     path_so_far = ''
     components = list(relpath.split(os.path.sep))
     symlinks = 0
@@ -414,7 +423,7 @@ class Git(Scm):
       if component == '':
         continue
 
-      parent_tree = self._read_tree(rev, path_so_far)
+      parent_tree = self._read_tree(path_so_far)
       parent_path = path_so_far
 
       if path_so_far != '':
@@ -424,12 +433,12 @@ class Git(Scm):
       try:
         obj = parent_tree[component]
       except KeyError:
-        raise self.MissingFileException(rev, relpath)
+        raise self.MissingFileException(self.rev, relpath)
 
       if isinstance(obj, self.File):
         if components:
           # We've encountered a file while searching for a directory
-          raise self.NotADirException(rev, relpath)
+          raise self.NotADirException(self.rev, relpath)
         else:
           return path_so_far
       elif isinstance(obj, self.Dir):
@@ -439,7 +448,7 @@ class Git(Scm):
       elif isinstance(obj, self.Symlink):
         symlinks += 1
         if symlinks > MAX_SYMLINKS_IN_REALPATH:
-          raise self.SymlinkLoopException(rev, relpath)
+          raise self.SymlinkLoopException(self.rev, relpath)
         # A git symlink is stored as a blob containing the name of the target.
         # Read that blob.
         object_type, path_data = self._read_object_from_repo(sha=obj.sha)
@@ -462,17 +471,17 @@ class Git(Scm):
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
 
-  def _read_tree(self, rev, path):
+  def _read_tree(self, path):
     """Given a revision and path, parse the tree data out of git cat-file output.
 
     :returns: a dict from filename -> [list of Symlink, Dir, and Fil objectse]
     """
 
-    tree = self._trees[rev].get(path)
+    tree = self._trees.get(path)
     if tree:
       return tree
     tree = {}
-    object_type, tree_data = self._read_object_from_repo(rev=rev, relpath=path)
+    object_type, tree_data = self._read_object_from_repo(rev=self.rev, relpath=path)
     assert object_type == 'tree'
     # The tree data here is (mode ' ' filename \0 20-byte-sha)*
     i = 0
@@ -494,7 +503,7 @@ class Git(Scm):
         tree[name] = self.Dir(name, sha)
       else:
         tree[name] = self.File(name, sha)
-    self._trees[rev][path] = tree
+    self._trees[path] = tree
     return tree
 
   def _read_object_from_repo(self, rev=None, relpath=None, sha=None):
@@ -532,3 +541,7 @@ class Git(Scm):
     assert self._cat_file_process.stdout.read(1) == '\n'
     assert len(blob) == int(object_len)
     return object_type, blob
+
+  def __del__(self):
+    if self._cat_file_process:
+      self._cat_file_process.communicate()

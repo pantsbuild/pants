@@ -143,8 +143,9 @@ class GitTest(unittest.TestCase):
     safe_rmtree(self.clone2)
 
   def test_listdir(self):
+    reader = self.git.repo_reader(self.initial_rev)
 
-    results = self.git.listdir(self.initial_rev, '.')
+    results = reader.listdir('.')
     self.assertEquals(['README',
                        'dir',
                        'link-to-dir',
@@ -153,7 +154,7 @@ class GitTest(unittest.TestCase):
                        'not-a-dir'],
                       sorted(results))
 
-    results = self.git.listdir(self.initial_rev, 'dir')
+    results = reader.listdir('dir')
     self.assertEquals(['f',
                        'not-absolute\u2764'.encode('utf-8'),
                        'relative-dotdot',
@@ -161,59 +162,63 @@ class GitTest(unittest.TestCase):
                        'relative-symlink'],
                       sorted(results))
 
-    with self.assertRaises(self.git.MissingFileException):
-      with self.git.listdir(self.current_rev, 'bogus') as f:
+    with self.assertRaises(reader.MissingFileException):
+      with reader.listdir('bogus') as f:
         pass
 
   def test_open(self):
-    with self.git.open(self.initial_rev, 'README') as f:
+    reader = self.git.repo_reader(self.initial_rev)
+
+    with reader.open('README') as f:
       self.assertEquals('', f.read())
 
-    with self.git.open(self.initial_rev, 'dir/f') as f:
+    with reader.open('dir/f') as f:
       self.assertEquals('file in subdir', f.read())
 
-    with self.assertRaises(self.git.MissingFileException):
-      with self.git.open(self.initial_rev, 'no-such-file') as f:
+    with self.assertRaises(reader.MissingFileException):
+      with reader.open('no-such-file') as f:
         self.assertEquals('', f.read())
 
-    with self.assertRaises(self.git.MissingFileException):
-      with self.git.open(self.initial_rev, 'dir/no-such-file') as f:
+    with self.assertRaises(reader.MissingFileException):
+      with reader.open('dir/no-such-file') as f:
         pass
 
-    with self.assertRaises(self.git.IsDirException):
-      with self.git.open(self.initial_rev, 'dir') as f:
+    with self.assertRaises(reader.IsDirException):
+      with reader.open('dir') as f:
         self.assertEquals('', f.read())
 
-    with self.git.open(self.current_rev, 'README') as f:
+    current_reader = self.git.repo_reader(self.current_rev)
+
+    with current_reader.open('README') as f:
       self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
 
-    with self.git.open(self.current_rev, 'link-to-dir/f') as f:
+    with current_reader.open('link-to-dir/f') as f:
       self.assertEquals('file in subdir', f.read())
 
-    with self.git.open(self.current_rev, 'dir/relative-symlink') as f:
+    with current_reader.open('dir/relative-symlink') as f:
       self.assertEquals('file in subdir', f.read())
 
-    with self.assertRaises(self.git.SymlinkLoopException):
-      with self.git.open(self.current_rev, 'loop1') as f:
+    with self.assertRaises(current_reader.SymlinkLoopException):
+      with current_reader.open('loop1') as f:
         pass
 
-    with self.assertRaises(self.git.MissingFileException):
-      with self.git.open(self.current_rev, 'dir/relative-nonexistent') as f:
+    with self.assertRaises(current_reader.MissingFileException):
+      with current_reader.open('dir/relative-nonexistent') as f:
         pass
 
-    with self.assertRaises(self.git.NotADirException):
-      with self.git.open(self.current_rev, 'not-a-dir') as f:
+    with self.assertRaises(current_reader.NotADirException):
+      with current_reader.open('not-a-dir') as f:
         pass
 
-    with self.assertRaises(self.git.MissingFileException):
-      with self.git.open(self.current_rev, 'dir/not-absolute\u2764') as f:
+    with self.assertRaises(current_reader.MissingFileException):
+      with current_reader.open('dir/not-absolute\u2764') as f:
         pass
 
-    with self.assertRaises(self.git.MissingFileException):
-      with self.git.open(self.current_rev, 'dir/relative-nonexistent') as f:
+    with self.assertRaises(current_reader.MissingFileException):
+      with current_reader.open('dir/relative-nonexistent') as f:
         pass
 
-    with self.git.open(self.current_rev, 'dir/relative-dotdot') as f:
+    with current_reader.open('dir/relative-dotdot') as f:
       self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
 
   def test_integration(self):

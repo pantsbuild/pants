@@ -23,10 +23,14 @@ class ScmBuildFile(BuildFile):
   @classmethod
   def set_rev(cls, rev):
     cls._rev = rev
+    if cls._scm:
+      cls._reader = cls._scm.repo_reader(cls._rev)
 
   @classmethod
   def set_scm(cls, scm):
     cls._scm = scm
+    if cls._rev:
+      cls._reader = cls._scm.repo_reader(cls._rev)
 
   @classmethod
   def _scm_worktree(cls):
@@ -47,29 +51,29 @@ class ScmBuildFile(BuildFile):
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
     relpath = os.path.relpath(path, self._scm_worktree())
-    files = self._scm.listdir(self._rev, relpath)
+    files = self._reader.listdir(relpath)
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
 
   def source(self):
     """Returns the source code for this BUILD file."""
     relpath = os.path.relpath(self.full_path, self._scm_worktree())
-    with self._scm.open(self._rev, relpath) as source:
+    with self._reader.open(relpath) as source:
       return source.read()
 
   def _isdir(self, path):
     """Returns True if path is a directory"""
     relpath = os.path.relpath(path, self._scm_worktree())
-    return self._scm.isdir(self._rev, relpath)
+    return self._reader.isdir(relpath)
 
   def _isfile(self, path):
     """Returns True if path is a file"""
     relpath = os.path.relpath(path, self._scm_worktree())
-    return self._scm.isfile(self._rev, relpath)
+    return self._reader.isfile(relpath)
 
   def _exists(self, path):
     """Returns True if path exists"""
     relpath = os.path.relpath(path, self._scm_worktree())
-    return self._scm.exists(self._rev, relpath)
+    return self._reader.exists(relpath)
 
   @classmethod
   def _walk(cls, root_dir, root, topdown=False):
@@ -90,13 +94,13 @@ class ScmBuildFile(BuildFile):
   @classmethod
   def _do_walk(cls, root, topdown=False):
     """Helper method for _walk"""
-    if cls._scm.isdir(cls._rev, root):
+    if cls._reader.isdir(root):
       filenames = []
       dirnames = []
       dirpaths = []
-      for filename in cls._scm.listdir(cls._rev, root):
+      for filename in cls._reader.listdir(root):
         path = os.path.join(root, filename)
-        if cls._scm.isdir(cls._rev, path):
+        if cls._reader.isdir(path):
           dirnames.append(filename)
           dirpaths.append(path)
         else:
