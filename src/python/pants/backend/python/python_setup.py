@@ -11,36 +11,50 @@ from pex.fetcher import Fetcher, PyPIFetcher
 from pex.http import Context
 from pkg_resources import Requirement
 
+from pants.option.options import Options
+from pants.subsystem.subsystem import Subsystem
 
-# TODO(benjy): These are basically proto-subsystems. There's some obvious commonality, but
-# rather than factor that out now I'll retrofit these to use whatever general subsystem
-# implementation we come up with in the near future.
 
-class PythonSetup(object):
-  """Configuration data for a python environment."""
-  def __init__(self, config):
-    self._config = config
+class PythonSetup(Subsystem):
+  """A python environment."""
+
+  @classmethod
+  def scope_qualifier(cls):
+    return 'python-setup'
+
+  @classmethod
+  def register_options(cls, register):
+    super(PythonSetup, cls).register_options(register)
+    register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
+             help='The interpreter requirement string for this python environment.')
+    register('--setuptools-version', advanced=True, default='5.4.1',
+             help='The setuptools version for this python environment.')
+    register('--wheel-version', advanced=True, default='0.23.0',
+             help='The wheel version for this python environment.')
+    register('--platforms', advanced=True, type=Options.list, default=['current'],
+             help='The wheel version for this python environment.')
 
   @property
   def interpreter_requirement(self):
-    """Returns the repo-wide interpreter requirement."""
-    return self._get_config('interpreter_requirement')
+    return self.get_options().interpreter_requirement
 
   @property
   def setuptools_version(self):
-    return self._get_config('setuptools_version', default='5.4.1')
+    return self.get_options().setuptools_version
 
   @property
   def wheel_version(self):
-    return self._get_config('wheel_version', default='0.23.0')
+    return self.get_options().wheel_version
 
   @property
   def platforms(self):
-    return self._get_config_list('platforms', default=['current'])
+    return self.get_options().platforms
 
   @property
   def scratch_dir(self):
-    return os.path.join(self._config.getdefault('pants_workdir'), 'python')
+    # Note that this gives us a separate scratch dir for every instance of this subsystem,
+    # which allows us to have multiple python setups in play in a single pants run.
+    return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
 
   def setuptools_requirement(self):
     return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))
@@ -60,25 +74,29 @@ class PythonSetup(object):
     except TypeError:
       return Requirement.parse(requirement)
 
-  def _get_config(self, *args, **kwargs):
-    return self._config.get('python-setup', *args, **kwargs)
 
-  def _get_config_list(self, *args, **kwargs):
-    return self._config.getlist('python-setup', *args, **kwargs)
+class PythonRepos(Subsystem):
+  """A python code repository."""
 
+  @classmethod
+  def scope_qualifier(cls):
+    return 'python-repos'
 
-class PythonRepos(object):
-  """Configuration data for a python code repository."""
-  def __init__(self, config):
-    self._config = config
+  @classmethod
+  def register_options(cls, register):
+    super(PythonRepos, cls).register_options(register)
+    register('--repos', advanced=True, type=Options.list, default=[],
+             help='URLs of code repositories.')
+    register('--indexes', advanced=True, type=Options.list, default=[],
+             help='URLs of code repository indexes.')
 
   @property
   def repos(self):
-    return self._get_config_list('repos', [])
+    return self.get_options().repos
 
   @property
   def indexes(self):
-    return self._get_config_list('indexes', [])
+    return self.get_options().indexes
 
   def get_fetchers(self):
     fetchers = []
@@ -89,6 +107,3 @@ class PythonRepos(object):
   def get_network_context(self):
     # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
     return Context.get()
-
-  def _get_config_list(self, *args, **kwargs):
-    return self._config.getlist('python-repos', *args, **kwargs)

@@ -19,6 +19,10 @@ from pants.base.exceptions import TaskError
 
 
 class PythonTask(Task):
+  @classmethod
+  def global_subsystems(cls):
+    return super(PythonTask, cls).global_subsystems() + (PythonSetup, PythonRepos)
+
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
     self._compatibilities = self.get_options().interpreter or [b'']
@@ -28,8 +32,8 @@ class PythonTask(Task):
   @property
   def interpreter_cache(self):
     if self._interpreter_cache is None:
-      self._interpreter_cache = PythonInterpreterCache(PythonSetup(self.context.config),
-                                                       PythonRepos(self.context.config),
+      self._interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                                       PythonRepos.global_instance(),
                                                        logger=self.context.log.debug)
 
       # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
@@ -96,6 +100,8 @@ class PythonTask(Task):
     with self.context.new_workunit('chroot'):
       chroot = PythonChroot(
         context=self.context,
+        python_setup=PythonSetup.global_instance(),
+        python_repos=PythonRepos.global_instance(),
         targets=targets,
         extra_requirements=extra_requirements,
         builder=builder,

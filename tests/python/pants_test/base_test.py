@@ -127,6 +127,7 @@ class BaseTest(unittest.TestCase):
       'cache_key_gen_version': '0-test',
     }
     BuildRoot().path = self.build_root
+    Subsystem.reset()
 
     self.create_file('pants.ini')
     build_configuration = BuildConfiguration()

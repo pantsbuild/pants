@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.address import SyntheticAddress
 from pants_test.tasks.task_test_base import TaskTestBase

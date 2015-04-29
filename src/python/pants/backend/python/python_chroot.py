@@ -54,17 +54,19 @@ class PythonChroot(object):
     def __init__(self, target):
       Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
 
+  # TODO: A little extra push and we can get rid of the 'context' argument.
   def __init__(self,
                context,
+               python_setup,
+               python_repos,
                targets,
                extra_requirements=None,
                builder=None,
                platforms=None,
                interpreter=None):
     self.context = context
-    # TODO: These should come from the caller, and we should not know about config.
-    self._python_setup = PythonSetup(self.context.config)
-    self._python_repos = PythonRepos(self.context.config)
+    self._python_setup = python_setup
+    self._python_repos = python_repos
 
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []

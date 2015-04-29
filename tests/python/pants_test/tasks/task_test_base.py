@@ -15,7 +15,6 @@ from StringIO import StringIO
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants_test.base_test import BaseTest
 
 
@@ -41,8 +40,9 @@ class TaskTestBase(BaseTest):
     self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
     self._test_workdir = os.path.join(self._tmpdir, 'workdir')
     os.mkdir(self._test_workdir)
+    # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
+    # action in this non-JVM-specific, high-level base class.
     Bootstrapper.reset_instance()
-    IvySubsystem.reset_global_instance()
 
   @property
   def test_workdir(self):

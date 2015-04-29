@@ -13,6 +13,7 @@ python_library(
   sources=['python_task_test.py'],
   dependencies=[
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python:python_setup',
     'src/python/pants/base:address',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/util:dirutil',

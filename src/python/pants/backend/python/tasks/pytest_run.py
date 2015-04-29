@@ -22,9 +22,10 @@ from six.moves import configparser
 
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.exceptions import TestFailedTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -74,6 +75,10 @@ class PytestRun(PythonTask):
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(PytestRun, cls).global_subsystems() + (PythonSetup, PythonRepos)
 
   @classmethod
   def register_options(cls, register):
@@ -234,7 +239,7 @@ class PytestRun(PythonTask):
     with temporary_dir() as plugin_root:
       plugin_root = os.path.realpath(plugin_root)
       with safe_open(os.path.join(plugin_root, 'pants_reporter.py'), 'w') as fp:
-        fp.write(dedent('''
+        fp.write(dedent("""
           def pytest_configure(__multicall__, config):
             # This executes the rest of the pytest_configures ensuring the `pytest_cov` plugin is
             # registered so we can grab it below.
@@ -242,7 +247,7 @@ class PytestRun(PythonTask):
             pycov = config.pluginmanager.getplugin('_cov')
             # Squelch console reporting
             pycov.pytest_terminal_summary = lambda *args, **kwargs: None
-        '''))
+        """))
 
       pythonpath = os.environ.get('PYTHONPATH')
       existing_pythonpath = pythonpath.split(os.pathsep) if pythonpath else []
@@ -337,6 +342,8 @@ class PytestRun(PythonTask):
     builder.info.entry_point = 'pytest'
     chroot = PythonChroot(
       context=self.context,
+      python_setup=PythonSetup.global_instance(),
+      python_repos=PythonRepos.global_instance(),
       targets=targets,
       extra_requirements=self._TESTING_TARGETS,
       builder=builder,

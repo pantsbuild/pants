@@ -65,13 +65,12 @@ class Subsystem(object):
     return cls._instance_for_scope(Options.GLOBAL_SCOPE)
 
   @classmethod
-  def reset_instance_for_scope(cls, scope):
-    key = (cls, scope)
-    cls._scoped_instances.pop(key, None)
+  def reset(cls):
+    """Forget all cached subsystem instances.
 
-  @classmethod
-  def reset_global_instance(cls):
-    cls.reset_instance_for_scope(Options.GLOBAL_SCOPE)
+    Used for test isolation.
+    """
+    cls._scoped_instances = {}
 
   @classmethod
   def instance_for_task(cls, task):
