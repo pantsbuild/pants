@@ -44,7 +44,8 @@ class ScmBuildFile(BuildFile):
       cls._cache[key] = cls(*key)
     return cls._cache[key]
 
-  def glob1(self, path, glob):
+  def _glob1(self, path, glob):
+    """Returns a list of paths in path that match glob"""
     relpath = os.path.relpath(path, self._scm_worktree())
     files = self._scm.listdir(self._rev, relpath)
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
@@ -55,20 +56,28 @@ class ScmBuildFile(BuildFile):
     with self._scm.open(self._rev, relpath) as source:
       return source.read()
 
-  def isdir(self, path):
+  def _isdir(self, path):
+    """Returns True if path is a directory"""
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._scm.isdir(self._rev, relpath)
 
-  def isfile(self, path):
+  def _isfile(self, path):
+    """Returns True if path is a file"""
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._scm.isfile(self._rev, relpath)
 
-  def exists(self, path):
+  def _exists(self, path):
+    """Returns True if path exists"""
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._scm.exists(self._rev, relpath)
 
   @classmethod
-  def walk(cls, root_dir, root, topdown=False):
+  def _walk(cls, root_dir, root, topdown=False):
+    """Walk a file tree.  If root is non-empty, the absolute path of the
+    tree is root_dir/root; else it is just root_dir.
+
+    Works like os.walk.
+    """
     worktree = cls._scm_worktree()
     scm_rootpath = os.path.relpath(root_dir, worktree)
     if root:
@@ -80,6 +89,7 @@ class ScmBuildFile(BuildFile):
 
   @classmethod
   def _do_walk(cls, root, topdown=False):
+    """Helper method for _walk"""
     if cls._scm.isdir(cls._rev, root):
       filenames = []
       dirnames = []

@@ -85,7 +85,8 @@ def register_global_options(register):
            help='Timeout in seconds for url reads when fetching binary tools from the '
                 'repos specified by --pants-support-baseurls')
   register('--build-file-rev',
-           help='Read BUILD files from this scm rev instead of from the working tree')
+           help='Read BUILD files from this scm rev instead of from the working tree.  This is '
+           'useful for implementing pants-aware sparse checkouts.')
 
   # The following options are specific to java_thrift_library targets.
   register('--thrift-default-compiler', type=str, advanced=True, default='thrift',
