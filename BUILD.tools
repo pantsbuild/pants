@@ -122,17 +122,16 @@ jar_library(name = 'checkstyle',
 jar_library(name = 'junit',
             jars = [
               jar(org = 'junit', name = 'junit-dep', rev = '4.10'),
-              jar(org = 'org.hamcrest', name = 'hamcrest-core', rev = '1.2'),
               jar(org = 'com.twitter.common', name = 'junit-runner', rev = '0.0.41'),
-
-              # TODO(Eric Ayers) We need to rename/shade the dependencies of junit-runner
-              #      or use a custom classloader for junit runner to permanently
-              #      address guava version conflicts in guava
-              #
-              # junit-runner version 0.0.41 uses guava 16.0 by default
-              # If your user code needs to use a more recent version of guava, you can force
-              # the version in the next line.
               jar(org = 'com.google.guava', name = 'guava', rev = '16.0', force = True),
+            ],
+            dependencies = [
+              ':hamcrest-core',
+            ])
+
+jar_library(name = 'hamcrest-core',
+            jars = [
+              jar(org = 'org.hamcrest', name = 'hamcrest-core', rev = '1.2'),
             ])
 
 jar_library(name = 'scrooge-gen',

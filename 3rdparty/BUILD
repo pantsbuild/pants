@@ -160,10 +160,15 @@ jar_library(name='guava-testlib',
               jar('com.google.guava', 'guava-testlib', '18.0')
             ])
 
-jar_library(name='junit',
-            jars=[
-              jar('junit', 'junit', '4.12')
-            ])
+target(name='junit',
+       dependencies=[
+         '//:junit',
+       ])
+
+target(name='hamcrest-core',
+       dependencies=[
+         '//:hamcrest-core',
+       ])
 
 jar_library(name='specs',
             jars=[
