@@ -124,12 +124,13 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         targets = list(self.context.resolve(tool))
         if not targets:
           raise KeyError
-      except (KeyError, AddressLookupError):
+      except (KeyError, AddressLookupError) as e:
         self.context.log.error("Failed to resolve target for tool: {tool}.\n"
                                "This target was obtained from option {option} in scope {scope}.\n"
                                "You probably need to add this target to your tools "
                                "BUILD file(s), usually located in the workspace root.\n"
-                               "".format(tool=tool, scope=scope, option=key))
+                               "\nException: {e}\n"
+                               "".format(tool=tool, e=e, scope=scope, option=key))
         raise TaskError()
       for target in targets:
         yield target
