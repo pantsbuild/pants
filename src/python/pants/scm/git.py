@@ -18,6 +18,13 @@ from pants.util.strutil import ensure_binary
 
 # 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
 MAX_SYMLINKS_IN_REALPATH = 40
+GIT_HASH_LENGTH = 20
+# Precompute these because ensure_binary is slow and we'll need them a lot
+SLASH = ensure_binary('/')
+NUL = ensure_binary('\0')
+SPACE = ensure_binary(' ')
+NEWLINE = ensure_binary('\n')
+EMPTY_STRING = ensure_binary("")
 
 
 class Git(Scm):
@@ -98,6 +105,7 @@ class Git(Scm):
     self._cat_file_process = None
     # Trees is a dict from rev -> dict(path=[list of Dir, Symlink or File objects])
     self._trees = defaultdict(dict)
+    self._realpath_cache = defaultdict(dict)
 
   def current_rev_identifier(self):
     return 'HEAD'
@@ -262,7 +270,7 @@ class Git(Scm):
   def _maybe_start_cat_file_process(self):
     if not self._cat_file_process:
       self._cat_file_process = subprocess.Popen(self._create_git_cmdline(['cat-file', '--batch']),
-                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                                                stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
   class MissingFileException(Exception):
     def __init__(self, rev, relpath):
@@ -384,16 +392,23 @@ class Git(Scm):
               to that file; if a directory, the relative path + '/'; if
               a symlink outside the repo, a path starting with / or ../.
     """
-    self._maybe_start_cat_file_process()
 
     if relpath == '.' or relpath == '':
       # The root is never a symlink, so we don't need to process it further
       return '/'
 
+    realpath = self._realpath_cache[rev].get(relpath)
+    if not realpath:
+      realpath = self._realpath_uncached(rev, relpath)
+      self._realpath_cache[rev][relpath] = realpath
+    return realpath
+
+  def _realpath_uncached(self, rev, relpath):
     path_so_far = ''
     components = list(relpath.split(os.path.sep))
     symlinks = 0
 
+    # Consume components to build path_so_far
     while components:
       component = components.pop(0)
       if component == '':
@@ -402,7 +417,7 @@ class Git(Scm):
       parent_tree = self._read_tree(rev, path_so_far)
       parent_path = path_so_far
 
-      if path_so_far:
+      if path_so_far != '':
         path_so_far += '/'
       path_so_far += component
 
@@ -441,7 +456,7 @@ class Git(Scm):
 
         # Restart our search at the top with the new path.
         # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
-        components = link_to.split(ensure_binary('/')) + components
+        components = link_to.split(SLASH) + components
         path_so_far = ''
       else:
         # Programmer error
@@ -468,11 +483,11 @@ class Git(Scm):
       mode = tree_data[start:i]
       i += 1 # skip space
       start = i
-      while tree_data[i] != ensure_binary('\0'):
+      while tree_data[i] != NUL:
         i += 1
       name = tree_data[start:i]
       sha = tree_data[i+1:i+21].encode('hex')
-      i += 21
+      i += 1 + GIT_HASH_LENGTH
       if mode == '120000':
         tree[name] = self.Symlink(name, sha)
       elif mode == '40000':
@@ -492,15 +507,18 @@ class Git(Scm):
       assert rev is not None
       assert relpath is not None
       spec = '{}:{}\n'.format(rev, relpath)
+
+    self._maybe_start_cat_file_process()
     self._cat_file_process.stdin.write(spec)
     self._cat_file_process.stdin.flush()
     header = None
     while not header:
       header = self._cat_file_process.stdout.readline()
-      if self._cat_file_process.poll():
+      if self._cat_file_process.poll() is not None:
         raise self.GitDiedException("Git cat-file died while trying to read '{}'.".format(spec))
+
     header = header.rstrip()
-    parts = header.rsplit(ensure_binary(' '), 2)
+    parts = header.rsplit(SPACE, 2)
     if len(parts) == 2:
       assert parts[1] == 'missing'
       raise self.MissingFileException(rev, relpath)

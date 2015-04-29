@@ -69,31 +69,34 @@ class ScmBuildFile(BuildFile):
 
   @classmethod
   def walk(cls, root_dir, root, topdown=False):
-    scm_rootpath = os.path.relpath(root_dir, cls._scm_worktree())
+    worktree = cls._scm_worktree()
+    scm_rootpath = os.path.relpath(root_dir, worktree)
     if root:
       relpath = os.path.join(scm_rootpath, root)
     else:
       relpath = scm_rootpath
     for path, dirnames, filenames in cls._do_walk(relpath, topdown=topdown):
-      yield (os.path.join(cls._scm_worktree(), path), dirnames, filenames)
+      yield (os.path.join(worktree, path), dirnames, filenames)
 
   @classmethod
   def _do_walk(cls, root, topdown=False):
     if cls._scm.isdir(cls._rev, root):
       filenames = []
       dirnames = []
+      dirpaths = []
       for filename in cls._scm.listdir(cls._rev, root):
         path = os.path.join(root, filename)
         if cls._scm.isdir(cls._rev, path):
           dirnames.append(filename)
+          dirpaths.append(path)
         else:
           filenames.append(filename)
 
       if topdown:
         yield (root, dirnames, filenames)
 
-      for dirname in dirnames:
-        for item in cls._do_walk(os.path.join(root, dirname), topdown=topdown):
+      for dirpath in dirpaths:
+        for item in cls._do_walk(dirpath, topdown=topdown):
           yield item
 
       if not topdown:
