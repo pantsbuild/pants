@@ -195,6 +195,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
+                                          self._language,
                                           lambda s: s.endswith(self._file_suffix))
 
   def _jvm_fingerprint_strategy(self):

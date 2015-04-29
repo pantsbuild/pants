@@ -62,7 +62,8 @@ class JvmCompileStrategy(object):
     """
     pass
 
-  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
+    self._language = language
     self.context = context
     self._analysis_tools = analysis_tools
 
