@@ -15,10 +15,6 @@ from pants.base.workunit import WorkUnit
 
 
 class RunPrepCommand(Task):
-  def __init__(self, *args, **kwargs):
-    super(RunPrepCommand, self).__init__(*args, **kwargs)
-    self.confs = self.context.config.getlist('prep', 'confs', default=['default'])
-
   def execute(self):
     targets = self.context.targets(postorder=True)
     Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])

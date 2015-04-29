@@ -9,7 +9,7 @@ that contains some metadata -- code coverage info, source git
 repository, java version that created the jar, etc. To accomplish this,
 you'll first need to write a custom task, which creates any additional
 files (jar or otherwise) that you would like to publish. Next, you'll
-create a `publish_extras` section under `[jar-publish]` in pants.ini,
+create a `publish_extras` section under `[publish.jar]` in pants.ini,
 and add a key for the new product type. Your custom task will create the
 extra file(s) that you want to publish, and write the path to the
 products map under the key that you have defined in pants.ini. The
@@ -22,7 +22,7 @@ An example of a custom task is supplied in the
 `examples/src/python/example/pants_publish_plugin` directory. To use it,
 add the following to your pants.ini:
 
-    [jar-publish]
+    [publish.jar]
     publish_extras: {
         'extra_test_jar_example': {
           'override_name': '{target_provides_name}-extra_example',

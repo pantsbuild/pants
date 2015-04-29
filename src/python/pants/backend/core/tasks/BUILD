@@ -229,6 +229,7 @@ python_library(
   dependencies = [
     ':common',
     'src/python/pants/goal:products',
+    'src/python/pants/option',
     'src/python/pants/util:dirutil',
   ],
 )

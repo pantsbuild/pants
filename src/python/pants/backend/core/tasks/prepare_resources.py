@@ -14,10 +14,17 @@ from twitter.common.collections import OrderedSet
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
+from pants.option.options import Options
 from pants.util.dirutil import relativize_path, safe_mkdir
 
 
 class PrepareResources(Task):
+
+  @classmethod
+  def register_options(cls, register):
+    super(PrepareResources, cls).register_options(register)
+    register('--confs', advanced=True, type=Options.list, default=['default'],
+             help='Prepare resources for these Ivy confs.')
 
   @classmethod
   def product_types(cls):
@@ -34,7 +41,7 @@ class PrepareResources(Task):
 
   def __init__(self, *args, **kwargs):
     super(PrepareResources, self).__init__(*args, **kwargs)
-    self.confs = self.context.config.getlist('prepare-resources', 'confs', default=['default'])
+    self.confs = self.get_options().confs
     self._buildroot = get_buildroot()
 
   def execute(self):
