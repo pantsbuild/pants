@@ -99,7 +99,10 @@ class _JUnitRunner(object):
                       # Clearly both tests and the runner need access to the same @Test, @Before,
                       # as well as other annotations, but there is also the Assert class and some
                       # subset of the @Rules, @Theories and @RunWith APIs.
-                      custom_rules=[Shader.exclude_package('org.junit', recursive=True)])
+                      custom_rules=[
+                        Shader.exclude_package('org.junit', recursive=True),
+                        Shader.exclude_package('org.hamcrest', recursive=True)
+                      ])
 
   def __init__(self, task_exports, context):
     self._task_exports = task_exports
