@@ -1,0 +1,9 @@
+scala_library(name='zinc',
+  dependencies=[
+      '//:compiler-interface',
+      '//:incremental-compiler',
+      '//:nailgun-server',
+      '//:sbt-interface',
+  ],
+  sources=globs('*.scala')
+)
