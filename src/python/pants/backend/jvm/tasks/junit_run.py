@@ -762,6 +762,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
       # that missing sources can be detected early.
       for target in targets:
         if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-          raise TargetDefinitionException(target, 'JavaTests must include a non-empty set of sources.')
+          msg = 'JavaTests target {} must include a non-empty set of sources.'.format(self.address)
+          raise TargetDefinitionException(target, msg)
 
       self._runner.execute(targets)
