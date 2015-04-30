@@ -86,6 +86,7 @@ python_library(
     ':jvm_binary_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
   ],
