@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 
@@ -43,7 +44,6 @@ class ReverseDepmap(ConsoleTask):
 
   def console_output(self, _):
     buildfiles = OrderedSet()
-    address_mapper = self.context.address_mapper
     if self._dependees_type:
       base_paths = OrderedSet()
       for dependees_type in self._dependees_type:
@@ -63,11 +63,11 @@ class ReverseDepmap(ConsoleTask):
                         '\nPlease define a source root in BUILD file as:' +
                         '\n\tsource_root(\'<src-folder>\', {})'.format(', '.join(self._dependees_type)))
       for base_path in base_paths:
-        buildfiles.update(address_mapper.scan_buildfiles(get_buildroot(),
+        buildfiles.update(BuildFile.scan_buildfiles(get_buildroot(),
                                                     os.path.join(get_buildroot(), base_path),
                                                     spec_excludes=self._spec_excludes))
     else:
-      buildfiles = address_mapper.scan_buildfiles(get_buildroot(), spec_excludes=self._spec_excludes)
+      buildfiles = BuildFile.scan_buildfiles(get_buildroot(), spec_excludes=self._spec_excludes)
 
     build_graph = self.context.build_graph
     build_file_parser = self.context.build_file_parser

@@ -14,7 +14,7 @@ import pkg_resources
 from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file import FilesystemBuildFile
+from pants.base.build_file import BuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
@@ -105,14 +105,14 @@ class GoalRunner(object):
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
                                              run_tracker=self.run_tracker)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
     self.build_graph = BuildGraph(run_tracker=self.run_tracker,
                                   address_mapper=self.address_mapper)
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
       for path in self.config.getlist('goals', 'bootstrap_buildfiles', default=[]):
-        build_file = self.address_mapper.from_cache(root_dir=self.root_dir, relpath=path)
+        build_file = BuildFile.from_cache(root_dir=self.root_dir, relpath=path)
         # TODO(pl): This is an unfortunate interface leak, but I don't think
         # in the long run that we should be relying on "bootstrap" BUILD files
         # that do nothing except modify global state.  That type of behavior
@@ -154,7 +154,7 @@ class GoalRunner(object):
     fail_fast = self.options.for_global_scope().fail_fast
 
     for goal in goals:
-      if self.address_mapper.from_cache(get_buildroot(), goal, must_exist=False).file_exists():
+      if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 

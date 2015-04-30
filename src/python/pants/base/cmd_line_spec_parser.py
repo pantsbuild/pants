@@ -133,8 +133,7 @@ class CmdLineSpecParser(object):
         raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
                                 .format(spec_dir))
       try:
-        build_files = self._address_mapper.scan_buildfiles(self._root_dir, spec_dir,
-                                                           spec_excludes=self._spec_excludes)
+        build_files = BuildFile.scan_buildfiles(self._root_dir, spec_dir, spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
 
@@ -167,7 +166,7 @@ class CmdLineSpecParser(object):
       spec_parts[0] = normalize_spec_path(spec_parts[0])
       spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        build_file = self._address_mapper.from_cache(self._root_dir, spec_path)
+        build_file = BuildFile.from_cache(self._root_dir, spec_path)
         return set([BuildFileAddress(build_file, target_name)])
       except BuildFile.BuildFileError as e:
         raise self.BadSpecError(e)
