@@ -331,7 +331,7 @@ def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
 
   :param task: provides an implementation of the method calculate_genfiles()
   :param dict sources_by_base: mapping of base to path
-  :param list sources: list of sources
+  :param set|OrderedSet sources: set of sources
   :param Context.Log log: writes error messages to the console for conflicts
   """
   sources_by_genfile = {}

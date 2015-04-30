@@ -151,7 +151,8 @@ python_library(
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
     'src/python/pants/java:util',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/option',
   ],
 )
