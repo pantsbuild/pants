@@ -53,6 +53,7 @@ target(
     ':run_info',
     ':source_root',
     ':target',
+    ':worker_pool',
   ]
 )
 
@@ -329,5 +330,14 @@ python_tests(
   sources = [ 'test_spec_exclude_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
+  name = 'worker_pool',
+  sources = ['test_worker_pool.py'],
+  dependencies = [
+    'src/python/pants/base:worker_pool',
+    'src/python/pants/util:contextutil',
   ]
 )

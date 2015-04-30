@@ -9,6 +9,7 @@ import multiprocessing
 import os
 import signal
 import sys
+import thread
 import threading
 from multiprocessing.pool import ThreadPool
 
@@ -140,6 +141,11 @@ class WorkerPool(object):
           return func(*args_tuple)
       else:
         return func(*args_tuple)
+    except KeyboardInterrupt:
+      # If a worker thread intercepts a KeyboardInterrupt, we want to propagate it to the main
+      # thread.
+      thread.interrupt_main()
+      raise
     except Exception as e:
       if on_failure:
         # Note that here the work's workunit is closed. So, e.g., it's OK to use on_failure()
