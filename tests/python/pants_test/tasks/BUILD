@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
+    'src/python/pants/ivy',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',
   ]
@@ -209,7 +210,7 @@ python_tests(
   sources = ['test_depmap_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/ivy:ivy',
+    'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -240,7 +241,7 @@ python_tests(
   sources = ['test_export_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/ivy:ivy',
+    'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
