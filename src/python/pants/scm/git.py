@@ -267,6 +267,11 @@ class Git(Scm):
 
 
 class GitRepositoryReader(object):
+  """
+  Allows reading from files and directory information from an arbitrary git
+  commit. This is useful for pants-aware git sparse checkouts.
+
+  """
   def __init__(self, scm, rev):
     self.scm = scm
     self.rev = rev
