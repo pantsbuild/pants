@@ -278,7 +278,7 @@ class GitRepositoryReader(object):
     self._cat_file_process = None
     # Trees is a dict from path to [list of Dir, Symlink or File objects]
     self._trees = {}
-    self._realpath_cache = {}
+    self._realpath_cache = {'.' : '/' , '' : '/'}
 
   def _maybe_start_cat_file_process(self):
     if not self._cat_file_process:
@@ -392,6 +392,7 @@ class GitRepositoryReader(object):
 
     if path.startswith('../') or path[0] == '/':
       yield open(path, 'rb')
+      return
 
     object_type, data = self._read_object_from_repo(rev=self.rev, relpath=path)
     if object_type == 'tree':
@@ -406,10 +407,6 @@ class GitRepositoryReader(object):
               to that file; if a directory, the relative path + '/'; if
               a symlink outside the repo, a path starting with / or ../.
     """
-
-    if relpath == '.' or relpath == '':
-      # The root is never a symlink, so we don't need to process it further
-      return '/'
 
     realpath = self._realpath_cache.get(relpath)
     if not realpath:
@@ -500,7 +497,7 @@ class GitRepositoryReader(object):
       while tree_data[i] != NUL:
         i += 1
       name = tree_data[start:i]
-      sha = tree_data[i+1:i+21].encode('hex')
+      sha = tree_data[i+1:i+1+GIT_HASH_LENGTH].encode('hex')
       i += 1 + GIT_HASH_LENGTH
       if mode == '120000':
         tree[name] = self.Symlink(name, sha)
