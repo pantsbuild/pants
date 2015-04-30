@@ -211,19 +211,10 @@ class IvyUtils(object):
     updated_symlink_map = OrderedDict()
     with safe_open(inpath, 'r') as infile:
       inpaths = filter(None, infile.read().strip().split(os.pathsep))
-      paths = OrderedSet()
-      for path in inpaths:
-        paths.add(path)
-        realpath = os.path.realpath(path)
-        if path != realpath:
-          paths.add(realpath)
-          if realpath.startswith(real_ivy_cache_dir):
-            paths.add(os.path.join(ivy_cache_dir, realpath[len(real_ivy_cache_dir)+1:]))
+      paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
-      if path.startswith(ivy_cache_dir):
-        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
-      elif path.startswith(real_ivy_cache_dir):
+      if path.startswith(real_ivy_cache_dir):
         updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
       else:
         # This path is outside the cache. We won't symlink it.

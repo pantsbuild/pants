@@ -257,7 +257,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
           self.assertEquals(
             {
-              foo_path : symlink_foo_path,
               os.path.realpath(foo_path) : symlink_foo_path
             },
             result_map)
@@ -278,9 +277,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
           self.assertEquals(
             {
-              foo_path : symlink_foo_path,
               os.path.realpath(foo_path) : symlink_foo_path,
-              bar_path : symlink_bar_path,
               os.path.realpath(bar_path) : symlink_bar_path,
             },
             result_map)
