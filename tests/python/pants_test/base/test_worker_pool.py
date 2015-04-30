@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import threading
-import time
 import unittest
 
 from pants.base.worker_pool import Work, WorkerPool
@@ -21,6 +20,7 @@ class FakeRunTracker(object):
 
 def keyboard_interrupt_raiser():
   raise KeyboardInterrupt()
+
 
 class WorkerPoolTest(unittest.TestCase):
   def test_keyboard_interrupts_propagated(self):
