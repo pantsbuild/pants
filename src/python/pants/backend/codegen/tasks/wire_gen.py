@@ -39,7 +39,6 @@ class WireGen(CodeGen, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
     super(WireGen, self).__init__(*args, **kwargs)
-    self.wire_version = self.context.config.get('wire-gen', 'version', default='1.6.0')
     self.java_out = os.path.join(self.workdir, 'gen-java')
 
   def resolve_deps(self, key, default=None):
