@@ -94,10 +94,20 @@ python_tests(
   ]
 )
 
+python_library(
+  name = 'build_file_test_base',
+  sources = ['build_file_test_base.py'],
+  dependencies = [
+    'src/python/pants/base:build_file',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
 python_tests(
   name = 'build_file',
   sources = ['test_build_file.py'],
   dependencies = [
+    ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:build_file',
@@ -310,6 +320,18 @@ python_tests(
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'scm_build_file',
+  sources = ['test_scm_build_file.py'],
+  dependencies = [
+    ':build_file_test_base',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:scm_build_file',
+    'src/python/pants/scm:git',
+    'src/python/pants/util:contextutil',
   ]
 )
 

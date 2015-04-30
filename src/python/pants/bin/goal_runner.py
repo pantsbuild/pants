@@ -13,7 +13,7 @@ import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
@@ -21,6 +21,7 @@ from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
+from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
@@ -105,7 +106,15 @@ class GoalRunner(object):
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
                                              run_tracker=self.run_tracker)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
+
+    rev = self.options.for_global_scope().build_file_rev
+    if rev:
+      ScmBuildFile.set_rev(rev)
+      ScmBuildFile.set_scm(get_scm())
+      build_file_type = ScmBuildFile
+    else:
+      build_file_type = FilesystemBuildFile
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, build_file_type)
     self.build_graph = BuildGraph(run_tracker=self.run_tracker,
                                   address_mapper=self.address_mapper)
 

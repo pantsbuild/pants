@@ -12,13 +12,9 @@ from pants.base.exceptions import TargetDefinitionException
 class JavaTests(JvmTarget):
   """Tests JVM sources with JUnit."""
 
-  def __init__(self, sources=None, **kwargs):
-    _sources = self.assert_list(sources)
+  def __init__(self, **kwargs):
 
-    super(JavaTests, self).__init__(sources=_sources, **kwargs)
-
-    if not _sources:
-      raise TargetDefinitionException(self, 'JavaTests must include a non-empty set of sources.')
+    super(JavaTests, self).__init__(**kwargs)
 
     # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
     # applicable labels - fixup the 'java' misnomer.
