@@ -25,6 +25,7 @@ def keyboard_interrupt_raiser():
 class WorkerPoolTest(unittest.TestCase):
   def test_keyboard_interrupts_propagated(self):
     condition = threading.Condition()
+    condition.acquire()
     with self.assertRaises(KeyboardInterrupt):
       with temporary_dir() as rundir:
         pool = WorkerPool(WorkUnit(rundir, None, "work"), FakeRunTracker(), 1)
