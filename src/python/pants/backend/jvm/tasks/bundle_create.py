@@ -13,6 +13,7 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.fs import archive
 from pants.util.dirutil import safe_mkdir
 
@@ -47,6 +48,7 @@ class BundleCreate(JvmBinaryTask):
     def __init__(self, target):
       assert self.is_app(target), '{} is not a valid app target'.format(target)
 
+      self.address = target.address
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
       self.basename = target.basename
@@ -121,6 +123,9 @@ class BundleCreate(JvmBinaryTask):
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
         bundle_path = os.path.join(bundle_dir, relpath)
+        if not os.path.exists(bundle_path):
+          raise TaskError('Given path: {} does not exist in target {}'.format(
+            bundle_path, app.target))
         safe_mkdir(os.path.dirname(bundle_path))
         verbose_symlink(path, bundle_path)
 
