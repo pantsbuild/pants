@@ -121,8 +121,6 @@ class BundleCreate(JvmBinaryTask):
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
         bundle_path = os.path.join(bundle_dir, relpath)
-        if not os.path.exists(bundle_path):
-          raise ValueError('Given path: {} does not exist'.format(bundle_path))
         safe_mkdir(os.path.dirname(bundle_path))
         verbose_symlink(path, bundle_path)
 

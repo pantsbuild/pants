@@ -115,6 +115,8 @@ class Bundle(object):
 
     if relative_to:
       base = os.path.join(get_buildroot(), self._rel_path, relative_to)
+      if not os.path.isdir(os.path.join(get_buildroot(), base)):
+        raise ValueError('Could not find a directory to bundle relative to at {}'.format(base))
       self.mapper = RelativeToMapper(base)
     else:
       self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
@@ -131,6 +133,9 @@ class Bundle(object):
         abspath = path
         if not os.path.isabs(abspath):
           abspath = os.path.join(get_buildroot(), self._rel_path, path)
+        if not os.path.exists(abspath):
+          raise ValueError('Given path: {} with absolute path: {} which does not exist'
+                           .format(path, abspath))
         self.filemap[abspath] = self.mapper(abspath)
     return self
 
