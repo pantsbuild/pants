@@ -27,9 +27,10 @@ def shared_artifacts(version, extra_jar=None):
   return {'org/pantsbuild/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
 
 
+# TODO: Right now some options are set via config and some via cmd-line flags. Normalize this?
 def publish_extra_config(unique_config):
   return {
-          'publish': {
+          'publish.jar': {
             'publish_extras': {
               'extra_test_jar_example': unique_config,
               },
@@ -113,14 +114,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts(name),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--publish-named-snapshot=%s' % name])
+                      extra_options=['--named-snapshot=%s' % name])
 
   def test_publish_override_flag_succeeds(self):
     override = "com.twitter.foo#baz=0.1.0"
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--publish-override=%s' % override])
+                      extra_options=['--override=%s' % override])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
   def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
@@ -200,14 +201,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     """
 
     with temporary_dir() as publish_dir:
-      options = ['--publish-local=%s' % publish_dir,
-                 '--no-publish-dryrun',
-                 '--publish-force']
+      options = ['--local=%s' % publish_dir,
+                 '--no-dryrun',
+                 '--force']
       if extra_options:
         options.extend(extra_options)
 
       yes = 'y' * expected_primary_artifact_count
-      pants_run = self.run_pants(['publish', target] + options, config=extra_config,
+      pants_run = self.run_pants(['publish.jar'] + options + [target], config=extra_config,
                                  stdin_data=yes, extra_env=extra_env)
       if success_expected:
         self.assert_success(pants_run, "'pants goal publish' expected success, but failed instead.")

@@ -596,7 +596,7 @@ class JarPublish(ScmPublishMixin, JarTask):
 
     try:
       ivy.execute(jvm_options=jvm_options, args=args,
-                  workunit_factory=self.context.new_workunit, workunit_name='jar-publish')
+                  workunit_factory=self.context.new_workunit, workunit_name='ivy-publish')
     except Ivy.Error as e:
       raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))
 
