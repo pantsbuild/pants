@@ -153,7 +153,7 @@ class BuildFile(AbstractClass):
 
     self.root_dir = os.path.realpath(root_dir)
 
-    path = os.path.join(root_dir, relpath) if relpath else root_dir
+    path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
     buildfile = os.path.join(path, self._build_basename) if self._isdir(path) else path
 
@@ -177,6 +177,7 @@ class BuildFile(AbstractClass):
         buildfile = os.path.join(path, self._build_basename)
         break
 
+    self.full_path = os.path.realpath(buildfile)
     if must_exist:
       if not self._exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
@@ -185,8 +186,6 @@ class BuildFile(AbstractClass):
       if not self._is_buildfile_name(os.path.basename(buildfile)):
         raise self.MissingBuildFileError('{path} is not a BUILD file'
                                          .format(path=buildfile))
-
-    self.full_path = os.path.realpath(buildfile)
 
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
