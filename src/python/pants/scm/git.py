@@ -278,7 +278,7 @@ class GitRepositoryReader(object):
     self._cat_file_process = None
     # Trees is a dict from path to [list of Dir, Symlink or File objects]
     self._trees = {}
-    self._realpath_cache = {'.' : '/' , '' : '/'}
+    self._realpath_cache = {'.' : './' , '' : './'}
 
   def _maybe_start_cat_file_process(self):
     if not self._cat_file_process:
@@ -373,6 +373,9 @@ class GitRepositoryReader(object):
     path = self._realpath(relpath)
     if not path.endswith('/'):
       raise self.NotADirException(self.rev, relpath)
+
+    if path[0] == '/' or path.startswith('../'):
+      return os.listdir(path)
 
     tree = self._read_tree(path[:-1])
     return tree.keys()
@@ -479,6 +482,12 @@ class GitRepositoryReader(object):
     :returns: a dict from filename -> [list of Symlink, Dir, and Fil objectse]
     """
 
+    # Git commands can't handle dot-relative paths
+    if path.startswith('./'):
+      path = path[2:]
+    elif path == '.':
+      path = ''
+
     tree = self._trees.get(path)
     if tree:
       return tree
@@ -517,6 +526,11 @@ class GitRepositoryReader(object):
     else:
       assert rev is not None
       assert relpath is not None
+      # Git doesn't understand dot-relative paths
+      if relpath.startswith('./'):
+        relpath = relpath[2:]
+      elif relpath == '.':
+        relpath = ''
       spec = '{}:{}\n'.format(rev, relpath)
 
     self._maybe_start_cat_file_process()

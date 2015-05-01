@@ -162,6 +162,14 @@ class GitTest(unittest.TestCase):
                        'relative-symlink'],
                       sorted(results))
 
+    results = reader.listdir('link-to-dir')
+    self.assertEquals(['f',
+                       'not-absolute\u2764'.encode('utf-8'),
+                       'relative-dotdot',
+                       'relative-nonexistent',
+                       'relative-symlink'],
+                      sorted(results))
+
     with self.assertRaises(reader.MissingFileException):
       with reader.listdir('bogus') as f:
         pass
