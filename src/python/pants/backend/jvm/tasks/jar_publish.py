@@ -406,6 +406,9 @@ class JarPublish(ScmPublishMixin, JarTask):
              help='Extra products to publish as a individual artifact.')
     register('--push-postscript', advanced=True, default=None,
              help='A post-script to add to pushdb commit messages and push tag commit messages.')
+    register('--changelog', default=True, action='store_true',
+             help='A changelog.txt file will be created and printed to the console for each artifact '
+                  'published')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -459,6 +462,7 @@ class JarPublish(ScmPublishMixin, JarTask):
     self.dryrun = self.get_options().dryrun
     self.transitive = self.get_options().transitive
     self.force = self.get_options().force
+    self.publish_changelog = self.get_options().changelog
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -516,7 +520,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       isatty = False
     if not isatty:
       return True
-    push = raw_input('Publish {} with revision {} ? [y|N] '.format(
+    push = raw_input('\nPublish {} with revision {} ? [y|N] '.format(
       coord, version
     ))
     print('\n')
@@ -640,8 +644,9 @@ class JarPublish(ScmPublishMixin, JarTask):
         return self.artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
                                   artifact_ext=artifact_ext)
 
-      with safe_open(path(suffix='-CHANGELOG', extension='txt'), 'wb') as changelog_file:
-        changelog_file.write(changelog.encode('utf-8'))
+      if self.publish_changelog:
+        with safe_open(path(suffix='-CHANGELOG', extension='txt'), 'wb') as changelog_file:
+          changelog_file.write(changelog.encode('utf-8'))
       ivyxml = path(name='ivy', extension='xml')
 
       IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, extra_confs=extra_confs,
@@ -803,10 +808,12 @@ class JarPublish(ScmPublishMixin, JarTask):
       newentry = newentry.with_sha_and_fingerprint(head_sha, newfingerprint)
       no_changes = newentry.fingerprint == oldentry.fingerprint
 
-      if no_changes:
-        changelog = 'No changes for {0} - forced push.\n'.format(pushdb_coordinate(jar, oldentry))
-      else:
-        changelog = self.changelog(target, oldentry.sha) or 'Direct dependencies changed.\n'
+      changelog = ''
+      if self.publish_changelog:
+        if no_changes:
+          changelog = 'No changes for {0} - forced push.\n'.format(pushdb_coordinate(jar, oldentry))
+        else:
+          changelog = self.changelog(target, oldentry.sha) or 'Direct dependencies changed.\n'
 
       if no_changes and not self.force:
         print('No changes for {0}'.format(pushdb_coordinate(jar, oldentry)))
@@ -820,20 +827,21 @@ class JarPublish(ScmPublishMixin, JarTask):
       else:
         if not self.dryrun:
           # Confirm push looks good
-          if no_changes:
-            print(changelog)
-          else:
-            # The changelog may contain non-ascii text, but the print function can, under certain
-            # circumstances, incorrectly detect the output encoding to be ascii and thus blow up on
-            # non-ascii changelog characters.  Here we explicitly control the encoding to avoid
-            # the print function's mis-interpretation.
-            # TODO(John Sirois): Consider introducing a pants/util `print_safe` helper for this.
-            message = '\nChanges for {} since {} @ {}:\n\n{}\n'.format(
-                coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
-            # The stdout encoding can be detected as None when running without a tty (common in
-            # tests), in which case we want to force encoding with a unicode-supporting codec.
-            encoding = sys.stdout.encoding or 'utf-8'
-            sys.stdout.write(message.encode(encoding))
+          if self.publish_changelog:
+            if no_changes:
+              print(changelog)
+            else:
+              # The changelog may contain non-ascii text, but the print function can, under certain
+              # circumstances, incorrectly detect the output encoding to be ascii and thus blow up on
+              # non-ascii changelog characters.  Here we explicitly control the encoding to avoid
+              # the print function's mis-interpretation.
+              # TODO(John Sirois): Consider introducing a pants/util `print_safe` helper for this.
+              message = '\nChanges for {} since {} @ {}:\n\n{}\n'.format(
+                  coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
+              # The stdout encoding can be detected as None when running without a tty (common in
+              # tests), in which case we want to force encoding with a unicode-supporting codec.
+              encoding = sys.stdout.encoding or 'utf-8'
+              sys.stdout.write(message.encode(encoding))
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
             raise TaskError('User aborted push')
 
