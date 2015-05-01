@@ -476,17 +476,21 @@ class GitRepositoryReader(object):
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
 
+  def _fixup_dot_relative(self, path):
+    """Git doesn't understand dot-relative paths."""
+    if path.startswith('./'):
+      return path[2:]
+    elif path == '.':
+      return ''
+    return path
+
   def _read_tree(self, path):
     """Given a revision and path, parse the tree data out of git cat-file output.
 
     :returns: a dict from filename -> [list of Symlink, Dir, and Fil objectse]
     """
 
-    # Git commands can't handle dot-relative paths
-    if path.startswith('./'):
-      path = path[2:]
-    elif path == '.':
-      path = ''
+    path = self._fixup_dot_relative(path)
 
     tree = self._trees.get(path)
     if tree:
@@ -526,11 +530,7 @@ class GitRepositoryReader(object):
     else:
       assert rev is not None
       assert relpath is not None
-      # Git doesn't understand dot-relative paths
-      if relpath.startswith('./'):
-        relpath = relpath[2:]
-      elif relpath == '.':
-        relpath = ''
+      relpath = self._fixup_dot_relative(relpath)
       spec = '{}:{}\n'.format(rev, relpath)
 
     self._maybe_start_cat_file_process()
