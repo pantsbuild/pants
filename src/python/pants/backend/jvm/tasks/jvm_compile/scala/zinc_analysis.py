@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from zincutils.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
 
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
@@ -48,7 +50,9 @@ class ZincAnalysis(Analysis):
 
   def split(self, splits, catchall=False):
     buildroot = get_buildroot()
-    return [ZincAnalysis(s) for s in self.underlying_analysis.split(splits, buildroot, catchall)]
+    abs_splits = [set([s if os.path.isabs(s) else os.path.join(buildroot, s) for s in x])
+                  for x in splits]
+    return [ZincAnalysis(s) for s in self.underlying_analysis.split(abs_splits, catchall)]
 
   def write(self, outfile, rebasings=None):
     self.underlying_analysis.write(outfile, rebasings)
