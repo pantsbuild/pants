@@ -210,7 +210,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
   known_failing_targets=(
     # The following two targets lose out due to a resource collision, because `example_b` happens
     # to be first in the context, and test.junit mixes all classpaths.
-    testprojects/maven_layout/resource_collision/example_a/src/test/java/org/pantsbuild/duplicateres/examplea:examplea
+    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb
     testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec
   )
 

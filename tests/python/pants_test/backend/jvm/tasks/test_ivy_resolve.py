@@ -124,9 +124,10 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertEquals(losing_cp, winning_cp)
     self.assertEquals(OrderedSet([(u'default', u'bogus0'), (u'default', u'bogus1')]), winning_cp)
 
-  def test_resolve_multiple_artifacts(self):
+  def test_resolve_multiple_artifacts1(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
-    classifier_and_no_classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources', artifacts=[IvyArtifact('junit')])
+    classifier_and_no_classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources',
+                                                 artifacts=[IvyArtifact('junit')])
 
     no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
     classifier_and_no_classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier_and_no_classifier])
@@ -143,6 +144,22 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     self.assertNotIn(sources_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
     self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
+
+  def test_resolve_multiple_artifacts2(self):
+    no_classifier2 = JarDependency('org.apache.avro', 'avro', rev='1.7.7')
+    classifier = JarDependency('org.apache.avro', 'avro', rev='1.7.7', classifier='tests')
+
+    lib = self.make_target('//:c', JarLibrary, jars=[no_classifier2, classifier])
+    compile_classpath = self.resolve([lib])
+    cp = compile_classpath.get_for_target(lib)
+    tests_jar = 'avro-1.7.7-tests.jar'
+    regular_jar = 'avro-1.7.7.jar'
+    self.assertIn(tests_jar, list((os.path.basename(j[-1]) for j in cp)))
+    self.assertIn(regular_jar, list((os.path.basename(j[-1]) for j in cp)))
+
+    # TODO(Eric Ayers):  I can't replicate the test in test_resolve_multiple_artifacts1
+    # probably because the previous example creates a unique key for the jar_dependency for //:b
+    # with a classifier.
 
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
