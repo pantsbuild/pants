@@ -153,7 +153,7 @@ def register_goals():
     action=CheckPublishedDeps,
   ).install('check_published_deps').with_description('Find references to outdated artifacts.')
 
-  task(name='publish', action=JarPublish).install('publish').with_description(
+  task(name='jar', action=JarPublish).install('publish').with_description(
       'Publish artifacts.')
 
   # Testing.

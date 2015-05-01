@@ -11,7 +11,7 @@ from pants.base.target import Target
 class Credentials(Target):
   """Supplies credentials for a maven repository on demand.
 
-  The ``jar-publish`` section of your ``pants.ini`` file can refer to one
+  The ``publish.jar`` section of your ``pants.ini`` file can refer to one
   or more of these.
   """
 

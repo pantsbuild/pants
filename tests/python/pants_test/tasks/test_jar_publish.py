@@ -92,7 +92,7 @@ class JarPublishTest(TaskTestBase):
     task._copy_artifact = Mock()
     task.create_source_jar = Mock()
     task.create_doc_jar = Mock()
-    task.changelog = Mock(return_value="Many changes")
+    task.changelog = Mock(return_value='Many changes')
     task.publish = Mock()
     task.confirm_push = Mock(return_value=True)
     task.context.products.get = Mock(return_value=Mock())
@@ -134,12 +134,12 @@ class JarPublishTest(TaskTestBase):
       for _, _, filenames in safe_walk(self.push_db_basedir):
         files.extend(filenames)
       self.assertEquals(0, len(files),
-                        "Nothing should be written to the pushdb during a dryrun publish")
+                        'Nothing should be written to the pushdb during a dryrun publish')
 
       self.assertEquals(0, task.confirm_push.call_count,
-                        "Expected confirm_push not to be called")
+                        'Expected confirm_push not to be called')
       self.assertEquals(0, task.publish.call_count,
-                        "Expected publish not to be called")
+                        'Expected publish not to be called')
 
   def test_publish_local(self):
     for with_alias in [True, False]:
@@ -157,13 +157,13 @@ class JarPublishTest(TaskTestBase):
         for _, _, filenames in safe_walk(self.push_db_basedir):
           files.extend(filenames)
         self.assertEquals(0, len(files),
-                          "Nothing should be written to the pushdb during a local publish")
+                          'Nothing should be written to the pushdb during a local publish')
 
         publishable_count = len(targets) - (1 if with_alias else 0)
         self.assertEquals(publishable_count, task.confirm_push.call_count,
-                          "Expected one call to confirm_push per artifact")
+                          'Expected one call to confirm_push per artifact')
         self.assertEquals(publishable_count, task.publish.call_count,
-                          "Expected one call to publish per artifact")
+                          'Expected one call to publish per artifact')
 
   def test_publish_remote(self):
     targets = self._prepare_for_publishing()
@@ -178,14 +178,14 @@ class JarPublishTest(TaskTestBase):
       files.extend(filenames)
 
     self.assertEquals(len(targets), len(files),
-                      "During a remote publish, one pushdb should be written per target")
+                      'During a remote publish, one pushdb should be written per target')
     self.assertEquals(len(targets), task.confirm_push.call_count,
-                      "Expected one call to confirm_push per artifact")
+                      'Expected one call to confirm_push per artifact')
     self.assertEquals(len(targets), task.publish.call_count,
-                      "Expected one call to publish per artifact")
+                      'Expected one call to publish per artifact')
 
     self.assertEquals(len(targets), task.scm.commit.call_count,
-                      "Expected one call to scm.commit per artifact")
+                      'Expected one call to scm.commit per artifact')
     args, kwargs = task.scm.commit.call_args
     message = args[0]
     message_lines = message.splitlines()
@@ -194,10 +194,10 @@ class JarPublishTest(TaskTestBase):
     self.assertEquals('PS', message_lines[-1])
 
     self.assertEquals(len(targets), task.scm.add.call_count,
-                      "Expected one call to scm.add per artifact")
+                      'Expected one call to scm.add per artifact')
 
     self.assertEquals(len(targets), task.scm.tag.call_count,
-                      "Expected one call to scm.tag per artifact")
+                      'Expected one call to scm.tag per artifact')
     args, kwargs = task.scm.tag.call_args
     tag_name, tag_message = args
     tag_message_splitlines = tag_message.splitlines()

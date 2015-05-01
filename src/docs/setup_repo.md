@@ -268,7 +268,7 @@ refers to the `public` repository defined above. (Notice it's a Python object, n
 If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
-In your config file (usually `pants.ini`), set up a `[jar-publish]` section. In that section,
+In your config file (usually `pants.ini`), set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
@@ -353,7 +353,7 @@ the custom Ivy settings when publishing:
 Your organization might have a notion of a special "release branch": you want [[artifact
 publishing|pants('src/docs:publish')]] to happen on this source control branch, which you maintain
 extra-carefully. You can set this branch using the `restrict_push_branches` option of the
-`[jar-publish]` section of your config file (usually `pants.ini`).
+`[publish.jar]` section of your config file (usually `pants.ini`).
 
 ### Task to Publish "Extra" Artifacts
 

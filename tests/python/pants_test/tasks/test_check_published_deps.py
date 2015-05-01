@@ -41,6 +41,11 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
   def task_type(cls):
     return CheckPublishedDeps
 
+  def assert_console_output(self, *args, **kwargs):
+    # Ensure that JarPublish's repos option is set, as CheckPublishedDeps consults it.
+    self.set_options_for_scope('publish.jar', repos={})
+    return super(CheckPublishedDepsTest, self).assert_console_output(*args, **kwargs)
+
   def setUp(self):
     super(CheckPublishedDepsTest, self).setUp()
 
