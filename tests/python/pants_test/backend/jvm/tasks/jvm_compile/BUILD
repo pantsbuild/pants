@@ -8,7 +8,6 @@ target(
     ':resource_mapping',
     ':zinc_utils',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile/java',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala',
   ],
 )
 
