@@ -19,7 +19,7 @@ class ZincAnalysisParser(AnalysisParser):
   """
 
   # Implement AnalysisParser properties.
-  empty_test_header = 'products'
+  empty_test_header = b'products'
   current_test_header = ZincAnalysis.FORMAT_VERSION_LINE
 
   def __init__(self):
@@ -47,5 +47,12 @@ class ZincAnalysisParser(AnalysisParser):
     with raise_on_eof(infile):
       try:
         return self._underlying_parser.parse_deps(infile, classes_dir)
+      except UnderlyingParser.ParseError as e:
+        raise ParseError(e)
+
+  def rebase(self, infile, outfile, pants_home_from, pants_home_to, java_home=None):
+    with raise_on_eof(infile):
+      try:
+        self._underlying_parser.rebase(infile, outfile, pants_home_from, pants_home_to, java_home)
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)

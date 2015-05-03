@@ -1,0 +1,6 @@
+pcd entries:
+1 items
+org/pantsbuild/example/hello/main/HelloMain	/src/pants/examples/src/java/org/pantsbuild/example/hello/main/HelloMain.java	1430672789000	2925777736	DummyBlob1
+dependencies:
+1 items
+/src/pants/examples/src/java/org/pantsbuild/example/hello/main/HelloMain.java	org/pantsbuild/example/hello/main/HelloMain	java/lang/Object	java/io/IOException	java/lang/System	org/pantsbuild/example/hello/greet/Greeting	java/io/PrintStream

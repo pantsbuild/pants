@@ -18,49 +18,49 @@ from pants.base.build_environment import get_buildroot
 class JMakeAnalysisParser(AnalysisParser):
   """Parse a file containing representation of an analysis for some JVM language."""
 
-  empty_test_header = 'pcd entries'
-  current_test_header = 'pcd entries:\n'
+  empty_test_header = b'pcd entries'
+  current_test_header = b'pcd entries:\n'
 
-  def parse(self, infile):
-    self._expect_header(infile.readline(), 'pcd entries')
-    num_pcd_entries = self.parse_num_items(infile.readline())
+  def parse(self, lines_iter):
+    self._expect_header(lines_iter.next(), 'pcd entries')
+    num_pcd_entries = self.parse_num_items(lines_iter.next())
     pcd_entries = []
     for i in range(0, num_pcd_entries):
-      line = infile.readline()
-      tpl = line.split('\t')
+      line = lines_iter.next()
+      tpl = line.split(b'\t')
       if len(tpl) != 5:
         raise ParseError('Line must contain 5 tab-separated fields: {}'.format(line))
       pcd_entries.append(tpl)  # Note: we preserve the \n on the last entry.
-    src_to_deps = self._parse_deps_at_position(infile)
+    src_to_deps = self._parse_deps_at_position(lines_iter)
     return JMakeAnalysis(pcd_entries, src_to_deps)
 
-  def parse_products(self, infile, classes_dir):
-    self._expect_header(infile.readline(), 'pcd entries')
-    num_pcd_entries = self.parse_num_items(infile.readline())
+  def parse_products(self, lines_iter, classes_dir):
+    self._expect_header(lines_iter.next(), b'pcd entries')
+    num_pcd_entries = self.parse_num_items(lines_iter.next())
     ret = defaultdict(list)
     # Parse more efficiently than above, since we only care about
     # the first two elements in the line.
     for _ in range(0, num_pcd_entries):
-      line = infile.readline()
-      p1 = line.find('\t')
-      clsfile = os.path.join(classes_dir, line[0:p1] + '.class')
-      p2 = line.find('\t', p1 + 1)
+      line = lines_iter.next()
+      p1 = line.find(b'\t')
+      clsfile = os.path.join(classes_dir, line[0:p1] + b'.class')
+      p2 = line.find(b'\t', p1 + 1)
       src = line[p1+1:p2]
       ret[src].append(clsfile)
     return ret
 
-  def parse_deps(self, infile, classpath_indexer, classes_dir):
+  def parse_deps(self, lines_iter, classpath_indexer, classes_dir):
     buildroot = get_buildroot()
     classpath_elements_by_class = classpath_indexer()
-    self._expect_header(infile.readline(), 'pcd entries')
-    num_pcd_entries = self.parse_num_items(infile.readline())
+    self._expect_header(lines_iter.next(), b'pcd entries')
+    num_pcd_entries = self.parse_num_items(lines_iter.next())
     for _ in range(0, num_pcd_entries):
-      infile.readline()  # Skip these lines.
-    src_to_deps = self._parse_deps_at_position(infile)
+      lines_iter.next()  # Skip these lines.
+    src_to_deps = self._parse_deps_at_position(lines_iter)
     ret = defaultdict(set)
     for src, deps in src_to_deps.items():
       for dep in deps:
-        rel_classfile = dep + '.class'
+        rel_classfile = dep + b'.class'
         # Check if we have an internal class first.
         internal_classfile = os.path.join(buildroot, classes_dir, rel_classfile)
         if os.path.exists(internal_classfile):
@@ -72,12 +72,38 @@ class JMakeAnalysisParser(AnalysisParser):
 
     return ret
 
-  def _parse_deps_at_position(self, infile):
-    self._expect_header(infile.readline(), 'dependencies')
-    num_deps = self.parse_num_items(infile.readline())
+  def rebase(self, lines_iter, outfile, pants_home_from, pants_home_to, java_home=None):
+    # Note that jmake analysis contains no references to jars under java_home,
+    # so we don't use that arg.
+    # TODO: Profile and optimize this. For example, it can be faster to write in large chunks, even
+    # at the cost of a large string join.
+    self._expect_header(lines_iter.next(), b'pcd entries')
+    num_pcd_entries = self.parse_num_items(lines_iter.next())
+    outfile.write(b'pcd entries:\n')
+    outfile.write(b'{} items\n'.format(num_pcd_entries))
+    for i in range(num_pcd_entries):
+      line = lines_iter.next()
+      tpl = line.split(b'\t', 2)
+      if tpl[1].startswith(pants_home_from):
+        tpl[1] = pants_home_to + tpl[1][len(pants_home_from):]
+      outfile.write(b'\t'.join(tpl))
+
+    self._expect_header(lines_iter.next(), b'dependencies')
+    num_deps = self.parse_num_items(lines_iter.next())
+    outfile.write(b'dependencies:\n')
+    outfile.write(b'{} items\n'.format(num_deps))
+    for i in range(num_deps):
+      line = lines_iter.next()
+      if line.startswith(pants_home_from):
+        line = pants_home_to + line[len(pants_home_from):]
+      outfile.write(line)
+
+  def _parse_deps_at_position(self, lines_iter):
+    self._expect_header(lines_iter.next(), b'dependencies')
+    num_deps = self.parse_num_items(lines_iter.next())
     src_to_deps = {}
     for i in range(0, num_deps):
-      tpl = infile.readline().split('\t')
+      tpl = lines_iter.next().split(b'\t')
       src = tpl[0]
       deps = tpl[1:]
       deps[-1] = deps[-1][0:-1]  # Trim off the \n.
@@ -85,6 +111,6 @@ class JMakeAnalysisParser(AnalysisParser):
     return src_to_deps
 
   def _expect_header(self, line, header):
-    expected = header + ':\n'
+    expected = header + b':\n'
     if line != expected:
       raise ParseError('Expected: {}. Found: {}'.format(expected, line))
