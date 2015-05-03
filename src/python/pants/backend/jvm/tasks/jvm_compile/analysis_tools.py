@@ -54,7 +54,6 @@ class AnalysisTools(object):
   def relativize(self, src_analysis, relativized_analysis):
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis.relativized')
-
       # NOTE: We can't port references to deps on the Java home. This is because different JVM
       # implementations on different systems have different structures, and there's not
       # necessarily a 1-1 mapping between Java jars on different systems. Instead we simply
@@ -62,12 +61,10 @@ class AnalysisTools(object):
       #
       # In practice the JVM changes rarely, and it should be fine to require a full rebuild
       # in those rare cases.
-      rebasings = [
-        (self._java_home, None),
-        (self._pants_home, self._PANTS_HOME_PLACEHOLDER),
-        ]
       # Work on a tmpfile, for safety.
-      self._rebase_from_path(src_analysis, tmp_analysis_file, rebasings)
+      self.parser.rebase_from_path(src_analysis, tmp_analysis_file,
+                                   self._pants_home, self._PANTS_HOME_PLACEHOLDER,
+                                   self._java_home)
       shutil.move(tmp_analysis_file, relativized_analysis)
 
   def localize(self, src_analysis, localized_analysis):
@@ -77,14 +74,6 @@ class AnalysisTools(object):
         (AnalysisTools._PANTS_HOME_PLACEHOLDER, self._pants_home),
         ]
       # Work on a tmpfile, for safety.
-      self._rebase_from_path(src_analysis, tmp_analysis_file, rebasings)
+      self.parser.rebase_from_path(src_analysis, tmp_analysis_file,
+                                   self._PANTS_HOME_PLACEHOLDER, self._pants_home)
       shutil.move(tmp_analysis_file, localized_analysis)
-
-  def _rebase_from_path(self, input_analysis_path, output_analysis_path, rebasings):
-    """Rebase file paths in an analysis file.
-
-    rebasings: A list of path prefix pairs [from_prefix, to_prefix] to rewrite.
-               to_prefix may be None, in which case matching paths are removed entirely.
-    """
-    analysis = self.parser.parse_from_path(input_analysis_path)
-    analysis.write_to_path(output_analysis_path, rebasings=rebasings)

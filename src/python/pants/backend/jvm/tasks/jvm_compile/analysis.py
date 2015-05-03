@@ -26,14 +26,10 @@ class Analysis(object):
     """
     raise NotImplementedError()
 
-  def write_to_path(self, outfile_path, rebasings=None):
+  def write_to_path(self, outfile_path):
     with open(outfile_path, 'w') as outfile:
-      self.write(outfile, rebasings)
+      self.write(outfile)
 
-  def write(self, outfile, rebasings=None):
-    """Write this Analysis to outfile.
-
-    rebasings: A list of path prefix pairs [from_prefix, to_prefix] to rewrite.
-               to_prefix may be None, in which case matching paths are removed entirely.
-    """
+  def write(self, outfile):
+    """Write this Analysis to outfile."""
     raise NotImplementedError()

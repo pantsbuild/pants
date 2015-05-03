@@ -4,8 +4,19 @@
 target(
   name='java',
   dependencies=[
+    ':jmake_analysis'
   ],
 )
+
+python_tests(
+  name='jmake_analysis',
+  sources=['test_jmake_analysis.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile:java',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
 
 python_tests(
   name='apt_compile_integration',
