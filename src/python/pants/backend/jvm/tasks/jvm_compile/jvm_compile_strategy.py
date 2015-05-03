@@ -137,6 +137,7 @@ class JvmCompileStrategy(object):
 
   def validate_analysis(self, compile_context, deep):
     """Throws a TaskError for mismatched or unreadable analysis files."""
+    path = compile_context.analysis_file
     try:
       # Confirm that the file is readable at the current version.
       self._analysis_parser.validate_analysis(compile_context, deep)
@@ -147,9 +148,8 @@ class JvmCompileStrategy(object):
                               "clean-all is executed.\n{}".format(path, e))
         safe_delete(path)
       else:
-        raise
-        #raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
-        #                "run `clean-all` if your tools versions changed recently:\n{}".format(e))
+        raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
+                        "run `clean-all` if your tools versions changed recently:\n{}".format(e))
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     """Prepares to compile the given set of targets.
