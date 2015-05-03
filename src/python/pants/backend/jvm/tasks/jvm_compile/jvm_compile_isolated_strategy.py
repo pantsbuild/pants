@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -56,6 +56,13 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                analysis_file,
                                classes_dir,
                                self._sources_for_target(target))
+
+  def _create_compile_contexts_for_targets(self, targets):
+    compile_contexts = OrderedDict()
+    for target in targets:
+      compile_context = self.compile_context(target)
+      compile_contexts[target] = compile_context
+    return compile_contexts
 
   def pre_compile(self):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
@@ -216,12 +223,14 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     extra_compile_time_classpath = self._compute_extra_classpath(
       extra_compile_time_classpath_elements)
 
-    compile_contexts = self._create_compile_contexts_for_targets(relevant_targets)
+    compile_contexts = self._create_compile_contexts_for_targets(all_targets)
 
     # Now create compile jobs for each invalid target one by one.
-    jobs = self._create_compile_jobs(compile_classpaths, compile_contexts,
+    jobs = self._create_compile_jobs(compile_classpaths,
+                                     compile_contexts,
                                      extra_compile_time_classpath,
-                                     invalid_targets, invalidation_check.invalid_vts_partitioned,
+                                     invalid_targets,
+                                     invalidation_check.invalid_vts_partitioned,
                                      compile_vts,
                                      register_vts,
                                      update_artifact_cache_vts_work)
