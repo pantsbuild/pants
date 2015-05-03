@@ -153,6 +153,13 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                                          target_closure))
         cp_entries = self._compute_classpath_entries(compile_classpaths, compile_context,
                                                      extra_compile_time_classpath)
+        for entry in cp_entries:
+          if not entry.endswith('.jar'):
+            if not entry in upstream_analysis:
+              self.context.log.warn('Missing upstream analysis for {}'.format(entry))
+            else:
+              self.context.log.debug('Found upstream analysis for {}'.format(entry))
+
         with self._empty_analysis_cleanup(compile_context):
           compile_vts(vts,
                       compile_context.sources,
