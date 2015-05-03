@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from six import next
 from six.moves import range
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
