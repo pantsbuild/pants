@@ -164,8 +164,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         progress_message = vts.targets[0].address.spec
         cp_entries = self._compute_classpath_entries(compile_classpaths, compile_context,
                                                      extra_compile_time_classpath)
-        # hm.
-        upstream_analysis = {} #dict(self._upstream_analysis(compile_contexts, cp_entries))
+        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         with self._empty_analysis_cleanup(compile_context):
           compile_vts(vts,
