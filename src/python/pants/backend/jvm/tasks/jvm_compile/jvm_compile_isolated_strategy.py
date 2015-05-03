@@ -81,7 +81,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         cc = self.compile_context(target)
         safe_mkdir(cc.classes_dir)
         compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
-        self.validate_analysis(cc, self._deep_analysis_validation)
+        self.check_analysis(cc)
 
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._language)) \
@@ -154,7 +154,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       if not preexisting_analysis:
         safe_delete(compile_context.analysis_file)
       raise
-    self.validate_analysis(compile_context, self._deep_analysis_validation)
+    self.check_analysis(compile_context)
 
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                      invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,

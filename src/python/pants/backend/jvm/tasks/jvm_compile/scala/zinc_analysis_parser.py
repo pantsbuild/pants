@@ -31,10 +31,10 @@ class ZincAnalysisParser(AnalysisParser):
 
   # Implement AnalysisParser methods.
 
-  def validate_analysis(self, compile_context, deep):
-    """Overrides superclass to implement `deep` validation of stamps and classfiles."""
+  def check_analysis(self, compile_context, deep):
+    """Overrides superclass to implement `deep` checks of stamps and classfiles."""
     if not deep:
-      super(ZincAnalysisParser, self).validate_analysis(compile_context, deep)
+      super(ZincAnalysisParser, self).check_analysis(compile_context, deep)
     elif os.path.exists(compile_context.analysis_file):
       with open(compile_context.analysis_file, 'r') as infile:
         zinc_analysis = self.parse(infile)._underlying_analysis

@@ -45,19 +45,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--confs', type=Options.list, default=['default'],
              help='Compile for these Ivy confs.')
 
+    register('--analysis-check-deep', default=False, action='store_true',
+             advanced=True,
+             help='When set, analysis files will be deeply checked by comparing them to '
+                  'their classfiles. Failing checks are subject to --analysis-check-clean.')
+
     # TODO: Stale analysis should be automatically ignored via Task identities:
     # https://github.com/pantsbuild/pants/issues/1351
-    # TODO: misnomer: should be "mismatched" or "unreadable"
-    register('--clear-invalid-analysis', default=False, action='store_true',
+    register('--analysis-check-clean', default=False, action='store_true',
              advanced=True,
-             help='When set, any invalid/incompatible analysis files will be deleted '
-                  'automatically.  When unset, an error is raised instead.')
-
-    # TODO: misnomer: should be "mismatched" or "unreadable"
-    register('--deep-analysis-validation', default=False, action='store_true',
-             advanced=True,
-             help='When set, analysis files will be deeply validated by comparing them to '
-                  'their classfiles.')
+             help='When set, any corrupt/incompatible analysis files will be deleted '
+                  'automatically. When unset, an error is raised instead.')
 
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')

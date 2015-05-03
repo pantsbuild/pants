@@ -75,8 +75,8 @@ class JvmCompileStrategy(object):
     self._confs = options.confs
 
     # Analysis validation options.
-    self._clear_invalid_analysis = options.clear_invalid_analysis
-    self._deep_analysis_validation = options.deep_analysis_validation
+    self._analysis_check_deep = options.analysis_check_deep
+    self._analysis_check_clean = options.analysis_check_clean
 
   @abstractmethod
   def name(self):
@@ -135,14 +135,14 @@ class JvmCompileStrategy(object):
     """Executed once before any compiles."""
     pass
 
-  def validate_analysis(self, compile_context, deep):
+  def check_analysis(self, compile_context):
     """Throws a TaskError for mismatched or unreadable analysis files."""
     path = compile_context.analysis_file
     try:
       # Confirm that the file is readable at the current version.
-      self._analysis_parser.validate_analysis(compile_context, deep)
+      self._analysis_parser.check_analysis(compile_context, self._analysis_check_deep)
     except Exception as e:
-      if self._clear_invalid_analysis:
+      if self._analysis_check_clean:
         self.context.log.warn("Invalid analysis detected at path {} ... pants will remove these "
                               "automatically, but\nyou may experience spurious warnings until "
                               "clean-all is executed.\n{}".format(path, e))

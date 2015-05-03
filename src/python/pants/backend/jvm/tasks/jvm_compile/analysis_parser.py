@@ -44,10 +44,10 @@ class AnalysisParser(object):
     """
     raise NotImplementedError('Subclasses must implement.')
 
-  def validate_analysis(self, compile_context, deep):
-    """Validates that the given path is either empty, or contains a readable analysis file.
+  def check_analysis(self, compile_context, deep):
+    """Confirms that the given path is either empty, or contains a readable analysis file.
 
-    If deep=True, may perform additional validation that compares the analysis to the associated
+    If deep=True, may perform additional checks to compares the analysis to associated
     classfiles.
 
     Raises ParseError on failure.
