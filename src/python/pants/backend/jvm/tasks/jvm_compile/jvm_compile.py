@@ -47,10 +47,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
     # https://github.com/pantsbuild/pants/issues/1351
+    # TODO: misnomer: should be "mismatched" or "unreadable"
     register('--clear-invalid-analysis', default=False, action='store_true',
              advanced=True,
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
+
+    # TODO: misnomer: should be "mismatched" or "unreadable"
+    register('--deep-analysis-validation', default=False, action='store_true',
+             advanced=True,
+             help='When set, analysis files will be deeply validated by comparing them to '
+                  'their classfiles.')
 
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')

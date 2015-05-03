@@ -74,7 +74,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         cc = self.compile_context(target)
         safe_mkdir(cc.classes_dir)
         compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
-        self.validate_analysis(cc.analysis_file)
+        self.validate_analysis(cc, self._deep_analysis_validation)
 
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._language)) \

@@ -142,9 +142,16 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
 
+  def _validate_analysis_files(self, target):
+    """Given a dummy target, validate the valid/invalid analysis files."""
     # Look for invalid analysis files.
-    for f in (self._invalid_analysis_file, self._analysis_file):
-      self.validate_analysis(f)
+    valid = self.compile_context(target)
+    invalid = self.CompileContext(target,
+                                  self._invalid_analysis_file,
+                                  self._classes_dir,
+                                  self._sources_for_target(target))
+    for cc in (valid, invalid):
+      self.validate_analysis(cc, self._deep_analysis_validation)
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
@@ -157,6 +164,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Split the global analysis file into valid and invalid parts.
     invalidation_check = cache_manager.check(relevant_targets)
     if invalidation_check.invalid_vts:
+      self._validate_analysis_files(invalidation_check.invalid_vts[0].target)
+
       # The analysis for invalid and deleted sources is no longer valid.
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       invalid_sources_by_target = {}

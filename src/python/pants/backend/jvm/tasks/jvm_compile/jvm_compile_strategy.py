@@ -73,7 +73,10 @@ class JvmCompileStrategy(object):
 
     # The ivy confs for which we're building.
     self._confs = options.confs
+
+    # Analysis validation options.
     self._clear_invalid_analysis = options.clear_invalid_analysis
+    self._deep_analysis_validation = options.deep_analysis_validation
 
   @abstractmethod
   def name(self):
@@ -132,10 +135,11 @@ class JvmCompileStrategy(object):
     """Executed once before any compiles."""
     pass
 
-  def validate_analysis(self, path):
-    """Throws a TaskError for invalid analysis files."""
+  def validate_analysis(self, compile_context, deep):
+    """Throws a TaskError for mismatched or unreadable analysis files."""
     try:
-      self._analysis_parser.validate_analysis(path)
+      # Confirm that the file is readable at the current version.
+      self._analysis_parser.validate_analysis(compile_context, deep)
     except Exception as e:
       if self._clear_invalid_analysis:
         self.context.log.warn("Invalid analysis detected at path {} ... pants will remove these "
@@ -143,8 +147,9 @@ class JvmCompileStrategy(object):
                               "clean-all is executed.\n{}".format(path, e))
         safe_delete(path)
       else:
-        raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
-                        "run `clean-all` if your tools versions changed recently:\n{}".format(e))
+        raise
+        #raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
+        #                "run `clean-all` if your tools versions changed recently:\n{}".format(e))
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     """Prepares to compile the given set of targets.
