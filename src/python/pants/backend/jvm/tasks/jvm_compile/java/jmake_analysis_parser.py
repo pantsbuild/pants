@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from six import next
 from six.moves import range
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import AnalysisParser, ParseError
@@ -22,11 +23,11 @@ class JMakeAnalysisParser(AnalysisParser):
   current_test_header = b'pcd entries:\n'
 
   def parse(self, lines_iter):
-    self._expect_header(lines_iter.next(), 'pcd entries')
-    num_pcd_entries = self.parse_num_items(lines_iter.next())
+    self._expect_header(next(lines_iter), 'pcd entries')
+    num_pcd_entries = self.parse_num_items(next(lines_iter))
     pcd_entries = []
-    for i in range(0, num_pcd_entries):
-      line = lines_iter.next()
+    for _ in range(0, num_pcd_entries):
+      line = next(lines_iter)
       tpl = line.split(b'\t')
       if len(tpl) != 5:
         raise ParseError('Line must contain 5 tab-separated fields: {}'.format(line))
@@ -35,13 +36,13 @@ class JMakeAnalysisParser(AnalysisParser):
     return JMakeAnalysis(pcd_entries, src_to_deps)
 
   def parse_products(self, lines_iter, classes_dir):
-    self._expect_header(lines_iter.next(), b'pcd entries')
-    num_pcd_entries = self.parse_num_items(lines_iter.next())
+    self._expect_header(next(lines_iter), b'pcd entries')
+    num_pcd_entries = self.parse_num_items(next(lines_iter))
     ret = defaultdict(list)
     # Parse more efficiently than above, since we only care about
     # the first two elements in the line.
     for _ in range(0, num_pcd_entries):
-      line = lines_iter.next()
+      line = next(lines_iter)
       p1 = line.find(b'\t')
       clsfile = os.path.join(classes_dir, line[0:p1] + b'.class')
       p2 = line.find(b'\t', p1 + 1)
@@ -52,10 +53,10 @@ class JMakeAnalysisParser(AnalysisParser):
   def parse_deps(self, lines_iter, classpath_indexer, classes_dir):
     buildroot = get_buildroot()
     classpath_elements_by_class = classpath_indexer()
-    self._expect_header(lines_iter.next(), b'pcd entries')
-    num_pcd_entries = self.parse_num_items(lines_iter.next())
+    self._expect_header(next(lines_iter), b'pcd entries')
+    num_pcd_entries = self.parse_num_items(next(lines_iter))
     for _ in range(0, num_pcd_entries):
-      lines_iter.next()  # Skip these lines.
+      next(lines_iter)  # Skip these lines.
     src_to_deps = self._parse_deps_at_position(lines_iter)
     ret = defaultdict(set)
     for src, deps in src_to_deps.items():
@@ -77,33 +78,33 @@ class JMakeAnalysisParser(AnalysisParser):
     # so we don't use that arg.
     # TODO: Profile and optimize this. For example, it can be faster to write in large chunks, even
     # at the cost of a large string join.
-    self._expect_header(lines_iter.next(), b'pcd entries')
-    num_pcd_entries = self.parse_num_items(lines_iter.next())
+    self._expect_header(next(lines_iter), b'pcd entries')
+    num_pcd_entries = self.parse_num_items(next(lines_iter))
     outfile.write(b'pcd entries:\n')
     outfile.write(b'{} items\n'.format(num_pcd_entries))
-    for i in range(num_pcd_entries):
-      line = lines_iter.next()
+    for _ in range(num_pcd_entries):
+      line = next(lines_iter)
       tpl = line.split(b'\t', 2)
       if tpl[1].startswith(pants_home_from):
         tpl[1] = pants_home_to + tpl[1][len(pants_home_from):]
       outfile.write(b'\t'.join(tpl))
 
-    self._expect_header(lines_iter.next(), b'dependencies')
-    num_deps = self.parse_num_items(lines_iter.next())
+    self._expect_header(next(lines_iter), b'dependencies')
+    num_deps = self.parse_num_items(next(lines_iter))
     outfile.write(b'dependencies:\n')
     outfile.write(b'{} items\n'.format(num_deps))
-    for i in range(num_deps):
-      line = lines_iter.next()
+    for _ in range(num_deps):
+      line = next(lines_iter)
       if line.startswith(pants_home_from):
         line = pants_home_to + line[len(pants_home_from):]
       outfile.write(line)
 
   def _parse_deps_at_position(self, lines_iter):
-    self._expect_header(lines_iter.next(), b'dependencies')
-    num_deps = self.parse_num_items(lines_iter.next())
+    self._expect_header(next(lines_iter), b'dependencies')
+    num_deps = self.parse_num_items(next(lines_iter))
     src_to_deps = {}
     for i in range(0, num_deps):
-      tpl = lines_iter.next().split(b'\t')
+      tpl = next(lines_iter).split(b'\t')
       src = tpl[0]
       deps = tpl[1:]
       deps[-1] = deps[-1][0:-1]  # Trim off the \n.
