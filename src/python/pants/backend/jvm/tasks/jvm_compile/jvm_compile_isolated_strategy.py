@@ -141,6 +141,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       if not preexisting_analysis:
         safe_delete(compile_context.analysis_file)
       raise
+    self.validate_analysis(compile_context, self._deep_analysis_validation)
 
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                      invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,
