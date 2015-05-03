@@ -90,14 +90,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # No partitioning.
     return (0, None)
 
-  def _upstream_analysis(self, compile_contexts, target_closure):
-    """Returns tuples of classes_dir->analysis_file for the closure of the target."""
-    # If we have a compile context for the target, include it.
-    for dep in target_closure:
-      if dep in compile_contexts:
-        compile_context = compile_contexts[dep]
-        yield compile_context.classes_dir, compile_context.analysis_file
-
   def compute_classes_by_source(self, compile_contexts):
     buildroot = get_buildroot()
     classes_by_src_by_context = defaultdict(dict)
@@ -114,8 +106,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def _compute_classpath_entries(self, compile_classpaths, compile_context,
                                  extra_compile_time_classpath):
-    # Generate a classpath specific to this compile and target, and include analysis
-    # for upstream targets.
+    # Generate a classpath specific to this compile and target.
     raw_compile_classpath = compile_classpaths.get_for_target(compile_context.target)
     compile_classpath = extra_compile_time_classpath + list(raw_compile_classpath)
     # Validate that the classpath is located within the working copy, which simplifies
@@ -123,6 +114,21 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     self._validate_classpath(compile_classpath)
     # Filter the final classpath and gather upstream analysis.
     return [entry for conf, entry in compile_classpath if conf in self._confs]
+
+  def _upstream_analysis(self, compile_contexts, classpath_entries):
+    """Returns tuples of classes_dir->analysis_file for the closure of the target."""
+    # Reorganize the compile_contexts by class directory.
+    compile_contexts_by_directory = {}
+    for compile_context in compile_contexts.values():
+      compile_contexts_by_directory[compile_context.classes_dir] = compile_context
+    # If we have a compile context for the target, include it.
+    for entry in classpath_entries:
+      if not entry.endswith('.jar'):
+        compile_context = compile_contexts_by_directory.get(entry)
+        if not compile_context:
+          self.context.log.debug('Missing upstream analysis for {}'.format(entry))
+        else:
+          yield compile_context.classes_dir, compile_context.analysis_file
 
   def exec_graph_key_for_target(self, compile_target):
     return "compile-{}".format(compile_target.address.spec)
@@ -146,19 +152,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                      invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,
                      update_artifact_cache_vts_work):
-    def create_work_for_vts(vts, compile_context, target_closure):
+    def create_work_for_vts(vts, compile_context):
       def work():
         progress_message = vts.targets[0].address.spec
-        upstream_analysis = dict(self._upstream_analysis(compile_contexts,
-                                                         target_closure))
         cp_entries = self._compute_classpath_entries(compile_classpaths, compile_context,
                                                      extra_compile_time_classpath)
-        for entry in cp_entries:
-          if not entry.endswith('.jar'):
-            if not entry in upstream_analysis:
-              self.context.log.warn('Missing upstream analysis for {}'.format(entry))
-            else:
-              self.context.log.debug('Found upstream analysis for {}'.format(entry))
+        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         with self._empty_analysis_cleanup(compile_context):
           compile_vts(vts,
@@ -186,13 +185,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       # Invalidated targets are a subset of relevant targets: get the context for this one.
       compile_target = vts.targets[0]
       compile_context = compile_contexts[compile_target]
-      compile_target_closure = compile_target.closure()
 
       # dependencies of the current target which are invalid for this chunk
-      invalid_dependencies = (compile_target_closure & invalid_target_set) - [compile_target]
+      invalid_dependencies = (compile_target.closure() & invalid_target_set) - [compile_target]
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
-                      create_work_for_vts(vts, compile_context, compile_target_closure),
+                      create_work_for_vts(vts, compile_context),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
                       # If compilation and analysis work succeeds, validate the vts.
                       # Otherwise, fail it.
