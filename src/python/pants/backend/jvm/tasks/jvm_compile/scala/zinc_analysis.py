@@ -32,7 +32,7 @@ class ZincAnalysis(Analysis):
     ./pants test tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala:zinc_analysis
   """
 
-  FORMAT_VERSION_LINE = 'format version: 5\n'
+  FORMAT_VERSION_LINE = UnderlyingAnalysis.FORMAT_VERSION_LINE
 
   @classmethod
   def merge(cls, analyses):
@@ -54,8 +54,8 @@ class ZincAnalysis(Analysis):
                   for x in splits]
     return [ZincAnalysis(s) for s in self.underlying_analysis.split(abs_splits, catchall)]
 
-  def write(self, outfile, rebasings=None):
-    self.underlying_analysis.write(outfile, rebasings)
+  def write(self, outfile):
+    self.underlying_analysis.write(outfile)
 
   def diff(self, other):
     return self.underlying_analysis.diff(other.underlying_analysis)
