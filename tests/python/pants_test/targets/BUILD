@@ -62,7 +62,7 @@ python_tests(
 
 python_tests(
   name = 'jvm_app',
-  sources = ['test_jvm_app.py'],
+  sources = ['test_jvm_app_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
   ]
