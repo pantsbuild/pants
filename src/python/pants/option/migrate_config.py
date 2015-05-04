@@ -225,6 +225,9 @@ migrations = {
   ('ragel-gen', 'version'): ('gen.ragel', 'version'),
 
   ('prepare-resources', 'confs'): ('resources.prepare', 'confs'),
+
+  ('compile.scala', 'runtime-deps'): ('scala-platform', 'runtime'),
+  ('compile.scala', 'scalac'): ('scala-platform', 'scalac'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
