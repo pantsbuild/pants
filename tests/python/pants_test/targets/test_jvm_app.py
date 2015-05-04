@@ -11,5 +11,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
   def test_smoke(self):
     pants_run = self.run_pants(['bundle',
-                                'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main'])
+                                'testprojects/src/java/org/pantsbuild/testproject/bundle'])
     self.assert_success(pants_run)
+
+  def test_missing_files(self):
+    pants_run = self.run_pants(['bundle',
+                                'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'])
+    self.assert_failure(pants_run)

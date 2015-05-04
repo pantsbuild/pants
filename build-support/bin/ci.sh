@@ -217,6 +217,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
   # Targets that are intended to fail
   negative_test_targets=(
     testprojects/src/antlr/pants/backend/python/test:antlr_failure
+    testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files
     testprojects/src/java/org/pantsbuild/testproject/cycle1
     testprojects/src/java/org/pantsbuild/testproject/cycle2
     testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
