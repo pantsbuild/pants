@@ -5,9 +5,10 @@
 
 jvm_app(name='main',
   basename = 'hello-example',
-  dependencies = [
-    ':main-bin'
-  ],
+  binary=':main-bin',
+  bundles=[
+    bundle(fileset=globs('data/*')),
+  ]
 )
 
 # The binary, the "runnable" part:
