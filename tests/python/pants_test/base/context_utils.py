@@ -5,15 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import io
 import logging
-import os
 import sys
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
 
-from pants.base.config import Config, SingleFileConfig
 from pants.base.target import Target
 from pants.goal.context import Context
 
@@ -55,14 +52,6 @@ def create_options(options):
   return TestOptions()
 
 
-def create_empty_config():
-  """Creates an empty ``Config``."""
-  parser = Config.create_parser()
-  with io.BytesIO(b'') as ini:
-    parser.readfp(ini)
-  return SingleFileConfig('dummy/path', parser)
-
-
 class TestContext(Context):
   """A Context to use during unittesting.
 
@@ -90,17 +79,6 @@ class TestContext(Context):
     def set_outcome(self, outcome):
       return sys.stderr.write('Outcome: {}'.format(outcome))
 
-
-  def __init__(self, options, target_roots, build_graph=None, build_file_parser=None,
-               address_mapper=None, console_outstream=None, workspace=None):
-    # Some code still reads config directly. We have no tests left that actually care
-    # about the values, but we still need something to read from so we don't crash.
-    # TODO: Get rid of this once all direct config accesses are gone.
-    empty_config = create_empty_config()
-    super(TestContext, self).__init__(config=empty_config, options=options, run_tracker=None,
-        target_roots=target_roots, build_graph=build_graph, build_file_parser=build_file_parser,
-        address_mapper=address_mapper, console_outstream=console_outstream, workspace=workspace)
-
   @contextmanager
   def new_workunit(self, name, labels=None, cmd=''):
     yield TestContext.DummyWorkunit()
@@ -114,7 +92,7 @@ class TestContext(Context):
 def create_context(options=None, target_roots=None, build_graph=None,
                    build_file_parser=None, address_mapper=None,
                    console_outstream=None, workspace=None):
-  """Creates a ``Context`` with no config values, options, or targets by default.
+  """Creates a ``Context`` with no options or targets by default.
 
   :param options: A map of scope -> (map of key to value).
 
@@ -122,6 +100,7 @@ def create_context(options=None, target_roots=None, build_graph=None,
   """
   options = create_options(options or {})
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return TestContext(options=options, target_roots=target_roots, build_graph=build_graph,
-                     build_file_parser=build_file_parser, address_mapper=address_mapper,
-                     console_outstream=console_outstream, workspace=workspace)
+  return TestContext(options=options, run_tracker=None, target_roots=target_roots,
+                     build_graph=build_graph, build_file_parser=build_file_parser,
+                     address_mapper=address_mapper, console_outstream=console_outstream,
+                     workspace=workspace)

@@ -224,7 +224,6 @@ class GoalRunner(object):
     update_reporting(self.global_options, is_quiet_task() or is_explain, self.run_tracker)
 
     context = Context(
-      config=self.config,
       options=self.options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
