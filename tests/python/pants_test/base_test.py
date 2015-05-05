@@ -116,9 +116,13 @@ class BaseTest(unittest.TestCase):
     super(BaseTest, self).setUp()
     Goal.clear()
     self.real_build_root = BuildRoot().path
+
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.addCleanup(safe_rmtree, self.build_root)
+
     self.pants_workdir = os.path.join(self.build_root, '.pants.d')
     safe_mkdir(self.pants_workdir)
+
     self.options = defaultdict(dict)  # scope -> key-value mapping.
     self.options[''] = {
       'pants_workdir': self.pants_workdir,
@@ -127,7 +131,10 @@ class BaseTest(unittest.TestCase):
       'pants_configdir': os.path.join(self.build_root, 'config'),
       'cache_key_gen_version': '0-test',
     }
+
     BuildRoot().path = self.build_root
+    self.addCleanup(BuildRoot().reset)
+
     Subsystem.reset()
 
     self.create_file('pants.ini')
@@ -219,9 +226,7 @@ class BaseTest(unittest.TestCase):
     return context
 
   def tearDown(self):
-    BuildRoot().reset()
     SourceRoot.reset()
-    safe_rmtree(self.build_root)
     FilesystemBuildFile.clear_cache()
 
   def target(self, spec):
