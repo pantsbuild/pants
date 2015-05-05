@@ -11,6 +11,7 @@ import shutil
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.base.build_root import BuildRoot
 from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.ivy.bootstrapper import Bootstrapper
@@ -30,6 +31,10 @@ class JvmToolTaskTestBase(TaskTestBase):
     # Ensure we get a read of the real pants.ini config
     Config.reset_default_bootstrap_option_values()
     real_config = Config.from_cache()
+    # Loading the config sets BuildRoot, but our superclass setUp() relies on it being unset.
+    # Fortunately we plan to get rid of this direct config read soon, and then we can get rid of
+    # this hack too.
+    BuildRoot().reset()
 
     super(JvmToolTaskTestBase, self).setUp()
 

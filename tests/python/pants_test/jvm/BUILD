@@ -17,6 +17,7 @@ python_library(
   dependencies = [
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
+    'src/python/pants/base:build_root',
     'src/python/pants/base:config',
     'src/python/pants/base:extension_loader',
     'src/python/pants/util:dirutil',

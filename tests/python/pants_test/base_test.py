@@ -49,6 +49,11 @@ class BaseTest(unittest.TestCase):
     """
     super(BaseTest, cls).setUpClass()
     Config.cache(Config.load())
+    # Config.load() causes the BuildRoot singleton to be set. However in setUp() we rely
+    # on it being unset on entry, to help ensure tests start with a clean slate.
+    # So we reset it here.  Fortunately we plan to get rid of this Config hack soon, and
+    # can then also get rid of this enture method.
+    BuildRoot().reset()
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
@@ -113,9 +118,27 @@ class BaseTest(unittest.TestCase):
     return BuildFileAliases.create(targets={'target': Dependencies})
 
   def setUp(self):
+    buildroot = BuildRoot()  # Get the global BuildRoot singleton.
+    if buildroot.is_set():
+      print(dedent("""
+        ********** Test framework in bad state. Aborting entire testing run. **********
+
+        BaseTest.tearDown() failed to run after a test, meaning that state established in
+        BaseTest.setUp() has not been cleared properly. This includes global state such as the
+        BuildRoot setting. It is therefore dangerous to proceed with other tests, so the entire
+        testing run has been aborted.
+
+        The most likely cause of this failure is an exception thrown inside setUp() in BaseTest
+        or one of its subclasses. When setUp() doesn't complete successfully, tearDown() is not
+        run by the unit test framework. So you will likely see output above for some error in
+        some setUp() method. Fix that, and rerun your tests.
+      """))
+      # pytest traps sys.exit(), so we use this hard exit.
+      os._exit(1)
+
     super(BaseTest, self).setUp()
     Goal.clear()
-    self.real_build_root = BuildRoot().path
+    self.real_build_root = buildroot.path
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     self.pants_workdir = os.path.join(self.build_root, '.pants.d')
     safe_mkdir(self.pants_workdir)
@@ -127,7 +150,7 @@ class BaseTest(unittest.TestCase):
       'pants_configdir': os.path.join(self.build_root, 'config'),
       'cache_key_gen_version': '0-test',
     }
-    BuildRoot().path = self.build_root
+    buildroot.path = self.build_root
     Subsystem.reset()
 
     self.create_file('pants.ini')

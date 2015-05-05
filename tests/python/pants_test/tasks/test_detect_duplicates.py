@@ -70,6 +70,7 @@ class DuplicateDetectorTest(TaskTestBase):
       }
 
   def tearDown(self):
+    super(DuplicateDetectorTest, self).tearDown()
     safe_rmtree(self.base_dir)
 
   def test_duplicate_found(self):
