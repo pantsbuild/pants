@@ -5,6 +5,7 @@ page(
     ':credits',
     ':dev_tasks',
     ':docs',
+    ':export',
     ':howto_ask',
     ':howto_contribute',
     ':howto_develop',
@@ -33,6 +34,11 @@ page(
 page(
   name='docs',
   source='docs.md',
+)
+
+page(
+  name='export',
+  source='export.md',
 )
 
 page(

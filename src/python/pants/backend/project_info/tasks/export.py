@@ -29,6 +29,20 @@ class Export(ConsoleTask):
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """
+
+  # FORMAT_VERSION_NUMBER: Version number for identifying the export file format output. This
+  # version number should change when there is a change to the output format.
+  #
+  # Major Version 1.x.x : Increment this field when there is a major format change
+  # Minor Version x.1.x : Increment this field when there is a minor change that breaks backward
+  #   compatibility for an existing field or a field is removed.
+  # Patch version x.x.1 : Increment this field when a minor format change that just adds information
+  #   that an application can safely ignore.
+  #
+  # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
+  #
+  DEFAULT_EXPORT_VERSION='1.0.0'
+
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
     SOURCE = 'SOURCE'  # Source Target
@@ -171,6 +185,8 @@ class Export(ConsoleTask):
     }
     if self.get_options().libraries:
       graph_info['libraries'] = self._resolve_jars_info()
+
+    graph_info['version'] = self.DEFAULT_EXPORT_VERSION
 
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
