@@ -50,6 +50,9 @@ class BuildRoot(Singleton):
       raise ValueError('Build root does not exist: {}'.format(root_dir))
     self._root_dir = path
 
+  def is_set(self):
+    return self._root_dir is not None
+
   def reset(self):
     """Clears the last calculated build root for the current workspace."""
     self._root_dir = None
