@@ -41,6 +41,15 @@ from pants_test.base.context_utils import create_context
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
 
+  @classmethod
+  def setUpClass(cls):
+    """Ensure that all code has a config to read from the cache.
+
+    TODO: Yuck. Get rid of this after plumbing options through in the right places.
+    """
+    super(BaseTest, cls).setUpClass()
+    Config.cache(Config.load())
+
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
     if os.path.basename(relpath).startswith('BUILD'):
