@@ -135,6 +135,12 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
     self.assertEqual({}, result['libraries'])
 
+  def test_version(self):
+    result = get_json(self.execute_console_task(
+      targets=[self.target('project_info:first')]
+    ))
+    self.assertEqual('1.0.0', result['version'])
+
   def test_sources(self):
     result = get_json(self.execute_console_task(
       options=dict(sources=True),
