@@ -12,6 +12,7 @@
     "dev_tasks": "dist/markdown/html/src/python/pants/docs/dev_tasks.html",
     "dev_tasks_publish_extras": "dist/markdown/html/src/python/pants/docs/dev_tasks_publish_extras.html",
     "docs": "dist/markdown/html/src/python/pants/docs/docs.html",
+    "export" : "dist/markdown/html/src/python/pants/docs/export.html",
     "first_concepts": "dist/markdown/html/src/docs/first_concepts.html",
     "first_tutorial": "dist/markdown/html/src/docs/first_tutorial.html",
     "from_maven": "dist/markdown/html/examples/src/java/org/pantsbuild/example/from_maven.html",
@@ -92,6 +93,7 @@
         { "page": "build_dictionary" },
         { "page": "options_reference" },
         { "page": "changelog" },
+        { "page": "export"},
         { "page": "dev",
           "children": [
             { "page": "howto_contribute" },
