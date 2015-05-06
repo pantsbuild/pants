@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
 import os
 import unittest
 from collections import defaultdict
@@ -28,12 +29,13 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.option.global_options import register_global_options
 from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
+from pants.option.options_bootstrapper import register_bootstrap_options
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
-from pants_test.base.context_utils import create_context
+from pants_test.base.context_utils import create_context, create_option_values
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
@@ -143,7 +145,6 @@ class BaseTest(unittest.TestCase):
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
-    self.bootstrap_option_values = OptionsBootstrapper().get_bootstrap_options().for_global_scope()
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
@@ -160,30 +161,40 @@ class BaseTest(unittest.TestCase):
 
     option_values = defaultdict(dict)
     registered_global_subsystems = set()
+    bootstrap_option_values = None  # We fill these in after registering bootstrap options.
 
-    # Get default values for all options registered by the tasks in for_task_types.
-    # TODO: This is clunky and somewhat repetitive of the real registration code.
+    # We provide our own test-only registration implementation, bypassing argparse.
+    # When testing we set option values directly, so we don't care about cmd-line flags, config,
+    # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
+    # All this does is make the names available in code, with the default values.
+    # Individual tests can then override the option values they care about.
+    def register_func(on_scope):
+      def register(*rargs, **rkwargs):
+        scoped_options = option_values[on_scope]
+        default = rkwargs.get('default')
+        if default is None and rkwargs.get('action') == 'append':
+          default = []
+        for flag_name in rargs:
+          option_name = flag_name.lstrip('-').replace('-', '_')
+          scoped_options[option_name] = default
+      register.bootstrap = bootstrap_option_values
+      register.scope = on_scope
+      return register
+
+    # TODO: This sequence is a bit repetitive of the real registration sequence.
+
+    # Register bootstrap options and grab their default values for use in subsequent registration.
+    register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
+    bootstrap_option_values = create_option_values(copy.copy(option_values[Options.GLOBAL_SCOPE]))
+
+    # Now register the remaining global scope options.
+    register_global_options(register_func(Options.GLOBAL_SCOPE))
+
+    # Now register task and subsystem options for relevant tasks.
     for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
-
-      # We provide our own test-only registration implementation, bypassing argparse.
-      # When testing we set option values directly, so we don't care about cmd-line flags, config,
-      # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
-      def register_func(on_scope):
-        def register(*rargs, **rkwargs):
-          scoped_options = option_values[on_scope]
-          default = rkwargs.get('default')
-          if default is None and rkwargs.get('action') == 'append':
-            default = []
-          for flag_name in rargs:
-            option_name = flag_name.lstrip('-').replace('-', '_')
-            scoped_options[option_name] = default
-        register.bootstrap = self.bootstrap_option_values
-        register.scope = on_scope
-        return register
-      register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
       task_type.register_options(register_func(scope))
       for subsystem in task_type.global_subsystems():
         if subsystem not in registered_global_subsystems:
@@ -192,10 +203,9 @@ class BaseTest(unittest.TestCase):
       for subsystem in task_type.task_subsystems():
         subsystem.register_options(register_func(subsystem.qualify_scope(scope)))
 
-
-    # Now override with any caller-specified values.
-
+    # Now default option values override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
+
     for scope, opts in options.items():
       for key, val in opts.items():
         option_values[scope][key] = val
@@ -349,8 +359,3 @@ class BaseTest(unittest.TestCase):
         return product
       product_mapping.add(target, outdir, map(create_product, products))
       yield temporary_dir
-
-  def set_bootstrap_options(self, **values):
-    """Override some of the bootstrap option values."""
-    self.bootstrap_option_values.update(values)
-    self.set_options_for_scope(Options.GLOBAL_SCOPE, **values)
