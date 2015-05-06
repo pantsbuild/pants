@@ -35,8 +35,8 @@ class TaskTestBase(BaseTest):
   def setUp(self):
     super(TaskTestBase, self).setUp()
     self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
-    # We locate the workdir below the pants_workdir, which BaseTest locates within
-    # the BuildRoot.
+    # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
+    # BaseTest cleans this up, so we don't need to.
     self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
     self._test_workdir = os.path.join(self._tmpdir, 'workdir')
     os.mkdir(self._test_workdir)

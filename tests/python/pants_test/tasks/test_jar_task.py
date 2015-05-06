@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-import subprocess
 from collections import defaultdict
 from contextlib import contextmanager
 from textwrap import dedent
@@ -15,9 +14,12 @@ from textwrap import dedent
 from six.moves import range
 from twitter.common.collections import maybe_list
 
+from pants.backend.jvm.targets.java_agent import JavaAgent
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.products import MultipleRootedProducts
-from pants.util.contextutil import open_zip, pushd, temporary_dir, temporary_file
+from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
@@ -30,6 +32,16 @@ class BaseJarTaskTest(JarTaskTestBase):
   @classmethod
   def task_type(cls):
     return cls.TestJarTask
+
+  @property
+  def alias_groups(self):
+    return super(BaseJarTaskTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_agent': JavaAgent,
+        'jvm_binary': JvmBinary,
+      },
+    ))
+
 
   def setUp(self):
     super(BaseJarTaskTest, self).setUp()
@@ -216,7 +228,7 @@ class JarBuilderTest(BaseJarTaskTest):
 
 
   def test_agent_manifest(self):
-    self.add_to_build_file('src/java/pants/agents', dedent('''
+    self.add_to_build_file('src/java/pants/agents', dedent("""
         java_agent(
           name='fake_agent',
           premain='bob',
@@ -224,7 +236,7 @@ class JarBuilderTest(BaseJarTaskTest):
           can_redefine=True,
           can_retransform=True,
           can_set_native_method_prefix=True
-        )''').strip())
+        )""").strip())
     java_agent = self.target('src/java/pants/agents:fake_agent')
 
     context = self.context(target_roots=[java_agent])
@@ -258,7 +270,7 @@ class JarBuilderTest(BaseJarTaskTest):
                           set(expected_entries.items()).intersection(set(all_entries.items())))
 
   def test_manifest_items(self):
-    self.add_to_build_file('src/java/hello', dedent('''
+    self.add_to_build_file('src/java/hello', dedent("""
         jvm_binary(
           name='hello',
           main='hello.Hello',
@@ -266,7 +278,7 @@ class JarBuilderTest(BaseJarTaskTest):
             'Foo': 'foo-value',
             'Implementation-Version': '1.2.3',
           },
-        )''').strip())
+        )""").strip())
     binary_target = self.target('src/java/hello:hello')
     context = self.context(target_roots=[binary_target])
 

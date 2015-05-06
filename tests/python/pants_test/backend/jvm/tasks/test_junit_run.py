@@ -11,7 +11,9 @@ from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.core.targets.resources import Resources
+from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
@@ -36,9 +38,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def task_type(cls):
     return JUnitRun
 
+  @property
+  def alias_groups(self):
+    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_tests': JavaTests,
+      },
+    ))
+
   def test_junit_runner_success(self):
     self.execute_junit_runner(
-      dedent('''
+      dedent("""
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -47,13 +57,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(5 > 3);
           }
         }
-      ''')
+      """)
     )
 
   def test_junit_runner_failure(self):
     with self.assertRaises(TaskError) as cm:
       self.execute_junit_runner(
-        dedent('''
+        dedent("""
           import org.junit.Test;
           import static org.junit.Assert.assertTrue;
           public class FooTest {
@@ -62,7 +72,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertTrue(5 < 3);
             }
           }
-        ''')
+        """)
       )
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])

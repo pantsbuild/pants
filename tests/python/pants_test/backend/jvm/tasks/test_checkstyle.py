@@ -8,8 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.base.address import BuildFileAddress
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
@@ -17,36 +19,44 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 class CheckstyleTest(NailgunTaskTestBase):
   """Tests for the class Checkstyle."""
 
-  _RULE_XML_FILE_TAB_CHECKER = dedent('''
+  _RULE_XML_FILE_TAB_CHECKER = dedent("""
       <module name="FileTabCharacter"/>
-  ''')
+  """)
 
-  _RULE_XML_SUPPRESSION_FILTER = dedent('''
+  _RULE_XML_SUPPRESSION_FILTER = dedent("""
     <module name="SuppressionFilter">
       <property name="file" value="${checkstyle.suppression.file}"/>
     </module>
-  ''')
+  """)
 
-  _TEST_JAVA_SOURCE_WITH_NO_TAB = dedent('''
+  _TEST_JAVA_SOURCE_WITH_NO_TAB = dedent("""
     public class HelloMain {
       public static void main(String[] args) throws IOException {
         System.out.println("A test.");
       }
     }
-  ''')
+  """)
 
-  _TEST_JAVA_SOURCE_WITH_TAB = dedent('''
+  _TEST_JAVA_SOURCE_WITH_TAB = dedent("""
     public class HelloMain {
       public static void main(String[] args) throws IOException {
         \tSystem.out.println("A test.");
       }
     }
-  ''')
+  """)
 
 
   @classmethod
   def task_type(cls):
     return Checkstyle
+
+  @property
+  def alias_groups(self):
+    return super(CheckstyleTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_library': JavaLibrary,
+      },
+    ))
 
   def _create_context(self, rules_xml=(), properties=None, target_roots=None):
     return self.context(
@@ -63,38 +73,38 @@ class CheckstyleTest(NailgunTaskTestBase):
     return self.create_file(
       relpath='coding_style.xml',
       contents=dedent(
-        '''<?xml version="1.0"?>
+        """<?xml version="1.0"?>
            <!DOCTYPE module PUBLIC
              "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
              "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
            <module name="Checker">
              {rules_xml}
-           </module>'''.format(rules_xml='\n'.join(rules_xml))))
+           </module>""".format(rules_xml='\n'.join(rules_xml))))
 
   def _create_suppression_file(self, suppresses_xml=()):
     return self.create_file(
       relpath='suppression.xml',
       contents=dedent(
-        '''<?xml version="1.0"?>
+        """<?xml version="1.0"?>
            <!DOCTYPE suppressions PUBLIC
              "-//Puppy Crawl//DTD Suppressions 1.1//EN"
             "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
            <suppressions>
              {suppresses_xml}
            </suppressions>
-        '''.format(suppresses_xml='\n'.join(suppresses_xml))))
+        """.format(suppresses_xml='\n'.join(suppresses_xml))))
 
   def _create_target(self, name, test_java_source):
     rel_dir = os.path.join('src/java', name)
     self.create_file(relpath=os.path.join(rel_dir, '{name}.java'.format(name=name)),
                      contents=test_java_source)
 
-    build_file = self.add_to_build_file(rel_dir, dedent('''
+    build_file = self.add_to_build_file(rel_dir, dedent("""
       java_library(
         name="{name}",
         sources=["{name}.java"]
       )
-    '''.format(name=name)))
+    """.format(name=name)))
 
     java_target_address = BuildFileAddress(build_file, name)
     self.build_graph.inject_address_closure(java_target_address)
