@@ -13,6 +13,7 @@ target(
   dependencies = [
     ':jar_library',
     ':java_agent',
+    ':jvm_app',
     ':python_binary',
     ':python_target',
     ':scala_library',
@@ -56,6 +57,14 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'jvm_app',
+  sources = ['test_jvm_app_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
   ]
 )
 
