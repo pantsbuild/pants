@@ -34,6 +34,8 @@ def linkify(buildroot, s, memoized_urls=None):
   if memoized_urls is None:
     memoized_urls = {}
   def memoized_to_url(m):
+    # to_url uses None to signal not to replace the text,
+    # so we use a different sentinel value.
     value = memoized_urls.get(m.group(0), _NO_URL)
     if value is _NO_URL:
       value = to_url(m)
