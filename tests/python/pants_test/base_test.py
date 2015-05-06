@@ -140,9 +140,9 @@ class BaseTest(unittest.TestCase):
     Subsystem.reset()
 
     self.create_file('pants.ini')
-    build_configuration = BuildConfiguration()
-    build_configuration.register_aliases(self.alias_groups)
-    self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
+    self._build_configuration = BuildConfiguration()
+    self._build_configuration.register_aliases(self.alias_groups)
+    self.build_file_parser = BuildFileParser(    self._build_configuration, self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
@@ -196,7 +196,8 @@ class BaseTest(unittest.TestCase):
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
       task_type.register_options(register_func(scope))
-      for subsystem in task_type.global_subsystems():
+      for subsystem in (set(task_type.global_subsystems()) |
+                        self._build_configuration.subsystem_types()):
         if subsystem not in registered_global_subsystems:
           subsystem.register_options(register_func(subsystem.qualify_scope(Options.GLOBAL_SCOPE)))
           registered_global_subsystems.add(subsystem)

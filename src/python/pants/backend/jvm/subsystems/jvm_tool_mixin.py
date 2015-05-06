@@ -5,12 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
 
 
 class JvmToolMixin(object):
-  """A mixin for registering and accessing JVM-based tools."""
+  """A mixin for registering and accessing JVM-based tools.
+
+  Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
+  """
+  class DepLookupError(AddressLookupError):
+    """Thrown when a dependency can't be found."""
+    pass
 
   _tool_keys = []  # List of (scope, key, main, custom_rule) tuples.
 
@@ -59,6 +66,21 @@ class JvmToolMixin(object):
   def reset_registered_tools():
     """Needed only for test isolation."""
     JvmToolMixin._tool_keys = []
+
+  def tool_targets(self, context, key):
+    """Return the Target objects obtained by resolving a tool's specs."""
+    specs = self.get_options()[key]
+    targets = []
+    for spec in specs:
+      # Resolve to actual targets.
+      try:
+        targets.extend(context.resolve(spec))
+      except AddressLookupError as e:
+        raise self.DepLookupError("{message}\n  specified by option --{key} in scope {scope}."
+                                  .format(message=e,
+                                          key=key,
+                                          scope=self.options_scope))
+    return targets
 
   def tool_classpath_from_products(self, products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.

@@ -84,6 +84,10 @@ class ScalastyleTest(NailgunTaskTestBase):
   def _create_scalastyle_task_from_context(self, context):
     return self.create_task(context, self.build_root)
 
+  def setUp(self):
+    super(ScalastyleTest, self).setUp()
+    self.context()  # Trigger subsystem registration.
+
   def test_initialize_config_no_config_settings(self):
     with self.assertRaises(Scalastyle.UnspecifiedConfig):
       self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()

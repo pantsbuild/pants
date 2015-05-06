@@ -210,6 +210,16 @@ class GroupTask(Task):
         _MEMBER_TYPES = []
 
         @classmethod
+        def global_subsystems(cls):
+          return (super(SingletonGroupTask, cls).global_subsystems() +
+            tuple(s for mt in cls._member_types() for s in mt.global_subsystems()))
+
+        @classmethod
+        def task_subsystems(cls):
+          return (super(SingletonGroupTask, cls).task_subsystems() +
+            tuple(s for mt in cls._member_types() for s in mt.task_subsystems()))
+
+        @classmethod
         def product_types(cls):
           return product_type
 
