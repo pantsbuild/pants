@@ -27,10 +27,10 @@ _PATH = _PREFIX + _REL_PATH_COMPONENT + _OPTIONAL_PORT + _ABS_PATH_COMPONENTS + 
         _OPTIONAL_TARGET_SUFFIX + '\w'
 _PATH_RE = re.compile(_PATH)
 
-_NO_URL = "no url"
+_NO_URL = "no url" # Sentinel value for non-existent files in linkify's memo
 
 def linkify(buildroot, s, memoized_urls=None):
-  """Augment text by heuristically finding URL and file references and turning them into links/"""
+  """Augment text by heuristically finding URL and file references and turning them into links."""
   if memoized_urls is None:
     memoized_urls = {}
   def memoized_to_url(m):
