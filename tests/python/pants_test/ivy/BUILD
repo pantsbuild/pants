@@ -15,7 +15,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
     'src/python/pants/ivy',
-    'src/python/pants/util:contextutil',
+    'src/python/pants/option',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )

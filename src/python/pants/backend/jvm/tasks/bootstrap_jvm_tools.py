@@ -10,6 +10,7 @@ import os
 import shutil
 import threading
 from collections import defaultdict
+from textwrap import dedent
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
@@ -73,15 +74,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   @classmethod
   def register_options(cls, register):
     super(BootstrapJvmTools, cls).register_options(register)
-
-    # TODO(John Sirois): Adopt subsystems for IvyTaskMixin and JarTask (JarTool).
-    # This task uses 3 jvm subsystems!: IvyUtil, JarTask (should be a subsystem), and Shader.
-    # Right now there is no clean way to grab jvm_options for each's needs without dragging
-    # configuration away from the `jvm_options` standard (we need subsystem scopes).  As a result,
-    # we don't and just use this one option for now.
     register('--jvm-options', action='append', metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
-
     cls.register_jvm_tool(register, 'jarjar')
 
   @classmethod
@@ -125,13 +119,14 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         if not targets:
           raise KeyError
       except (KeyError, AddressLookupError) as e:
-        self.context.log.error("Failed to resolve target for tool: {tool}.\n"
-                               "This target was obtained from option {option} in scope {scope}.\n"
-                               "You probably need to add this target to your tools "
-                               "BUILD file(s), usually located in the workspace root.\n"
-                               "\nException: {e}\n"
-                               "".format(tool=tool, e=e, scope=scope, option=key))
-        raise TaskError()
+        msg = dedent("""
+          Failed to resolve target for tool: {tool}. This target was obtained from
+          option {option} in scope {scope}. You probably need to add this target to your tools
+          BUILD file(s), usually located in BUILD.tools in the workspace root.
+          Exception {etype}: {e}
+        """.format(tool=tool, etype=type(e).__name__, e=e, scope=scope, option=key))
+        self.context.log.error(msg)
+        raise TaskError(msg)
       for target in targets:
         yield target
 

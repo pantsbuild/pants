@@ -10,9 +10,11 @@ import os
 import shutil
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.config import Config
-from pants.base.extension_loader import load_plugins_and_backends
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -23,7 +25,15 @@ class JvmToolTaskTestBase(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return load_plugins_and_backends().registered_aliases()
+    # Aliases appearing in our real BUILD.tools.
+    return BuildFileAliases.create(
+      targets={
+        'jar_library': JarLibrary,
+      },
+      objects={
+        'jar': JarDependency,
+      },
+    )
 
   def setUp(self):
     # TODO(Eric Ayers): this is the old way
@@ -76,20 +86,10 @@ class JvmToolTaskTestBase(TaskTestBase):
 
     # TODO(John Sirois): Find a way to do this cleanly
     link('pants.ini', force=True)
-
-    # TODO(pl): Note that this pulls in a big chunk of the hairball to every test that
-    # depends on it, because BUILD contains source_roots that specify a variety of types
-    # from different backends.
-    link('BUILD', force=True)
-
     link('BUILD.tools', force=True)
+
     support_dir = real_config.getdefault('pants_supportdir')
     link_tree(os.path.relpath(os.path.join(support_dir, 'ivy'), self.real_build_root), force=True)
-    safe_mkdir(os.path.join(self.bootstrap_option_values.pants_supportdir, 'ivy'))
-    settings_file = os.path.join(self.bootstrap_option_values.pants_supportdir, 'ivy', 'ivysettings.xml')
-    if not os.path.exists(settings_file):
-      shutil.copy('build-support/ivy/ivysettings.xml',
-                  os.path.join(self.bootstrap_option_values.pants_supportdir, 'ivy'))
     Bootstrapper.reset_instance()
 
   def context(self, for_task_types=None, options=None, target_roots=None,
