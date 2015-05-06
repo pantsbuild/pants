@@ -35,8 +35,10 @@ python_tests(
   name = 'checkstyle',
   sources = ['test_checkstyle.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:checkstyle',
     'src/python/pants/base:address',
+    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
@@ -87,7 +89,10 @@ python_tests(
   sources = ['test_junit_run.py'],
   dependencies = [
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
     'src/python/pants/goal:products',
     'src/python/pants/ivy',
     'src/python/pants/java/distribution:distribution',
@@ -109,9 +114,11 @@ python_tests(
   name = 'scalastyle',
   sources = ['test_scalastyle.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/base:address',
+    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]

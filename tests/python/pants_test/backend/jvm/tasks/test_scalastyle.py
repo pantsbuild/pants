@@ -8,9 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 from textwrap import dedent
 
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import FileExcluder, Scalastyle
 from pants.base.address import BuildFileAddress
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
@@ -25,6 +27,14 @@ class ScalastyleTest(NailgunTaskTestBase):
   def task_type(cls):
     return Scalastyle
 
+  @property
+  def alias_groups(self):
+    return super(ScalastyleTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_library': JavaLibrary,
+        'scala_library': ScalaLibrary,
+      },
+    ))
   #
   # Internal test helper section
   #

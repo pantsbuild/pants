@@ -495,6 +495,7 @@ python_tests(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_task',
     'src/python/pants/base:build_file_aliases',

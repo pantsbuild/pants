@@ -13,7 +13,7 @@ from pants.util.meta import Singleton
 
 # TODO: Even this should probably just be a new-style option?
 class BuildRoot(Singleton):
-  """Represents the global workspace build root
+  """Represents the global workspace build root.
 
   By default a pants workspace is defined by a root directory where the workspace configuration
   file - 'pants.ini' - lives.  This can be overridden by exporting 'PANTS_BUILD_ROOT' in the
@@ -59,8 +59,7 @@ class BuildRoot(Singleton):
 
   @contextmanager
   def temporary(self, path):
-    """A contextmanager that establishes a temporary build root, restoring the prior build root on
-    exit."""
+    """Establishes a temporary build root, restoring the prior build root on exit."""
     if path is None:
       raise ValueError('Can only temporarily establish a build root given a path.')
     prior = self._root_dir

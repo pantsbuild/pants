@@ -11,8 +11,11 @@ from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
 
+from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.antlr_gen import AntlrGen
 from pants.base.address import SyntheticAddress
+from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.source_root import SourceRoot
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
@@ -20,6 +23,17 @@ class AntlrGenTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
     return AntlrGen
+
+  @property
+  def alias_groups(self):
+    return super(AntlrGenTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_antlr_library': JavaAntlrLibrary,
+      },
+      context_aware_object_factories={
+        'source_root': SourceRoot.factory,
+      },
+    ))
 
   PARTS = {'srcroot': 'testprojects/src/antlr',
            'dir': 'this/is/a/directory',
@@ -30,15 +44,19 @@ class AntlrGenTest(NailgunTaskTestBase):
 
   def setUp(self):
     super(AntlrGenTest, self).setUp()
+    self.add_to_build_file('BUILD', dedent("""
+      source_root('{srcroot}', java_antlr_library)
+    """.format(**self.PARTS)))
+
     self.create_file(relpath='{srcroot}/{dir}/{prefix}.g4'.format(**self.PARTS),
-                     contents=dedent('''
+                     contents=dedent("""
       grammar {prefix};
       ////////////////////
       start  : letter EOF ;
       letter : LETTER ;
       ////////////////////
       fragment LETTER : [a-zA-Z] ;
-    '''.format(**self.PARTS)))
+    """.format(**self.PARTS)))
 
   def create_context(self):
     # generate a context to contain the build graph for the input target, then execute
@@ -84,25 +102,25 @@ class AntlrGenTest(NailgunTaskTestBase):
       self.assertIn(syn_target, context.targets())
 
   def test_explicit_package(self):
-    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent('''
+    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent("""
       java_antlr_library(
         name='{name}',
         compiler='antlr4',
         package='this.is.a.package',
         sources=['{prefix}.g4'],
       )
-    '''.format(**self.PARTS)))
+    """.format(**self.PARTS)))
 
     self.execute_antlr4_test('this.is.a.package')
 
   def test_derived_package(self):
-    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent('''
+    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent("""
       java_antlr_library(
         name='{name}',
         compiler='antlr4',
         sources=['{prefix}.g4'],
       )
-    '''.format(**self.PARTS)))
+    """.format(**self.PARTS)))
 
     self.execute_antlr4_test(self.PARTS['dir'].replace('/', '.'))
 
@@ -110,13 +128,13 @@ class AntlrGenTest(NailgunTaskTestBase):
     self.create_file(relpath='{srcroot}/{dir}/sub/not_read.g4'.format(**self.PARTS),
                      contents='// does not matter')
 
-    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent('''
+    self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent("""
       java_antlr_library(
         name='{name}',
         compiler='antlr4',
         sources=['{prefix}.g4', 'sub/not_read.g4'],
       )
-    '''.format(**self.PARTS)))
+    """.format(**self.PARTS)))
 
     with self.assertRaises(AntlrGen.AmbiguousPackageError):
       self.execute(self.create_context())
