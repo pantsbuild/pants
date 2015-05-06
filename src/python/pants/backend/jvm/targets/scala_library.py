@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.scala.target_platform import TargetPlatform
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
@@ -42,10 +42,9 @@ class ScalaLibrary(ExportableJvmLibrary):
     for spec in super(ScalaLibrary, self).traversable_dependency_specs:
       yield spec
 
-    # TODO(John Sirois): Targets should have a config plumbed as part of the implicit
-    # BuildFileParser injected context and that could be used to allow in general for targets with
-    # knobs and in particular an explict config arg to the TargetPlatform constructor below.
-    for library_spec in TargetPlatform().library_specs:
+    # TODO(John Sirois): Targets should be able to set their scala platform version
+    # explicitly, and not have to conform to this global setting.
+    for library_spec in ScalaPlatform.global_instance().runtime:
       yield library_spec
 
   @property
