@@ -52,6 +52,7 @@ class HtmlReporter(Reporter):
 
     # We redirect stdout, stderr etc. of tool invocations to these files.
     self._output_files = defaultdict(dict)  # workunit_id -> {path -> fileobj}.
+    self._linkify_memo = {}
 
   def report_path(self):
     """The path to the main report file."""
@@ -81,7 +82,8 @@ class HtmlReporter(Reporter):
     # Get useful properties from the workunit.
     workunit_dict = workunit.to_dict()
     if workunit_dict['cmd']:
-      workunit_dict['cmd'] = linkify(self._buildroot, workunit_dict['cmd'].replace('$', '\\\\$'))
+      workunit_dict['cmd'] = linkify(self._buildroot, workunit_dict['cmd'].replace('$', '\\\\$'),
+                                     self._linkify_memo)
 
     # Create the template arguments.
     args = { 'indent': len(workunit.ancestors()) * 10,
@@ -264,7 +266,7 @@ class HtmlReporter(Reporter):
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
     colored = self._handle_ansi_color_codes(cgi.escape(s.decode('utf-8')))
-    return linkify(self._buildroot, colored).replace('\n', '</br>')
+    return linkify(self._buildroot, colored, self._linkify_memo).replace('\n', '</br>')
 
   _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')
 

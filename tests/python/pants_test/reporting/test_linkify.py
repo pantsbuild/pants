@@ -30,10 +30,10 @@ class RunInfoTest(unittest.TestCase):
     if os.path.exists(self._buildroot):
       shutil.rmtree(self._buildroot, ignore_errors=True)
 
-  def _do_test_linkify(self, expected_link, url):
+  def _do_test_linkify(self, expected_link, url, memo=None):
     s = 'foo %s bar' % url
     expected = 'foo <a target="_blank" href="%s">%s</a> bar' % (expected_link, url)
-    linkified = linkify(self._buildroot, s)
+    linkified = linkify(self._buildroot, s, memo)
     self.assertEqual(expected, linkified)
 
   def test_linkify_absolute_paths(self):
@@ -67,3 +67,9 @@ class RunInfoTest(unittest.TestCase):
   def test_linkify_suffix(self):
     ensure_file_exists(os.path.join(self._buildroot, 'foo/bar/BUILD.suffix'))
     self._do_test_linkify('/browse/foo/bar/BUILD.suffix', 'foo/bar')
+
+  def test_linkify_stores_values_in_memo(self):
+    url = 'https://foobar.com/baz/qux'
+    memo = {}
+    self._do_test_linkify(url, url, memo)
+    self.assertEqual(url, memo[url])
