@@ -17,6 +17,17 @@ target(
 )
 
 python_tests(
+  name = 'binary_create',
+  sources = ['test_binary_create.py'],
+  dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/tasks:binary_create',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+  ]
+)
+
+python_tests(
   name = 'bootstrap_jvm_tools',
   sources = ['test_bootstrap_jvm_tools.py'],
   dependencies = [
