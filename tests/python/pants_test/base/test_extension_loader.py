@@ -23,6 +23,7 @@ from pants.base.extension_loader import (PluginLoadOrderError, PluginNotFound, l
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
+from pants.subsystem.subsystem import Subsystem
 
 
 class MockMetadata(EmptyProvider):
@@ -37,6 +38,35 @@ class MockMetadata(EmptyProvider):
 
   def get_metadata_lines(self, name):
     return yield_lines(self.get_metadata(name))
+
+
+class DummySubsystem1(Subsystem):
+  @classmethod
+  def scope_qualifier(cls):
+    return 'dummy-subsystem1'
+
+
+class DummySubsystem2(Subsystem):
+  @classmethod
+  def scope_qualifier(cls):
+    return 'dummy-subsystem2'
+
+
+class DummyTarget(Target):
+  @classmethod
+  def subsystems(cls):
+    return super(DummyTarget, cls).subsystems() + (DummySubsystem1, )
+
+
+class DummyObject1(object):
+  # Test that registering an object with no subsystems() method succeeds.
+  pass
+
+
+class DummyObject2(object):
+  @classmethod
+  def subsystems(cls):
+    return (DummySubsystem2, )
 
 
 class DummyTask(Task):
@@ -83,6 +113,7 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(0, len(registered_aliases.targets))
     self.assertEqual(0, len(registered_aliases.objects))
     self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
+    self.assertEqual(self.build_configuration.subsystem_types(), set())
 
   def test_load_valid_empty(self):
     with self.create_register() as backend_package:
@@ -90,13 +121,17 @@ class LoaderTest(unittest.TestCase):
       self.assert_empty_aliases()
 
   def test_load_valid_partial_aliases(self):
-    aliases = BuildFileAliases.create(targets={'bob': Target},
-                                      objects={'MEANING_OF_LIFE': 42})
+    aliases = BuildFileAliases.create(targets={'bob': DummyTarget},
+                                      objects={'obj1': DummyObject1,
+                                               'obj2': DummyObject2})
     with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
       load_backend(self.build_configuration, backend_package)
       registered_aliases = self.build_configuration.registered_aliases()
-      self.assertEqual(Target, registered_aliases.targets['bob'])
-      self.assertEqual(42, registered_aliases.objects['MEANING_OF_LIFE'])
+      self.assertEqual(DummyTarget, registered_aliases.targets['bob'])
+      self.assertEqual(DummyObject1, registered_aliases.objects['obj1'])
+      self.assertEqual(DummyObject2, registered_aliases.objects['obj2'])
+      self.assertEqual(self.build_configuration.subsystem_types(),
+                       set([DummySubsystem1, DummySubsystem2]))
 
   def test_load_valid_partial_goals(self):
     def register_goals():
@@ -222,7 +257,9 @@ class LoaderTest(unittest.TestCase):
 
   def test_plugin_installs_alias(self):
     def reg_alias():
-      return BuildFileAliases.create(targets={'pluginalias': Target}, objects={'FROMPLUGIN': 100})
+      return BuildFileAliases.create(targets={'pluginalias': DummyTarget},
+                                     objects={'FROMPLUGIN1': DummyObject1,
+                                              'FROMPLUGIN2': DummyObject2})
     self.working_set.add(self.get_mock_plugin('aliasdemo', '0.0.1', alias=reg_alias))
 
     # Start with no aliases.
@@ -233,5 +270,8 @@ class LoaderTest(unittest.TestCase):
 
     # Aliases now exist.
     registered_aliases = self.build_configuration.registered_aliases()
-    self.assertEqual(Target, registered_aliases.targets['pluginalias'])
-    self.assertEqual(100, registered_aliases.objects['FROMPLUGIN'])
+    self.assertEqual(DummyTarget, registered_aliases.targets['pluginalias'])
+    self.assertEqual(DummyObject1, registered_aliases.objects['FROMPLUGIN1'])
+    self.assertEqual(DummyObject2, registered_aliases.objects['FROMPLUGIN2'])
+    self.assertEqual(self.build_configuration.subsystem_types(),
+                     set([DummySubsystem1, DummySubsystem2]))

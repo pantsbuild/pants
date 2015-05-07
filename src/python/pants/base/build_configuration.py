@@ -34,6 +34,10 @@ class BuildConfiguration(object):
     self._addressable_alias_map = {}
     self._exposed_objects = {}
     self._exposed_context_aware_object_factories = {}
+    self._subsystems = set()
+
+  def subsystem_types(self):
+    return self._subsystems
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -70,6 +74,7 @@ class BuildConfiguration(object):
                   .format(alias=alias))
     self._target_aliases[alias] = target
     self.register_addressable_alias(alias, target.get_addressable_type())
+    self._subsystems.update(target.subsystems())
 
   def register_exposed_object(self, alias, obj):
     """Registers the given object under the given alias.
@@ -85,6 +90,9 @@ class BuildConfiguration(object):
       logger.debug('Object alias {alias} has already been registered. Overwriting!'
                   .format(alias=alias))
     self._exposed_objects[alias] = obj
+    # obj doesn't implement any common base class, so we have to test for this attr.
+    if hasattr(obj, 'subsystems'):
+      self._subsystems.update(obj.subsystems())
 
   def register_addressable_alias(self, alias, addressable_type):
     """Registers a general Addressable type under the given alias.

@@ -78,7 +78,9 @@ class GoalRunner(object):
     known_scopes = ['']
 
     # Add scopes for global subsystem instances.
-    for subsystem_type in set(self.subsystems) | Goal.global_subsystem_types():
+    for subsystem_type in (set(self.subsystems) |
+                           Goal.global_subsystem_types() |
+                           build_configuration.subsystem_types()):
       known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
 
     # Add scopes for all tasks in all goals.

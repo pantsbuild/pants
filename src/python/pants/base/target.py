@@ -27,6 +27,16 @@ from pants.base.validation import assert_list
 
 class AbstractTarget(object):
 
+  @classmethod
+  def subsystems(cls):
+    """The subsystems this target uses.
+
+    Targets always use the global subsystem instance. They have no notion of any other scope.
+
+    :return: A tuple of subsystem types.
+    """
+    return tuple()
+
   @property
   def has_resources(self):
     """Returns True if the target has an associated set of Resources."""
