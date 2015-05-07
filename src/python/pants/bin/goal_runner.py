@@ -78,9 +78,10 @@ class GoalRunner(object):
     known_scopes = ['']
 
     # Add scopes for global subsystem instances.
-    for subsystem_type in (set(self.subsystems) |
-                           Goal.global_subsystem_types() |
-                           build_configuration.subsystem_types()):
+    global_subsystems = (set(self.subsystems) |
+                         Goal.global_subsystem_types() |
+                         build_configuration.subsystem_types())
+    for subsystem_type in global_subsystems:
       known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
 
     # Add scopes for all tasks in all goals.
@@ -90,7 +91,7 @@ class GoalRunner(object):
 
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
-    self.register_options()
+    self.register_options(global_subsystems)
 
     # Make the options values available to all subsystems.
     Subsystem._options = self.options
@@ -145,12 +146,12 @@ class GoalRunner(object):
   def global_options(self):
     return self.options.for_global_scope()
 
-  def register_options(self):
+  def register_options(self, global_subsystems):
     # Standalone global options.
     register_global_options(self.options.registration_function_for_global_scope())
 
     # Options for global-level subsystems.
-    for subsystem_type in set(self.subsystems) | Goal.global_subsystem_types():
+    for subsystem_type in global_subsystems:
       subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
