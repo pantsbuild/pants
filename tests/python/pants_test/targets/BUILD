@@ -13,7 +13,6 @@ target(
   dependencies = [
     ':jar_library',
     ':java_agent',
-    ':jvm_app',
     ':python_binary',
     ':python_target',
     ':scala_library',
