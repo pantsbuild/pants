@@ -19,16 +19,21 @@ class BinaryCreate(JvmBinaryTask):
     super(BinaryCreate, self).__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
 
+  @classmethod
+  def product_types(cls):
+    return ['jvm_binaries']
+
   def execute(self):
+    jvm_binaries_product = self.context.products.get('jvm_binaries')
     for binary in self.context.targets(self.is_binary):
-      self.create_binary(binary)
+      self.create_binary(binary, jvm_binaries_product)
 
-  def create_binary(self, binary):
+  def create_binary(self, binary, jvm_binaries_product):
     safe_mkdir(self._outdir)
-
     binary_jarname = '{}.jar'.format(binary.basename)
     binary_jarpath = os.path.join(self._outdir, binary_jarname)
     self.context.log.info('creating {}'.format(os.path.relpath(binary_jarpath, get_buildroot())))
+    jvm_binaries_product.add(binary, self._outdir).append(binary_jarname)
 
     with self.monolithic_jar(binary, binary_jarpath, with_external_deps=True) as jar:
       self.add_main_manifest_entry(jar, binary)
