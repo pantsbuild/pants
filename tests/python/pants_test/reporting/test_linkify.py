@@ -71,8 +71,8 @@ class RunInfoTest(unittest.TestCase):
     url = 'https://foobar.com/baz/qux'
     self._do_test_linkify(url, url)
 
-  def test_linkify_ftps(self):
-    url = 'ftps://foobar.com/baz/qux'
+  def test_linkify_sftp(self):
+    url = 'sftp://foobar.com/baz/qux'
     self._do_test_not_linkified(url)
 
   def test_linkify_target(self):
