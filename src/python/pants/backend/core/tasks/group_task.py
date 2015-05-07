@@ -306,10 +306,11 @@ class GroupTask(Task):
         ordered_chunks.append((group_member, chunk))
         chunks_by_member[group_member].append(chunk)
 
-      self.context.log.debug('::: created chunks({})'.format(len(ordered_chunks)))
-      for i, (group_member, goal_chunk) in enumerate(ordered_chunks):
-        self.context.log.debug('  chunk({}) [flavor={}]:\n\t{}'.format(
-            i, group_member.name(), '\n\t'.join(sorted(map(str, goal_chunk)))))
+      if self.context.log.is_debug():
+        self.context.log.debug('::: created chunks({})'.format(len(ordered_chunks)))
+        for i, (group_member, goal_chunk) in enumerate(ordered_chunks):
+          self.context.log.debug('  chunk({}) [flavor={}]:\n\t{}'.format(
+              i, group_member.name(), '\n\t'.join(sorted(map(str, goal_chunk)))))
 
       # prep
       for group_member, chunks in chunks_by_member.items():

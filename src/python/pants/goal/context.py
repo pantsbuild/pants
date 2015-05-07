@@ -56,6 +56,9 @@ class Context(object):
     def fatal(self, *msg_elements):
       self._run_tracker.log(Report.FATAL, *msg_elements)
 
+    def is_debug(self):
+      return self._run_tracker.level_enabled(Report.DEBUG)
+
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
   def __init__(self, options, run_tracker, target_roots,
