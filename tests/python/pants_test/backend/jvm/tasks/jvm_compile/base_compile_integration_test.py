@@ -16,7 +16,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class BaseCompileIT(PantsRunIntegrationTest):
   @contextmanager
   def do_test_compile(self, target, strategy,
-      expected_files=None, iterations=2, expect_failure=False):
+      expected_files=None, iterations=2, expect_failure=False, extra_args=None):
     """Runs a configurable number of iterations of compilation for the given target.
 
     By default, runs twice to shake out errors related to noops.
@@ -29,7 +29,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
             '--compile-java-strategy={}'.format(strategy),
             '--compile-scala-strategy={}'.format(strategy),
             target,
-          ]
+          ] + (extra_args if extra_args else [])
         # Clean-all on the first iteration.
         if i == 0:
           args.insert(0, 'clean-all')
