@@ -20,7 +20,7 @@ _ABS_PATH_COMPONENTS = r'({})+'.format(_ABS_PATH_COMPONENT)
 _OPTIONAL_TARGET_SUFFIX = r'(:{})?'.format(_REL_PATH_COMPONENT)  # For /foo/bar:target.
 
 # Note that we require at least two path components.
-# We require the last characgter to be alphanumeric or underscore, because some tools print an
+# We require the last character to be alphanumeric or underscore, because some tools print an
 # ellipsis after file names (I'm looking at you, zinc). None of our files end in a dot in practice,
 # so this is fine.
 _PATH = _PREFIX + _REL_PATH_COMPONENT + _OPTIONAL_PORT + _ABS_PATH_COMPONENTS + \
@@ -29,10 +29,14 @@ _PATH_RE = re.compile(_PATH)
 
 _NO_URL = "no url" # Sentinel value for non-existent files in linkify's memo
 
-def linkify(buildroot, s, memoized_urls=None):
-  """Augment text by heuristically finding URL and file references and turning them into links."""
-  if memoized_urls is None:
-    memoized_urls = {}
+def linkify(buildroot, s, memoized_urls):
+  """Augment text by heuristically finding URL and file references and turning them into links.
+
+  :param string buildroot: The base directory of the project.
+  :param string s: The text to insert links into.
+  :param dict memoized_urls: A cache of text to links so repeated substitutions don't require
+                             additional file stats calls.
+  """
   def memoized_to_url(m):
     # to_url uses None to signal not to replace the text,
     # so we use a different sentinel value.

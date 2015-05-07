@@ -31,22 +31,34 @@ class RunInfoTest(unittest.TestCase):
       shutil.rmtree(self._buildroot, ignore_errors=True)
 
   def _do_test_linkify(self, expected_link, url, memo=None):
-    s = 'foo %s bar' % url
-    expected = 'foo <a target="_blank" href="%s">%s</a> bar' % (expected_link, url)
+    memo = {} if memo is None else memo
+    s = 'foo {} bar'.format(url)
+    expected = 'foo <a target="_blank" href="{}">{}</a> bar'.format(expected_link, url)
     linkified = linkify(self._buildroot, s, memo)
     self.assertEqual(expected, linkified)
+
+  def _do_test_not_linkified(self, url, memo=None):
+    memo = {} if memo is None else memo
+    s = 'foo {} bar'.format(url)
+    linkified = linkify(self._buildroot, s, memo)
+    self.assertEqual(s, linkified)
 
   def test_linkify_absolute_paths(self):
     relpath = 'underscore_and.dot/and-dash/baz'
     path = os.path.join(self._buildroot, relpath)
     ensure_file_exists(path)
-    self._do_test_linkify('/browse/%s' % relpath, path)
+    self._do_test_linkify('/browse/{}'.format(relpath), path)
 
   def test_linkify_relative_paths(self):
     relpath = 'underscore_and.dot/and-dash/baz'
     path = os.path.join(self._buildroot, relpath)
     ensure_file_exists(path)
-    self._do_test_linkify('/browse/%s' % relpath, relpath)
+    self._do_test_linkify('/browse/{}'.format(relpath), relpath)
+
+  def test_linkify_non_existent_relative_paths(self):
+    relpath = 'underscore_and.dot/and-dash/baz'
+
+    self._do_test_not_linkified(relpath)
 
   def test_linkify_http(self):
     url = 'http://foobar.com/baz/qux'
@@ -58,6 +70,10 @@ class RunInfoTest(unittest.TestCase):
   def test_linkify_https(self):
     url = 'https://foobar.com/baz/qux'
     self._do_test_linkify(url, url)
+
+  def test_linkify_ftps(self):
+    url = 'ftps://foobar.com/baz/qux'
+    self._do_test_not_linkified(url)
 
   def test_linkify_target(self):
     ensure_file_exists(os.path.join(self._buildroot, 'foo/bar/BUILD'))
