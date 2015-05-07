@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
@@ -24,6 +25,18 @@ class JarCreateTestBase(JarTaskTestBase):
   @classmethod
   def task_type(cls):
     return JarCreate
+
+  @property
+  def alias_groups(self):
+    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_library': JavaLibrary,
+        'java_thrift_library': JavaThriftLibrary,
+        'jvm_binary': JvmBinary,
+        'resources': Resources,
+        'scala_library': ScalaLibrary,
+      },
+    ))
 
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
@@ -50,12 +63,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def jvm_binary(self, path, name, source=None, resources=None):
     self.create_files(path, [source])
-    self.add_to_build_file(path, dedent('''
+    self.add_to_build_file(path, dedent("""
           jvm_binary(name=%(name)r,
             source=%(source)r,
             resources=[%(resources)r],
           )
-        ''' % dict(name=name, source=source, resources=resources)))
+        """ % dict(name=name, source=source, resources=resources)))
     return self.target('%s:%s' % (path, name))
 
   def java_thrift_library(self, path, name, *sources):

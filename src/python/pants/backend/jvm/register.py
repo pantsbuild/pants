@@ -37,7 +37,8 @@ from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
-from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ScalaCompile
+from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCompile,
+                                                                     ScalaZincCompile)
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
@@ -119,12 +120,13 @@ def register_goals():
   # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
   # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
   # systemic compile errors.
-  jvm_compile.add_member(ScalaCompile)
+  jvm_compile.add_member(ScalaZincCompile)
 
   # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
   # subset of java code
   jvm_compile.add_member(AptCompile)
 
+  jvm_compile.add_member(JavaZincCompile)
   jvm_compile.add_member(JavaCompile)
 
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')

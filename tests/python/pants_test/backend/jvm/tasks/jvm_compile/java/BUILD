@@ -17,10 +17,17 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='apt_compile_integration',
   sources=['test_apt_compile_integration.py'],
+  dependencies=[
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+  ]
+)
+
+python_tests(
+  name='java_zinc_compile_integration',
+  sources=['test_java_zinc_compile_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ]

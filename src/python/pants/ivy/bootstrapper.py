@@ -46,9 +46,6 @@ class Bootstrapper(object):
 
   _INSTANCE = None
 
-  def global_subsystems(cls):
-    return super(Bootstrapper, cls).global_subsystems() + (IvySubsystem, )
-
   @classmethod
   def default_ivy(cls, bootstrap_workunit_factory=None):
     """Returns an Ivy instance using the default global bootstrapper.
@@ -64,7 +61,6 @@ class Bootstrapper(object):
 
   def __init__(self, *args, **kwargs):
     """Creates an ivy bootstrapper."""
-    super(Bootstrapper, self).__init__(*args, **kwargs)
     self._ivy_subsystem = IvySubsystem.global_instance()
     self._version_or_ivyxml = self._ivy_subsystem.get_options().ivy_profile
     self._classpath = None
