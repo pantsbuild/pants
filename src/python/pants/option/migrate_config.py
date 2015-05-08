@@ -140,10 +140,13 @@ migrations = {
   ('jar-publish', 'repos'): ('publish.jar', 'repos'),
   ('jar-publish', 'publish_extras'): ('publish.jar', 'publish_extras'),
 
-  ('publish', 'restrict_push_branches'): ('publish.jar', 'restrict_push_branches'),
+  ('publish', 'individual_plugins'): ('publish.jar', 'individual_plugins'),
+  ('publish', 'ivy_settings'): ('publish.jar', 'ivy_settings'),
   ('publish', 'jvm_options'): ('publish.jar', 'jvm_options'),
-  ('publish', 'repos'): ('publish.jar', 'repos'),
   ('publish', 'publish_extras'): ('publish.jar', 'publish_extras'),
+  ('publish', 'push_postscript'): ('publish.jar', 'push_postscript'),
+  ('publish', 'repos'): ('publish.jar', 'repos'),
+  ('publish', 'restrict_push_branches'): ('publish.jar', 'restrict_push_branches'),
 
   # Three changes are pertinent to migrate 'ide' to both idea and & eclipse. I tried to capture
   # that in notes
