@@ -73,7 +73,8 @@ class Report(object):
       return ret
 
   def start_workunit(self, workunit):
-    self._workunits[workunit.id] = workunit
+    with self._workunits_lock:
+      self._workunits[workunit.id] = workunit
     for reporter in self._reporter_list():
       reporter.start_workunit(workunit)
 

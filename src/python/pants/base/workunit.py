@@ -109,8 +109,7 @@ class WorkUnit(object):
 
   def start(self):
     """Mark the time at which this workunit started."""
-    with self._lock:
-      self.start_time = time.time()
+    self.start_time = time.time()
 
   def end(self):
     """Mark the time at which this workunit ended."""
@@ -175,14 +174,12 @@ class WorkUnit(object):
 
   def start_time_string(self):
     """A convenient string representation of start_time."""
-    with self._lock:
-      return time.strftime('%H:%M:%S', time.localtime(self.start_time))
+    return time.strftime('%H:%M:%S', time.localtime(self.start_time))
 
   def start_delta_string(self):
     """A convenient string representation of how long after the run started we started."""
-    with self._lock:
-      delta = int(self.start_time) - int(self.root().start_time)
-      return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
+    delta = int(self.start_time) - int(self.root().start_time)
+    return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
 
   def root(self):
     ret = self
