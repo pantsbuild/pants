@@ -142,7 +142,7 @@ class BaseTest(unittest.TestCase):
     self.create_file('pants.ini')
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
-    self.build_file_parser = BuildFileParser(    self._build_configuration, self.build_root)
+    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 

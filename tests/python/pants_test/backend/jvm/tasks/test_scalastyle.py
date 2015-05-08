@@ -86,7 +86,7 @@ class ScalastyleTest(NailgunTaskTestBase):
 
   def setUp(self):
     super(ScalastyleTest, self).setUp()
-    self.context()  # Trigger subsystem registration.
+    self.context()  # We don't need the context, but this ensures subsystem option registration.
 
   def test_initialize_config_no_config_settings(self):
     with self.assertRaises(Scalastyle.UnspecifiedConfig):

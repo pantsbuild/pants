@@ -46,7 +46,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def global_subsystems(cls):
-    return super(ScalaCompile, cls).global_subsystems() + (ScalaPlatform, )
+    return super(ZincCompile, cls).global_subsystems() + (ScalaPlatform, )
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -63,8 +63,6 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    # Note: Used in ZincUtils.
-    # TODO: Revisit this. It's unintuitive for ZincUtils to reach back into the task for options.
     register('--plugins', action='append', help='Use these scalac plugins.')
     register('--plugin-args', advanced=True, type=Options.dict, default={},
              help='Map from plugin name to list of arguments for that plugin.')
@@ -91,6 +89,9 @@ class ZincCompile(JvmCompile):
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
 
+  def zinc_classpath(self):
+    return self.tool_classpath('zinc')
+
   def compiler_classpath(self):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)
 
@@ -109,6 +110,9 @@ class ZincCompile(JvmCompile):
     if self._lazy_plugin_args is None:
       self._lazy_plugin_args = self._create_plugin_args()
     return self._lazy_plugin_args
+
+  def name_hashing(self):
+    return self.get_options().name_hashing
 
   def _create_plugin_args(self):
     if not self.get_options().plugins:
@@ -195,9 +199,11 @@ class ZincCompile(JvmCompile):
     return self._zinc_utils.compile(args, classpath, sources,
                                     classes_output_dir, analysis_file, upstream_analysis)
 
+
 class ScalaZincCompile(ZincCompile):
   _language = 'scala'
   _file_suffix = '.scala'
+
 
 class JavaZincCompile(ZincCompile):
   _language = 'java'
@@ -215,7 +221,8 @@ class JavaZincCompile(ZincCompile):
   @classmethod
   def register_options(cls, register):
     super(JavaZincCompile, cls).register_options(register)
-    register('--enabled', action='store_true', default=False, help='Use zinc to compile Java targets')
+    register('--enabled', action='store_true', default=False,
+             help='Use zinc to compile Java targets')
 
   def select(self, target):
     return self.get_options().enabled and super(JavaZincCompile, self).select(target)

@@ -37,7 +37,7 @@ class ZincUtils(object):
 
   @property
   def _zinc_classpath(self):
-    return self._nailgun_task.tool_classpath('zinc')
+    return self._nailgun_task.zinc_classpath()
 
   @property
   def _compiler_classpath(self):
@@ -72,7 +72,7 @@ class ZincUtils(object):
     ])
     if not self._color:
       args.append('-no-color')
-    if not self._nailgun_task.get_options().name_hashing:
+    if not self._nailgun_task.name_hashing():
       args.append('-no-name-hashing')
 
     args.extend(self._zinc_jar_args())
