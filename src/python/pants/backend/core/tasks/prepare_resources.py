@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import defaultdict
 import hashlib
 import os
 import shutil
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
