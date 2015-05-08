@@ -25,7 +25,7 @@ Options
 
 To get information about options
 
-    ./pants run.jvm zinc:bin --run-jvm-args=-help
+    ./pants run zinc:bin -- -help
 
 ### Compile
 

@@ -27,25 +27,43 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   {{#artifact.dependencies?}}
   <dependencies>
     {{#artifact.dependencies}}
-    <dependency>
-      <groupId>{{org}}</groupId>
-      <artifactId>{{name}}</artifactId>
-      <version>{{rev}}</version>
-      <scope>{{scope}}</scope>
-      {{#classifier?}}
-      <classifier>{{classifier}}</classifier>
-      {{/classifier?}}
-      {{#excludes?}}
-      <exclusions>
-        {{#excludes}}
-        <exclusion>
+      {{^classifiers}}
+        <dependency>
           <groupId>{{org}}</groupId>
           <artifactId>{{name}}</artifactId>
-        </exclusion>
-        {{/excludes}}
-      </exclusions>
-      {{/excludes?}}
-    </dependency>
+          <version>{{rev}}</version>
+          <scope>{{scope}}</scope>
+          {{#excludes?}}
+            <exclusions>
+              {{#excludes}}
+                <exclusion>
+                  <groupId>{{org}}</groupId>
+                  <artifactId>{{name}}</artifactId>
+                </exclusion>
+              {{/excludes}}
+            </exclusions>
+          {{/excludes?}}
+        </dependency>
+      {{/classifiers}}
+      {{#classifiers}}
+        <dependency>
+          <groupId>{{org}}</groupId>
+          <artifactId>{{name}}</artifactId>
+          <version>{{rev}}</version>
+          <scope>{{scope}}</scope>
+          <classifier>{{classifier}}</classifier>
+          {{#excludes?}}
+            <exclusions>
+              {{#excludes}}
+                <exclusion>
+                  <groupId>{{org}}</groupId>
+                  <artifactId>{{name}}</artifactId>
+                </exclusion>
+              {{/excludes}}
+            </exclusions>
+          {{/excludes?}}
+        </dependency>
+      {{/classifiers}}
     {{/artifact.dependencies}}
   </dependencies>
   {{/artifact.dependencies?}}
