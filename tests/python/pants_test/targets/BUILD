@@ -86,7 +86,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:config',
   ]
 )
 

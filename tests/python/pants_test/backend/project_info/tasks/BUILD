@@ -86,7 +86,6 @@ python_tests(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
-    'src/python/pants/base:config',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

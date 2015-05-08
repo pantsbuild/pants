@@ -13,7 +13,6 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
-from pants.base.config import Config
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -28,6 +27,11 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def setUp(self):
     super(FileDepsTest, self).setUp()
+    self.context(options={
+      'scala-platform': {
+        'runtime': ['tools:scala-library']
+      }
+    })
 
     # TODO(John Sirois): Rationalize much of this target emission setup.  Lots of tests do similar
     # things: https://github.com/pantsbuild/pants/issues/525
@@ -35,16 +39,6 @@ class FileDepsTest(ConsoleTaskTestBase):
       if sources:
         self.create_files(path, sources)
       self.add_to_build_file(path, definition)
-
-    self.create_file('pants.ini',
-                     contents=dedent("""
-                       [compile.scala]
-                       runtime-deps: ['tools:scala-library']
-                     """),
-                     mode='a')
-
-    # TODO: Required because target code has no direct config reference. Remove after fixing that.
-    Config.cache(Config.load())
 
     create_target(path='tools',
                   definition=dedent("""
