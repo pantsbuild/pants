@@ -349,7 +349,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     if self.skip_scala:
       scalac_classpath = []
     else:
-      scalac_classpath = self.tool_classpath('scalac', scope='compile.scala')
+      scalac_classpath = self.tool_classpath('scalac', scope='scala-platform')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     targets = self.context.targets()
