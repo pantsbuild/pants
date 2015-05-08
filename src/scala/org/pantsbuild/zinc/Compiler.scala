@@ -101,11 +101,16 @@ object Compiler {
   }
 
   /**
-   * Get an analysis, lookup by cache file.
+   * Analysis for the given file if it is already cached.
    */
-  def analysis(cacheFile: File): Analysis = {
-    analysisStore(cacheFile).get map (_._1) getOrElse Analysis.Empty
-  }
+  def analysisOption(cacheFile: File): Option[Analysis] =
+    analysisStore(cacheFile).get map (_._1)
+
+  /**
+   * Analysis for the given file, or Analysis.Empty if it is not in the cache.
+   */
+  def analysis(cacheFile: File): Analysis =
+    analysisOption(cacheFile) getOrElse Analysis.Empty
 
   /**
    * Check whether an analysis is empty.

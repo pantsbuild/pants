@@ -53,7 +53,7 @@ object Main {
       sys.exit(0) // only run analysis utilities
     }
 
-    val inputs = Inputs(settings)
+    val inputs = Inputs(log, settings)
     val setup = Setup(settings)
 
     // if there are no sources provided, print outputs based on current analysis if requested,

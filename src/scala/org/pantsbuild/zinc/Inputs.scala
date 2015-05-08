@@ -36,9 +36,10 @@ object Inputs {
   /**
    * Create inputs based on command-line settings.
    */
-  def apply(settings: Settings): Inputs = {
+  def apply(log: sbt.Logger, settings: Settings): Inputs = {
     import settings._
     inputs(
+      log,
       classpath,
       sources,
       classesDirectory,
@@ -55,10 +56,20 @@ object Inputs {
       analysis.mirrorAnalysis)
   }
 
+  /** An overridden definesClass to use analysis for an input directory if it is available. */
+  def definesClass(log: sbt.Logger, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
+    analysisMap.get(entry).map { analysis =>
+      log.debug(s"Hit analysis cache for class definitions with ${entry}")
+      (s: String) => analysis.relations.definesClass(s).nonEmpty
+    }.getOrElse {
+      Locate.definesClass(entry)
+    }
+
   /**
    * Create normalised and defaulted Inputs.
    */
   def inputs(
+    log: sbt.Logger,
     classpath: Seq[File],
     sources: Seq[File],
     classesDirectory: File,
@@ -80,12 +91,24 @@ object Inputs {
     val classes          = normalise(classesDirectory)
     val cacheFile        = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
-    val analysisMap      = (cp map { file => (file, analysisFor(file, classes, upstreamAnalysis)) }).toMap
+    // Use only existing upstream analysis files for class lookups.
+    val validUpstreamAnalysis =
+      upstreamAnalysis.flatMap {
+        case (k, _) if k == classes =>
+          // ignore our own analysis
+          None
+        case (k, v) =>
+          // use analysis only if it was valid/non-empty
+          Compiler.analysisOption(v).map { analysis =>
+            k -> analysis
+          }
+      }
+    val analysisMap      = (cp map { file => (file, allAnalysisFor(file, classes, upstreamAnalysis)) }).toMap
     val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
     val printRelations   = outputRelations map normalise
     val printProducts    = outputProducts map normalise
     new Inputs(
-      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, Locate.definesClass,
+      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, definesClass(log, validUpstreamAnalysis, _),
       javaOnly, compileOrder, incOpts, printRelations, printProducts, mirrorAnalysis
     )
   }
@@ -94,6 +117,7 @@ object Inputs {
    * Java API for creating Inputs.
    */
   def create(
+    log: sbt.Logger,
     classpath: JList[File],
     sources: JList[File],
     classesDirectory: File,
@@ -105,6 +129,7 @@ object Inputs {
     incOptions: IncOptions,
     mirrorAnalysisCache: Boolean): Inputs =
   inputs(
+    log,
     classpath.asScala,
     sources.asScala,
     classesDirectory,
@@ -123,6 +148,7 @@ object Inputs {
 
   @deprecated("Use the variant that takes `incOptions` parameter, instead.", "0.3.5.3")
   def create(
+    log: sbt.Logger,
     classpath: JList[File],
     sources: JList[File],
     classesDirectory: File,
@@ -132,7 +158,7 @@ object Inputs {
     analysisMap: JMap[File, File],
     compileOrder: String,
     mirrorAnalysisCache: Boolean): Inputs =
-    create(classpath, sources, classesDirectory, scalacOptions, javacOptions,
+    create(log, classpath, sources, classesDirectory, scalacOptions, javacOptions,
       analysisCache, analysisMap, compileOrder, IncOptions(), mirrorAnalysisCache)
 
   /**
@@ -154,9 +180,9 @@ object Inputs {
 
   /**
    * Get the analysis for a compile run, based on a classpath entry.
-   * If not cached in memory, reads from the cache file.
+   * If not cached in memory, reads from the cache file, or creates empty analysis.
    */
-  def analysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
+  def allAnalysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
     cacheFor(file, exclude, mapped) map Compiler.analysis getOrElse Analysis.Empty
   }
 
