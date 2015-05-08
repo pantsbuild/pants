@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import contextmanager
-
 import os
 import re
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 
 from six.moves import range
 
