@@ -28,10 +28,8 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
-
     val log = Util.logger(settings.quiet, settings.logLevel, settings.color)
-    MainLog.log = log
+    val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
 
     // bail out on any command-line option errors
     if (!errors.isEmpty) {
@@ -109,9 +107,5 @@ object Main {
         if (message ne null) log.error(message)
         sys.exit(1)
     }
-  }
-
-  object MainLog {
-    var log: sbt.Logger = null
   }
 }

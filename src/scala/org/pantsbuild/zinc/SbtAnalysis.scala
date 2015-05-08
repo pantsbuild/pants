@@ -254,12 +254,13 @@ object SbtAnalysis {
             }
           }
         }
+        import analysis.relations.{ srcProd, binaryDep, internalSrcDep, externalDep, classes }
         val sections =
-          ("products", analysis.relations.srcProd) ::
-          ("binary dependencies", analysis.relations.binaryDep) ::
-          ("source dependencies", analysis.relations.internalSrcDep) ::
-          ("external dependencies", analysis.relations.externalDep) ::
-          ("class names", analysis.relations.classes) ::
+          ("products", srcProd) ::
+          ("binary dependencies", binaryDep) ::
+          ("source dependencies", internalSrcDep) ::
+          ("external dependencies", externalDep) ::
+          ("class names", classes) ::
           Nil
         sections foreach { x => printRelation(x._1, x._2) }
       }
@@ -273,8 +274,9 @@ object SbtAnalysis {
     for (file <- output) {
       Using.fileWriter(utf8)(file) { out =>
         def relative(path: File) = Util.relativize(classesDirectory, path)
-        analysis.relations.srcProd._1s.toSeq.sorted foreach {  k =>
-          analysis.relations.srcProd.forward(k).toSeq.sorted foreach { v =>
+        import analysis.relations.srcProd
+        srcProd._1s.toSeq.sorted foreach {  k =>
+          srcProd.forward(k).toSeq.sorted foreach { v =>
             out.write(relative(k)); out.write(" -> "); out.write(relative(v)); out.write("\n")
           }
         }

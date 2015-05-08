@@ -4,30 +4,26 @@
 
 package org.pantsbuild.zinc
 
-import java.io.{ByteArrayOutputStream, DataInputStream, File, OutputStream}
-import java.net.{InetAddress, Socket}
-import java.nio.ByteBuffer
-import java.util.{List => JList}
-
 import com.martiansoftware.nailgun.NGConstants
-import org.pantsbuild.zinc.ZincClient.Chunk.{Argument, Command, Directory, Exit, StdErr, StdOut}
-
+import java.io.{ ByteArrayOutputStream, DataInputStream, File, OutputStream }
+import java.net.{ InetAddress, Socket }
+import java.nio.ByteBuffer
+import java.util.{ List => JList }
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-
 object ZincClient {
   object Chunk {
-    val Argument = NGConstants.CHUNKTYPE_ARGUMENT
-    val Command = NGConstants.CHUNKTYPE_COMMAND
+    val Argument  = NGConstants.CHUNKTYPE_ARGUMENT
+    val Command   = NGConstants.CHUNKTYPE_COMMAND
     val Directory = NGConstants.CHUNKTYPE_WORKINGDIRECTORY
-    val StdOut = NGConstants.CHUNKTYPE_STDOUT
-    val StdErr = NGConstants.CHUNKTYPE_STDERR
-    val Exit = NGConstants.CHUNKTYPE_EXIT
+    val StdOut    = NGConstants.CHUNKTYPE_STDOUT
+    val StdErr    = NGConstants.CHUNKTYPE_STDERR
+    val Exit      = NGConstants.CHUNKTYPE_EXIT
   }
 
   object Exception {
-    val ServerExit = NGConstants.EXIT_EXCEPTION
+    val ServerExit    = NGConstants.EXIT_EXCEPTION
     val NoSuchCommand = NGConstants.EXIT_NOSUCHCOMMAND
     val ClientReceive = 897
   }
@@ -87,14 +83,12 @@ class ZincClient(val address: InetAddress, val port: Int) {
    * @throws java.net.ConnectException if the zinc server is not available
    */
   def send(command: String, args: Seq[String], cwd: File, out: OutputStream, err: OutputStream): Int = {
-    val socket = new Socket(address, port)
+    val socket  = new Socket(address, port)
     val sockout = socket.getOutputStream
-    val sockin = new DataInputStream(socket.getInputStream)
+    val sockin  = new DataInputStream(socket.getInputStream)
     sendCommand(command, args, cwd, sockout)
     val exitCode = receiveOutput(sockin, out, err)
-    sockout.close();
-    sockin.close();
-    socket.close()
+    sockout.close(); sockin.close(); socket.close()
     exitCode
   }
 
@@ -119,11 +113,7 @@ class ZincClient(val address: InetAddress, val port: Int) {
       // give some time for startup
       var count = 0
       while (!serverAvailable && (count < 50)) {
-        try {
-          Thread.sleep(100)
-        } catch {
-          case _: InterruptedException =>
-        }
+        try { Thread.sleep(100) } catch { case _: InterruptedException => }
         count += 1
       }
     }
@@ -170,6 +160,7 @@ class ZincClient(val address: InetAddress, val port: Int) {
   }
 
   private def sendCommand(command: String, args: Seq[String], cwd: File, out: OutputStream): Unit = {
+    import ZincClient.Chunk.{ Argument, Command, Directory }
     args foreach { arg => putChunk(Argument, arg, out) }
     putChunk(Directory, cwd.getCanonicalPath, out)
     putChunk(Command, command, out)
@@ -177,11 +168,12 @@ class ZincClient(val address: InetAddress, val port: Int) {
 
   @tailrec
   private def receiveOutput(in: DataInputStream, out: OutputStream, err: OutputStream): Int = {
+    import ZincClient.Chunk.{ Exit, StdOut, StdErr }
     val exitCode =
       try {
         val (chunkType, data) = getChunk(in)
         chunkType match {
-          case Exit => Some(new String(data).toInt)
+          case Exit   => Some(new String(data).toInt)
           case StdOut => out.write(data); None
           case StdErr => err.write(data); None
         }
