@@ -19,6 +19,10 @@ class _RWBuf(object):
     self._lock = threading.Lock()
     self._io = io
     self._readpos = 0
+    self._closed = False
+
+  def is_closed(self):
+    return self._closed
 
   def read(self, size=-1):
     with self._lock:
@@ -42,6 +46,7 @@ class _RWBuf(object):
       self._io.flush()
 
   def close(self):
+    self._closed = True
     self._io.close()
 
   def do_write(self, s):

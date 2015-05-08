@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from contextlib import contextmanager
+
 import os
 import re
+import threading
 import time
 import uuid
 
@@ -100,23 +103,28 @@ class WorkUnit(object):
     if self.parent:
       self.parent.children.append(self)
 
+    self._lock = threading.Lock()
+
   def has_label(self, label):
     return label in self.labels
 
   def start(self):
     """Mark the time at which this workunit started."""
-    self.start_time = time.time()
+    with self._lock:
+      self.start_time = time.time()
 
   def end(self):
     """Mark the time at which this workunit ended."""
-    self.end_time = time.time()
-    for output in self._outputs.values():
-      output.close()
-    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnit.TOOL)
+    with self._lock:
+      self.end_time = time.time()
+      for output in self._outputs.values():
+        output.close()
+      return self.path(), self._duration(), self._self_time(), self.has_label(WorkUnit.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit."""
-    return self._outcome
+    with self._lock:
+      return self._outcome
 
   def set_outcome(self, outcome):
     """Set the outcome of this work unit.
@@ -126,10 +134,10 @@ class WorkUnit(object):
     worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
-
-    if outcome < self._outcome:
-      self._outcome = outcome
-      if self.parent: self.parent.set_outcome(self._outcome)
+    with self._lock:
+      if outcome < self._outcome:
+        self._outcome = outcome
+        if self.parent: self.parent.set_outcome(self._outcome)
 
   _valid_name_re = re.compile(r'\w+')
 
@@ -138,38 +146,44 @@ class WorkUnit(object):
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: {}'.format(name))
-    if name not in self._outputs:
-      workunit_name = re.sub(r'\W', '_', self.name)
-      path = os.path.join(self.run_info_dir,
-                          'tool_outputs', '{workunit_name}-{id}.{output_name}'
-                          .format(workunit_name=workunit_name,
-                                  id=self.id,
-                                  output_name=name))
-      safe_mkdir_for(path)
-      self._outputs[name] = FileBackedRWBuf(path)
-      self._output_paths[name] = path
-    return self._outputs[name]
+    with self._lock:
+      if name not in self._outputs:
+        workunit_name = re.sub(r'\W', '_', self.name)
+        path = os.path.join(self.run_info_dir,
+                            'tool_outputs', '{workunit_name}-{id}.{output_name}'
+                            .format(workunit_name=workunit_name,
+                                    id=self.id,
+                                    output_name=name))
+        safe_mkdir_for(path)
+        self._outputs[name] = FileBackedRWBuf(path)
+        self._output_paths[name] = path
+      return self._outputs[name]
 
-  def outputs(self):
-    """Returns the map of output name -> output buffer."""
-    return self._outputs
-
-  def output_paths(self):
-    """Returns the map of output name -> path of the output file."""
-    return self._output_paths
+  @contextmanager
+  def safe_outputs(self):
+    with self._lock:
+      outputs = {k: v for k, v in self._outputs.items() if not v.is_closed()}
+      yield outputs
 
   def duration(self):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""
+    with self._lock:
+      return self._duration()
+
+  def _duration(self):
+    # For use under a lock
     return (self.end_time or time.time()) - self.start_time
 
   def start_time_string(self):
     """A convenient string representation of start_time."""
-    return time.strftime('%H:%M:%S', time.localtime(self.start_time))
+    with self._lock:
+      return time.strftime('%H:%M:%S', time.localtime(self.start_time))
 
   def start_delta_string(self):
     """A convenient string representation of how long after the run started we started."""
-    delta = int(self.start_time) - int(self.root().start_time)
-    return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
+    with self._lock:
+      delta = int(self.start_time) - int(self.root().start_time)
+      return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
 
   def root(self):
     ret = self
@@ -196,7 +210,8 @@ class WorkUnit(object):
     This assumes that all major work should be done in leaves.
     TODO: Is this assumption valid?
     """
-    return 0 if len(self.children) == 0 else self._self_time()
+    with self._lock:
+      return 0 if len(self.children) == 0 else self._self_time()
 
   def to_dict(self):
     """Useful for providing arguments to templates."""
@@ -210,4 +225,4 @@ class WorkUnit(object):
 
   def _self_time(self):
     """Returns the time spent in this workunit outside of any children."""
-    return self.duration() - sum([child.duration() for child in self.children])
+    return self._duration() - sum([child.duration() for child in self.children])

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import cgi
 import os
 import re
+import threading
 import uuid
 from collections import defaultdict, namedtuple
 
@@ -53,6 +54,7 @@ class HtmlReporter(Reporter):
     # We redirect stdout, stderr etc. of tool invocations to these files.
     self._output_files = defaultdict(dict)  # workunit_id -> {path -> fileobj}.
     self._linkify_memo = {}
+    self._output_lock = threading.Lock()
 
   def report_path(self):
     """The path to the main report file."""
@@ -65,11 +67,12 @@ class HtmlReporter(Reporter):
 
   def close(self):
     """Implementation of Reporter callback."""
-    self._report_file.close()
-    # Make sure everything's closed.
-    for files in self._output_files.values():
-      for f in files.values():
-        f.close()
+    with self._output_lock:
+      self._report_file.close()
+      # Make sure everything's closed.
+      for files in self._output_files.values():
+        for f in files.values():
+          f.close()
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -177,7 +180,9 @@ class HtmlReporter(Reporter):
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+    if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+      return
+    with self._output_lock:
       path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
       output_files = self._output_files[workunit.id]
       if path not in output_files:
@@ -253,13 +258,17 @@ class HtmlReporter(Reporter):
 
   def _emit(self, s):
     """Append content to the main report file."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+    if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+      return
+    with self._output_lock:
       self._report_file.write(s)
       self._report_file.flush()  # We must flush in the same thread as the write.
 
   def _overwrite(self, filename, s):
     """Overwrite a file with the specified contents."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+    if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+      return
+    with self._output_lock:
       with open(os.path.join(self._html_dir, filename), 'w') as f:
         f.write(s)
 

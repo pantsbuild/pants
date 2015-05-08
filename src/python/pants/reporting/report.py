@@ -46,12 +46,16 @@ class Report(object):
     self._reporters = {}  # name -> Reporter instance.
 
     # We synchronize on this, to support parallel execution.
-    self._lock = threading.Lock()
+    self._reporters_lock = threading.Lock()
+    self._workunits_lock = threading.Lock()
+
+  def _reporter_list(self):
+    with self._reporters_lock:
+      return self._reporters.values()
 
   def open(self):
-    with self._lock:
-      for reporter in self._reporters.values():
-        reporter.open()
+    for reporter in self._reporter_list():
+      reporter.open()
     self._emitter_thread.start()
 
   # Note that if you addr/remove reporters after open() has been called you have
@@ -59,56 +63,54 @@ class Report(object):
   # stateless reporters, such as ConsoleReporter.
 
   def add_reporter(self, name, reporter):
-    with self._lock:
+    with self._reporters_lock:
       self._reporters[name] = reporter
 
   def remove_reporter(self, name):
-    with self._lock:
+    with self._reporters_lock:
       ret = self._reporters[name]
       del self._reporters[name]
       return ret
 
   def start_workunit(self, workunit):
-    with self._lock:
-      self._workunits[workunit.id] = workunit
-      for reporter in self._reporters.values():
-        reporter.start_workunit(workunit)
+    self._workunits[workunit.id] = workunit
+    for reporter in self._reporter_list():
+      reporter.start_workunit(workunit)
 
   def log(self, workunit, level, *msg_elements):
     """Log a message.
 
     Each element of msg_elements is either a message string or a (message, detail) pair.
     """
-    with self._lock:
-      for reporter in self._reporters.values():
-        reporter.handle_log(workunit, level, *msg_elements)
+    for reporter in self._reporter_list():
+      reporter.handle_log(workunit, level, *msg_elements)
 
   def end_workunit(self, workunit):
-    with self._lock:
-      self._notify()  # Make sure we flush everything reported until now.
-      for reporter in self._reporters.values():
-        reporter.end_workunit(workunit)
+    self._notify()  # Make sure we flush everything reported until now.
+    for reporter in self._reporter_list():
+      reporter.end_workunit(workunit)
+    with self._workunits_lock:
       if workunit.id in self._workunits:
         del self._workunits[workunit.id]
 
   def flush(self):
-    with self._lock:
-      self._notify()
+    self._notify()
 
   def close(self):
     self._emitter_thread.stop()
-    with self._lock:
-      self._notify()  # One final time.
-      for reporter in self._reporters.values():
-        reporter.close()
+    self._notify()  # One final time.
+    for reporter in self._reporter_list():
+      reporter.close()
 
   def _notify(self):
     # Notify for output in all workunits. Note that output may be coming in from workunits other
     # than the current one, if work is happening in parallel.
-    # Assumes self._lock is held by the caller.
-    for workunit in self._workunits.values():
-      for label, output in workunit.outputs().items():
-        s = output.read()
-        if len(s) > 0:
-          for reporter in self._reporters.values():
-            reporter.handle_output(workunit, label, s)
+    with self._workunits_lock:
+      workunits = self._workunits.values()
+    for workunit in workunits:
+      with workunit.safe_outputs() as outputs:
+        for label, output in outputs.items():
+          s = output.read()
+          if len(s) > 0:
+            for reporter in self._reporter_list():
+              reporter.handle_output(workunit, label, s)
