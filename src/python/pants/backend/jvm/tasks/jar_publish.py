@@ -219,12 +219,25 @@ class PomWriter(DependencyWriter):
 
   def jardep(self, jar, classifier=None):
     return TemplateData(
-        org=jar.org,
-        name=jar.name,
-        rev=jar.rev,
-        scope='compile',
-        classifier=classifier,
-        excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
+      classifiers=self.classifiers(classifier, jar.artifacts),
+      excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name],
+      name=jar.name,
+      org=jar.org,
+      rev=jar.rev,
+      scope='compile')
+
+  @staticmethod
+  def classifiers(classifier, artifacts):
+    """Find a list of plausible classifiers.
+
+    :param classifier: the starting classifier
+    :param artifacts: a sequence of IvyArtifact's
+    :return: list like [TemplateData(classifier='sources'), TemplateData(classifier='javadoc')]
+    """
+    r = []
+    if classifier:
+      r.append(TemplateData(classifier=classifier))
+    return r + [TemplateData(classifier=i) for i in map(lambda x: x.classifier, artifacts) if i]
 
   def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
     return self.jardep(jar_dependency, classifier=classifier)

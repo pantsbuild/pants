@@ -300,27 +300,19 @@ public class ConsoleRunner {
       }
     }
 
+    // TODO: Register all listeners to core instead of to abortableListener because
+    // abortableListener gets removed when one of the listener throws exceptions in
+    // RunNotifier.java. Other listeners should not get removed.
     if (perTestTimer) {
       abortableListener.addListener(new PerClassConsoleListener(out));
     } else {
-      abortableListener.addListener(new ConsoleListener(out));
+      core.addListener(new ConsoleListener(out));
     }
 
-    Thread abnormalExitHook = new Thread() {
-      @Override public void run() {
-        try {
-          abortableListener.abort(new UnknownError("Abnormal VM exit - test crashed."));
-        // We want to trap and log no matter why abort failed for a better end user message.
-        // SUPPRESS CHECKSTYLE RegexpSinglelineJava
-        } catch (Exception e) {
-          out.println(e);
-          e.printStackTrace(out);
-        }
-      }
-    };
-    abnormalExitHook.setDaemon(true);
+    // Wrap test execution with registration of a shutdown hook that will ensure we
+    // never exit silently if the VM does.
+    Thread abnormalExitHook = createAbnormalExitHook(abortableListener, out);
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
-
     int failures = 0;
     try {
       if (this.parallelThreads > 1) {
@@ -335,10 +327,37 @@ public class ConsoleRunner {
       }
     } catch (InitializationError initializationError) {
       failures = 1;
+    } finally {
+      // If we're exiting via a thrown exception, we'll get a better message by letting it
+      // propagate than by halt()ing.
+      Runtime.getRuntime().removeShutdownHook(abnormalExitHook);
     }
-
-    Runtime.getRuntime().removeShutdownHook(abnormalExitHook);
     exit(failures);
+  }
+
+
+  /**
+   * Returns a thread that records a system exit to the listener, and then halts(1).
+   */
+  private Thread createAbnormalExitHook(final AbortableListener listener, final PrintStream out) {
+    Thread abnormalExitHook = new Thread() {
+      @Override public void run() {
+        try {
+          listener.abort(new UnknownError("Abnormal VM exit - test crashed."));
+        // We want to trap and log no matter why abort failed for a better end user message.
+        // SUPPRESS CHECKSTYLE RegexpSinglelineJava
+        } catch (Exception e) {
+          out.println(e);
+          e.printStackTrace(out);
+        }
+        // This error might be a call to `System.exit(0)`, which we definitely do
+        // not want to go unnoticed.
+        out.println("FATAL: VM exiting uncleanly.");
+        out.flush();
+        Runtime.getRuntime().halt(1);
+      }
+    };
+    return abnormalExitHook;
   }
 
   private List<Request> parseRequests(PrintStream out, PrintStream err, Iterable<String> specs) {

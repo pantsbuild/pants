@@ -194,7 +194,6 @@ python_library(
   dependencies = [
     ':mustache',
     '3rdparty/python:pystache',
-    '3rdparty/python:six',
   ]
 )
 
@@ -217,6 +216,7 @@ python_library(
   sources = ['mustache.py'],
   dependencies = [
     '3rdparty/python:pystache',
+    '3rdparty/python:six',
   ]
 )
 

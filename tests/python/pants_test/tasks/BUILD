@@ -140,6 +140,7 @@ python_tests(
     'src/python/pants/backend/core/tasks:reflect',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/base:config',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'tests/python/pants_test:base_test',

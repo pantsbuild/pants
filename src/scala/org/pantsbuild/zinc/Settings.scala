@@ -6,7 +6,6 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList }
-import org.pantsbuild.zinc.Main.MainLog
 import sbt.inc.ClassfileManager
 import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
 import sbt.Level
@@ -150,7 +149,7 @@ case class IncOptions(
 
   def classfileManager: () => ClassfileManager = {
     if (transactional && backup.isDefined)
-      ClassfileManager.transactional(backup.get, MainLog.log)
+      ClassfileManager.transactional(backup.get)
     else
       DefaultIncOptions.newClassfileManager
   }
@@ -305,38 +304,39 @@ object Settings {
   def normalise(settings: Settings, cwd: Option[File]): Settings = {
     if (cwd.isEmpty) settings
     else {
+      import settings._
       settings.copy(
-        sources = Util.normaliseSeq(cwd)(settings.sources),
-        classpath = Util.normaliseSeq(cwd)(settings.classpath),
-        classesDirectory = Util.normalise(cwd)(settings.classesDirectory),
-        scala = settings.scala.copy(
-          home = Util.normaliseOpt(cwd)(settings.scala.home),
-          path = Util.normaliseSeq(cwd)(settings.scala.path),
-          compiler = Util.normaliseOpt(cwd)(settings.scala.compiler),
-          library = Util.normaliseOpt(cwd)(settings.scala.library),
-          extra = Util.normaliseSeq(cwd)(settings.scala.extra)
+        sources = Util.normaliseSeq(cwd)(sources),
+        classpath = Util.normaliseSeq(cwd)(classpath),
+        classesDirectory = Util.normalise(cwd)(classesDirectory),
+        scala = scala.copy(
+          home = Util.normaliseOpt(cwd)(scala.home),
+          path = Util.normaliseSeq(cwd)(scala.path),
+          compiler = Util.normaliseOpt(cwd)(scala.compiler),
+          library = Util.normaliseOpt(cwd)(scala.library),
+          extra = Util.normaliseSeq(cwd)(scala.extra)
         ),
-        javaHome = Util.normaliseOpt(cwd)(settings.javaHome),
-        sbt = settings.sbt.copy(
-          sbtInterface = Util.normaliseOpt(cwd)(settings.sbt.sbtInterface),
-          compilerInterfaceSrc = Util.normaliseOpt(cwd)(settings.sbt.compilerInterfaceSrc)
+        javaHome = Util.normaliseOpt(cwd)(javaHome),
+        sbt = sbt.copy(
+          sbtInterface = Util.normaliseOpt(cwd)(sbt.sbtInterface),
+          compilerInterfaceSrc = Util.normaliseOpt(cwd)(sbt.compilerInterfaceSrc)
         ),
-        incOptions = settings.incOptions.copy(
-          apiDumpDirectory = Util.normaliseOpt(cwd)(settings.incOptions.apiDumpDirectory),
-          backup = Util.normaliseOpt(cwd)(settings.incOptions.backup)
+        incOptions = incOptions.copy(
+          apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory),
+          backup = Util.normaliseOpt(cwd)(incOptions.backup)
         ),
-        analysis = settings.analysis.copy(
-          cache = Util.normaliseOpt(cwd)(settings.analysis.cache),
-          cacheMap = Util.normaliseMap(cwd)(settings.analysis.cacheMap),
-          outputRelations = Util.normaliseOpt(cwd)(settings.analysis.outputRelations),
-          outputProducts = Util.normaliseOpt(cwd)(settings.analysis.outputProducts)
+        analysis = analysis.copy(
+          cache = Util.normaliseOpt(cwd)(analysis.cache),
+          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap),
+          outputRelations = Util.normaliseOpt(cwd)(analysis.outputRelations),
+          outputProducts = Util.normaliseOpt(cwd)(analysis.outputProducts)
         ),
-        analysisUtil = settings.analysisUtil.copy(
-          cache = Util.normaliseOpt(cwd)(settings.analysisUtil.cache),
-          merge = Util.normaliseSeq(cwd)(settings.analysisUtil.merge),
-          rebase = settings.analysisUtil.rebase map Util.normalisePair(cwd),
-          split = Util.normaliseSeqMap(cwd)(settings.analysisUtil.split),
-          reload = Util.normaliseSeq(cwd)(settings.analysisUtil.reload)
+        analysisUtil = analysisUtil.copy(
+          cache = Util.normaliseOpt(cwd)(analysisUtil.cache),
+          merge = Util.normaliseSeq(cwd)(analysisUtil.merge),
+          rebase = analysisUtil.rebase map Util.normalisePair(cwd),
+          split = Util.normaliseSeqMap(cwd)(analysisUtil.split),
+          reload = Util.normaliseSeq(cwd)(analysisUtil.reload)
         )
       )
     }

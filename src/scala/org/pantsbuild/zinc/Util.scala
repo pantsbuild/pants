@@ -5,11 +5,7 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import java.util.{Timer, TimerTask}
-
-import sbt.Path._
-import sbt.{ConsoleLogger, Hash, IO, Level, Logger}
-
+import sbt.{ ConsoleLogger, Hash, IO, Level, Logger }
 
 object Util {
 
@@ -18,31 +14,35 @@ object Util {
   //
 
   /**
-   * Simple duration regular expression.
-   */
-  val Duration = """(\d+)([hms])""".r
-  /**
    * Create a new logger based on quiet, level, and color settings.
    */
   def logger(quiet: Boolean, level: Level.Value, color: Boolean): Logger = {
     if (quiet) {
       new SilentLogger
     } else {
-      val log = ConsoleLogger(useColor = ConsoleLogger.formatEnabled && color);
-      log.setLevel(level);
-      log
+      val log = ConsoleLogger(useColor = ConsoleLogger.formatEnabled && color); log.setLevel(level); log
     }
+  }
+
+  /**
+   * A logger that does nothing.
+   */
+  class SilentLogger extends Logger {
+    def trace(t: => Throwable): Unit = ()
+    def success(message: => String): Unit = ()
+    def log(level: Level.Value, message: => String): Unit = ()
   }
 
   //
   // Time
   //
+
   /**
    * Current timestamp and time passed since start time.
    */
   def timing(start: Long): String = {
     val end = System.currentTimeMillis
-    "at %s [%s]" format(dateTime(end), duration(end - start))
+    "at %s [%s]" format (dateTime(end), duration(end - start))
   }
 
   /**
@@ -51,8 +51,8 @@ object Util {
   def duration(millis: Long): String = {
     val secs = millis / 1000
     val (m, s, ms) = (secs / 60, secs % 60, millis % 1000)
-    if (m > 0) "%d:%02d.%03ds" format(m, s, ms)
-    else "%d.%03ds" format(s, ms)
+    if (m > 0) "%d:%02d.%03ds" format (m, s, ms)
+    else "%d.%03ds" format (s, ms)
   }
 
   /**
@@ -65,46 +65,54 @@ object Util {
   //
   // Files
   //
-  /**
-   * Normalise optional file in relation to actual current working directory.
-   */
-  def normaliseOpt(cwd: Option[File])(optFile: Option[File]): Option[File] = {
-    if (cwd.isDefined) optFile map normalise(cwd) else optFile
-  }
-  /**
-   * Normalise file pair in relation to actual current working directory.
-   */
-  def normalisePair(cwd: Option[File])(pair: (File, File)): (File, File) = {
-    if (cwd.isDefined) (normalise(cwd)(pair._1), normalise(cwd)(pair._2)) else pair
-  }
-  /**
-   * Normalise file map in relation to actual current working directory.
-   */
-  def normaliseMap(cwd: Option[File])(mapped: Map[File, File]): Map[File, File] = {
-    if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else mapped
-  }
-  /**
-   * Normalise file sequence map in relation to actual current working directory.
-   */
-  def normaliseSeqMap(cwd: Option[File])(mapped: Map[Seq[File], File]): Map[Seq[File], File] = {
-    if (cwd.isDefined) mapped map { case (l, r) => (normaliseSeq(cwd)(l), normalise(cwd)(r)) } else mapped
-  }
+
   /**
    * Normalise file in relation to actual current working directory.
    */
   def normalise(cwd: Option[File])(file: File): File = {
     if (cwd.isDefined && !file.isAbsolute) new File(cwd.get, file.getPath) else file
   }
+
+  /**
+   * Normalise optional file in relation to actual current working directory.
+   */
+  def normaliseOpt(cwd: Option[File])(optFile: Option[File]): Option[File] = {
+    if (cwd.isDefined) optFile map normalise(cwd) else optFile
+  }
+
+  /**
+   * Normalise file pair in relation to actual current working directory.
+   */
+  def normalisePair(cwd: Option[File])(pair: (File, File)): (File, File) = {
+    if (cwd.isDefined) (normalise(cwd)(pair._1), normalise(cwd)(pair._2)) else pair
+  }
+
   /**
    * Normalise sequence of files in relation to actual current working directory.
    */
   def normaliseSeq(cwd: Option[File])(files: Seq[File]): Seq[File] = {
     if (cwd.isDefined) files map normalise(cwd) else files
   }
+
+  /**
+   * Normalise file map in relation to actual current working directory.
+   */
+  def normaliseMap(cwd: Option[File])(mapped: Map[File, File]): Map[File, File] = {
+    if (cwd.isDefined) mapped map { case (l, r) => (normalise(cwd)(l), normalise(cwd)(r)) } else mapped
+  }
+
+  /**
+   * Normalise file sequence map in relation to actual current working directory.
+   */
+  def normaliseSeqMap(cwd: Option[File])(mapped: Map[Seq[File], File]): Map[Seq[File], File] = {
+    if (cwd.isDefined) mapped map { case (l, r) => (normaliseSeq(cwd)(l), normalise(cwd)(r)) } else mapped
+  }
+
   /**
    * Fully relativize a path, relative to any other base.
    */
   def relativize(base: File, path: File): String = {
+    import scala.tools.nsc.io.Path._
     (base relativize path).toString
   }
 
@@ -112,17 +120,14 @@ object Util {
    * Check a file is writable, create it if it doesn't exist.
    */
   def checkWritable(file: File) = {
-    try {
-      IO.touch(file); true
-    } catch {
-      case e: Exception => false
-    }
+    try { IO.touch(file); true } catch { case e: Exception => false }
   }
 
   /**
    * Clean all class files from a directory.
    */
   def cleanAllClasses(dir: File): Unit = {
+    import sbt.Path._
     IO.delete((dir ** "*.class").get)
   }
 
@@ -142,9 +147,7 @@ object Util {
    */
   def intProperty(name: String, default: Int): Int = {
     val value = System.getProperty(name)
-    if (value ne null) try value.toInt catch {
-      case _: Exception => default
-    } else default
+    if (value ne null) try value.toInt catch { case _: Exception => default } else default
   }
 
   /**
@@ -179,15 +182,9 @@ object Util {
   def propertiesFromResource(resource: String, classLoader: ClassLoader): java.util.Properties = {
     val props = new java.util.Properties
     val stream = classLoader.getResourceAsStream(resource)
-    try {
-      props.load(stream)
-    }
-    catch {
-      case e: Exception =>
-    }
-    finally {
-      if (stream ne null) stream.close
-    }
+    try { props.load(stream) }
+    catch { case e: Exception => }
+    finally { if (stream ne null) stream.close }
     props
   }
 
@@ -204,6 +201,12 @@ object Util {
   //
   // Timers
   //
+
+  /**
+   * Simple duration regular expression.
+   */
+  val Duration = """(\d+)([hms])""".r
+
   /**
    * Milliseconds from string duration of the form Nh|Nm|Ns, otherwise default.
    */
@@ -214,19 +217,48 @@ object Util {
           case "h" => 60 * 60 * 1000
           case "m" => 60 * 1000
           case "s" => 1000
-          case _ => 0
+          case _   => 0
         }
-        try {
-          length.toLong * multiplier
-        } catch {
-          case _: Exception => default
-        }
+        try { length.toLong * multiplier } catch { case _: Exception => default }
       case _ => default
     }
+
   /**
    * Schedule a resettable timer.
    */
   def timer(delay: Long)(body: => Unit) = new Alarm(delay)(body)
+
+  /**
+   * Resettable timer.
+   */
+  class Alarm(delay: Long)(body: => Unit) {
+    import java.util.{ Timer, TimerTask }
+
+    private[this] var timer: Timer = _
+    private[this] var task: TimerTask = _
+
+    schedule()
+
+    private[this] def schedule(): Unit = {
+      if ((task eq null) && delay > 0) {
+        if (timer eq null) timer = new Timer(true) // daemon = true
+        task = new TimerTask { def run = body }
+        timer.schedule(task, delay)
+      }
+    }
+
+    def reset(): Unit = synchronized {
+      if (task ne null) { task.cancel(); task = null }
+      schedule()
+    }
+
+    def cancel(): Unit = if (timer ne null) timer.cancel()
+  }
+
+  //
+  // Debug output
+  //
+
   /**
    * General utility for displaying objects for debug output.
    */
@@ -244,46 +276,8 @@ object Util {
       case any => out(prefix + any.toString)
     }
   }
+
   def counted(count: Int, prefix: String, single: String, plural: String): String = {
     count.toString + " " + prefix + (if (count == 1) single else plural)
-  }
-
-  //
-  // Debug output
-  //
-  /**
-   * A logger that does nothing.
-   */
-  class SilentLogger extends Logger {
-    def trace(t: => Throwable): Unit = ()
-    def success(message: => String): Unit = ()
-    def log(level: Level.Value, message: => String): Unit = ()
-  }
-  /**
-   * Resettable timer.
-   */
-  class Alarm(delay: Long)(body: => Unit) {
-
-    private[this] var timer: java.util.Timer = _
-    private[this] var task: java.util.TimerTask = _
-
-    schedule()
-    def reset(): Unit = synchronized {
-      if (task ne null) {
-        task.cancel();
-        task = null
-      }
-      schedule()
-    }
-    private[this] def schedule(): Unit = {
-      if ((task eq null) && delay > 0) {
-        if (timer eq null) timer = new Timer(true) // daemon = true
-        task = new TimerTask {
-          def run = body
-        }
-        timer.schedule(task, delay)
-      }
-    }
-    def cancel(): Unit = if (timer ne null) timer.cancel()
   }
 }

@@ -12,7 +12,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.config import Config
 from pants_test.base_test import BaseTest
 
 
@@ -32,25 +31,22 @@ class ScalaLibraryTest(BaseTest):
 
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()
+    self.context(options={
+      'scala-platform': {
+        'runtime': []
+      }
+    })
 
-    self.create_file('pants.ini', dedent('''
-        [compile.scala]
-        runtime-deps: []
-        '''))
-
-    # TODO: Required because target code has no direct config reference. Remove after fixing that.
-    Config.cache(Config.load())
-
-    self.add_to_build_file('3rdparty', dedent('''
+    self.add_to_build_file('3rdparty', dedent("""
         jar_library(
           name='hub-and-spoke',
           jars=[
             jar('org.jalopy', 'hub-and-spoke', '0.0.1')
           ]
         )
-        '''))
+        """))
 
-    self.add_to_build_file('scala', dedent('''
+    self.add_to_build_file('scala', dedent("""
         scala_library(
           name='lib',
           sources=[],
@@ -59,9 +55,9 @@ class ScalaLibraryTest(BaseTest):
             'java:no_scala_dep',
           ]
         )
-        '''))
+        """))
 
-    self.add_to_build_file('java', dedent('''
+    self.add_to_build_file('java', dedent("""
         java_library(
           name='explicit_scala_dep',
           sources=[],
@@ -76,7 +72,7 @@ class ScalaLibraryTest(BaseTest):
           sources=[],
           dependencies=[]
         )
-        '''))
+        """))
 
     self.lib_hub_and_spoke = self.target('3rdparty:hub-and-spoke')
     self.scala_library = self.target('scala:lib')
