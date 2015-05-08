@@ -3,7 +3,7 @@ scala_library(name='zinc',
     org='org.pantsbuild',
     name='zinc',
     repo=public,
-    description="The SBT incremental compiler for nailgun"
+    publication_metadata=pants_library('The SBT incremental compiler for nailgun')
   ),
   dependencies=[
     '//:nailgun-server',
