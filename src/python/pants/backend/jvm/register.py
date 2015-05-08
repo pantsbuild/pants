@@ -41,6 +41,7 @@ from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCom
                                                                      ScalaZincCompile)
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
+from pants.backend.jvm.tasks.prepare_zipped_resources import PrepareZippedResources
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.specs_run import SpecsRun
@@ -164,6 +165,9 @@ def register_goals():
   task(name='bench', action=BenchmarkRun).install('bench')
 
   # Running.
+
+  task(name='prepare_zips', action=PrepareZippedResources).install('zip_resources')
+
   task(name='jvm', action=JvmRun, serialize=False).install('run').with_description(
       'Run a binary target.')
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty').with_description(

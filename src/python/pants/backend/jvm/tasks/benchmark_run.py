@@ -32,7 +32,7 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
     # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
     # and depend on that.
     # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('resources_by_target')
+    round_manager.require_data('zipped_resources_by_target')
     round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):

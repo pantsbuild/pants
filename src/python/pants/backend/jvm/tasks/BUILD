@@ -32,6 +32,7 @@ python_library(
     ':jvm_task',
     ':jvm_tool_task_mixin',
     ':jvmdoc_gen',
+    ':prepare_zipped_resources',
     ':nailgun_task',
     ':scala_repl',
     ':scaladoc_gen',
@@ -249,6 +250,7 @@ python_library(
     ':common',
     ':jvm_task',
     ':jvm_tool_task_mixin',
+    ':prepare_zipped_resources',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
@@ -277,6 +279,7 @@ python_library(
   dependencies = [
     ':common',
     ':jvm_task',
+    ':prepare_zipped_resources',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
     'src/python/pants/fs',
@@ -316,6 +319,16 @@ python_library(
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
   ],
+)
+
+python_library(
+  name = 'prepare_zipped_resources',
+  sources = ['prepare_zipped_resources.py'],
+  dependencies = [
+    ':common',
+    'src/python/pants/goal:products',
+    'src/python/pants/util:dirutil',
+    ],
 )
 
 python_library(
