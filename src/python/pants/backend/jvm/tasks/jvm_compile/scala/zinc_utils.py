@@ -26,7 +26,7 @@ class ZincUtils(object):
   Instances are immutable, and all methods are reentrant (assuming that the java_runner is).
   """
 
-  _ZINC_MAIN = 'com.typesafe.zinc.Main'
+  _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
 
   def __init__(self, context, nailgun_task, jvm_options, color=True, log_level='info'):
     self.context = context
