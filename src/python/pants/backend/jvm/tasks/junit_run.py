@@ -714,7 +714,7 @@ class Cobertura(_Coverage):
 
 
 class JUnitRun(JvmTask, JvmToolTaskMixin):
-  _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
+  _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
   def register_options(cls, register):

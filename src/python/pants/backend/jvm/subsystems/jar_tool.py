@@ -27,7 +27,7 @@ class JarTool(JvmToolMixin, Subsystem):
   def run(self, context, runjava, args):
     return runjava(self.tool_classpath_from_products(context.products, 'jar-tool',
                                                      scope=self.options_scope),
-                   'com.twitter.common.jar.tool.Main',
+                   'org.pantsbuild.tools.jar.Main',
                    jvm_options=self.get_options().jvm_options,
                    args=args,
                    workunit_name='jar-tool',
