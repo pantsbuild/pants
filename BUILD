@@ -4,7 +4,8 @@
 # Pants source code
 source_root('src/python', page, python_binary, python_library, resources)
 source_root('src/java', page, java_library, jvm_binary)
-source_root('src/resources', page, resources)
+source_root('src/java', page, java_library, jvm_binary)
+source_root('src/scala', page, scala_library, jvm_binary)
 
 # Pants test code
 source_root('tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
