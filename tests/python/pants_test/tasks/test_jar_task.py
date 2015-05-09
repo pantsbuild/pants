@@ -155,7 +155,7 @@ class JarTaskTest(BaseJarTaskTest):
     def manifest_content(classpath):
       return (b'Manifest-Version: 1.0\r\n' +
               b'Class-Path: {}\r\n' +
-              b'Created-By: com.twitter.common.jar.tool.JarBuilder\r\n\r\n').format(
+              b'Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n').format(
                 ' '.join(maybe_list(classpath)))
 
     def assert_classpath(classpath):
