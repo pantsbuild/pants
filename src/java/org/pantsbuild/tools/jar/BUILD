@@ -14,6 +14,9 @@ java_library(
     org='org.pantsbuild',
     name='jar-tool',
     repo=public,
+    publication_metadata=pants_library("""
+      A command line tool for creating jars given a set of rules.
+    """)
   ),
 )
 

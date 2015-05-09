@@ -13,5 +13,8 @@ java_library(
     org='org.pantsbuild',
     name='args4j',
     repo=public,
+    publication_metadata=pants_library("""
+      Utilities to make args4j more like com.twitter.common#args
+    """)
   ),
 )

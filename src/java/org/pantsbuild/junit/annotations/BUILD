@@ -7,6 +7,9 @@ java_library(
     org='org.pantsbuild',
     name='junit-runner-annotations',
     repo=public,
+    publication_metadata=pants_library("""
+      Annotations for use with org.pantsbuild#junit-runner that support running tests in parallel.
+    """)
   ),
   sources=globs('*.java')
 )
