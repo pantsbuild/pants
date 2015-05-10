@@ -18,7 +18,9 @@ jar_library(name = 'jmake',
             jars = [jar(org = 'org.pantsbuild', name = 'jmake', rev = '1.3.8-10')])
 
 jar_library(name = 'java-compiler',
-            jars = [jar(org = 'com.twitter.common.tools', name = 'java-compiler', rev = '0.0.12')])
+            jars = [
+              jar(org = 'org.pantsbuild.tools.compiler', name = 'java-compiler', rev = '0.0.1')
+            ])
 
 jar_library(name = 'nailgun-server',
             jars = [jar(org = 'com.martiansoftware', name = 'nailgun-server', rev = '0.9.1')])
