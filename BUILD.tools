@@ -73,7 +73,7 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.1')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.2')
             ])
 
 # common rev for all org.scala-lang%* artifacts
