@@ -11,6 +11,7 @@ scala_library(name='zinc',
     '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
     '3rdparty/jvm/com/typesafe/sbt:sbt-interface',
     '3rdparty:guava',
+    '3rdparty:jsr305',
   ],
   sources=globs('*.scala'),
 )

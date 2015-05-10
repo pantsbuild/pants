@@ -13,6 +13,8 @@ import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 import xsbti.Logger
 
+import org.pantsbuild.zinc.Cache.Implicits
+
 object Compiler {
   val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")
@@ -36,9 +38,10 @@ object Compiler {
   /**
    * Get or create a zinc compiler based on compiler setup.
    */
-  def apply(setup: Setup, log: Logger): Compiler = {
-    compilerCache.get(setup)(create(setup, log))
-  }
+  def apply(setup: Setup, log: Logger): Compiler =
+    compilerCache.getOrElseUpdate(setup) {
+      create(setup, log)
+    }
 
   /**
    * Java API for creating compiler.
@@ -93,7 +96,11 @@ object Compiler {
         FileFPrint.fprint(cacheFile) foreach { analysisCache.put(_, Some((analysis, setup))) }
       }
       def get(): Option[(Analysis, CompileSetup)] = {
-        FileFPrint.fprint(cacheFile) flatMap { fprint => analysisCache.get(fprint)(fileStore.get) }
+        FileFPrint.fprint(cacheFile) flatMap { fprint =>
+          analysisCache.getOrElseUpdate(fprint) {
+            fileStore.get
+          }
+        }
       }
     }
 
