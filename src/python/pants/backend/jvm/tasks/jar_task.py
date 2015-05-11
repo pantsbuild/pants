@@ -15,9 +15,9 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.subsystems.jar_tool import JarTool
 from pants.backend.jvm.targets.java_agent import JavaAgent
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
@@ -382,8 +382,8 @@ class JarTask(NailgunTask):
           if isinstance(tgt, JavaAgent):
             self._add_agent_manifest(tgt, self._manifest)
 
-          if isinstance(tgt, JvmBinary):
-            self._add_manifest_entries(tgt, self._manifest)
+      if isinstance(target, JvmBinary):
+        self._add_manifest_entries(target, self._manifest)
 
       if recursive:
         target.walk(add_to_jar)
