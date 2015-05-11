@@ -331,6 +331,29 @@ class GitTest(unittest.TestCase):
         worktree_relative_to('is/a', clone)
         worktree_relative_to('is/a/dir', clone)
 
+  def test_detect_worktree_no_cwd(self):
+    with temporary_dir() as _clone:
+      with pushd(_clone):
+        clone = os.path.realpath(_clone)
+
+        self.init_repo('origin', self.origin)
+        subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
+
+        def worktree_relative_to(some_dir, expected):
+          # Given a directory relative to the worktree, tests that the worktree is detected as 'expected'.
+          subdir = os.path.join(clone, some_dir)
+          if not os.path.isdir(subdir):
+            os.mkdir(subdir)
+          actual = Git.detect_worktree(subdir=subdir)
+          self.assertEqual(expected, actual)
+
+
+        worktree_relative_to('..', None)
+        worktree_relative_to('.', clone)
+        worktree_relative_to('is', clone)
+        worktree_relative_to('is/a', clone)
+        worktree_relative_to('is/a/dir', clone)
+
   @property
   def test_changes_in(self):
     """Test finding changes in a diffspecs
