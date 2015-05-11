@@ -9,7 +9,6 @@ import os
 import re
 
 import pytest
-
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
@@ -184,6 +183,16 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                                artifact_name='hello-greet-0.0.1-SNAPSHOT.jar',
                                success_expected=False)
 
+  def test_scala_publish_classifiers(self):
+    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
+                      dict({
+                        'org/pantsbuild/testproject/publish/classifiers/0.0.1-SNAPSHOT': [
+                          'classifiers-0.0.1-SNAPSHOT.pom',
+                          'ivy-0.0.1-SNAPSHOT.xml',
+                        ]}),
+                      [],
+                      assert_publish_config_contents=True)
+
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
                    assert_publish_config_contents=False):
@@ -191,13 +200,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
     :param target: Target to test.
     :param artifacts: A map from directories to a list of expected filenames.
+    :param pushdb_files: list of pushdb files that would be created if this weren't a local publish
     :param extra_options: Extra command-line options to the pants run.
     :param extra_config: Extra pants.ini configuration for the pants run.
     :param expected_primary_artifact_count: Number of artifacts we expect to be published.
     :param extra_env: Extra environment variables for the pants run.
     :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
            If set to True, compares the generated ivy.xml and pom files in
-           tests/python/pants_test/tasks/jar_publish_resources/<pakage_name>/<artifact_name>/
+           tests/python/pants_test/tasks/jar_publish_resources/<package_name>/<artifact_name>/
     """
 
     with temporary_dir() as publish_dir:
