@@ -5,8 +5,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
 <ivysettings>
-  <include file="${ivy.settings.dir}/ivysettings.xml"/>
-
   <!-- TODO(John Sirois): Find a better way to get the pgp passphrase than this
        by-convention-only, chmod 400 file.  This may require writing an ivy signer
        plugin that shells out to pgp and invokes it password dialog. Tracked by:
@@ -24,9 +22,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
                username="${login}"
                passwd="${password}"/>
 
+  <settings defaultResolver="maven2"/>
+
   <resolvers>
     <!-- For resolving foreign deps only (to create a poms for publishing). -->
-    <_remote_resolvers name="remote-repos"/>
+    <ibiblio name="maven2" m2compatible="true"/>
 
     <!-- For publishing to maven central only. -->
     <ibiblio name="oss.sonatype.org"
