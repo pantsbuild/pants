@@ -346,8 +346,8 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                     })
 
   def test_all_targets(self):
+    # The android targets won't work if the Android ADK is not installed.
     self._idea_test(['src::', 'tests::', 'examples::', 'testprojects::',
-                     # The android targets won't work if the Android ADK is not installed
                      '--exclude-target-regexp=.*android.*',])
 
   def test_ivy_classifiers(self):
