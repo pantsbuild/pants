@@ -75,6 +75,19 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     """Navigate the dom to return the list of all <excludeFolder> entries in the project file"""
     return self._get_new_module_root_manager(dom).getElementsByTagName('excludeFolder')
 
+  def _get_external_libraries(self, dom, type='CLASSES'):
+    """Return 'root' elements under <CLASSES>, <JAVADOC>, or <SOURCES> for <library name='external'>"""
+    module = dom.getElementsByTagName('module')[0]
+    components = module.getElementsByTagName('component')
+    for component in components:
+      if component.getAttribute('name') == 'NewModuleRootManager':
+        for orderEntry in component.getElementsByTagName('orderEntry'):
+          for library in orderEntry.getElementsByTagName('library'):
+            if library.getAttribute('name') == 'external':
+              for library_type in library.getElementsByTagName(type):
+                return library_type.getElementsByTagName('root')
+    return None
+
   # Testing IDEA integration on lots of different targets which require different functionalities to
   # make sure that everything that needs to happen for idea gen does happen.
   # TODO(Garrett Malmquist): Actually validate the contents of the project files, rather than just
@@ -336,3 +349,45 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     self._idea_test(['src::', 'tests::', 'examples::', 'testprojects::',
                      # The android targets won't work if the Android ADK is not installed
                      '--exclude-target-regexp=.*android.*',])
+
+  def test_ivy_classifiers(self):
+    def do_check(path):
+      """Check to see that the project contains the expected jar files."""
+      def check_jars(dom, jars, expected_jars):
+        # Make sure the .jar files are present on disk
+        for jar in expected_jars:
+          self.assertTrue(os.path.exists(jar))
+        to_find = set([ 'jar://{}!/'.format(jar) for jar in expected_jars])
+        for external_library in jars:
+          to_find.discard(external_library.getAttribute('url'))
+        self.assertEqual(set([]), to_find)
+
+      iml_file = os.path.join(path, 'project.iml')
+      self.assertTrue(os.path.exists(iml_file))
+      dom = minidom.parse(iml_file)
+      check_jars(dom, self._get_external_libraries(dom, type='CLASSES'), [
+         os.path.join(get_buildroot(), path, 'external-libs', jar_path )
+        for jar_path in [
+          'avro-1.7.7.jar',
+          'avro-1.7.7-tests.jar'
+        ]
+      ])
+
+      # TODO(Eric Ayers) we'd pull down sources and javadoc, but this fails when you
+      # use <artifact> elements in ivy to pull artifacts with classifiers.
+
+      #check_jars(dom, self._get_external_libraries(dom, type='SOURCES'), [
+      #  "jar://" + os.path.join(get_buildroot(), path, 'external-libsources', jar_path )
+      #  for jar_path in [
+      #    'avro-1.7.7-sources.jar',
+      #  ]
+      #])
+      #check_jars(dom, self._get_external_libraries(dom, type='JAVADOC'), [
+      #  "jar://" + os.path.join(get_buildroot(), path, 'external-libjavadoc', jar_path )
+      #  for jar_path in [
+      #    'avro-1.7.7-javadoc.jar',
+      #    ]
+      #])
+
+    self._idea_test(['testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier::'],
+                    check_func=do_check)

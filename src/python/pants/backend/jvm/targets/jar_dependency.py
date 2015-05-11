@@ -6,10 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import sys
-from collections import defaultdict
 from textwrap import dedent
-
-from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_manual import manual
@@ -109,12 +106,11 @@ class JarDependency(object):
     self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact))
 
     if ext or url or type_ or classifier:
-      artifact = IvyArtifact(name,
-                             type_=type_,
-                             ext=ext,
-                             url=url,
-                             classifier=classifier)
-      self.artifacts += (artifact,)
+      self.append_artifact(name,
+                           type_=type_,
+                           ext=ext,
+                           url=url,
+                           classifier=classifier)
 
     self._configurations = ('default',)
 
@@ -137,6 +133,10 @@ class JarDependency(object):
     if not self.classifier and len(self.artifacts) > 1:
       raise ValueError('Cannot determine classifier. No explicit classifier is set and this jar '
                        'has more than 1 artifact: {}\n\t{}'.format(self, '\n\t'.join(map(str, self.artifacts))))
+
+  def append_artifact(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
+    """Append a new IvyArtifact to the list of artifacts for this jar."""
+    self.artifacts += (IvyArtifact(name, type_=type_, ext=ext, conf=conf, url=url, classifier=classifier), )
 
   @manual.builddict()
   def exclude(self, org, name=None):
