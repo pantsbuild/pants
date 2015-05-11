@@ -77,6 +77,10 @@ class WorkUnit(object):
             E.g., the cmd line of a compiler invocation.
     """
     self._outcome = WorkUnit.UNKNOWN
+    # Protects outcome being set at the same time on different threads.
+    # eg, a child workunit may be aborted in a worker thread at the same time it's parent is aborted
+    # on the main thread.
+    self._outcome_lock = threading.Lock()
 
     self.run_info_dir = run_info_dir
     self.parent = parent
@@ -88,7 +92,7 @@ class WorkUnit(object):
     self.id = uuid.uuid4()
 
     # In seconds since the epoch. Doubles, to account for fractional seconds.
-    self.start_time = 0
+    self.start_time = time.time()
     self.end_time = 0
 
     # A workunit may have multiple outputs, which we identify by a name.
@@ -96,32 +100,36 @@ class WorkUnit(object):
     self._outputs = {}  # name -> output buffer.
     self._output_paths = {}
 
+    # Outputs are closed on the thread that ends the workunit, but the reporting thread may be
+    # trying to read from them at the same time, so they are guarded with this lock.
+    self._outputs_lock = threading.Lock()
+
     # Do this last, as the parent's _self_time() might get called before we're
     # done initializing ourselves.
     # TODO: Ensure that a parent can't be ended before all its children are.
     if self.parent:
       self.parent.children.append(self)
 
-    self._lock = threading.Lock()
-
   def has_label(self, label):
     return label in self.labels
 
-  def start(self):
-    """Mark the time at which this workunit started."""
-    self.start_time = time.time()
-
   def end(self):
     """Mark the time at which this workunit ended."""
-    with self._lock:
-      self.end_time = time.time()
+
+    self.end_time = time.time()
+
+    with self._outputs_lock:
       for output in self._outputs.values():
         output.close()
-      return self.path(), self._duration(), self._self_time(), self.has_label(WorkUnit.TOOL)
+
+    return self.path(),               \
+           self.duration(), \
+           self._self_time(),         \
+           self.has_label(WorkUnit.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit."""
-    with self._lock:
+    with self._outcome_lock:
       return self._outcome
 
   def set_outcome(self, outcome):
@@ -132,7 +140,7 @@ class WorkUnit(object):
     worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
-    with self._lock:
+    with self._outcome_lock:
       if outcome < self._outcome:
         self._outcome = outcome
         if self.parent: self.parent.set_outcome(self._outcome)
@@ -144,7 +152,7 @@ class WorkUnit(object):
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: {}'.format(name))
-    with self._lock:
+    with self._outputs_lock:
       if name not in self._outputs:
         workunit_name = re.sub(r'\W', '_', self.name)
         path = os.path.join(self.run_info_dir,
@@ -157,19 +165,24 @@ class WorkUnit(object):
         self._output_paths[name] = path
       return self._outputs[name]
 
+  def full_outputs_contents(self):
+    """Returns full contents of this workunit's open output buffers as a dict of label -> text."""
+    with self._open_outputs() as outputs:
+      return {name: outbuf.read_from(0) for name, outbuf in outputs.items()}
+
+  def unread_outputs_contents(self):
+    """Returns unread contents of this workunit's open output buffers as a dict of label -> text."""
+    with self._open_outputs() as outputs:
+      return {name: outbuf.read() for name, outbuf in outputs.items()}
+
   @contextmanager
-  def safe_outputs(self):
-    with self._lock:
-      outputs = {k: v for k, v in self._outputs.items() if not v.is_closed()}
+  def _open_outputs(self):
+    with self._outputs_lock:
+      outputs = {label: outbuf for label, outbuf in self._outputs.items() if not outbuf.is_closed()}
       yield outputs
 
   def duration(self):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""
-    with self._lock:
-      return self._duration()
-
-  def _duration(self):
-    # For use under a lock
     return (self.end_time or time.time()) - self.start_time
 
   def start_time_string(self):
@@ -206,8 +219,7 @@ class WorkUnit(object):
     This assumes that all major work should be done in leaves.
     TODO: Is this assumption valid?
     """
-    with self._lock:
-      return 0 if len(self.children) == 0 else self._self_time()
+    return 0 if len(self.children) == 0 else self._self_time()
 
   def to_dict(self):
     """Useful for providing arguments to templates."""
@@ -221,4 +233,4 @@ class WorkUnit(object):
 
   def _self_time(self):
     """Returns the time spent in this workunit outside of any children."""
-    return self._duration() - sum([child.duration() for child in self.children])
+    return self.duration() - sum([child.duration() for child in self.children])

@@ -98,11 +98,11 @@ class PlainTextReporter(Reporter):
 
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
       # Emit the suppressed workunit output, if any, to aid in debugging the problem.
-      with workunit.safe_outputs() as outputs:
-        for name, outbuf in outputs.items():
-          self.emit(self._prefix(workunit, b'\n==== {} ====\n'.format(name)))
-          self.emit(self._prefix(workunit, outbuf.read_from(0)))
-          self.flush()
+      output_contents = workunit.full_outputs_contents()
+      for name, outbuf in output_contents.items():
+        self.emit(self._prefix(workunit, b'\n==== {} ====\n'.format(name)))
+        self.emit(self._prefix(workunit, outbuf.read_from(0)))
+        self.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""

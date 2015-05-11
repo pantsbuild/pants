@@ -54,7 +54,6 @@ class HtmlReporter(Reporter):
     # We redirect stdout, stderr etc. of tool invocations to these files.
     self._output_files = defaultdict(dict)  # workunit_id -> {path -> fileobj}.
     self._linkify_memo = {}
-    self._output_lock = threading.Lock()
 
   def report_path(self):
     """The path to the main report file."""
@@ -67,12 +66,11 @@ class HtmlReporter(Reporter):
 
   def close(self):
     """Implementation of Reporter callback."""
-    with self._output_lock:
-      self._report_file.close()
-      # Make sure everything's closed.
-      for files in self._output_files.values():
-        for f in files.values():
-          f.close()
+    self._report_file.close()
+    # Make sure everything's closed.
+    for files in self._output_files.values():
+      for f in files.values():
+        f.close()
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -182,17 +180,16 @@ class HtmlReporter(Reporter):
     """Implementation of Reporter callback."""
     if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
       return
-    with self._output_lock:
-      path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
-      output_files = self._output_files[workunit.id]
-      if path not in output_files:
-        f = open(path, 'w')
-        output_files[path] = f
-      else:
-        f = output_files[path]
-      f.write(self._htmlify_text(s).encode('utf-8'))
-      # We must flush in the same thread as the write.
-      f.flush()
+    path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
+    output_files = self._output_files[workunit.id]
+    if path not in output_files:
+      f = open(path, 'w')
+      output_files[path] = f
+    else:
+      f = output_files[path]
+    f.write(self._htmlify_text(s).encode('utf-8'))
+    # We must flush in the same thread as the write.
+    f.flush()
 
   _log_level_css_map = {
     Report.FATAL: 'fatal',
@@ -260,17 +257,15 @@ class HtmlReporter(Reporter):
     """Append content to the main report file."""
     if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
       return
-    with self._output_lock:
-      self._report_file.write(s)
-      self._report_file.flush()  # We must flush in the same thread as the write.
+    self._report_file.write(s)
+    self._report_file.flush()  # We must flush in the same thread as the write.
 
   def _overwrite(self, filename, s):
     """Overwrite a file with the specified contents."""
     if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
       return
-    with self._output_lock:
-      with open(os.path.join(self._html_dir, filename), 'w') as f:
-        f.write(s)
+    with open(os.path.join(self._html_dir, filename), 'w') as f:
+      f.write(s)
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""

@@ -151,7 +151,6 @@ class RunTracker(Subsystem):
     self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
-    self._main_root_workunit.start()
     self.report.start_workunit(self._main_root_workunit)
 
   def set_root_outcome(self, outcome):
@@ -200,7 +199,6 @@ class RunTracker(Subsystem):
     Task code should not typically call this directly.
     """
     workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels, cmd=cmd)
-    workunit.start()
     try:
       self.report.start_workunit(workunit)
       yield workunit
@@ -299,7 +297,6 @@ class RunTracker(Subsystem):
     if self._background_root_workunit is None:
       self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                                 name='background', cmd=None)
-      self._background_root_workunit.start()
       self.report.start_workunit(self._background_root_workunit)
     return self._background_root_workunit
 
