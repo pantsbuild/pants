@@ -194,8 +194,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
     compile(inputs, cwd, reporter, progress = None)(log)
     val progress =
-      if (setup.logProgress || setup.logPhases)
-        Some(new SimpleCompileProgress(setup.logPhases, setup.logProgress)(log))
+      if (setup.logPhases)
+        Some(new SimpleCompileProgress(setup.logPhases)(log))
       else
         None
     compile(inputs, cwd, reporter, progress)(log)

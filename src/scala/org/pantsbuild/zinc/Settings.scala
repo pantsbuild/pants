@@ -23,7 +23,6 @@ case class Settings(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
   logPhases: Boolean         = false,
-  logProgress: Boolean       = false,
   sources: Seq[File]         = Seq.empty,
   classpath: Seq[File]       = Seq.empty,
   classesDirectory: File     = new File("."),
@@ -193,7 +192,6 @@ object Settings {
     boolean(   "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logLevel = Level.Debug)),
     string(    "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logLevel = Level.withName(l))),
     boolean(   "-no-color",                    "No color in logging",                        (s: Settings) => s.copy(color = false)),
-    boolean(   "-log-progress",                "Periodically log completion progress",       (s: Settings) => s.copy(logProgress = true)),
     boolean(   "-log-phases",                  "Log phases of compilation for each file",    (s: Settings) => s.copy(logPhases = true)),
 
     header("Compile options:"),

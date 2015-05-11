@@ -21,8 +21,7 @@ case class Setup(
   javaHome: Option[File],
   forkJava: Boolean,
   cacheDir: File,
-  logPhases: Boolean,
-  logProgress: Boolean)
+  logPhases: Boolean)
 
 /**
  * Jar file description for locating jars.
@@ -63,7 +62,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava, settings.logPhases, settings.logProgress)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava, settings.logPhases)
   }
 
   /**
@@ -77,8 +76,7 @@ object Setup {
     compilerInterfaceSrc: File,
     javaHomeDir: Option[File],
     forkJava: Boolean,
-    logPhases: Boolean,
-    logProgress: Boolean): Setup =
+    logPhases: Boolean): Setup =
   {
     val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
@@ -88,7 +86,7 @@ object Setup {
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
     val cacheDir             = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir, logPhases, logProgress)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir, logPhases)
   }
 
   /**
@@ -102,8 +100,7 @@ object Setup {
     compilerInterfaceSrc: File,
     javaHome: File,
     forkJava: Boolean,
-    logPhases: Boolean,
-    logProgress: Boolean): Setup =
+    logPhases: Boolean): Setup =
   setup(
     scalaCompiler,
     scalaLibrary,
@@ -112,7 +109,6 @@ object Setup {
     compilerInterfaceSrc,
     Option(javaHome),
     forkJava,
-    false,
     false
   )
 
@@ -125,7 +121,7 @@ object Setup {
     compilerInterfaceSrc: File,
     javaHome: File): Setup =
       create(scalaCompiler, scalaLibrary, scalaExtra, sbtInterface,
-        compilerInterfaceSrc, javaHome, false, false, false)
+        compilerInterfaceSrc, javaHome, false, false)
 
   /**
    * Java API for creating Setup with ScalaLocation and SbtJars.
@@ -146,7 +142,6 @@ object Setup {
       compilerInterfaceSrc,
       Option(javaHome),
       forkJava,
-      false,
       false
     )
   }
