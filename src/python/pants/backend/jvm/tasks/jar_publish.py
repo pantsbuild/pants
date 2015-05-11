@@ -237,10 +237,11 @@ class PomWriter(DependencyWriter):
     :param artifacts: a sequence of IvyArtifact's
     :return: list like [TemplateData(classifier='sources'), TemplateData(classifier='javadoc')]
     """
-    r = []
+    s = set()
     if classifier:
-      r.append(TemplateData(classifier=classifier))
-    return r + [TemplateData(classifier=i) for i in map(lambda x: x.classifier, artifacts) if i]
+      s.add(classifier)
+    s.update([i.classifier for i in artifacts if i.classifier])
+    return map(lambda x: TemplateData(classifier=x), s)
 
   def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
     template_data = self.jardep(jar_dependency, classifier=classifier)
