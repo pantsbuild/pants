@@ -7,6 +7,8 @@ python_library(
   dependencies = [
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:build_manual',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:ossrh_publication_metadata',
     'src/python/pants/backend/jvm:repository',
   ]
 )

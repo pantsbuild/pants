@@ -7,6 +7,9 @@ java_library(
     org='org.pantsbuild',
     name='junit-runner-withretry',
     repo=public,
+    publication_metadata=pants_library("""
+      Provides an org.junit.runner.Runner that supports retries of failing tests.
+    """)
   ),
   dependencies=[
     '3rdparty:junit',

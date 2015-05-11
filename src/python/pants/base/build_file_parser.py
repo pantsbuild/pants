@@ -6,10 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import warnings
 
 import six
-
-from pants.base.build_file import BuildFile
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,6 @@ class BuildFileParser(object):
 
   class ParseError(BuildFileParserError):
     """An exception was encountered in the python parser"""
-
 
   class ExecuteError(BuildFileParserError):
     """An exception was encountered executing code in the BUILD file"""
@@ -98,7 +96,7 @@ class BuildFileParser(object):
     def _format_context_msg(lineno, offset, error_type, message):
       """Show the line of the BUILD file that has the error along with a few line of context"""
       build_contents = build_file.source()
-      context = "Error parsing {build_file}:\n".format(build_file=build_file)
+      context = "While parsing {build_file}:\n".format(build_file=build_file)
       curr_lineno = 0
       for line in build_contents.split('\n'):
         curr_lineno += 1
@@ -107,12 +105,16 @@ class BuildFileParser(object):
         else:
           highlight = ' '
         if curr_lineno >= lineno - 3:
-          context += "{highlight}{curr_lineno:4d}: {line}".format(
+          context += "{highlight}{curr_lineno:4d}: {line}\n".format(
             highlight=highlight, line=line, curr_lineno=curr_lineno)
-          if offset and lineno == curr_lineno:
-            context += "       {caret:>{width}} {error_type}: {message}\n\n" \
-              .format(caret="^", width=int(offset), error_type=error_type,
-                      message=message)
+          if lineno == curr_lineno:
+            if offset:
+              context += ("       {caret:>{width}} {error_type}: {message}\n\n"
+                          .format(caret="^", width=int(offset), error_type=error_type,
+                                  message=message))
+            else:
+              context += ("        {error_type}: {message}\n\n"
+                          .format(error_type=error_type, message=message))
         if curr_lineno > lineno + 3:
           break
       return context
@@ -131,7 +133,13 @@ class BuildFileParser(object):
 
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
-      six.exec_(build_file_code, parse_state.parse_globals)
+      with warnings.catch_warnings(record=True) as warns:
+        six.exec_(build_file_code, parse_state.parse_globals)
+        for warn in warns:
+          logger.warning(_format_context_msg(lineno=warn.lineno,
+                                             offset=None,
+                                             error_type=warn.category.__name__,
+                                             message=warn.message))
     except Exception as e:
       raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
                               .format(message=e, build_file=build_file))

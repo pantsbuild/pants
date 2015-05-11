@@ -7,6 +7,10 @@ java_library(
     org='org.pantsbuild',
     name='junit-runner',
     repo=public,
+    publication_metadata=pants_library("""
+      A command line tool for running junit tests that provides functionality above and beyond
+      that provided by org.junit.runner.JUnitCore.
+    """)
   ),
   dependencies=[
     '3rdparty:args4j',

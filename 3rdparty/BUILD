@@ -25,6 +25,11 @@ jar_library(name='guava',
                   apidocs='http://docs.guava-libraries.googlecode.com/git-history/v18.0/javadoc/'),
             ])
 
+jar_library(name='jansi',
+            jars=[
+              jar('org.fusesource.jansi', 'jansi', '1.11'),
+            ])
+
 jar_library(name='jsr305',
             jars=[
               jar('com.google.code.findbugs', 'jsr305', '3.0.0'),

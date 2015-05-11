@@ -9,6 +9,7 @@ junit_tests(
     '3rdparty:guava',
     '3rdparty:guava-testlib',
     '3rdparty:junit',
+    'src/java/org/pantsbuild/testing',
     'src/java/org/pantsbuild/tools/jar',
   ],
   resources=[

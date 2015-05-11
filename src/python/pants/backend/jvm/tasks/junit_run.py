@@ -20,7 +20,7 @@ from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnit
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
@@ -714,7 +714,7 @@ class Cobertura(_Coverage):
 
 
 class JUnitRun(JvmTask, JvmToolTaskMixin):
-  _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
+  _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
   def register_options(cls, register):
@@ -765,7 +765,7 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
       # that missing sources can be detected early.
       for target in targets:
         if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-          msg = 'JavaTests target {} must include a non-empty set of sources.'.format(self.address)
+          msg = 'JavaTests target {} must include a non-empty set of sources.'.format(target.address.spec)
           raise TargetDefinitionException(target, msg)
 
       self._runner.execute(targets)

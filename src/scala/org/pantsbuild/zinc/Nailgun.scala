@@ -8,6 +8,8 @@ import com.martiansoftware.nailgun.{ Alias, AliasManager, NGContext, NGServer }
 import java.io.File
 import sbt.Path
 
+import org.pantsbuild.zinc.Cache.Implicits
+
 class Nailgun // for classOf
 
 object Nailgun {
