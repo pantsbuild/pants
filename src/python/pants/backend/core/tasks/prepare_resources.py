@@ -105,7 +105,10 @@ class PrepareResources(Task):
     register('--confs', advanced=True, type=Options.list, default=['default'],
              help='Prepare resources for these Ivy confs.')
     register('--use-jar', advanced=True, action='store_true', default=False,
-             help='Zip resources into a jar.')
+             help='Zip resources into a jar for class loader performance during test, run, or repl.'
+                  ' Tests must be written without the assumption that resources are directly laying'
+                  ' in the filesystem. If not, either disable this global option or turn use_jar'
+                  ' off in the specific Resources target.')
     register('--short-path', advanced=True, action='store_true', default=True,
              help='Replace the target id in a resource jar file path with a unique '
                   'id to shorten the file path.')
@@ -121,9 +124,6 @@ class PrepareResources(Task):
     # compile. It solves some problems we've been having getting our annotation processors to
     # compile consistently due to extraneous resources polluting the classpath. Perhaps this could
     # be fixed more elegantly whenever we get a formal classpath object?
-
-    # Question(Jin Feng) is this still necessary? [resources] is right now taking place after
-    # [compile] because of this?
     round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):

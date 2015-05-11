@@ -23,8 +23,9 @@ class Resources(Target):
     """
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
-    :param use_jar: Whether or not the resources will be zipped into a jar. This flag is ignored
-      if PrepareResources task's --use-jar option is set to false.
+    :param use_jar: Whether or not the resources will be zipped into a jar. This flag only impacts
+      test, run, repl, benchmark goals. For bundle and binary, resources are always jarred.
+      Also this flag is ignored if PrepareResources task's --use-jar option is set to false.
     :type sources: ``Fileset`` or list of strings
     """
     payload = payload or Payload()
