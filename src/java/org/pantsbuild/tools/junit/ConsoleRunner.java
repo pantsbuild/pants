@@ -281,8 +281,8 @@ public class ConsoleRunner {
     System.setOut(new PrintStream(SWAPPABLE_OUT));
     System.setErr(new PrintStream(SWAPPABLE_ERR));
 
-    final List<Request> requests =
-      parseRequests(SWAPPABLE_OUT.getOriginal(), SWAPPABLE_ERR.getOriginal(), tests);
+    List<Request> requests =
+        parseRequests(SWAPPABLE_OUT.getOriginal(), SWAPPABLE_ERR.getOriginal(), tests);
 
     if (numTestShards > 0) {
       requests = setFilterForTestShard(requests);
@@ -323,7 +323,7 @@ public class ConsoleRunner {
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
     final Thread abnormalExitHook =
-      createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
+        createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
     int failures = 0;
     try {
