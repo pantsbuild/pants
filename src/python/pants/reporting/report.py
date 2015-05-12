@@ -158,8 +158,8 @@ class Report(object):
     for reporter in self._reporter_list():
       reporter.handle_log(workunit, level, *msg_elements)
 
-  def _end_workunit(self, workunit, remaing_unread_output):
-    self._handle_outputs(workunit, remaing_unread_output)
+  def _end_workunit(self, workunit, remaining_unread_output):
+    self._handle_outputs(workunit, remaining_unread_output)
     for reporter in self._reporter_list():
       reporter.end_workunit(workunit)
 

@@ -66,6 +66,7 @@ class PlainTextReporter(Reporter):
       self.emit(b'\n')
       self.emit(self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
     self.emit(b'\n')
+    self.flush()
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -99,9 +100,9 @@ class PlainTextReporter(Reporter):
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
       # Emit the suppressed workunit output, if any, to aid in debugging the problem.
       output_contents = workunit.full_outputs_contents()
-      for name, outbuf in output_contents.items():
+      for name, full_contents in output_contents.items():
         self.emit(self._prefix(workunit, b'\n==== {} ====\n'.format(name)))
-        self.emit(self._prefix(workunit, outbuf.read_from(0)))
+        self.emit(self._prefix(workunit, full_contents))
         self.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):
