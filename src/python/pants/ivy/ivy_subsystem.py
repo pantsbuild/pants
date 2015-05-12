@@ -41,8 +41,6 @@ class IvySubsystem(Subsystem):
     register('--cache-dir', advanced=True, default=os.path.expanduser('~/.ivy2/pants'),
              help='Directory to store artifacts retrieved by Ivy.')
     register('--ivy-settings', advanced=True,
-             default='{pants_supportdir}/ivy/ivysettings.xml'
-             .format(pants_supportdir=bootstrap_options.pants_supportdir),
              help='Location of XML configuration file for Ivy settings.')
 
   def http_proxy(self):
