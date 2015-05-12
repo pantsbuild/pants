@@ -155,6 +155,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """Extra classpath elements common to all compiler invocations.
 
     E.g., jars for compiler plugins.
+
+    These are added at the end of the classpath, after any dependencies, so that if they
+    overlap with any explicit dependencies, the compiler sees those first.  This makes
+    missing dependency accounting much simpler.
     """
     return []
 
