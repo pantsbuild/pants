@@ -15,11 +15,9 @@ from collections import namedtuple
 class ReportingError(Exception):
   pass
 
-
-class ReportMessage(namedtuple('ReportMessage', ['type', 'args'])):
-  START_WORKUNIT = 0
-  END_WORKUNIT = 1
-  LOG = 2
+class ReportWork(namedtuple('ReportWork', ['func', 'args'])):
+  def __call__(self):
+    self.func(*self.args)
 
 # Seconds to wait for the report thread to close out reports on an error.
 REPORT_THREAD_SHUTDOWN_TIMEOUT = 1
@@ -49,14 +47,18 @@ class Report(object):
 
     # Synchronizes access to the reporters added to this report.
     self._reporters_lock = threading.Lock()
-    # Queues messages to report
-    self._message_queue = queue.Queue()
+    # Queues reporting work to be done on the reporting thread.
+    self._work_queue = queue.Queue()
     # Communicates shutdown process to report thread.
     self._shutdown_event = threading.Event()
     # We periodically emit newly gathered output from tool invocations.
-    self._report_thread = threading.Thread(name='reporting', target=self._reporting_target)
+    self._report_thread = threading.Thread(name='reporting-emit', target=self._reporting_target)
     self._report_thread.daemon = True
+    self._reporting_done = False
 
+    # Notifies reporting thread of new workunit output and of reporting shutdown.
+    self._watcher_thread = threading.Thread(name='reporting-watcher', target=self._watcher_target)
+    self._watcher_thread.daemon = True
     # Map from workunit id to workunit.
     self._workunits = {}
 
@@ -83,92 +85,111 @@ class Report(object):
 
   def open(self):
     self._report_thread.start()
+    self._watcher_thread.start()
 
   def start_workunit(self, workunit):
-    self._message_queue.put(ReportMessage(ReportMessage.START_WORKUNIT, (workunit,)))
+    self._submit_work(self._start_workunit, (workunit,))
 
   def log(self, workunit, level, *msg_elements):
     """Log a message.
 
     Each element of msg_elements is either a message string or a (message, detail) pair.
     """
-    self._message_queue.put(ReportMessage(ReportMessage.LOG, (workunit, level,) + msg_elements))
+    self._submit_work(self._handle_log, (workunit, level,) + msg_elements)
 
   def end_workunit(self, workunit):
-    self._message_queue.put(ReportMessage(ReportMessage.END_WORKUNIT, (workunit,)))
+    """Report the end of the workunit. Expects to be called before outputs are closed out."""
+    self._submit_work(self._end_workunit, (workunit, workunit.unread_outputs_contents()))
 
   def close(self):
     self._shutdown_event.set()
     self._report_thread.join(timeout=REPORT_THREAD_SHUTDOWN_TIMEOUT)
+
+  def _watcher_target(self):
+    try:
+      while not self._shutdown_event.wait(REPORT_THREAD_EVENT_HANDLING_INTERVAL):
+        self._submit_work(self._handle_output_for_all_workunits, ())
+    except KeyboardInterrupt:
+      thread.interrupt_main()
+      raise
+    finally:
+      self._submit_work(self._mark_as_done, ())
 
   def _reporting_target(self):
     try:
       for reporter in self._reporter_list():
         reporter.open()
 
-      while not self._shutdown_event.wait(REPORT_THREAD_EVENT_HANDLING_INTERVAL):
-        current_messages = self._drain_message_queue()
+      while not self._reporting_done:
+        try:
+          work = self._work_queue.get(timeout=REPORT_THREAD_EVENT_HANDLING_INTERVAL)
+        except queue.Empty:
+          continue
+        work()
 
-        self._handle_report_event(current_messages)
-
-        self._handle_new_workunit_output()
     except KeyboardInterrupt:
       thread.interrupt_main()
       raise
     except Exception:
+      # TODO: add mechanism to notify goal runner that the interrupt triggered here was not caused
+      # by user action
       traceback.print_exc()
       thread.interrupt_main()
       raise
     finally:
-      self._handle_new_workunit_output() # One final time.
+      # Wait until main thread triggers shutdown to ensure all in progress workunits have submitted
+      # their output.
+      self._shutdown_event.wait()
+
+      self._handle_output_for_all_workunits() # One final time.
+      remaining_work = self._drain_work_queue()
+      for work in remaining_work:
+        work()
+
       for reporter in self._reporter_list():
         reporter.close()
 
-  def _start_workunit(self, message):
-    workunit = message.args[0]
+  def _start_workunit(self, workunit):
     self._workunits[workunit.id] = workunit
     for reporter in self._reporter_list():
-      reporter.start_workunit(*message.args)
+      reporter.start_workunit(workunit)
 
-  def _handle_log(self, message):
+  def _handle_log(self, workunit, level, *msg_elements):
     for reporter in self._reporter_list():
-      reporter.handle_log(*message.args)
+      reporter.handle_log(workunit, level, *msg_elements)
 
-  def _end_workunit(self, message):
-    workunit = message.args[0]
-    self._handle_new_workunit_output()
+  def _end_workunit(self, workunit, remaing_unread_output):
+    self._handle_outputs(workunit, remaing_unread_output)
     for reporter in self._reporter_list():
-      reporter.end_workunit(*message.args)
+      reporter.end_workunit(workunit)
 
     if workunit.id in self._workunits:
       del self._workunits[workunit.id]
 
-  def _drain_message_queue(self):
-    # Drains the queue without blocking
-    current_messages = []
-    while not self._message_queue.empty():
-      try:
-        current_messages.append(self._message_queue.get_nowait())
-      except queue.Empty:
-        break
-    return current_messages
+  def _handle_outputs(self, workunit, outputs):
+    for label, s in outputs.items():
+      if len(s) > 0:
+        for reporter in self._reporter_list():
+          reporter.handle_output(workunit, label, s)
 
-  def _handle_report_event(self, current_messages):
-    for message in current_messages:
-      if message.type is ReportMessage.START_WORKUNIT:
-        self._start_workunit(message)
-      elif message.type is ReportMessage.LOG:
-        self._handle_log(message)
-      elif message.type is ReportMessage.END_WORKUNIT:
-        self._end_workunit(message)
-      else:
-        raise ReportingError("Unknown message type: {}".format(message))
-
-  def _handle_new_workunit_output(self):
+  def _handle_output_for_all_workunits(self):
     # Notify for output in all workunits. Note that output may be coming in from workunits other
     # than the current one, if work is happening in parallel.
     for workunit in self._workunits.values():
-      for label, s in workunit.unread_outputs_contents().items():
-        if len(s) > 0:
-          for reporter in self._reporter_list():
-            reporter.handle_output(workunit, label, s)
+      self._handle_outputs(workunit, workunit.unread_outputs_contents())
+
+  def _mark_as_done(self):
+    self._reporting_done = True
+
+  def _drain_work_queue(self):
+    # Drains the queue without blocking
+    ret = []
+    while not self._work_queue.empty():
+      try:
+        ret.append(self._work_queue.get_nowait())
+      except queue.Empty:
+        break
+    return ret
+
+  def _submit_work(self, func, args):
+    self._work_queue.put(ReportWork(func, args))

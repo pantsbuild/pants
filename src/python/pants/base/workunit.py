@@ -123,7 +123,7 @@ class WorkUnit(object):
         output.close()
 
     return self.path(),               \
-           self.duration(), \
+           self.duration(),           \
            self._self_time(),         \
            self.has_label(WorkUnit.TOOL)
 
@@ -166,9 +166,17 @@ class WorkUnit(object):
       return self._outputs[name]
 
   def full_outputs_contents(self):
-    """Returns full contents of this workunit's open output buffers as a dict of label -> text."""
-    with self._open_outputs() as outputs:
-      return {name: outbuf.read_from(0) for name, outbuf in outputs.items()}
+    """Returns full contents of this workunit's output buffers as a dict of label -> text."""
+    with self._outputs_lock:
+      ret = {}
+      for name, buf in self._outputs.items():
+        if not buf.is_closed():
+          ret[name] = buf.read_from(0)
+        else:
+          # output buffers may be closed by the time the workunit end is reported
+          with open(self._output_paths[name]) as reopened_buf:
+            ret[name] = reopened_buf.read()
+      return ret
 
   def unread_outputs_contents(self):
     """Returns unread contents of this workunit's open output buffers as a dict of label -> text."""
