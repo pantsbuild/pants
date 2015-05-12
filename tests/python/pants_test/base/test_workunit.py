@@ -15,7 +15,6 @@ from pants.base.workunit import WorkUnit
 from pants.util.contextutil import temporary_dir
 
 
-print('wut')
 class WorkUnitTest(unittest.TestCase):
 
   # life cycle tests
