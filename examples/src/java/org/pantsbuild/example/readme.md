@@ -69,10 +69,10 @@ especially relevant.
 
 > A `junit_tests` BUILD target holds source code for some JUnit tests;
 > typically, it would have one or more `java_library` targets as
-> dependencies and would import and test their code.
->
-> A `scala_specs` target is similar, but has source code for Scala
-> specs.
+> dependencies and would import and test their code.  Note that most
+> popular scala test frameworks support running with JUnit via a base
+> class/trait or via a `@RunWith` annotation; so you can use
+> `junit_tests` for your scala tests as well.
 >
 > The Pants `test` goal runs tests.
 

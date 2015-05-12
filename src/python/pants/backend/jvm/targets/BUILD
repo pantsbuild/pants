@@ -60,7 +60,6 @@ python_library(
   name = 'scala',
   sources = [
     'scala_library.py',
-    'scala_tests.py',
     'scalac_plugin.py',
   ],
   dependencies = [

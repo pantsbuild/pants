@@ -12,7 +12,6 @@ import tempfile
 from xml.dom import minidom
 
 from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
@@ -131,7 +130,7 @@ class IdeaGen(IdeGen):
     def has_test_type(types):
       for target_type in types:
         # TODO(Eric Ayers) Find a way for a target to identify itself instead of a hard coded list
-        if target_type in [JavaTests, PythonTests, ScalaTests]:
+        if target_type in (JavaTests, PythonTests):
           return True
       return False
 

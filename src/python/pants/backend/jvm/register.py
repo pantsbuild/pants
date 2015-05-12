@@ -22,7 +22,6 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
@@ -45,7 +44,6 @@ from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
-from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
@@ -67,8 +65,6 @@ def build_file_aliases():
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
       'scala_library': ScalaLibrary,
-      'scala_specs': ScalaTests,
-      'scala_tests': ScalaTests,
       'scalac_plugin': ScalacPlugin,
     },
     objects={
@@ -167,7 +163,6 @@ def register_goals():
 
   # Testing.
   task(name='junit', action=JUnitRun).install('test').with_description('Test compiled code.')
-  task(name='specs', action=SpecsRun).install('test')
   task(name='bench', action=BenchmarkRun).install('bench')
 
   # Running.

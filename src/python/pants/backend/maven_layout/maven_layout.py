@@ -21,7 +21,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
@@ -53,4 +52,4 @@ def maven_layout(parse_context, basedir=''):
   root('src/test/java', JavaLibrary, JavaTests, Page, Benchmark)
   root('src/test/python', Page, PythonLibrary, PythonTests)
   root('src/test/resources', Page, Resources)
-  root('src/test/scala', JavaTests, Page, ScalaLibrary, ScalaTests, Benchmark)
+  root('src/test/scala', JavaTests, Page, ScalaLibrary, Benchmark)

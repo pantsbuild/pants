@@ -36,7 +36,6 @@ python_library(
     ':scala_repl',
     ':scaladoc_gen',
     ':scalastyle',
-    ':specs_run',
     ':unpack_jars',
     ],
 )
@@ -367,25 +366,11 @@ python_library(
 )
 
 python_library(
-  name = 'specs_run',
-  sources = ['specs_run.py'],
-  dependencies = [
-    ':common',
-    ':jvm_task',
-    ':jvm_tool_task_mixin',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:workunit',
-    'src/python/pants:binary_util',
-    'src/python/pants/java:util',
-  ],
-)
-
-python_library(
   name = 'unpack_jars',
   sources = ['unpack_jars.py'],
   dependencies = [
     ':common',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/jvm/targets:jvm',
-    ]
+  ]
 )
