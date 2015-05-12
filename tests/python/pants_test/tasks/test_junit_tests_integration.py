@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -23,7 +24,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
     self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.welcome.WelSpec')
 
-  def test_junit_test(self):
+  def test_junit_test_custom_interpreter(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
@@ -179,3 +180,11 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-jvm-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd',])
     self.assert_failure(pants_run)
+
+  @unittest.skip("junit-runner isn't published yet ")
+  def test_junit_test_suppress_output_flag(self):
+    pants_run = self.run_pants([
+        'test.junit',
+        '--no-suppress-output',
+        'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
+    self.assertTrue('Hello from test!' in pants_run.stdout_data)

@@ -55,7 +55,6 @@ import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRe
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
 public class ConsoleRunner {
-
   private static final SwappableStream<PrintStream> SWAPPABLE_OUT =
       new SwappableStream<PrintStream>(System.out);
 
@@ -102,12 +101,19 @@ public class ConsoleRunner {
     private final File err;
     private OutputStream errstream;
 
+    /**
+     *  If true capture stdout and stderr to original System.out and System.err
+     *  as well as to out and err files.
+    **/
+    private final boolean printToOriginalOutputs;
+
     private int useCount;
     private boolean closed;
 
-    StreamCapture(File out, File err) throws IOException {
+    StreamCapture(File out, File err, boolean printToOriginalOutputs) throws IOException {
       this.out = out;
       this.err = err;
+      this.printToOriginalOutputs = printToOriginalOutputs;
     }
 
     void incrementUseCount() {
@@ -121,8 +127,13 @@ public class ConsoleRunner {
       if (errstream == null) {
         errstream = new FileOutputStream(err);
       }
-      SWAPPABLE_OUT.swap(outstream);
-      SWAPPABLE_ERR.swap(errstream);
+      if (printToOriginalOutputs) {
+        SWAPPABLE_OUT.swap(new MultiOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
+        SWAPPABLE_ERR.swap(new MultiOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
+      } else {
+        SWAPPABLE_OUT.swap(outstream);
+        SWAPPABLE_ERR.swap(errstream);
+      }
     }
 
     void close() throws IOException {
@@ -164,9 +175,11 @@ public class ConsoleRunner {
     private final Map<Class<?>, StreamCapture> captures = Maps.newHashMap();
 
     private final File outdir;
+    private final boolean printToOriginalOutputs;
 
-    StreamCapturingListener(File outdir) {
+    StreamCapturingListener(File outdir, boolean printToOriginalOutputs) {
       this.outdir = outdir;
+      this.printToOriginalOutputs = printToOriginalOutputs;
     }
 
     @Override
@@ -188,7 +201,7 @@ public class ConsoleRunner {
 
             File err = new File(outdir, prefix + ".err.txt");
             Files.createParentDirs(err);
-            capture = new StreamCapture(out, err);
+            capture = new StreamCapture(out, err, printToOriginalOutputs);
             captures.put(test.getTestClass(), capture);
           }
           capture.incrementUseCount();
@@ -265,12 +278,11 @@ public class ConsoleRunner {
   }
 
   void run(Iterable<String> tests) {
-    final PrintStream out = System.out;
-    final PrintStream err = System.err;
     System.setOut(new PrintStream(SWAPPABLE_OUT));
     System.setErr(new PrintStream(SWAPPABLE_ERR));
 
-    List<Request> requests = parseRequests(out, err, tests);
+    final List<Request> requests =
+      parseRequests(SWAPPABLE_OUT.getOriginal(), SWAPPABLE_ERR.getOriginal(), tests);
 
     if (numTestShards > 0) {
       requests = setFilterForTestShard(requests);
@@ -284,34 +296,34 @@ public class ConsoleRunner {
     };
     core.addListener(abortableListener);
 
-    if (xmlReport || suppressOutput) {
+    if (xmlReport) {
       if (!outdir.exists()) {
         if (!outdir.mkdirs()) {
           throw new IllegalStateException("Failed to create output directory: " + outdir);
         }
       }
-      StreamCapturingListener streamCapturingListener = new StreamCapturingListener(outdir);
+      StreamCapturingListener streamCapturingListener =
+        new StreamCapturingListener(outdir, !suppressOutput);
       abortableListener.addListener(streamCapturingListener);
 
-      if (xmlReport) {
-        AntJunitXmlReportListener xmlReportListener =
-            new AntJunitXmlReportListener(outdir, streamCapturingListener);
-        abortableListener.addListener(xmlReportListener);
-      }
+      AntJunitXmlReportListener xmlReportListener =
+          new AntJunitXmlReportListener(outdir, streamCapturingListener);
+      abortableListener.addListener(xmlReportListener);
     }
 
     // TODO: Register all listeners to core instead of to abortableListener because
     // abortableListener gets removed when one of the listener throws exceptions in
     // RunNotifier.java. Other listeners should not get removed.
     if (perTestTimer) {
-      abortableListener.addListener(new PerClassConsoleListener(out));
+      abortableListener.addListener(new PerClassConsoleListener(SWAPPABLE_OUT.getOriginal()));
     } else {
-      core.addListener(new ConsoleListener(out));
+      core.addListener(new ConsoleListener(SWAPPABLE_OUT.getOriginal()));
     }
 
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
-    Thread abnormalExitHook = createAbnormalExitHook(abortableListener, out);
+    final Thread abnormalExitHook =
+      createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
     int failures = 0;
     try {

@@ -79,7 +79,6 @@ class _JUnitRunner(object):
     register('--test', action='append',
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
-    register('--xml-report', action='store_true', help='Output an XML report for the test run.')
     register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
     register('--default-parallel', action='store_true',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
@@ -89,7 +88,7 @@ class _JUnitRunner(object):
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
-             help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
+             help='Redirect test output to files in .pants.d/test/junit.')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the first target path.')
     register_jvm_tool(register,
@@ -113,14 +112,12 @@ class _JUnitRunner(object):
     self._fail_fast = options.fail_fast
     self._working_dir = self._pick_working_dir(options.cwd, context)
     self._args = copy.copy(task_exports.args)
-    if options.xml_report or options.suppress_output:
-      if self._fail_fast:
-        self._args.append('-fail-fast')
-      if options.xml_report:
-        self._args.append('-xmlreport')
+    if options.suppress_output:
       self._args.append('-suppress-output')
-      self._args.append('-outdir')
-      self._args.append(task_exports.workdir)
+    if self._fail_fast:
+      self._args.append('-fail-fast')
+    self._args.append('-outdir')
+    self._args.append(task_exports.workdir)
 
     if options.per_test_timer:
       self._args.append('-per-test-timer')
