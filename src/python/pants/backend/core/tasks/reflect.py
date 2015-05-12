@@ -397,10 +397,6 @@ PREDEFS = {  # some hardwired entries
                                     ' use `target`_',
                                     'Deprecated way to group Python tests;'
                                     ' use <a href="#target">target</a>')},
-  'scala_tests': {'defn':
-                    msg_entry('scala_tests',
-                              'Old name for `scala_specs`_',
-                              'Old name for <a href="#scala_specs">scala_specs</a>')},
 }
 
 

@@ -91,15 +91,6 @@ jar_library(name = 'scala-library',
               jar(org = 'org.scala-lang', name = 'scala-library', rev = SCALA_REV),
             ])
 
-jar_library(name = 'scala-specs',
-            jars = [
-              jar(org = 'org.scala-tools.testing', name = 'specs_2.10', rev = '1.6.9'),
-              jar(org = 'com.twitter.common', name = 'specs-testing', rev = '0.0.6')
-            ],
-            dependencies = [
-              ':scala-library',
-            ])
-
 jar_library(name = 'scala-repl',
             jars = [
               jar(org = 'org.scala-lang', name = 'jline', rev = SCALA_REV, intransitive = True),
