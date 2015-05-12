@@ -16,17 +16,6 @@ from pants.util.contextutil import temporary_dir
 
 
 class WorkUnitTest(unittest.TestCase):
-
-  # life cycle tests
-  #
-  # features
-  #  - current duration
-  #  - name
-  #  - propagates outcome to parent
-  #  - closed output not in output list
-  #  - output value gathering
-  #  - if parent, parent has current as child
-  # what happens for outputs
   def test_duration_dynamic_when_not_ended(self):
     with self.mocked_time() as m_time:
       with temporary_dir() as rundir:
