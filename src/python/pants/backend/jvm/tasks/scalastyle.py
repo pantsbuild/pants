@@ -38,7 +38,7 @@ class FileExcluder(object):
     return True
 
 
-class Scalastyle(NailgunTask):
+class Scalastyle(NailgunTask, JvmToolTaskMixin):
   """Checks scala source files to ensure they're stylish.
 
   Scalastyle only checks scala sources in non-synthetic targets.

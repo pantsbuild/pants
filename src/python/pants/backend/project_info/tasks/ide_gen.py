@@ -17,6 +17,7 @@ from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -279,29 +280,14 @@ class IdeGen(JvmToolTaskMixin, Task):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  @staticmethod
-  def get_jar_infos(ivy_products, confs=None):
-    """Returns a list of dicts containing the paths of various jar file resources.
-
-    Keys include 'default' (normal jar path), 'sources' (path to source jar), and 'javadoc'
-    (path to doc jar). None of them are guaranteed to be present, but 'sources' and 'javadoc'
-    will never be present if 'default' isn't.
-
-    :param ivy_products: ivy_jar_products data from a context
-    :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
-      left unspecified.
-    :returns {dict}
-    """
-    classpath_maps = defaultdict(dict)
-    if ivy_products:
-      for conf, info_group in ivy_products.items():
-        if conf not in confs:
-          continue # We don't care about it.
-        for info in info_group:
-          for module in info.modules_by_ref.values():
-            for artifact in module.artifacts:
-              classpath_maps[module.ref][conf] = artifact.path
-    return classpath_maps
+  def copy_jars(self, jar_list, dest_dir):
+    cp_jars = []
+    if jar_list:
+      for jar in jar_list:
+        cp_jar = os.path.join(dest_dir, os.path.basename(jar))
+        shutil.copy(jar, cp_jar)
+        cp_jars.append(cp_jar)
+    return cp_jars
 
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
@@ -312,27 +298,25 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
-
-    confs = ['default', 'sources', 'javadoc']
-    jar_paths = self.get_jar_infos(self.context.products.get_data('ivy_jar_products'), confs)
+    jar_products = self.context.products.get_data('ivy_jar_products')
+    jar_paths = get_jar_infos(jar_products, confs=['default', 'sources', 'javadoc'])
     for entry in jar_paths.values():
-      jar = entry.get('default')
-      if jar:
-        cp_jar = os.path.join(external_jar_dir, os.path.basename(jar))
-        shutil.copy(jar, cp_jar)
-
-        cp_source_jar = None
-        source_jar = entry.get('sources')
-        if source_jar:
-          cp_source_jar = os.path.join(external_source_jar_dir, os.path.basename(source_jar))
-          shutil.copy(source_jar, cp_source_jar)
-
-        cp_javadoc_jar = None
-        javadoc_jar = entry.get('javadoc')
-        if javadoc_jar:
-          cp_javadoc_jar = os.path.join(external_javadoc_jar_dir, os.path.basename(javadoc_jar))
-          shutil.copy(javadoc_jar, cp_javadoc_jar)
-
+      binary_jars = entry.get('default')
+      sources_jars = entry.get('sources')
+      javadoc_jars = entry.get('javadoc')
+      cp_jars = self.copy_jars(binary_jars, external_jar_dir)
+      cp_source_jars = self.copy_jars(sources_jars, external_source_jar_dir)
+      cp_javadoc_jars = self.copy_jars(javadoc_jars, external_javadoc_jar_dir)
+      for i in range(len(cp_jars)):
+        cp_jar = cp_jars[i]
+        if i < len(cp_source_jars):
+          cp_source_jar = cp_source_jars[i]
+        else:
+          cp_source_jar = None
+        if i < len(cp_javadoc_jars):
+          cp_javadoc_jar = cp_javadoc_jars[i]
+        else:
+          cp_javadoc_jar = None
         self._project.external_jars.add(ClasspathEntry(cp_jar,
                                                        source_jar=cp_source_jar,
                                                        javadoc_jar=cp_javadoc_jar))
@@ -349,7 +333,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     if self.skip_scala:
       scalac_classpath = []
     else:
-      scalac_classpath = self.tool_classpath('scalac', scope='compile.scala')
+      scalac_classpath = self.tool_classpath('scalac', scope='scala-platform')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
     targets = self.context.targets()

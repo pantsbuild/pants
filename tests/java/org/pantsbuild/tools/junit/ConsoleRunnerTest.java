@@ -75,6 +75,9 @@ public class ConsoleRunnerTest {
   @Test
   public void testFlakyTests() throws Exception {
     TestRegistry.consoleRunnerTestRunsFlakyTests = true;
+    FlakyTest.numFlakyTestInstantiations = 0;
+    FlakyTest.numExpectedExceptionMethodInvocations = 0;
+
     try {
       ConsoleRunner.main(asArgsArray("FlakyTest -num-retries 2"));
       Assert.fail("Should have failed with RuntimeException due to FlakyTest.methodAlwaysFails");

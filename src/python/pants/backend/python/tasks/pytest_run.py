@@ -69,9 +69,12 @@ class PythonTestResult(object):
 
 class PytestRun(PythonTask):
   _TESTING_TARGETS = [
-    PythonRequirement('pytest'),
+    # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
+    # to avoid confusion when debugging pants tests.
+    # TODO: make these an option, so any pants install base can pick their pytest version.
+    PythonRequirement('pytest>=2.6,<2.7'),
     PythonRequirement('pytest-timeout'),
-    PythonRequirement('pytest-cov'),
+    PythonRequirement('pytest-cov>=1.8,<1.9'),
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]

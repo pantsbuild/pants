@@ -198,6 +198,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm:ossrh_publication_metadata',
     'src/python/pants/base:address',
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',

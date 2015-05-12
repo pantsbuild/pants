@@ -10,6 +10,7 @@ from pants.backend.core.tasks import reflect
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
+from pants.base.config import Config
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants_test.base_test import BaseTest
@@ -42,9 +43,20 @@ class BuildsymsSanityTests(BaseTest):
 
 
 class GoalDataTest(BaseTest):
-  def test_gen_tasks_options_reference_data(self):
+  # TODO(Eric Ayers): This test is disabled because it modifies global options values in a way
+  # that changes the outcome of tests that follow it. See the note in
+  #  bootstrap_option_values() defined in reflect.py
+  def DISABLED_test_gen_tasks_options_reference_data(self):
+    # TODO(Eric Ayers) Not really part of the test, just to detect the cache poisoning
+    before_support_dir = Config.from_cache().getdefault('pants_supportdir')
+
     # can we run our reflection-y goal code without crashing? would be nice
     Goal.by_name('jack').install(TaskRegistrar('jill', DummyTask))
     oref_data = reflect.gen_tasks_options_reference_data()
+
+    # TODO(Eric Ayers) Not really part of the test, just to detect the cache poisoning
+    after_support_dir = Config.from_cache().getdefault('pants_supportdir')
+    self.assertEquals(before_support_dir, after_support_dir)
+
     self.assertTrue(len(oref_data) > 0,
                     'Tried to generate data for options reference, got emptiness')

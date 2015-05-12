@@ -4,8 +4,9 @@
 
 package org.pantsbuild.zinc
 
-import java.io.{FileNotFoundException, FileInputStream, InputStream, File}
-import java.security.MessageDigest
+import java.io.{FileNotFoundException, File}
+import com.google.common.hash.Hashing
+import com.google.common.base.Charsets
 
 
 class FileFPrint(val file: File, val fprint: String) {
@@ -20,20 +21,30 @@ class FileFPrint(val file: File, val fprint: String) {
 }
 
 object FileFPrint {
+  private val HashFunction = Hashing.murmur3_128()
+  private val LongStringLen = (2l^31).toString.size
+
+  /**
+   * NB: This used to SHA1 the entire analysis file to generate fingerprint, but in the context
+   * of many, many small projects that is too expensive an operation. Instead, we use only the
+   * analysis file name and lastModified time here.
+   *
+   * TODO: It should be relatively unlikely to encounter a collision here, but it would be good
+   * to prevent it entirely by including a UUID in the header of the analysis file and using that
+   * as its fingerprint.
+   */
   def fprint(file: File): Option[FileFPrint] = {
-    var is: Option[InputStream] = None
-    val md = MessageDigest.getInstance("SHA1")
-    val buf = new Array[Byte](8192)
-    var n = 0
     try {
-      is = Some(new FileInputStream(file))
-      while ({n = (is map {_.read(buf)}).getOrElse(-1); n != -1}) { md.update(buf, 0, n) }
-      val ret = Some(md.digest().map("%02X" format _).mkString)
-      ret map { new FileFPrint(file, _) }
+      if (!file.exists()) {
+        return None
+      }
+      val filePath = file.getCanonicalPath()
+      val hasher = HashFunction.newHasher(filePath.size + (2 * LongStringLen))
+      hasher.putString(filePath, Charsets.UTF_8)
+      hasher.putLong(file.lastModified)
+      Some(new FileFPrint(file, hasher.hash.toString))
     } catch {
       case e: FileNotFoundException => None
-    } finally {
-      is foreach { _.close }
     }
   }
 }

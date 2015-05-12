@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -29,11 +28,8 @@ import com.google.common.io.Closer;
 import com.google.common.io.Files;
 import com.google.common.reflect.TypeToken;
 import com.google.common.testing.TearDown;
-import com.google.common.testing.TearDownStack;
 
 import org.easymock.Capture;
-import org.easymock.IMocksControl;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -41,7 +37,8 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-
+import org.pantsbuild.testing.EasyMockTest;
+import org.pantsbuild.testing.TearDownTestCase;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateAction;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateEntryException;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateHandler;
@@ -50,7 +47,6 @@ import org.pantsbuild.tools.jar.JarBuilder.Entry;
 import org.pantsbuild.tools.jar.JarBuilder.Listener;
 
 import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -68,47 +64,6 @@ public class JarBuilderTest {
 
   interface ExceptionalFunction<S, T, E extends Exception> {
     T apply(S input) throws E;
-  }
-
-  public static class TearDownTestCase {
-
-    private TearDownStack tearDowns;
-
-    @Before
-    public final void setUpTearDowns() {
-      tearDowns = new TearDownStack();
-    }
-
-    @After
-    public final void runTearDowns() {
-      tearDowns.runTearDown();
-    }
-
-    protected final void addTearDown(TearDown tearDown) {
-      Preconditions.checkState(tearDowns != null);
-      tearDowns.addTearDown(tearDown);
-    }
-  }
-
-  public static class EasyMockTest extends TearDownTestCase {
-    protected IMocksControl control;
-
-    @Before
-    public final void setupControl() {
-      control = createControl();
-      addTearDown(new TearDown() {
-        @Override
-        public void tearDown() {
-          control.verify();
-        }
-      });
-    }
-
-    protected <T> T createMock(TypeToken<T> token) {
-      @SuppressWarnings("unchecked")
-      Class<T> rawType = (Class<T>) token.getRawType();
-      return control.createMock(rawType);
-    }
   }
 
   public static class DuplicatePolicyTests {

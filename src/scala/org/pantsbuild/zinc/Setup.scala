@@ -274,11 +274,9 @@ object Setup {
    * For snapshots the zinc version includes timestamp and commit.
    */
   lazy val versionString: String = {
-    if (zincVersion.published.endsWith("-SNAPSHOT")) {
-      "%s %s-%s" format (zincVersion.published, zincVersion.timestamp, zincVersion.commit take 10)
-    } else {
-      zincVersion.published
-    }
+    import zincVersion._
+    if (published.endsWith("-SNAPSHOT")) "%s %s-%s" format (published, timestamp, commit take 10)
+    else published
   }
 
   /**
@@ -301,15 +299,16 @@ object Setup {
    * Debug output for compiler setup.
    */
   def show(setup: Setup, output: String => Unit): Unit = {
+    import setup._
     val values = Seq(
-      "scala compiler"             -> setup.scalaCompiler,
-      "scala library"              -> setup.scalaLibrary,
-      "scala extra"                -> setup.scalaExtra,
-      "sbt interface"              -> setup.sbtInterface,
-      "compiler interface sources" -> setup.compilerInterfaceSrc,
-      "java home"                  -> setup.javaHome,
-      "fork java"                  -> setup.forkJava,
-      "cache directory"            -> setup.cacheDir)
+      "scala compiler"             -> scalaCompiler,
+      "scala library"              -> scalaLibrary,
+      "scala extra"                -> scalaExtra,
+      "sbt interface"              -> sbtInterface,
+      "compiler interface sources" -> compilerInterfaceSrc,
+      "java home"                  -> javaHome,
+      "fork java"                  -> forkJava,
+      "cache directory"            -> cacheDir)
     Util.show(("Setup", values), output)
   }
 }

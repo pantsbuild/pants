@@ -25,6 +25,11 @@ jar_library(name='guava',
                   apidocs='http://docs.guava-libraries.googlecode.com/git-history/v18.0/javadoc/'),
             ])
 
+jar_library(name='jansi',
+            jars=[
+              jar('org.fusesource.jansi', 'jansi', '1.11'),
+            ])
+
 jar_library(name='jsr305',
             jars=[
               jar('com.google.code.findbugs', 'jsr305', '3.0.0'),
@@ -62,9 +67,17 @@ jar_library(name='finagle-core',
               ':util-core'
             ])
 
+# The finagle-thrift lib has a dep on org.apache.thrift#libthrift;0.5.0 which is
+# hosted at maven.twttr.com.  Since finagle-thrift is only used by test code we
+# exclude and then use org.apache.hadoop#libthrift;0.5.0.o instead to avoid the
+# need to setup a custom ivy resolver.
 jar_library(name='finagle-thrift',
             jars = [
-              jar(org='com.twitter', name='finagle-thrift_2.10', rev=FINAGLE_REV),
+              jar(org='com.twitter', name='finagle-thrift_2.10', rev=FINAGLE_REV)
+                .exclude(org='org.apache.thrift', name='libthrift'),
+            ],
+            dependencies=[
+              ':libthrift-0.5.0',
             ])
 
 jar_library(name='log4j',
@@ -114,7 +127,12 @@ jar_library(name = 'spindle-runtime',
 
 jar_library(name='libthrift-0.5.0',
             jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.5.0-1'),
+              jar(org='org.apache.hadoop', name='libthrift', rev='0.5.0.0')
+                # These are un-needed and un-available log4j appender deps pulled in via a
+                # libthrift dep on slf4j-log4j.
+                .exclude(org='javax.jms', name='jms')
+                .exclude(org='com.sun.jdmk', name='jmxtools')
+                .exclude(org='com.sun.jmx', name='jmxri')
             ])
 
 jar_library(name='thrift-0.5.0',

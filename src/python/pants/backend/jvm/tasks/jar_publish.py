@@ -19,6 +19,7 @@ from twitter.common.config import Properties
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
@@ -162,10 +163,10 @@ class DependencyWriter(object):
     dependencies = OrderedDict()
     internal_codegen = {}
     configurations = set(confs or [])
-    for dep in target_internal_dependencies(target):
-      jar = self._as_versioned_jar(dep)
-      dependencies[(jar.org, jar.name)] = self.internaldep(jar, dep, classifier=classifier)
-      if dep.is_codegen:
+    for internal_dep in target_internal_dependencies(target):
+      jar = self._as_versioned_jar(internal_dep)
+      dependencies[(jar.org, jar.name)] = self.internaldep(jar, internal_dep, classifier=classifier)
+      if internal_dep.is_codegen:
         internal_codegen[jar.name] = jar.name
     for jar in target.jar_dependencies:
       if jar.rev:
@@ -173,7 +174,8 @@ class DependencyWriter(object):
         configurations |= set(jar._configurations)
 
     target_jar = self.internaldep(self._as_versioned_jar(target),
-                                  classifier,
+                                  target,
+                                  classifier=classifier,
                                   configurations=list(configurations))
     target_jar = target_jar.extend(dependencies=dependencies.values())
 
@@ -189,7 +191,7 @@ class DependencyWriter(object):
     """
     raise NotImplementedError()
 
-  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
+  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
     """
       Subclasses must return a template data for the given internal target (provided in jar
       dependency form).
@@ -209,25 +211,54 @@ class DependencyWriter(object):
 
 
 class PomWriter(DependencyWriter):
-  def __init__(self, get_db):
+  def __init__(self, get_db, tag):
     super(PomWriter, self).__init__(
         get_db,
         os.path.join('templates', 'jar_publish', 'pom.mustache'))
+    self._tag = tag
 
   def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
-    return dict(artifact=target_jar)
+    return dict(project=target_jar)
 
   def jardep(self, jar, classifier=None):
     return TemplateData(
-        org=jar.org,
-        name=jar.name,
-        rev=jar.rev,
-        scope='compile',
-        classifier=classifier,
-        excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
+      classifiers=self.classifiers(classifier, jar.artifacts),
+      artifact_id=jar.name,
+      group_id=jar.org,
+      version=jar.rev,
+      scope='compile',
+      excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
 
-  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
-    return self.jardep(jar_dependency, classifier=classifier)
+  @staticmethod
+  def classifiers(classifier, artifacts):
+    """Find a list of plausible classifiers.
+
+    :param classifier: the starting classifier
+    :param artifacts: a sequence of IvyArtifact's
+    :return: list like [TemplateData(classifier='sources'), TemplateData(classifier='javadoc')]
+    """
+    r = []
+    if classifier:
+      r.append(TemplateData(classifier=classifier))
+    return r + [TemplateData(classifier=i) for i in map(lambda x: x.classifier, artifacts) if i]
+
+  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
+    template_data = self.jardep(jar_dependency, classifier=classifier)
+    if isinstance(target.provides.publication_metadata, OSSRHPublicationMetadata):
+      pom = target.provides.publication_metadata
+
+      # Forming the project name from the coordinates like this is acceptable as a fallback when
+      # the user supplies no project name.
+      # See: http://central.sonatype.org/pages/requirements.html#project-name-description-and-url
+      name = pom.name or '{}:{}'.format(jar_dependency.org, jar_dependency.name)
+
+      template_data = template_data.extend(name=name,
+                                           description=pom.description,
+                                           url=pom.url,
+                                           licenses=pom.licenses,
+                                           scm=pom.scm.tagged(self._tag),
+                                           developers=pom.developers)
+    return template_data
 
 
 class IvyWriter(DependencyWriter):
@@ -266,7 +297,7 @@ class IvyWriter(DependencyWriter):
                         configurations=jar._configurations,
                         classifier=classifier)
 
-  def internaldep(self, jar_dependency, dep=None, configurations=None, classifier=None):
+  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
     return self._jardep(jar_dependency, configurations=configurations, classifier=classifier)
 
 
@@ -638,7 +669,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       entry = pushdb.get_entry(tgt)
       return entry.fingerprint or '0.0.0'
 
-    def stage_artifact(tgt, jar, version, changelog, confs=None, artifact_ext='',
+    def stage_artifact(tgt, jar, version, tag, changelog, confs=None, artifact_ext='',
                        extra_confs=None, classifier=''):
       def path(name=None, suffix='', extension='jar'):
         return self.artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
@@ -651,12 +682,12 @@ class JarPublish(ScmPublishMixin, JarTask):
 
       IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, extra_confs=extra_confs,
                                   classifier=classifier)
-      PomWriter(get_pushdb).write(tgt, path(extension='pom'), extra_confs=extra_confs,
-                                  classifier=classifier)
+      PomWriter(get_pushdb, tag).write(tgt, path(extension='pom'), extra_confs=extra_confs,
+                                       classifier=classifier)
 
       return ivyxml
 
-    def stage_artifacts(tgt, jar, version, changelog):
+    def stage_artifacts(tgt, jar, version, tag, changelog):
       if self.get_options().individual_plugins:
         return stage_individual_plugins(tgt, jar, version, changelog)
       DEFAULT_IVY_TYPE = 'jar'
@@ -729,7 +760,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
       if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
         confs.add(IvyWriter.JAVADOC_CONFIG)
-      return stage_artifact(tgt, jar, version, changelog, confs, extra_confs=extra_confs)
+      return stage_artifact(tgt, jar, version, tag, changelog, confs, extra_confs=extra_confs)
 
     # TODO Remove this once we fix https://github.com/pantsbuild/pants/issues/1229
     def stage_individual_plugins(tgt, jar, version, changelog):
@@ -815,15 +846,20 @@ class JarPublish(ScmPublishMixin, JarTask):
         else:
           changelog = self.changelog(target, oldentry.sha) or 'Direct dependencies changed.\n'
 
+      org = jar.org
+      name = jar.name
+      rev = newentry.version().version()
+      tag_name = '{org}-{name}-{rev}'.format(org=org, name=name, rev=rev) if self.commit else None
+
       if no_changes and not self.force:
         print('No changes for {0}'.format(pushdb_coordinate(jar, oldentry)))
-        stage_artifacts(target, jar, oldentry.version().version(), changelog)
+        stage_artifacts(target, jar, oldentry.version().version(), tag_name, changelog)
       elif skip:
         print('Skipping {} to resume at {}'.format(
           jar_coordinate(jar, (newentry.version() if self.force else oldentry.version()).version()),
           coordinate(self.restart_at[0], self.restart_at[1])
         ))
-        stage_artifacts(target, jar, oldentry.version().version(), changelog)
+        stage_artifacts(target, jar, oldentry.version().version(), tag_name, changelog)
       else:
         if not self.dryrun:
           # Confirm push looks good
@@ -846,7 +882,7 @@ class JarPublish(ScmPublishMixin, JarTask):
             raise TaskError('User aborted push')
 
         pushdb.set_entry(target, newentry)
-        ivyxml = stage_artifacts(target, jar, newentry.version().version(), changelog)
+        ivyxml = stage_artifacts(target, jar, rev, tag_name, changelog)
 
         if self.dryrun:
           print('Skipping publish of {0} in test mode.'.format(pushdb_coordinate(jar, newentry)))
@@ -854,9 +890,6 @@ class JarPublish(ScmPublishMixin, JarTask):
           self.publish(ivyxml, jar=jar, entry=newentry, repo=repo, published=published)
 
           if self.commit:
-            org = jar.org
-            name = jar.name
-            rev = newentry.version().version()
             coord = coordinate(org, name, rev)
 
             pushdb.dump(dbfile)
@@ -864,7 +897,7 @@ class JarPublish(ScmPublishMixin, JarTask):
             self.publish_pushdb_changes_to_remote_scm(
               pushdb_file=dbfile,
               coordinate=coord,
-              tag_name='{org}-{name}-{rev}'.format(org=org, name=name, rev=rev),
+              tag_name=tag_name,
               tag_message='Publish of {coordinate} initiated by {user} {cause}'.format(
                 coordinate=coord,
                 user=getpass.getuser(),

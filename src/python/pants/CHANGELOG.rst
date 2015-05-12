@@ -1,6 +1,20 @@
 RELEASE HISTORY
 ===============
 
+0.0.33 (unreleased)
+-------------------
+
+API Changes
+~~~~~~~~~~~
+
+Folks who use a custom ivysettings.xml but have no ivy.ivy_settings
+option defined in pants.ini pointing to it must now add one like so:
+
+.. code::
+
+  [ivy]
+  ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
+
 0.0.32 (3/26/2015)
 ------------------
 

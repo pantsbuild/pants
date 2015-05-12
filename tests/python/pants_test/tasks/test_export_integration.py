@@ -104,3 +104,30 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       self.assertIsNotNone(scala_lang_lib['default'])
       self.assertIsNotNone(scala_lang_lib['sources'])
       self.assertIsNotNone(scala_lang_lib['javadoc'])
+
+  def test_ivy_classifiers(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
+      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
+      # to get in a test that isn't a subclass of TaskTestBase.
+      # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
+      ivy_cache_dir = os.path.expanduser('~/.ivy2/pants')
+      avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
+      self.assertIsNotNone(avro_lib_info)
+      self.assertEquals(
+        avro_lib_info.get('default'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
+      )
+      # TODO(Eric Ayers): this BUILD file also requests the avro 'tests' jar using
+      # a classifier in the JarDependency.  See https://github.com/pantsbuild/pants/issues/1489
+
+      # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
+      #self.assertEquals(
+      #  common_lang_lib_info.get('javadoc'),
+      #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-javadoc.jar')
+      #)
+      #self.assertEquals(
+      #  common_lang_lib_info.get('sources'),
+      #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-sources.jar')
+      #)

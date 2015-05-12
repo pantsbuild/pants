@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
+                                                          OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -71,6 +73,11 @@ def build_file_aliases():
     },
     objects={
       'artifact': Artifact,
+      'ossrh': OSSRHPublicationMetadata,
+      'license': License,
+      'scm': Scm,
+      'developer': Developer,
+      'github': Scm.github,
       'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
