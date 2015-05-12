@@ -105,15 +105,21 @@ class Report(object):
     self._shutdown_event.set()
     self._report_thread.join(timeout=REPORT_THREAD_SHUTDOWN_TIMEOUT)
 
+  def flush_output(self):
+    self._submit_work(self._handle_output_for_all_workunits, ())
+
+  def notify_shutdown(self):
+    self._submit_work(self._mark_as_done, ())
+
   def _watcher_target(self):
     try:
       while not self._shutdown_event.wait(REPORT_THREAD_EVENT_HANDLING_INTERVAL):
-        self._submit_work(self._handle_output_for_all_workunits, ())
+        self.flush_output()
     except KeyboardInterrupt:
       thread.interrupt_main()
       raise
     finally:
-      self._submit_work(self._mark_as_done, ())
+      self.notify_shutdown()
 
   def _reporting_target(self):
     try:
@@ -150,6 +156,10 @@ class Report(object):
         reporter.close()
 
   def _start_workunit(self, workunit):
+    if workunit.id in self._workunits:
+      # don't re-report workunits if they're already being tracked
+      return
+
     self._workunits[workunit.id] = workunit
     for reporter in self._reporter_list():
       reporter.start_workunit(workunit)
@@ -159,12 +169,15 @@ class Report(object):
       reporter.handle_log(workunit, level, *msg_elements)
 
   def _end_workunit(self, workunit, remaining_unread_output):
+    if workunit.id not in self._workunits:
+      # don't report the end of workunits that are no longer being tracked
+      return
+
     self._handle_outputs(workunit, remaining_unread_output)
     for reporter in self._reporter_list():
       reporter.end_workunit(workunit)
 
-    if workunit.id in self._workunits:
-      del self._workunits[workunit.id]
+    del self._workunits[workunit.id]
 
   def _handle_outputs(self, workunit, outputs):
     for label, s in outputs.items():
