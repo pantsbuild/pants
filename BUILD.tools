@@ -93,7 +93,7 @@ jar_library(name = 'scala-library',
 
 jar_library(name = 'scala-specs',
             jars = [
-              jar(org = 'org.scala-tools.testing', name = 'specs_2.10.3', rev = '1.6.9'),
+              jar(org = 'org.scala-tools.testing', name = 'specs_2.10', rev = '1.6.9'),
               jar(org = 'com.twitter.common', name = 'specs-testing', rev = '0.0.6')
             ],
             dependencies = [
