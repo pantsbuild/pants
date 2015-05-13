@@ -227,8 +227,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # chunk, which avoids needing to introduce compile-time dependencies between annotation
     # processors and the classes they annotate.
     compile_classpath = compile_classpaths.get_for_targets(all_targets)
-    compile_classpath = OrderedSet(
-      self._compute_extra_classpath(extra_compile_time_classpath_elements) + list(compile_classpath))
+
+    compile_classpath = OrderedSet(list(compile_classpath) +
+                          self._compute_extra_classpath(extra_compile_time_classpath_elements))
 
     # Validate that all classpath entries are located within the working copy, which
     # simplifies relativizing the analysis files.
