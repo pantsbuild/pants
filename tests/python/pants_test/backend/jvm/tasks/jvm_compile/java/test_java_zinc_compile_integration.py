@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
-from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
+from pants_test.backend.jvm.tasks.jvm_compile.utils import provide_compile_strategies
 
 
 class JvmExamplesCompileIntegrationTest(BaseCompileIT):

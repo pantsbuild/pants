@@ -26,10 +26,11 @@ env:
   matrix:
     # No need to run the self-checks on OSX where vms are at a premium since these are file-level,
     # non-platform fragile lints.
-    # - CI_FLAGS="-clpn 'Various pants self checks'"  # (fkmsr)
-    - CI_FLAGS="-fkmsrcn 'Unit tests for pants and pants-plugins'"  # (jlp)
-    - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
-    - CI_FLAGS="-fkmsrjlpn 'Python integration tests for pants'"  # (c)
+    # - CI_FLAGS="-clpnet 'Various pants self checks'"  # (fkmsr)
+    - CI_FLAGS="-fkmsrcjlpn 'Test examples and testprojects'"  # (et)
+    - CI_FLAGS="-fkmsrcnet 'Unit tests for pants and pants-plugins'"  # (jlp)
+    - CI_FLAGS="-fkmsrcjlpet 'Python contrib tests'"  # (n)
+    - CI_FLAGS="-fkmsrjlpnet 'Python integration tests for pants'"  # (c)
 
 before_install:
   # We need a sane python and as of 3/5/2015 on OSX 10.9 the provided python 2.7.5 encounters

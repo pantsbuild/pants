@@ -29,10 +29,7 @@ def _wrap(testmethod, setupfun):
   return wrapped
 
 def provide_compile_strategies(testmethod):
-  """ A decorator for test methods that provides the compilation strategy as a parameter.
-
-  Invokes the test multiple times, once for each built-in strategy in _STRATEGIES.
-  """
+  """A decorator for test methods that provides the compilation strategy as a parameter."""
   return _wrap(testmethod, lambda self, testmethod, strategy: testmethod(self, strategy))
 
 def set_compile_strategies(testmethod):
