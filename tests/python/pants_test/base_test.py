@@ -117,6 +117,8 @@ class BaseTest(unittest.TestCase):
   def setUp(self):
     super(BaseTest, self).setUp()
     Goal.clear()
+    Subsystem.reset()
+
     self.real_build_root = BuildRoot().path
 
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
@@ -137,8 +139,7 @@ class BaseTest(unittest.TestCase):
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
-    Subsystem.reset()
-
+    # We need a pants.ini, even if empty. get_buildroot() uses its presence.
     self.create_file('pants.ini')
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)

@@ -66,10 +66,11 @@ class Subsystem(object):
 
   @classmethod
   def reset(cls):
-    """Forget all cached subsystem instances.
+    """Forget all option values and cached subsystem instances.
 
     Used for test isolation.
     """
+    cls._options = None
     cls._scoped_instances = {}
 
   @classmethod

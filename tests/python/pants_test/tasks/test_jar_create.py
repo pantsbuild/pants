@@ -88,6 +88,14 @@ class JarCreateExecuteTest(JarCreateTestBase):
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
+    # This is hacky: Creating a scala_library below requires Subsystem initialization,
+    # which we must force by this call to the superclass context() (note that can't call our own
+    # context() because it expects the scala_library to already exist). The test methods themselves
+    # then call self.context() again to get hold of a context, which will superfluously (but
+    # harmlessly) re-initialize Subsystem.
+    # TODO: Fix this hack by separating option setup from context setup in the test sequence.
+    super(JarCreateExecuteTest, self).context()
+
     self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
     self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],
                                 resources=test_path('src/resources/com/twitter:spam'))
