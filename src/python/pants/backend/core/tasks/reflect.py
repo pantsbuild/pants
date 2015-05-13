@@ -14,7 +14,6 @@ from docutils.core import publish_parts
 from six.moves import range
 
 from pants.base.build_manual import get_builddict_info
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
@@ -418,15 +417,7 @@ def get_syms(build_file_parser):
 
 
 def bootstrap_option_values():
-  try:
-    return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
-  finally:
-    # Today, the OptionsBootstrapper mutates global state upon construction in the form of:
-    #  Config.reset_default_bootstrap_option_values(...)
-    # As such bootstrap options that use the buildroot get contaminated globally here.  We only
-    # need the contaminated values locally though for doc display, thus the reset of global state.
-    # TODO(John Sirois): remove this hack when mutable Config._defaults is killed.
-    Config.reset_default_bootstrap_option_values()
+  return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
 
 
 def gen_glopts_reference_data():

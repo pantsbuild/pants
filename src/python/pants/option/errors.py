@@ -6,11 +6,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 
-class RegistrationError(Exception):
+class OptionsError(Exception):
+  """An options system-related error."""
+  pass
+
+
+class BootstrapError(OptionsError):
+  """An error at options bootstrapping time."""
+  pass
+
+
+class RegistrationError(OptionsError):
   """An error at option registration time."""
   pass
 
 
-class ParseError(Exception):
+class ParseError(OptionsError):
   """An error at flag parsing time."""
   pass

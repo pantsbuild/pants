@@ -21,47 +21,6 @@ except ImportError:
   import configparser as ConfigParser
 
 
-def reset_default_bootstrap_option_values(defaults, values=None, buildroot=None):
-  """Reset the bootstrap options' default values.
-
-  :param defaults: The dict to set the values on.
-  :param values: A namespace containing the values to set. If unspecified, uses
-                 buildroot-based defaults.
-  :param buildroot: If values is None, use this buildroot to generate the hard-coded defaults.
-                    If unspecified, uses the detected buildroot.
-
-  The bootstrapping code will use this to set the bootstrapped values. Code that doesn't trigger
-  bootstrapping (i.e., the one remaining old-style command) will get the hard-coded defaults, as
-  it did before.
-
-  It's a code smell to update nominally static data dynamically, but this is temporary,
-  and saves us having to plumb things through to all the Config.from_cache() call sites.
-
-  This method is also called in tests of this code, to reset state for unrelated tests.
-
-  TODO: Remove after all direct config reads have been subsumed into the options system,
-        which can pass these into Config.load() itself after bootstrapping them.
-  """
-
-  buildroot = buildroot or get_buildroot()
-  defaults.update({
-    'buildroot': buildroot
-  })
-
-  if values:
-    defaults.update({
-      'pants_workdir': values.pants_workdir,
-      'pants_supportdir': values.pants_supportdir,
-      'pants_distdir': values.pants_distdir
-    })
-  else:
-    defaults.update({
-      'pants_workdir': os.path.join(buildroot, '.pants.d'),
-      'pants_supportdir': os.path.join(buildroot, 'build-support'),
-      'pants_distdir': os.path.join(buildroot, 'dist')
-    })
-
-
 class Config(object):
   """Encapsulates ini-style config file loading and access.
 
@@ -70,22 +29,8 @@ class Config(object):
   """
   DEFAULT_SECTION = ConfigParser.DEFAULTSECT
 
-  _defaults = {
-    'homedir': os.path.expanduser('~'),
-    'user': getpass.getuser(),
-    'pants_bootstrapdir': get_pants_cachedir(),
-    'pants_configdir': get_pants_configdir()
-  }
-  reset_default_bootstrap_option_values(_defaults)
-
   class ConfigError(Exception):
     pass
-
-  @classmethod
-  def reset_default_bootstrap_option_values(cls, values=None, buildroot=None):
-    reset_default_bootstrap_option_values(cls._defaults, values, buildroot)
-
-  _cached_config = None
 
   @classmethod
   def _munge_configpaths_arg(cls, configpaths):
@@ -98,43 +43,56 @@ class Config(object):
     return tuple(configpaths) if configpaths else (os.path.join(get_buildroot(), 'pants.ini'),)
 
   @classmethod
-  def from_cache(cls):
-    if not cls._cached_config:
-      raise cls.ConfigError('No config cached.')
-    return cls._cached_config
-
-  @classmethod
-  def cache(cls, config):
-    cls._cached_config = config
-
-  @classmethod
-  def load(cls, configpaths=None):
+  def load(cls, configpaths=None, seed_values=None):
     """Loads config from the given paths.
 
-     By default this is the path to the pants.ini file in the current build root directory.
-     Callers may specify a single path, or a list of the paths of configs to be chained, with
-     later instances taking precedence over eariler ones.
+    A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
+    section, and be available for use in substitutions.  The caller may override some of these
+    seed values.
 
-     Any defaults supplied will act as if specified in the loaded config file's DEFAULT section.
-     The 'buildroot', invoking 'user' and invoking user's 'homedir' are automatically defaulted.
+    :param configpaths: Load from these paths. Later instances take precedence over earlier ones.
+                        If unspecified, loads from pants.ini in the current build root directory.
+    :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
+                        pants_supportdir and pants_distdir.
     """
     configpaths = cls._munge_configpaths_arg(configpaths)
     single_file_configs = []
     for configpath in configpaths:
-      parser = cls.create_parser()
+      parser = cls.create_parser(seed_values)
       with open(configpath, 'r') as ini:
         parser.readfp(ini)
       single_file_configs.append(SingleFileConfig(configpath, parser))
     return ChainedConfig(single_file_configs)
 
   @classmethod
-  def create_parser(cls):
+  def create_parser(cls, seed_values=None):
     """Creates a config parser that supports %([key-name])s value substitution.
 
-    Any defaults supplied will act as if specified in the loaded config file's DEFAULT section and
-    be available for substitutions, along with all the standard defaults defined above.
+    A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
+    section, and be available for use in substitutions.  The caller may override some of these
+    seed values.
+
+    :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
+                        pants_supportdir and pants_distdir.
     """
-    return ConfigParser.SafeConfigParser(cls._defaults)
+    seed_values = seed_values or {}
+    buildroot = seed_values.get('buildroot', get_buildroot())
+
+    all_seed_values = {
+      'buildroot': buildroot,
+      'homedir': os.path.expanduser('~'),
+      'user': getpass.getuser(),
+      'pants_bootstrapdir': get_pants_cachedir(),
+      'pants_configdir': get_pants_configdir(),
+    }
+
+    def update_dir_from_seed_values(key, default):
+      all_seed_values[key] = seed_values.get(key, os.path.join(buildroot, default))
+    update_dir_from_seed_values('pants_workdir', '.pants.d')
+    update_dir_from_seed_values('pants_supportdir', 'build-support')
+    update_dir_from_seed_values('pants_distdir', 'dist')
+
+    return ConfigParser.SafeConfigParser(all_seed_values)
 
   # TODO(John Sirois): s/type/type_/
 

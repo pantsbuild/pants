@@ -19,7 +19,6 @@ from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit
@@ -53,11 +52,8 @@ class GoalRunner(object):
 
   def setup(self):
     options_bootstrapper = OptionsBootstrapper()
-
-    # Force config into the cache so we (and plugin/backend loading code) can use it.
-    # TODO: Plumb options in explicitly.
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
-    self.config = Config.from_cache()
+    config = options_bootstrapper.post_bootstrap_config()
 
     # Get logging setup prior to loading backends so that they can log as needed.
     self._setup_logging(bootstrap_options.for_global_scope())
@@ -68,8 +64,8 @@ class GoalRunner(object):
       pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    backend_packages = self.config.getlist('backends', 'packages', [])
-    plugins = self.config.getlist('backends', 'plugins', [])
+    backend_packages = config.getlist('backends', 'packages', [])
+    plugins = config.getlist('backends', 'plugins', [])
     build_configuration = load_plugins_and_backends(plugins, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
@@ -98,7 +94,7 @@ class GoalRunner(object):
 
     # Now that we have options we can instantiate subsystems.
     self.run_tracker = RunTracker.global_instance()
-    report = initial_reporting(self.config, self.run_tracker)
+    report = initial_reporting(config, self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
     if url:
@@ -123,7 +119,7 @@ class GoalRunner(object):
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
-      for path in self.config.getlist('goals', 'bootstrap_buildfiles', default=[]):
+      for path in config.getlist('goals', 'bootstrap_buildfiles', default=[]):
         build_file = self.address_mapper.from_cache(root_dir=self.root_dir, relpath=path)
         # TODO(pl): This is an unfortunate interface leak, but I don't think
         # in the long run that we should be relying on "bootstrap" BUILD files

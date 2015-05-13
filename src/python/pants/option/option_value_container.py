@@ -63,6 +63,13 @@ class OptionValueContainer(object):
     for k, v in attrs.items():
       setattr(self, k, v)
 
+  def get(self, key, default=None):
+    # Support dict-like dynamic access.  See also __getitem__ below.
+    if hasattr(self, key):
+      return getattr(self, key)
+    else:
+      return default
+
   def __setattr__(self, key, value):
     if key == '_forwardings':
       return super(OptionValueContainer, self).__setattr__(key, value)
