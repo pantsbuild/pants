@@ -9,6 +9,7 @@ import pytest
 
 from pants.base import validation
 
+
 assert_list = validation.assert_list
 
 
