@@ -65,7 +65,7 @@ class CppLibraryCreate(CppTask):
     cmd.extend([output])
     cmd.extend(objects)
 
-    with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]):
-      self.run_command(cmd)
+    with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]) as workunit:
+      self.run_command(cmd, workunit)
 
     return output
