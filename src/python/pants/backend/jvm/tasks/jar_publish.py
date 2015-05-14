@@ -241,7 +241,7 @@ class PomWriter(DependencyWriter):
     if classifier:
       s.add(classifier)
     s.update([i.classifier for i in artifacts if i.classifier])
-    return map(lambda x: TemplateData(classifier=x), s)
+    return map(lambda x: TemplateData(classifier=x), sorted(s))
 
   def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
     template_data = self.jardep(jar_dependency, classifier=classifier)
