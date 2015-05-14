@@ -228,8 +228,11 @@ python_library(
   sources = ['prepare_resources.py'],
   dependencies = [
     ':common',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_environment',
     'src/python/pants/goal:products',
     'src/python/pants/option',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
 )

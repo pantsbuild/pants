@@ -39,7 +39,7 @@ class PrepareResourcesDirectory:
     """Prepare the resources for the given target by copying the files to a resources directory.
     :param resources_target: The Resources target.
     """
-    target_dir = self.compute_target_dir(resources_target)
+    target_dir = os.path.join(self.buildroot, self.compute_target_dir(resources_target))
     self.context.log.debug(
       'Writing resources of target \'{}\' into dir \'{}\':'.format(resources_target.id, target_dir))
     safe_mkdir(target_dir, clean=True)
@@ -48,7 +48,10 @@ class PrepareResourcesDirectory:
       destdir = os.path.join(target_dir, basedir)
       safe_mkdir(destdir)
       # TODO: Symlink instead?
-      src = os.path.join(resources_target.target_base, resource_file_from_source_root)
+      src = os.path.join(
+        self.buildroot,
+        resources_target.target_base,
+        resource_file_from_source_root)
       dest = os.path.join(target_dir, resource_file_from_source_root)
       self.context.log.debug('  {}'.format(src))
       shutil.copy(src, dest)
@@ -85,7 +88,7 @@ class PrepareResourcesJar:
       files into the jar.
     :param resources_target: The Resources target
     """
-    target_jar = self.compute_target_jar(resources_target)
+    target_jar = os.path.join(self.buildroot, self.compute_target_jar(resources_target))
     self.context.log.debug(
       'Writing resources of target \'{}\' into jar \'{}\':'.format(resources_target.id, target_jar))
     safe_mkdir(os.path.dirname(target_jar))
@@ -93,7 +96,9 @@ class PrepareResourcesJar:
       for resource_file_from_source_root in resources_target.sources_relative_to_source_root():
         self.context.log.debug('  {}'.format(resource_file_from_source_root))
         jar.write(
-          os.path.join(resources_target.target_base, resource_file_from_source_root),
+          os.path.join(self.buildroot,
+                       resources_target.target_base,
+                       resource_file_from_source_root),
           resource_file_from_source_root)
 
 

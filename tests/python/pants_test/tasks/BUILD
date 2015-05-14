@@ -46,6 +46,7 @@ target(
     ':sorttargets',
     ':targets_help',
     ':what_changed',
+    ':prepare_resources',
   ],
 )
 
@@ -552,3 +553,17 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'prepare_resources',
+  sources = ['test_prepare_resources.py'],
+  dependencies = [
+    ':task_test_base',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:prepare_resources',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/goal:products',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)
