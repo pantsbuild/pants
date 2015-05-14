@@ -13,7 +13,6 @@ import sys
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.errors import BootstrapError
 from pants.option.options import Options
 from pants.option.parser import Parser
 
@@ -32,6 +31,10 @@ def register_bootstrap_options(register, buildroot=None):
   status as "bootstrap options" is only pertinent during option registration.
   """
   buildroot = buildroot or get_buildroot()
+  register('--plugins', advanced=True, type=Options.list, help='Load these plugins.')
+  register('--backend-packages', advanced=True, type=Options.list,
+           help='Load backends from these packages that are already on the path.')
+
   register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
            help='Use this dir for global cache.')
   register('--pants-configdir', advanced=True, metavar='<dir>', default=get_pants_configdir(),
@@ -79,12 +82,6 @@ class OptionsBootstrapper(object):
     self._args = args or sys.argv
     self._bootstrap_options = None  # We memoize the bootstrap options here.
     self._full_options = None  # We memoize the full options here.
-
-  def post_bootstrap_config(self):
-    if not self._post_bootstrap_config:
-      raise BootstrapError('Must call get_bootstrap_options() before accessing '
-                           'post-bootstrap config')
-    return self._post_bootstrap_config
 
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
