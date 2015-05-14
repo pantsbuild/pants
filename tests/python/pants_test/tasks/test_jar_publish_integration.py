@@ -182,8 +182,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                                artifact_name='hello-greet-0.0.1-SNAPSHOT.jar',
                                success_expected=False)
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
-                      reason='No scaladoc binary on the PATH.')
   def test_scala_publish_classifiers(self):
     self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
                       dict({
@@ -192,6 +190,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                           'ivy-0.0.1-SNAPSHOT.xml',
                         ]}),
                       [],
+                      extra_options=['--doc-scaladoc-skip'],
                       assert_publish_config_contents=True)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
