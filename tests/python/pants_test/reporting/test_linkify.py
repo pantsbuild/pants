@@ -22,7 +22,7 @@ def ensure_file_exists(path):
   open(path, 'a').close()
 
 
-class RunInfoTest(unittest.TestCase):
+class LinkifyTest(unittest.TestCase):
   def setUp(self):
     self._buildroot = tempfile.mkdtemp(prefix='test_html_reporter')
 
