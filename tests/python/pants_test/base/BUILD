@@ -52,6 +52,7 @@ target(
     ':run_info',
     ':source_root',
     ':target',
+    ':validation',
     ':worker_pool',
   ]
 )
@@ -361,5 +362,13 @@ python_tests(
   dependencies = [
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'validation',
+  sources = ['test_validation.py'],
+  dependencies = [
+    'src/python/pants/base:validation',
   ]
 )
