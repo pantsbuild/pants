@@ -212,7 +212,7 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
     # compiler strategy. Java test target additions/removal to/from testprojects/ could easily
     # upset and change the order, causing failures. Thus disabling them on CI runs.
     testprojects/maven_layout/resource_collision/example_a/src/test/java/org/pantsbuild/duplicateres/examplea:examplea
-    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/examplea:exampleb
+    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb
     testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec
   )
 
