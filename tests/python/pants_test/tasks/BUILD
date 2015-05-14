@@ -331,6 +331,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:generator',
     'src/python/pants/base:source_root',
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
