@@ -64,7 +64,7 @@ class CppIntegrationTest(PantsRunIntegrationTest):
   def test_cpp_run(self):
     pants_run = self.run_pants(['run', self.TEST_RUN_TARGET])
     self.assert_success(pants_run)
-    self.assertIn('[cpp-run]Hello, pants!\nGoodbye, pants!\n',
+    self.assertIn('[cpp-run]\nHello, pants!\nGoodbye, pants!\n',
                   pants_run.stdout_data)
 
   def _binary_test(self, target):

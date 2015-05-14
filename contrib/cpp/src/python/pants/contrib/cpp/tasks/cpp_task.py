@@ -39,11 +39,11 @@ class CppTask(Task):
   def execute(self):
     raise NotImplementedError('execute must be implemented by subclasses of CppTask')
 
-  def run_command(self, cmd):
+  def run_command(self, cmd, workunit):
     try:
       self.context.log.debug('Executing: {0}'.format(cmd))
       # TODO: capture stdout/stderr and redirect to log
-      subprocess.check_call(cmd)
+      subprocess.check_call(cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     except subprocess.CalledProcessError as e:
       raise TaskError('Execution failed: {0}'.format(e))
     except:
