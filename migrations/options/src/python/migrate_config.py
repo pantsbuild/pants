@@ -159,6 +159,8 @@ migrations = {
 
   ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
 
+  ('reporting', 'reports_template_dir'): ('reporting', 'template_dir'),
+
   ('DEFAULT', 'stats_upload_url'): ('run-tracker', 'stats_upload_url'),
   ('DEFAULT', 'stats_upload_timeout'): ('run-tracker', 'stats_upload_timeout'),
   ('DEFAULT', 'num_foreground_workers'): ('run-tracker', 'num_foreground_workers'),
