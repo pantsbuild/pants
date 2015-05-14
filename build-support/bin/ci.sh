@@ -208,9 +208,11 @@ if [[ "${skip_testprojects:-false}" == "false" ]]; then
 
   # Targets that fail but shouldn't
   known_failing_targets=(
-    # The following two targets lose out due to a resource collision, because `example_b` happens
-    # to be first in the context, and test.junit mixes all classpaths.
+    # The following targets passing/failing depend on the order the classpaths under global
+    # compiler strategy. Java test target additions/removal to/from testprojects/ could easily
+    # upset and change the order, causing failures. Thus disabling them on CI runs.
     testprojects/maven_layout/resource_collision/example_a/src/test/java/org/pantsbuild/duplicateres/examplea:examplea
+    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/examplea:exampleb
     testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec
   )
 
