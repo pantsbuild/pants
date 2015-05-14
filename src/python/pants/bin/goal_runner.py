@@ -25,13 +25,13 @@ from pants.base.workunit import WorkUnit
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
-from pants.goal.initialize_reporting import initial_reporting, update_reporting
 from pants.goal.run_tracker import RunTracker
 from pants.logging.setup import setup_logging
 from pants.option.global_options import register_global_options
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
+from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -42,7 +42,7 @@ class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
   # Subsytems used outside of any task.
-  subsystems = (RunTracker, )
+  subsystems = (Reporting, RunTracker)
 
   def __init__(self, root_dir):
     """
@@ -94,7 +94,8 @@ class GoalRunner(object):
 
     # Now that we have options we can instantiate subsystems.
     self.run_tracker = RunTracker.global_instance()
-    report = initial_reporting(config, self.run_tracker)
+    self.reporting = Reporting.global_instance()
+    report = self.reporting.initial_reporting(self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
     if url:
@@ -220,7 +221,9 @@ class GoalRunner(object):
       return False
 
     is_explain = self.global_options.explain
-    update_reporting(self.global_options, is_quiet_task() or is_explain, self.run_tracker)
+    self.reporting.update_reporting(self.global_options,
+                                    is_quiet_task() or is_explain,
+                                    self.run_tracker)
 
     context = Context(
       options=self.options,
