@@ -7,7 +7,6 @@ python_library(
     ':dependencies',
     ':depmap',
     ':export',
-    ':export_integration',
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
@@ -69,11 +68,10 @@ python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/python:plugin',
-    'src/python/pants/backend/project_info/tasks:export',
-    'tests/python/pants_test/tasks:task_test_base',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/ivy',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
   ]
 )
 

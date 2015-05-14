@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.targets.dependencies import Dependencies
@@ -21,7 +22,10 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import Export
+from pants.backend.python.register import build_file_aliases as register_python
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -32,7 +36,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
 
   @property
   def alias_groups(self):
-    return register_core().merge(register_jvm())
+    return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
     super(ProjectInfoTest, self).setUp()
@@ -127,6 +131,38 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       target_type=JvmTarget,
       dependencies=[],
       resources=[],
+    )
+
+    SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'src')),
+                        PythonLibrary)
+
+    self.add_to_build_file('src/x/BUILD', '''
+       python_library(name="x", sources=globs("*.py"))
+    '''.strip())
+
+    self.add_to_build_file('src/y/BUILD', dedent('''
+      python_library(name="y", sources=rglobs("*.py"))
+      python_library(name="y2", sources=rglobs("subdir/*.py"))
+      python_library(name="y3", sources=rglobs("Test*.py"))
+    '''))
+
+    self.add_to_build_file('src/z/BUILD', '''
+      python_library(name="z", sources=zglobs("**/*.py"))
+    '''.strip())
+
+    self.add_to_build_file('src/exclude/BUILD', '''
+      python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
+    '''.strip())
+
+  def test_source_globs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/x')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/x/*.py',]},
+      result['targets']['src/x:x']['globs']
     )
 
   def test_without_dependencies(self):
@@ -280,6 +316,65 @@ class ProjectInfoTest(ConsoleTaskTestBase):
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):
       self.execute_console_task(targets=[self.target('project_info:unrecognized_target_type')])
+
+  def test_source_exclude(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/exclude')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/exclude/*.py',],
+       'exclude' : [{
+         'globs' : ['src/exclude/foo.py']
+       }],
+     },
+      result['targets']['src/exclude:exclude']['globs']
+    )
+
+  def test_source_rglobs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/**/*.py',]},
+      result['targets']['src/y:y']['globs']
+    )
+
+  def test_source_rglobs_subdir(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y:y2')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/subdir/**/*.py',]},
+      result['targets']['src/y:y2']['globs']
+    )
+
+  def test_source_rglobs_noninitial(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y:y3')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/Test*.py',]},
+      result['targets']['src/y:y3']['globs']
+    )
+
+  def test_source_zglobs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/z')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/z/**/*.py',]},
+      result['targets']['src/z:z']['globs']
+    )
 
 
 def get_json(lines):

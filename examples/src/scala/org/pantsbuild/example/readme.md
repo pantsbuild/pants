@@ -24,9 +24,7 @@ There's a sample test in
 [examples/tests/scala/org/pantsbuild/example/hello/welcome](https://github.com/pantsbuild/pants/tree/master/examples/tests/scala/org/pantsbuild/example/hello/welcome).
 It's a <a xref="bdict_junit_tests">`junit_tests`</a> with `.scala` sources.
 (You might have thought JUnit was only for Java testing, but it also works great
-for Scala. Pants also has a
-<a xref="bdict_scala_specs">`scala_specs`</a> target type for testing with
-Specs.)
+for Scala.)
 
 !inc[start-at=junit_tests](../../../../../tests/scala/org/pantsbuild/example/hello/welcome/BUILD)
 

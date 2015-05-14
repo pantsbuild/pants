@@ -12,6 +12,7 @@ python_library(
     ':filedeps',
     ':ide_gen',
     ':idea_gen',
+    ':projectutils',
   ],
 )
 
@@ -73,7 +74,7 @@ python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
-    ':ide_gen',
+    ':projectutils',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:console_task',
@@ -101,6 +102,7 @@ python_library(
   name = 'ide_gen',
   sources = ['ide_gen.py'],
   dependencies = [
+    ':projectutils',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:java',
@@ -131,3 +133,9 @@ python_library(
   ],
 )
 
+python_library(
+  name = 'projectutils',
+  sources = ['projectutils.py'],
+  dependencies = [
+  ],
+)

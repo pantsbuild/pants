@@ -10,12 +10,11 @@ import java.util.List;
 import java.util.jar.Attributes.Name;
 import java.util.jar.Manifest;
 import java.util.logging.ConsoleHandler;
-import java.util.logging.Formatter;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import javax.annotation.Nullable;
 
@@ -239,7 +238,24 @@ public final class Main {
         handler = JarsOptionHandler.class)
     private List<File> jars = Lists.newArrayList();
 
-    @Option(name = "-skip", usage = "A list of regular expressions identifying entries to skip.")
+    public static class PatternOptionHandler extends CollectionOptionHandler<Pattern> {
+      public  PatternOptionHandler(
+          CmdLineParser parser,
+          OptionDef option,
+          Setter<? super Pattern> setter) {
+        super(parser, option, setter, "PATTERN", new ItemParser<Pattern>() {
+          @Override public Pattern parse(String item) {
+            try {
+              return Pattern.compile(item);
+            } catch (PatternSyntaxException e) {
+              throw new IllegalArgumentException(e);
+            }
+          }
+        });
+      }
+    }
+    @Option(name = "-skip", usage = "A list of regular expressions identifying entries to skip.",
+        handler = PatternOptionHandler.class)
     private List<Pattern> skip = Lists.newArrayList();
 
     private static final String ACTIONS = "SKIP|REPLACE|CONCAT|THROW";

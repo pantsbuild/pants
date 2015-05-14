@@ -41,7 +41,7 @@ class BootstrapperTest(JvmToolTaskTestBase):
     bootstrapper = Bootstrapper.instance()
     ivy = bootstrapper.ivy()
     self.assertIsNotNone(ivy.ivy_cache_dir)
-    self.assertIsNotNone(ivy.ivy_settings)
+    self.assertIsNone(ivy.ivy_settings)
     bootstrap_jar_path = os.path.join(self.test_workdir,
                                       'tools', 'jvm', 'ivy', 'bootstrap.jar')
     self.assertTrue(os.path.exists(bootstrap_jar_path))
@@ -55,4 +55,4 @@ class BootstrapperTest(JvmToolTaskTestBase):
   def test_default_ivy(self):
     ivy = Bootstrapper.default_ivy()
     self.assertIsNotNone(ivy.ivy_cache_dir)
-    self.assertIsNotNone(ivy.ivy_settings)
+    self.assertIsNone(ivy.ivy_settings)

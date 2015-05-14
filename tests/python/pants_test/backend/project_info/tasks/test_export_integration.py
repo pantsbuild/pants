@@ -7,128 +7,126 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-from textwrap import dedent
 
-from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
-from pants.backend.project_info.tasks.export import Export
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.source_root import SourceRoot
-from pants_test.base_test import BaseTest
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import temporary_dir
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ExportIntegrationTest(ConsoleTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return Export
+class ExportIntegrationTest(PantsRunIntegrationTest):
+  _resolve_args = [
+    'resolve',
+    '--resolve-ivy-confs=default',
+    '--resolve-ivy-confs=sources',
+    '--resolve-ivy-confs=javadoc',
+  ]
 
-  @property
-  def alias_groups(self):
-    return BuildFileAliases.create(
-      targets={
-        'python_library': PythonLibrary,
-      },
-      context_aware_object_factories={
-        'globs': Globs,
-        'rglobs': RGlobs,
-        'zglobs': ZGlobs,
-      },
-    )
+  def run_export(self, test_target, workdir, extra_args = list()):
+    export_out_file = os.path.join(workdir, 'export_out.txt')
+    pants_run = self.run_pants_with_workdir(extra_args + [
+        'export',
+        '--output-file={out_file}'.format(out_file=export_out_file),
+        test_target],
+        workdir)
+    self.assert_success(pants_run)
+    self.assertTrue(os.path.exists(export_out_file),
+                    msg='Could not find export output file in {out_file}'
+                        .format(out_file=export_out_file))
+    with open(export_out_file) as json_file:
+      json_data = json.load(json_file)
+      return json_data
 
-  def setUp(self):
-    super(ExportIntegrationTest, self).setUp()
-    SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'src')),
-                        PythonLibrary)
+  def test_export_code_gen(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
+      json_data = self.run_export(test_target, workdir)
+      thrift_target_name = 'examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java'
+      codegen_target = os.path.join(os.path.relpath(workdir, get_buildroot()),
+                                    'gen/thrift/combined/gen-java:%s' % thrift_target_name)
+      self.assertIn(codegen_target, json_data.get('targets'))
 
-    self.add_to_build_file('src/x/BUILD', '''
-       python_library(name="x", sources=globs("*.py"))
-    '''.strip())
+  def test_export_json_transitive_jar(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
+      json_data = self.run_export(test_target, workdir)
+      targets = json_data.get('targets')
+      self.assertIn('org.hamcrest:hamcrest-core:1.3', targets[test_target]['libraries'])
 
-    self.add_to_build_file('src/y/BUILD', dedent('''
-      python_library(name="y", sources=rglobs("*.py"))
-      python_library(name="y2", sources=rglobs("subdir/*.py"))
-      python_library(name="y3", sources=rglobs("Test*.py"))
-    '''))
+  def test_export_jar_path_with_excludes(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
+      json_data = self.run_export(test_target, workdir, ['resolve'])
+      self.assertIsNone(json_data.get('libraries').get('com.typesafe.sbt:incremental-compiler:0.13.7'))
 
-    self.add_to_build_file('src/z/BUILD', '''
-      python_library(name="z", sources=zglobs("**/*.py"))
-    '''.strip())
+  def test_export_jar_path_with_excludes_soft(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
+      json_data = self.run_export(test_target, workdir, ['resolve', '--resolve-ivy-soft-excludes'])
+      self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
 
-    self.add_to_build_file('src/exclude/BUILD', '''
-      python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
-    '''.strip())
+  def test_export_jar_path(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
+      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
+      # to get in a test that isn't a subclass of TaskTestBase.
+      # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
+      ivy_cache_dir = os.path.expanduser('~/.ivy2/pants')
+      common_lang_lib_info = json_data.get('libraries').get('commons-lang:commons-lang:2.5')
+      self.assertIsNotNone(common_lang_lib_info)
+      self.assertEquals(
+        common_lang_lib_info.get('default'),
+        os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/jars/commons-lang-2.5.jar')
+      )
+      self.assertEquals(
+        common_lang_lib_info.get('javadoc'),
+        os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/javadocs/commons-lang-2.5-javadoc.jar')
+      )
+      self.assertEquals(
+        common_lang_lib_info.get('sources'),
+        os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/sources/commons-lang-2.5-sources.jar')
+      )
 
-  def test_source_globs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/x')]
-    ))
+  def test_dep_map_for_java_sources(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
+      json_data = self.run_export(test_target, workdir)
+      targets = json_data.get('targets')
+      self.assertIn('examples/src/java/org/pantsbuild/example/java_sources:java_sources', targets)
 
-    self.assertEqual(
-      {'globs' : ['src/x/*.py',]},
-      result['targets']['src/x:x']['globs']
-    )
+  def test_sources_and_javadocs(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
+      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.4')
+      self.assertIsNotNone(scala_lang_lib)
+      self.assertIsNotNone(scala_lang_lib['default'])
+      self.assertIsNotNone(scala_lang_lib['sources'])
+      self.assertIsNotNone(scala_lang_lib['javadoc'])
 
-  def test_source_exclude(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/exclude')]
-    ))
+  def test_ivy_classifiers(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
+      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
+      # to get in a test that isn't a subclass of TaskTestBase.
+      # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
+      ivy_cache_dir = os.path.expanduser('~/.ivy2/pants')
+      avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
+      self.assertIsNotNone(avro_lib_info)
+      self.assertEquals(
+        avro_lib_info.get('default'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
+      )
+      # TODO(Eric Ayers): this BUILD file also requests the avro 'tests' jar using
+      # a classifier in the JarDependency.  See https://github.com/pantsbuild/pants/issues/1489
 
-    self.assertEqual(
-      {'globs' : ['src/exclude/*.py',],
-       'exclude' : [{
-         'globs' : ['src/exclude/foo.py']
-       }],
-     },
-      result['targets']['src/exclude:exclude']['globs']
-    )
-
-  def test_source_rglobs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/y')]
-    ))
-
-    self.assertEqual(
-      {'globs' : ['src/y/**/*.py',]},
-      result['targets']['src/y:y']['globs']
-    )
-
-  def test_source_rglobs_subdir(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/y:y2')]
-    ))
-
-    self.assertEqual(
-      {'globs' : ['src/y/subdir/**/*.py',]},
-      result['targets']['src/y:y2']['globs']
-    )
-
-  def test_source_rglobs_noninitial(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/y:y3')]
-    ))
-
-    self.assertEqual(
-      {'globs' : ['src/y/Test*.py',]},
-      result['targets']['src/y:y3']['globs']
-    )
-
-  def test_source_zglobs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/z')]
-    ))
-
-    self.assertEqual(
-      {'globs' : ['src/z/**/*.py',]},
-      result['targets']['src/z:z']['globs']
-    )
-
-
-def get_json(lines):
-  return json.loads(''.join(lines))
+      # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
+      #self.assertEquals(
+      #  common_lang_lib_info.get('javadoc'),
+      #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-javadoc.jar')
+      #)
+      #self.assertEquals(
+      #  common_lang_lib_info.get('sources'),
+      #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-sources.jar')
+      #)

@@ -57,7 +57,6 @@ target(
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
-    ':export_integration',
     ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
@@ -238,16 +237,6 @@ python_tests(
     ]
 )
 
-python_tests(
-  name = 'export_integration',
-  sources = ['test_export_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/ivy',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-)
 python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],

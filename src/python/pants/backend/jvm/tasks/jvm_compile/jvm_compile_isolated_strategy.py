@@ -117,7 +117,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Generate a classpath specific to this compile and target, and include analysis
     # for upstream targets.
     raw_compile_classpath = compile_classpaths.get_for_target(compile_context.target)
-    compile_classpath = extra_compile_time_classpath + list(raw_compile_classpath)
+    compile_classpath = list(raw_compile_classpath) + extra_compile_time_classpath
     # Validate that the classpath is located within the working copy, which simplifies
     # relativizing the analysis files.
     self._validate_classpath(compile_classpath)
