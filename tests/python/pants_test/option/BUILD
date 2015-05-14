@@ -7,7 +7,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:pytest',
     'src/python/pants/base:deprecated',
-    'src/python/pants/base:config',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
   ],

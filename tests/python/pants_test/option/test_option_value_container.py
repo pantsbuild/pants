@@ -57,6 +57,11 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertEqual(1, o['foo'])
     self.assertEqual(1, o['bar'])
 
+    self.assertEqual(1, o.get('foo'))
+    self.assertEqual(1, o.get('foo', 2))
+    self.assertIsNone(o.get('unknown'))
+    self.assertEqual(2, o.get('unknown', 2))
+
     with self.assertRaises(AttributeError):
       o['baz']
 

@@ -8,14 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from textwrap import dedent
 
-from pants.base.config import Config
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_file
 
 
 class BootstrapOptionsTest(unittest.TestCase):
-  def tearDown(self):
-    Config.reset_default_bootstrap_option_values()
 
   def _do_test(self, expected_vals, config, env, args):
     self._test_bootstrap_options(config, env, args,

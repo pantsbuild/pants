@@ -23,7 +23,6 @@ from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
@@ -42,15 +41,6 @@ from pants_test.base.context_utils import create_context, create_option_values
 # for tests, not a test of a thing called 'Base'.
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
-
-  @classmethod
-  def setUpClass(cls):
-    """Ensure that all code has a config to read from the cache.
-
-    TODO: Yuck. Get rid of this after plumbing options through in the right places.
-    """
-    super(BaseTest, cls).setUpClass()
-    Config.cache(Config.load())
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""

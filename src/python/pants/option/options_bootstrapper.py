@@ -13,6 +13,7 @@ import sys
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.errors import BootstrapError
 from pants.option.options import Options
 from pants.option.parser import Parser
 
@@ -73,15 +74,17 @@ class OptionsBootstrapper(object):
   def __init__(self, env=None, configpath=None, args=None, buildroot=None):
     self._buildroot = buildroot or get_buildroot()
     self._env = env or os.environ.copy()
-    Config.reset_default_bootstrap_option_values(buildroot=self._buildroot)
-    self._pre_bootstrap_config = Config.load([configpath] if configpath else None)
+    self._configpath = configpath
     self._post_bootstrap_config = None  # Will be set later.
     self._args = args or sys.argv
     self._bootstrap_options = None  # We memoize the bootstrap options here.
     self._full_options = None  # We memoize the full options here.
-    # So other startup code has config to work with. This will go away once we replace direct
-    # config accesses with options, and plumb those through everywhere that needs them.
-    Config.cache(self._pre_bootstrap_config)
+
+  def post_bootstrap_config(self):
+    if not self._post_bootstrap_config:
+      raise BootstrapError('Must call get_bootstrap_options() before accessing '
+                           'post-bootstrap config')
+    return self._post_bootstrap_config
 
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
@@ -115,24 +118,26 @@ class OptionsBootstrapper(object):
       # bootstrap options.
       bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
 
-      self._bootstrap_options = Options(env=self._env, config=self._pre_bootstrap_config,
+      configpaths = [self._configpath] if self._configpath else None
+      pre_bootstrap_config = Config.load(configpaths, seed_values={'buildroot': self._buildroot})
+
+      self._bootstrap_options = Options(env=self._env, config=pre_bootstrap_config,
                                         known_scopes=[GLOBAL_SCOPE], args=bargs)
       register_bootstrap_options(self._bootstrap_options.register_global, buildroot=self._buildroot)
       bootstrap_option_values = self._bootstrap_options.for_global_scope()
-      Config.reset_default_bootstrap_option_values(values=bootstrap_option_values)
 
       # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
       # from (typically pants.ini), then config override, then rcfiles.
-      configpaths = list(self._pre_bootstrap_config.sources())
+      full_configpaths = pre_bootstrap_config.sources()
       if bootstrap_option_values.config_override:
-        configpaths.append(bootstrap_option_values.config_override)
+        full_configpaths.append(bootstrap_option_values.config_override)
       if bootstrap_option_values.pantsrc:
         rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
         existing_rcfiles = filter(os.path.exists, rcfiles)
-        configpaths.extend(existing_rcfiles)
+        full_configpaths.extend(existing_rcfiles)
 
-      self._post_bootstrap_config = Config.load(configpaths)
-      Config.cache(self._post_bootstrap_config)
+      self._post_bootstrap_config = Config.load(full_configpaths,
+                                                seed_values=bootstrap_option_values)
 
     return self._bootstrap_options
 
