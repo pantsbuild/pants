@@ -62,8 +62,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   def tearDown(self):
     safe_rmtree(self.pushdb_root)
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
-                      reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
     unique_artifacts = {'org/pantsbuild/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
