@@ -5,16 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import defaultdict
 import hashlib
-from textwrap import dedent
 import os
+from collections import defaultdict
+from textwrap import dedent
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.products import Products, MultipleRootedProducts, UnionProducts
+from pants.goal.products import MultipleRootedProducts, Products, UnionProducts
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import relativize_path
 from pants_test.tasks.task_test_base import TaskTestBase
