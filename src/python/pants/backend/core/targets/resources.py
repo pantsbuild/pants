@@ -35,7 +35,7 @@ class Resources(Target):
     })
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 
-    self.use_jar = use_jar
+    self._use_jar = use_jar
 
   def has_sources(self, extension=None):
     """``Resources`` never own sources of any particular native type, like for example
@@ -44,8 +44,9 @@ class Resources(Target):
     # TODO(John Sirois): track down the reason for this hack and kill or explain better.
     return extension is None
 
+  @property
   def use_jar(self):
     """Whether or not to zip up the sources of this Resources target into a jar.
     This flag is ignored if PrepareResources task's --use-jar option is set to false.
     """
-    return self.use_jar
+    return self._use_jar
