@@ -351,3 +351,8 @@ class BaseTest(unittest.TestCase):
         return product
       product_mapping.add(target, outdir, map(create_product, products))
       yield temporary_dir
+
+  def assert_file_content(self, file_path, expected_file_content):
+    self.assertTrue(os.path.exists(file_path))
+    with open(file_path) as fp:
+      self.assertEqual(expected_file_content, fp.read())

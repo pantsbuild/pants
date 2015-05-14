@@ -19,10 +19,13 @@ class Resources(Target):
   and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
   """
 
-  def __init__(self, address=None, payload=None, sources=None, **kwargs):
+  def __init__(self, address=None, payload=None, sources=None, use_jar=True, **kwargs):
     """
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
+    :param use_jar: Whether or not the resources will be zipped into a jar. This flag only impacts
+      test, run, repl, benchmark goals. For bundle and binary, resources are always jarred.
+      Also this flag is ignored if PrepareResources task's --use-jar option is set to false.
     :type sources: ``Fileset`` or list of strings
     """
     payload = payload or Payload()
@@ -32,9 +35,18 @@ class Resources(Target):
     })
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 
+    self._use_jar = use_jar
+
   def has_sources(self, extension=None):
     """``Resources`` never own sources of any particular native type, like for example
     ``JavaLibrary``.
     """
     # TODO(John Sirois): track down the reason for this hack and kill or explain better.
     return extension is None
+
+  @property
+  def use_jar(self):
+    """Whether or not to zip up the sources of this Resources target into a jar.
+    This flag is ignored if PrepareResources task's --use-jar option is set to false.
+    """
+    return self._use_jar
