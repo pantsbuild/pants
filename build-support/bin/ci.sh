@@ -139,8 +139,8 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
     # itself so we override backends to ensure a minimal env works.
     config=$(mktemp -t pants-ci.XXXXXX.ini) && \
     (cat << EOF > ${config}
-[backends]
-packages: [
+[DEFAULT]
+backend_packages: [
     # TODO(John Sirois): When we have fine grained plugins, include the python backend here
     "internal_backend.utilities",
   ]
