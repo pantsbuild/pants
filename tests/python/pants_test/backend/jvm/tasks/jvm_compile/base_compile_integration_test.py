@@ -23,17 +23,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       for i in xrange(0, iterations):
-        args = [
-            'compile',
-            '--compile-apt-strategy={}'.format(strategy),
-            '--compile-java-strategy={}'.format(strategy),
-            '--compile-scala-strategy={}'.format(strategy),
-            target,
-          ] + (extra_args if extra_args else [])
-        # Clean-all on the first iteration.
-        if i == 0:
-          args.insert(0, 'clean-all')
-        pants_run = self.run_pants_with_workdir(args, workdir)
+        pants_run = self.run_test_compile(workdir, target, strategy, clean_all=(i == 0), extra_args=extra_args)
         if expect_failure:
           self.assert_failure(pants_run)
         else:
@@ -50,6 +40,20 @@ class BaseCompileIT(PantsRunIntegrationTest):
           self.assertEqual(set(), to_find,
                           'Failed to find the following compiled files: {}'.format(to_find))
         yield found
+
+  def run_test_compile(self, workdir, target, strategy, clean_all=False, extra_args=None):
+    args = [
+        'compile',
+        '--compile-apt-strategy={}'.format(strategy),
+        '--compile-java-strategy={}'.format(strategy),
+        '--compile-scala-strategy={}'.format(strategy),
+        '--compile-zinc-java-strategy={}'.format(strategy),
+        target,
+      ] + (extra_args if extra_args else [])
+    # Clean-all on the first iteration.
+    if clean_all:
+      args.insert(0, 'clean-all')
+    return self.run_pants_with_workdir(args, workdir)
 
   def get_only(self, found, name):
     files = found[name]

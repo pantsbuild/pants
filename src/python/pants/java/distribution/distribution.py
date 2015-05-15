@@ -150,6 +150,24 @@ class Distribution(object):
     """
     return self._get_version(self.java)
 
+  def find_libs(self, names):
+    """Looks for jars in lib folder.
+
+    :param list names: jar file names
+    :return: list of paths to requested libraries
+    :raises: `Distribution.Error` if any of the jars could not be found.
+    """
+    def collect_existing_libs():
+      # self._bin_path points to bin folder.
+      jdk_root = os.path.dirname(self._bin_path)
+      for name in names:
+        lib_path = os.path.join(jdk_root, 'lib', name)
+        if not os.path.exists(lib_path):
+          raise Distribution.Error('Failed to locate {} library'.format(name))
+        yield lib_path
+
+    return list(collect_existing_libs())
+
   @property
   def home(self):
     """Returns the distribution JAVA_HOME."""
