@@ -158,8 +158,8 @@ class Distribution(object):
     :raises: `Distribution.Error` if any of the jars could not be found.
     """
     def collect_existing_libs():
-      # self.home points to bin folder.
-      jdk_root = os.path.dirname(self.home)
+      # self._bin_path points to bin folder.
+      jdk_root = os.path.dirname(self._bin_path)
       for name in names:
         lib_path = os.path.join(jdk_root, 'lib', name)
         if not os.path.exists(lib_path):
