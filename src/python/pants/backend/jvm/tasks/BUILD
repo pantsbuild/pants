@@ -33,6 +33,7 @@ python_library(
     ':jvm_tool_task_mixin',
     ':jvmdoc_gen',
     ':nailgun_task',
+    ':resolve_excludes',
     ':scala_repl',
     ':scaladoc_gen',
     ':scalastyle',
@@ -151,6 +152,17 @@ python_library(
     'src/python/pants/util:dirutil',
   ],
 )
+
+python_library(
+  name = 'resolve_excludes',
+  sources = ['resolve_excludes.py'],
+  dependencies = [
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/goal:products',
+  ],
+)
+
 
 python_library(
   name = 'ivy_task_mixin',

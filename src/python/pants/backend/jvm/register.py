@@ -42,6 +42,7 @@ from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCom
                                                                      ScalaZincCompile)
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
+from pants.backend.jvm.tasks.resolve_excludes import ResolveExcludes
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
@@ -104,6 +105,10 @@ def register_goals():
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve').with_description(
       'Resolve dependencies and produce dependency reports.')
+
+  task(name='excludes', action=ResolveExcludes).install('resolve').with_description(
+    'Collect excludes.')
+
 
   task(name='ivy-imports', action=IvyImports).install('imports')
 
