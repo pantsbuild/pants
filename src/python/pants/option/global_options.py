@@ -45,6 +45,11 @@ def register_global_options(register):
            help='Regex pattern to exclude from the target list (useful in conjunction with ::). '
                 'Multiple patterns may be specified by setting this flag multiple times.',
            recursive=True)
+
+  # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load time.
+  register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
+           help='Initialize state by evaluating these buildfiles.')
+
   # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
   # options to there. When we do that, also drop the cumbersome word 'artifact' from these
   # option names. There's only one cache concept that users care about.

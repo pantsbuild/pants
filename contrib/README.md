@@ -44,8 +44,7 @@ Contrib plugins should generally follow 3 basic setup steps:
        "%(buildroot)s/contrib/example/src/python",
      ]
    ...
-   [backends]
-   packages: [
+   backend_packages: [
        "internal_backend.optional",
        "internal_backend.repositories",
        "internal_backend.sitegen",

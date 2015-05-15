@@ -53,7 +53,6 @@ class GoalRunner(object):
   def setup(self):
     options_bootstrapper = OptionsBootstrapper()
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
-    config = options_bootstrapper.post_bootstrap_config()
 
     # Get logging setup prior to loading backends so that they can log as needed.
     self._setup_logging(bootstrap_options.for_global_scope())
@@ -64,8 +63,8 @@ class GoalRunner(object):
       pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    backend_packages = config.getlist('backends', 'packages', [])
-    plugins = config.getlist('backends', 'plugins', [])
+    plugins = bootstrap_options.for_global_scope().plugins
+    backend_packages = bootstrap_options.for_global_scope().backend_packages
     build_configuration = load_plugins_and_backends(plugins, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
@@ -120,7 +119,7 @@ class GoalRunner(object):
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
-      for path in config.getlist('goals', 'bootstrap_buildfiles', default=[]):
+      for path in self.options.for_global_scope().bootstrap_buildfiles:
         build_file = self.address_mapper.from_cache(root_dir=self.root_dir, relpath=path)
         # TODO(pl): This is an unfortunate interface leak, but I don't think
         # in the long run that we should be relying on "bootstrap" BUILD files
