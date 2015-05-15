@@ -7,8 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+import threading
 import time
 import uuid
+from contextlib import contextmanager
 
 from six.moves import range
 
@@ -75,6 +77,10 @@ class WorkUnit(object):
             E.g., the cmd line of a compiler invocation.
     """
     self._outcome = WorkUnit.UNKNOWN
+    # Protects outcome being set at the same time on different threads.
+    # eg, a child workunit may be aborted in a worker thread at the same time it's parent is aborted
+    # on the main thread.
+    self._outcome_lock = threading.Lock()
 
     self.run_info_dir = run_info_dir
     self.parent = parent
@@ -86,13 +92,17 @@ class WorkUnit(object):
     self.id = uuid.uuid4()
 
     # In seconds since the epoch. Doubles, to account for fractional seconds.
-    self.start_time = 0
+    self.start_time = time.time()
     self.end_time = 0
 
     # A workunit may have multiple outputs, which we identify by a name.
     # E.g., a tool invocation may have 'stdout', 'stderr', 'debug_log' etc.
     self._outputs = {}  # name -> output buffer.
     self._output_paths = {}
+
+    # Outputs are closed on the thread that ends the workunit, but the reporting thread may be
+    # trying to read from them at the same time, so they are guarded with this lock.
+    self._outputs_lock = threading.Lock()
 
     # Do this last, as the parent's _self_time() might get called before we're
     # done initializing ourselves.
@@ -103,20 +113,24 @@ class WorkUnit(object):
   def has_label(self, label):
     return label in self.labels
 
-  def start(self):
-    """Mark the time at which this workunit started."""
-    self.start_time = time.time()
-
   def end(self):
     """Mark the time at which this workunit ended."""
+
     self.end_time = time.time()
-    for output in self._outputs.values():
-      output.close()
-    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnit.TOOL)
+
+    with self._outputs_lock:
+      for output in self._outputs.values():
+        output.close()
+
+    return self.path(),               \
+           self.duration(),           \
+           self._self_time(),         \
+           self.has_label(WorkUnit.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit."""
-    return self._outcome
+    with self._outcome_lock:
+      return self._outcome
 
   def set_outcome(self, outcome):
     """Set the outcome of this work unit.
@@ -126,10 +140,10 @@ class WorkUnit(object):
     worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
-
-    if outcome < self._outcome:
-      self._outcome = outcome
-      if self.parent: self.parent.set_outcome(self._outcome)
+    with self._outcome_lock:
+      if outcome < self._outcome:
+        self._outcome = outcome
+        if self.parent: self.parent.set_outcome(self._outcome)
 
   _valid_name_re = re.compile(r'\w+')
 
@@ -138,25 +152,42 @@ class WorkUnit(object):
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: {}'.format(name))
-    if name not in self._outputs:
-      workunit_name = re.sub(r'\W', '_', self.name)
-      path = os.path.join(self.run_info_dir,
-                          'tool_outputs', '{workunit_name}-{id}.{output_name}'
-                          .format(workunit_name=workunit_name,
-                                  id=self.id,
-                                  output_name=name))
-      safe_mkdir_for(path)
-      self._outputs[name] = FileBackedRWBuf(path)
-      self._output_paths[name] = path
-    return self._outputs[name]
+    with self._outputs_lock:
+      if name not in self._outputs:
+        workunit_name = re.sub(r'\W', '_', self.name)
+        path = os.path.join(self.run_info_dir,
+                            'tool_outputs', '{workunit_name}-{id}.{output_name}'
+                            .format(workunit_name=workunit_name,
+                                    id=self.id,
+                                    output_name=name))
+        safe_mkdir_for(path)
+        self._outputs[name] = FileBackedRWBuf(path)
+        self._output_paths[name] = path
+      return self._outputs[name]
 
-  def outputs(self):
-    """Returns the map of output name -> output buffer."""
-    return self._outputs
+  def full_outputs_contents(self):
+    """Returns full contents of this workunit's output buffers as a dict of label -> text."""
+    with self._outputs_lock:
+      ret = {}
+      for name, buf in self._outputs.items():
+        if not buf.is_closed():
+          ret[name] = buf.read_from(0)
+        else:
+          # output buffers may be closed by the time the workunit end is reported
+          with open(self._output_paths[name]) as reopened_buf:
+            ret[name] = reopened_buf.read()
+      return ret
 
-  def output_paths(self):
-    """Returns the map of output name -> path of the output file."""
-    return self._output_paths
+  def unread_outputs_contents(self):
+    """Returns unread contents of this workunit's open output buffers as a dict of label -> text."""
+    with self._open_outputs() as outputs:
+      return {name: outbuf.read() for name, outbuf in outputs.items()}
+
+  @contextmanager
+  def _open_outputs(self):
+    with self._outputs_lock:
+      outputs = {label: outbuf for label, outbuf in self._outputs.items() if not outbuf.is_closed()}
+      yield outputs
 
   def duration(self):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""

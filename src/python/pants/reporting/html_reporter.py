@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import cgi
 import os
 import re
+import threading
 import uuid
 from collections import defaultdict, namedtuple
 
@@ -177,17 +178,18 @@ class HtmlReporter(Reporter):
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-      path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
-      output_files = self._output_files[workunit.id]
-      if path not in output_files:
-        f = open(path, 'w')
-        output_files[path] = f
-      else:
-        f = output_files[path]
-      f.write(self._htmlify_text(s).encode('utf-8'))
-      # We must flush in the same thread as the write.
-      f.flush()
+    if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+      return
+    path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
+    output_files = self._output_files[workunit.id]
+    if path not in output_files:
+      f = open(path, 'w')
+      output_files[path] = f
+    else:
+      f = output_files[path]
+    f.write(self._htmlify_text(s).encode('utf-8'))
+    # We must flush in the same thread as the write.
+    f.flush()
 
   _log_level_css_map = {
     Report.FATAL: 'fatal',
@@ -253,15 +255,17 @@ class HtmlReporter(Reporter):
 
   def _emit(self, s):
     """Append content to the main report file."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-      self._report_file.write(s)
-      self._report_file.flush()  # We must flush in the same thread as the write.
+    if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+      return
+    self._report_file.write(s)
+    self._report_file.flush()  # We must flush in the same thread as the write.
 
   def _overwrite(self, filename, s):
     """Overwrite a file with the specified contents."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-      with open(os.path.join(self._html_dir, filename), 'w') as f:
-        f.write(s)
+    if not os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+      return
+    with open(os.path.join(self._html_dir, filename), 'w') as f:
+      f.write(s)
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""

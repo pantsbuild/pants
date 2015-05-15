@@ -89,6 +89,14 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'test_read_write_buffer',
+  sources = ['test_read_write_buffer.py'],
+  dependencies = [
+    'src/python/pants/rwbuf',
+  ]
+)
+
 target(
   name = 'integration',
   dependencies = [
@@ -105,6 +113,7 @@ target(
   dependencies = [
     ':test_binary_util',
     ':test_maven_layout',
+    ':test_read_write_buffer',
     ':test_thrift_util',
     'tests/python/pants_test/android',
     'tests/python/pants_test/authentication:netrc',

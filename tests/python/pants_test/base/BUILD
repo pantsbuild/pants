@@ -53,6 +53,7 @@ target(
     ':source_root',
     ':target',
     ':worker_pool',
+    ':workunit',
   ]
 )
 
@@ -360,6 +361,16 @@ python_tests(
   sources = ['test_worker_pool.py'],
   dependencies = [
     'src/python/pants/base:worker_pool',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'workunit',
+  sources = ['test_workunit.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
   ]
 )
