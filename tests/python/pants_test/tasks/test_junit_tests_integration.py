@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
+from xml.etree import ElementTree
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -137,9 +139,11 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'html', 'index.html')))
-      # TODO(Eric Ayers): Look at the xml report.  I think something is broken, it is empty
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
+      xmlf = os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')
+      self.assertTrue(os.path.exists(xmlf))
+      hits = ElementTree.parse(xmlf).findall("packages/package/classes/class/lines/line")
+      if all(i.attrib['hits'] == "0" for i in hits):
+        self.fail("no nonzero hits found in the generated coverage.xml")
 
   def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
