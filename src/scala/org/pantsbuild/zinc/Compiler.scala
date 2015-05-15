@@ -67,7 +67,7 @@ object Compiler {
   }
 
   /**
-   * Create a new java compiler.
+
    */
   def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
     val options = ClasspathOptions.javac(false)
@@ -192,7 +192,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
    *  Note: This variant does not report progress updates
    */
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
-    val progress = Some(new SimpleCompileProgress(setup.logPhases)(log))
+    val progress = Some(new SimpleCompileProgress(setup.logPhases, setup.printDots)(log))
     compile(inputs, cwd, reporter, progress)(log)
   }
 
