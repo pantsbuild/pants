@@ -10,7 +10,7 @@ import sbt.Logger
 class SimpleCompileProgress (logPhases: Boolean, printDots: Boolean)(log: Logger) extends CompileProgress {
   @volatile private var lastStep: Int = 0
 
-  /** 
+  /**
    * startUnit Optionally reports to stdout when a phase of compilation has begun for a file.
    */
   def startUnit(phase: String, unitPath: String): Unit =  {
@@ -21,10 +21,10 @@ class SimpleCompileProgress (logPhases: Boolean, printDots: Boolean)(log: Logger
 
   /**
    * advance Optionally emit a '.' character for each step of compilation progress completed.
-   * 
-   * advance is periodically called during compilation, indicating the total number of compilation 
-   * steps completed (`current`) out of the total number of steps necessary. The method returns 
-   * false if the user wishes to cancel compilation, or true otherwise. Currently, Zinc never 
+   *
+   * advance is periodically called during compilation, indicating the total number of compilation
+   * steps completed (`current`) out of the total number of steps necessary. The method returns
+   * false if the user wishes to cancel compilation, or true otherwise. Currently, Zinc never
    * requests to cancel compilation.
    */
   def advance(current: Int, total: Int): Boolean = {
