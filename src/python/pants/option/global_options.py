@@ -47,7 +47,7 @@ def register_global_options(register):
            recursive=True)
 
   # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load time.
-  register('--bootstrap-buildfiles', advanced=True, type=Options.list,
+  register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
            help='Initialize state by evaluating these buildfiles.')
 
   # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
