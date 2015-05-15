@@ -97,8 +97,8 @@ class ZincCompile(JvmCompile):
       try:
         return Distribution.cached(jdk=True).find_libs(['tools.jar'])
       except Distribution.Error:
-        self.log.info('Failed to locate tools.jar. '
-                      'Install a JDK to increase performance of Zinc.')
+        self.context.log.info('Failed to locate tools.jar. '
+                              'Install a JDK to increase performance of Zinc.')
         return []
 
     return self.tool_classpath('zinc') + locate_tools_jar()
