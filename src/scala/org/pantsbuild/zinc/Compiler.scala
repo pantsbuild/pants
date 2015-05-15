@@ -188,7 +188,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
-   * 
+   *
    *  Note: This variant does not report progress updates
    */
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
