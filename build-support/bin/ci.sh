@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpncieat)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -23,14 +23,12 @@ function usage() {
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
   echo " -n           skip contrib python tests"
-  echo " -c           skip pants integration tests"
+  echo " -c           skip pants integration tests (includes examples and testprojects)"
   echo " -i TOTAL_SHARDS:SHARD_NUMBER"
   echo "              if running integration tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
-  echo " -e           skip example tests"
   echo " -a           skip android targets when running tests"
-  echo " -t           skip testprojects tests"
   if (( $# > 0 )); then
     die "$@"
   else
@@ -44,7 +42,7 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrjlpnci:eat" opt; do
+while getopts "hfxbkmsrjlpnci:a" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -66,9 +64,7 @@ while getopts "hfxbkmsrjlpnci:eat" opt; do
       TOTAL_SHARDS=${OPTARG%%:*}
       SHARD_NUMBER=${OPTARG##*:}
       ;;
-    e) skip_examples="true" ;;
     a) skip_android="true" ;;
-    t) skip_testprojects="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -77,9 +73,9 @@ shift $((${OPTIND} - 1))
 # Android testing requires the SDK to be installed and configured in Pants.
 # Skip if ANDROID_HOME isn't configured in the environment
 if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  android_test_opts="--exclude-target-regexp=.*android.*"
+  export SKIP_ANDROID="true"
 else
-  android_test_opts=""
+  export SKIP_ANDROID="false"
 fi
 
 if [[ $# > 0 ]]; then
@@ -200,77 +196,6 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex ${PANTS_ARGS[@]} test.pytest --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
-
-if [[ "${skip_testprojects:-false}" == "false" ]]; then
-
-  # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
-  # right now, just split them into two categories and ignore them.
-
-  # Targets that fail but shouldn't
-  known_failing_targets=(
-    # The following two targets lose out due to a resource collision, because `example_b` happens
-    # to be first in the context, and test.junit mixes all classpaths.
-    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb
-    testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec
-  )
-
-  # Targets that are intended to fail
-  negative_test_targets=(
-    testprojects/src/antlr/pants/backend/python/test:antlr_failure
-    testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files
-    testprojects/src/java/org/pantsbuild/testproject/cycle1
-    testprojects/src/java/org/pantsbuild/testproject/cycle2
-    testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
-    testprojects/src/python/antlr:test_antlr_failure
-    testprojects/src/scala/org/pantsbuild/testproject/compilation_failure
-    testprojects/src/thrift/org/pantsbuild/thrift_linter:
-    testprojects/tests/java/org/pantsbuild/testproject/empty:
-    testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target
-    testprojects/tests/python/pants/dummies:failing_target
-  )
-
-  targets_to_exclude=(
-    ${known_failing_targets[@]}
-    ${negative_test_targets[@]}
-  )
-  exclude_opts="${targets_to_exclude[@]/#/--exclude-target-regexp=}"
-
-  run()
-  {
-    local strategy=$1
-    banner "Running tests in testprojects/ with the $strategy strategy"
-    (
-      ./pants.pex ${PANTS_ARGS[@]} test \
-        --compile-apt-strategy=$strategy \
-        --compile-java-strategy=$strategy \
-        --compile-scala-strategy=$strategy \
-        testprojects:: $android_test_opts $exclude_opts
-    ) || die "test failure in testprojects/ with the $strategy strategy"
-  }
-
-  run "global"
-  run "isolated"
-fi
-
-if [[ "${skip_examples:-false}" == "false" ]]; then
-  run()
-  {
-    local strategy=$1
-    banner "Running example tests with the $strategy strategy"
-    (
-      ./pants.pex ${PANTS_ARGS[@]} test \
-        --compile-apt-strategy=$strategy \
-        --compile-java-strategy=$strategy \
-        --compile-scala-strategy=$strategy \
-        examples:: \
-        $android_test_opts
-    ) || die "Examples tests failure with the $strategy strategy"
-  }
-
-  run "global"
-  run "isolated"
-fi
-
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
   if [[ ! -z "${TOTAL_SHARDS}" ]]; then
