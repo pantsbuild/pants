@@ -33,6 +33,9 @@ class PythonSetup(Subsystem):
              help='The wheel version for this python environment.')
     register('--platforms', advanced=True, type=Options.list, default=['current'],
              help='The wheel version for this python environment.')
+    register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
+             help='The parent directory for the interpreter cache. '
+                  'If unspecified, a standard path under the workdir is used.')
 
   @property
   def interpreter_requirement(self):
@@ -51,9 +54,12 @@ class PythonSetup(Subsystem):
     return self.get_options().platforms
 
   @property
+  def interpreter_cache_dir(self):
+    return (self.get_options().interpreter_cache_dir or
+            os.path.join(self.scratch_dir, 'interpreters'))
+
+  @property
   def scratch_dir(self):
-    # Note that this gives us a separate scratch dir for every instance of this subsystem,
-    # which allows us to have multiple python setups in play in a single pants run.
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
 
   def setuptools_requirement(self):
