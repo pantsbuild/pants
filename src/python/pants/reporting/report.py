@@ -74,6 +74,19 @@ class Report(object):
       for reporter in self._reporters.values():
         reporter.start_workunit(workunit)
 
+  def level_enabled(self, level):
+    """Checks whether any reporter would handle a log at the provided level.
+
+    :param level int: level to check. eg Report.DEBUG
+    :return: True if the logger would output a message with that level
+    """
+    with self._lock:
+      for reporter in self._reporters.values():
+        c = reporter.settings.log_level
+        if c >= level:
+          return True
+    return False
+
   def log(self, workunit, level, *msg_elements):
     """Log a message.
 

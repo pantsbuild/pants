@@ -220,6 +220,9 @@ class RunTracker(Subsystem):
     """Log a message against the current workunit."""
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
+  def level_enabled(self, level):
+    return self.report.level_enabled(level)
+
   def upload_stats(self):
     """Send timing results to URL specified in pants.ini"""
     def error(msg):

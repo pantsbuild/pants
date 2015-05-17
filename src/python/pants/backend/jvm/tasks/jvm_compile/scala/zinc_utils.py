@@ -120,8 +120,9 @@ class ZincUtils(object):
     return jars_by_name
 
   def log_zinc_file(self, analysis_file):
-    self.context.log.debug('Calling zinc on: {} ({})'
-                           .format(analysis_file,
-                                   hash_file(analysis_file).upper()
-                                   if os.path.exists(analysis_file)
-                                   else 'nonexistent'))
+    if self.context.log.is_debug():
+      self.context.log.debug('Calling zinc on: {} ({})'
+                             .format(analysis_file,
+                                     hash_file(analysis_file).upper()
+                                     if os.path.exists(analysis_file)
+                                     else 'nonexistent'))
