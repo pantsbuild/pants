@@ -35,9 +35,7 @@ class AndroidLibrary(ImportJarsMixin, AndroidTarget):
     self.include_patterns = include_patterns or []
     self.exclude_patterns = exclude_patterns or []
 
-
     super(AndroidLibrary, self).__init__(payload=payload, **kwargs)
-
 
   @property
   def imported_jar_library_specs(self):

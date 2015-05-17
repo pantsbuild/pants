@@ -38,7 +38,6 @@ class AaptTask(AndroidTask):
     self._forced_build_tools_version = self.get_options().build_tools_version
     self.ignored_assets = self.get_options().ignored_assets
     self._forced_target_sdk = self.get_options().target_sdk
-    self._sdks = {}
 
   def aapt_tool(self, build_tools_version):
     """Return the appropriate aapt tool.
