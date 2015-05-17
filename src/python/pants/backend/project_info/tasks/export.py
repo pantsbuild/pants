@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -17,7 +17,7 @@ from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.project_info.tasks.ide_gen import IdeGen
+from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
@@ -29,6 +29,20 @@ class Export(ConsoleTask):
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """
+
+  # FORMAT_VERSION_NUMBER: Version number for identifying the export file format output. This
+  # version number should change when there is a change to the output format.
+  #
+  # Major Version 1.x.x : Increment this field when there is a major format change
+  # Minor Version x.1.x : Increment this field when there is a minor change that breaks backward
+  #   compatibility for an existing field or a field is removed.
+  # Patch version x.x.1 : Increment this field when a minor format change that just adds information
+  #   that an application can safely ignore.
+  #
+  # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
+  #
+  DEFAULT_EXPORT_VERSION='1.0.0'
+
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
     SOURCE = 'SOURCE'  # Source Target
@@ -44,6 +58,10 @@ class Export(ConsoleTask):
 
   @staticmethod
   def _jar_id(jar):
+    """Create a string identifier for the IvyModuleRef key.
+    :param IvyModuleRef jar: key for a resolved jar
+    :returns: String representing the key as a maven coordinate
+    """
     if jar.rev:
       return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
     else:
@@ -61,11 +79,16 @@ class Export(ConsoleTask):
     super(Export, cls).register_options(register)
     register('--formatted', default=True, action='store_false',
              help='Causes output to be a single line of JSON.')
+    register('--libraries', default=True, action='store_true',
+             help='Causes libraries to be output.')
+    register('--sources', default=False, action='store_true',
+             help='Causes sources to be output.')
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
-    round_manager.require_data('ivy_jar_products')
+    if options.libraries:
+      round_manager.require_data('ivy_jar_products')
 
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
@@ -75,18 +98,19 @@ class Export(ConsoleTask):
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
-    # This product is a list for historical reasons (exclusives groups) but in practice should
-    # have either 0 or 1 entries.
-    ivy_info_list = ivy_jar_products.get('default')
-    if ivy_info_list:
-      assert len(ivy_info_list) == 1, (
-        'The values in ivy_jar_products should always be length 1,'
-        ' since we no longer have exclusives groups.'
-      )
-      ivy_info = ivy_info_list[0]
-    else:
-      ivy_info = None
+    if self.get_options().libraries:
+      ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
+      # This product is a list for historical reasons (exclusives groups) but in practice should
+      # have either 0 or 1 entries.
+      ivy_info_list = ivy_jar_products.get('default')
+      if ivy_info_list:
+        assert len(ivy_info_list) == 1, (
+          'The values in ivy_jar_products should always be length 1,'
+          ' since we no longer have exclusives groups.'
+        )
+        ivy_info = ivy_info_list[0]
+      else:
+        ivy_info = None
 
     ivy_jar_memo = {}
     def process_target(current_target):
@@ -107,6 +131,8 @@ class Export(ConsoleTask):
             return Export.SourceRootTypes.SOURCE
 
       def get_transitive_jars(jar_lib):
+        if not self.get_options().libraries:
+          return []
         if not ivy_info:
           return OrderedSet()
         transitive_jars = OrderedSet()
@@ -122,6 +148,11 @@ class Export(ConsoleTask):
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
+
+      if not current_target.is_synthetic:
+        info['globs'] = current_target.globs_relative_to_buildroot()
+        if self.get_options().sources:
+          info['sources'] = list(current_target.sources_relative_to_buildroot())
 
       target_libraries = set()
       if isinstance(current_target, JarLibrary):
@@ -146,7 +177,8 @@ class Export(ConsoleTask):
         'package_prefix': package_prefix
       }, self._source_roots_for_target(current_target))
 
-      info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
+      if self.get_options().libraries:
+        info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[self._address(current_target.address)] = info
 
     for target in targets:
@@ -154,19 +186,38 @@ class Export(ConsoleTask):
 
     graph_info = {
       'targets': targets_map,
-      'libraries': self._resolve_jars_info()
     }
+    if self.get_options().libraries:
+      graph_info['libraries'] = self._resolve_jars_info()
+
+    graph_info['version'] = self.DEFAULT_EXPORT_VERSION
+
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
       return [json.dumps(graph_info)]
 
   def _resolve_jars_info(self):
+    """Consults ivy_jar_products to export the external libraries.
+
+    :return: mapping of jar_id -> { 'default' : [ <jar_files> ],
+                                    'sources' : [ <jar_files> ],
+                                    'javadoc' : [ <jar_files> ],
+                                  }
+    """
     mapping = defaultdict(list)
     jar_data = self.context.products.get_data('ivy_jar_products')
-    jar_infos = IdeGen.get_jar_infos(ivy_products=jar_data, confs=['default', 'sources', 'javadoc'])
-    for jar, paths in jar_infos.iteritems():
-      mapping[self._jar_id(jar)] = paths
+    jar_infos = get_jar_infos(ivy_products=jar_data, confs=['default', 'sources', 'javadoc'])
+    for ivy_module_ref, paths in jar_infos.iteritems():
+      conf_to_jarfile_map = OrderedDict()
+      for conf, pathlist in paths.iteritems():
+        # TODO(Eric Ayers): pathlist can contain multiple jars in the case where classifiers
+        # to resolve extra artifacts are used.  This only captures the first one, meaning the
+        # export is incomplete. See https://github.com/pantsbuild/pants/issues/1489
+        if pathlist:
+          conf_to_jarfile_map[conf] = pathlist[0]
+
+      mapping[self._jar_id(ivy_module_ref)] = conf_to_jarfile_map
     return mapping
 
   def _get_pants_target_alias(self, pants_target_type):

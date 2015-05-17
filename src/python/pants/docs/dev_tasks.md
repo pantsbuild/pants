@@ -102,20 +102,9 @@ file paths.
 Task Configuration
 ------------------
 
-Tasks may be configured in two ways:
+Tasks may be configured via options.
 
--   a configuration file
--   command-line flags
-
-The configuration file is normally called `pants.ini` and is a standard
-`ini` file loaded with `ConfigParser`. During instantiation, tasks have
-access to a `pants.base.config.Config` to read these settings.
-
-    :::python
-    # Let's read mykey from the mytask pants.ini section.
-    self.context.config.get('mytask', 'mykey')
-
-To define a command-line flag, handle your Task's `register_options`
+To define an option, handle your Task's `register_options`
 class method and call the passed-in `register` function:
 
 !inc[start-after=ListGoals&end-before=console_output](../backend/core/tasks/list_goals.py)
@@ -123,8 +112,24 @@ class method and call the passed-in `register` function:
 Option values are available via `self.get_options()`:
 
     :::python
-    # Did user pass in the --all CLI flag (or set it in .ini)?
-    if self.get_options().all:
+    # Did user pass in the --my-option CLI flag (or set it in .ini)?
+    if self.get_options().my_option:
+
+Every task has an options scope: If the task is registered as `task` in goal `goal`, then its
+scope is `goal.task`, unless goal and task are the same string, in which case the scope is simply
+that string. For example, the `JavaCompile` task has scope `compile.java`, and the `filemap`
+task has the scope `filemap`.
+
+The scope is used to set options values. E.g., the value of `self.get_options().my_option` for a
+task with scope `scope` is set by, in this order:
+  - The value of the cmd-line flag `--scope-my-option`.
+  - The value of the environment variable `PANTS_SCOPE_MY_OPTION`.
+  - The value of the config var `my_option` in section `scope`.
+
+Note that if the task being run is specified explicitly on the command line, you can omit the
+scope from the cmd-line flag name. For example, instead of
+`./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`.
+
 
 GroupTask
 ---------

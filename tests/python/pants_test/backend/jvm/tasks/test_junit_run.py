@@ -7,12 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-import sys
 from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.core.targets.resources import Resources
+from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.distribution.distribution import Distribution
@@ -25,13 +27,57 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(JUnitRunnerTest, self).setUp()
-    self.set_options(pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+
+    # JUnitRun uses the safe_args context manager to guard long command lines, and it needs this
+    # option set
+    self.set_options_for_scope('', max_subprocess_args=100)
+    # Hack to make sure subsystems are initialized
+    self.context()
 
   @classmethod
   def task_type(cls):
     return JUnitRun
 
-  def test_junit_runner(self):
+  @property
+  def alias_groups(self):
+    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_tests': JavaTests,
+      },
+    ))
+
+  def test_junit_runner_success(self):
+    self.execute_junit_runner(
+      dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            assertTrue(5 > 3);
+          }
+        }
+      """)
+    )
+
+  def test_junit_runner_failure(self):
+    with self.assertRaises(TaskError) as cm:
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          import static org.junit.Assert.assertTrue;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              assertTrue(5 < 3);
+            }
+          }
+        """)
+      )
+
+    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
+  def execute_junit_runner(self, content):
 
     # Create the temporary base test directory
     test_rel_path = 'tests/java/org/pantsbuild/foo'
@@ -41,17 +87,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # Generate the temporary java test source code.
     test_java_file_rel_path = os.path.join(test_rel_path, 'FooTest.java')
     test_java_file_abs_path = os.path.join(self.build_root, test_java_file_rel_path)
-    self.create_file(test_java_file_rel_path,
-      dedent('''
-        import org.junit.Test;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            assertTrue(5 > 3);
-          }
-        }
-      '''))
+    self.create_file(test_java_file_rel_path, content)
 
     # Invoke ivy to resolve classpath for junit.
     distribution = Distribution.cached(jdk=True)
@@ -100,6 +136,19 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     # Finally execute the task.
     self.execute(context)
+
+  def test_empty_sources(self):
+    self.add_to_build_file('foo', dedent('''
+        java_tests(
+          name='empty',
+          sources=[],
+        )
+        '''
+    ))
+    task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r':empty must include a non-empty set of sources'):
+      task.execute()
 
 
 class EmmaTest(JvmToolTaskTestBase):

@@ -13,6 +13,7 @@ python_library(
   name = 'scm',
   sources = ['scm.py'],
   dependencies = [
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
   ],
 )
@@ -22,5 +23,7 @@ python_library(
   sources = ['git.py'],
   dependencies = [
     ':scm',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:strutil',
   ],
 )

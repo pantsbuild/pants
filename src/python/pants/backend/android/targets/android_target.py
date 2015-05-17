@@ -15,7 +15,6 @@ from pants.base.exceptions import TargetDefinitionException
 class AndroidTarget(JvmTarget):
   """A base class for all Android targets."""
 
-
   def __init__(self,
                address=None,
                # TODO (mateor) add support for minSDk
@@ -42,8 +41,6 @@ class AndroidTarget(JvmTarget):
   def manifest(self):
     """Return an AndroidManifest object made from a manifest by AndroidManifestParser."""
 
-    # For both gradle and ant layouts, AndroidManifest is conventionally at top-level.
-    # I would recommend users still explicitly define a 'manifest' in android BUILD files.
     if self._manifest is None:
       # If there was no 'manifest' field in the BUILD file, try to find one with the default value.
       if self._manifest_path is None:

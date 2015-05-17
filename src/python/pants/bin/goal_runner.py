@@ -13,24 +13,26 @@ import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
+from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.config import Config
 from pants.base.extension_loader import load_plugins_and_backends
+from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
-from pants.goal.initialize_reporting import initial_reporting, update_reporting
 from pants.goal.run_tracker import RunTracker
 from pants.logging.setup import setup_logging
 from pants.option.global_options import register_global_options
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
+from pants.reporting.reporting import Reporting
+from pants.subsystem.subsystem import Subsystem
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,9 @@ logger = logging.getLogger(__name__)
 
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
+
+  # Subsytems used outside of any task.
+  subsystems = (Reporting, RunTracker)
 
   def __init__(self, root_dir):
     """
@@ -47,11 +52,7 @@ class GoalRunner(object):
 
   def setup(self):
     options_bootstrapper = OptionsBootstrapper()
-
-    # Force config into the cache so we (and plugin/backend loading code) can use it.
-    # TODO: Plumb options in explicitly.
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
-    self.config = Config.from_cache()
 
     # Get logging setup prior to loading backends so that they can log as needed.
     self._setup_logging(bootstrap_options.for_global_scope())
@@ -62,43 +63,64 @@ class GoalRunner(object):
       pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    backend_packages = self.config.getlist('backends', 'packages', [])
-    plugins = self.config.getlist('backends', 'plugins', [])
+    plugins = bootstrap_options.for_global_scope().plugins
+    backend_packages = bootstrap_options.for_global_scope().backend_packages
     build_configuration = load_plugins_and_backends(plugins, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
-    # TODO: Create a 'Subsystem' abstraction instead of special-casing run-tracker here
-    # and in register_options().
-    known_scopes = ['', 'run-tracker']
+
+    known_scopes = ['']
+
+    # Add scopes for global subsystem instances.
+    global_subsystems = (set(self.subsystems) |
+                         Goal.global_subsystem_types() |
+                         build_configuration.subsystem_types())
+    for subsystem_type in global_subsystems:
+      known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
+
+    # Add scopes for all tasks in all goals.
     for goal in Goal.all():
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
 
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
-    self.register_options()
+    self.register_options(global_subsystems)
 
-    self.run_tracker = RunTracker.from_options(self.options)
-    report = initial_reporting(self.config, self.run_tracker)
+    # Make the options values available to all subsystems.
+    Subsystem._options = self.options
+
+    # Now that we have options we can instantiate subsystems.
+    self.run_tracker = RunTracker.global_instance()
+    self.reporting = Reporting.global_instance()
+    report = self.reporting.initial_reporting(self.run_tracker)
     self.run_tracker.start(report)
     url = self.run_tracker.run_info.get_info('report_url')
     if url:
-      self.run_tracker.log(Report.INFO, 'See a report at: %s' % url)
+      self.run_tracker.log(Report.INFO, 'See a report at: {}'.format(url))
     else:
       self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
                                              run_tracker=self.run_tracker)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+
+    rev = self.options.for_global_scope().build_file_rev
+    if rev:
+      ScmBuildFile.set_rev(rev)
+      ScmBuildFile.set_scm(get_scm())
+      build_file_type = ScmBuildFile
+    else:
+      build_file_type = FilesystemBuildFile
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, build_file_type)
     self.build_graph = BuildGraph(run_tracker=self.run_tracker,
                                   address_mapper=self.address_mapper)
 
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
       # construct base parameters to be filled in for BuildGraph
-      for path in self.config.getlist('goals', 'bootstrap_buildfiles', default=[]):
-        build_file = BuildFile.from_cache(root_dir=self.root_dir, relpath=path)
+      for path in self.options.for_global_scope().bootstrap_buildfiles:
+        build_file = self.address_mapper.from_cache(root_dir=self.root_dir, relpath=path)
         # TODO(pl): This is an unfortunate interface leak, but I don't think
         # in the long run that we should be relying on "bootstrap" BUILD files
         # that do nothing except modify global state.  That type of behavior
@@ -120,23 +142,18 @@ class GoalRunner(object):
   def global_options(self):
     return self.options.for_global_scope()
 
-  def register_options(self):
-    # Add a 'bootstrap' attribute to the register function, so that register_global can
-    # access the bootstrap option values.
-    def register_global(*args, **kwargs):
-      return self.options.register_global(*args, **kwargs)
-    register_global.bootstrap = self.options.bootstrap_option_values()
-    register_global_options(register_global)
+  def register_options(self, global_subsystems):
+    # Standalone global options.
+    register_global_options(self.options.registration_function_for_global_scope())
 
-    # This is the first case we have of non-task, non-global options.
-    # The current implementation special-cases RunTracker, and is temporary.
-    # In the near future it will be replaced with a 'Subsystem' abstraction.
-    # But for now this is useful for kicking the tires.
-    def register_run_tracker(*args, **kwargs):
-      self.options.register('run-tracker', *args, **kwargs)
-    RunTracker.register_options(register_run_tracker)
+    # Options for global-level subsystems.
+    for subsystem_type in global_subsystems:
+      subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
 
+    # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
+    # be a subsystem?
     for goal in Goal.all():
+      # Register task options (including per-task subsystem options).
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):
@@ -145,7 +162,7 @@ class GoalRunner(object):
     fail_fast = self.options.for_global_scope().fail_fast
 
     for goal in goals:
-      if BuildFile.from_cache(get_buildroot(), goal, must_exist=False).exists():
+      if self.address_mapper.from_cache(get_buildroot(), goal, must_exist=False).file_exists():
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
@@ -203,10 +220,11 @@ class GoalRunner(object):
       return False
 
     is_explain = self.global_options.explain
-    update_reporting(self.global_options, is_quiet_task() or is_explain, self.run_tracker)
+    self.reporting.update_reporting(self.global_options,
+                                    is_quiet_task() or is_explain,
+                                    self.run_tracker)
 
     context = Context(
-      config=self.config,
       options=self.options,
       run_tracker=self.run_tracker,
       target_roots=self.targets,
@@ -223,7 +241,7 @@ class GoalRunner(object):
         unknown.append(goal)
 
     if unknown:
-      context.log.error('Unknown goal(s): %s\n' % ' '.join(goal.name for goal in unknown))
+      context.log.error('Unknown goal(s): {}\n'.format(' '.join(goal.name for goal in unknown)))
       return 1
 
     engine = RoundEngine()

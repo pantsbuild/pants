@@ -58,7 +58,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_manual',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
@@ -114,7 +113,6 @@ python_library(
     ':console_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
   ],
@@ -230,6 +228,7 @@ python_library(
   dependencies = [
     ':common',
     'src/python/pants/goal:products',
+    'src/python/pants/option',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -253,7 +252,6 @@ python_library(
     '3rdparty/python:docutils',
     '3rdparty/python:six',
     'src/python/pants/base:build_manual',
-    'src/python/pants/base:config',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
@@ -284,8 +282,7 @@ python_library(
   name = 'scm_publish',
   sources = ['scm_publish.py'],
   dependencies = [
-    ':common',
-    'src/python/pants/base:deprecated',
+    'src/python/pants/base:exceptions',
     'src/python/pants/option',
     'src/python/pants/scm',
   ],

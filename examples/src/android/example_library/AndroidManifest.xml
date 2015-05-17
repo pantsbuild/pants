@@ -4,12 +4,12 @@ Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="org.pantsbuild.example_library.hello_with_library">
+          package="org.pantsbuild.examples.example_library">
     <uses-sdk android:minSdkVersion="9" />
 
     <application>
         <meta-data
-            android:name="org.pantsbuild.example_library.HelloWithLibrary" />
+                android:name="org.pantsbuild.examples.example_library.ExampleLibrary" />
     </application>
 
 </manifest>

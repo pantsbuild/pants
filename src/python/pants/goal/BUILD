@@ -52,17 +52,6 @@ python_library(
   sources = ['error.py'],
 )
 
-python_library(
-  name = 'initialize_reporting',  # XXX shouldn't this be in reporting?!
-  sources = ['initialize_reporting.py'],
-  dependencies = [
-    '3rdparty/python:six',
-    'src/python/pants/reporting',
-    'src/python/pants/reporting:report',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
 # TODO(benjy): As a result of a renaming, we ended up with this target owning only one source
 # file, whereas its name might indicate to the casual reader that it represents the entire package.
 # However the targets in this BUILD file (and elsewhere) are probably too fine-grained anyway, so
@@ -93,6 +82,7 @@ python_library(
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/reporting', # XXX(fixme)
+    'src/python/pants/subsystem',
   ],
 )
 

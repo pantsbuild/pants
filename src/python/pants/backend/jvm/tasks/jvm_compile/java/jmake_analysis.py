@@ -58,41 +58,26 @@ class JMakeAnalysis(Analysis):
 
     return [JMakeAnalysis(x, y) for x, y in zip(split_pcd_entries, split_src_to_deps)]
 
-  def write(self, outfile, rebasings=None):
-    # Note that the only paths in a jmake analysis are source files.
-    def rebase_path(path):
-      if rebasings:
-        for rebase_from, rebase_to in rebasings:
-          if rebase_to is None:
-            if path.startswith(rebase_from):
-              return None
-          else:
-            path = path.replace(rebase_from, rebase_to)
-      return path
-
-    outfile.write('pcd entries:\n')
-    outfile.write('%d items\n' % len(self.pcd_entries))
+  def write(self, outfile):
+    # TODO: Profile and optimize this. For example, it can be faster to write in large chunks, even
+    # at the cost of a large string join.
+    outfile.write(b'pcd entries:\n')
+    outfile.write(b'{} items\n'.format(len(self.pcd_entries)))
     for pcd_entry in self.pcd_entries:
-      rebased_src = rebase_path(pcd_entry[1])
-      if rebased_src:
-        outfile.write(pcd_entry[0])
-        outfile.write('\t')
-        outfile.write(rebased_src)
-        for x in pcd_entry[2:]:
-          outfile.write('\t')
-          outfile.write(x)
-          # Note that last element already includes \n.
+      # Note that last element in pcd_entry already ends with a \n, so we don't write one.
+      outfile.write(b'\t'.join(pcd_entry))
 
-    outfile.write('dependencies:\n')
-    outfile.write('%d items\n' % len(self.src_to_deps))
-    for src, deps in self.src_to_deps.items():
-      rebased_src = rebase_path(src)
-      if rebased_src:
-        outfile.write(rebased_src)
-        for dep in deps:
-          outfile.write('\t')
-          outfile.write(dep)
-        outfile.write('\n')
+    outfile.write(b'dependencies:\n')
+    outfile.write(b'{} items\n'.format(len(self.src_to_deps)))
+    if os.environ.get('JMAKE_SORTED_ANALYSIS'):  # Useful in tests.
+      lines = []
+      for src, deps in self.src_to_deps.items():
+        lines.append(b'{src}\t{deps}\n'.format(src=src, deps=b'\t'.join(deps)))
+      for line in sorted(lines):
+        outfile.write(line)
+    else:
+      for src, deps in self.src_to_deps.items():
+        outfile.write(b'{src}\t{deps}\n'.format(src=src, deps=b'\t'.join(deps)))
 
   def compute_products(self):
     """Returns the products in this analysis.
@@ -107,5 +92,8 @@ class JMakeAnalysis(Analysis):
     for pcd_entry in self.pcd_entries:
       srcfile = pcd_entry[1]
       # In the file classes are represented with slashes, not dots. E.g., com/foo/bar/Baz.
-      src_to_classfiles[srcfile].append(pcd_entry[0] + '.class')
+      src_to_classfiles[srcfile].append(pcd_entry[0] + b'.class')
     return src_to_classfiles
+
+  def is_equal_to(self, other):
+    return (self.pcd_entries, self.src_to_deps) == (other.pcd_entries, other.src_to_deps)

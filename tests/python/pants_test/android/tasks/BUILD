@@ -7,7 +7,9 @@ target(
     ':aapt_builder',
     ':aapt_gen',
     ':aapt_task',
+    ':dx_compile',
     ':sign_apk',
+    ':unpack_libraries',
     ':zipalign',
   ],
 )
@@ -19,6 +21,7 @@ target(
     ':aapt_gen_integration',
     ':dx_compile_integration',
     ':sign_apk_integration',
+    ':unpack_libraries_integration',
     ':zipalign_integration',
   ],
 )
@@ -80,6 +83,20 @@ python_tests(
 )
 
 python_tests(
+  name = 'dx_compile',
+  sources = [
+    'test_dx_compile.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android/tasks:all',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/goal:products',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/android:android_base',
+  ],
+)
+
+python_tests(
   name = 'dx_compile_integration',
   sources = [
     'test_dx_compile_integration.py',
@@ -106,6 +123,35 @@ python_tests(
   name = 'sign_apk_integration',
   sources = [
     'test_sign_apk_integration.py',
+  ],
+  dependencies = [
+    'tests/python/pants_test/android:android_integration_test',
+  ],
+)
+
+python_tests(
+  name = 'unpack_libraries',
+  sources = [
+    'test_unpack_libraries.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:unpack_libraries',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/fs:fs',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/android:android_base',
+  ],
+)
+
+python_tests(
+  name = 'unpack_libraries_integration',
+  sources = [
+    'test_unpack_libraries_integration.py',
   ],
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',

@@ -14,7 +14,7 @@ from pants_test.android.test_android_base import TestAndroidBase
 
 
 class SignApkTest(TestAndroidBase):
-  """Test the package signing methods in pants.backend.android.tasks.SignApk"""
+  """Test the package signing methods in pants.backend.android.tasks.SignApk."""
 
   _TEST_KEYSTORE = '%(homedir)s/.doesnt/matter/keystore_config.ini'
 

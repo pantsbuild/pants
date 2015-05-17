@@ -68,8 +68,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
 
-    JvmCompileGlobalStrategy.register_options(register, cls._language)
-    JvmCompileIsolatedStrategy.register_options(register, cls._language)
+    JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
+    JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
 
   @classmethod
   def product_types(cls):
@@ -100,6 +100,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   # --------------------------
   _language = None
   _file_suffix = None
+  _supports_concurrent_execution = None
 
   @classmethod
   def name(cls):
@@ -154,6 +155,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """Extra classpath elements common to all compiler invocations.
 
     E.g., jars for compiler plugins.
+
+    These are added at the end of the classpath, after any dependencies, so that if they
+    overlap with any explicit dependencies, the compiler sees those first.  This makes
+    missing dependency accounting much simpler.
     """
     return []
 
@@ -194,6 +199,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
+                                          self._language,
                                           lambda s: s.endswith(self._file_suffix))
 
   def _jvm_fingerprint_strategy(self):
@@ -286,13 +292,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                    compiled individually.
     """
     if not sources:
-      self.context.log.warn('Skipping %s compile for targets with no sources:\n  %s'
-                            % (self.name(), vts.targets))
+      self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
+                            .format(self.name(), vts.targets))
     else:
       # Do some reporting.
       self.context.log.info(
         'Compiling ',
-        items_to_report_element(sources, '%s source' % self.name()),
+        items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -329,9 +335,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Register class products.
     if classes_by_source is not None or classes_by_target is not None:
-      computed_classes_by_source = self._strategy.compute_classes_by_source(compile_contexts)
+      computed_classes_by_source_by_context = self._strategy.compute_classes_by_source(
+          compile_contexts)
       resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
       for compile_context in compile_contexts:
+        computed_classes_by_source = computed_classes_by_source_by_context[compile_context]
         target = compile_context.target
         classes_dir = compile_context.classes_dir
         target_products = classes_by_target[target] if classes_by_target is not None else None

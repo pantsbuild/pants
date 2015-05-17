@@ -3,8 +3,8 @@
 
 python_library(
   name = 'reporting',
-  sources = globs('*.py') - ['report.py'],
-  resources = rglobs('assets/*') + globs('templates/*.mustache'),
+  sources = globs('*.py', exclude=[['report.py']]),
+  resources = rglobs('assets/*', 'templates/*.mustache'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.threading',
     '3rdparty/python:ansicolors',
@@ -18,6 +18,7 @@ python_library(
     'src/python/pants/base:run_info',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
+    'src/python/pants/subsystem',
   ]
 )
 

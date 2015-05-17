@@ -21,6 +21,7 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
 
@@ -63,6 +64,10 @@ class IvyTaskMixin(object):
   stable locations within the working copy. To consume the map, consume a parsed Ivy
   report which will give you IvyArtifact instances: the artifact path is key.
   """
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, )
 
   @classmethod
   def register_options(cls, register):
@@ -144,8 +149,8 @@ class IvyTaskMixin(object):
             confs=confs)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
-          raise TaskError('Ivy failed to create classpath file at %s'
-                          % raw_target_classpath_file_tmp)
+          raise TaskError('Ivy failed to create classpath file at {}'
+                          .format(raw_target_classpath_file_tmp))
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
         logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
@@ -158,9 +163,12 @@ class IvyTaskMixin(object):
     with IvyTaskMixin.symlink_map_lock:
       products = self.context.products
       existing_symlinks_map = products.get_data('ivy_resolve_symlink_map', lambda: dict())
-      symlink_map = IvyUtils.symlink_cachepath(ivy.ivy_cache_dir, raw_target_classpath_file,
-                                               symlink_dir, target_classpath_file,
-                                               existing_symlinks_map)
+      symlink_map = IvyUtils.symlink_cachepath(
+        IvySubsystem.global_instance().get_options().cache_dir,
+        raw_target_classpath_file,
+        symlink_dir,
+        target_classpath_file,
+        existing_symlinks_map)
       existing_symlinks_map.update(symlink_map)
 
     with IvyUtils.cachepath(target_classpath_file) as classpath:
@@ -205,11 +213,7 @@ class IvyTaskMixin(object):
     """
     mapdir = self.mapjar_workdir(target)
     safe_mkdir(mapdir, clean=True)
-    ivyargs = [
-      '-retrieve', '%s/[organisation]/[artifact]/[conf]/'
-                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]' % mapdir,
-      '-symlink',
-    ]
+    ivyargs = self._get_ivy_args(mapdir)
     confs = maybe_list(target.payload.get_field_value('configurations') or [])
     self.exec_ivy(mapdir,
                   [target],
@@ -275,7 +279,7 @@ class IvyTaskMixin(object):
         result = execute_runner(runner, workunit_factory=self.context.new_workunit,
                                 workunit_name=workunit_name)
         if result != 0:
-          raise TaskError('Ivy returned %d' % result)
+          raise TaskError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
       except runner.executor.Error as e:
         raise TaskError(e)
 
@@ -291,3 +295,15 @@ class IvyTaskMixin(object):
       """
       return (exclude.org, exclude.name) not in jars
     return exclude_filter
+
+  @staticmethod
+  def _get_ivy_args(mapdir):
+    # At least one task(android.unpack_libraries) relies on mapped jars filenames being unique and
+    # including the version number. This method is being used to create a regression test to protect
+    # that interest.
+    ivy_args = [
+      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
+      '-symlink',
+      ]
+    return ivy_args

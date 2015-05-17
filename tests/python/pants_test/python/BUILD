@@ -53,9 +53,7 @@ python_tests(name = 'test_resolver',
   sources = ['test_resolver.py'],
   dependencies = [
     '3rdparty/python:pex',
-    'src/python/pants/base:config',
     'src/python/pants/backend/python:resolver',
-    'src/python/pants/util:contextutil',
   ],
 )
 

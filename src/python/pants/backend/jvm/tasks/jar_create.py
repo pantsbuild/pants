@@ -56,11 +56,15 @@ class JarCreate(JarTask):
   def product_types(cls):
     return ['jars']
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarCreate, cls).prepare(options, round_manager)
+    cls.JarBuilder.prepare(round_manager)
+
   def __init__(self, *args, **kwargs):
     super(JarCreate, self).__init__(*args, **kwargs)
 
     self.compressed = self.get_options().compressed
-    self._jar_builder = self.prepare_jar_builder()
     self._jars = {}
 
   def execute(self):
@@ -71,16 +75,17 @@ class JarCreate(JarTask):
         jar_name = jarname(target)
         jar_path = os.path.join(self.workdir, jar_name)
         with self.create_jar(target, jar_path) as jarfile:
-          if target in self._jar_builder.add_target(jarfile, target):
-            self.context.products.get('jars').add(target, self.workdir).append(jar_name)
+          with self.create_jar_builder(jarfile) as jar_builder:
+            if target in jar_builder.add_target(target):
+              self.context.products.get('jars').add(target, self.workdir).append(jar_name)
 
   @contextmanager
   def create_jar(self, target, path):
     existing = self._jars.setdefault(path, target)
     if target != existing:
-      raise TaskError('Duplicate name: target %s tried to write %s already mapped to target %s' % (
-        target, path, existing
-      ))
+      raise TaskError(
+          'Duplicate name: target {} tried to write {} already mapped to target {}'
+          .format(target, path, existing))
     self._jars[path] = target
     with self.open_jar(path, overwrite=True, compressed=self.compressed) as jar:
       yield jar

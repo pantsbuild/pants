@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -46,8 +45,8 @@ class JavaThriftLibrary(JvmTarget):
 
     def check_value_for_arg(arg, value, values):
       if value and value not in values:
-        raise TargetDefinitionException(self, "%s may only be set to %s ('%s' not valid)" %
-                                        (arg, ', or '.join(map(repr, values)), value))
+        raise TargetDefinitionException(self, "{} may only be set to {} ('{}' not valid)"
+                                        .format(arg, ', or '.join(map(repr, values)), value))
       return value
 
     # TODO(pl): These should all live in payload fields

@@ -20,13 +20,15 @@ from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnit
+from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
 from pants.util.strutil import safe_shlex_split
+from pants.util.xml_parser import XmlParser
 
 
 _CWD_NOT_PRESENT='CWD NOT PRESENT'
@@ -77,7 +79,6 @@ class _JUnitRunner(object):
     register('--test', action='append',
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
-    register('--xml-report', action='store_true', help='Output an XML report for the test run.')
     register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
     register('--default-parallel', action='store_true',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
@@ -87,10 +88,20 @@ class _JUnitRunner(object):
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
-             help='Redirect test output to files in .pants.d/test/junit. Implied by --xml-report.')
+             help='Redirect test output to files in .pants.d/test/junit.')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the first target path.')
-    register_jvm_tool(register, 'junit')
+    register_jvm_tool(register,
+                      'junit',
+                      main=JUnitRun._MAIN,
+                      # TODO(John Sirois): Investigate how much less we can get away with.
+                      # Clearly both tests and the runner need access to the same @Test, @Before,
+                      # as well as other annotations, but there is also the Assert class and some
+                      # subset of the @Rules, @Theories and @RunWith APIs.
+                      custom_rules=[
+                        Shader.exclude_package('org.junit', recursive=True),
+                        Shader.exclude_package('org.hamcrest', recursive=True)
+                      ])
 
   def __init__(self, task_exports, context):
     self._task_exports = task_exports
@@ -101,14 +112,12 @@ class _JUnitRunner(object):
     self._fail_fast = options.fail_fast
     self._working_dir = self._pick_working_dir(options.cwd, context)
     self._args = copy.copy(task_exports.args)
-    if options.xml_report or options.suppress_output:
-      if self._fail_fast:
-        self._args.append('-fail-fast')
-      if options.xml_report:
-        self._args.append('-xmlreport')
+    if options.suppress_output:
       self._args.append('-suppress-output')
-      self._args.append('-outdir')
-      self._args.append(task_exports.workdir)
+    if self._fail_fast:
+      self._args.append('-fail-fast')
+    self._args.append('-outdir')
+    self._args.append(task_exports.workdir)
 
     if options.per_test_timer:
       self._args.append('-per-test-timer')
@@ -129,21 +138,21 @@ class _JUnitRunner(object):
     #
     # Thus, we filter out the non-java-tests targets first but
     # keep the original targets set intact for coverages.
-    tests = self._collect_test_targets(targets)
+    tests_and_targets = self._collect_test_targets(targets)
 
-    if not tests:
+    if not tests_and_targets:
       return
 
     bootstrapped_cp = self._task_exports.tool_classpath('junit')
     junit_classpath = self._task_exports.classpath(targets, cp=bootstrapped_cp)
 
     self._context.release_lock()
-    self.instrument(targets, tests, junit_classpath)
+    self.instrument(targets, tests_and_targets.keys(), junit_classpath)
 
     def _do_report(exception=None):
-      self.report(targets, tests, tests_failed_exception=exception)
+      self.report(targets, tests_and_targets.keys(), tests_failed_exception=exception)
     try:
-      self.run(tests, junit_classpath)
+      self.run(tests_and_targets, junit_classpath)
       _do_report(exception=None)
     except TaskError as e:
       _do_report(exception=e)
@@ -161,18 +170,18 @@ class _JUnitRunner(object):
     """
     pass
 
-  def run(self, tests, junit_classpath):
+  def run(self, tests_and_targets, junit_classpath):
     """Run the tests in the appropriate environment.
 
     Subclasses should override this if they need more work done.
 
-    :param tests: an iterable that contains all the test class names
-      extracted from the testing targets.
+    :param tests_and_targets: a dict that contains all the test class names
+      mapped to their targets extracted from the testing targets.
     :param junit_classpath: the collective classpath value under which
       the junit tests will be executed.
     """
 
-    self._run_tests(tests, junit_classpath, JUnitRun._MAIN)
+    self._run_tests(tests_and_targets, junit_classpath, JUnitRun._MAIN)
 
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
@@ -189,11 +198,24 @@ class _JUnitRunner(object):
     pass
 
   def _collect_test_targets(self, targets):
+    """Returns a mapping from test names to target objects for all tests that
+    are included in targets. If self._tests_to_run is set, return {test: None}
+    for these tests instead."""
+
+    java_tests_targets = list(self._test_target_candidates(targets))
+    tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
+
     if self._tests_to_run:
-      return list(self._get_tests_to_run())
+      # Find matching targets to any requested test.
+      tests_with_targets = {}
+      for test in self._get_tests_to_run():
+        # A test might contain #specific_method, which is not needed to find a target.
+        test_class_name = test.partition('#')[0]
+        target = tests_from_targets.get(test_class_name)
+        tests_with_targets[test] = target
+      return tests_with_targets
     else:
-      java_tests_targets = list(self._test_target_candidates(targets))
-      return list(self._calculate_tests_from_targets(java_tests_targets))
+      return tests_from_targets
 
   def _pick_working_dir(self, cwd_opt, context):
     if not cwd_opt and context.target_roots:
@@ -206,28 +228,64 @@ class _JUnitRunner(object):
     else:
       return get_buildroot()
 
-  def _run_tests(self, tests, classpath, main, extra_jvm_options=None):
-    # TODO(John Sirois): Integrated batching with the test runner.  As things stand we get
-    # results summaries for example for each batch but no overall summary.
-    # http://jira.local.twitter.com/browse/AWESOME-1114
+  def _get_failed_targets(self, tests_and_targets):
+    """Return a list of failed targets.
+
+    Analyzes JUnit XML files to figure out which test had failed.
+
+    :tests_and_targets: {test: target} mapping.
+    """
+
+    def get_test_filename(test):
+      return os.path.join(self._task_exports.workdir, 'TEST-{0}.xml'.format(test))
+
+    failed_targets = []
+
+    for test, target in tests_and_targets.items():
+      if target is None:
+        self._context.log.warning('Unknown target for test %{0}'.format(test))
+
+      filename = get_test_filename(test)
+
+      if os.path.exists(filename):
+        try:
+          xml = XmlParser.from_file(filename)
+          str_failures = xml.get_attribute('testsuite', 'failures')
+          int_failures = int(str_failures)
+
+          if target and (int_failures > 0):
+            failed_targets.append(target)
+        except (XmlParser.XmlError, ValueError) as e:
+          self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
+
+    return failed_targets
+
+  def _run_tests(self, tests_and_targets, classpath, main, extra_jvm_options=None):
     extra_jvm_options = extra_jvm_options or []
+
     result = 0
-    for batch in self._partition(tests):
+    for batch in self._partition(tests_and_targets.keys()):
       with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
         result += abs(execute_java(
           classpath=classpath,
           main=main,
           jvm_options=self._task_exports.jvm_options + extra_jvm_options,
-          args=self._args + batch_tests,
+          args=self._args + batch_tests + [u'-xmlreport'],
           workunit_factory=self._context.new_workunit,
           workunit_name='run',
           workunit_labels=[WorkUnit.TEST],
           cwd=self._working_dir
         ))
+
         if result != 0 and self._fail_fast:
           break
+
     if result != 0:
-      raise TaskError('java {0} ... exited non-zero ({1})'.format(main, result))
+      failed_targets = self._get_failed_targets(tests_and_targets)
+      raise TestFailedTaskError(
+        'java {0} ... exited non-zero ({1})'.format(main, result),
+        failed_targets=failed_targets
+      )
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
@@ -245,13 +303,17 @@ class _JUnitRunner(object):
         yield target
 
   def _calculate_tests_from_targets(self, targets):
+    """
+    :param list targets: list of targets to calculate test classes for.
+    generates tuples (class_name, target).
+    """
     targets_to_classes = self._context.products.get_data('classes_by_target')
     for target in self._test_target_candidates(targets):
       target_products = targets_to_classes.get(target)
       if target_products:
         for _, classes in target_products.rel_paths():
           for cls in classes:
-            yield _classfile_to_classname(cls)
+            yield (_classfile_to_classname(cls), target)
 
   def _classnames_from_source_file(self, srcfile):
     relsrc = os.path.relpath(srcfile, get_buildroot())
@@ -339,7 +401,7 @@ class _Coverage(_JUnitRunner):
     pass
 
   @abstractmethod
-  def run(self, tests, junit_classpath):
+  def run(self, tests_and_targets, junit_classpath):
     pass
 
   @abstractmethod
@@ -402,8 +464,8 @@ class Emma(_Coverage):
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to instrument'".format(main, result))
 
-  def run(self, tests, junit_classpath):
-    self._run_tests(tests,
+  def run(self, tests_and_targets, junit_classpath):
+    self._run_tests(tests_and_targets,
                     [self._coverage_instrument_dir] + junit_classpath + self._emma_classpath,
                     JUnitRun._MAIN,
                     extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)])
@@ -541,12 +603,12 @@ class Cobertura(_Coverage):
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to instrument'".format(main, result))
 
-  def run(self, tests, junit_classpath):
+  def run(self, tests_and_targets, junit_classpath):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
     cobertura_cp = self._task_exports.tool_classpath('cobertura-run')
-    self._run_tests(tests,
+    self._run_tests(tests_and_targets,
                     cobertura_cp + junit_classpath,
                     JUnitRun._MAIN,
                     extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
@@ -649,7 +711,7 @@ class Cobertura(_Coverage):
 
 
 class JUnitRun(JvmTask, JvmToolTaskMixin):
-  _MAIN = 'com.twitter.common.junit.runner.ConsoleRunner'
+  _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
   def register_options(cls, register):
@@ -696,4 +758,11 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
   def execute(self):
     if not self.get_options().skip:
       targets = self.context.targets()
+      # TODO: move this check to an optional phase in goal_runner, so
+      # that missing sources can be detected early.
+      for target in targets:
+        if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
+          msg = 'JavaTests target {} must include a non-empty set of sources.'.format(target.address.spec)
+          raise TargetDefinitionException(target, msg)
+
       self._runner.execute(targets)

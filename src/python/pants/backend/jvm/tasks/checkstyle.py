@@ -18,7 +18,7 @@ from pants.process.xargs import Xargs
 from pants.util.dirutil import safe_open
 
 
-class Checkstyle(NailgunTask, JvmToolTaskMixin):
+class Checkstyle(NailgunTask):
 
   _CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 

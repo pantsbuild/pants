@@ -5,8 +5,12 @@
 android_library(
   name='example_library',
   manifest='AndroidManifest.xml',
+  libraries=['3rdparty/android:android-support-v4'],
+  include_patterns=[
+    'android/**/*.class',
+  ],
   dependencies=[
-    '3rdparty/android:android-support-v4',
+    ':gms-library',
     ':resources',
   ],
 )
@@ -15,4 +19,14 @@ android_resources(
   name='resources',
   manifest='AndroidManifest.xml',
   resource_dir='res'
+)
+
+android_library(
+  name='gms-library',
+  libraries=['3rdparty/android:google-play-services'],
+  include_patterns=[
+    '**/*.class',
+  ],
+  dependencies = [
+  ]
 )

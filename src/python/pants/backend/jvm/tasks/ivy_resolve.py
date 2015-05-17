@@ -15,20 +15,23 @@ from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
-from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 
-class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
+class IvyResolve(IvyTaskMixin, NailgunTask):
 
   class Error(TaskError):
     """Error in IvyResolve."""
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(IvyResolve, cls).global_subsystems() + (IvySubsystem, )
 
   @classmethod
   def register_options(cls, register):
@@ -76,8 +79,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
 
-    self._ivy_bootstrapper = Bootstrapper.instance()
-    self._cachedir = self._ivy_bootstrapper.ivy_cache_dir
+    self._cachedir = IvySubsystem.global_instance().get_options().cache_dir
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open
@@ -90,7 +92,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
 
     # Typically this should be a local cache only, since classpaths aren't portable.
     self.setup_artifact_cache()
-
 
   @property
   def confs(self):
@@ -145,7 +146,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask, JvmToolTaskMixin):
         # Add the artifacts from each dependency module.
         artifact_paths = []
         for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
-          artifact_paths.append(symlink_map[artifact.path])
+          if artifact.path in symlink_map:
+            key = artifact.path
+          else:
+            key = os.path.realpath(artifact.path)
+          artifact_paths.append(symlink_map[key])
         compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
 
     if self._report:

@@ -31,7 +31,7 @@ class Executor(AbstractClass):
   def _scrub_args(classpath, main, jvm_options, args, cwd):
     classpath = maybe_list(classpath)
     if not isinstance(main, string_types) or not main:
-      raise ValueError('A non-empty main classname is required, given: %s' % main)
+      raise ValueError('A non-empty main classname is required, given: {}'.format(main))
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
     return classpath, main, jvm_options, args, cwd
@@ -46,9 +46,14 @@ class Executor(AbstractClass):
     def executor(self):
       """Returns the executor this runner uses to run itself."""
 
-    @abstractproperty
+    @property
     def cmd(self):
       """Returns a string representation of the command that will be run."""
+      return ' '.join(self.command)
+
+    @abstractproperty
+    def command(self):
+      """Returns a copy of the command line that will be run as a list of command line tokens."""
 
     @abstractmethod
     def run(self, stdout=None, stderr=None, cwd=None):
@@ -70,12 +75,17 @@ class Executor(AbstractClass):
     """
     if distribution:
       if not isinstance(distribution, Distribution):
-        raise ValueError('A valid distribution is required, given: %s' % distribution)
+        raise ValueError('A valid distribution is required, given: {}'.format(distribution))
       distribution.validate()
     else:
       distribution = Distribution.cached()
 
     self._distribution = distribution
+
+  @property
+  def distribution(self):
+    """Returns the `Distribution` this executor runs via."""
+    return self._distribution
 
   def runner(self, classpath, main, jvm_options=None, args=None, cwd=None):
     """Returns an `Executor.Runner` for the given java command."""
@@ -126,8 +136,8 @@ class CommandLineGrabber(Executor):
         return self
 
       @property
-      def cmd(_):
-        return ' '.join(self._command)
+      def command(_):
+        return list(self._command)
 
       def run(_, stdout=None, stderr=None, cwd=None):
         return 0
@@ -182,8 +192,8 @@ class SubprocessExecutor(Executor):
         return self
 
       @property
-      def cmd(_):
-        return ' '.join(command)
+      def command(_):
+        return list(command)
 
       def run(_, stdout=None, stderr=None, cwd=None):
         return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()

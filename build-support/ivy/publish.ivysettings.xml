@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!--
+Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<ivysettings>
+  <!-- TODO(John Sirois): Find a better way to get the pgp passphrase than this
+       by-convention-only, chmod 400 file.  This may require writing an ivy signer
+       plugin that shells out to pgp and invokes it password dialog. Tracked by:
+       https://github.com/pantsbuild/pants/issues/1407 -->
+  <properties file="${user.home}/.pantsbuild.pants.pgp.properties"/>
+  <property name="pgp.secring" value="${user.home}/.gnupg/secring.gpg" override="false"/>
+  <property name="pgp.keyid" value="auto" override="false"/>
+
+  <!-- The ${login} and ${password} values below come from a credentials() object,
+       which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which
+       matches a resolver in the "[publish]repos" object in 'pants.ini', which also
+       matches the 'host' in this XML block. -->
+  <credentials host="oss.sonatype.org"
+               realm="Sonatype Nexus Repository Manager"
+               username="${login}"
+               passwd="${password}"/>
+
+  <settings defaultResolver="maven2"/>
+
+  <resolvers>
+    <!-- For resolving foreign deps only (to create a poms for publishing). -->
+    <ibiblio name="maven2" m2compatible="true"/>
+
+    <!-- For publishing to maven central only. -->
+    <ibiblio name="oss.sonatype.org"
+             m2compatible="true"
+             root="https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+             signer="pgp"/>
+  </resolvers>
+
+  <signers>
+    <pgp name="pgp"
+         secring="${pgp.secring}"
+         keyId="${pgp.keyid}"
+         password="${pgp.password}"/>
+  </signers>
+</ivysettings>

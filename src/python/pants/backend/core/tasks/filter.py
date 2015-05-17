@@ -59,6 +59,16 @@ class Filter(ConsoleTask):
              help="Regex patterns of target addresses to include (optional '+' prefix) or exclude "
                   "('-' prefix).  Multiple target inclusions or exclusions can be specified "
                   "in a comma-separated list or by using multiple instances of this flag.")
+    register('--tag', action='append',
+             help="Tags to include (optional '+' prefix) or exclude ('-' prefix).  Multiple "
+                  "attribute inclusions or exclusions can be specified in a comma-separated list "
+                  "or by using multiple instances of this flag. Format: "
+                  "--tag='+foo,-bar'")
+    register('--tag-regex', action='append',
+             help="Regex patterns of tags to include (optional '+' prefix) or exclude "
+                  "('-' prefix).  Multiple attribute inclusions or exclusions can be specified in "
+                  "a comma-separated list or by using multiple instances of this flag. Format: "
+                  "--tag-regex='+foo,-bar'")
 
   def __init__(self, *args, **kwargs):
     super(Filter, self).__init__(*args, **kwargs)
@@ -90,16 +100,16 @@ class Filter(ConsoleTask):
       try:
         # Try to do a fully qualified import 1st for filtering on custom types.
         from_list, module, type_name = name.rsplit('.', 2)
-        module = __import__('%s.%s' % (from_list, module), fromlist=[from_list])
+        module = __import__('{}.{}'.format(from_list, module), fromlist=[from_list])
         target_type = getattr(module, type_name)
       except (ImportError, ValueError):
         # Fall back on pants provided target types.
         registered_aliases = self.context.build_file_parser.registered_aliases()
         if name not in registered_aliases.targets:
-          raise TaskError('Invalid type name: %s' % name)
+          raise TaskError('Invalid type name: {}'.format(name))
         target_type = registered_aliases.targets[name]
       if not issubclass(target_type, Target):
-        raise TaskError('Not a Target type: %s' % name)
+        raise TaskError('Not a Target type: {}'.format(name))
       return lambda target: isinstance(target, target_type)
     self._filters.extend(_create_filters(self.get_options().type, filter_for_type))
 
@@ -112,9 +122,24 @@ class Filter(ConsoleTask):
     self._filters.extend(_create_filters(self.get_options().ancestor, filter_for_ancestor))
 
     def filter_for_regex(regex):
-      parser = re.compile(regex)
+      try:
+        parser = re.compile(regex)
+      except re.error as e:
+        raise TaskError("Invalid regular expression: {}: {}".format(regex, e))
       return lambda target: parser.search(str(target.address.spec))
     self._filters.extend(_create_filters(self.get_options().regex, filter_for_regex))
+
+    def filter_for_tag_regex(tag_regex):
+      try:
+        regex = re.compile(tag_regex)
+      except re.error as e:
+        raise TaskError("Invalid regular expression: {}: {}".format(tag_regex, e))
+      return lambda target: any(map(regex.search, map(str, target.tags)))
+    self._filters.extend(_create_filters(self.get_options().tag_regex, filter_for_tag_regex))
+
+    def filter_for_tag(tag):
+      return lambda target: tag in map(str, target.tags)
+    self._filters.extend(_create_filters(self.get_options().tag, filter_for_tag))
 
   def console_output(self, _):
     filtered = set()

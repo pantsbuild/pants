@@ -1,0 +1,62 @@
+# An override config example that uses the `isolated` compile strategy for JVM languages.
+# ./pants --config-override=pants.ini.isolated <goal> <targets>
+
+[compile.apt]
+strategy: isolated
+
+
+[compile.zinc-java]
+enabled: True
+runtime-deps: []
+scalac: [':scala-compile']
+strategy: isolated
+worker_count: 4
+zinc: [':zinc']
+jvm_options: [
+    '-Xmx4g', '-XX:MaxPermSize=512m', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4',
+    # bigger cache size for our big projects (default is just 5)
+    '-Dzinc.analysis.cache.limit=1000'
+  ]
+
+args: [
+    '-C-source', '-C1.7',
+    '-C-target', '-C1.7',
+    '-java-only', '-C-encoding', '-CUTF-8',
+  ]
+warning_args: [
+    '-C-Xlint:all', '-C-Xlint:-serial', '-C-Xlint:-path',
+    '-C-deprecation',
+  ]
+no_warning_args: [
+    '-C-Xlint:none',
+    '-C-nowarn',
+  ]
+
+
+[compile.scala]
+runtime-deps: [':scala-library']
+scalac: [':scala-compiler']
+strategy: isolated  
+worker_count: 4
+zinc: [':zinc']
+jvm_options: [
+    '-Xmx4g', '-XX:MaxPermSize=512m', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4',
+    # bigger cache size for our big projects (default is just 5)
+    '-Dzinc.analysis.cache.limit=1000',
+  ]
+
+args: [
+    '-C-source', '-C1.7',
+    '-C-target', '-C1.7',
+    '-S-encoding', '-SUTF-8',
+    '-S-g:vars',
+  ]
+warning_args: [
+    '-S-deprecation',
+    '-S-unchecked',
+    # request warnings for http://www.scala-lang.org/api/2.10.4/index.html#scala.language$
+    '-S-feature',
+  ]
+no_warning_args: [
+    '-S-nowarn',
+  ]

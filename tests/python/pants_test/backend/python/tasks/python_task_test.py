@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.address import SyntheticAddress
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -74,10 +75,11 @@ class PythonTaskTest(TaskTestBase):
     """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
     return self.target(SyntheticAddress(relpath, name).spec)
 
-  def context(self, config='', options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, options=None, target_roots=None,
+              console_outstream=None, workspace=None):
     # Our python tests don't pass on Python 3 yet.
     # TODO: Clean up this hard-coded interpreter constraint once we have subsystems
     # and can simplify InterpreterCache and PythonSetup.
     self.set_options(interpreter=['CPython>=2.7,<3'])
-    return super(PythonTaskTest, self).context(config=config, options=options,
-                                               target_roots=target_roots, **kwargs)
+    return super(PythonTaskTest, self).context(for_task_types=for_task_types, options=options,
+        target_roots=target_roots, console_outstream=console_outstream, workspace=workspace)

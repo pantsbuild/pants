@@ -28,7 +28,7 @@ class CppTarget(Target):
       sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=self.assert_list(sources),
-                              sources_rel_path=sources_rel_path),
+      'sources': self.create_sources_field(sources=sources,
+                                           sources_rel_path=sources_rel_path),
     })
     super(CppTarget, self).__init__(address=address, payload=payload, **kwargs)

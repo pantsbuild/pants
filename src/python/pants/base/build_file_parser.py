@@ -6,10 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import warnings
 
 import six
-
-from pants.base.build_file import BuildFile
 
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,6 @@ class BuildFileParser(object):
   class ParseError(BuildFileParserError):
     """An exception was encountered in the python parser"""
 
-
   class ExecuteError(BuildFileParserError):
     """An exception was encountered executing code in the BUILD file"""
 
@@ -66,13 +64,7 @@ class BuildFileParser(object):
     """Returns a copy of the registered build file aliases this build file parser uses."""
     return self._build_configuration.registered_aliases()
 
-  def address_map_from_spec_path(self, spec_path):
-    try:
-      build_file = BuildFile.from_cache(self._root_dir, spec_path)
-    except BuildFile.BuildFileError as e:
-      raise self.BuildFileScanError("{message}\n searching {spec_path}"
-                                    .format(message=e,
-                                            spec_path=spec_path))
+  def address_map_from_build_file(self, build_file):
     family_address_map_by_build_file = self.parse_build_file_family(build_file)
     address_map = {}
     for build_file, sibling_address_map in family_address_map_by_build_file.items():
@@ -103,25 +95,29 @@ class BuildFileParser(object):
 
     def _format_context_msg(lineno, offset, error_type, message):
       """Show the line of the BUILD file that has the error along with a few line of context"""
-      with open(build_file.full_path, "r") as build_contents:
-        context = "Error parsing {path}:\n".format(path=build_file.full_path)
-        curr_lineno = 0
-        for line in build_contents.readlines():
-          curr_lineno += 1
-          if curr_lineno == lineno:
-            highlight = '*'
-          else:
-            highlight = ' '
-          if curr_lineno >= lineno - 3:
-            context += "{highlight}{curr_lineno:4d}: {line}".format(
-              highlight=highlight, line=line, curr_lineno=curr_lineno)
-            if offset and lineno == curr_lineno:
-              context += "       {caret:>{width}} {error_type}: {message}\n\n" \
-                .format(caret="^", width=int(offset), error_type=error_type,
-                        message=message)
-          if curr_lineno > lineno + 3:
-            break
-        return context
+      build_contents = build_file.source()
+      context = "While parsing {build_file}:\n".format(build_file=build_file)
+      curr_lineno = 0
+      for line in build_contents.split('\n'):
+        curr_lineno += 1
+        if curr_lineno == lineno:
+          highlight = '*'
+        else:
+          highlight = ' '
+        if curr_lineno >= lineno - 3:
+          context += "{highlight}{curr_lineno:4d}: {line}\n".format(
+            highlight=highlight, line=line, curr_lineno=curr_lineno)
+          if lineno == curr_lineno:
+            if offset:
+              context += ("       {caret:>{width}} {error_type}: {message}\n\n"
+                          .format(caret="^", width=int(offset), error_type=error_type,
+                                  message=message))
+            else:
+              context += ("        {error_type}: {message}\n\n"
+                          .format(error_type=error_type, message=message))
+        if curr_lineno > lineno + 3:
+          break
+      return context
 
     logger.debug("Parsing BUILD file {build_file}."
                  .format(build_file=build_file))
@@ -137,7 +133,13 @@ class BuildFileParser(object):
 
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
-      six.exec_(build_file_code, parse_state.parse_globals)
+      with warnings.catch_warnings(record=True) as warns:
+        six.exec_(build_file_code, parse_state.parse_globals)
+        for warn in warns:
+          logger.warning(_format_context_msg(lineno=warn.lineno,
+                                             offset=None,
+                                             error_type=warn.category.__name__,
+                                             message=warn.message))
     except Exception as e:
       raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
                               .format(message=e, build_file=build_file))

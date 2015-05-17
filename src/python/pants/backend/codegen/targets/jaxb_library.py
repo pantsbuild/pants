@@ -5,14 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import sys
-from hashlib import sha1
-from types import GeneratorType
-
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 

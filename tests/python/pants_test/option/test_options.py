@@ -12,8 +12,6 @@ import warnings
 from contextlib import contextmanager
 from textwrap import dedent
 
-import pytest
-
 from pants.base.deprecated import PastRemovalVersionError
 from pants.option.errors import ParseError
 from pants.option.options import Options
@@ -361,7 +359,7 @@ class OptionsTest(unittest.TestCase):
                               deprecated_hint='The semver for this option has already passed.')
 
   def test_is_deprecated(self):
-    options = self._parse('./pants');
+    options = self._parse('./pants')
     global_parser = options.get_global_parser()
     self.assertTrue(global_parser.is_deprecated('--global-crufty'))
     self.assertTrue(global_parser.is_deprecated('--global-crufty=foo'))

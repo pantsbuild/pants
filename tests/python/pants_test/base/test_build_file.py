@@ -6,58 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
-import tempfile
-import unittest
 
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_file import BuildFile
-from pants.util.dirutil import safe_mkdir, safe_open, touch
+from pants.base.build_file import BuildFile, FilesystemBuildFile
+from pants.util.dirutil import safe_open
+from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
-class BuildFileTest(unittest.TestCase):
-
-  def fullpath(self, path):
-    return os.path.join(self.root_dir, path)
-
-  def makedirs(self, path):
-    safe_mkdir(self.fullpath(path))
-
-  def touch(self, path):
-    touch(self.fullpath(path))
-
-  def create_buildfile(self, path):
-    return BuildFile(self.root_dir, path)
-
+class BuildFileTest(BuildFileTestBase):
   def setUp(self):
-    self.base_dir = tempfile.mkdtemp()
-
-    # Seed a BUILD outside the build root that should not be detected
-    touch(os.path.join(self.base_dir, 'BUILD'))
-
-    self.root_dir = os.path.join(self.base_dir, 'root')
-
-    self.touch('grandparent/parent/BUILD')
-    self.touch('grandparent/parent/BUILD.twitter')
-    # Tricky!  This is a directory
-    self.makedirs('grandparent/parent/BUILD.dir')
-    self.makedirs('grandparent/BUILD')
-    self.touch('BUILD')
-    self.touch('BUILD.twitter')
-    self.touch('grandparent/parent/child1/BUILD')
-    self.touch('grandparent/parent/child1/BUILD.twitter')
-    self.touch('grandparent/parent/child2/child3/BUILD')
-    self.makedirs('grandparent/parent/child2/BUILD')
-    self.makedirs('grandparent/parent/child4')
-    self.touch('grandparent/parent/child5/BUILD')
-    self.makedirs('path-that-does-exist')
-    self.touch('path-that-does-exist/BUILD.invalid.suffix')
+    super(BuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
-
-  def tearDown(self):
-    shutil.rmtree(self.base_dir)
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
@@ -98,16 +59,16 @@ class BuildFileTest(unittest.TestCase):
       self.buildfile.descendants(spec_excludes=['grandparent/parent/child1']))
 
   def testMustExistFalse(self):
-    buildfile = BuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
+    buildfile = FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
     self.assertEquals(OrderedSet([buildfile]), buildfile.family())
 
   def testMustExistTrue(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
+      FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, "path-that-does-exist/BUILD", must_exist=True)
+      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
+      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
 
   def testSuffixOnly(self):
     self.makedirs('suffix-test')
@@ -150,18 +111,18 @@ class BuildFileTest(unittest.TestCase):
   def test_buildfile_with_dir_must_exist_false(self):
     # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.
     # This is used in what_changed for example.
-    buildfile = BuildFile(self.root_dir, 'grandparent/BUILD', must_exist=False)
-    self.assertFalse(buildfile.exists())
+    buildfile = FilesystemBuildFile(self.root_dir, 'grandparent/BUILD', must_exist=False)
+    self.assertFalse(buildfile.file_exists())
 
   def test_buildfile_with_dir_must_exist_true(self):
     # We should NOT be able to create a BuildFile instance against a dir called BUILD
     # in the default case.
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      BuildFile(self.root_dir, 'grandparent/BUILD')
+      FilesystemBuildFile(self.root_dir, 'grandparent/BUILD')
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
-    buildfiles = BuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
+    buildfiles = FilesystemBuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
 
     self.assertEquals(OrderedSet([
       self.create_buildfile('grandparent/parent/BUILD'),
@@ -174,7 +135,7 @@ class BuildFileTest(unittest.TestCase):
       ]), buildfiles)
 
   def test_scan_buildfiles_exclude_abspath(self):
-    buildfiles = BuildFile.scan_buildfiles(
+    buildfiles = FilesystemBuildFile.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')
@@ -189,7 +150,7 @@ class BuildFileTest(unittest.TestCase):
                       buildfiles)
 
   def test_scan_buildfiles_exclude_relpath(self):
-    buildfiles = BuildFile.scan_buildfiles(
+    buildfiles = FilesystemBuildFile.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'
@@ -206,7 +167,7 @@ class BuildFileTest(unittest.TestCase):
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
     with self.assertRaises(BuildFile.InvalidRootDirError):
-      BuildFile('tmp', 'grandparent/BUILD')
+      FilesystemBuildFile('tmp', 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are

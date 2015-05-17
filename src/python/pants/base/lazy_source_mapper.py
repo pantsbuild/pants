@@ -67,8 +67,8 @@ class LazySourceMapper(object):
     while walking:
       # It is possible
       if path not in self._mapped_paths:
-        candidate = BuildFile.from_cache(root_dir=root, relpath=path, must_exist=False)
-        if candidate.exists():
+        candidate = self._address_mapper.from_cache(root_dir=root, relpath=path, must_exist=False)
+        if candidate.file_exists():
           self._map_sources_from_family(candidate.family())
         self._mapped_paths.add(path)
       elif not self._stop_after_match:

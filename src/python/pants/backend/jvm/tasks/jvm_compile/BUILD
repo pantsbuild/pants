@@ -95,12 +95,21 @@ python_library(
   name = 'jvm_compile_isolated_strategy',
   sources = ['jvm_compile_isolated_strategy.py'],
   dependencies = [
+    ':execution_graph',
     ':jvm_compile_strategy',
     ':resource_mapping',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'execution_graph',
+  sources = ['execution_graph.py'],
+  dependencies = [
+    'src/python/pants/base:worker_pool',
   ],
 )
 
@@ -155,13 +164,13 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    '3rdparty/python:zincutils',
     ':analysis',
     ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
-    'src/python/pants/backend/jvm/scala:target_platform',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',

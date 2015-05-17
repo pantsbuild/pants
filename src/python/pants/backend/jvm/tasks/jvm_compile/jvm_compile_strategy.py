@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict, namedtuple
+from collections import OrderedDict, defaultdict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_delete, safe_mkdir
+from pants.util.dirutil import safe_delete
 
 
 class JvmCompileStrategy(object):
@@ -21,11 +21,27 @@ class JvmCompileStrategy(object):
 
   __metaclass__ = ABCMeta
 
-  # A context for the compilation of a target.
-  #
-  # This can be used to differentiate between a partially completed compile in a temporary location
-  # and a finalized compile in its permanent location.
-  CompileContext = namedtuple('CompileContext', ['target', 'analysis_file', 'classes_dir', 'sources'])
+  class CompileContext(object):
+    """A context for the compilation of a target.
+
+    This can be used to differentiate between a partially completed compile in a temporary location
+    and a finalized compile in its permanent location.
+    """
+    def __init__(self, target, analysis_file, classes_dir, sources):
+      self.target = target
+      self.analysis_file = analysis_file
+      self.classes_dir = classes_dir
+      self.sources = sources
+
+    @property
+    def _id(self):
+      return (self.target, self.analysis_file, self.classes_dir)
+
+    def __eq__(self, other):
+      return self._id == other._id
+
+    def __hash__(self):
+      return hash(self._id)
 
   # Common code.
   # ------------
@@ -39,14 +55,15 @@ class JvmCompileStrategy(object):
 
   @classmethod
   @abstractmethod
-  def register_options(cls, register, language):
+  def register_options(cls, register, language, supports_concurrent_execution):
     """Registration for strategy-specific options.
 
     The abstract base class does not register any options itself: those are left to JvmCompile.
     """
     pass
 
-  def __init__(self, context, options, workdir, analysis_tools, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
+    self._language = language
     self.context = context
     self._analysis_tools = analysis_tools
 
@@ -78,9 +95,10 @@ class JvmCompileStrategy(object):
 
   @abstractmethod
   def compute_classes_by_source(self, compile_contexts):
-    """Compute src->classes for the given compile_contexts.
+    """Compute a map of (context->(src->classes)) for the given compile_contexts.
 
-    Srcs are relative to buildroot. Classes are absolute paths.
+    It's possible (although unfortunate) for multiple targets to own the same sources, hence
+    the top level division. Srcs are relative to buildroot. Classes are absolute paths.
     """
     pass
 
@@ -203,3 +221,22 @@ class JvmCompileStrategy(object):
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
+
+  def _create_compile_contexts_for_targets(self, relevant_targets):
+    compile_contexts = OrderedDict()
+    for target in relevant_targets:
+      compile_context = self.compile_context(target)
+      compile_contexts[target] = compile_context
+    return compile_contexts
+
+  # Compute any extra compile-time-only classpath elements.
+  # TODO(benjy): Model compile-time vs. runtime classpaths more explicitly.
+  # TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,
+  # we can inject a dep on the scala runtime library and still have it ivy-resolve.
+  def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
+    def extra_compile_classpath_iter():
+      for conf in self._confs:
+        for jar in extra_compile_time_classpath_elements:
+          yield (conf, jar)
+
+    return list(extra_compile_classpath_iter())

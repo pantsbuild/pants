@@ -10,6 +10,7 @@ import pkgutil
 import urlparse
 
 import pystache
+import six
 
 
 class MustacheRenderer(object):
@@ -39,6 +40,15 @@ class MustacheRenderer(object):
     ret.update(dict(items))
     return ret
 
+  @staticmethod
+  def parse_template(template_text):
+    if six.PY2:
+      # pystache does a typecheck for unicode in python 2.x but rewrites its sources to deal
+      # unicode via str in python 3.x.
+      template_text = unicode(template_text)
+    template = pystache.parse(template_text)
+    return template
+
   def __init__(self, template_dir=None, package_name=None):
     """Create a renderer that finds templates by name in one of two ways.
 
@@ -51,22 +61,11 @@ class MustacheRenderer(object):
     self._template_dir = template_dir
     self._package_name = package_name
     self._pystache_renderer = pystache.Renderer(search_dirs=template_dir)
+    self._templates = {}
 
   def render_name(self, template_name, args):
-    # TODO: Precompile and cache the templates?
-    if self._template_dir:
-      # Let pystache find the template by name.
-      return self._pystache_renderer.render_name(template_name, MustacheRenderer.expand(args))
-    else:
-      # Load the named template embedded in our package.
-      path = os.path.join('templates', template_name + '.mustache')
-      template = pkgutil.get_data(self._package_name, path)
-
-      if template == None:
-        raise self.MustacheError(
-          "could not find template %s in package %s" % (path, self._package_name))
-
-      return self.render(template, args)
+    parsed_template = self._load_template(template_name)
+    return self.render(parsed_template, args)
 
   def render(self, template, args):
     return self._pystache_renderer.render(template, MustacheRenderer.expand(args))
@@ -97,3 +96,20 @@ class MustacheRenderer(object):
     args = dict(outer_args.items() + inner_args.items())
     # Render.
     return self.render_name(inner_template_name, args)
+
+  def _load_template(self, template_name):
+    template = self._templates.get(template_name)
+    if not template:
+      if self._template_dir:
+        # Let pystache find the template by name.
+        template = self._pystache_renderer.load_template(template_name)
+      else:
+        # Load the named template embedded in our package.
+        path = os.path.join('templates', template_name + '.mustache')
+        template_text = pkgutil.get_data(self._package_name, path)
+        if template_text is None:
+          raise self.MustacheError(
+            "could not find template {} in package {}".format(path, self._package_name))
+        template = MustacheRenderer.parse_template(template_text)
+      self._templates[template_name] = template
+    return template

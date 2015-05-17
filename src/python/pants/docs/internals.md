@@ -13,7 +13,7 @@ How Some Base Classes Interrelate
 ---------------------------------
 
 **Target**<br>
-An addressable thing, such as a `python_binary` or `scala_tests`. To add
+An addressable thing, such as a `python_binary` or `junit_tests`. To add
 support for a new language, you probably want to add new target types to
 represent things you can build with that language. Most Target instances
 can depend on other Target instances. As a rule of thumb, if code in

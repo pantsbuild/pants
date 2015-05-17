@@ -83,7 +83,7 @@ class CppBinaryCreate(CppTask):
     if self.get_options().ld_options != None:
       cmd.extend(('-Wl,{0}'.format(o) for o in self.get_options().ld_options.split(' ')))
 
-    with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]):
-      self.run_command(cmd)
+    with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]) as workunit:
+      self.run_command(cmd, workunit)
 
     return output

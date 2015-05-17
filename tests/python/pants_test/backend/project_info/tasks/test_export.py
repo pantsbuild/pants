@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.targets.dependencies import Dependencies
@@ -21,7 +22,10 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import Export
+from pants.backend.python.register import build_file_aliases as register_python
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -32,7 +36,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
 
   @property
   def alias_groups(self):
-    return register_core().merge(register_jvm())
+    return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
     super(ProjectInfoTest, self).setUp()
@@ -60,6 +64,14 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       dependencies=[jar_lib],
       java_sources=['java/project_info:java_lib'],
       sources=['com/foo/Bar.scala', 'com/foo/Baz.scala'],
+    )
+
+    self.make_target(
+      'project_info:globular',
+      target_type=ScalaLibrary,
+      dependencies=[jar_lib],
+      java_sources=['java/project_info:java_lib'],
+      sources=['com/foo/*.scala'],
     )
 
     self.make_target(
@@ -121,11 +133,73 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       resources=[],
     )
 
+    SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'src')),
+                        PythonLibrary)
+
+    self.add_to_build_file('src/x/BUILD', '''
+       python_library(name="x", sources=globs("*.py"))
+    '''.strip())
+
+    self.add_to_build_file('src/y/BUILD', dedent('''
+      python_library(name="y", sources=rglobs("*.py"))
+      python_library(name="y2", sources=rglobs("subdir/*.py"))
+      python_library(name="y3", sources=rglobs("Test*.py"))
+    '''))
+
+    self.add_to_build_file('src/z/BUILD', '''
+      python_library(name="z", sources=zglobs("**/*.py"))
+    '''.strip())
+
+    self.add_to_build_file('src/exclude/BUILD', '''
+      python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
+    '''.strip())
+
+  def test_source_globs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/x')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/x/*.py',]},
+      result['targets']['src/x:x']['globs']
+    )
+
   def test_without_dependencies(self):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:first')]
     ))
     self.assertEqual({}, result['libraries'])
+
+  def test_version(self):
+    result = get_json(self.execute_console_task(
+      targets=[self.target('project_info:first')]
+    ))
+    self.assertEqual('1.0.0', result['version'])
+
+  def test_sources(self):
+    result = get_json(self.execute_console_task(
+      options=dict(sources=True),
+      targets=[self.target('project_info:third')]
+    ))
+
+    self.assertEqual(
+      ['project_info/com/foo/Bar.scala',
+       'project_info/com/foo/Baz.scala',
+      ],
+      sorted(result['targets']['project_info:third']['sources'])
+    )
+
+  def test_source_globs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('project_info:globular')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['project_info/com/foo/*.scala']},
+      result['targets']['project_info:globular']['globs']
+    )
 
   def test_with_dependencies(self):
     result = get_json(self.execute_console_task(
@@ -163,6 +237,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
     jvm_target = result['targets']['project_info:jvm_target']
     expected_jmv_target = {
+      'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
+                          'project_info/this/is/a/source/Bar.scala']},
       'libraries': ['org.apache:apache-jar:12.12.2012'],
       'is_code_gen': False,
       'targets': ['project_info:jar_lib'],
@@ -176,6 +252,14 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       'pants_target_type': 'scala_library'
     }
     self.assertEqual(jvm_target, expected_jmv_target)
+
+  def test_no_libraries(self):
+    result = get_json(self.execute_console_task(
+      options=dict(libraries=False),
+      targets=[self.target('project_info:java_test')]
+    ))
+    self.assertEqual([],
+                     result['targets']['project_info:java_test']['libraries'])
 
   def test_java_test(self):
     result = get_json(self.execute_console_task(
@@ -232,6 +316,65 @@ class ProjectInfoTest(ConsoleTaskTestBase):
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):
       self.execute_console_task(targets=[self.target('project_info:unrecognized_target_type')])
+
+  def test_source_exclude(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/exclude')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/exclude/*.py',],
+       'exclude' : [{
+         'globs' : ['src/exclude/foo.py']
+       }],
+     },
+      result['targets']['src/exclude:exclude']['globs']
+    )
+
+  def test_source_rglobs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/**/*.py',]},
+      result['targets']['src/y:y']['globs']
+    )
+
+  def test_source_rglobs_subdir(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y:y2')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/subdir/**/*.py',]},
+      result['targets']['src/y:y2']['globs']
+    )
+
+  def test_source_rglobs_noninitial(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/y:y3')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/y/Test*.py',]},
+      result['targets']['src/y:y3']['globs']
+    )
+
+  def test_source_zglobs(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('src/z')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['src/z/**/*.py',]},
+      result['targets']['src/z:z']['globs']
+    )
 
 
 def get_json(lines):

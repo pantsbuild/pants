@@ -295,7 +295,7 @@ class SourceRoot(object):
     else:
       abspath = os.path.normpath(os.path.join(buildroot, path))
     if not abspath.startswith(buildroot):
-      raise ValueError('Source root %s is not under the build root %s' % (abspath, buildroot))
+      raise ValueError('Source root {} is not under the build root {}'.format(abspath, buildroot))
     return os.path.relpath(abspath, buildroot)
 
   @classmethod

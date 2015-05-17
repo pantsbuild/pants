@@ -43,6 +43,11 @@ class AaptGen(AaptTask):
     # The aapt tool determines this information by parsing the manifest of the target.
     return os.path.join(cls.package_path(package), 'R.java')
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(AaptGen, cls).prepare(options, round_manager)
+    round_manager.require_data('unpacked_libraries')
+
   @staticmethod
   def is_aapt_target(target):
     """Return True for AndroidBinary targets."""
@@ -51,6 +56,7 @@ class AaptGen(AaptTask):
   def __init__(self, *args, **kwargs):
     super(AaptGen, self).__init__(*args, **kwargs)
     self._jar_library_by_sdk = {}
+    self._created_library_targets = {}
 
   def create_sdk_jar_deps(self, targets):
     """Create a JarLibrary target for every sdk in play.
@@ -115,29 +121,31 @@ class AaptGen(AaptTask):
 
       # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
-      # We can try some things with the BUILD file rework that'd be up next in a perfect world.
-      for targ in gentargets:
+      for gen in gentargets:
+        # AndroidLibraries are not currently required to have a manifest. No manifest = no work.
+        if gen.manifest:
+          # If a library does not specify a target_sdk, use the sdk of its dependee binary.
+          used_sdk = gen.manifest.target_sdk if gen.manifest.target_sdk else sdk
 
-        # If a library does not specify a target_sdk, use the sdk of its dependee binary.
-        used_sdk = targ.manifest.target_sdk if targ.manifest.target_sdk else sdk
+          # Get resource_dir of all AndroidResources targets in the transitive dependencies.
+          resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
+          resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
-        resource_dirs = []
-        for dep in targ.closure():
-          # A target's resources, as well as the resources of its transitive deps, are needed.
-          if isinstance(dep, AndroidResources):
-            resource_dirs.append(dep.resource_dir)
+          if resource_dirs:
+            args = self._render_args(gen, used_sdk, resource_dirs, outdir)
+            with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
+              returncode = subprocess.call(args, stdout=workunit.output('stdout'),
+                                           stderr=workunit.output('stderr'))
+              if returncode:
+                raise TaskError('The AaptGen process exited non-zero: {}'.format(returncode))
 
-        args = self._render_args(targ, used_sdk, resource_dirs, outdir)
-        with self.context.new_workunit(name='aapt_gen', labels=[WorkUnit.MULTITOOL]) as workunit:
-          returncode = subprocess.call(args, stdout=workunit.output('stdout'),
-                                       stderr=workunit.output('stderr'))
-          if returncode:
-            raise TaskError('The AaptGen process exited non-zero: {}'.format(returncode))
+              aapt_gen_file = self._calculate_genfile(gen.manifest.package_name)
+              if aapt_gen_file not in self._created_library_targets:
+                new_target = self.create_target(gen, sdk, aapt_gen_file)
+                self._created_library_targets[aapt_gen_file] = new_target
+              gen.inject_dependency(self._created_library_targets[aapt_gen_file].address)
 
-        new_target = self.create_target(targ, sdk)
-        targ.inject_dependency(new_target.address)
-
-  def create_target(self, gentarget, sdk):
+  def create_target(self, gentarget, sdk, aapt_output):
     """Create a JavaLibrary target for the R.java files created by the aapt tool.
 
     :param AndroidTarget gentarget: An android_binary or android_library that owns resources.
@@ -146,12 +154,11 @@ class AaptGen(AaptTask):
     """
     spec_path = os.path.join(os.path.relpath(self.aapt_out(sdk), get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
-    aapt_gen_file = self._calculate_genfile(gentarget.manifest.package_name)
     deps = [self._jar_library_by_sdk[sdk]]
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
-                                      sources=[aapt_gen_file],
+                                      sources=[aapt_output],
                                       dependencies=deps)
     return tgt
 

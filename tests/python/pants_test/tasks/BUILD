@@ -8,11 +8,11 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
     'src/python/pants/goal',
+    'src/python/pants/ivy',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',
   ]
@@ -27,9 +27,9 @@ target(
     ':console_task',
     ':dependees',
     ':detect_duplicates',
+    ':execution_graph',
     ':filter',
     ':group_task',
-    ':ivy_utils',
     ':jar_create',
     ':jar_publish',
     ':jar_task',
@@ -55,7 +55,6 @@ target(
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
-    ':export_integration',
     ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
@@ -209,8 +208,7 @@ python_tests(
   sources = ['test_depmap_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
-    'src/python/pants/ivy:ivy',
+    'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -229,16 +227,13 @@ python_tests(
 )
 
 python_tests(
-  name = 'export_integration',
-  sources = ['test_export_integration.py'],
+  name = 'execution_graph',
+  sources = ['test_execution_graph.py'],
   dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:config',
-    'src/python/pants/ivy:ivy',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
+    'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
+    ]
 )
+
 python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
@@ -302,20 +297,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'ivy_utils',
-  sources = ['test_ivy_utils.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/base:context_utils',
-  ]
-)
-
-python_tests(
   name = 'jar_create',
   sources = ['test_jar_create.py'],
   dependencies = [
@@ -348,11 +329,12 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:generator',
     'src/python/pants/base:source_root',
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:utils',
+    'tests/python/pants_test/testutils',
   ],
 )
 
@@ -502,6 +484,7 @@ python_tests(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_task',
     'src/python/pants/base:build_file_aliases',

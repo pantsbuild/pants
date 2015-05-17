@@ -83,11 +83,11 @@ Not everything's source code is in your repository. Your targets can
 depend on `.jar`s or `.eggs`s from elsewhere.
 
 **Test Targets**<br>
-To define a collection of tests, you want a `junit_tests`,
-`scala_specs`, `python_tests`, or `python_test_suite` target. The test
-target depends upon the targets whose code it tests. This isn't just
-logical, it's handy, too: you can compute dependencies to figure out
-what tests to run if you change some target's code.
+To define a collection of tests, you want a `junit_tests` or
+`python_tests` target. The test target depends upon the targets whose
+code it tests. This isn't just logical, it's handy, too: you can
+compute dependencies to figure out what tests to run if you change some
+target's code.
 
 For a list of all Target types (and other things that can go in `BUILD`
 files), see the <a href="build_dictionary.html">BUILD Dictionary</a>.

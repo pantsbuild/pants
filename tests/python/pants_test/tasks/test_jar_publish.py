@@ -14,16 +14,18 @@ from mock import Mock
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
+from pants.backend.jvm.targets.jar_dependency import IvyArtifact
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jar_publish import JarPublish
+from pants.backend.jvm.tasks.jar_publish import JarPublish, PomWriter
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.base.generator import TemplateData
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants_test.backend.jvm.tasks.jvm_compile.utils import set_compile_strategies
 from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.testutils.compile_strategy_utils import set_compile_strategies
 
 
 class JarPublishTest(TaskTestBase):
@@ -92,7 +94,7 @@ class JarPublishTest(TaskTestBase):
     task._copy_artifact = Mock()
     task.create_source_jar = Mock()
     task.create_doc_jar = Mock()
-    task.changelog = Mock(return_value="Many changes")
+    task.changelog = Mock(return_value='Many changes')
     task.publish = Mock()
     task.confirm_push = Mock(return_value=True)
     task.context.products.get = Mock(return_value=Mock())
@@ -134,12 +136,12 @@ class JarPublishTest(TaskTestBase):
       for _, _, filenames in safe_walk(self.push_db_basedir):
         files.extend(filenames)
       self.assertEquals(0, len(files),
-                        "Nothing should be written to the pushdb during a dryrun publish")
+                        'Nothing should be written to the pushdb during a dryrun publish')
 
       self.assertEquals(0, task.confirm_push.call_count,
-                        "Expected confirm_push not to be called")
+                        'Expected confirm_push not to be called')
       self.assertEquals(0, task.publish.call_count,
-                        "Expected publish not to be called")
+                        'Expected publish not to be called')
 
   def test_publish_local(self):
     for with_alias in [True, False]:
@@ -157,17 +159,17 @@ class JarPublishTest(TaskTestBase):
         for _, _, filenames in safe_walk(self.push_db_basedir):
           files.extend(filenames)
         self.assertEquals(0, len(files),
-                          "Nothing should be written to the pushdb during a local publish")
+                          'Nothing should be written to the pushdb during a local publish')
 
         publishable_count = len(targets) - (1 if with_alias else 0)
         self.assertEquals(publishable_count, task.confirm_push.call_count,
-                          "Expected one call to confirm_push per artifact")
+                          'Expected one call to confirm_push per artifact')
         self.assertEquals(publishable_count, task.publish.call_count,
-                          "Expected one call to publish per artifact")
+                          'Expected one call to publish per artifact')
 
   def test_publish_remote(self):
     targets = self._prepare_for_publishing()
-    self.set_options(dryrun=False, repos=self._get_repos())
+    self.set_options(dryrun=False, repos=self._get_repos(), push_postscript='\nPS')
     task = self.create_task(self.context(target_roots=targets))
     self._prepare_mocks(task)
     task.execute()
@@ -178,17 +180,32 @@ class JarPublishTest(TaskTestBase):
       files.extend(filenames)
 
     self.assertEquals(len(targets), len(files),
-                      "During a remote publish, one pushdb should be written per target")
+                      'During a remote publish, one pushdb should be written per target')
     self.assertEquals(len(targets), task.confirm_push.call_count,
-                      "Expected one call to confirm_push per artifact")
+                      'Expected one call to confirm_push per artifact')
     self.assertEquals(len(targets), task.publish.call_count,
-                      "Expected one call to publish per artifact")
+                      'Expected one call to publish per artifact')
+
     self.assertEquals(len(targets), task.scm.commit.call_count,
-                      "Expected one call to scm.commit per artifact")
+                      'Expected one call to scm.commit per artifact')
+    args, kwargs = task.scm.commit.call_args
+    message = args[0]
+    message_lines = message.splitlines()
+    self.assertTrue(len(message_lines) > 1,
+                    'Expected at least one commit message line in addition to the post script.')
+    self.assertEquals('PS', message_lines[-1])
+
     self.assertEquals(len(targets), task.scm.add.call_count,
-                      "Expected one call to scm.add per artifact")
+                      'Expected one call to scm.add per artifact')
+
     self.assertEquals(len(targets), task.scm.tag.call_count,
-                      "Expected one call to scm.tag per artifact")
+                      'Expected one call to scm.tag per artifact')
+    args, kwargs = task.scm.tag.call_args
+    tag_name, tag_message = args
+    tag_message_splitlines = tag_message.splitlines()
+    self.assertTrue(len(tag_message_splitlines) > 1,
+                    'Expected at least one tag message line in addition to the post script.')
+    self.assertEquals('PS', tag_message_splitlines[-1])
 
   def test_publish_retry_works(self):
     targets = self._prepare_for_publishing()
@@ -232,6 +249,13 @@ class JarPublishTest(TaskTestBase):
   def test_publish_local_only(self):
     with pytest.raises(TaskError):
       self.create_task(self.context())
+
+  def test_publish_classifiers(self):
+    artifacts = map(lambda x: IvyArtifact(x, classifier=x), ['a', 'c', 'b'])
+    p = PomWriter(None, None)
+    c = p.classifiers('a', artifacts)
+    r = map(lambda x: TemplateData(classifier=x), ['a', 'b', 'c'])
+    self.assertEquals(r, c)
 
 class FailNTimes:
   def __init__(self, tries, exc_type, success=None):

@@ -58,11 +58,10 @@ class Context(object):
 
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
-  def __init__(self, config, options, run_tracker, target_roots,
+  def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None):
-    self._config = config
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -81,11 +80,6 @@ class Context(object):
     self._spec_excludes = spec_excludes
     self._replace_targets(target_roots)
     self._synthetic_targets = defaultdict(list)
-
-  @property
-  def config(self):
-    """Returns a Config object containing the configuration data found in pants.ini."""
-    return self._config
 
   @property
   def options(self):
@@ -155,12 +149,7 @@ class Context(object):
 
   def __str__(self):
     ident = Target.identify(self.targets())
-    return 'Context(id:%s, targets:%s)' % (ident, self.targets())
-
-  def submit_foreground_work_and_wait(self, work, workunit_parent=None):
-    """Returns the pool to which tasks can submit foreground (blocking) work."""
-    return self.run_tracker.foreground_worker_pool().submit_work_and_wait(
-      work, workunit_parent=workunit_parent)
+    return 'Context(id:{}, targets:{})'.format(ident, self.targets())
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     background_root_workunit = self.run_tracker.get_background_root_workunit()

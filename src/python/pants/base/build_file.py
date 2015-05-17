@@ -8,12 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import re
+from abc import abstractmethod
 from collections import defaultdict
 from glob import glob1
 
 from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import safe_walk
+from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  Don't add references to those other types to this module.
 
-class BuildFile(object):
+class BuildFile(AbstractClass):
 
   class BuildFileError(Exception):
     """Base class for all exceptions raised in BuildFile to make exception handling easier"""
@@ -39,8 +41,7 @@ class BuildFile(object):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
-  _cache = {}
-
+  # Subclasses must have an _cache field.
   @classmethod
   def clear_cache(cls):
     cls._cache = {}
@@ -52,21 +53,24 @@ class BuildFile(object):
       cls._cache[key] = cls(*key)
     return cls._cache[key]
 
-  @staticmethod
-  def _get_all_build_files(path):
+  @abstractmethod
+  def _glob1(self, path, glob):
+    """Returns a list of paths in path that match glob"""
+
+  def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in glob1(path, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX)):
-      if BuildFile._is_buildfile_name(build):
+    for build in self._glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+      if self._is_buildfile_name(build):
         results.append(build)
     return sorted(results)
 
-  @staticmethod
-  def _is_buildfile_name(name):
-    return BuildFile._PATTERN.match(name)
+  @classmethod
+  def _is_buildfile_name(cls, name):
+    return cls._PATTERN.match(name)
 
-  @staticmethod
-  def scan_buildfiles(root_dir, base_path=None, spec_excludes=None):
+  @classmethod
+  def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
     :param root_dir: the root of the repo containing sources
     :param base_path: directory under root_dir to scan
@@ -106,15 +110,31 @@ class BuildFile(object):
     else:
       exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
 
-    for root, dirs, files in safe_walk(os.path.join(root_dir, base_path or ''), topdown=True):
+    for root, dirs, files in cls._walk(root_dir, base_path or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       for subdir in to_remove:
         dirs.remove(subdir)
       for filename in files:
-        if BuildFile._is_buildfile_name(filename):
+        if cls._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(BuildFile.from_cache(root_dir, buildfile_relpath))
+          buildfiles.append(cls.from_cache(root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
+
+  @abstractmethod
+  def _walk(self, root_dir, relpath, topdown=False):
+    """Walk the file tree rooted at `path`.  Works like os.walk"""
+
+  @abstractmethod
+  def _isdir(self, path):
+    """Returns True if path is a directory"""
+
+  @abstractmethod
+  def _isfile(self, path):
+    """Returns True if path is a file"""
+
+  @abstractmethod
+  def _exists(self, path):
+    """Returns True if path exists"""
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file set at the specified path.
@@ -131,41 +151,41 @@ class BuildFile(object):
       raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
                                      .format(root_dir=root_dir))
 
-    path = os.path.join(root_dir, relpath) if relpath else root_dir
-    self._build_basename = BuildFile._BUILD_FILE_PREFIX
-    buildfile = os.path.join(path, self._build_basename) if os.path.isdir(path) else path
+    self.root_dir = os.path.realpath(root_dir)
+
+    path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
+    self._build_basename = self._BUILD_FILE_PREFIX
+    buildfile = os.path.join(path, self._build_basename) if self._isdir(path) else path
 
     if must_exist:
       # If the build file must exist then we want to make sure it's not a dir.
       # In other cases we are ok with it being a dir, for example someone might have
       # repo/scripts/build/doit.sh.
-      if os.path.isdir(buildfile):
+      if self._isdir(buildfile):
         raise self.MissingBuildFileError(
           'Path to buildfile ({buildfile}) is a directory, but it must be a file.'
           .format(buildfile=buildfile))
 
-      if not os.path.exists(os.path.dirname(buildfile)):
+      if not self._exists(os.path.dirname(buildfile)):
         raise self.MissingBuildFileError('Path to BUILD file does not exist at: {path}'
                                          .format(path=os.path.dirname(buildfile)))
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not os.path.exists(buildfile) or os.path.isdir(buildfile):
-      for build in BuildFile._get_all_build_files(os.path.dirname(buildfile)):
+    if not self._exists(buildfile) or self._isdir(buildfile):
+      for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
         break
 
+    self.full_path = os.path.realpath(buildfile)
     if must_exist:
-      if not os.path.exists(buildfile):
+      if not self._exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
-      if not BuildFile._is_buildfile_name(os.path.basename(buildfile)):
+      if not self._is_buildfile_name(os.path.basename(buildfile)):
         raise self.MissingBuildFileError('{path} is not a BUILD file'
                                          .format(path=buildfile))
-
-    self.root_dir = os.path.realpath(root_dir)
-    self.full_path = os.path.realpath(buildfile)
 
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
@@ -173,14 +193,14 @@ class BuildFile(object):
     self.relpath = os.path.relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
 
-  def exists(self):
+  def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return os.path.exists(self.full_path) and not os.path.isdir(self.full_path)
+    return self._isfile(self.full_path)
 
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = BuildFile.scan_buildfiles(self.root_dir, self.parent_path,
+    descendants = self.scan_buildfiles(self.root_dir, self.parent_path,
                                             spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
@@ -191,10 +211,10 @@ class BuildFile(object):
 
     def find_parent(dir):
       parent = os.path.dirname(dir)
-      for parent_buildfile in BuildFile._get_all_build_files(parent):
+      for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        if os.path.exists(buildfile) and not os.path.isdir(buildfile):
-          return parent, BuildFile.from_cache(self.root_dir,
+        if self._isfile(buildfile):
+          return parent, self.from_cache(self.root_dir,
                                               os.path.relpath(buildfile, self.root_dir))
       return parent, None
 
@@ -217,11 +237,11 @@ class BuildFile(object):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in BuildFile._get_all_build_files(self.parent_path):
+    for build in self._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        if not os.path.isdir(os.path.join(self.root_dir, siblingpath)):
-          yield BuildFile.from_cache(self.root_dir, siblingpath)
+        if not self._isdir(os.path.join(self.root_dir, siblingpath)):
+          yield self.from_cache(self.root_dir, siblingpath)
 
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
@@ -232,14 +252,17 @@ class BuildFile(object):
     for sibling in self.siblings():
       yield sibling
 
+  @abstractmethod
+  def source(self):
+    """Returns the source code for this BUILD file."""
+
   def code(self):
     """Returns the code object for this BUILD file."""
-    with open(self.full_path, 'rb') as source:
-      return compile(source.read(), self.full_path, 'exec', flags=0, dont_inherit=True)
+    return compile(self.source(), self.full_path, 'exec', flags=0, dont_inherit=True)
 
   def __eq__(self, other):
     result = other and (
-      type(other) == BuildFile) and (
+      type(other) == type(self)) and (
       self.full_path == other.full_path)
     return result
 
@@ -250,4 +273,32 @@ class BuildFile(object):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return self.full_path
+    return '{}({})'.format(self.__class__.__name__, self.full_path)
+
+
+class FilesystemBuildFile(BuildFile):
+  # TODO(dturner): this cache should really be in BuildFileAddressMapper, but unfortunately this
+  # class needs to access it, so it can't be moved yet.
+  _cache = {}
+
+  def _glob1(self, path, glob):
+    return glob1(path, glob)
+
+  def source(self):
+    """Returns the source code for this BUILD file."""
+    with open(self.full_path, 'rb') as source:
+      return source.read()
+
+  def _isdir(self, path):
+    return os.path.isdir(path)
+
+  def _isfile(self, path):
+    return os.path.isfile(path)
+
+  def _exists(self, path):
+    return os.path.exists(path)
+
+  @classmethod
+  def _walk(self, root_dir, relpath, topdown=False):
+    path = os.path.join(root_dir, relpath)
+    return safe_walk(path, topdown=True)

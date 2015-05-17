@@ -52,6 +52,7 @@ class HtmlReporter(Reporter):
 
     # We redirect stdout, stderr etc. of tool invocations to these files.
     self._output_files = defaultdict(dict)  # workunit_id -> {path -> fileobj}.
+    self._linkify_memo = {}
 
   def report_path(self):
     """The path to the main report file."""
@@ -81,7 +82,8 @@ class HtmlReporter(Reporter):
     # Get useful properties from the workunit.
     workunit_dict = workunit.to_dict()
     if workunit_dict['cmd']:
-      workunit_dict['cmd'] = linkify(self._buildroot, workunit_dict['cmd'].replace('$', '\\\\$'))
+      workunit_dict['cmd'] = linkify(self._buildroot, workunit_dict['cmd'].replace('$', '\\\\$'),
+                                     self._linkify_memo)
 
     # Create the template arguments.
     args = { 'indent': len(workunit.ancestors()) * 10,
@@ -116,13 +118,13 @@ class HtmlReporter(Reporter):
     """Implementation of Reporter callback."""
     # Create the template arguments.
     duration = workunit.duration()
-    timing = '%.3f' % duration
+    timing = '{:.3f}'.format(duration)
     unaccounted_time = None
     # Background work may be idle a lot, no point in reporting that as unaccounted.
     if self.is_under_main_root(workunit):
       unaccounted_time_secs = workunit.unaccounted_time()
       if unaccounted_time_secs >= 1 and unaccounted_time_secs > 0.05 * duration:
-        unaccounted_time = '%.3f' % unaccounted_time_secs
+        unaccounted_time = '{:.3f}'.format(unaccounted_time_secs)
     args = { 'workunit': workunit.to_dict(),
              'status': HtmlReporter._outcome_css_classes[workunit.outcome()],
              'timing': timing,
@@ -139,7 +141,7 @@ class HtmlReporter(Reporter):
     def render_timings(timings):
       timings_dict = timings.get_all()
       for item in timings_dict:
-        item['timing_string'] = '%.3f' % item['timing']
+        item['timing_string'] = '{:.3f}'.format(item['timing'])
       args = {
         'timings': timings_dict
       }
@@ -176,7 +178,7 @@ class HtmlReporter(Reporter):
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
     if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-      path = os.path.join(self._html_dir, '%s.%s' % (workunit.id, label))
+      path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
       output_files = self._output_files[workunit.id]
       if path not in output_files:
         f = open(path, 'w')
@@ -196,8 +198,8 @@ class HtmlReporter(Reporter):
   }
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
-    content = '<span class="%s">%s</span>' % \
-              (HtmlReporter._log_level_css_map[level], self._render_message(*msg_elements))
+    content = '<span class="{}">{}</span>'.format(
+              HtmlReporter._log_level_css_map[level], self._render_message(*msg_elements))
 
     # Generate some javascript that appends the content to the workunit's div.
     args = {
@@ -264,7 +266,7 @@ class HtmlReporter(Reporter):
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
     colored = self._handle_ansi_color_codes(cgi.escape(s.decode('utf-8')))
-    return linkify(self._buildroot, colored).replace('\n', '</br>')
+    return linkify(self._buildroot, colored, self._linkify_memo).replace('\n', '</br>')
 
   _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')
 
@@ -283,7 +285,7 @@ class HtmlReporter(Reporter):
               ret.append('</span>')
               span_depth -= 1
           else:
-            ret.append('<span class="ansi-%s">' % code)
+            ret.append('<span class="ansi-{}">'.format(code))
             span_depth += 1
     while span_depth > 0:
       ret.append('</span>')

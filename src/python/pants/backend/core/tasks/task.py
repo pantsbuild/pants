@@ -51,6 +51,22 @@ class TaskBase(AbstractClass):
   """
 
   @classmethod
+  def global_subsystems(cls):
+    """The global subsystems this task uses.
+
+    A tuple of subsystem types.
+    """
+    return tuple()
+
+  @classmethod
+  def task_subsystems(cls):
+    """The private, per-task subsystems this task uses.
+
+    A tuple of subsystem types.
+    """
+    return tuple()
+
+  @classmethod
   def product_types(cls):
     """The list of products this Task produces. Set the product type(s) for this
     task i.e. the product type(s) this task creates e.g ['classes'].
@@ -74,17 +90,15 @@ class TaskBase(AbstractClass):
 
     Subclasses should not generally need to override this method.
     """
-    def register(*args, **kwargs):
-      options.register(cls.options_scope, *args, **kwargs)
-    register.bootstrap = options.bootstrap_option_values()
-    cls.register_options(register)
+    cls.register_options(options.registration_function_for_scope(cls.options_scope))
+    for subsystem_type in cls.task_subsystems():
+      subsystem_type.register_options_on_scope(options, cls.options_scope)
 
   @classmethod
   def register_options(cls, register):
-    """Set up the new options system.
+    """Register options for this task.
 
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments
-    to register options.
+    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
     """
 
   @classmethod
@@ -344,7 +358,7 @@ class TaskBase(AbstractClass):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
         if num_invalid_partitions > 1:
-          msg_elements.append(' in %d target partitions' % num_invalid_partitions)
+          msg_elements.append(' in {} target partitions'.format(num_invalid_partitions))
         msg_elements.append('.')
         self.context.log.info(*msg_elements)
 
@@ -460,8 +474,8 @@ class TaskBase(AbstractClass):
     if len(target_roots) == 0:
       raise TaskError('No target specified.')
     elif len(target_roots) > 1:
-      raise TaskError('Multiple targets specified: %s' %
-                      ', '.join([repr(t) for t in target_roots]))
+      raise TaskError('Multiple targets specified: {}'
+                      .format(', '.join([repr(t) for t in target_roots])))
     return target_roots[0]
 
   def require_homogeneous_targets(self, accept_predicate, reject_predicate):
@@ -489,8 +503,8 @@ class TaskBase(AbstractClass):
       # both accepted and rejected targets
       # TODO: once https://github.com/pantsbuild/pants/issues/425 lands, we should add
       # language-specific flags that would resolve the ambiguity here
-      raise TaskError('Mutually incompatible targets specified: %s vs %s (and %d others)' %
-                      (accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
+      raise TaskError('Mutually incompatible targets specified: {} vs {} (and {} others)'
+                      .format(accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
 
 
 class Task(TaskBase):

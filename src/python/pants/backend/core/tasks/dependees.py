@@ -12,7 +12,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 
@@ -44,12 +43,13 @@ class ReverseDepmap(ConsoleTask):
 
   def console_output(self, _):
     buildfiles = OrderedSet()
+    address_mapper = self.context.address_mapper
     if self._dependees_type:
       base_paths = OrderedSet()
       for dependees_type in self._dependees_type:
         target_aliases = self.context.build_file_parser.registered_aliases().targets
         if dependees_type not in target_aliases:
-          raise TaskError('Invalid type name: %s' % dependees_type)
+          raise TaskError('Invalid type name: {}'.format(dependees_type))
         target_type = target_aliases[dependees_type]
         # Try to find the SourceRoot for the given input type
         try:
@@ -59,15 +59,15 @@ class ReverseDepmap(ConsoleTask):
           pass
 
       if not base_paths:
-        raise TaskError('No SourceRoot set for any target type in %s.' % self._dependees_type +
+        raise TaskError('No SourceRoot set for any target type in {}.'.format(self._dependees_type) +
                         '\nPlease define a source root in BUILD file as:' +
-                        '\n\tsource_root(\'<src-folder>\', %s)' % ', '.join(self._dependees_type))
+                        '\n\tsource_root(\'<src-folder>\', {})'.format(', '.join(self._dependees_type)))
       for base_path in base_paths:
-        buildfiles.update(BuildFile.scan_buildfiles(get_buildroot(),
+        buildfiles.update(address_mapper.scan_buildfiles(get_buildroot(),
                                                     os.path.join(get_buildroot(), base_path),
                                                     spec_excludes=self._spec_excludes))
     else:
-      buildfiles = BuildFile.scan_buildfiles(get_buildroot(), spec_excludes=self._spec_excludes)
+      buildfiles = address_mapper.scan_buildfiles(get_buildroot(), spec_excludes=self._spec_excludes)
 
     build_graph = self.context.build_graph
     build_file_parser = self.context.build_file_parser

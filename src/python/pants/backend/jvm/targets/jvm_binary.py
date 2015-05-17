@@ -21,7 +21,8 @@ from pants.util.meta import AbstractClass
 
 
 class JarRule(FingerprintedMixin, AbstractClass):
-  def __init__(self, apply_pattern):
+  def __init__(self, apply_pattern, payload=None):
+    self.payload = payload or Payload()
     if not isinstance(apply_pattern, string_types):
       raise ValueError('The supplied apply_pattern is not a string, given: {}'
                        .format(apply_pattern))
@@ -31,15 +32,19 @@ class JarRule(FingerprintedMixin, AbstractClass):
       raise ValueError('The supplied apply_pattern: {pattern} '
                        'is not a valid regular expression: {msg}'
                        .format(pattern=apply_pattern, msg=e))
+    self.payload.add_fields({
+      'apply_pattern' : PrimitiveField(apply_pattern),
+    })
 
   def fingerprint(self):
-    hasher = sha1()
-    hasher.update(self._apply_pattern.pattern)
-    return hasher.hexdigest()
+    return self.payload.fingerprint()
 
   @property
   def apply_pattern(self):
-    """The pattern that matches jar entry paths this rule applies to."""
+    """The pattern that matches jar entry paths this rule applies to.
+
+    :rtype: re.RegexObject
+    """
     return self._apply_pattern
 
 
@@ -47,7 +52,7 @@ class Skip(JarRule):
   """A rule that skips adding matched entries to a jar."""
 
   def __repr__(self):
-    return "Skip(apply_pattern={})".format(self._apply_pattern.pattern)
+    return "Skip(apply_pattern={})".format(self.payload.apply_pattern)
 
 
 class Duplicate(JarRule):
@@ -105,24 +110,24 @@ class Duplicate(JarRule):
     :param action: An action to take to handle one or more duplicate entries.  Must be one of:
       ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT`` or ``Duplicate.FAIL``.
     """
-    super(Duplicate, self).__init__(apply_pattern)
+    payload = Payload()
+    payload.add_fields({
+      'action' :  PrimitiveField(self.validate_action(action)),
+    })
+    super(Duplicate, self).__init__(apply_pattern, payload=payload)
 
-    self._action = self.validate_action(action)
 
   @property
   def action(self):
     """The action to take for any duplicate entries that match this rule's ``apply_pattern``."""
-    return self._action
+    return self.payload.action
 
   def fingerprint(self):
-    hasher = sha1()
-    hasher.update(super(Duplicate, self).fingerprint())
-    hasher.update(self._action)
-    return hasher.hexdigest()
+    return self.payload.fingerprint()
 
   def __repr__(self):
-    return "Duplicate(apply_pattern={0}, action={1})".format(self._apply_pattern.pattern,
-                                                             self._action)
+    return "Duplicate(apply_pattern={0}, action={1})".format(self.payload.apply_pattern,
+                                                             self.payload.action)
 
 
 class JarRules(FingerprintedMixin):
@@ -198,13 +203,16 @@ class JarRules(FingerprintedMixin):
     :param default_dup_action: The default action to take when a duplicate entry is encountered and
       no explicit rules apply to the entry.
     """
-    self._default_dup_action = Duplicate.validate_action(default_dup_action)
+    self.payload = Payload()
+    self.payload.add_fields({
+      'default_dup_action' : PrimitiveField(Duplicate.validate_action(default_dup_action))
+    })
     self._rules = assert_list(rules, expected_type=JarRule)
 
   @property
   def default_dup_action(self):
     """The default action to take when a duplicate jar entry is encountered."""
-    return self._default_dup_action
+    return self.payload.default_dup_action
 
   @property
   def rules(self):
@@ -213,7 +221,7 @@ class JarRules(FingerprintedMixin):
 
   def fingerprint(self):
     hasher = sha1()
-    hasher.update(self.default_dup_action)
+    hasher.update(self.payload.fingerprint())
     for rule in self.rules:
       hasher.update(rule.fingerprint())
     return hasher.hexdigest()
@@ -221,6 +229,39 @@ class JarRules(FingerprintedMixin):
   @property
   def value(self):
     return self._jar_rules
+
+
+class ManifestEntries(FingerprintedMixin):
+  """Describes additional items to add to the app manifest."""
+
+  class ExpectedDictionaryError(Exception):
+    pass
+
+  def __init__(self, entries=None):
+    """
+    :param entries: Additional headers, value pairs to add to the MANIFEST.MF.
+      You can just add fixed string header / value pairs.
+    :type entries: dictionary of string : string
+    """
+    self.payload = Payload()
+    if entries:
+      if not isinstance(entries, dict):
+        raise self.ExpectedDictionaryError("entries must be a dictionary of strings.")
+      for key in entries.keys():
+        if not isinstance(key, string_types):
+          raise self.ExpectedDictionaryError(
+            "entries must be dictionary of strings, got key {} type {}"
+            .format(key, type(key).__name__))
+    self.payload.add_fields({
+      'entries' : PrimitiveField(entries or {}),
+      })
+
+  def fingerprint(self):
+    return self.payload.fingerprint()
+
+  @property
+  def entries(self):
+    return self.payload.entries
 
 
 class JvmBinary(JvmTarget):
@@ -243,6 +284,7 @@ class JvmBinary(JvmTarget):
                source=None,
                deploy_excludes=None,
                deploy_jar_rules=None,
+               manifest_entries=None,
                **kwargs):
     """
     :param string main: The name of the ``main`` class, e.g.,
@@ -266,6 +308,8 @@ class JvmBinary(JvmTarget):
       code but exclude the conflicting ``jar`` when deploying.
     :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
       deploy jar.
+    :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
+      for adding to MANIFEST.MF when packaging this binary.
     :param configurations: Ivy configurations to resolve for this target.
       This parameter is not intended for general use.
     :type configurations: tuple of strings
@@ -279,12 +323,17 @@ class JvmBinary(JvmTarget):
       raise TargetDefinitionException(self,
                                       'deploy_jar_rules must be a JarRules specification. got {}'
                                       .format(type(deploy_jar_rules).__name__))
+    if manifest_entries and not isinstance(manifest_entries, dict):
+      raise TargetDefinitionException(self,
+                                      'manifest_entries must be a dict. got {}'
+                                      .format(type(manifest_entries).__name__))
     sources = [source] if source else None
     payload = payload or Payload()
     payload.add_fields({
       'basename' : PrimitiveField(basename or name),
       'deploy_excludes' : ExcludesField(self.assert_list(deploy_excludes, expected_type=Exclude)),
       'deploy_jar_rules' :  FingerprintedField(deploy_jar_rules or JarRules.default()),
+      'manifest_entries' : FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
       })
 
@@ -309,3 +358,7 @@ class JvmBinary(JvmTarget):
   @property
   def main(self):
     return self.payload.main
+
+  @property
+  def manifest_entries(self):
+    return self.payload.manifest_entries

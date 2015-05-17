@@ -126,6 +126,6 @@ class TestAaptGen(TestAndroidBase):
         task = self.create_task(self.context())
         targets = [android_binary]
         task.create_sdk_jar_deps(targets)
-        created_target = task.create_target(android_binary, '19')
+        created_target = task.create_target(android_binary, '19', 'smoke/R.java')
         self.assertEqual(created_target.derived_from, android_binary)
         self.assertTrue(created_target.is_synthetic)

@@ -15,8 +15,9 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
-from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
@@ -25,18 +26,25 @@ class JarCreateTestBase(JarTaskTestBase):
   def task_type(cls):
     return JarCreate
 
+  @property
+  def alias_groups(self):
+    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_library': JavaLibrary,
+        'java_thrift_library': JavaThriftLibrary,
+        'jvm_binary': JvmBinary,
+        'resources': Resources,
+        'scala_library': ScalaLibrary,
+      },
+    ))
+
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):
-    ini = dedent("""
-          [DEFAULT]
-          pants_supportdir: /tmp/build-support
-          """).strip()
-
-    self.create_task(self.context(config=ini), '/tmp/workdir')
+    self.create_task(self.context(), '/tmp/workdir')
 
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
@@ -55,12 +63,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def jvm_binary(self, path, name, source=None, resources=None):
     self.create_files(path, [source])
-    self.add_to_build_file(path, dedent('''
+    self.add_to_build_file(path, dedent("""
           jvm_binary(name=%(name)r,
             source=%(source)r,
             resources=[%(resources)r],
           )
-        ''' % dict(name=name, source=source, resources=resources)))
+        """ % dict(name=name, source=source, resources=resources)))
     return self.target('%s:%s' % (path, name))
 
   def java_thrift_library(self, path, name, *sources):
@@ -69,27 +77,41 @@ class JarCreateExecuteTest(JarCreateTestBase):
   def setUp(self):
     super(JarCreateExecuteTest, self).setUp()
 
+    def test_path(path):
+      return os.path.join(self.__class__.__name__, path)
+
     def get_source_root_fs_path(path):
-      return os.path.realpath(os.path.join(self.build_root, path))
+      return os.path.realpath(os.path.join(self.build_root, test_path(path)))
 
     SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
     SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
     SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
     SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
-    self.res = self.create_resources('src/resources/com/twitter', 'spam', 'r.txt')
-    self.jl = self.java_library('src/java/com/twitter', 'foo', ['a.java'],
-                                resources='src/resources/com/twitter:spam')
-    self.sl = self.scala_library('src/scala/com/twitter', 'bar', ['c.scala'])
-    self.jtl = self.java_thrift_library('src/thrift/com/twitter', 'baz', 'd.thrift')
-    self.java_lib_foo = self.java_library('src/java/com/twitter/foo', 'java_foo', ['java_foo.java'])
-    self.scala_lib = self.scala_library('src/scala/com/twitter/foo',
+    # This is hacky: Creating a scala_library below requires Subsystem initialization,
+    # which we must force by this call to the superclass context() (note that can't call our own
+    # context() because it expects the scala_library to already exist). The test methods themselves
+    # then call self.context() again to get hold of a context, which will superfluously (but
+    # harmlessly) re-initialize Subsystem.
+    # TODO: Fix this hack by separating option setup from context setup in the test sequence.
+    super(JarCreateExecuteTest, self).context()
+
+    self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
+    self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],
+                                resources=test_path('src/resources/com/twitter:spam'))
+    self.sl = self.scala_library(test_path('src/scala/com/twitter'), 'bar', ['c.scala'])
+    self.jtl = self.java_thrift_library(test_path('src/thrift/com/twitter'), 'baz', 'd.thrift')
+    self.java_lib_foo = self.java_library(test_path('src/java/com/twitter/foo'),
+                                          'java_foo',
+                                          ['java_foo.java'])
+    self.scala_lib = self.scala_library(test_path('src/scala/com/twitter/foo'),
                                         'scala_foo',
                                         ['scala_foo.scala'],
-                                        java_sources=['src/java/com/twitter/foo:java_foo'])
-    self.binary = self.jvm_binary('src/java/com/twitter/baz', 'baz', source='b.java',
-                                  resources='src/resources/com/twitter:spam')
-    self.empty_sl = self.scala_library('src/scala/com/foo', 'foo', ['dupe.scala'])
+                                        java_sources=[
+                                          test_path('src/java/com/twitter/foo:java_foo')])
+    self.binary = self.jvm_binary(test_path('src/java/com/twitter/baz'), 'baz', source='b.java',
+                                  resources=test_path('src/resources/com/twitter:spam'))
+    self.empty_sl = self.scala_library(test_path('src/scala/com/foo'), 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):
     return super(JarCreateExecuteTest, self).context(
@@ -114,9 +136,12 @@ class JarCreateExecuteTest(JarCreateTestBase):
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
         with self.add_data(context.products, 'classes_by_target', self.binary, 'b.class'):
-          with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
-            with self.add_data(context.products, 'classes_by_target', self.scala_lib, 'scala_foo.class',
-                               'java_foo.class'):
+          with self.add_data(context.products,
+                             'resources_by_target',
+                             self.res,
+                             'r.txt.transformed'):
+            with self.add_data(context.products, 'classes_by_target', self.scala_lib,
+                               'scala_foo.class', 'java_foo.class'):
               self.execute(context)
 
               self.assert_jar_contents(context, 'jars', self.jl,

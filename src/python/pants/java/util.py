@@ -32,8 +32,8 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   """
   executor = executor or SubprocessExecutor()
   if not isinstance(executor, Executor):
-    raise ValueError('The executor argument must be a java Executor instance, give %s of type %s'
-                     % (executor, type(executor)))
+    raise ValueError('The executor argument must be a java Executor instance, give {} of type {}'
+                     .format(executor, type(executor)))
 
   runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options, cwd=cwd)
   workunit_name = workunit_name or main
@@ -61,7 +61,7 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   """
   if not isinstance(runner, Executor.Runner):
     raise ValueError('The runner argument must be a java Executor.Runner instance, '
-                     'given %s of type %s' % (runner, type(runner)))
+                     'given {} of type {}'.format(runner, type(runner)))
 
   if workunit_factory is None:
     return runner.run()

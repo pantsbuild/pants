@@ -36,11 +36,13 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         {{#package_prefix}}
       <sourceFolder url="file://{{module.root_dir}}/{{path}}"
                     isTestSource="{{is_test}}"
-                    packagePrefix="{{.}}"/>
+                    {{#content_type}}type="{{content_type}}"{{/content_type}}
+                    packagePrefix="{{package_prefix}}"/>
         {{/package_prefix}}
         {{^package_prefix}}
       <sourceFolder url="file://{{module.root_dir}}/{{path}}"
-                    isTestSource="{{is_test}}"/>
+                    isTestSource="{{is_test}}"
+                    {{#content_type}}type="{{content_type}}"{{/content_type}}/>
         {{/package_prefix}}
       {{/sources}}
     {{/module.content_roots}}

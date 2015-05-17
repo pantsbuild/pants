@@ -13,6 +13,7 @@ import threading
 import xml
 from collections import OrderedDict, defaultdict, namedtuple
 from contextlib import contextmanager
+from copy import deepcopy
 
 from twitter.common.collections import OrderedSet, maybe_list
 
@@ -23,16 +24,41 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
-from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-IvyModuleRef = namedtuple('IvyModuleRef', ['org', 'name', 'rev'])
 IvyArtifact = namedtuple('IvyArtifact', ['path', 'classifier'])
 IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
 
 
 logger = logging.getLogger(__name__)
+
+
+class IvyModuleRef(object):
+  def __init__(self, org, name, rev):
+    self.org = org
+    self.name = name
+    self.rev = rev
+
+  def __eq__(self, other):
+    return self.org == other.org and self.name == other.name and self.rev == other.rev
+
+  def __hash__(self):
+    return hash((self.org, self.name, self.rev))
+
+  @property
+  def unversioned(self):
+    """This returns an identifier for an IvyModuleRef without version information.
+
+       It's useful because ivy might return information about a
+       different version of a dependency than the one we request, and we
+       want to ensure that all requesters of any version of that
+       dependency are able to learn about it.
+    """
+
+    # latest.integration is ivy magic meaning "just get the latest version"
+    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration')
 
 
 class IvyInfo(object):
@@ -45,11 +71,12 @@ class IvyInfo(object):
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
+    if not module.artifacts:
+      # Module was evicted, so do not record information about it
+      return
     for caller in module.callers:
-      self._deps_by_caller[caller].add(module.ref)
-    # Strip the version from the ref before recording artifacts.
-    unversioned_ref = IvyModuleRef(module.ref.org, module.ref.name, "")
-    self._artifacts_by_ref[unversioned_ref].update(module.artifacts)
+      self._deps_by_caller[caller.unversioned].add(module.ref)
+    self._artifacts_by_ref[module.ref.unversioned].update(module.artifacts)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
@@ -79,7 +106,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref, ()):
+    for dep in self._deps_by_caller.get(ref.unversioned, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc
@@ -104,9 +131,8 @@ class IvyInfo(object):
       valid_classifiers = jar.artifact_classifiers
       artifacts_for_jar = []
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-        unversioned_ref = IvyModuleRef(module_ref.org, module_ref.name, "")
         artifacts_for_jar.extend(
-          artifact for artifact in self._artifacts_by_ref[unversioned_ref]
+          artifact for artifact in self._artifacts_by_ref[module_ref.unversioned]
           if artifact.classifier in valid_classifiers
         )
 
@@ -157,8 +183,22 @@ class IvyUtils(object):
       with safe_open(path, 'r') as cp:
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
-  @staticmethod
-  def symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
+  @classmethod
+  def _find_new_symlinks(cls, existing_symlink_path, updated_symlink_path):
+    """Find the difference between the existing and updated symlink path.
+
+    :param existing_symlink_path: map from path : symlink
+    :param updated_symlink_path: map from path : symlink after new resolve
+    :return: the portion of updated_symlink_path that is not found in existing_symlink_path.
+    """
+    diff_map = OrderedDict()
+    for key, value in updated_symlink_path.iteritems():
+      if key not in existing_symlink_path:
+        diff_map[key] = value
+    return diff_map
+
+  @classmethod
+  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
     If there is an existing symlink for a file under inpath, it is used rather than creating
@@ -166,34 +206,42 @@ class IvyUtils(object):
     Returns a map of path -> symlink to that path.
     """
     safe_mkdir(symlink_dir)
+    # The ivy_cache_dir might itself be a symlink. In this case, ivy may return paths that
+    # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
+    # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
+    real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
+    updated_symlink_map = OrderedDict()
     with safe_open(inpath, 'r') as infile:
-      paths = filter(None, infile.read().strip().split(os.pathsep))
-    new_paths = []
+      inpaths = filter(None, infile.read().strip().split(os.pathsep))
+      paths = OrderedSet([os.path.realpath(path) for path in inpaths])
+
     for path in paths:
-      if not path.startswith(ivy_cache_dir):
-        new_paths.append(path)
+      if path.startswith(real_ivy_cache_dir):
+        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
+      else:
+        # This path is outside the cache. We won't symlink it.
+        updated_symlink_map[path] = path
+
+    # Create symlinks for paths in the ivy cache dir that we haven't seen before.
+    new_symlinks = cls._find_new_symlinks(existing_symlink_map, updated_symlink_map)
+
+    for path, symlink in new_symlinks.iteritems():
+      if path == symlink:
+        # Skip paths that aren't going to be symlinked.
         continue
-      if path in existing_symlink_map:
-        new_paths.append(existing_symlink_map[path])
-        continue
-      symlink = os.path.join(symlink_dir, os.path.relpath(path, ivy_cache_dir))
-      try:
-        os.makedirs(os.path.dirname(symlink))
-      except OSError as e:
-        if e.errno != errno.EEXIST:
-          raise
-      # Note: The try blocks cannot be combined. It may be that the dir exists but the link doesn't.
+      safe_mkdir(os.path.dirname(symlink))
       try:
         os.symlink(path, symlink)
       except OSError as e:
         # We don't delete and recreate the symlink, as this may break concurrently executing code.
         if e.errno != errno.EEXIST:
           raise
-      new_paths.append(symlink)
+
+    # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
-      outfile.write(':'.join(new_paths))
-    symlink_map = dict(zip(paths, new_paths))
-    return symlink_map
+      outfile.write(':'.join(OrderedSet(updated_symlink_map.values())))
+
+    return dict(updated_symlink_map)
 
   @staticmethod
   def identify(targets):
@@ -207,7 +255,7 @@ class IvyUtils(object):
   def xml_report_path(cls, targets, conf):
     """The path to the xml report ivy creates after a retrieve."""
     org, name = cls.identify(targets)
-    cachedir = Bootstrapper.instance().ivy_cache_dir
+    cachedir = IvySubsystem.global_instance().get_options().cache_dir
     return os.path.join(cachedir, '{}-{}-{}.xml'.format(org, name, conf))
 
   @classmethod
@@ -254,6 +302,35 @@ class IvyUtils(object):
                                       caller.get('callerrev')))
         ret.add_module(IvyModule(IvyModuleRef(org, name, rev), artifacts, callers))
     return ret
+
+  @classmethod
+  def _combine_jars(cls, jars):
+    """Combine jars with the same org/name/version so they can be represented together in ivy.xml.
+
+    If you have multiple instances of a dependency with org/name/version with different
+    classifiers, they need to be represented with one <dependency> tag and multiple <artifact> tags.
+    :param jars: list of JarDependency definitions
+    :return: list of JarDependency definitions.  These are cloned from the input jars so we
+      don't mutate the inputs.
+    """
+    jar_map = OrderedDict()
+    for jar in jars:
+      key = (jar.org, jar.name, jar.rev)
+      if key not in jar_map:
+        jar_map[key] = deepcopy(jar)
+      else:
+        # Add an artifact
+        existing_jar = jar_map[key]
+        if not existing_jar.artifacts or not jar.artifacts:
+          # Add an artifact to represent the main artifact
+          existing_jar.append_artifact(jar.name,
+                                       type_=None,
+                                       ext=None,
+                                       url=None,
+                                       classifier=None)
+
+        existing_jar.artifacts += jar.artifacts
+    return jar_map.values()
 
   @classmethod
   def generate_ivy(cls, targets, jars, excludes, ivyxml, confs):
@@ -310,7 +387,15 @@ class IvyUtils(object):
     def collect_jars(target):
       targets_processed.add(target)
       if isinstance(target, JarLibrary):
+        # Combine together requests for jars with different classifiers from the same jar_library
+        # TODO(Eric Ayers) This is a short-term fix for dealing with the same ivy module that
+        # wants to download multiple jar files with different classifiers as binary dependencies.
+        # I am trying to work out a better long-term solution in this design doc:
+        # https://docs.google.com/document/d/1sEMXUmj7v-YCBZ_wHLpCFjkHOeWjsc1NR1hRIJ9uCZ8
+        target_jars = []
         for jar in target.jar_dependencies:
+          target_jars.append(jar)
+        for jar in cls._combine_jars(target_jars):
           if jar.rev:
             add_jar(jar)
 

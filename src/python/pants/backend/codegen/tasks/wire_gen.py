@@ -25,6 +25,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.java import util
+from pants.option.options import Options
 
 
 logger = logging.getLogger(__name__)
@@ -34,28 +35,27 @@ class WireGen(CodeGen, JvmToolTaskMixin):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)
+    register('--javadeps', type=Options.list, default=['//:wire-runtime'],
+             help='Runtime dependencies for wire-using Java code.')
     cls.register_jvm_tool(register, 'wire-compiler')
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
     super(WireGen, self).__init__(*args, **kwargs)
-    self.wire_version = self.context.config.get('wire-gen', 'version', default='1.6.0')
     self.java_out = os.path.join(self.workdir, 'gen-java')
 
-  def resolve_deps(self, key, default=None):
-    default = default or []
+  def resolve_deps(self, unresolved_deps):
     deps = OrderedSet()
-    for dep in self.context.config.getlist('wire-gen', key, default=maybe_list(default)):
+    for dep in unresolved_deps:
       try:
         deps.update(self.context.resolve(dep))
       except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  referenced from [{section}] key: {key} in pants.ini"
-                                  .format(message=e, section='wire-gen', key=key))
+        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
     return deps
 
   @property
   def javadeps(self):
-    return self.resolve_deps('javadeps', default='//:wire-runtime')
+    return self.resolve_deps(self.get_options().javadeps)
 
   def is_gentarget(self, target):
     return isinstance(target, JavaWireLibrary)

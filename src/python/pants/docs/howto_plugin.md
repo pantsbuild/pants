@@ -97,8 +97,8 @@ This instructs pants to look for a module named `ext_maven_layout.register` and 
 it.
 
         :::python
-        [backends]
-        packages: [
+        [DEFAULT]
+        backend_packages: [
             "ext_maven_layout",
           ]
 
@@ -113,11 +113,11 @@ This repo has a [`pants` wrapper script](https://github.com/twitter/commons/blob
 that script adds `pants-plugins/src/python` to `PYTHONPATH`.
 
 The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/master/pants) has a
-`[backends]` section listing the plugin packages (packages with `register.py` files):
+`backend_packages` entry listing the plugin packages (packages with `register.py` files):
 
     :::python
-    [backends]
-    packages: [
+    [DEFAULT]
+    backend_packages: [
         'twitter.common.pants.jvm.args',
         'twitter.common.pants.jvm.extras',
         'twitter.common.pants.python.commons',
@@ -137,6 +137,6 @@ registers a goal, `args-apt`. This plugin also defines the
 `setup_py` artifact. If you only use your plugin to build code in the *same* workspace,
 your plugin directory tree does *not* need any `BUILD` files. By publishing this plugin, Twitter can
 use its code in other workspaces, e.g., Twitter's internal codebase. Other folks can use it too:
-introduce a dependency on `twitter.common.pants` and add entries to their `pants.ini [backends]`
+introduce a dependency on `twitter.common.pants` and add entries to their `pants.ini backend_packages`
 section.)
 

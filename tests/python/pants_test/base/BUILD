@@ -7,13 +7,8 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:config',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
-    'src/python/pants/goal:run_tracker',
-    'src/python/pants/option',
-    'src/python/pants/reporting',
-    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -41,6 +36,7 @@ target(
     ':build_file_address_mapper',
     ':build_file_aliases',
     ':build_file_parser',
+    ':build_graph',
     ':build_invalidator',
     ':build_root',
     ':cmd_line_spec_parser',
@@ -56,6 +52,7 @@ target(
     ':run_info',
     ':source_root',
     ':target',
+    ':worker_pool',
   ]
 )
 
@@ -96,10 +93,20 @@ python_tests(
   ]
 )
 
+python_library(
+  name = 'build_file_test_base',
+  sources = ['build_file_test_base.py'],
+  dependencies = [
+    'src/python/pants/base:build_file',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
 python_tests(
   name = 'build_file',
   sources = ['test_build_file.py'],
   dependencies = [
+    ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:build_file',
@@ -113,6 +120,18 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:base_test',
   ]
+)
+
+python_tests(
+  name = 'build_graph',
+  sources = ['test_build_graph.py'],
+  dependencies = [
+    'src/python/pants/base:address',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:target',
+    'tests/python/pants_test:base_test'
+  ],
 )
 
 python_tests(
@@ -216,6 +235,7 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/subsystem',
   ]
 )
 
@@ -304,6 +324,18 @@ python_tests(
 )
 
 python_tests(
+  name = 'scm_build_file',
+  sources = ['test_scm_build_file.py'],
+  dependencies = [
+    ':build_file_test_base',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:scm_build_file',
+    'src/python/pants/scm:git',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
   name = 'source_root',
   sources = ['test_source_root.py'],
   dependencies = [
@@ -320,5 +352,14 @@ python_tests(
   sources = [ 'test_spec_exclude_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
+  name = 'worker_pool',
+  sources = ['test_worker_pool.py'],
+  dependencies = [
+    'src/python/pants/base:worker_pool',
+    'src/python/pants/util:contextutil',
   ]
 )

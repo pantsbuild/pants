@@ -1,0 +1,4 @@
+# Zinc is only recently imported, and reformatting the code would make it difficult
+# to share patches with upstream. Should eventually consider choosing and conforming
+# to a particular style.
+src/scala/org/pantsbuild/zinc/.*

@@ -229,7 +229,7 @@ class MarkdownToHtml(Task):
     css_path = os.path.join(outdir, 'css', 'codehighlight.css')
     css = emit_codehighlight_css(css_path, self.code_style)
     if css:
-      self.context.log.info('Emitted %s' % css)
+      self.context.log.info('Emitted {}'.format(css))
 
     def is_page(target):
       return isinstance(target, Page)
@@ -267,7 +267,7 @@ class MarkdownToHtml(Task):
             config,
             css=css
           )
-        self.context.log.info('Processed %s to %s' % (page.source, html_path))
+        self.context.log.info('Processed {} to {}'.format(page.source, html_path))
         relpath = os.path.relpath(html_path, outdir)
         genmap.add(key, outdir, [relpath])
         return html_path
@@ -308,7 +308,7 @@ class MarkdownToHtml(Task):
         page = self.context.build_graph.get_target(address)
         anchor = match.group(2) or ''
         if not page:
-          raise TaskError('Invalid markdown link to pants target: "%s". ' % match.group(1) +
+          raise TaskError('Invalid markdown link to pants target: "{}". '.format(match.group(1)) +
                           'Is your page missing a dependency on this target?')
         alias, url = url_builder(page, config=get_config(page))
         return alias, url + anchor

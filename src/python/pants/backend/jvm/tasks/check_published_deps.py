@@ -23,7 +23,9 @@ class CheckPublishedDeps(ConsoleTask):
     super(CheckPublishedDeps, self).__init__(*args, **kwargs)
 
     self._print_uptodate = self.get_options().print_uptodate
-    self.repos = self.context.config.getdict('jar-publish', 'repos')
+    # We look at the repos for the JarPublish task.
+    # TODO: Yuck. The repos should be a subsystem that both tasks use.
+    self.repos = self.context.options.for_scope('publish.jar').repos
     self._artifacts_to_targets = {}
 
     def is_published(tgt):
@@ -55,6 +57,6 @@ class CheckPublishedDeps(ConsoleTask):
             artifact_target = self._artifacts_to_targets[artifact]
             semver, sha = get_version_and_sha(artifact_target)
             if semver.version() != dep.rev:
-              yield 'outdated %s#%s %s latest %s' % (dep.org, dep.name, dep.rev, semver.version())
+              yield 'outdated {}#{} {} latest {}'.format(dep.org, dep.name, dep.rev, semver.version())
             elif self._print_uptodate:
-              yield 'up-to-date %s#%s %s' % (dep.org, dep.name, semver.version())
+              yield 'up-to-date {}#{} {}'.format(dep.org, dep.name, semver.version())

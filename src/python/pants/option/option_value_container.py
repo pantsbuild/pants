@@ -63,6 +63,13 @@ class OptionValueContainer(object):
     for k, v in attrs.items():
       setattr(self, k, v)
 
+  def get(self, key, default=None):
+    # Support dict-like dynamic access.  See also __getitem__ below.
+    if hasattr(self, key):
+      return getattr(self, key)
+    else:
+      return default
+
   def __setattr__(self, key, value):
     if key == '_forwardings':
       return super(OptionValueContainer, self).__setattr__(key, value)
@@ -101,7 +108,7 @@ class OptionValueContainer(object):
       # In case we get called in copy/deepcopy, which don't invoke the ctor.
       raise AttributeError
     if key not in self._forwardings:
-      raise AttributeError('No such forwarded attribute: %s' % key)
+      raise AttributeError('No such forwarded attribute: {}'.format(key))
     val = getattr(self, self._forwardings[key])
     if isinstance(val, RankedValue):
       return val.value

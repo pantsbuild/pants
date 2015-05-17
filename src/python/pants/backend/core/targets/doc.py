@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
-from pants.base.payload_field import PayloadField, PrimitiveField, SourcesField, combine_hashes
+from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.base.target import Target
 
 
@@ -95,8 +95,8 @@ class Page(Target):
       else:
         format = 'md'
     payload.add_fields({
-      'sources': SourcesField(sources=[source],
-                              sources_rel_path=address.spec_path),
+      'sources': self.create_sources_field(sources=[source],
+                                           sources_rel_path=address.spec_path),
       'format': PrimitiveField(format),
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
@@ -105,7 +105,7 @@ class Page(Target):
     super(Page, self).__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
-      raise ValueError('Page must provide a wiki_artifact. Found instead: %s' % provides)
+      raise ValueError('Page must provide a wiki_artifact. Found instead: {}'.format(provides))
 
   @property
   def source(self):

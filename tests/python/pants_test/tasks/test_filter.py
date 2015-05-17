@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -63,9 +64,10 @@ class FilterTest(BaseFilterTest):
       all_deps = ["'{0}'".format(dep) for dep in deps] + ["':foo'"]
       self.add_to_build_file(path, dedent("""
           python_library(name='{name}',
-            dependencies=[{all_deps}]
+            dependencies=[{all_deps}],
+            tags=['{tag}']
           )
-          """.format(name=name, all_deps=','.join(all_deps))))
+          """.format(name=name, tag=name+"_tag", all_deps=','.join(all_deps))))
 
     add_to_build_file('common/a', 'a')
     add_to_build_file('common/b', 'b')
@@ -282,4 +284,89 @@ class FilterTest(BaseFilterTest):
       'overlaps:three',
       targets=self.targets('::'),
       options={ 'regex': ['-^common,foo$'] }
+    )
+
+    # Invalid regex
+    self.assert_console_raises(TaskError,
+      targets=self.targets('::'),
+      options={ 'regex': ['abc)']}
+    )
+
+  def test_filter_tag_regex(self):
+    # Filter two
+    self.assert_console_output(
+      'overlaps:three',
+      targets=self.targets('::'),
+      options={ 'tag_regex': ['+e(?=e)'] }
+    )
+
+    # Removals
+    self.assert_console_output(
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:foo',
+      'overlaps:three',
+      targets=self.targets('::'),
+      options={ 'tag_regex': ['-one|two'] }
+    )
+
+    # Invalid regex
+    self.assert_console_raises(TaskError,
+      targets=self.targets('::'),
+      options={ 'tag_regex': ['abc)']}
+    )
+
+  def test_filter_tag(self):
+    # One match
+    self.assert_console_output(
+      'common/a:a',
+      targets=self.targets('::'),
+      options={ 'tag': ['+a_tag'] }
+    )
+
+    # Two matches
+    self.assert_console_output(
+      'common/a:a',
+      'common/b:b',
+      targets=self.targets('::'),
+      options={ 'tag': ['+a_tag,b_tag'] }
+    )
+
+    # One removal
+    self.assert_console_output(
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:foo',
+      'overlaps:two',
+      'overlaps:three',
+      targets=self.targets('::'),
+      options={ 'tag': ['-one_tag'] }
+    )
+
+    # Two removals
+    self.assert_console_output(
+      'common/a:a',
+      'common/a:foo',
+      'common/b:b',
+      'common/b:foo',
+      'common/c:c',
+      'common/c:foo',
+      'overlaps:foo',
+      'overlaps:three',
+      targets=self.targets('::'),
+      options={ 'tag': ['-one_tag,two_tag'] }
+    )
+
+    # No match
+    self.assert_console_output(
+      targets=self.targets('::'),
+      options={ 'tag': ['+abcdefg_tag'] }
     )

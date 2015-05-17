@@ -4,14 +4,30 @@
 target(
   name='java',
   dependencies=[
-    ':apt_compile_integration',
-    ':java_compile_integration',
+    ':jmake_analysis'
   ],
+)
+
+python_tests(
+  name='jmake_analysis',
+  sources=['test_jmake_analysis.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile:java',
+    'src/python/pants/util:contextutil',
+  ]
 )
 
 python_tests(
   name='apt_compile_integration',
   sources=['test_apt_compile_integration.py'],
+  dependencies=[
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+  ]
+)
+
+python_tests(
+  name='java_zinc_compile_integration',
+  sources=['test_java_zinc_compile_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ]

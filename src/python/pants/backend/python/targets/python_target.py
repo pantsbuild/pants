@@ -13,7 +13,7 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField, SourcesField
+from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
 
 
@@ -57,14 +57,14 @@ class PythonTarget(Target):
       sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
-      'sources': SourcesField(sources=self.assert_list(sources),
-                              sources_rel_path=sources_rel_path),
-      'resources': SourcesField(sources=self.assert_list(resources),
-                                sources_rel_path=address.spec_path),
+      'sources': self.create_sources_field(sources, sources_rel_path, address),
+      'resources': self.create_sources_field(resources, address.spec_path),
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
-    super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super(PythonTarget, self).__init__(address=address,
+                                       payload=payload,
+                                       **kwargs)
     self._resource_target_specs = resource_targets
     self.add_labels('python')
 
@@ -72,8 +72,8 @@ class PythonTarget(Target):
 
     if provides and not isinstance(provides, PythonArtifact):
       raise TargetDefinitionException(self,
-        "Target must provide a valid pants setup_py object. Received a '%s' object instead." %
-          provides.__class__.__name__)
+        "Target must provide a valid pants setup_py object. Received a '{}' object instead.".format(
+          provides.__class__.__name__))
 
     self._provides = provides
 
@@ -118,7 +118,7 @@ class PythonTarget(Target):
       def get_target(spec):
         tgt = self._build_graph.get_target_from_spec(spec)
         if tgt is None:
-          raise TargetDefinitionException(self, 'No such resource target: %s' % spec)
+          raise TargetDefinitionException(self, 'No such resource target: {}'.format(spec))
         return tgt
       resource_targets.extend(map(get_target, self._resource_target_specs))
 

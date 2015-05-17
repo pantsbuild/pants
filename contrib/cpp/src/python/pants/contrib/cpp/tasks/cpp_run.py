@@ -37,10 +37,10 @@ class CppRun(CppTask):
   def execute(self):
     binary = self.require_single_root_target()
     if isinstance(binary, CppBinary):
-      with self.context.new_workunit(name='cpp-run', labels=[WorkUnit.TASK]):
+      with self.context.new_workunit(name='cpp-run', labels=[WorkUnit.RUN]) as workunit:
         cmd = [os.path.join(binary.workdir, binary.id, binary.name)]
         args = self.get_options().args + self.get_passthru_args()
         if args != None:
           cmd.extend(args)
 
-        self.run_command(cmd)
+        self.run_command(cmd, workunit)

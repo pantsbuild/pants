@@ -14,6 +14,7 @@ from twitter.common.collections import maybe_list
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_library import AndroidLibrary
 from pants.backend.android.targets.android_resources import AndroidResources
+from pants.backend.android.targets.android_target import AndroidTarget
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -23,62 +24,67 @@ class TestAndroidBase(TaskTestBase):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @staticmethod
-  def android_manifest():
+  def android_manifest(package_name=None):
+    package_name = package_name or 'org.pantsbuild.example.hello'
     manifest = textwrap.dedent(
       """<?xml version="1.0" encoding="utf-8"?>
       <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="org.pantsbuild.example.hello" >
+          package="{}" >
           <uses-sdk
               android:minSdkVersion="8"
               android:targetSdkVersion="19" />
       </manifest>
-      """)
+      """.format(package_name))
     return manifest
 
   @contextmanager
-  def android_binary(self, name=None, dependencies=None):
-    """Represent an android_binary target."""
-    with temporary_file() as fp:
-      fp.write(self.android_manifest())
-      fp.close()
-      path = fp.name
-      name = name if name else 'binary'
-      deps = dependencies if dependencies else []
+  def android_target(self, name=None, package_name=None, dependencies=None,
+                     target_type=AndroidTarget, **kwargs):
+    """Represent an Android target."""
+    with temporary_file() as manifest:
+      manifest.write(self.android_manifest(package_name=package_name))
+      manifest.close()
+      name = name or 'target'
+      deps = dependencies or []
       target = self.make_target(spec=':{}'.format(name),
-                                target_type=AndroidBinary,
-                                manifest=path,
-                                dependencies=deps)
+                                target_type=target_type,
+                                manifest=manifest.name,
+                                dependencies=deps,
+                                **kwargs)
       yield target
 
   @contextmanager
-  def android_resources(self, name=None):
+  def android_binary(self, name=None, dependencies=None, package_name=None):
+    """Represent an android_binary target."""
+    with self.android_target(name=name or 'binary',
+                             dependencies=dependencies,
+                             package_name=package_name,
+                             target_type=AndroidBinary) as binary:
+      yield binary
+
+  @contextmanager
+  def android_resources(self, name=None, dependencies=None, package_name=None):
     """Represent an android_resources target."""
     with temporary_dir() as temp:
-      with temporary_file() as fp:
-        fp.write(self.android_manifest())
-        fp.close()
-        path = fp.name
-        name = name if name else 'resources'
-        target = self.make_target(spec=':{}'.format(name),
-                                  target_type=AndroidResources,
-                                  manifest=path,
-                                  resource_dir=temp)
-        yield target
+      with self.android_target(name=name or 'resources',
+                               dependencies=dependencies,
+                               resource_dir=temp,
+                               package_name=package_name,
+                               target_type=AndroidResources) as resources:
+        yield resources
 
   @contextmanager
-  def android_library(self, name=None, dependencies=None):
+  def android_library(self, name=None, libraries=None, include_patterns=None,
+                      exclude_patterns=None, dependencies=None, package_name=None):
     """Represent an android_library target."""
-    with temporary_file() as fp:
-      fp.write(self.android_manifest())
-      fp.close()
-      path = fp.name
-      deps = dependencies if dependencies else []
-      name = name if name else 'library'
-      target = self.make_target(spec=':{}'.format(name),
-                                target_type=AndroidLibrary,
-                                manifest=path,
-                                dependencies=deps)
-      yield target
+    with self.android_target(name=name or 'library',
+                             libraries=libraries,
+                             include_patterns=include_patterns,
+                             exclude_patterns=exclude_patterns,
+                             dependencies=dependencies,
+                             package_name=package_name,
+                             target_type=AndroidLibrary) as library:
+      yield library
 
 @contextmanager
 def distribution(installed_sdks=('18', '19'),
@@ -103,4 +109,6 @@ def distribution(installed_sdks=('18', '19'),
         path = os.path.join(sdk, 'build-tools', version, exe)
         touch(path)
         chmod_plus_x(path)
+      dx_path = os.path.join(sdk, 'build-tools', version, 'lib/dx.jar')
+      touch(dx_path)
     yield sdk

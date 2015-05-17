@@ -13,7 +13,6 @@ target(
   dependencies = [
     ':jar_library',
     ':java_agent',
-    ':java_tests',
     ':python_binary',
     ':python_target',
     ':scala_library',
@@ -61,13 +60,10 @@ python_tests(
 )
 
 python_tests(
-  name = 'java_tests',
-  sources = ['test_java_tests.py'],
+  name = 'jvm_app_integration',
+  sources = ['test_jvm_app_integration.py'],
   dependencies = [
-    ':base',
-    'src/python/pants/backend/core',
-    'src/python/pants/backend/jvm/targets:java',
-    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:int-test',
   ]
 )
 
@@ -90,7 +86,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:config',
   ]
 )
 

@@ -268,7 +268,7 @@ refers to the `public` repository defined above. (Notice it's a Python object, n
 If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
-In your config file (usually `pants.ini`), set up a `[jar-publish]` section. In that section,
+In your config file (usually `pants.ini`), set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
@@ -353,7 +353,7 @@ the custom Ivy settings when publishing:
 Your organization might have a notion of a special "release branch": you want [[artifact
 publishing|pants('src/docs:publish')]] to happen on this source control branch, which you maintain
 extra-carefully. You can set this branch using the `restrict_push_branches` option of the
-`[jar-publish]` section of your config file (usually `pants.ini`).
+`[publish.jar]` section of your config file (usually `pants.ini`).
 
 ### Task to Publish "Extra" Artifacts
 
@@ -365,6 +365,8 @@ metadata -- code coverage info, source git repository, java version that created
 [[plugin|pants('src/python/pants/docs:howto_plugin')]], you give Pants a new ability. [[Develop a
 Task to Publish "Extra" Artifacts|pants('src/python/pants/docs:dev_tasks_publish_extras')]] to find
 out how to develop a special Task to include "extra" data with published artifacts.
+
+<a id="setup_cache"></a>
 
 Outside Caches
 --------------
@@ -409,6 +411,72 @@ If the user's `.netrc` has authentication information for the cache server[s], P
 (Thus, if only some users with known-good setups should be able to write to the cache, you might
 find it handy to use `.netrc` to authenticate those users.)
 
+Uploading Timing Stats
+----------------------
+
+Pants tracks information about its performance: what it builds, how much
+time various build operations take, cache hits, and more.
+If you you work with a large engineering organization, you might want to
+gather this information in one place, so it can inform decisions about how
+to improve everybody's build times.
+
+In everyone's `pants.ini` files, in the `[DEFAULT]` section, add a
+`stats_upload_url` line:
+
+    stats_upload_url: "http://myorg.org/pantsstats"
+
+Pants `POST`s reports to that URL. It's up to you to write a server to "listen"
+at that URL. A `POST` can have the following fields:
+
+`artifact_cache_stats`: Information about Pants' caching.
+[This "cache" refers to the place where Pants can store and fetch things it
+builds](#setup_cache) (not to be confused with the information it keeps in its working
+directory or the pre-built artifacts it fetches from PyPI or maven).
+This field is JSON. If Pants did *not* exercise its cache in a run, this might
+be an empty list "`[]`". If Pants *did* exercise its cache, this JSON might
+look like:
+
+    :::javascript
+    [{"num_hits": 2,
+      "hits": ["3rdparty:hamcrest-core", "3rdparty:junit"],
+      "num_misses": 1,
+      "cache_name": "default",
+      "misses": ["examples/tests/java/com/pants/examples/hello/greet"]}]
+
+`run_info`: Miscellaneous info about the Pants run: SCM status, build
+failure/success, etc. This is formatted as a JSON dictionary. It might look
+like:
+
+    :::javascript
+    {"timestamp": "1422901742.05",
+     "datetime": "Monday Feb 02, 2015 10:29:02",
+     "machine": "pogo-desktop",
+     "default_report": "/home/lahosken/src/lpants/.pants.d/reports/pants_run_2015_02_02_10_29_02_54/html/build.html",
+     "tag": "release_0.0.27-153-g7daeafc",
+     "user": "lahosken",
+     "branch": "cache_printf",
+     "path": "/home/lahosken/src/lpants",
+     "outcome": "SUCCESS",
+     "cmd_line": "./pants test examples/tests/java/com/pants/examples/hello::",
+     "id": "pants_run_2015_02_02_10_29_02_54",
+     "revision": "7daeafc8b40dc9bdad532195d510b8ed520aaa7c"}
+
+`self_timings`, `cumulative_timings`: Timing information about the stages of
+the build. These stages "nest". If stage1 invokes stage2, then the
+`cumulative_timings` for `stage1` include the `stage2` time, but the
+`self_timings` for `stage1` will not. Each of these fields is a JSON-encoded
+list of structures. The start of `cumulative_timings` might look like
+
+    :::javascript
+    [{"timing": 3.3389577865600586, "is_tool": false, "label": "main"},
+     {"timing": 2.929041862487793, "is_tool": false, "label": "background"},
+     {"timing": 1.560438871383667, "is_tool": false, "label": "main:test"},
+     {"timing": 1.479201078414917, "is_tool": false, "label": "main:test:junit"},
+     {"timing": 1.262120008468628, "is_tool": false, "label": "main:compile"},
+     {"timing": 1.118539810180664, "is_tool": true, "label": "main:test:junit:bootstrap-junit"},
+     {"timing": 0.7393410205841064, "is_tool": false, "label": "main:compile:checkstyle"},
+     {"timing": 0.7151470184326172, "is_tool": true, "label": "main:compile:checkstyle:checkstyle"},
+     ...
 
 Using Pants behind a firewall
 ------------
@@ -559,3 +627,4 @@ indices: [
     "https://pypi.python.org/simple/"
   ]
 ```
+

@@ -75,7 +75,7 @@ class JvmdocGen(JvmTask):
 
     jvmdoc_tool_name = self.jvmdoc().tool_name
 
-    config_section = '%s-gen' % jvmdoc_tool_name
+    config_section = '{}-gen'.format(jvmdoc_tool_name)
 
     options = self.get_options()
     self._include_codegen = options.include_codegen
@@ -100,7 +100,7 @@ class JvmdocGen(JvmTask):
     catalog = self.context.products.isrequired(self.jvmdoc().product_type)
     if catalog and self.combined:
       raise TaskError(
-          'Cannot provide %s target mappings for combined output' % self.jvmdoc().product_type)
+          'Cannot provide {} target mappings for combined output'.format(self.jvmdoc().product_type))
 
     def docable(tgt):
       return language_predicate(tgt) and (self._include_codegen or not tgt.is_codegen)
@@ -140,7 +140,7 @@ class JvmdocGen(JvmTask):
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
-        self.context.log.debug("Running create_jvmdoc in %s with %s" % (gendir, " ".join(command)))
+        self.context.log.debug("Running create_jvmdoc in {} with {}".format(gendir, " ".join(command)))
         result, gendir = create_jvmdoc(command, gendir)
         self._handle_create_jvmdoc_result(targets, result, command)
     if self.open:
@@ -170,8 +170,8 @@ class JvmdocGen(JvmTask):
         self.context.log.debug("Begin multiprocessing section; output may be misordered or garbled")
         try:
           for gendir, (target, command) in jobs.items():
-            self.context.log.debug("Running create_jvmdoc in %s with %s" %
-                                   (gendir, " ".join(command)))
+            self.context.log.debug("Running create_jvmdoc in {} with {}"
+                                   .format(gendir, " ".join(command)))
             futures.append(pool.apply_async(create_jvmdoc, args=(command, gendir)))
 
           for future in futures:
@@ -188,7 +188,7 @@ class JvmdocGen(JvmTask):
   def _handle_create_jvmdoc_result(self, targets, result, command):
     if result != 0:
       targetlist = ", ".join(map(str, targets))
-      message = 'Failed to process %s for %s [%d]: %s' % (
+      message = 'Failed to process {} for {} [{}]: {}'.format(
                 self.jvmdoc().tool_name, targetlist, result, command)
       if self.ignore_failure:
         self.context.log.warn(message)

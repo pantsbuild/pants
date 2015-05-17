@@ -5,9 +5,9 @@ target(
   name='jvm_compile',
   dependencies=[
     ':jvm_fingerprint_strategy',
+    ':resource_mapping',
     ':zinc_utils',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile/java',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala',
   ],
 )
 
@@ -22,19 +22,21 @@ python_tests(
 )
 
 python_tests(
+  name = 'resource_mapping',
+  sources = ['test_resource_mapping.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks/jvm_compile:resource_mapping',
+    'tests/python/pants_test:base_test',
+  ],
+  resources=rglobs('test-data/*'),
+)
+
+python_tests(
   name = 'zinc_utils',
   sources = ['test_zinc_utils.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile:scala',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_library(
-  name = 'utils',
-  sources = ['utils.py'],
-  dependencies = [
-    '3rdparty/python:pytest',
   ]
 )
 

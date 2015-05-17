@@ -63,6 +63,18 @@ python_tests(
   ]
 )
 
+
+python_tests(
+  name = 'export_integration',
+  sources = ['test_export_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/ivy',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
+)
+
 python_tests(
   name = 'filedeps',
   sources = ['test_filedeps.py'],
@@ -72,7 +84,6 @@ python_tests(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
-    'src/python/pants/base:config',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

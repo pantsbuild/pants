@@ -51,7 +51,7 @@ class AnalysisParser(object):
     """
     if not os.path.exists(path):
       return
-    with open(path, 'r') as infile:
+    with open(path, 'rb') as infile:
       with raise_on_eof(infile):
         # The first line of the file should contain the expected header.
         firstline = infile.next()
@@ -65,10 +65,10 @@ class AnalysisParser(object):
     """Does the specified analysis file contain information for at least one source file."""
     if not os.path.exists(path):
       return False
-    with open(path, 'r') as infile:
+    with open(path, 'rb') as infile:
       with raise_on_eof(infile):
         # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
-        expected_header = '{0}:\n'.format(self.empty_test_header)
+        expected_header = b'{0}:\n'.format(self.empty_test_header)
         while infile.next() != expected_header:
           pass
         # Now see if this section is empty or not.
@@ -76,7 +76,7 @@ class AnalysisParser(object):
 
   def parse_from_path(self, infile_path):
     """Parse an analysis instance from a text file."""
-    with open(infile_path, 'r') as infile:
+    with open(infile_path, 'rb') as infile:
       return self.parse(infile)
 
   def parse(self, infile):
@@ -88,7 +88,7 @@ class AnalysisParser(object):
 
     Returns a map of src -> list of classfiles. All paths are absolute.
     """
-    with open(infile_path, 'r') as infile:
+    with open(infile_path, 'rb') as infile:
       return self.parse_products(infile, classes_dir)
 
   def parse_products(self, infile, classes_dir):
@@ -105,7 +105,7 @@ class AnalysisParser(object):
                         of class->element on the classpath that provides that class.
                         We use this indirection to avoid unnecessary precomputation.
     """
-    with open(infile_path, 'r') as infile:
+    with open(infile_path, 'rb') as infile:
       return self.parse_deps(infile, classpath_indexer, classes_dir)
 
   def parse_deps(self, infile, classpath_indexer, classes_dir):
@@ -130,3 +130,23 @@ class AnalysisParser(object):
     if not matchobj:
       raise ParseError('Expected: "<num> items". Found: "{0}"'.format(line))
     return int(matchobj.group(1))
+
+  def rebase_from_path(self, infile_path, outfile_path, pants_home_from, pants_home_to,
+                       java_home=None):
+    """Rebase an analysis at infile_path, writing the result to outfile_path.
+
+    See rebase() below for an explanation of rebasing.
+    """
+    with open(infile_path, 'rb') as infile:
+      with open(outfile_path, 'wb') as outfile:
+        self.rebase(infile, outfile, pants_home_from, pants_home_to, java_home)
+
+  def rebase(self, infile, outfile, pants_home_from, pants_home_to, java_home=None):
+    """Rebase an analysis read from infile and write the result to outfile.
+
+    Rebasing means replacing references to paths under pants_home_from with references to
+    equivalent paths under pants_home_to.
+
+    If java_home is specified then any references to paths under it are scrubbed entirely.
+    """
+    raise NotImplementedError()

@@ -27,20 +27,21 @@ def shared_artifacts(version, extra_jar=None):
   return {'org/pantsbuild/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
 
 
+# TODO: Right now some options are set via config and some via cmd-line flags. Normalize this?
 def publish_extra_config(unique_config):
   return {
-          'publish': {
-            'publish_extras': {
-              'extra_test_jar_example': unique_config,
-              },
-            },
-          'backends': {
-            'packages': [
-              'example.pants_publish_plugin',
-              'internal_backend.repositories',
-              ],
-            },
-          }
+    b'DEFAULT': {
+      b'backend_packages': [
+        b'example.pants_publish_plugin',
+        b'internal_backend.repositories',
+      ],
+    },
+    b'publish.jar': {
+      b'publish_extras': {
+        b'extra_test_jar_example': unique_config,
+      },
+    },
+  }
 
 
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
@@ -61,8 +62,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   def tearDown(self):
     safe_rmtree(self.pushdb_root)
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
-                      reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
     unique_artifacts = {'org/pantsbuild/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
@@ -113,14 +112,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts(name),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--publish-named-snapshot=%s' % name])
+                      extra_options=['--named-snapshot={}'.format(name)])
 
   def test_publish_override_flag_succeeds(self):
     override = "com.twitter.foo#baz=0.1.0"
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--publish-override=%s' % override])
+                      extra_options=['--override={}'.format(override)])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
   def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
@@ -183,6 +182,18 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                                artifact_name='hello-greet-0.0.1-SNAPSHOT.jar',
                                success_expected=False)
 
+  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
+                      reason='No scaladoc binary on the PATH.')
+  def test_scala_publish_classifiers(self):
+    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
+                      dict({
+                        'org/pantsbuild/testproject/publish/classifiers/0.0.1-SNAPSHOT': [
+                          'classifiers-0.0.1-SNAPSHOT.pom',
+                          'ivy-0.0.1-SNAPSHOT.xml',
+                        ]}),
+                      [],
+                      assert_publish_config_contents=True)
+
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
                    assert_publish_config_contents=False):
@@ -190,24 +201,25 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
     :param target: Target to test.
     :param artifacts: A map from directories to a list of expected filenames.
+    :param pushdb_files: list of pushdb files that would be created if this weren't a local publish
     :param extra_options: Extra command-line options to the pants run.
     :param extra_config: Extra pants.ini configuration for the pants run.
     :param expected_primary_artifact_count: Number of artifacts we expect to be published.
     :param extra_env: Extra environment variables for the pants run.
     :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
            If set to True, compares the generated ivy.xml and pom files in
-           tests/python/pants_test/tasks/jar_publish_resources/<pakage_name>/<artifact_name>/
+           tests/python/pants_test/tasks/jar_publish_resources/<package_name>/<artifact_name>/
     """
 
     with temporary_dir() as publish_dir:
-      options = ['--publish-local=%s' % publish_dir,
-                 '--no-publish-dryrun',
-                 '--publish-force']
+      options = ['--local={}'.format(publish_dir),
+                 '--no-dryrun',
+                 '--force']
       if extra_options:
         options.extend(extra_options)
 
       yes = 'y' * expected_primary_artifact_count
-      pants_run = self.run_pants(['publish', target] + options, config=extra_config,
+      pants_run = self.run_pants(['publish.jar'] + options + [target], config=extra_config,
                                  stdin_data=yes, extra_env=extra_env)
       if success_expected:
         self.assert_success(pants_run, "'pants goal publish' expected success, but failed instead.")

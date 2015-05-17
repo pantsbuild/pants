@@ -14,6 +14,7 @@ from StringIO import StringIO
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.goal.goal import Goal
+from pants.ivy.bootstrapper import Bootstrapper
 from pants_test.base_test import BaseTest
 
 
@@ -34,11 +35,14 @@ class TaskTestBase(BaseTest):
   def setUp(self):
     super(TaskTestBase, self).setUp()
     self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
-    # We locate the workdir below the pants_workdir, which BaseTest locates within
-    # the BuildRoot.
+    # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
+    # BaseTest cleans this up, so we don't need to.
     self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
     self._test_workdir = os.path.join(self._tmpdir, 'workdir')
     os.mkdir(self._test_workdir)
+    # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
+    # action in this non-JVM-specific, high-level base class.
+    Bootstrapper.reset_instance()
 
   @property
   def test_workdir(self):
@@ -62,13 +66,15 @@ class TaskTestBase(BaseTest):
   def set_options(self, **kwargs):
     self.set_options_for_scope(self.options_scope, **kwargs)
 
-  def context(self, config='', options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, options=None, target_roots=None,
+              console_outstream=None, workspace=None):
     # Add in our task type.
-    return super(TaskTestBase, self).context(for_task_types=[self._testing_task_type],
-                                             config=config,
+    for_task_types = [self._testing_task_type] + (for_task_types or [])
+    return super(TaskTestBase, self).context(for_task_types=for_task_types,
                                              options=options,
                                              target_roots=target_roots,
-                                             **kwargs)
+                                             console_outstream=console_outstream,
+                                             workspace=workspace)
 
   def create_task(self, context, workdir=None):
     return self._testing_task_type(context, workdir or self._test_workdir)

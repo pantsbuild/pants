@@ -46,16 +46,24 @@ class MockDistributionTest(unittest.TestCase):
       yield
 
   @contextmanager
-  def distribution(self, files=None, executables=None):
-    with temporary_dir() as jdk:
+  def distribution(self, files=None, executables=None, libs=None):
+    with temporary_dir() as jdk_root:
+      jdk_bin_dir = os.path.join(jdk_root, 'bin')
+      os.mkdir(jdk_bin_dir)
       for f in maybe_list(files or ()):
-        touch(os.path.join(jdk, f))
+        touch(os.path.join(jdk_bin_dir, f))
       for exe in maybe_list(executables or (), expected_type=self.EXE):
-        path = os.path.join(jdk, exe.name)
+        path = os.path.join(jdk_bin_dir, exe.name)
         with safe_open(path, 'w') as fp:
           fp.write(exe.contents or '')
         chmod_plus_x(path)
-      yield jdk
+
+      jdk_lib_dir = os.path.join(jdk_root, 'lib')
+      os.mkdir(jdk_lib_dir)
+      for f in maybe_list(libs or ()):
+        touch(os.path.join(jdk_lib_dir, f))
+
+      yield jdk_bin_dir
 
   def setUp(self):
     super(MockDistributionTest, self).setUp()
@@ -107,6 +115,14 @@ class MockDistributionTest(unittest.TestCase):
 
     with self.distribution(executables=[self.exe('java'), self.exe('jar')]) as jdk:
       Distribution(bin_path=jdk).binary('jar')
+
+  def test_validated_library(self):
+    with pytest.raises(Distribution.Error):
+      with self.distribution(executables=self.exe('java')) as jdk:
+        Distribution(bin_path=jdk).find_libs(['tools.jar'])
+
+    with self.distribution(executables=self.exe('java'), libs='tools.jar') as jdk:
+      Distribution(bin_path=jdk).find_libs(['tools.jar'])
 
   def test_locate(self):
 

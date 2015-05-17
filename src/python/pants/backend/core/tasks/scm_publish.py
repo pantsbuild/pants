@@ -9,7 +9,6 @@ import re
 import traceback
 from abc import abstractmethod
 
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.scm.scm import Scm
@@ -73,8 +72,8 @@ class Semver(Version):
       try:
         return int(component)
       except (TypeError, ValueError):
-        raise ValueError('Invalid revision component %s in %s - '
-                         'must be an integer' % (component, version))
+        raise ValueError('Invalid revision component {} in {} - '
+                         'must be an integer'.format(component, version))
     return Semver(to_i(major), to_i(minor), to_i(patch))
 
   def __init__(self, major, minor, patch, snapshot=False):
@@ -91,11 +90,9 @@ class Semver(Version):
     return Semver(self.major, self.minor, self.patch, snapshot=True)
 
   def version(self):
-    return '%s.%s.%s' % (
-      self.major,
-      self.minor,
-      ('%s-SNAPSHOT' % self.patch) if self.snapshot else self.patch
-    )
+    return '{}.{}.{}'.format(self.major,
+                             self.minor,
+                             ('{}-SNAPSHOT'.format(self.patch)) if self.snapshot else self.patch)
 
   def __eq__(self, other):
     return self.__cmp__(other) == 0
@@ -116,7 +113,7 @@ class Semver(Version):
     return diff
 
   def __repr__(self):
-    return 'Semver(%s)' % self.version()
+    return 'Semver({})'.format(self.version())
 
 
 class ScmPublishMixin(object):
@@ -163,19 +160,20 @@ class ScmPublishMixin(object):
     else:
       self.log.info('Skipping check for a clean {} branch in test mode.'.format(self.scm.branch_name))
 
-  def commit_pushdb(self, coordinates):
+  def commit_pushdb(self, coordinates, postscript=None):
     """Commit changes to the pushdb with a message containing the provided coordinates."""
-    self.scm.commit('pants build committing publish data for push of {}'.format(coordinates))
+    self.scm.commit('pants build committing publish data for push of {coordinates}'
+                    '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''))
 
-  def publish_pushdb_changes_to_remote_scm(self, pushdb_file, coordinate, tag_name, tag_message):
-    """Push the pushdb changes to the remote scm repository, and then tag the commit if it succeeds
-    """
+  def publish_pushdb_changes_to_remote_scm(self, pushdb_file, coordinate, tag_name, tag_message,
+                                           postscript=None):
+    """Push pushdb changes to the remote scm repository, and then tag the commit if it succeeds."""
 
     self._add_pushdb(pushdb_file)
-    self.commit_pushdb(coordinate)
+    self.commit_pushdb(coordinate, postscript=postscript)
     self._push_and_tag_changes(
       tag_name=tag_name,
-      tag_message=tag_message
+      tag_message='{message}{postscript}'.format(message=tag_message, postscript=postscript or '')
     )
 
   def _add_pushdb(self, pushdb_file):

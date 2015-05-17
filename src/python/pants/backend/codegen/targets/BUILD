@@ -12,11 +12,7 @@ python_library(
     'jaxb_library.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_manual',
-    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',

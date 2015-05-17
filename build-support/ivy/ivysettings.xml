@@ -8,6 +8,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="root.dir" value="${ivy.settings.dir}/../.." override="false"/>
   <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
   <properties file="${root.dir}/build.properties" override="false"/>
+  <properties environment="env" />
 
   <settings defaultResolver="chain-repos"/>
 
@@ -30,20 +31,19 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="sbt.repo.relpath" value="[organization]/[module]/[revision]"/>
   <property name="sbt.repo.artifact" value="${sbt.repo.relpath}/[type]s/[module].[ext]"/>
   <property name="sbt.repo.pom" value="${sbt.repo.relpath}/poms/[module].pom"/>
+
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact]-[revision](-[classifier]).[ext]"/>
 
-  <property name="pants-android.repo.artifact"
-            value="[organization]/[artifact]-[revision](-[classifier]).[ext]"/>
-
   <property name="sbt.repo.dir" value="${user.home}/.ivy2/local" override="false"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
-  <property name="pants-android.repo.dir" value="${root.dir}/3rdparty/android" override="false"/>
 
-  <property name="android.repo.artifact-pattern"
-            value="[module]/[revision]/[artifact]-[revision]"/>
+  <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
+  <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
+  <property name="google.repo.dir" value="${env.ANDROID_HOME}/extras/google/m2repository"/>
+
   <resolvers>
     <chain name="chain-repos" returnFirst="true">
       <_remote_resolvers name="remote-repos"/>
@@ -84,12 +84,16 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       </filesystem>
       -->
 
-         <!-- 3rdparty/android, checked-in android jars. -->
-         <filesystem name="local.pants-android" m2compatible="true" local="true" checkmodified="true">
-           <ivy pattern="${pants-android.repo.dir}/${m2.repo.pom}"/>
-           <artifact pattern="${pants-android.repo.dir}/${pants-android.repo.artifact}"/>
-         </filesystem>
-
+      <!-- Local Android SDK, as pointed to by the ANDROID_HOME environmental variable. -->
+      <ibiblio name="local.android"
+               m2compatible="true"
+               usepoms="true"
+               root="file://${android.repo.dir}/"/>
+      <!-- Local Android SDK, as pointed to by the ANDROID_HOME environmental variable. -->
+      <ibiblio name="local.google"
+               m2compatible="true"
+               usepoms="true"
+               root="file://${google.repo.dir}/"/>
     </chain>
   </resolvers>
 

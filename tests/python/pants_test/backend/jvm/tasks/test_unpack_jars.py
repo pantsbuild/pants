@@ -55,7 +55,7 @@ class UnpackJarsTest(TaskTestBase):
 
   def test_unpack_filter(self):
     def run_filter(filename, include_patterns=None, exclude_patterns=None):
-      return UnpackJars._unpack_filter(
+      return UnpackJars._file_filter(
         filename,
         UnpackJars._compile_patterns(include_patterns or []),
         UnpackJars._compile_patterns(exclude_patterns or []))

@@ -58,7 +58,7 @@ class RunInfo(object):
         val = str(val).strip()
         if ':' in key:
           raise Exception, 'info key must not contain a colon'
-        outfile.write('%s: %s\n' % (key, val))
+        outfile.write('{}: {}\n'.format(key, val))
         self._info[key] = val
     return infos
 

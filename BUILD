@@ -3,9 +3,14 @@
 
 # Pants source code
 source_root('src/python', page, python_binary, python_library, resources)
+source_root('src/java', page, java_library, jvm_binary)
+source_root('src/resources', page, resources)
+source_root('src/scala', page, scala_library, jvm_binary)
 
 # Pants test code
 source_root('tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
+source_root('tests/java', page, java_library, junit_tests, jvm_binary)
+source_root('tests/resources', page, resources)
 
 # Pants own plugins for this repo's exclusive use
 source_root('pants-plugins/src/python', page, python_binary, python_library, resources)
@@ -24,7 +29,7 @@ source_root('testprojects/src/thrift', java_thrift_library, page, python_thrift_
 source_root('testprojects/tests/java', java_library, junit_tests, page, jar_library)
 source_root('testprojects/tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
 source_root('testprojects/tests/resources', page, resources)
-source_root('testprojects/tests/scala', page, junit_tests, scala_library, scala_specs)
+source_root('testprojects/tests/scala', page, junit_tests, scala_library)
 
 # Example code intended to demonstrate to end users how to use Pants BUILD configuration
 source_root('examples/src/android', page, android_resources, android_binary)
@@ -40,8 +45,7 @@ source_root('examples/src/wire', java_wire_library, page)
 source_root('examples/tests/java', java_library, junit_tests, page)
 source_root('examples/tests/python', page, python_library, python_tests, python_test_suite, python_binary, resources)
 source_root('examples/tests/resources', page, resources)
-source_root('examples/tests/scala', page, junit_tests, scala_library, scala_specs)
+source_root('examples/tests/scala', page, junit_tests, scala_library)
 
 
-page(name="readme",
-  source="README.md")
+page(name="readme", source="README.md")

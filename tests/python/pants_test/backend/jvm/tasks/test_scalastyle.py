@@ -8,9 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 from textwrap import dedent
 
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import FileExcluder, Scalastyle
 from pants.base.address import BuildFileAddress
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
@@ -25,6 +27,14 @@ class ScalastyleTest(NailgunTaskTestBase):
   def task_type(cls):
     return Scalastyle
 
+  @property
+  def alias_groups(self):
+    return super(ScalastyleTest, self).alias_groups.merge(BuildFileAliases.create(
+      targets={
+        'java_library': JavaLibrary,
+        'scala_library': ScalaLibrary,
+      },
+    ))
   #
   # Internal test helper section
   #
@@ -51,14 +61,14 @@ class ScalastyleTest(NailgunTaskTestBase):
       relpath='scalastyle_excludes.txt',
       contents='\n'.join(exclude_patterns) if exclude_patterns else '')
 
-  def _create_context(self, config=None, excludes=None, skip=False, target_roots=None):
+  def _create_context(self, scalastyle_config=None, excludes=None, target_roots=None):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
-    # Also by default, the task shouldn't be skipped, so use no skip option.
-    options={
-      'config': config,
-      'skip': skip,
+    options = {
+      'skip': False,
     }
+    if scalastyle_config:
+      options['config'] = scalastyle_config
     if excludes:
       options['excludes'] = excludes
 
@@ -68,26 +78,24 @@ class ScalastyleTest(NailgunTaskTestBase):
       },
       target_roots=target_roots)
 
-  def _create_scalastyle_task(self, config=None, excludes=None, skip=False):
-    return self.create_task(self._create_context(config, excludes, skip), self.build_root)
+  def _create_scalastyle_task(self, scalastyle_config):
+    return self.create_task(self._create_context(scalastyle_config), self.build_root)
 
-  def _create_scalastyle_task_from_context(self, context=None):
-    if context:
-      return self.create_task(context, self.build_root)
-    else:
-      return self._create_scalastyle_task()
+  def _create_scalastyle_task_from_context(self, context):
+    return self.create_task(context, self.build_root)
 
-  #
-  # Test section
-  #
+  def setUp(self):
+    super(ScalastyleTest, self).setUp()
+    self.context()  # We don't need the context, but this ensures subsystem option registration.
 
   def test_initialize_config_no_config_settings(self):
     with self.assertRaises(Scalastyle.UnspecifiedConfig):
-      self._create_scalastyle_task(config='').validate_scalastyle_config()
+      self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()
 
   def test_initialize_config_config_setting_exist_but_invalid(self):
     with self.assertRaises(Scalastyle.MissingConfig):
-      self._create_scalastyle_task(config='file_does_not_exist.xml').validate_scalastyle_config()
+      self._create_scalastyle_task(
+        scalastyle_config='file_does_not_exist.xml').validate_scalastyle_config()
 
   def test_excludes_setting_exists_but_invalid(self):
     with self.assertRaises(TaskError):
@@ -180,7 +188,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     # Create a custom context so we can manually inject scala targets
     # with mixed sources in them to test the source filtering logic.
     context = self._create_context(
-      config=self._create_scalastyle_config_file(),
+      scalastyle_config=self._create_scalastyle_config_file(),
       excludes=self._create_scalastyle_excludes_file(['a/scala_2/Source2.scala']),
       target_roots=[
         scala_target_1,
@@ -223,7 +231,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     self.build_graph.inject_address_closure(scala_target_address)
     scala_target = self.build_graph.get_target(scala_target_address)
 
-    context = self._create_context(config=self._create_scalastyle_config_file(),
+    context = self._create_context(scalastyle_config=self._create_scalastyle_config_file(),
                                    target_roots=[scala_target])
 
     self.execute(context)

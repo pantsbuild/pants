@@ -52,19 +52,21 @@ class PythonChroot(object):
 
   class InvalidDependencyException(Exception):
     def __init__(self, target):
-      Exception.__init__(self, "Not a valid Python dependency! Found: %s" % target)
+      Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
 
+  # TODO: A little extra push and we can get rid of the 'context' argument.
   def __init__(self,
                context,
+               python_setup,
+               python_repos,
                targets,
                extra_requirements=None,
                builder=None,
                platforms=None,
                interpreter=None):
     self.context = context
-    # TODO: These should come from the caller, and we should not know about config.
-    self._python_setup = PythonSetup(self.context.config)
-    self._python_repos = PythonRepos(self.context.config)
+    self._python_setup = python_setup
+    self._python_repos = python_repos
 
     self._targets = targets
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
@@ -88,7 +90,7 @@ class PythonChroot(object):
     if os.getenv('PANTS_LEAVE_CHROOT') is None:
       self.delete()
     else:
-      self.debug('Left chroot at %s' % self.path())
+      self.debug('Left chroot at {}'.format(self.path()))
 
   @property
   def builder(self):
@@ -96,7 +98,7 @@ class PythonChroot(object):
 
   def debug(self, msg, indent=0):
     if os.getenv('PANTS_VERBOSE') is not None:
-      print('%s%s' % (' ' * indent, msg))
+      print('{}{}'.format(' ' * indent, msg))
 
   def path(self):
     return os.path.realpath(self._builder.path())
@@ -106,7 +108,7 @@ class PythonChroot(object):
       src = os.path.join(get_buildroot(), base, path)
       add_function(src, path)
 
-    self.debug('  Dumping library: %s' % library)
+    self.debug('  Dumping library: {}'.format(library))
     for relpath in library.sources_relative_to_source_root():
       try:
         copy_to_chroot(library.target_base, relpath, self._builder.add_source)
@@ -129,11 +131,11 @@ class PythonChroot(object):
           raise
 
   def _dump_requirement(self, req):
-    self.debug('  Dumping requirement: %s' % req)
+    self.debug('  Dumping requirement: {}'.format(req))
     self._builder.add_requirement(req)
 
   def _dump_distribution(self, dist):
-    self.debug('  Dumping distribution: .../%s' % os.path.basename(dist.location))
+    self.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
     self._builder.add_distribution(dist)
 
   def _generate_requirement(self, library, builder_cls):
@@ -171,7 +173,7 @@ class PythonChroot(object):
     return children
 
   def dump(self):
-    self.debug('Building chroot for %s:' % self._targets)
+    self.debug('Building chroot for {}:'.format(self._targets))
     targets = self.resolve(self._targets)
 
     for lib in targets['libraries'] | targets['binaries']:
@@ -199,7 +201,7 @@ class PythonChroot(object):
 
     for req in reqs_from_libraries | generated_reqs | self._extra_requirements:
       if not req.should_build(self._interpreter.python, Platform.current()):
-        self.debug('Skipping %s based upon version filter' % req)
+        self.debug('Skipping {} based upon version filter'.format(req))
         continue
       reqs_to_build.add(req)
       self._dump_requirement(req.requirement)

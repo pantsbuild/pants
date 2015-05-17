@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
 import os
 import unittest
 from collections import defaultdict
@@ -15,39 +16,31 @@ from textwrap import dedent
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import SyntheticAddress
 from pants.base.build_configuration import BuildConfiguration
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
+from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.config import Config
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.option.global_options import register_global_options
 from pants.option.options import Options
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.option.options_bootstrapper import register_bootstrap_options
+from pants.subsystem.subsystem import Subsystem
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
-from pants_test.base.context_utils import create_context
+from pants_test.base.context_utils import create_context, create_option_values
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
 # for tests, not a test of a thing called 'Base'.
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot."""
-
-  @classmethod
-  def setUpClass(cls):
-    """Ensure that all code has a config to read from the cache.
-
-    TODO: Yuck. Get rid of this after plumbing options through in the right places.
-    """
-    super(BaseTest, cls).setUpClass()
-    Config.cache(Config.load())
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path."""
@@ -84,7 +77,8 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    return BuildFile(root_dir=self.build_root, relpath=self.build_path(relpath))
+    cls = self.address_mapper._build_file_type
+    return cls(root_dir=self.build_root, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',
@@ -113,10 +107,16 @@ class BaseTest(unittest.TestCase):
   def setUp(self):
     super(BaseTest, self).setUp()
     Goal.clear()
+    Subsystem.reset()
+
     self.real_build_root = BuildRoot().path
+
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    self.addCleanup(safe_rmtree, self.build_root)
+
     self.pants_workdir = os.path.join(self.build_root, '.pants.d')
     safe_mkdir(self.pants_workdir)
+
     self.options = defaultdict(dict)  # scope -> key-value mapping.
     self.options[''] = {
       'pants_workdir': self.pants_workdir,
@@ -125,63 +125,79 @@ class BaseTest(unittest.TestCase):
       'pants_configdir': os.path.join(self.build_root, 'config'),
       'cache_key_gen_version': '0-test',
     }
-    BuildRoot().path = self.build_root
 
+    BuildRoot().path = self.build_root
+    self.addCleanup(BuildRoot().reset)
+
+    # We need a pants.ini, even if empty. get_buildroot() uses its presence.
     self.create_file('pants.ini')
-    build_configuration = BuildConfiguration()
-    build_configuration.register_aliases(self.alias_groups)
-    self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+    self._build_configuration = BuildConfiguration()
+    self._build_configuration.register_aliases(self.alias_groups)
+    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
-
-  def config(self, overrides=''):
-    """Returns a config valid for the test build root."""
-    ini_file = os.path.join(get_buildroot(), 'pants.ini')
-    if overrides:
-      with temporary_file(cleanup=False) as fp:
-        fp.write(overrides)
-        fp.close()
-        return Config.load([ini_file, fp.name])
-    else:
-      return Config.load([ini_file])
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, config='', options=None, target_roots=None, **kwargs):
+  def context(self, for_task_types=None, options=None, target_roots=None,
+              console_outstream=None, workspace=None):
     for_task_types = for_task_types or []
     options = options or {}
 
     option_values = defaultdict(dict)
+    registered_global_subsystems = set()
+    bootstrap_option_values = None  # We fill these in after registering bootstrap options.
 
-    # Get default values for all options registered by the tasks in for_task_types.
-    for task_type in for_task_types:
-      scope = task_type.options_scope
-      if scope is None:
-        raise TaskError('You must set a scope on your task type before using it in tests.')
-
-      # We provide our own test-only registration implementation, bypassing argparse.
-      # When testing we set option values directly, so we don't care about cmd-line flags, config,
-      # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
+    # We provide our own test-only registration implementation, bypassing argparse.
+    # When testing we set option values directly, so we don't care about cmd-line flags, config,
+    # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
+    # All this does is make the names available in code, with the default values.
+    # Individual tests can then override the option values they care about.
+    def register_func(on_scope):
       def register(*rargs, **rkwargs):
-        scoped_options = option_values[scope]
+        scoped_options = option_values[on_scope]
         default = rkwargs.get('default')
         if default is None and rkwargs.get('action') == 'append':
           default = []
         for flag_name in rargs:
           option_name = flag_name.lstrip('-').replace('-', '_')
           scoped_options[option_name] = default
+      register.bootstrap = bootstrap_option_values
+      register.scope = on_scope
+      return register
 
-      task_type.register_options(register)
+    # TODO: This sequence is a bit repetitive of the real registration sequence.
 
-    # Now override with any caller-specified values.
+    # Register bootstrap options and grab their default values for use in subsequent registration.
+    register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
+    bootstrap_option_values = create_option_values(copy.copy(option_values[Options.GLOBAL_SCOPE]))
 
+    # Now register the remaining global scope options.
+    register_global_options(register_func(Options.GLOBAL_SCOPE))
+
+    # Now register task and subsystem options for relevant tasks.
+    for task_type in for_task_types:
+      scope = task_type.options_scope
+      if scope is None:
+        raise TaskError('You must set a scope on your task type before using it in tests.')
+      task_type.register_options(register_func(scope))
+      for subsystem in (set(task_type.global_subsystems()) |
+                        self._build_configuration.subsystem_types()):
+        if subsystem not in registered_global_subsystems:
+          subsystem.register_options(register_func(subsystem.qualify_scope(Options.GLOBAL_SCOPE)))
+          registered_global_subsystems.add(subsystem)
+      for subsystem in task_type.task_subsystems():
+        subsystem.register_options(register_func(subsystem.qualify_scope(scope)))
+
+    # Now default option values override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
+
     for scope, opts in options.items():
       for key, val in opts.items():
         option_values[scope][key] = val
@@ -201,19 +217,19 @@ class BaseTest(unittest.TestCase):
           if key not in opts:  # Inner scope values override the inherited ones.
             opts[key] = val
 
-    return create_context(config=self.config(overrides=config),
-                          options=option_values,
-                          target_roots=target_roots,
-                          build_graph=self.build_graph,
-                          build_file_parser=self.build_file_parser,
-                          address_mapper=self.address_mapper,
-                          **kwargs)
+    context = create_context(options=option_values,
+                             target_roots=target_roots,
+                             build_graph=self.build_graph,
+                             build_file_parser=self.build_file_parser,
+                             address_mapper=self.address_mapper,
+                             console_outstream=console_outstream,
+                             workspace=workspace)
+    Subsystem._options = context.options
+    return context
 
   def tearDown(self):
-    BuildRoot().reset()
     SourceRoot.reset()
-    safe_rmtree(self.build_root)
-    BuildFile.clear_cache()
+    FilesystemBuildFile.clear_cache()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.

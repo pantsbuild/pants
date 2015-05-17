@@ -13,7 +13,6 @@ from twitter.common.collections import OrderedSet
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
@@ -25,7 +24,7 @@ from pants.util.dirutil import safe_mkdir
 logger = logging.getLogger(__name__)
 
 
-class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
+class AntlrGen(CodeGen, NailgunTask):
 
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
@@ -51,7 +50,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   def genlang(self, lang, targets):
     if lang != 'java':
-      raise TaskError('Unrecognized antlr gen lang: %s' % lang)
+      raise TaskError('Unrecognized antlr gen lang: {}'.format(lang))
 
     # TODO: Instead of running the compiler for each target, collect the targets
     # by type and invoke it twice, once for antlr3 and once for antlr4.
@@ -87,7 +86,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
       result = self.runjava(classpath=antlr_classpath, main=java_main,
                             args=args, workunit_name='antlr')
       if result != 0:
-        raise TaskError('java %s ... exited non-zero (%i)' % (java_main, result))
+        raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the
@@ -111,7 +110,7 @@ class AntlrGen(CodeGen, NailgunTask, JvmToolTaskMixin):
 
   def createtarget(self, lang, gentarget, dependees):
     if lang != 'java':
-      raise TaskError('Unrecognized antlr gen lang: %s' % lang)
+      raise TaskError('Unrecognized antlr gen lang: {}'.format(lang))
     return self._create_java_target(gentarget, dependees)
 
   def _create_java_target(self, target, dependees):

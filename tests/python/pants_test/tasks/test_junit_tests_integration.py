@@ -6,6 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
+from xml.etree import ElementTree
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -23,7 +25,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
     self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.welcome.WelSpec')
 
-  def test_junit_test(self):
+  def test_junit_test_custom_interpreter(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
@@ -34,6 +36,14 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
+
+  def test_junit_test(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      pants_run = self.run_pants_with_workdir([
+          'test',
+          'testprojects/tests/scala/org/pantsbuild/testproject/empty'],
+          workdir)
+      self.assert_failure(pants_run)
 
   def test_junit_test_with_test_option_with_relpath(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -128,9 +138,11 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
       self.assertTrue(os.path.exists(
         os.path.join(workdir, 'test', 'junit', 'coverage', 'html', 'index.html')))
-      # TODO(Eric Ayers): Look at the xml report.  I think something is broken, it is empty
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')))
+      xmlf = os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')
+      self.assertTrue(os.path.exists(xmlf))
+      hits = ElementTree.parse(xmlf).findall("packages/package/classes/class/lines/line")
+      if all(i.attrib['hits'] == "0" for i in hits):
+        self.fail("no nonzero hits found in the generated coverage.xml")
 
   def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
@@ -171,3 +183,10 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-jvm-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd',])
     self.assert_failure(pants_run)
+
+  def test_junit_test_suppress_output_flag(self):
+    pants_run = self.run_pants([
+        'test.junit',
+        '--no-suppress-output',
+        'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
+    self.assertTrue('Hello from test!' in pants_run.stdout_data)

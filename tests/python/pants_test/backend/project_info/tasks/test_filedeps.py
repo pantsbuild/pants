@@ -13,7 +13,6 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
-from pants.base.config import Config
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -28,6 +27,11 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def setUp(self):
     super(FileDepsTest, self).setUp()
+    self.context(options={
+      'scala-platform': {
+        'runtime': ['tools:scala-library']
+      }
+    })
 
     # TODO(John Sirois): Rationalize much of this target emission setup.  Lots of tests do similar
     # things: https://github.com/pantsbuild/pants/issues/525
@@ -35,16 +39,6 @@ class FileDepsTest(ConsoleTaskTestBase):
       if sources:
         self.create_files(path, sources)
       self.add_to_build_file(path, definition)
-
-    self.create_file('pants.ini',
-                     contents=dedent("""
-                       [compile.scala]
-                       runtime-deps: ['tools:scala-library']
-                     """),
-                     mode='a')
-
-    # TODO: Required because target code has no direct config reference. Remove after fixing that.
-    Config.cache(Config.load())
 
     create_target(path='tools',
                   definition=dedent("""
@@ -74,10 +68,9 @@ class FileDepsTest(ConsoleTaskTestBase):
                   definition=dedent("""
                     java_library(
                       name='core',
-                      sources=[
-                        'core1.java',
-                        'core2.java'
-                      ],
+                      sources=globs(
+                        'core*.java',
+                      ),
                       dependencies=[
                         'src/scala/core'
                       ]
@@ -167,6 +160,17 @@ class FileDepsTest(ConsoleTaskTestBase):
       'src/resources/lib/BUILD',
       'src/resources/lib/data.json',
       targets=[self.target('src/resources/lib')]
+    )
+
+  def test_globs(self):
+    self.assert_console_output(
+      'tools/BUILD',
+      'src/scala/core/BUILD',
+      'src/scala/core/core1.scala',
+      'src/java/core/BUILD',
+      'src/java/core/core*.java',
+      targets=[self.target('src/scala/core')],
+      options=dict(globs=True),
     )
 
   def test_scala_java_cycle_scala_end(self):

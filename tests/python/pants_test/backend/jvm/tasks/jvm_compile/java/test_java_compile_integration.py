@@ -11,8 +11,8 @@ from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMake
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
-from pants_test.backend.jvm.tasks.jvm_compile.utils import provide_compile_strategies
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
 class JavaCompileIntegrationTest(PantsRunIntegrationTest):

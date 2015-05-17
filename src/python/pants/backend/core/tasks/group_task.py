@@ -210,6 +210,16 @@ class GroupTask(Task):
         _MEMBER_TYPES = []
 
         @classmethod
+        def global_subsystems(cls):
+          return (super(SingletonGroupTask, cls).global_subsystems() +
+            tuple(s for mt in cls._member_types() for s in mt.global_subsystems()))
+
+        @classmethod
+        def task_subsystems(cls):
+          return (super(SingletonGroupTask, cls).task_subsystems() +
+            tuple(s for mt in cls._member_types() for s in mt.task_subsystems()))
+
+        @classmethod
         def product_types(cls):
           return product_type
 
@@ -248,9 +258,9 @@ class GroupTask(Task):
       cls._GROUPS[name] = group_task
 
     if group_task.product_types() != product_type:
-      raise ValueError('The group %r was already registered with product type: %r - refusing to '
-                       'overwrite with new product type: %r' % (name, group_task.product_types(),
-                                                                product_type))
+      raise ValueError('The group {!r} was already registered with product type: {!r} - refusing to '
+                       'overwrite with new product type: {!r}'.format(name, group_task.product_types(),
+                                                                      product_type))
 
     return group_task
 
@@ -271,7 +281,7 @@ class GroupTask(Task):
     """
     if not issubclass(group_member, GroupMember):
       raise ValueError('Only GroupMember subclasses can join a GroupTask, '
-                       'given %s of type %s' % (group_member, type(group_member)))
+                       'given {} of type {}'.format(group_member, type(group_member)))
 
     group_member.options_scope = Goal.scope(cls.parent_options_scope, group_member.name())
     cls._member_types().append(group_member)
@@ -306,9 +316,9 @@ class GroupTask(Task):
         ordered_chunks.append((group_member, chunk))
         chunks_by_member[group_member].append(chunk)
 
-      self.context.log.debug('::: created chunks(%d)' % len(ordered_chunks))
+      self.context.log.debug('::: created chunks({})'.format(len(ordered_chunks)))
       for i, (group_member, goal_chunk) in enumerate(ordered_chunks):
-        self.context.log.debug('  chunk(%d) [flavor=%s]:\n\t%s' % (
+        self.context.log.debug('  chunk({}) [flavor={}]:\n\t{}'.format(
             i, group_member.name(), '\n\t'.join(sorted(map(str, goal_chunk)))))
 
       # prep

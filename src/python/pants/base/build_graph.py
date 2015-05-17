@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import traceback
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
@@ -183,7 +183,7 @@ class BuildGraph(object):
     return sort_targets(self._target_by_address.values())
 
   def walk_transitive_dependency_graph(self, addresses, work, predicate=None, postorder=False):
-    """Given a work function, walks the transitive dependency closure of `addresses`.
+    """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
 
     :param list<Address> addresses: The closure of `addresses` will be walked.
     :param function work: The function that will be called on every target in the closure using
@@ -262,6 +262,26 @@ class BuildGraph(object):
                                           predicate=predicate,
                                           postorder=postorder)
     return ret
+
+  def transitive_subgraph_of_addresses_bfs(self, addresses, predicate=None):
+    """Returns the transitive dependency closure of `addresses` using BFS.
+
+    :param list<Address> addresses: The closure of `addresses` will be walked.
+    :param function predicate: If this parameter is not given, no Targets will be filtered
+      out of the closure.  If it is given, any Target which fails the predicate will not be
+      walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
+      that would only be reachable through Targets that fail the predicate.
+    """
+    walked = OrderedSet()
+    to_walk = deque(addresses)
+    while len(to_walk) > 0:
+      address = to_walk.popleft()
+      target = self._target_by_address[address]
+      if target not in walked:
+        if not predicate or predicate(target):
+          walked.add(target)
+          to_walk.extend(self._target_dependencies_by_address[address])
+    return walked
 
   def inject_synthetic_target(self,
                               address,
@@ -385,7 +405,7 @@ class BuildGraph(object):
 class CycleException(Exception):
   """Thrown when a circular dependency is detected."""
   def __init__(self, cycle):
-    Exception.__init__(self, 'Cycle detected:\n\t%s' % (
+    Exception.__init__(self, 'Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 

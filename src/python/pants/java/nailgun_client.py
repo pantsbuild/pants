@@ -79,7 +79,7 @@ class NailgunSession(object):
     for arg in args:
       self._send_chunk('A', arg)
     for k, v in environment.items():
-      self._send_chunk('E', '%s=%s' % (k, v))
+      self._send_chunk('E', '{}={}'.format(k, v))
     self._send_chunk('D', workdir)
     self._send_chunk('C', main_class)
 
@@ -106,7 +106,7 @@ class NailgunSession(object):
         self._err.flush()
         return int(payload)
       else:
-        raise self.ProtocolError('Received unexpected chunk %s -> %s' % (command, payload))
+        raise self.ProtocolError('Received unexpected chunk {} -> {}'.format(command, payload))
 
   def _read_chunk(self, buff):
     while len(buff) < self.HEADER_LENGTH:
@@ -185,19 +185,19 @@ class NailgunClient(object):
     sock = self.try_connect()
     if not sock:
       raise self.NailgunError('Problem connecting to nailgun server'
-                              ' %s:%d' % (self._host, self._port))
+                              ' {}:{}'.format(self._host, self._port))
 
     session = NailgunSession(sock, self._ins, self._out, self._err)
     try:
       return session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
-      raise self.NailgunError('Problem contacting nailgun server %s:%d:'
-                              ' %s' % (self._host, self._port, e))
+      raise self.NailgunError('Problem contacting nailgun server {}:{}:'
+                              ' {}'.format(self._host, self._port, e))
     except session.ProtocolError as e:
-      raise self.NailgunError('Problem executing the nailgun protocol with nailgun server %s:%s:'
-                              ' %s' % (self._host, self._port, e))
+      raise self.NailgunError('Problem executing the nailgun protocol with nailgun server {}:{}:'
+                              ' {}'.format(self._host, self._port, e))
     finally:
       sock.close()
 
   def __repr__(self):
-    return 'NailgunClient(host=%r, port=%r, workdir=%r)' % (self._host, self._port, self._workdir)
+    return 'NailgunClient(host={!r}, port={!r}, workdir={!r})'.format(self._host, self._port, self._workdir)

@@ -9,6 +9,7 @@ import multiprocessing
 import os
 import signal
 import sys
+import thread
 import threading
 from multiprocessing.pool import ThreadPool
 
@@ -94,7 +95,7 @@ class WorkerPool(object):
 
     def error(e):
       done()
-      self._run_tracker.log(Report.ERROR, '%s' % e)
+      self._run_tracker.log(Report.ERROR, '{}'.format(e))
 
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
@@ -112,7 +113,7 @@ class WorkerPool(object):
       submit_next()
     except Exception as e:  # Handles errors in the submission code.
       done()
-      self._run_tracker.log(Report.ERROR, '%s' % e)
+      self._run_tracker.log(Report.ERROR, '{}'.format(e))
       raise
 
   def submit_work_and_wait(self, work, workunit_parent=None):
@@ -140,6 +141,11 @@ class WorkerPool(object):
           return func(*args_tuple)
       else:
         return func(*args_tuple)
+    except KeyboardInterrupt:
+      # If a worker thread intercepts a KeyboardInterrupt, we want to propagate it to the main
+      # thread.
+      thread.interrupt_main()
+      raise
     except Exception as e:
       if on_failure:
         # Note that here the work's workunit is closed. So, e.g., it's OK to use on_failure()

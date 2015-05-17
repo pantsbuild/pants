@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import pprint
 
 import pystache
-import six
 
 from pants.base.mustache import MustacheRenderer
 
@@ -29,7 +28,7 @@ class TemplateData(dict):
     return TemplateData(**props)
 
   def __setattr__(self, key, value):
-    raise AttributeError("Mutation not allowed - use %s.extend(%s = %s)" % (self, key, value))
+    raise AttributeError("Mutation not allowed - use {}.extend({} = {})".format(self, key, value))
 
   def __getattr__(self, key):
     if key in self:
@@ -38,18 +37,14 @@ class TemplateData(dict):
       return object.__getattribute__(self, key)
 
   def __str__(self):
-    return 'TemplateData(%s)' % pprint.pformat(self)
+    return 'TemplateData({})'.format(pprint.pformat(self))
 
 
 class Generator(object):
   """Generates pants intermediary output files using a configured mustache template."""
 
   def __init__(self, template_text, **template_data):
-    # pystache does a typecheck for unicode in python 2.x but rewrites its sources to deal unicode
-    # via str in python 3.x.
-    if six.PY2:
-      template_text = unicode(template_text)
-    self._template = pystache.parse(template_text)
+    self._template = MustacheRenderer.parse_template(template_text)
     self.template_data = template_data
 
   def write(self, stream):

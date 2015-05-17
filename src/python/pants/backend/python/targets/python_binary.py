@@ -91,7 +91,7 @@ class PythonBinary(PythonTarget):
       source_entry_point = self._translate_to_entry_point(entry_source)
       if entry_point_module != source_entry_point:
         raise TargetDefinitionException(self,
-            'Specified both source and entry_point but they do not agree: %s vs %s' % (
+            'Specified both source and entry_point but they do not agree: {} vs {}'.format(
             source_entry_point, entry_point_module))
 
   @property

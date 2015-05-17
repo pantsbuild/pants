@@ -32,7 +32,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
   tools = AndroidIntegrationTest.requirements(TOOLS)
 
   @pytest.mark.skipif('not AaptBuilderIntegrationTest.tools',
-                      reason='Android integration test requires tools {0!r} '
+                      reason='Android integration test requires tools {} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_aapt_bundle(self):
     self.bundle_test(AndroidIntegrationTest.TEST_TARGET)
@@ -42,17 +42,17 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
     self.assert_success(pants_run)
 
   @pytest.mark.skipif('not AaptBuilderIntegrationTest.tools',
-                      reason='Android integration test requires tools {0!r} '
+                      reason='Android integration test requires tools {} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_android_library_products(self):
     # Doing the work under a tempdir gives us a handle for the workdir and guarantees a clean build.
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      spec = 'examples/src/android/hello_with_library/main:hello_with_library'
+      spec = 'examples/src/android/hello_with_library:'
       pants_run = self.run_pants_with_workdir(['apk', '-ldebug', spec], workdir)
       self.assert_success(pants_run)
 
       # Make sure that the unsigned apk was produced for the binary target.
-      apk_file = 'apk/apk/org.pantsbuild.example.pants_library.unsigned.apk'
+      apk_file = 'apk/apk/org.pantsbuild.examples.hello_with_library.unsigned.apk'
       self.assertEqual(os.path.isfile(os.path.join(workdir, apk_file)), True)
 
       # Scrape debug statements.
@@ -62,6 +62,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
             yield line
 
       aapt_blocks = list(find_aapt_blocks(pants_run.stderr_data.split('\n')))
+      # Only one apk is built, so only one aapt invocation here, for any number of dependent libs.
       self.assertEquals(len(aapt_blocks), 1, 'Expected one invocation of the aapt tool! '
                                              '(was: {})\n{}'.format(len(aapt_blocks),
                                                                     pants_run.stderr_data))
@@ -71,6 +72,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
         resource_dirs = re.findall(r'-S ([^\s]+)', line)
         self.assertEqual(resource_dirs[0], 'examples/src/android/hello_with_library/main/res')
         self.assertEqual(resource_dirs[1], 'examples/src/android/example_library/res')
-        self.assertEquals(len(resource_dirs), 2, 'Expected two resource dirs to be included '
+        # The other six are google-play-services v21 resource_dirs. Their presence is enough.
+        self.assertEquals(len(resource_dirs), 8, 'Expected eight resource dirs to be included '
                                                  'when calling aapt on hello_with_library apk.'
                                                  ' (was: {})\n'.format(resource_dirs))

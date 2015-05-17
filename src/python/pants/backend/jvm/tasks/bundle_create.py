@@ -13,6 +13,7 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.fs import archive
 from pants.util.dirutil import safe_mkdir
 
@@ -45,8 +46,9 @@ class BundleCreate(JvmBinaryTask):
       return isinstance(target, (JvmApp, JvmBinary))
 
     def __init__(self, target):
-      assert self.is_app(target), '%s is not a valid app target' % target
+      assert self.is_app(target), '{} is not a valid app target'.format(target)
 
+      self.address = target.address
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
       self.basename = target.basename
@@ -63,7 +65,7 @@ class BundleCreate(JvmBinaryTask):
             app.basename,
             prefix=app.basename if self._prefix else None
           )
-          self.context.log.info('created %s' % os.path.relpath(archivepath, get_buildroot()))
+          self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
   def bundle(self, app):
     """Create a self-contained application bundle.
@@ -80,7 +82,7 @@ class BundleCreate(JvmBinaryTask):
         raise e
 
     bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
-    self.context.log.info('creating %s' % os.path.relpath(bundle_dir, get_buildroot()))
+    self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
 
@@ -121,6 +123,9 @@ class BundleCreate(JvmBinaryTask):
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
         bundle_path = os.path.join(bundle_dir, relpath)
+        if not os.path.exists(path):
+          raise TaskError('Given path: {} does not exist in target {}'.format(
+            path, app.address.spec))
         safe_mkdir(os.path.dirname(bundle_path))
         verbose_symlink(path, bundle_path)
 

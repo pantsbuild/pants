@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
+                                                          OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -20,7 +22,6 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.targets.scala_tests import ScalaTests
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
@@ -37,12 +38,12 @@ from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
-from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ScalaCompile
+from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCompile,
+                                                                     ScalaZincCompile)
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
-from pants.backend.jvm.tasks.specs_run import SpecsRun
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
@@ -64,12 +65,15 @@ def build_file_aliases():
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
       'scala_library': ScalaLibrary,
-      'scala_specs': ScalaTests,
-      'scala_tests': ScalaTests,
       'scalac_plugin': ScalacPlugin,
     },
     objects={
       'artifact': Artifact,
+      'ossrh': OSSRHPublicationMetadata,
+      'license': License,
+      'scm': Scm,
+      'developer': Developer,
+      'github': Scm.github,
       'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
@@ -119,12 +123,13 @@ def register_goals():
   # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
   # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
   # systemic compile errors.
-  jvm_compile.add_member(ScalaCompile)
+  jvm_compile.add_member(ScalaZincCompile)
 
   # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
   # subset of java code
   jvm_compile.add_member(AptCompile)
 
+  jvm_compile.add_member(JavaZincCompile)
   jvm_compile.add_member(JavaCompile)
 
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
@@ -153,12 +158,11 @@ def register_goals():
     action=CheckPublishedDeps,
   ).install('check_published_deps').with_description('Find references to outdated artifacts.')
 
-  task(name='publish', action=JarPublish).install('publish').with_description(
+  task(name='jar', action=JarPublish).install('publish').with_description(
       'Publish artifacts.')
 
   # Testing.
   task(name='junit', action=JUnitRun).install('test').with_description('Test compiled code.')
-  task(name='specs', action=SpecsRun).install('test')
   task(name='bench', action=BenchmarkRun).install('bench')
 
   # Running.

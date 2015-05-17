@@ -91,7 +91,7 @@ class CppCompile(CppTask):
       cmd.extend([self.get_options().cc_options])
 
     # TODO: submit_async_work with self.run_command, [(cmd)] as a Work object.
-    with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.COMPILER]):
-      self.run_command(cmd)
+    with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.COMPILER]) as workunit:
+      self.run_command(cmd, workunit)
 
     self.context.log.info('Built c++ object: {0}'.format(obj))

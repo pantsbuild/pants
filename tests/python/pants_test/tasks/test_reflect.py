@@ -43,7 +43,7 @@ class BuildsymsSanityTests(BaseTest):
 
 class GoalDataTest(BaseTest):
   def test_gen_tasks_options_reference_data(self):
-    # can we run our reflection-y goal code without crashing? would be nice
+    # Can we run our reflection-y goal code without crashing? would be nice.
     Goal.by_name('jack').install(TaskRegistrar('jill', DummyTask))
     oref_data = reflect.gen_tasks_options_reference_data()
     self.assertTrue(len(oref_data) > 0,
