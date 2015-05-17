@@ -214,6 +214,7 @@ class IvyTaskMixin(object):
     mapdir = self.mapjar_workdir(target)
     safe_mkdir(mapdir, clean=True)
     ivyargs = self._get_ivy_args(mapdir)
+
     confs = maybe_list(target.payload.get_field_value('configurations') or [])
     self.exec_ivy(mapdir,
                   [target],
