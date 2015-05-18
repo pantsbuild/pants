@@ -195,7 +195,7 @@ class UnpackLibraries(Task):
                 self._created_targets[archive] = new_target
               target.inject_dependency(self._created_targets[archive].address)
 
-            # All dunpacked_libraries product is the full unpacked source. The files that match the
+            # The unpacked_libraries product is the full unpacked source. The files that match the
             # include/exclude patterns of the android_library are calculated during DxCompile.
             unpack_product_dir = self.unpack_jar_location(archive)
             unpacked_products = self.context.products.get('unpacked_libraries')

@@ -32,6 +32,12 @@ class UnpackLibrariesTest(TestAndroidBase):
   def task_type(cls):
     return UnpackLibraries
 
+  @classmethod
+  def _add_ivy_imports_product(cls, foo_target, android_dep, unpack_task):
+    ivy_imports_product = unpack_task.context.products.get('ivy_imports')
+    ivy_imports_product.add(foo_target, os.path.dirname(android_dep),
+                            [os.path.basename(android_dep)])
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -77,7 +83,7 @@ class UnpackLibrariesTest(TestAndroidBase):
   @contextmanager
   def sample_jarfile(self, location, name=None, filenames=None):
     """Create a sample jar file."""
-    name = name or 'classes.jar'
+    name = '{}.jar'.format(name) if name else 'classes.jar'
     jar_name = os.path.join(location, name)
     with open_zip(jar_name, 'w') as library:
       library.writestr('a/b/c/Foo.class', '0xCAFEBABE')
@@ -184,6 +190,46 @@ class UnpackLibrariesTest(TestAndroidBase):
 
   # Test unpacking process.
 
+  def create_unpack_build_file(self):
+    self.add_to_build_file('unpack', dedent('''
+            android_library(name='test',
+              libraries=['unpack/libs:test-jar'],
+              include_patterns=[
+                'a/b/c/*.class',
+              ],
+             )
+            '''))
+
+  def test_unpack_jar_library(self):
+    # Test for when the imported library is a jarfile.
+    with temporary_dir() as temp:
+      with self.sample_jarfile(temp, 'org.pantsbuild.android.test',
+                               filenames=['a/b/c/Any.class', 'a/b/d/Thing.class']) as jar_file:
+        self.create_unpack_build_file()
+        target_name = 'unpack:test'
+        self._make_android_dependency('test-jar', jar_file, '1.0')
+        test_target = self.target(target_name)
+        files = self.unpack_libraries(target_name, jar_file)
+
+        # If the android_library imports a jar, files are unpacked but no new targets are created.
+        self.assertIn('Thing.class', files)
+        self.assertEqual(len(test_target.dependencies), 0)
+
+
+  def test_unexpected_archive_type(self):
+    with self.assertRaises(UnpackLibraries.UnexpectedArchiveType):
+      with temporary_dir() as temp:
+        with self.sample_aarfile(temp, 'org.pantsbuild.android.test') as aar:
+          unexpected_archive = os.path.join(temp, 'org.pantsbuild.android.test{}'.format('.other'))
+          os.rename(aar, unexpected_archive)
+          self.create_unpack_build_file()
+
+          target_name = 'unpack:test'
+          self._make_android_dependency('test-jar', unexpected_archive, '1.0')
+          self.unpack_libraries(target_name, unexpected_archive)
+
+  # Test aar unpacking and invalidation
+
   def test_ivy_args(self):
     # A regression test for ivy_mixin_task. UnpackLibraries depends on the mapped jar filename being
     # unique and including the version number. If you are making a change to
@@ -200,11 +246,10 @@ class UnpackLibrariesTest(TestAndroidBase):
   # care about the details of the imported jar name but it does rely on that name being unique and
   # including the version number.
   def _approximate_ivy_mapjar_name(self, archive, android_archive):
-    # This essentially takes the AndroidDependency's target.id and adds the file extension.
+    # This basically creates a copy named after the target.id + file extension.
     location = os.path.dirname(archive)
-    ivy_mapjar_name = os.path.join(location, '{}{}'.format(android_archive,
-                                                           os.path.splitext(archive)[1]))
-
+    ivy_mapjar_name = os.path.join(location,
+                                   '{}{}'.format(android_archive, os.path.splitext(archive)[1]))
     shutil.copy(archive, ivy_mapjar_name)
     return ivy_mapjar_name
 
@@ -220,22 +265,16 @@ class UnpackLibrariesTest(TestAndroidBase):
       )
     '''.format(name=name, version=version, filepath=library_file)))
 
-  def _add_dummy_product(self, foo_target, android_dep, unpack_task):
-    ivy_imports_product = unpack_task.context.products.get('ivy_imports')
-    ivy_imports_product.add(foo_target, os.path.dirname(android_dep),
-                            [os.path.basename(android_dep)])
-
-
   def unpack_libraries(self, target_name, aar_file):
-    test_target = self.target('{}'.format(target_name))
+    test_target = self.target(target_name)
     task = self.create_task(self.context(target_roots=[test_target]))
 
     for android_archive in test_target.imported_jars:
       target_jar = self._approximate_ivy_mapjar_name(aar_file, android_archive)
-      self._add_dummy_product(test_target, target_jar, task)
+      self._add_ivy_imports_product(test_target, target_jar, task)
     task.execute()
 
-    # Check output from unpacking this aar file.
+    # Gather classes found when unpacking the aar_file.
     aar_name = os.path.basename(target_jar)
     files = []
     jar_location = task.unpack_jar_location(aar_name)
@@ -243,17 +282,11 @@ class UnpackLibrariesTest(TestAndroidBase):
       files.extend(filename)
     return files
 
-  def test_unpack_libraries_invalidation(self):
+  def test_unpack_aar_files_and_invalidation(self):
     with temporary_dir() as temp:
       with self.sample_aarfile(temp, 'org.pantsbuild.android.test') as aar:
-        self.add_to_build_file('unpack', dedent('''
-        android_library(name='test',
-          libraries=['unpack/libs:test-jar'],
-          include_patterns=[
-            'a/b/c/*.class',
-          ],
-         )
-        '''))
+        self.create_unpack_build_file()
+
         target_name = 'unpack:test'
         self._make_android_dependency('test-jar', aar, '1.0')
         files = self.unpack_libraries(target_name, aar)
