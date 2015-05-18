@@ -798,7 +798,7 @@ class JarPublish(ScmPublishMixin, JarTask):
                            'classifier': classifier,
                            'conf': confs,
                            'ext': DEFAULT_EXT}
-          return stage_artifact(tgt, jar, version, changelog, confs,
+          return stage_artifact(tgt, jar, version, tag_name, changelog, confs,
                               extra_confs=extra_confs, classifier=classifier)
       raise ValueError('No product mapping in {0} for {1}. '
                        'You may need to run some other task first'.format(product_config.keys(),
