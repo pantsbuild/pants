@@ -57,12 +57,16 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
       json_data = self.run_export(test_target, workdir, ['resolve'])
       self.assertIsNone(json_data.get('libraries').get('com.typesafe.sbt:incremental-compiler:0.13.7'))
+      self.assertIsNotNone(json_data.get('excludes'))
+      self.assertTrue('com.martiansoftware:nailgun-server' in json_data.get('excludes'))
 
   def test_export_jar_path_with_excludes_soft(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
       json_data = self.run_export(test_target, workdir, ['resolve', '--resolve-ivy-soft-excludes'])
       self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
+      self.assertIsNotNone(json_data.get('excludes'))
+      self.assertTrue('com.martiansoftware:nailgun-server' in json_data.get('excludes'))
 
   def test_export_jar_path(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
