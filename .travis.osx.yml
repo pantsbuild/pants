@@ -27,7 +27,7 @@ env:
     # No need to run the self-checks on OSX where vms are at a premium since these are file-level,
     # non-platform fragile lints.
     # - CI_FLAGS="-clpnet 'Various pants self checks'"  # (fkmsr)
-    - CI_FLAGS="-fkmsrcnet 'Unit tests for pants and pants-plugins'"  # (jlp)
+    - CI_FLAGS="-fkmsrcn 'Unit tests for pants and pants-plugins'"  # (jlp)
     - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
     - CI_FLAGS="-fkmsrjlpn -i 2:0 'Python integration tests for pants - shard 1'"  # (c)
     - CI_FLAGS="-fkmsrjlpn -i 2:1 'Python integration tests for pants - shard 2'"

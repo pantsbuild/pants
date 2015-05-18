@@ -126,6 +126,7 @@ class Distribution(object):
 
     self._jdk = jdk
 
+    self._home_path = None
     self._is_jdk = False
     self._system_properties = None
     self._version = None
@@ -151,27 +152,45 @@ class Distribution(object):
     return self._get_version(self.java)
 
   def find_libs(self, names):
-    """Looks for jars in lib folder.
+    """Looks for jars in the distribution lib folder(s).
+
+    If the distribution is a JDK, both the `lib` and `jre/lib` dirs will be scanned.
+    The endorsed and extension dirs are not checked.
 
     :param list names: jar file names
     :return: list of paths to requested libraries
     :raises: `Distribution.Error` if any of the jars could not be found.
     """
     def collect_existing_libs():
-      # self._bin_path points to bin folder.
-      jdk_root = os.path.dirname(self._bin_path)
+      def lib_paths():
+        yield os.path.join(self.home, 'lib')
+        if self.jdk:
+          yield os.path.join(self.home, 'jre', 'lib')
+
       for name in names:
-        lib_path = os.path.join(jdk_root, 'lib', name)
-        if not os.path.exists(lib_path):
+        for path in lib_paths():
+          lib_path = os.path.join(path, name)
+          if os.path.exists(lib_path):
+            yield lib_path
+            break
+        else:
           raise Distribution.Error('Failed to locate {} library'.format(name))
-        yield lib_path
 
     return list(collect_existing_libs())
 
   @property
   def home(self):
     """Returns the distribution JAVA_HOME."""
-    return self._get_system_properties(self.java)['java.home']
+    if not self._home_path:
+      home = self._get_system_properties(self.java)['java.home']
+      # The `jre/bin/java` executable in a JDK distribution will report `java.home` as the jre dir,
+      # so we check for this and re-locate to the containing jdk dir when present.
+      if os.path.basename(home) == 'jre':
+        jdk_dir = os.path.dirname(home)
+        if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
+          home = jdk_dir
+      self._home_path = home
+    return self._home_path
 
   @property
   def java(self):
@@ -193,6 +212,7 @@ class Distribution(object):
         >>>
 
     If this distribution has no valid command of the given name raises Distribution.Error.
+    If this distribution is a JDK checks both `bin` and `jre/bin` for the binary.
     """
     if not isinstance(name, string_types):
       raise ValueError('name must be a binary name, given {} of type {}'.format(name, type(name)))
@@ -219,6 +239,10 @@ class Distribution(object):
         if version > self._maximum_version:
           raise self.Error('The java distribution at {} is too new; expecting no older than'
                            ' {} and got {}'.format(java, self._maximum_version, version))
+
+    # We might be a JDK discovered by the embedded jre `java` executable.
+    # If so reset the bin path to the true JDK home dir for full access to all binaries.
+    self._bin_path = os.path.join(self.home, 'bin')
 
     try:
       self._validated_executable('javac')  # Calling purely for the check and cache side effects
@@ -254,11 +278,17 @@ class Distribution(object):
     return self._system_properties
 
   def _validate_executable(self, name):
-    exe = os.path.join(self._bin_path, name)
-    if not self._is_executable(exe):
-      raise self.Error('Failed to locate the {} executable, {} does not appear to be a'
-                       ' valid {} distribution'.format(name, self, 'JDK' if self._jdk else 'JRE'))
-    return exe
+    def bin_paths():
+      yield self._bin_path
+      if self._is_jdk:
+        yield os.path.join(self.home, 'jre', 'bin')
+
+    for bin_path in bin_paths():
+      exe = os.path.join(bin_path, name)
+      if self._is_executable(exe):
+        return exe
+    raise self.Error('Failed to locate the {} executable, {} does not appear to be a'
+                     ' valid {} distribution'.format(name, self, 'JDK' if self._jdk else 'JRE'))
 
   def _validated_executable(self, name):
     exe = self._validated_binaries.get(name)
@@ -275,4 +305,4 @@ class Distribution(object):
 
   def __repr__(self):
     return ('Distribution({!r}, minimum_version={!r}, maximum_version={!r} jdk={!r})'.format(
-             self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
+            self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
