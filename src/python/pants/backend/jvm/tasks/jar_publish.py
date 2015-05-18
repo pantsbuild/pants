@@ -693,7 +693,7 @@ class JarPublish(ScmPublishMixin, JarTask):
 
     def stage_artifacts(tgt, jar, version, tag, changelog):
       if self.get_options().individual_plugins:
-        return stage_individual_plugins(tgt, jar, version, changelog)
+        return stage_individual_plugins(tgt, jar, version, tag, changelog)
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_EXTENSION = 'jar'
@@ -767,7 +767,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return stage_artifact(tgt, jar, version, tag, changelog, confs, extra_confs=extra_confs)
 
     # TODO Remove this once we fix https://github.com/pantsbuild/pants/issues/1229
-    def stage_individual_plugins(tgt, jar, version, changelog):
+    def stage_individual_plugins(tgt, jar, version, tag_name, changelog):
       DEFAULT_IVY_TYPE = 'jar'
       DEFAULT_CLASSIFIER = ''
       DEFAULT_CONF = 'default'
