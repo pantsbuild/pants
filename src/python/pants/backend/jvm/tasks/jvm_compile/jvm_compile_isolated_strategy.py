@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 from contextlib import contextmanager
+
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
