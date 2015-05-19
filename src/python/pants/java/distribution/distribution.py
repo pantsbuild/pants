@@ -143,8 +143,6 @@ class Distribution(object):
       for location in cls._linux_java_homes():
         yield location
 
-      # OSX has non-standard on-disk layouts for jdks that can lead to trouble unless a special
-      # tool is used to locate the standard-layout dir.
       for location in cls._osx_java_homes():
         yield location
 
@@ -192,7 +190,9 @@ class Distribution(object):
 
   def __init__(self, home_path=None, bin_path=None, minimum_version=None, maximum_version=None,
                jdk=False):
-    """Creates a distribution wrapping the given bin_path.
+    """Creates a distribution wrapping the given `home_path` or `bin_path`.
+
+    Only one of `home_path` or `bin_path` should be supplied.
 
     :param string home_path: the path to the java distribution's home dir
     :param string bin_path: the path to the java distribution's bin dir
@@ -204,9 +204,9 @@ class Distribution(object):
       raise ValueError('The specified java home path is invalid: {}'.format(home_path))
     if bin_path and not os.path.isdir(bin_path):
       raise ValueError('The specified binary path is invalid: {}'.format(bin_path))
-    if home_path and bin_path and not bin_path.startswith(home_path):
-      raise ValueError('The specified binary path {} is not inside java home {}'
-                       .format(bin_path, home_path))
+    if not bool(home_path) ^ bool(bin_path):
+      raise ValueError('Exactly one of home path or bin path should be supplied, given: '
+                       'home_path={} bin_path={}'.format(home_path, bin_path))
 
     self._home = home_path
     self._bin_path = bin_path or (os.path.join(home_path, 'bin') if home_path else '/usr/bin')

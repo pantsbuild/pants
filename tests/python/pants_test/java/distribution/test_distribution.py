@@ -44,10 +44,10 @@ def distribution(files=None, executables=None, java_home=None):
     with environment_as(DIST_ROOT=os.path.join(dist_root, java_home) if java_home else dist_root):
       for f in maybe_list(files or ()):
         touch(os.path.join(dist_root, f))
-      for exe in maybe_list(executables or (), expected_type=EXE):
-        path = os.path.join(dist_root, exe.relpath)
+      for executable in maybe_list(executables or (), expected_type=EXE):
+        path = os.path.join(dist_root, executable.relpath)
         with safe_open(path, 'w') as fp:
-          fp.write(exe.contents or '')
+          fp.write(executable.contents or '')
         chmod_plus_x(path)
       yield dist_root
 
@@ -227,9 +227,8 @@ class DistributionEnvLocationTest(BaseDistributionLocationEnvOnlyTest):
         Distribution.locate(jdk=True)
 
   def test_locate_jdk_via_jre_path(self):
-    with distribution(executables=[exe('jre/bin/java'),
-                                        exe('bin/javac')],
-                           java_home='jre') as dist_root:
+    with distribution(executables=[exe('jre/bin/java'), exe('bin/javac')],
+                      java_home='jre') as dist_root:
       with env(PATH=os.path.join(dist_root, 'jre', 'bin')):
         Distribution.locate(jdk=True)
 
