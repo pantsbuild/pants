@@ -409,9 +409,9 @@ class Target(AbstractTarget):
     """
     return self.id
 
-  def walk(self, work, predicate=None):
-    """Walk of this target's dependency graph, DFS preorder traversal, visiting each node exactly
-    once.
+  def walk(self, work, predicate=None, postorder=False):
+    """Walk of this target's dependency graph, visiting each node exactly once, in DFS preorder (or
+    postorder if the postorder parameter is True).
 
     If a predicate is supplied it will be used to test each target before handing the target to
     work and descending. Work can return targets in which case these will be added to the walk
@@ -421,12 +421,15 @@ class Target(AbstractTarget):
       as its single argument.
     :param predicate: Callable that takes a :py:class:`pants.base.target.Target`
       as its single argument and returns True if the target should passed to ``work``.
+    :param bool postorder: When ``True``, the traversal order is postorder (children before
+      parents), else it is preorder (parents before children).
     """
     if not callable(work):
       raise ValueError('work must be callable but was {}'.format(work))
     if predicate and not callable(predicate):
       raise ValueError('predicate must be callable but was {}'.format(predicate))
-    self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
+    self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate,
+                                                       postorder=postorder)
 
   def closure(self, bfs=False):
     """Returns this target's transitive dependencies.
