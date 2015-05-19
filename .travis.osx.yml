@@ -29,8 +29,9 @@ env:
     # - CI_FLAGS="-clpnet 'Various pants self checks'"  # (fkmsr)
     - CI_FLAGS="-fkmsrcn 'Unit tests for pants and pants-plugins'"  # (jlp)
     - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
-    - CI_FLAGS="-fkmsrjlpn -i 2:0 'Python integration tests for pants - shard 1'"  # (c)
-    - CI_FLAGS="-fkmsrjlpn -i 2:1 'Python integration tests for pants - shard 2'"
+    - CI_FLAGS="-fkmsrjlpn -i 0/3 'Python integration tests for pants - shard 1'"  # (c)
+    - CI_FLAGS="-fkmsrjlpn -i 1/3 'Python integration tests for pants - shard 2'"
+    - CI_FLAGS="-fkmsrjlpn -i 2/3 'Python integration tests for pants - shard 3'"
 
 before_install:
   # We need a sane python and as of 3/5/2015 on OSX 10.9 the provided python 2.7.5 encounters
