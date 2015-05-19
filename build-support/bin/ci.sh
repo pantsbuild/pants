@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpncia)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpuncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -22,12 +22,16 @@ function usage() {
   echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
+  echo " -u SHARD_NUMBER/TOTAL_SHARDS"
+  echo "              if running core python tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -n           skip contrib python tests"
   echo " -c           skip pants integration tests (includes examples and testprojects)"
-  echo " -i TOTAL_SHARDS:SHARD_NUMBER"
+  echo " -i SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running integration tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
+  echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
   echo " -a           skip android targets when running tests"
   if (( $# > 0 )); then
     die "$@"
@@ -42,7 +46,11 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrjlpnci:a" opt; do
+# No python test sharding (1 shard) by default.
+python_unit_shard="0/1"
+python_intg_shard="0/1"
+
+while getopts "hfxbkmsrjlpu:nci:a" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -55,15 +63,10 @@ while getopts "hfxbkmsrjlpnci:a" opt; do
     j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
+    u) python_unit_shard=${OPTARG} ;;
     n) skip_contrib="true" ;;
     c) skip_integration="true" ;;
-    i)
-      if [[ "valid" != "$(echo ${OPTARG} | sed -E 's|[0-9]+:[0-9]+|valid|')" ]]; then
-        usage "Invalid shard specification '${OPTARG}'"
-      fi
-      TOTAL_SHARDS=${OPTARG%%:*}
-      SHARD_NUMBER=${OPTARG##*:}
-      ;;
+    i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
@@ -179,7 +182,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_unit_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
@@ -204,12 +207,10 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_intg_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
-            grep integration | \
-            sort | \
-            awk "NR%${TOTAL_SHARDS:-1}==${SHARD_NUMBER:-0}")
+            grep integration)
   ) || die "Pants Integration test failure"
 fi
 
