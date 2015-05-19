@@ -4,6 +4,7 @@
 package org.pantsbuild.tools.jar;
 
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -1186,8 +1187,9 @@ public class JarBuilder implements Closeable {
   }
 
   private JarWriter jarWriter(File path, boolean compress) throws IOException {
-    FileOutputStream out = closer.register(new FileOutputStream(path));
-    final JarOutputStream jar = closer.register(new JarOutputStream(out));
+    FileOutputStream fout = closer.register(new FileOutputStream(path));
+    BufferedOutputStream bout = closer.register(new BufferedOutputStream(fout, 1024 * 1024));
+    final JarOutputStream jar = closer.register(new JarOutputStream(bout));
     closer.register(new Closeable() {
       @Override public void close() throws IOException {
         jar.closeEntry();
