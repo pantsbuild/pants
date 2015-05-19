@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 from contextlib import contextmanager
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
@@ -115,7 +117,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def exclude_patterns_for_closure(self, target_closure):
     excludes_patterns = set()
     for target in target_closure:
-      if target.excludes:
+      if isinstance(target, (JvmTarget, JarLibrary)) and target.excludes:
         excludes_patterns.update([os.path.sep.join(['jars', e.org, e.name or ''])
                                   for e in target.excludes])
     return excludes_patterns
