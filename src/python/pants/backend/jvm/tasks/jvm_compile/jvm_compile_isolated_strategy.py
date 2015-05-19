@@ -114,7 +114,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         classes_by_src[relsrc] = classes
     return classes_by_src_by_context
 
-  def exclude_patterns_for_closure(self, target_closure):
+  def _exclude_patterns_for_closure(self, target_closure):
     excludes_patterns = set()
     for target in target_closure:
       if isinstance(target, (JvmTarget, JarLibrary)) and target.excludes:
@@ -130,7 +130,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # for upstream targets.
     raw_compile_classpath = compile_classpaths.get_for_target(compile_context.target)
 
-    exclude_patterns = self.exclude_patterns_for_closure(target_closure)
+    exclude_patterns = self._exclude_patterns_for_closure(target_closure)
 
     classpath_minus_excludes = [(conf, entry) for conf, entry in raw_compile_classpath
                                 if not any(excluded in entry for excluded in exclude_patterns)]
