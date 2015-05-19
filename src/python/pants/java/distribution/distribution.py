@@ -179,7 +179,7 @@ class Distribution(object):
     # We accommodate that difference here using lenient parsing.
     # We also accommodate specification versions, which just have major and minor
     # components; eg: `1.8`.  These are useful when specifying constraints a distribution must
-    # satisfy; eg to pick any 1.8 java distribution: '1.8' <= version <= '1.8.99'
+    # satisfy; eg: to pick any 1.8 java distribution: '1.8' <= version <= '1.8.99'
     if isinstance(version, string_types):
       version = Revision.lenient(version)
     if version and not isinstance(version, Revision):

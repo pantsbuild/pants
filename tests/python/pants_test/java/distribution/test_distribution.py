@@ -51,6 +51,7 @@ def distribution(files=None, executables=None, java_home=None):
         chmod_plus_x(path)
       yield dist_root
 
+
 @contextmanager
 def env(**kwargs):
   environment = dict(JDK_HOME=None, JAVA_HOME=None, PATH=None)
@@ -145,27 +146,28 @@ class DistributionValidationTest(unittest.TestCase):
 
 
 class BaseDistributionLocationTest(unittest.TestCase):
-  def set_up_no_linux_discovery(self):
-    isdir = os.path.isdir
-
-    def restore_isdir():
-      os.path.isdir = isdir
-    os.path.isdir = lambda path: False if path == '/usr/lib/jvm' else isdir(path)
-    self.addCleanup(restore_isdir)
-
-  def set_up_no_osx_discovery(self):
-    osx_java_home_exe = Distribution._OSX_JAVA_HOME_EXE
-
+  def make_tmp_dir(self):
     tmpdir = tempfile.mkdtemp()
 
     def cleanup_tmpdir():
       safe_rmtree(tmpdir)
     self.addCleanup(cleanup_tmpdir)
+    return tmpdir
+
+  def set_up_no_linux_discovery(self):
+    orig_java_dist_dir = Distribution._JAVA_DIST_DIR
+
+    def restore_java_dist_dir():
+      Distribution._JAVA_DIST_DIR = orig_java_dist_dir
+    Distribution._JAVA_DIST_DIR = self.make_tmp_dir()
+    self.addCleanup(restore_java_dist_dir)
+
+  def set_up_no_osx_discovery(self):
+    osx_java_home_exe = Distribution._OSX_JAVA_HOME_EXE
 
     def restore_osx_java_home_exe():
       Distribution._OSX_JAVA_HOME_EXE = osx_java_home_exe
-
-    Distribution._OSX_JAVA_HOME_EXE = os.path.join(tmpdir, 'java_home')
+    Distribution._OSX_JAVA_HOME_EXE = os.path.join(self.make_tmp_dir(), 'java_home')
     self.addCleanup(restore_osx_java_home_exe)
 
 
