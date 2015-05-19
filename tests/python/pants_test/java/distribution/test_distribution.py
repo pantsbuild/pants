@@ -148,10 +148,7 @@ class DistributionValidationTest(unittest.TestCase):
 class BaseDistributionLocationTest(unittest.TestCase):
   def make_tmp_dir(self):
     tmpdir = tempfile.mkdtemp()
-
-    def cleanup_tmpdir():
-      safe_rmtree(tmpdir)
-    self.addCleanup(cleanup_tmpdir)
+    self.addCleanup(safe_rmtree, tmpdir)
     return tmpdir
 
   def set_up_no_linux_discovery(self):
