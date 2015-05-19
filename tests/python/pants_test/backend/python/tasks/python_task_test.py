@@ -27,10 +27,12 @@ class PythonTaskTest(TaskTestBase):
   def setUp(self):
     super(PythonTaskTest, self).setUp()
 
-    # This is a test performance hack - instead of using a new workdir per test run, re-use a
-    # workdir across all test runs.  The important bit of savings here is the dep resolution and
-    # interpreter setup.  At the time of writing, this packages tests run at 43s with this hack and
-    # 194s without (line below commented out).
+    # This is a test performance hack.  Instead of using a new workdir per test setUp/tearDown
+    # (per-each test function/method executed) as is normal for `TaskTestBase`, re-use a single
+    # workdir across all test test function/method executions in a given concrete `PythonTaskTest`
+    # subclass.  The important bit of savings here is the dep resolution and interpreter setup.  At
+    # the time of writing, this packages tests run at 43s with this hack and 194s without (line
+    # below commented out).
     self.set_options_for_scope('', pants_workdir=self.workdir)
 
     self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
