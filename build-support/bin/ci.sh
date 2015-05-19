@@ -162,7 +162,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
@@ -172,13 +172,15 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex ${PANTS_ARGS[@]} test \
         $(./pants.pex list pants-plugins/tests/python:: | \
-            xargs ./pants.pex filter --filter-type=python_tests | \
-            grep -v integration)
+            xargs ./pants.pex filter --filter-type=python_tests)
   ) || die "Internal backend python test failure"
 fi
 
 if [[ "${skip_python:-false}" == "false" ]]; then
-  banner "Running core python tests"
+  if [[ "0/1" != "${python_unit_shard}" ]]; then
+    shard_desc=" [shard ${python_unit_shard}]"
+  fi
+  banner "Running core python tests${shard_desc}"
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
@@ -201,8 +203,8 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
-  if [[ ! -z "${TOTAL_SHARDS}" ]]; then
-    shard_desc=" [shard $((SHARD_NUMBER+1)) of ${TOTAL_SHARDS}]"
+  if [[ "0/1" != "${python_intg_shard}" ]]; then
+    shard_desc=" [shard ${python_intg_shard}]"
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
