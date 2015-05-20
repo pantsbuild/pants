@@ -113,4 +113,4 @@ class ClasspathUtil(object):
     buildroot = get_buildroot()
     for f in classpath:
       if os.path.relpath(f, buildroot).startswith('..'):
-        raise TaskError('Classpath entry {} is located outside the buildroot.'.format())
+        raise TaskError('Classpath entry {} is located outside the buildroot.'.format(f))
