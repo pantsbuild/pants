@@ -33,6 +33,7 @@ from pants.backend.core.tasks.reporting_server import KillServer, RunServer
 from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
+from pants.backend.core.tasks.attributes import Attributes
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
@@ -97,6 +98,9 @@ def build_file_aliases():
 def register_goals():
   # Getting help.
   task(name='goals', action=ListGoals).install().with_description('List all documented goals.')
+
+  task(name='attributes', action=Attributes).install().with_description(
+    'List attributes of targets such as platform or language.')
 
   task(name='targets', action=TargetsHelp).install().with_description(
       'List target types and BUILD file symbols (python_tests, jar, etc).')
