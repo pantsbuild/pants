@@ -13,6 +13,7 @@ from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDepe
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
+from pants.backend.core.tasks.attributes import Attributes
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
@@ -33,7 +34,6 @@ from pants.backend.core.tasks.reporting_server import KillServer, RunServer
 from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
-from pants.backend.core.tasks.attributes import Attributes
 from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
