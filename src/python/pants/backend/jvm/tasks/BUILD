@@ -114,6 +114,17 @@ python_library(
 )
 
 python_library(
+  name = 'classpath_util',
+  sources = ['classpath_util.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+  ],
+)
+
+python_library(
   name = 'detect_duplicates',
   sources = ['detect_duplicates.py'],
   dependencies = [
@@ -291,6 +302,7 @@ python_library(
   name = 'jvm_task',
   sources = ['jvm_task.py'],
   dependencies = [
+    ':classpath_util',
     ':common',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/option',

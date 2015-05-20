@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.option.options import Options
 from pants.util.strutil import safe_shlex_split
 
@@ -61,11 +62,10 @@ class JvmTask(Task):
 
   def classpath(self, targets, cp=None):
     classpath = list(cp) if cp else []
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    compile_classpath = compile_classpaths.get_for_targets(targets)
 
-    def conf_needed(conf):
-      return not self.confs or conf in self.confs
-
-    classpath.extend(path for conf, path in compile_classpath if conf_needed(conf))
+    classpath_for_targets = ClasspathUtil. \
+      classpath_entries(targets,
+                        self.context.products.get_data('compile_classpath'),
+                        self.confs)
+    classpath.extend(classpath_for_targets)
     return classpath
