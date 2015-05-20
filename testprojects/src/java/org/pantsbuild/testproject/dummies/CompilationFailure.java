@@ -1,5 +1,6 @@
 package org.pantsbuild.testproject.dummies;
 
+// intentional warning. see JvmExamplesCompileIntegrationTest#test_log_level
 import sun.security.x509.X500Name;
 
 /**
@@ -8,6 +9,7 @@ import sun.security.x509.X500Name;
 public class CompilationFailure {
   public static void main(String[] args) {
     System.out.println("Hello World!");
+    // intentional error. see JvmExamplesCompileIntegrationTest#test_log_level
     System2.out.println("Hello World!");
   }
 }

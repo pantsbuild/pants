@@ -29,13 +29,16 @@ object Main {
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
     val log = Util.logger(settings.quiet, settings.logLevel, settings.color)
-    val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
+    val isDebug = !settings.quiet && settings.logLevel == Level.Debug
 
     // bail out on any command-line option errors
-    if (!errors.isEmpty) {
+    if (errors.nonEmpty) {
       for (error <- errors) log.error(error)
       log.error("See %s -help for information about options" format Setup.Command)
       sys.exit(1)
+    }
+    if (rawSettings.forkJava) {
+      log.warn("-fork-java is deprecated and will be ignored. Use -java-home instead.")
     }
 
     if (settings.version) Setup.printVersion()

@@ -45,3 +45,4 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
         workdir, target, strategy, extra_args=['--compile-zinc-java-enabled', '--no-color'], clean_all=True
       )
       self.assertTrue('[warn] sun.security.x509.X500Name' in pants_run.stdout_data)
+      self.assertTrue('[error] System2.out' in pants_run.stdout_data)
