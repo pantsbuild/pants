@@ -4,6 +4,7 @@
 target(
   name = 'all',
   dependencies = [
+    ':attributes',
     ':builddictionary',
     ':changed_target_goals',
     ':clean',
@@ -43,6 +44,15 @@ target(
 )
 
 python_library(
+  name = 'attributes',
+  sources = ['attributes.py'],
+  dependencies = [
+    ':common',
+    ':console_task',
+    ],
+)
+
+python_library(
   name = 'builddictionary',
   sources = ['builddictionary.py'],
   resources = globs('templates/builddictionary/*.mustache'),
@@ -58,6 +68,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_manual',
+    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
@@ -252,6 +263,7 @@ python_library(
     '3rdparty/python:docutils',
     '3rdparty/python:six',
     'src/python/pants/base:build_manual',
+    'src/python/pants/base:config',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
@@ -304,7 +316,6 @@ python_library(
   sources = ['targets_help.py'],
   resources = globs('templates/targets_help/*.mustache'),
   dependencies = [
-    ':builddictionary',
     ':common',
     ':console_task',
     ':reflect',
