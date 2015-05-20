@@ -49,13 +49,15 @@ python_binary(
   ],
 )
 
-# This binary is for internal use only.  It adds a dep on internal_backends not meant for
-# publishing in the `pantsbuild.pants` sdist.
+# This binary is for internal use only.  It adds a deps on both internal_backends not meant for
+# publishing in the `pantsbuild.pants` sdist as well as deps on backend plugins published as
+# seperate sdists from the core `pantsbuild.pants` sdist that this repo uses.
 python_binary(
   name = 'pants_local_binary',
   entry_point = 'pants.bin.pants_exe:main',
   dependencies = [
     ':bin',
     'pants-plugins/src/python/internal_backend:plugins',
+    'src/python/pants/backend/android:plugin',
   ],
 )

@@ -134,22 +134,6 @@ fi
 if [[ "${skip_distribution:-false}" == "false" ]]; then
   banner "Running pants distribution tests"
   (
-    # The published pants should need no local plugins beyond the python backend to distribute
-    # itself so we override backends to ensure a minimal env works.
-    config=$(mktemp -t pants-ci.XXXXXX.ini) && \
-    (cat << EOF > ${config}
-[DEFAULT]
-backend_packages: [
-    # TODO(John Sirois): When we have fine grained plugins, include the python backend here
-    "internal_backend.utilities",
-  ]
-EOF
-    ) && \
-    ./pants.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
-      src/python/pants/bin:pants && \
-    mv dist/pants.pex dist/self.pex && \
-    ./dist/self.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
-      src/python/pants/bin:pants && \
     ./build-support/bin/release.sh -pn
   ) || die "Failed to create pants distributions."
 fi

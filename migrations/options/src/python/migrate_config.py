@@ -18,7 +18,7 @@ migrations = {
 
   ('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
-  ('goals', 'bootstrap_buildfiles'): ('DEFAULT', 'bootstrap_buildfiles'),
+  ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
   ('jvm', 'missing_deps_target_whitelist'): ('compile.java', 'missing_deps_whitelist'),
 

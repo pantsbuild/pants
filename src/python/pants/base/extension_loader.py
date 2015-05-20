@@ -99,8 +99,7 @@ def load_build_configuration_from_source(build_configuration, additional_backend
                       'pants.backend.jvm',
                       'pants.backend.codegen',
                       'pants.backend.maven_layout',
-                      'pants.backend.project_info',
-                      'pants.backend.android']
+                      'pants.backend.project_info']
 
   for backend_package in OrderedSet(backend_packages + (additional_backends or [])):
     load_backend(build_configuration, backend_package)
