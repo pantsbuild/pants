@@ -19,7 +19,6 @@ case class Setup(
   sbtInterface: File,
   compilerInterfaceSrc: File,
   javaHome: Option[File],
-  forkJava: Boolean,
   cacheDir: File)
 
 /**
@@ -61,7 +60,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome)
   }
 
   /**
@@ -73,8 +72,7 @@ object Setup {
     scalaExtra: Seq[File],
     sbtInterface: File,
     compilerInterfaceSrc: File,
-    javaHomeDir: Option[File],
-    forkJava: Boolean): Setup =
+    javaHomeDir: Option[File]): Setup =
   {
     val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
@@ -84,7 +82,7 @@ object Setup {
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
     val cacheDir             = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, cacheDir)
   }
 
   /**
@@ -96,28 +94,15 @@ object Setup {
     scalaExtra: JList[File],
     sbtInterface: File,
     compilerInterfaceSrc: File,
-    javaHome: File,
-    forkJava: Boolean): Setup =
+    javaHome: File): Setup =
   setup(
     scalaCompiler,
     scalaLibrary,
     scalaExtra.asScala,
     sbtInterface,
     compilerInterfaceSrc,
-    Option(javaHome),
-    forkJava
+    Option(javaHome)
   )
-
-  @deprecated("Use variant that takes forkJava parameter instead.", "0.3.6")
-  def create(
-    scalaCompiler: File,
-    scalaLibrary: File,
-    scalaExtra: JList[File],
-    sbtInterface: File,
-    compilerInterfaceSrc: File,
-    javaHome: File): Setup =
-      create(scalaCompiler, scalaLibrary, scalaExtra, sbtInterface,
-        compilerInterfaceSrc, javaHome, false)
 
   /**
    * Java API for creating Setup with ScalaLocation and SbtJars.
@@ -125,8 +110,7 @@ object Setup {
   def create(
     scalaLocation: ScalaLocation,
     sbtJars: SbtJars,
-    javaHome: File,
-    forkJava: Boolean): Setup =
+    javaHome: File): Setup =
   {
     val scalaJars = selectScalaJars(scalaLocation)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(sbtJars)
@@ -136,16 +120,9 @@ object Setup {
       scalaJars.extra,
       sbtInterface,
       compilerInterfaceSrc,
-      Option(javaHome),
-      forkJava
+      Option(javaHome)
     )
   }
-
-  @deprecated("Use variant that takes forkJava parameter instead.", "0.3.6")
-  def create(
-    scalaLocation: ScalaLocation,
-    sbtJars: SbtJars,
-    javaHome: File): Setup = create(scalaLocation, sbtJars, javaHome, false)
 
   /**
    * Select the scala jars.
@@ -307,7 +284,6 @@ object Setup {
       "sbt interface"              -> sbtInterface,
       "compiler interface sources" -> compilerInterfaceSrc,
       "java home"                  -> javaHome,
-      "fork java"                  -> forkJava,
       "cache directory"            -> cacheDir)
     Util.show(("Setup", values), output)
   }

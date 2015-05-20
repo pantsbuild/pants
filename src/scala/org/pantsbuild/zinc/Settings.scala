@@ -28,7 +28,6 @@ case class Settings(
   scala: ScalaLocation       = ScalaLocation(),
   scalacOptions: Seq[String] = Seq.empty,
   javaHome: Option[File]     = None,
-  forkJava: Boolean          = false,
   javaOnly: Boolean          = false,
   javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
@@ -206,7 +205,6 @@ object Settings {
 
     header("Java options:"),
     file(      "-java-home", "directory",      "Select javac home directory (and fork)",     (s: Settings, f: File) => s.copy(javaHome = Some(f))),
-    boolean(   "-fork-java",                   "Run java compiler in separate process",      (s: Settings) => s.copy(forkJava = true)),
     string(    "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
     boolean(   "-java-only",                   "Don't add scala library to classpath",       (s: Settings) => s.copy(javaOnly = true)),
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
