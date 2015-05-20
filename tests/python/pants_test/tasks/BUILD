@@ -8,6 +8,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:config',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/goal:context',
@@ -52,9 +53,11 @@ target(
   name = 'integration',
   dependencies = [
     ':antlr_integration',
+    ':attributes_integration',
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
+    ':export_integration',
     ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
@@ -75,6 +78,18 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    ]
+)
+
+python_tests(
+  name='attributes_integration',
+  sources=['test_attributes_integration.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+    ],
+  coverage=[
+    'pants.backend.core.tasks.attributes',
     ]
 )
 
@@ -235,6 +250,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'export_integration',
+  sources = ['test_export_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/ivy',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [
@@ -329,12 +354,11 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:generator',
     'src/python/pants/base:source_root',
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:utils',
   ],
 )
 
