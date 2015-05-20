@@ -18,27 +18,44 @@ from pants.base.exceptions import TaskError
 class ClasspathUtil(object):
 
   @staticmethod
-  def compute_classpath(all_targets, extra_classpath_tuples, products, confs):
+  def compute_classpath(targets, extra_classpath_tuples, products, confs):
+    """Returns the list of jar entries for a classpath covering all the passed targets.
+
+    :param targets: Targets to build a aggregated classpath for
+    :param extra_classpath_tuples: Additional (conf, path) pairs to be added to the classpath
+    :param products: The products manager for the current run
+    :param confs: The list of confs for use by this classpath
+    """
     extra_classpath_paths = ClasspathUtil._just_paths(extra_classpath_tuples)
+
     compile_classpaths = products.get_data('compile_classpath')
-    all_targets_compile_classpath = ClasspathUtil.classpath_entries(all_targets, compile_classpaths,
+    all_targets_compile_classpath = ClasspathUtil.classpath_entries(targets, compile_classpaths,
                                                                     confs)
     compile_classpath = OrderedSet(list(all_targets_compile_classpath) +
                                    extra_classpath_paths)
     return list(compile_classpath)
 
   @staticmethod
-  def compute_classpath_for_target(compile_classpaths, target, extra_compile_time_classpath,
+  def compute_classpath_for_target(compile_classpaths, target, extra_classpath_tuples,
                           target_closure,
                           confs):
+    """Returns the list of jar entries for a classpath covering the passed target.
+
+    :param UnionProduct compile_classpaths: Product containing classpath elements.
+    :param target: The target to generate a classpath for
+    :param extra_classpath_tuples: Additional classpath entries
+    :param target_closure: The transitive closure of the target
+    :param confs: The list of confs for use by this classpath
+    """
     classpath_for_target = ClasspathUtil.classpath_entries_for_target(target,
                                                                       compile_classpaths,
                                                                       confs=confs,
                                                                       target_closure=target_closure)
 
     extra_compiletime_classpath_paths = ClasspathUtil. \
-      _filter_classpath_and_include_only_paths(extra_compile_time_classpath, [], confs)
-    ClasspathUtil._validate_classpath_paths(extra_compile_time_classpath)
+      _filter_classpath_and_include_only_paths(extra_classpath_tuples, [], confs)
+    ClasspathUtil._validate_classpath_paths(extra_classpath_tuples)
+
     compile_classpath = classpath_for_target + \
                         extra_compiletime_classpath_paths
     return list(compile_classpath)
