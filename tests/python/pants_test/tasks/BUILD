@@ -52,6 +52,7 @@ target(
   name = 'integration',
   dependencies = [
     ':antlr_integration',
+    ':attributes_integration',
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
@@ -75,6 +76,18 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    ]
+)
+
+python_tests(
+  name='attributes_integration',
+  sources=['test_attributes_integration.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+    ],
+  coverage=[
+    'pants.backend.core.tasks.attributes',
     ]
 )
 

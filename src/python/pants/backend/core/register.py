@@ -13,6 +13,7 @@ from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDepe
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
+from pants.backend.core.tasks.attributes import Attributes
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
@@ -97,6 +98,9 @@ def build_file_aliases():
 def register_goals():
   # Getting help.
   task(name='goals', action=ListGoals).install().with_description('List all documented goals.')
+
+  task(name='attributes', action=Attributes).install().with_description(
+    'List attributes of targets such as platform or language.')
 
   task(name='targets', action=TargetsHelp).install().with_description(
       'List target types and BUILD file symbols (python_tests, jar, etc).')

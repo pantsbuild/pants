@@ -4,6 +4,7 @@
 target(
   name = 'all',
   dependencies = [
+    ':attributes',
     ':builddictionary',
     ':changed_target_goals',
     ':clean',
@@ -40,6 +41,15 @@ target(
     ':task',
     'src/python/pants/base:exceptions',
   ]
+)
+
+python_library(
+  name = 'attributes',
+  sources = ['attributes.py'],
+  dependencies = [
+    ':common',
+    ':console_task',
+    ],
 )
 
 python_library(
