@@ -36,13 +36,6 @@ class ClasspathUtil(object):
                                                                       confs=confs,
                                                                       target_closure=target_closure)
 
-    #compile_classpath = compile_classpaths.get_for_targets(targets)
-    #exclude_patterns = ClasspathUtil._exclude_patterns(targets)
-    #paths = ClasspathUtil._filter_classpath_and_include_only_paths(compile_classpath,
-    #                                                               exclude_patterns, confs)
-    #ClasspathUtil._validate_classpath_paths(paths)
-
-
     extra_compiletime_classpath_paths = ClasspathUtil. \
       _filter_classpath_and_include_only_paths(extra_compile_time_classpath, [], confs)
     ClasspathUtil._validate_classpath_paths(extra_compile_time_classpath)
