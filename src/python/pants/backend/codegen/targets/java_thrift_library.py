@@ -6,7 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.config import Config
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 
 
 class JavaThriftLibrary(JvmTarget):
@@ -37,22 +40,27 @@ class JavaThriftLibrary(JvmTarget):
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     """
-
-    super(JavaThriftLibrary, self).__init__(**kwargs)
-
-    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-    self.add_labels('codegen')
-
     def check_value_for_arg(arg, value, values):
       if value and value not in values:
         raise TargetDefinitionException(self, "{} may only be set to {} ('{}' not valid)"
                                         .format(arg, ', or '.join(map(repr, values)), value))
       return value
 
-    # TODO(pl): These should all live in payload fields
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = check_value_for_arg('language', language, self._LANGUAGES)
     self._rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
+
+    payload = Payload()
+    payload.add_fields({
+      'compiler': PrimitiveField(self._compiler),
+      'language': PrimitiveField(self._language),
+      'rpc_style': PrimitiveField(self._rpc_style),
+    })
+
+    super(JavaThriftLibrary, self).__init__(payload=payload, **kwargs)
+
+    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
+    self.add_labels('codegen')
 
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
