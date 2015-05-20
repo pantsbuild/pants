@@ -119,9 +119,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target, and include analysis
     # for upstream targets.
-    return ClasspathUtil.compute_classpath_for_target(compile_classpaths, compile_context.target,
-                                              extra_compile_time_classpath,
-                                              target_closure, self._confs)
+    return ClasspathUtil.compute_classpath_for_target(compile_context.target, compile_classpaths,
+                                                      extra_compile_time_classpath, self._confs,
+                                                      target_closure)
 
   def exec_graph_key_for_target(self, compile_target):
     return "compile-{}".format(compile_target.address.spec)
