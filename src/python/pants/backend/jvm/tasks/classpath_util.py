@@ -18,17 +18,16 @@ from pants.base.exceptions import TaskError
 class ClasspathUtil(object):
 
   @staticmethod
-  def compute_classpath(targets, extra_classpath_tuples, products, confs):
+  def compute_classpath(targets, extra_classpath_tuples, compile_classpaths, confs):
     """Returns the list of jar entries for a classpath covering all the passed targets.
 
     :param targets: Targets to build a aggregated classpath for
     :param extra_classpath_tuples: Additional (conf, path) pairs to be added to the classpath
-    :param products: The products manager for the current run
+    :param UnionProducts compile_classpaths: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath
     """
-    extra_classpath_paths = ClasspathUtil._just_paths(extra_classpath_tuples)
+    extra_classpath_paths = ClasspathUtil._pluck_paths(extra_classpath_tuples)
 
-    compile_classpaths = products.get_data('compile_classpath')
     all_targets_compile_classpath = ClasspathUtil.classpath_entries(targets, compile_classpaths,
                                                                     confs)
     compile_classpath = OrderedSet(list(all_targets_compile_classpath) +
@@ -41,7 +40,7 @@ class ClasspathUtil(object):
                           confs):
     """Returns the list of jar entries for a classpath covering the passed target.
 
-    :param UnionProduct compile_classpaths: Product containing classpath elements.
+    :param UnionProducts compile_classpaths: Product containing classpath elements.
     :param target: The target to generate a classpath for
     :param extra_classpath_tuples: Additional classpath entries
     :param target_closure: The transitive closure of the target
@@ -52,12 +51,13 @@ class ClasspathUtil(object):
                                                                       confs=confs,
                                                                       target_closure=target_closure)
 
-    extra_compiletime_classpath_paths = ClasspathUtil. \
-      _filter_classpath_and_include_only_paths(extra_classpath_tuples, [], confs)
-    ClasspathUtil._validate_classpath_paths(extra_classpath_tuples)
+    filtered_extra_classpath_tuples = ClasspathUtil. \
+      _filter_classpath_by_excludes_and_confs(extra_classpath_tuples, [], confs)
+    extra_classpath_paths = ClasspathUtil._pluck_paths(filtered_extra_classpath_tuples)
+    ClasspathUtil._validate_classpath_paths(filtered_extra_classpath_tuples)
 
     compile_classpath = classpath_for_target + \
-                        extra_compiletime_classpath_paths
+                        extra_classpath_paths
     return list(compile_classpath)
 
   @staticmethod
@@ -65,8 +65,9 @@ class ClasspathUtil(object):
     compile_classpath = compile_classpaths.get_for_target(target)
     exclude_patterns = ClasspathUtil._exclude_patterns_for_closure(target_closure or target.closure())
 
-    paths = ClasspathUtil._filter_classpath_and_include_only_paths(compile_classpath,
+    tuples = ClasspathUtil._filter_classpath_by_excludes_and_confs(compile_classpath,
                                                                    exclude_patterns, confs)
+    paths = ClasspathUtil._pluck_paths(tuples)
     ClasspathUtil._validate_classpath_paths(paths)
     return paths
 
@@ -74,26 +75,16 @@ class ClasspathUtil(object):
   def classpath_entries(targets, compile_classpaths, confs):
     compile_classpath = compile_classpaths.get_for_targets(targets)
     exclude_patterns = ClasspathUtil._exclude_patterns(targets)
-    paths = ClasspathUtil._filter_classpath_and_include_only_paths(compile_classpath,
+    tuples = ClasspathUtil._filter_classpath_by_excludes_and_confs(compile_classpath,
                                                                    exclude_patterns, confs)
+    paths = ClasspathUtil._pluck_paths(tuples)
     ClasspathUtil._validate_classpath_paths(paths)
     return paths
 
   @staticmethod
-  def _filter_classpath_and_include_only_paths(compile_classpath, exclude_patterns, confs):
+  def _filter_classpath_by_excludes_and_confs(compile_classpath, exclude_patterns, confs):
     def conf_needed(conf):
-      return not confs or conf in confs
-
-    def excluded(path):
-      return any(excluded in path for excluded in exclude_patterns)
-
-    return [path for conf, path in compile_classpath
-            if conf_needed(conf) and not excluded(path)]
-
-  @staticmethod
-  def _filter_classpath(compile_classpath, exclude_patterns, confs):
-    def conf_needed(conf):
-      return not confs or conf in confs
+      return conf in confs if confs else True
 
     def excluded(path):
       return any(excluded in path for excluded in exclude_patterns)
@@ -102,7 +93,7 @@ class ClasspathUtil(object):
             if conf_needed(conf) and not excluded(path)]
 
   @staticmethod
-  def _just_paths(classpath):
+  def _pluck_paths(classpath):
     return [path for conf, path in classpath]
 
   @staticmethod

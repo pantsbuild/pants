@@ -228,7 +228,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # chunk, which avoids needing to introduce compile-time dependencies between annotation
     # processors and the classes they annotate.
     compile_classpath = ClasspathUtil.compute_classpath(all_targets, extra_classpath_tuples,
-                                                        self.context.products, self._confs)
+                                                        self.context.products.get_data(
+                                                          'compile_classpath'),
+                                                        self._confs)
 
     # Find the invalid sources for this chunk.
     invalid_sources_by_target = {t: self._sources_for_target(t) for t in invalid_targets}
