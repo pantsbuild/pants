@@ -148,7 +148,7 @@ class CmdLineSpecParser(object):
             raise self.BadSpecError(e)
           errored_out.append('--------------------')
           errored_out.append(traceback.format_exc())
-          errored_out.append('Exception message: {0}'.format(e.message))
+          errored_out.append('Exception message: {0}'.format(e))
 
       if errored_out:
         error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec)])

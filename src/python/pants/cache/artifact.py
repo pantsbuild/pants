@@ -120,4 +120,4 @@ class TarballArtifact(Artifact):
         tarin.extractall(self._artifact_root)
         self._relpaths.update(paths)
     except tarfile.ReadError as e:
-      raise ArtifactError(e.message)
+      raise ArtifactError(str(e))
