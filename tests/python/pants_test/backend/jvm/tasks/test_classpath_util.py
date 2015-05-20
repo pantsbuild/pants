@@ -6,21 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-#import xml.etree.ElementTree as ET
-#from textwrap import dedent
 
-#from mock import Mock
-
-#from pants.backend.core.register import build_file_aliases as register_core
-#from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
-#from pants.backend.jvm.register import build_file_aliases as register_jvm
-#from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
-#from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
 
 
