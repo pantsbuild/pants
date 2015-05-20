@@ -23,20 +23,22 @@ class PythonTestBuilderTestBase(PythonTaskTest):
   def task_type(cls):
     return PytestRun
 
-  def run_tests(self, targets):
-    options = {
+  def run_tests(self, targets, **options):
+    test_options = {
       'colors': False,
       'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
     }
-    self.set_options(**options)
+    test_options.update(options)
+    self.set_options(**test_options)
     context = self.context(target_roots=targets)
     pytest_run_task = self.create_task(context)
     with pushd(self.build_root):
       pytest_run_task.execute()
 
-  def run_failing_tests(self, targets, failed_targets):
+  def run_failing_tests(self, targets, failed_targets, **options):
     with self.assertRaises(TestFailedTaskError) as cm:
-      self.run_tests(targets=targets)
+      self.run_tests(targets=targets, **options)
+    self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
 
 class PythonTestBuilderTestEmpty(PythonTestBuilderTestBase):
@@ -260,3 +262,28 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       all_statements, not_run_statements = self.load_coverage_data(covered_file)
       self.assertEqual([1, 2, 5, 6], all_statements)
       self.assertEqual([], not_run_statements)
+
+  def test_sharding(self):
+    self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red], shard='0/2')
+    self.run_tests(targets=[self.red, self.green], shard='1/2')
+
+  def test_sharding_single(self):
+    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], shard='0/1')
+
+  def test_sharding_invalid_shard_too_small(self):
+    with self.assertRaises(PytestRun.InvalidShardSpecification):
+      self.run_tests(targets=[self.green], shard='-1/1')
+
+  def test_sharding_invalid_shard_too_big(self):
+    with self.assertRaises(PytestRun.InvalidShardSpecification):
+      self.run_tests(targets=[self.green], shard='1/1')
+
+  def test_sharding_invalid_shard_bad_format(self):
+    with self.assertRaises(PytestRun.InvalidShardSpecification):
+      self.run_tests(targets=[self.green], shard='1')
+
+    with self.assertRaises(PytestRun.InvalidShardSpecification):
+      self.run_tests(targets=[self.green], shard='1/2/3')
+
+    with self.assertRaises(PytestRun.InvalidShardSpecification):
+      self.run_tests(targets=[self.green], shard='1/a')
