@@ -30,15 +30,25 @@ def shared_artifacts(version, extra_jar=None):
 # TODO: Right now some options are set via config and some via cmd-line flags. Normalize this?
 def publish_extra_config(unique_config):
   return {
-    b'DEFAULT': {
-      b'backend_packages': [
-        b'example.pants_publish_plugin',
-        b'internal_backend.repositories',
+    'DEFAULT': {
+      'pythonpath': [
+        'examples/src/python',
+        'pants-plugins/src/python',
+      ],
+      'backend_packages': [
+        'example.pants_publish_plugin',
+        'internal_backend.repositories',
+        'pants.backend.android',  # There are android target source roots defined in examples/BUILD
       ],
     },
-    b'publish.jar': {
-      b'publish_extras': {
-        b'extra_test_jar_example': unique_config,
+    'goals': {
+      'bootstrap_buildfiles': [
+        'examples/BUILD'
+      ]
+    },
+    'publish.jar': {
+      'publish_extras': {
+        'extra_test_jar_example': unique_config,
       },
     },
   }
@@ -56,7 +66,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
   def setUp(self):
     # This attribute is required to see the full diff between ivy and pom files.
-    self.maxDiff  = None
+    self.maxDiff = None
     safe_rmtree(self.pushdb_root)
 
   def tearDown(self):
@@ -128,9 +138,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
                       extra_options=['--doc-javadoc-skip'],
                       extra_config=extra_config,
-                      extra_env={'WRAPPER_SRCPATH': 'examples/src/python'},
                       success_expected=success_expected)
-
   #
   # Run through all the permutations of the config parameters for publish_extras.
   #
