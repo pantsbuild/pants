@@ -64,8 +64,6 @@ class JvmTask(Task):
     classpath = list(cp) if cp else []
 
     classpath_for_targets = ClasspathUtil. \
-      classpath_entries(targets,
-                        self.context.products.get_data('compile_classpath'),
-                        self.confs)
+      classpath_entries(targets, self.context.products.get_data('compile_classpath'), self.confs)
     classpath.extend(classpath_for_targets)
     return classpath

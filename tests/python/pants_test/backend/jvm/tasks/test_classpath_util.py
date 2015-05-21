@@ -22,7 +22,7 @@ class ClasspathUtilTest(BaseTest):
     classpath_product = UnionProducts()
     path = os.path.join(self.build_root, 'jar/path')
     classpath_product.add_for_target(a, [('default', path)])
-    classpath = ClasspathUtil.compute_classpath([a], [], classpath_product, ['default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
     self.assertEqual([path], classpath)
 
   def test_fails_on_paths_outside_buildroot(self):
@@ -32,7 +32,7 @@ class ClasspathUtilTest(BaseTest):
     classpath_product.add_for_target(a, [('default', '/dev/null')])
 
     with self.assertRaises(TaskError):
-      ClasspathUtil.compute_classpath([a], [], classpath_product, ['default'])
+      ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
 
   def test_excluded_classpath_element(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
@@ -41,7 +41,7 @@ class ClasspathUtilTest(BaseTest):
     example_jar_path = os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
     classpath_product.add_for_target(a, [('default', example_jar_path)])
 
-    classpath = ClasspathUtil.compute_classpath([a], [], classpath_product, ['default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
 
     self.assertEqual([], classpath)
 
@@ -53,7 +53,7 @@ class ClasspathUtilTest(BaseTest):
     example_jar_path = os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
     classpath_product.add_for_target(a, [('default', example_jar_path)])
 
-    classpath = ClasspathUtil.compute_classpath([a], [], classpath_product, ['default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
 
     self.assertEqual([], classpath)
 
@@ -67,7 +67,7 @@ class ClasspathUtilTest(BaseTest):
     classpath_product.add_for_target(a, [('default', com_example_jar_path),
                                          ('default', org_example_jar_path)])
 
-    classpath = ClasspathUtil.compute_classpath([a], [], classpath_product, ['default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
 
     self.assertEqual([org_example_jar_path], classpath)
 
@@ -79,6 +79,6 @@ class ClasspathUtilTest(BaseTest):
     example_jar_path = os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
     classpath_product.add_for_target(b, [('default', example_jar_path)])
 
-    classpath = ClasspathUtil.compute_classpath([b], [], classpath_product, ['default'])
+    classpath = ClasspathUtil.compute_classpath([b], classpath_product, [], ['default'])
 
     self.assertEqual([example_jar_path], classpath)
