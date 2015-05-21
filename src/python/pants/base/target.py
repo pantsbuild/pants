@@ -5,9 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import namedtuple
+from hashlib import sha1
 import functools
 import os
-from hashlib import sha1
 
 from six import string_types
 
@@ -123,6 +124,76 @@ class Target(AbstractTarget):
     """Internal error, too many elements in Addresses"""
     pass
 
+  class UnknownParameter(TypeError):
+    def __init__(self, name):
+      self._name = name
+      super(Target.UnknownParameter, self).__init__('Unknown parameter: {0}'.format(', '.join(name)))
+
+    @property
+    def name(self):
+      return self._name
+
+  class ParamRegistrationConflict(Exception):
+    def __init__(self, opponent):
+      self._opponent = opponent
+      super(Target.ParamRegistrationConflict, self).__init__(
+        'Parameter already registered for class {0}'.format(opponent.__name__)
+      )
+
+    @property
+    def opponent(self):
+      return self._opponent
+
+  ParameterTag = namedtuple('ParameterTag', ['name', 'value'])
+
+  # { name: { cls: convert } } A mapping between a parameter name and the
+  # possible classes that registered it and their conversion functions.
+  _registered_parameters = {}
+
+  @classmethod
+  def clear_all_parameters(cls):
+    cls._registered_parameters = {}
+
+  @classmethod
+  def register_parameter(cls, name, convert):
+    """Register a parameter that might be given to __init__.
+
+    :param name: name of parameter.
+    :param convert: a function that takes the given argument and converts
+       it into its final format.
+    :raises ParamRegistrationConflict: when a parameter is attempted registration
+       for more than a single class which are not orthogonal (one is a subclass
+       of the other).
+    """
+
+    classes = cls._registered_parameters.get(name, {})
+
+    for kls in classes.keys():
+      if issubclass(cls, kls) or issubclass(kls, cls):
+        raise cls.ParamRegistrationConflict(kls)
+
+    classes[cls] = convert
+    cls._registered_parameters[name] = classes
+
+  @classmethod
+  def _get_registered_parameter_converter(cls, name):
+    """Given a name return the convertion function for said parameter.
+
+    :param name: name of parameter.
+    :raises UnknownParameter: if parameter is unknown for given class.
+    """
+    classes = cls._registered_parameters.get(name, None)
+    if not classes:
+      raise cls.UnknownParameter(name)
+
+    converters = [cvt for kls, cvt in classes.items() if issubclass(cls, kls)]
+    assert len(converters) in (0, 1), "Can't have more than one converter for class"
+
+    if not converters:
+      raise cls.UnknownParameter(name)
+
+    return converters[0]
+
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
@@ -178,7 +249,7 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None, **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -199,13 +270,28 @@ class Target(AbstractTarget):
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._tags = set(tags or [])
     self._build_graph = build_graph
     self.description = description
     self.labels = set()
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+
+    self._tags = set(tags or [])
+    self._tags.update(self._parse_registered_parameters(kwargs))
+
+  @classmethod
+  def _parse_registered_parameters(cls, kwargs):
+    parameter_tags = set()
+    for name, value in kwargs.items():
+      convert = cls._get_registered_parameter_converter(name)
+      converted_value = convert(value)
+      parameter_tags.add(cls.ParameterTag(name=name, value=converted_value))
+    return parameter_tags
+
+  @property
+  def params(self):
+    return dict((p.name, p.value) for p in self.tags if isinstance(p, self.ParameterTag))
 
   @property
   def tags(self):
