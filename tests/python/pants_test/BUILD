@@ -120,6 +120,7 @@ target(
     'tests/python/pants_test/net',
     'tests/python/pants_test/option',
     'tests/python/pants_test/process',
+    'tests/python/pants_test/projects',
     'tests/python/pants_test/python',
     'tests/python/pants_test/reporting',
     'tests/python/pants_test/scm',

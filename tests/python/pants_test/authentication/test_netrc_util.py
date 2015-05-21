@@ -35,7 +35,7 @@ class TestNetrcUtil(object):
     netrc = Netrc()
     with pytest.raises(netrc.NetrcError) as exc:
       netrc._ensure_loaded()
-    assert exc.value.message == 'A ~/.netrc file is required to authenticate'
+    assert str(exc.value) == 'A ~/.netrc file is required to authenticate'
 
   def test_netrc_parse_error(self, MockOsPath):
     with self.netrc('machine test') as netrc:
@@ -47,7 +47,7 @@ class TestNetrcUtil(object):
     with self.netrc('') as netrc:
       with pytest.raises(netrc.NetrcError) as exc:
         netrc._ensure_loaded()
-      assert exc.value.message == 'Found no usable authentication blocks in ~/.netrc'
+      assert str(exc.value) == 'Found no usable authentication blocks in ~/.netrc'
 
   @contextmanager
   def netrc(self, netrc_contents):

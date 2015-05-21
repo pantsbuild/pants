@@ -34,10 +34,9 @@ class JaxbGen(CodeGen, NailgunTask):
     lang = 'java'
     if self.context.products.isrequired(lang):
       self.gen_langs.add(lang)
-    self.jar_location = os.path.join(Distribution.cached().home, '..', 'lib', 'tools.jar')
 
   def _compile_schema(self, args):
-    classpath = [self.jar_location]
+    classpath = Distribution.cached(jdk=True).find_libs(['tools.jar'])
     java_main = 'com.sun.tools.internal.xjc.Driver'
     return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 

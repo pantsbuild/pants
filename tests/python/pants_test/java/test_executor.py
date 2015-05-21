@@ -25,8 +25,9 @@ class SubprocessExecutorTest(unittest.TestCase):
       with safe_open(path, 'w') as fp:
         fp.write(textwrap.dedent("""
             #!/bin/sh
-            echo ${env_var}
-          """.format(env_var=env_var)).strip())
+            echo ${env_var} >&2
+            echo "java.home={java_home}"
+          """.format(env_var=env_var, java_home=jre)).strip())
       chmod_plus_x(path)
       yield jre
 
@@ -39,9 +40,9 @@ class SubprocessExecutorTest(unittest.TestCase):
                                  main='dummy.main',
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
-        stdout, _ = process.communicate()
+        _, stderr = process.communicate()
         self.assertEqual(0, process.returncode)
-        self.assertEqual('' if scrubbed else env_value, stdout.strip())
+        self.assertEqual('' if scrubbed else env_value, stderr.strip())
 
   def test_not_scrubbed(self):
     self.do_test_jre_env_var('FRED', 'frog', scrubbed=False)

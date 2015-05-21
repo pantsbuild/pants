@@ -16,6 +16,7 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.build_environment import get_buildroot
@@ -41,7 +42,7 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.0'
+  DEFAULT_EXPORT_VERSION='1.0.1'
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -66,6 +67,14 @@ class Export(ConsoleTask):
       return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
     else:
       return '{0}:{1}'.format(jar.org, jar.name)
+
+  @staticmethod
+  def _exclude_id(jar):
+    """Create a string identifier for the Exclude key.
+    :param Exclude jar: key for an excluded jar
+    :returns: String representing the key as a maven coordinate
+    """
+    return '{0}:{1}'.format(jar.org, jar.name)
 
   @staticmethod
   def _address(address):
@@ -171,6 +180,9 @@ class Export(ConsoleTask):
         for dep in current_target.java_sources:
           info['targets'].append(self._address(dep.address))
           process_target(dep)
+
+      if isinstance(current_target, JvmTarget):
+        info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,

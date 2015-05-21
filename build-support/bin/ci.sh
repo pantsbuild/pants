@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpncieat)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpuncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -22,15 +22,17 @@ function usage() {
   echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
+  echo " -u SHARD_NUMBER/TOTAL_SHARDS"
+  echo "              if running core python tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -n           skip contrib python tests"
-  echo " -c           skip pants integration tests"
-  echo " -i TOTAL_SHARDS:SHARD_NUMBER"
+  echo " -c           skip pants integration tests (includes examples and testprojects)"
+  echo " -i SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running integration tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
-  echo " -e           skip example tests"
+  echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
   echo " -a           skip android targets when running tests"
-  echo " -t           skip testprojects tests"
   if (( $# > 0 )); then
     die "$@"
   else
@@ -44,7 +46,11 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrjlpnci:eat" opt; do
+# No python test sharding (1 shard) by default.
+python_unit_shard="0/1"
+python_intg_shard="0/1"
+
+while getopts "hfxbkmsrjlpu:nci:a" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -57,18 +63,11 @@ while getopts "hfxbkmsrjlpnci:eat" opt; do
     j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
+    u) python_unit_shard=${OPTARG} ;;
     n) skip_contrib="true" ;;
     c) skip_integration="true" ;;
-    i)
-      if [[ "valid" != "$(echo ${OPTARG} | sed -E 's|[0-9]+:[0-9]+|valid|')" ]]; then
-        usage "Invalid shard specification '${OPTARG}'"
-      fi
-      TOTAL_SHARDS=${OPTARG%%:*}
-      SHARD_NUMBER=${OPTARG##*:}
-      ;;
-    e) skip_examples="true" ;;
+    i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
-    t) skip_testprojects="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -77,9 +76,9 @@ shift $((${OPTIND} - 1))
 # Android testing requires the SDK to be installed and configured in Pants.
 # Skip if ANDROID_HOME isn't configured in the environment
 if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  android_test_opts="--exclude-target-regexp=.*android.*"
+  export SKIP_ANDROID="true"
 else
-  android_test_opts=""
+  export SKIP_ANDROID="false"
 fi
 
 if [[ $# > 0 ]]; then
@@ -135,22 +134,6 @@ fi
 if [[ "${skip_distribution:-false}" == "false" ]]; then
   banner "Running pants distribution tests"
   (
-    # The published pants should need no local plugins beyond the python backend to distribute
-    # itself so we override backends to ensure a minimal env works.
-    config=$(mktemp -t pants-ci.XXXXXX.ini) && \
-    (cat << EOF > ${config}
-[backends]
-packages: [
-    # TODO(John Sirois): When we have fine grained plugins, include the python backend here
-    "internal_backend.utilities",
-  ]
-EOF
-    ) && \
-    ./pants.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
-      src/python/pants/bin:pants && \
-    mv dist/pants.pex dist/self.pex && \
-    ./dist/self.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
-      src/python/pants/bin:pants && \
     ./build-support/bin/release.sh -pn
   ) || die "Failed to create pants distributions."
 fi
@@ -163,7 +146,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
@@ -173,17 +156,19 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex ${PANTS_ARGS[@]} test \
         $(./pants.pex list pants-plugins/tests/python:: | \
-            xargs ./pants.pex filter --filter-type=python_tests | \
-            grep -v integration)
+            xargs ./pants.pex filter --filter-type=python_tests)
   ) || die "Internal backend python test failure"
 fi
 
 if [[ "${skip_python:-false}" == "false" ]]; then
-  banner "Running core python tests"
+  if [[ "0/1" != "${python_unit_shard}" ]]; then
+    shard_desc=" [shard ${python_unit_shard}]"
+  fi
+  banner "Running core python tests${shard_desc}"
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_unit_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
@@ -201,90 +186,17 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   ) || die "Contrib python test failure"
 fi
 
-if [[ "${skip_testprojects:-false}" == "false" ]]; then
-
-  # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
-  # right now, just split them into two categories and ignore them.
-
-  # Targets that fail but shouldn't
-  known_failing_targets=(
-    # The following two targets lose out due to a resource collision, because `example_b` happens
-    # to be first in the context, and test.junit mixes all classpaths.
-    testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb
-    testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec
-  )
-
-  # Targets that are intended to fail
-  negative_test_targets=(
-    testprojects/src/antlr/pants/backend/python/test:antlr_failure
-    testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files
-    testprojects/src/java/org/pantsbuild/testproject/cycle1
-    testprojects/src/java/org/pantsbuild/testproject/cycle2
-    testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*
-    testprojects/src/python/antlr:test_antlr_failure
-    testprojects/src/scala/org/pantsbuild/testproject/compilation_failure
-    testprojects/src/thrift/org/pantsbuild/thrift_linter:
-    testprojects/tests/java/org/pantsbuild/testproject/empty:
-    testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target
-    testprojects/tests/python/pants/dummies:failing_target
-  )
-
-  targets_to_exclude=(
-    ${known_failing_targets[@]}
-    ${negative_test_targets[@]}
-  )
-  exclude_opts="${targets_to_exclude[@]/#/--exclude-target-regexp=}"
-
-  run()
-  {
-    local strategy=$1
-    banner "Running tests in testprojects/ with the $strategy strategy"
-    (
-      ./pants.pex ${PANTS_ARGS[@]} test \
-        --compile-apt-strategy=$strategy \
-        --compile-java-strategy=$strategy \
-        --compile-scala-strategy=$strategy \
-        testprojects:: $android_test_opts $exclude_opts
-    ) || die "test failure in testprojects/ with the $strategy strategy"
-  }
-
-  run "global"
-  run "isolated"
-fi
-
-if [[ "${skip_examples:-false}" == "false" ]]; then
-  run()
-  {
-    local strategy=$1
-    banner "Running example tests with the $strategy strategy"
-    (
-      ./pants.pex ${PANTS_ARGS[@]} test \
-        --compile-apt-strategy=$strategy \
-        --compile-java-strategy=$strategy \
-        --compile-scala-strategy=$strategy \
-        examples:: \
-        $android_test_opts
-    ) || die "Examples tests failure with the $strategy strategy"
-  }
-
-  run "global"
-  run "isolated"
-fi
-
-
 if [[ "${skip_integration:-false}" == "false" ]]; then
-  if [[ ! -z "${TOTAL_SHARDS}" ]]; then
-    shard_desc=" [shard $((SHARD_NUMBER+1)) of ${TOTAL_SHARDS}]"
+  if [[ "0/1" != "${python_intg_shard}" ]]; then
+    shard_desc=" [shard ${python_intg_shard}]"
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_intg_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
-            grep integration | \
-            sort | \
-            awk "NR%${TOTAL_SHARDS:-1}==${SHARD_NUMBER:-0}")
+            grep integration)
   ) || die "Pants Integration test failure"
 fi
 

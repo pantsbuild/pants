@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincA
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.java.distribution.distribution import Distribution
 from pants.option.options import Options
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
@@ -90,7 +91,17 @@ class ZincCompile(JvmCompile):
     return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
 
   def zinc_classpath(self):
-    return self.tool_classpath('zinc')
+    # Zinc takes advantage of tools.jar if it's presented in classpath.
+    # For example com.sun.tools.javac.Main is used for in process java compilation.
+    def locate_tools_jar():
+      try:
+        return Distribution.cached(jdk=True).find_libs(['tools.jar'])
+      except Distribution.Error:
+        self.context.log.info('Failed to locate tools.jar. '
+                              'Install a JDK to increase performance of Zinc.')
+        return []
+
+    return self.tool_classpath('zinc') + locate_tools_jar()
 
   def compiler_classpath(self):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)

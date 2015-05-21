@@ -6,17 +6,35 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import tempfile
 from textwrap import dedent
 
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.address import SyntheticAddress
+from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class PythonTaskTest(TaskTestBase):
+  @classmethod
+  def setUpClass(cls):
+    cls.workdir = tempfile.mkdtemp()
+
+  @classmethod
+  def tearDownClass(cls):
+    safe_rmtree(cls.workdir)
+
   def setUp(self):
     super(PythonTaskTest, self).setUp()
+
+    # This is a test performance hack.  Instead of using a new workdir per test setUp/tearDown
+    # (per-each test function/method executed) as is normal for `TaskTestBase`, re-use a single
+    # workdir across all test test function/method executions in a given concrete `PythonTaskTest`
+    # subclass.  The important bit of savings here is the dep resolution and interpreter setup.  At
+    # the time of writing, this packages tests run at 43s with this hack and 194s without (line
+    # below commented out).
+    self.set_options_for_scope('', pants_workdir=self.workdir)
+
     self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
 
   @property

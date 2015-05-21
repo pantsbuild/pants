@@ -176,7 +176,7 @@ public final class Main {
     @Option(name = "-manifest",
         usage = "A path to a manifest file to use. If -main or -classpath is specified those "
             + "values will overwrite the corresponding entry in this manifest.")
-    void setManfiset(File manifest) {
+    void setManifest(File manifest) {
       if (manifest == null) {
         throw new InvalidCmdLineArgumentException("-manifest", manifest, "Cannot be null.");
       }
