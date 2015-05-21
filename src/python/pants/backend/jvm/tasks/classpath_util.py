@@ -61,7 +61,7 @@ class ClasspathUtil(object):
 
     full_classpath_tuples = filtered_classpath_tuples + filtered_extra_classpath_tuples
 
-    cls._validate_classpath_paths(full_classpath_tuples)
+    cls._validate_classpath_paths(full_classpath_tuples, classpath_products)
 
     return cls._pluck_paths(full_classpath_tuples)
 
@@ -77,9 +77,9 @@ class ClasspathUtil(object):
     exclude_patterns = cls._exclude_patterns(targets)
     tuples = cls._filter_classpath_by_excludes_and_confs(compile_classpath,
                                                          exclude_patterns, confs)
-    paths = cls._pluck_paths(tuples)
-    cls._validate_classpath_paths(paths)
-    return paths
+    cls._validate_classpath_paths(tuples, classpath_products)
+
+    return cls._pluck_paths(tuples)
 
   @classmethod
   def _filter_classpath_by_excludes_and_confs(cls, compile_classpath, exclude_patterns, confs):
@@ -116,9 +116,12 @@ class ClasspathUtil(object):
     return excludes_patterns
 
   @classmethod
-  def _validate_classpath_paths(cls, classpath):
+  def _validate_classpath_paths(cls, classpath, classpath_products):
     """Validates that all files are located within the working copy, to simplify relativization."""
     buildroot = get_buildroot()
-    for f in classpath:
-      if os.path.relpath(f, buildroot).startswith('..'):
-        raise TaskError('Classpath entry {} is located outside the buildroot.'.format(f))
+    for conf, path in classpath:
+      if os.path.relpath(path, buildroot).startswith('..'):
+        target = classpath_products.target_for_product((conf, path))
+        raise TaskError(
+          'Classpath entry {} for target {} is located outside the buildroot.'
+          .format(path, target.address.spec))

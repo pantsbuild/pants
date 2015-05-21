@@ -43,6 +43,17 @@ class UnionProducts(object):
           visited.add(dep)
     return products
 
+  def target_for_product(self, product):
+    """Looks up the target key for a product.
+
+    :param product: The product to search for
+    :return: None if there is no target for the product
+    """
+    for target, products in self._products_by_target.items():
+      if product in products:
+        return target
+    return None
+
   def __str__(self):
     return "UnionProducts({})".format(self._products_by_target)
 

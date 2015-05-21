@@ -31,8 +31,12 @@ class ClasspathUtilTest(BaseTest):
     classpath_product = UnionProducts()
     classpath_product.add_for_target(a, [('default', '/dev/null')])
 
-    with self.assertRaises(TaskError):
+    with self.assertRaises(TaskError) as cm:
       ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
+
+    self.assertEqual(
+      str('Classpath entry /dev/null for target a:a is located outside the buildroot.'),
+      str(cm.exception))
 
   def test_excluded_classpath_element(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
@@ -80,5 +84,31 @@ class ClasspathUtilTest(BaseTest):
     classpath_product.add_for_target(b, [('default', example_jar_path)])
 
     classpath = ClasspathUtil.compute_classpath([b], classpath_product, [], ['default'])
+
+    self.assertEqual([example_jar_path], classpath)
+
+
+  def test_excludes_used_across_targets(self):
+    b = self.make_target('b', JvmTarget)
+    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+
+    classpath_product = UnionProducts()
+    example_jar_path = os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
+    classpath_product.add_for_target(b, [('default', example_jar_path)])
+
+    classpath = ClasspathUtil.compute_classpath([a, b], classpath_product, [], ['default'])
+
+    self.assertEqual([], classpath)
+
+
+  def test_compute_classpath_for_target_excludes_ignored_for_resolving_child_target(self):
+    b = self.make_target('b', JvmTarget)
+    self.make_target('a', JvmTarget, dependencies=[b], excludes=[Exclude('com.example', 'lib')])
+
+    classpath_product = UnionProducts()
+    example_jar_path = os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
+    classpath_product.add_for_target(b, [('default', example_jar_path)])
+
+    classpath = ClasspathUtil.compute_classpath_for_target(b, classpath_product, [], ['default'])
 
     self.assertEqual([example_jar_path], classpath)
