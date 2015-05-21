@@ -163,8 +163,7 @@ python_library(
   dependencies = [
     ':exceptions',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/android:plugin',
-    'src/python/pants/backend/authentication:authentication',
+    'src/python/pants/backend/authentication',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',

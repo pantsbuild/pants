@@ -21,10 +21,10 @@ Contrib plugins should generally follow 3 basic setup steps:
      src/python/pants/contrib/example/...
      tests/python/pants_test/contrib/example/...
    ```
-   Source roots for this layout would be added to contrib/BUILD:
+   Source roots for this layout would be added to contrib/example/BUILD:
    ```
-   source_root('example/src/python', page, python_library, resources)
-   source_root('example/tests/python', page, python_library, python_tests, resources)
+   source_root('src/python', page, python_library, resources)
+   source_root('tests/python', page, python_library, python_tests, resources)
    ```
    **NB: python code should be in the pants/contrib and pants_test/contrib namespaces and the
    `__init__.py` files for these shared root namespaces should contain a namespace declaration
@@ -34,23 +34,36 @@ Contrib plugins should generally follow 3 basic setup steps:
    ```
 
 2. Make the local pants aware of your plugin
-   This involves 2 edits to `pants.ini`, adding a `pythonpath` entry and a `packages` entry:
+   This involves 3 edits to `pants.ini`.  You'll need to add one entry in each of the
+   `pythonpath`, `backend_packages` and `bootstrap_buildfiles` lists:
    ```ini
    [DEFAULT]
    # Enable our own custom loose-source plugins as well as contribs.
    pythonpath: [
        "%(buildroot)s/pants-plugins/src/python",
-       "%(buildroot)s/contrib/scrooge/src/python",
-       "%(buildroot)s/contrib/example/src/python",
+       ...
+       "%(buildroot)s/contrib/example/src/python",  # 1
+       ...
      ]
-   ...
+
    backend_packages: [
        "internal_backend.optional",
        "internal_backend.repositories",
        "internal_backend.sitegen",
        "internal_backend.utilities",
-       "pants.contrib.scrooge",
-       "pants.contrib.example",
+       ...
+       "pants.contrib.example",  # 2
+       ...
+     ]
+   ...
+   [goals]
+   bootstrap_buildfiles: [
+       "%(buildroot)s/BUILD",
+       ...
+       "%(buildroot)s/contrib/example/BUILD",  # 3
+       ...
+       "%(buildroot)s/examples/BUILD",
+       "%(buildroot)s/testprojects/BUILD",
      ]
    ```
 
@@ -78,7 +91,9 @@ Contrib plugins should generally follow 3 basic setup steps:
    function pkg_example_install_test() {
      PIP_ARGS="$@"
      pip install ${PIP_ARGS} pantsbuild.pants.example==$(local_version) && \
-     execute_packaged_pants_with_internal_backends goals | grep "example-goal" &> /dev/null
+     execute_packaged_pants_with_internal_backends \
+       "extra_backend_packages='pants.contrib.example'" \
+       goals | grep "example-goal" &> /dev/null
    }
 
    # Once an individual (new) package is declared above, insert it into the array below)
