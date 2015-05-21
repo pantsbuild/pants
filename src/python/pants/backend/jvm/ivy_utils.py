@@ -369,7 +369,7 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def calculate_classpath(cls, targets):
+  def calculate_classpath(cls, targets, automatic_excludes=True):
     jars = OrderedDict()
     excludes = set()
     targets_processed = set()
@@ -402,9 +402,11 @@ class IvyUtils(object):
       target_excludes = target.payload.get_field_value('excludes')
       if target_excludes:
         excludes.update(target_excludes)
-      if target.is_exported:
+      if target.is_exported and automatic_excludes:
         # if a source dep is exported, it should always override remote/binary versions
         # of itself, ie "round trip" dependencies
+        logger.info('Automatically excluding jar {}.{}, which is provided by {}'.format(
+          target.provides.org, target.provides.name, target))
         excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     for target in targets:
