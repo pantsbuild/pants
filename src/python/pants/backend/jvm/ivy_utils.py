@@ -405,7 +405,7 @@ class IvyUtils(object):
       if target.is_exported and automatic_excludes:
         # if a source dep is exported, it should always override remote/binary versions
         # of itself, ie "round trip" dependencies
-        logger.info('Automatically excluding jar {}.{}, which is provided by {}'.format(
+        logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
           target.provides.org, target.provides.name, target))
         excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
