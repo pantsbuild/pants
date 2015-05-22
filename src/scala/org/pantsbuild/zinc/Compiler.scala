@@ -6,6 +6,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.net.URLClassLoader
+import sbt.compiler.javac
 import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, LoggerReporter, ScalaInstance }
 import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
 import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
@@ -54,7 +55,7 @@ object Compiler {
   def create(setup: Setup, log: Logger): Compiler = {
     val instance     = scalaInstance(setup)
     val interfaceJar = compilerInterface(setup, instance, log)
-    val scalac       = newScalaCompiler(instance, interfaceJar, log)
+    val scalac       = newScalaCompiler(instance, interfaceJar)
     val javac        = newJavaCompiler(instance, setup.javaHome, setup.forkJava)
     new Compiler(scalac, javac)
   }
@@ -62,19 +63,22 @@ object Compiler {
   /**
    * Create a new scala compiler.
    */
-  def newScalaCompiler(instance: ScalaInstance, interfaceJar: File, log: Logger): AnalyzingCompiler = {
-    IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot, log)
+  def newScalaCompiler(instance: ScalaInstance, interfaceJar: File): AnalyzingCompiler = {
+    IC.newScalaCompiler(instance, interfaceJar, ClasspathOptions.boot)
   }
 
   /**
    * Create a new java compiler.
    */
   def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
-    val options = ClasspathOptions.javac(false)
-    if (fork || javaHome.isDefined)
-      sbt.compiler.JavaCompiler.fork(options, instance)(AggressiveCompile.forkJavac(javaHome))
-    else
-      sbt.compiler.JavaCompiler.directOrFork(options, instance)(AggressiveCompile.forkJavac(None))
+    val compiler =
+      if (fork || javaHome.isDefined)
+        javac.JavaCompiler.fork(javaHome)
+      else
+        javac.JavaCompiler.local.getOrElse(javac.JavaCompiler.fork(None))
+
+    val options = ClasspathOptions.javac(compiler = false)
+    new javac.JavaCompilerAdapter(compiler, instance, options)
   }
 
   /**
@@ -130,7 +134,7 @@ object Compiler {
    * Create the scala instance for the compiler. Includes creating the classloader.
    */
   def scalaInstance(setup: Setup): ScalaInstance = {
-    import setup.{ scalaCompiler, scalaLibrary, scalaExtra}
+    import setup.{scalaCompiler, scalaExtra, scalaLibrary}
     val loader = scalaLoader(scalaLibrary +: scalaCompiler +: scalaExtra)
     val version = scalaVersion(loader)
     new ScalaInstance(version.getOrElse("unknown"), loader, scalaLibrary, scalaCompiler, scalaExtra, version)
@@ -201,7 +205,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler) {
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Analysis = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
-    val getAnalysis: File => Option[Analysis] = analysisMap.get _
+    val getAnalysis: File => Option[Analysis] = analysisMap.get
     val aggressive    = new AggressiveCompile(cacheFile)
     val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath)
     val compileOutput = CompileOutput(classesDirectory)
