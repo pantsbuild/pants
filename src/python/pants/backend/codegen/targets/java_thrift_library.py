@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import collections
+
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -18,9 +20,11 @@ class JavaThriftLibrary(JvmTarget):
   # In general a plugin will contribute a target and a task, but in this case we have a shared
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
-  _COMPILERS = frozenset(['thrift', 'scrooge'])
-  _LANGUAGES = frozenset(['java', 'scala'])
-  _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
+  ConfigInfo = collections.namedtuple('ConfigInfo', 'default valid_values')
+
+  _COMPILERS = ConfigInfo(default='thrift', valid_values=frozenset(['thrift', 'scrooge']))
+  _LANGUAGES = ConfigInfo(default='java', valid_values=frozenset(['java', 'scala']))
+  _RPC_STYLES = ConfigInfo(default='sync', valid_values=frozenset(['sync', 'finagle', 'ostrich']))
 
   def __init__(self,
                compiler=None,
@@ -39,10 +43,13 @@ class JavaThriftLibrary(JvmTarget):
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     """
-    def check_value_for_arg(arg, value, values):
-      if value and value not in values:
+    def check_value_for_arg(arg, value, config):
+      if not value:
+        value = config.default
+      if value not in config.valid_values:
         raise TargetDefinitionException(self, "{} may only be set to {} ('{}' not valid)"
-                                        .format(arg, ', or '.join(map(repr, values)), value))
+                                        .format(arg, ', or '.join(map(repr, config.valid_values)),
+                                        config.valid_values))
       return value
 
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
@@ -64,14 +71,17 @@ class JavaThriftLibrary(JvmTarget):
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
 
-  def compiler(self, options):
-    return self._compiler or options.for_global_scope().thrift_default_compiler
+  @property
+  def compiler(self):
+    return self._compiler
 
-  def language(self, options):
-    return self._language or options.for_global_scope().thrift_default_language
+  @property
+  def language(self):
+    return self._language
 
-  def rpc_style(self, options):
-    return self._rpc_style or options.for_global_scope().thrift_default_rpc_style
+  @property
+  def rpc_style(self):
+    return self._rpc_style
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   @property

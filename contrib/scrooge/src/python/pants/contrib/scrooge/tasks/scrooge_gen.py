@@ -131,8 +131,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                        self._resolve_deps(self.get_options().structs_deps))
 
     for target in gentargets:
-      language = target.language(self.context.options)
-      rpc_style = target.rpc_style(self.context.options)
+      language = target.language
+      rpc_style = target.rpc_style
       partial_cmd = self.PartialCmd(
           language=language,
           rpc_style=rpc_style,
@@ -243,7 +243,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genfiles = gen_files_for_source[source]
       has_service = has_service or services
       files.extend(genfiles)
-    language = target.language(self.context.options)
+    language = target.language
     target_type = _TARGET_TYPE_FOR_LANG[language]
     deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language])
     deps.update(target.dependencies)
@@ -297,19 +297,19 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if target.compiler(self.context.options) != 'scrooge':
+    if target.compiler != 'scrooge':
       return False
 
-    language = target.language(self.context.options)
+    language = target.language
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 
   def _validate_compiler_configs(self, targets):
-    self._validate(self.context.options, targets)
+    self._validate(targets)
 
   @staticmethod
-  def _validate(options, targets):
+  def _validate(targets):
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
@@ -319,16 +319,18 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       # sources. As there's no permutation allowing the creation of
       # incompatible sources with the same language+rpc_style we omit
       # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=tgt.language(options),
-                                    rpc_style=tgt.rpc_style(options))
+      return ValidateCompilerConfig(language=tgt.language,
+                                    rpc_style=tgt.rpc_style)
 
     mismatched_compiler_configs = defaultdict(set)
 
     for target in filter(lambda t: isinstance(t, JavaThriftLibrary), targets):
       mycompilerconfig = compiler_config(target)
+
       def collect(dep):
         if mycompilerconfig != compiler_config(dep):
           mismatched_compiler_configs[target].add(dep)
+
       target.walk(collect, predicate=lambda t: isinstance(t, JavaThriftLibrary))
 
     if mismatched_compiler_configs:
