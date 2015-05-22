@@ -247,23 +247,9 @@ class JarTask(NailgunTask):
     # control.
 
   @contextmanager
-  def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
-    """Yields a Jar that will be written when the context exits.
-
-    :param string path: the path to the jar file
-    :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:
-      update the pre-existing jar at ``path``
-    :param bool compressed: entries added to the jar should be compressed; ``True`` by default
-    :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
-    """
-    jar = Jar()
-    try:
-      yield jar
-    except jar.Error as e:
-      raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
-
+  def open_jar_args(self, jar, path, overwrite, compressed, jar_rules):
     with jar._render_jar_tool_args(self.get_options()) as args:
-      if args:  # Don't build an empty jar
+      if args:
         args.append('-update={}'.format(self._flag(not overwrite)))
         args.append('-compress={}'.format(self._flag(compressed)))
 
@@ -290,6 +276,26 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
+      yield args
+
+  @contextmanager
+  def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
+    """Yields a Jar that will be written when the context exits.
+
+    :param string path: the path to the jar file
+    :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:
+      update the pre-existing jar at ``path``
+    :param bool compressed: entries added to the jar should be compressed; ``True`` by default
+    :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
+    """
+    jar = Jar()
+    try:
+      yield jar
+    except jar.Error as e:
+      raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
+
+    with self.open_jar_args(jar, path, overwrite, compressed, jar_rules) as args:
+      if args: # Don't build an empty jar.
         JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args)
 
   class JarBuilder(AbstractClass):

@@ -24,7 +24,7 @@ class Job(object):
 
     :param key: Key used to reference and look up jobs
     :param fn callable: The work to perform
-    :param dependency_keys: List of keys for dependent jobs
+    :param dependencies: List of keys for dependent jobs
     :param on_success: Zero parameter callback to run if job completes successfully. Run on main
                        thread.
     :param on_failure: Zero parameter callback to run if job completes successfully. Run on main

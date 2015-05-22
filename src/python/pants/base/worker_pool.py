@@ -42,7 +42,7 @@ class WorkerPool(object):
     # All workers accrue work to the same root.
     self._pool = ThreadPool(processes=num_workers,
                             initializer=self._run_tracker.register_thread,
-                            initargs=(parent_workunit, ))
+                            initargs=(parent_workunit,))
     # We mustn't shutdown when there are pending workchains, as they may need to submit work
     # in the future, and the pool doesn't know about this yet.
     self._pending_workchains = 0
@@ -164,6 +164,7 @@ class WorkerPool(object):
 
   def abort(self):
     self._pool.terminate()
+
 
 class SubprocPool(object):
   """Singleton for managing multiprocessing.Pool instances
