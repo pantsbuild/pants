@@ -27,12 +27,10 @@ class ClasspathUtil(object):
     :param confs: The list of confs for use by this classpath
     """
 
-    all_targets_compile_classpath = cls.classpath_entries(targets, classpath_products,
-                                                          confs)
+    all_targets_classpath_entries = cls.classpath_entries(targets, classpath_products, confs)
 
     extra_classpath_paths = cls._pluck_paths(extra_classpath_tuples)
-    classpath_paths = OrderedSet(list(all_targets_compile_classpath) +
-                                   extra_classpath_paths)
+    classpath_paths = OrderedSet(list(all_targets_classpath_entries) + extra_classpath_paths)
     return list(classpath_paths)
 
   @classmethod
@@ -56,8 +54,8 @@ class ClasspathUtil(object):
     filtered_classpath_tuples = cls._filter_classpath_by_excludes_and_confs(classpath_tuples,
                                                                             exclude_patterns, confs)
 
-    filtered_extra_classpath_tuples = cls. \
-      _filter_classpath_by_excludes_and_confs(extra_classpath_tuples, [], confs)
+    filtered_extra_classpath_tuples = \
+      cls._filter_classpath_by_excludes_and_confs(extra_classpath_tuples, [], confs)
 
     full_classpath_tuples = filtered_classpath_tuples + filtered_extra_classpath_tuples
 
@@ -73,23 +71,22 @@ class ClasspathUtil(object):
     :param UnionProducts classpath_products: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath
     """
-    compile_classpath = classpath_products.get_for_targets(targets)
+    classpath_tuples = classpath_products.get_for_targets(targets)
     exclude_patterns = cls._exclude_patterns(targets)
-    tuples = cls._filter_classpath_by_excludes_and_confs(compile_classpath,
-                                                         exclude_patterns, confs)
+    tuples = cls._filter_classpath_by_excludes_and_confs(classpath_tuples, exclude_patterns, confs)
     cls._validate_classpath_paths(tuples, classpath_products)
 
     return cls._pluck_paths(tuples)
 
   @classmethod
-  def _filter_classpath_by_excludes_and_confs(cls, compile_classpath, exclude_patterns, confs):
+  def _filter_classpath_by_excludes_and_confs(cls, classpath_tuples, exclude_patterns, confs):
     def conf_needed(conf):
-      return conf in confs if confs else True
+      return conf in confs if confs is None else True
 
     def excluded(path):
       return any(excluded in path for excluded in exclude_patterns)
 
-    return [(conf, path) for conf, path in compile_classpath
+    return [(conf, path) for conf, path in classpath_tuples
             if conf_needed(conf) and not excluded(path)]
 
   @classmethod
