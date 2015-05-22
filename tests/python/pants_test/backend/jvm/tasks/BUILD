@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':bootstrap_jvm_tools',
     ':checkstyle',
+    ':classpath_util',
     ':ivy_imports',
     ':ivy_resolve',
     ':ivy_utils',
@@ -52,6 +53,18 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+  ]
+)
+
+
+python_tests(
+  name = 'classpath_util',
+  sources = ['test_classpath_util.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/goal:products',
+    'tests/python/pants_test:base_test',
   ]
 )
 
