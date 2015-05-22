@@ -32,7 +32,7 @@ class UnionProducts(object):
     return self.get_for_targets([target])
 
   def get_for_targets(self, targets):
-    """Gets the transitive product deps for the given targets, in order."""
+    """Gets the transitive product deps for the given targets, in breadth first order."""
     products = OrderedSet()
     visited = set()
     # Walk the targets transitively to aggregate their products. We do a breadth-first
@@ -41,6 +41,35 @@ class UnionProducts(object):
         if dep not in visited:
           products.update(self._products_by_target[dep])
           visited.add(dep)
+    return products
+
+  def get_for_target_dfs(self, target, filter_child_products=None):
+    return self.get_for_targets_dfs([target], filter_child_products)
+
+  def get_for_targets_dfs(self, targets, filter_child_products=None):
+    """Gets the transitive product deps for the given targets, in postorder.
+
+    :param function filter_child_products: A function that takes the parent target its child
+    target's products, filters them and returns them. Defaults to a pass through.
+    """
+    if filter_child_products is None:
+      filter_child_products = lambda t, p: p
+
+    # Walk the targets transitively to aggregate their products. We do postordering
+    stack = []
+    def pop_and_update(target):
+      products_from_children = stack.pop()
+      parent_products = stack[-1]
+      parent_products.update(filter_child_products(target, products_from_children))
+      parent_products.update(self._products_by_target[target])
+
+    def push_stack(target):
+      stack.append(OrderedSet())
+      return True
+    products = OrderedSet()
+    stack.append(products)
+    for target in targets:
+      target.walk(work=pop_and_update, predicate=push_stack, postorder=True)
     return products
 
   def __str__(self):

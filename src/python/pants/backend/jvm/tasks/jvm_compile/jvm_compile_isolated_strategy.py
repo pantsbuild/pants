@@ -9,6 +9,7 @@ import os
 from collections import defaultdict
 from contextlib import contextmanager
 
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
@@ -116,8 +117,23 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target, and include analysis
     # for upstream targets.
+
+    def filter_excluded_jars(target, jar_paths):
+      if isinstance(target, JvmTarget) and target.excludes:
+        exclude_patterns = [os.path.sep.join(['jars', e.org, e.name or ''])
+                            for e in target.excludes]
+        return [jar_path for jar_path in jar_paths
+                if all(not exclude in jar_path for exclude in exclude_patterns)]
+      else:
+        return jar_paths
+
+    compile_classpath_without_excludes = \
+      compile_classpaths.get_for_target_dfs(compile_context.target,
+                                            filter_child_products=filter_excluded_jars)
     raw_compile_classpath = compile_classpaths.get_for_target(compile_context.target)
-    compile_classpath = list(raw_compile_classpath) + extra_compile_time_classpath
+    classpath_minus_excludes = raw_compile_classpath & compile_classpath_without_excludes
+    compile_classpath = list(classpath_minus_excludes) + extra_compile_time_classpath
+
     # Validate that the classpath is located within the working copy, which simplifies
     # relativizing the analysis files.
     self._validate_classpath(compile_classpath)

@@ -98,6 +98,7 @@ python_library(
     ':execution_graph',
     ':jvm_compile_strategy',
     ':resource_mapping',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
