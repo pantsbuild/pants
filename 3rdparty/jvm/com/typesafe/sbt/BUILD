@@ -1,6 +1,6 @@
 # zinc dependencies
 
-SBT_REV='0.13.7'
+SBT_REV='0.13.8'
 
 jar_library(name = 'compiler-interface',
             jars = [jar(org = 'com.typesafe.sbt', name = 'compiler-interface', rev = SBT_REV,
