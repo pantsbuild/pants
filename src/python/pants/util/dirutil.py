@@ -31,9 +31,9 @@ def safe_mkdir(directory, clean=False):
 
 
 def safe_mkdir_for(path, clean=False):
-  """
-    Ensure that the parent directory for a file is present.  If it's not there, create it.
-    If it is, no-op. If clean is True, ensure the directory is empty.
+  """Ensure that the parent directory for a file is present.
+
+  If it's not there, create it. If it is, no-op. If clean is True, ensure the directory is empty.
   """
   safe_mkdir(os.path.dirname(path), clean)
 
@@ -98,26 +98,19 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
 
 
 def safe_rmtree(directory):
-  """
-    Delete a directory if it's present. If it's not present, no-op.
-  """
+  """Delete a directory if it's present. If it's not present, no-op."""
   if os.path.exists(directory):
     shutil.rmtree(directory, True)
 
 
 def safe_open(filename, *args, **kwargs):
-  """
-    Open a file safely (ensuring that the directory components leading up to it
-    have been created first.)
-  """
+  """Open a file safely, ensuring that its directory exists."""
   safe_mkdir(os.path.dirname(filename))
   return open(filename, *args, **kwargs)
 
 
 def safe_delete(filename):
-  """
-    Delete a file safely. If it's not present, no-op.
-  """
+  """Delete a file safely. If it's not present, no-op."""
   try:
     os.unlink(filename)
   except OSError as e:
@@ -125,10 +118,20 @@ def safe_delete(filename):
       raise
 
 
+def safe_concurrent_rename(src, dst):
+  """Rename src to dst, ignoring errors due to dst already existing.
+
+  Useful when concurrent processes my attempt to create dst, and it doesn't matter who wins.
+  """
+  try:
+    shutil.move(src, dst)
+  except IOError as e:
+    if e.errno != errno.EEXIST:
+      raise
+
+
 def chmod_plus_x(path):
-  """
-    Equivalent of unix `chmod a+x path`
-  """
+  """Equivalent of unix `chmod a+x path`"""
   path_mode = os.stat(path).st_mode
   path_mode &= int('777', 8)
   if path_mode & stat.S_IRUSR:

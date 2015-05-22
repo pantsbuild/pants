@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
 import shutil
 import uuid
@@ -17,7 +16,7 @@ from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.iterator import Iterator
 from pex.package import EggPackage, SourcePackage
 
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_concurrent_rename, safe_mkdir
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -76,19 +75,12 @@ class PythonInterpreterCache(object):
     return None
 
   def _setup_interpreter(self, interpreter, cache_path):
-    tmp_cache_path = '{0}.tmp.{1}'.format(cache_path, uuid.uuid4().hex)
-    os.makedirs(tmp_cache_path)
-    os.symlink(interpreter.binary, os.path.join(tmp_cache_path, 'python'))
-    ret = self._resolve(interpreter, tmp_cache_path)
-    try:
-      shutil.move(tmp_cache_path, cache_path)
-    except IOError as e:
-      if e.errno != errno.EEXIST:
-        raise e
-      # Otherwise there was a race condition with some other process, and it doesn't matter
-      # who wins, so just continue.
+    cache_path_tmp = '{0}.tmp.{1}'.format(cache_path, uuid.uuid4().hex)
+    os.makedirs(cache_path_tmp)
+    os.symlink(interpreter.binary, os.path.join(cache_path_tmp, 'python'))
+    ret = self._resolve(interpreter, cache_path_tmp)
+    safe_concurrent_rename(cache_path_tmp, cache_path)
     return ret
-
 
   def _setup_cached(self, filters):
     """Find all currently-cached interpreters."""
