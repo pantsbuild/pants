@@ -1042,6 +1042,12 @@ class JarPublish(ScmPublishMixin, JarTask):
     # ends up creating 2 jars one scala and other java both including the java_sources.
 
     def abs_and_relative_sources(target):
+      sources = target.payload.get_field('sources')
+      if sources:
+        source_root = sources.rel_path
+        for source in sources.source_paths:
+          yield os.path.join(source_root, source), source
+        return
       abs_source_root = os.path.join(get_buildroot(), target.target_base)
       for source in target.sources_relative_to_source_root():
         yield os.path.join(abs_source_root, source), source

@@ -28,7 +28,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
       'Compiling proto source file',
       'Created output directory',
       'Writing generated code',
-      '/gen/wire/gen-java/org/pantsbuild/example/temperature/Temperature.java',
+      '/gen/wire/org/pantsbuild/example/temperature/Temperature.java',
     ]
     for expected_output in expected_outputs:
       self.assertIn(expected_output, pants_run.stdout_data)

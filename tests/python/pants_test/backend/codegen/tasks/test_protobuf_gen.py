@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from collections import OrderedDict
 from textwrap import dedent
 
@@ -40,15 +41,15 @@ class ProtobufGenTest(TaskTestBase):
   def alias_groups(self):
     return register_core().merge(register_codegen())
 
-  def assert_files(self, task, lang, rel_path, contents, expected_files):
+  def assert_files(self, task, rel_path, contents, expected_files):
     assert_list(expected_files)
     with temporary_file() as fp:
       fp.write(contents)
       fp.close()
-      self.assertEqual(set(expected_files), task.calculate_genfiles(fp.name, rel_path)[lang])
+      self.assertEqual(set(expected_files), set(task.calculate_genfiles(fp.name, rel_path)))
 
   def assert_java_files(self, task, rel_path, contents, expected_files):
-    self.assert_files(task, 'java', rel_path, contents, expected_files)
+    self.assert_files(task, rel_path, contents, expected_files)
 
   def test_plain(self):
     task = self.create_task(self.context())
@@ -338,11 +339,9 @@ class ProtobufGenTest(TaskTestBase):
 
     check_duplicate_conflicting_protos(task, sources_by_base, [file1, file2], test_logger)
 
-    self.assertEquals(4, len(test_logger._warn))
+    self.assertEquals(2, len(test_logger._warn), '\n'.join([re.sub('\\n', '\\\\n', s) for s in test_logger._warn]))
     self.assertRegexpMatches(test_logger._warn[0], '^Proto duplication detected.*\n.*src1/foo.proto\n.*src2/foo.proto')
     self.assertRegexpMatches(test_logger._warn[1], 'Arbitrarily favoring proto 1')
-    self.assertRegexpMatches(test_logger._warn[2], '^Proto duplication detected.*\n.*src1/foo.proto\n.*src2/foo.proto')
-    self.assertRegexpMatches(test_logger._warn[3], 'Arbitrarily favoring proto 1')
 
     self.assertEquals([], test_logger._error)
 
@@ -366,10 +365,8 @@ class ProtobufGenTest(TaskTestBase):
 
     check_duplicate_conflicting_protos(task, sources_by_base, [file1, file2], test_logger)
 
-    self.assertEquals(2, len(test_logger._warn))
+    self.assertEquals(1, len(test_logger._warn))
 
     self.assertRegexpMatches(test_logger._warn[0], 'Arbitrarily favoring proto 1')
-    self.assertRegexpMatches(test_logger._warn[1], 'Arbitrarily favoring proto 1')
-    self.assertEquals(2, len(test_logger._error))
+    self.assertEquals(1, len(test_logger._error))
     self.assertRegexpMatches(test_logger._error[0], '^Proto conflict detected.*\n.*src1/foo.proto\n.*src2/foo.proto')
-    self.assertRegexpMatches(test_logger._error[1], '^Proto conflict detected.*\n.*src1/foo.proto\n.*src2/foo.proto')

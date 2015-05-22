@@ -5,17 +5,27 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
+from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
+from pants.backend.core.register import build_file_aliases as register_core
 from pants.util.contextutil import temporary_file
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class JaxbGenTestBase(unittest.TestCase):
-  """Basically copied from test_protobuf_gen.py.
+class JaxbGenJavaTest(TaskTestBase):
+  """Test the java code generation.
 
-  Contains helper method to check generated temp files.
+  Mostly just tests that code would be put in the proper package, since that's the easiest point of
+  failure.
   """
+  @classmethod
+  def task_type(cls):
+    return JaxbGen
+
+  @property
+  def alias_groups(self):
+    return register_core().merge(register_codegen())
+
   def assert_files(self, package, contents, *expected_files):
     with temporary_file() as fp:
       fp.write(contents)
@@ -38,13 +48,6 @@ class JaxbGenTestBase(unittest.TestCase):
               </xsd:sequence>
             </xsd:complexType>'''.format(name=name)
     )
-
-class JaxbGenJavaTest(JaxbGenTestBase):
-  """Test the java code generation.
-
-  Mostly just tests that code would be put in the proper package, since that's the easiest point of
-  failure.
-  """
 
   def test_plain(self):
     self.assert_files(

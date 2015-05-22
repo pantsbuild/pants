@@ -11,17 +11,15 @@ import re
 from xml.dom.minidom import parse
 
 from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
-from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
 
-class JaxbGen(CodeGen, NailgunTask):
+class JaxbGen(SimpleCodegenTask, NailgunTask):
   """Generates java source files from jaxb schema (.xsd)."""
 
   def __init__(self, *args, **kwargs):
@@ -40,23 +38,19 @@ class JaxbGen(CodeGen, NailgunTask):
     java_main = 'com.sun.tools.internal.xjc.Driver'
     return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
-  def is_forced(self, lang):
-    return lang in self.gen_langs
+  @property
+  def synthetic_target_type(self):
+    return JavaLibrary
 
   def is_gentarget(self, target):
     return isinstance(target, JaxbLibrary)
 
-  def prepare_gen(self, target):
-    pass
-
-  def genlang(self, lang, targets):
-    if lang != 'java':
-      raise TaskError('Unrecognized jaxb language: {}'.format(lang))
-    output_dir = os.path.join(self.workdir, 'gen-java')
-    safe_mkdir(output_dir)
+  def execute_codegen(self, targets):
     cache = []
 
     for target in targets:
+      output_dir = self.codegen_workdir(target)
+      safe_mkdir(output_dir)
       if not isinstance(target, JaxbLibrary):
         raise TaskError('Invalid target type "{class_type}" (expected JaxbLibrary)'
                         .format(class_type=type(target).__name__))
@@ -82,36 +76,11 @@ class JaxbGen(CodeGen, NailgunTask):
 
     return cache
 
-  def genlangs(self):
-    return {'java': lambda t: t.is_jvm}
-
-  def createtarget(self, lang, gentarget, dependees):
-    predicates = self.genlangs()
-    languages = predicates.keys()
-    if not (lang in languages) or not (predicates[lang](gentarget)):
-      raise TaskError('Invalid language "{lang}" for task {task}'
-                      .format(lang=lang, task=type(self).__name__))
-
+  def sources_generated_by_target(self, target):
     to_generate = []
-    for source in gentarget.sources_relative_to_buildroot():
-      to_generate.extend(self._sources_to_be_generated(gentarget.package, source))
-
-    spec_path = os.path.join(os.path.relpath(self.workdir, get_buildroot()), 'gen-java')
-    address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
-    target = self.context.add_new_target(
-        address,
-        JavaLibrary,
-        derived_from=gentarget,
-        sources=to_generate,
-        provides=gentarget.provides,
-        dependencies=[],
-        excludes=gentarget.payload.excludes
-    )
-
-    for dependee in dependees:
-      dependee.inject_dependency(target.address)
-
-    return target
+    for source in target.sources_relative_to_buildroot():
+      to_generate.extend(self._sources_to_be_generated(target.package, source))
+    return to_generate
 
   @classmethod
   def _guess_package(self, path):
