@@ -25,7 +25,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -94,6 +94,9 @@ class PytestRun(PythonTask):
     register('--coverage',
              help='Emit coverage information for specified paths/modules. Value has two forms: '
                   '"module:list,of,modules" or "path:list,of,paths"')
+    register('--shard',
+             help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
+                  'run tests number 2, 5, 8, 11, ...')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -143,6 +146,59 @@ class PytestRun(PythonTask):
       failed_targets = [target for target, rv in results.items() if not rv.success]
       if failed_targets:
         raise TestFailedTaskError(failed_targets=failed_targets)
+
+  class InvalidShardSpecification(TaskError):
+    """Indicates an invalid `--shard` option."""
+
+  @contextmanager
+  def _maybe_shard(self):
+    shard_spec = self.get_options().shard
+    if not shard_spec:
+      yield []
+      return
+
+    components = shard_spec.split('/', 1)
+    if len(components) != 2:
+      raise self.InvalidShardSpecification("Invalid shard specification '{}', should be of form: "
+                                           "[shard index]/[total shards]".format(shard_spec))
+
+    def ensure_int(item):
+      try:
+        return int(item)
+      except ValueError:
+        raise self.InvalidShardSpecification("Invalid shard specification '{}', item {} is not an "
+                                             "int".format(shard_spec, item))
+
+    shard = ensure_int(components[0])
+    total = ensure_int(components[1])
+    if not (0 <= shard and shard < total):
+      raise self.InvalidShardSpecification("Invalid shard specification '{}', shard must "
+                                           "be >= 0 and < {}".format(shard_spec, total))
+    if total < 2:
+      yield []
+      return
+
+    with temporary_dir() as tmp:
+      path = os.path.join(tmp, 'conftest.py')
+      with open(path, 'w') as fp:
+        fp.write(dedent("""
+          def pytest_report_header(config):
+            return 'shard: {shard} of {total} (0-based shard numbering)'
+
+
+          def pytest_collection_modifyitems(session, config, items):
+            total_count = len(items)
+            removed = 0
+            for i, item in enumerate(list(items)):
+              if i % {total} != {shard}:
+                del items[i - removed]
+                removed += 1
+            reporter = config.pluginmanager.getplugin('terminalreporter')
+            reporter.write_line('Only executing {{}} of {{}} total tests in shard {shard} of '
+                                '{total}'.format(total_count - removed, total_count),
+                                bold=True, invert=True, yellow=True)
+        """.format(shard=shard, total=total)))
+      yield [path]
 
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):
@@ -356,12 +412,13 @@ class PytestRun(PythonTask):
       builder = chroot.dump()
       builder.freeze()
       pex = PEX(builder.path(), interpreter=interpreter)
-      with self._maybe_emit_junit_xml(targets) as junit_args:
-        with self._maybe_emit_coverage_data(targets,
-                                            builder.path(),
-                                            pex,
-                                            workunit) as coverage_args:
-          yield pex, junit_args + coverage_args
+      with self._maybe_shard() as shard_args:
+        with self._maybe_emit_junit_xml(targets) as junit_args:
+          with self._maybe_emit_coverage_data(targets,
+                                              builder.path(),
+                                              pex,
+                                              workunit) as coverage_args:
+            yield pex, shard_args + junit_args + coverage_args
     finally:
       chroot.delete()
 

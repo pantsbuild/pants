@@ -8,7 +8,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpncia)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpuncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -22,12 +22,16 @@ function usage() {
   echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
   echo " -p           skip core python tests"
+  echo " -u SHARD_NUMBER/TOTAL_SHARDS"
+  echo "              if running core python tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -n           skip contrib python tests"
   echo " -c           skip pants integration tests (includes examples and testprojects)"
-  echo " -i TOTAL_SHARDS:SHARD_NUMBER"
+  echo " -i SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running integration tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-i 2:0', odd: '-i 2:1'"
+  echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
   echo " -a           skip android targets when running tests"
   if (( $# > 0 )); then
     die "$@"
@@ -42,7 +46,11 @@ bootstrap_compile_args=(
   --fail-slow
 )
 
-while getopts "hfxbkmsrjlpnci:a" opt; do
+# No python test sharding (1 shard) by default.
+python_unit_shard="0/1"
+python_intg_shard="0/1"
+
+while getopts "hfxbkmsrjlpu:nci:a" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -55,15 +63,10 @@ while getopts "hfxbkmsrjlpnci:a" opt; do
     j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
+    u) python_unit_shard=${OPTARG} ;;
     n) skip_contrib="true" ;;
     c) skip_integration="true" ;;
-    i)
-      if [[ "valid" != "$(echo ${OPTARG} | sed -E 's|[0-9]+:[0-9]+|valid|')" ]]; then
-        usage "Invalid shard specification '${OPTARG}'"
-      fi
-      TOTAL_SHARDS=${OPTARG%%:*}
-      SHARD_NUMBER=${OPTARG##*:}
-      ;;
+    i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
@@ -131,22 +134,6 @@ fi
 if [[ "${skip_distribution:-false}" == "false" ]]; then
   banner "Running pants distribution tests"
   (
-    # The published pants should need no local plugins beyond the python backend to distribute
-    # itself so we override backends to ensure a minimal env works.
-    config=$(mktemp -t pants-ci.XXXXXX.ini) && \
-    (cat << EOF > ${config}
-[DEFAULT]
-backend_packages: [
-    # TODO(John Sirois): When we have fine grained plugins, include the python backend here
-    "internal_backend.utilities",
-  ]
-EOF
-    ) && \
-    ./pants.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
-      src/python/pants/bin:pants && \
-    mv dist/pants.pex dist/self.pex && \
-    ./dist/self.pex ${INTERPRETER_ARGS[@]} --config-override=${config} binary \
-      src/python/pants/bin:pants && \
     ./build-support/bin/release.sh -pn
   ) || die "Failed to create pants distributions."
 fi
@@ -159,7 +146,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
@@ -169,17 +156,19 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
     PANTS_PYTHON_TEST_FAILSOFT=1 \
       ./pants.pex ${PANTS_ARGS[@]} test \
         $(./pants.pex list pants-plugins/tests/python:: | \
-            xargs ./pants.pex filter --filter-type=python_tests | \
-            grep -v integration)
+            xargs ./pants.pex filter --filter-type=python_tests)
   ) || die "Internal backend python test failure"
 fi
 
 if [[ "${skip_python:-false}" == "false" ]]; then
-  banner "Running core python tests"
+  if [[ "0/1" != "${python_unit_shard}" ]]; then
+    shard_desc=" [shard ${python_unit_shard}]"
+  fi
+  banner "Running core python tests${shard_desc}"
   (
     PANTS_PY_COVERAGE=paths:pants/ \
       PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_unit_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
@@ -198,18 +187,16 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
-  if [[ ! -z "${TOTAL_SHARDS}" ]]; then
-    shard_desc=" [shard $((SHARD_NUMBER+1)) of ${TOTAL_SHARDS}]"
+  if [[ "0/1" != "${python_intg_shard}" ]]; then
+    shard_desc=" [shard ${python_intg_shard}]"
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
     PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_intg_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
-            grep integration | \
-            sort | \
-            awk "NR%${TOTAL_SHARDS:-1}==${SHARD_NUMBER:-0}")
+            grep integration)
   ) || die "Pants Integration test failure"
 fi
 

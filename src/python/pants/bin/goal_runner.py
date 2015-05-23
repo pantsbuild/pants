@@ -38,17 +38,45 @@ from pants.subsystem.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
+class SourceRootBootstrapper(Subsystem):
+  @classmethod
+  def scope_qualifier(cls):
+    # This is an odd name, but we maintain the legacy scope until we can kill this subsystem
+    # outright.
+    return 'goals'
+
+  @classmethod
+  def register_options(cls, register):
+    super(SourceRootBootstrapper, cls).register_options(register)
+    # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load
+    # time.
+    register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
+             help='Initialize state by evaluating these buildfiles.')
+
+  def bootstrap(self, address_mapper, build_file_parser):
+    for path in self.get_options().bootstrap_buildfiles:
+      build_file = address_mapper.from_cache(root_dir=build_file_parser.root_dir, relpath=path)
+      # TODO(pl): This is an unfortunate interface leak, but I don't think
+      # in the long run that we should be relying on "bootstrap" BUILD files
+      # that do nothing except modify global state.  That type of behavior
+      # (e.g. source roots, goal registration) should instead happen in
+      # project plugins, or specialized configuration files.
+      build_file_parser.parse_build_file_family(build_file)
+
+
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
-
-  # Subsytems used outside of any task.
-  subsystems = (Reporting, RunTracker)
 
   def __init__(self, root_dir):
     """
     :param root_dir: The root directory of the pants workspace.
     """
     self.root_dir = root_dir
+
+  @property
+  def subsystems(self):
+    # Subsystems used outside of any task.
+    return SourceRootBootstrapper, Reporting, RunTracker
 
   def setup(self):
     options_bootstrapper = OptionsBootstrapper()
@@ -86,7 +114,7 @@ class GoalRunner(object):
 
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
-    self.register_options(global_subsystems)
+    self.register_subsystem_options(global_subsystems)
 
     # Make the options values available to all subsystems.
     Subsystem._options = self.options
@@ -117,16 +145,10 @@ class GoalRunner(object):
     self.build_graph = BuildGraph(run_tracker=self.run_tracker,
                                   address_mapper=self.address_mapper)
 
+    # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
-      # construct base parameters to be filled in for BuildGraph
-      for path in self.options.for_global_scope().bootstrap_buildfiles:
-        build_file = self.address_mapper.from_cache(root_dir=self.root_dir, relpath=path)
-        # TODO(pl): This is an unfortunate interface leak, but I don't think
-        # in the long run that we should be relying on "bootstrap" BUILD files
-        # that do nothing except modify global state.  That type of behavior
-        # (e.g. source roots, goal registration) should instead happen in
-        # project plugins, or specialized configuration files.
-        self.build_file_parser.parse_build_file_family(build_file)
+      source_root_bootstrapper = SourceRootBootstrapper.global_instance()
+      source_root_bootstrapper.bootstrap(self.address_mapper, self.build_file_parser)
 
     self._expand_goals_and_specs()
 
@@ -142,7 +164,7 @@ class GoalRunner(object):
   def global_options(self):
     return self.options.for_global_scope()
 
-  def register_options(self, global_subsystems):
+  def register_subsystem_options(self, global_subsystems):
     # Standalone global options.
     register_global_options(self.options.registration_function_for_global_scope())
 

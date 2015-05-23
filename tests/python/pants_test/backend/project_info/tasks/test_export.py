@@ -175,7 +175,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:first')]
     ))
-    self.assertEqual('1.0.0', result['version'])
+    self.assertEqual('1.0.1', result['version'])
 
   def test_sources(self):
     result = get_json(self.execute_console_task(
@@ -237,6 +237,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
     jvm_target = result['targets']['project_info:jvm_target']
     expected_jmv_target = {
+      'excludes': [],
       'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
                           'project_info/this/is/a/source/Bar.scala']},
       'libraries': ['org.apache:apache-jar:12.12.2012'],

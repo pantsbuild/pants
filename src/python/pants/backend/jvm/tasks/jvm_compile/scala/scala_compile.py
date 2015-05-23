@@ -130,7 +130,7 @@ class ZincCompile(JvmCompile):
       return []
 
     plugin_args = self.get_options().plugin_args
-    active_plugins = self.find_plugins()
+    active_plugins = self._find_plugins()
     ret = []
     for name, jar in active_plugins.items():
       ret.append('-S-Xplugin:{}'.format(jar))

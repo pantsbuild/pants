@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ConfigParser
 import os
 import subprocess
 import unittest
@@ -49,30 +50,29 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
-    config = config.copy() if config else {}
 
-    # We add workdir to the DEFAULT section, and also ensure that it's emitted first.
-    default_section = config.pop('DEFAULT', {})
-    default_section['pants_workdir'] = '%s' % workdir
+    args = ['--no-pantsrc',
+            '--pants-workdir=' + workdir,
+            '--kill-nailguns',
+            '--print-exception-stacktrace']
 
-    ini = ''
-    for section, section_config in [('DEFAULT', default_section)] + config.items():
-      ini += '\n[%s]\n' % section
-      for key, val in section_config.items():
-        ini += '%s: %s\n' % (key, val)
-
-    ini_file_name = os.path.join(workdir, 'pants.ini')
-    with safe_open(ini_file_name, mode='w') as fp:
-      fp.write(ini)
-    env = os.environ.copy()
-    env.update(extra_env or {})
+    if config:
+      config_data = config.copy()
+      ini = ConfigParser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
+      for section, section_config in config_data.items():
+        ini.add_section(section)
+        for key, value in section_config.items():
+          ini.set(section, key, value)
+      ini_file_name = os.path.join(workdir, 'pants.ini')
+      with safe_open(ini_file_name, mode='w') as fp:
+        ini.write(fp)
+      args.append('--config-override=' + ini_file_name)
 
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
-    pants_command = [pants_script,
-                     '--kill-nailguns',
-                     '--no-pantsrc',
-                     '--config-override={0}'.format(ini_file_name),
-                     '--print-exception-stacktrace'] + command
+    pants_command = [pants_script] + args + command
+
+    env = os.environ.copy()
+    env.update(extra_env or {})
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
