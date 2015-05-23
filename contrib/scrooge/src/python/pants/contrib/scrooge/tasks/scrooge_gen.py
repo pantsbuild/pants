@@ -25,6 +25,9 @@ from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
 from twitter.common.collections import OrderedSet
 
+from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
+  JavaThriftLibraryFingerprintStrategy
+
 
 _CONFIG_SECTION = 'scrooge-gen'
 
@@ -157,7 +160,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
             langtarget.inject_dependency(langtarget_by_gentarget[dep].address)
 
   def gen(self, partial_cmd, targets):
-    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
+    fp_strategy = JavaThriftLibraryFingerprintStrategy(self.context.options)
+    with self.invalidated(targets, fingerprint_strategy=fp_strategy,
+                          invalidate_dependents=True) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)

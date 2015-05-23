@@ -49,7 +49,6 @@ class JavaThriftLibrary(JvmTarget):
                                         .format(arg, ', or '.join(map(repr, values)), value))
       return value
 
-    # TODO(pl): These should all live in payload fields
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = check_value_for_arg('language', language, self._LANGUAGES)
     self._rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)

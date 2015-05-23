@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':scrooge_gen',
     ':thrift_linter_integration',
+    ':java_thrift_library_fingerprint_strategy',
   ],
 )
 
@@ -29,4 +30,13 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
+)
+
+python_tests(
+  name = 'java_thrift_library_fingerprint_strategy',
+  sources = ['test_java_thrift_library_fingerprint_strategy.py'],
+  dependencies = [
+    'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:java_thrift_library_fingerprint_strategy',
+    'tests/python/pants_test/base:context_utils',
+  ]
 )
