@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
 <ivysettings>
-  <properties file="${ivy.settings.dir}/../../build.properties" override="false"/>
+  <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
   <properties environment="env" />
   <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
   <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
@@ -29,4 +29,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
                root="file://${google.repo.dir}/"/>
     </chain>
   </resolvers>
+  <caches default="default" lockStrategy="no-lock" useOrigin="true">
+    <cache name="default" basedir="${ivy.cache.dir}"/>
+  </caches>
 </ivysettings>

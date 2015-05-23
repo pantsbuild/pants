@@ -106,7 +106,7 @@ class UnpackJars(Task):
                                              spec=spec)
     return lambda f: cls._file_filter(f, include_patterns, exclude_patterns)
 
-  # TODO (mateor) move above unpack methods that aren't specific to jars up to fs.archive.
+  # TODO(mateor) move unpack code that isn't jar-specific to fs.archive or an Unpack base class.
 
   @classmethod
   def get_unpack_filter(cls, unpacked_jars):
@@ -115,8 +115,8 @@ class UnpackJars(Task):
     :param Target unpacked_jars: A target with include_patterns and exclude_patterns attributes.
     """
     return cls.calculate_unpack_filter(includes=unpacked_jars.include_patterns,
-                                        excludes=unpacked_jars.exclude_patterns,
-                                        spec=unpacked_jars.address.spec)
+                                       excludes=unpacked_jars.exclude_patterns,
+                                       spec=unpacked_jars.address.spec)
 
   def _unpack(self, unpacked_jars):
     """Extracts files from the downloaded jar files and places them in a work directory.

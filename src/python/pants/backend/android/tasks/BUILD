@@ -99,7 +99,7 @@ python_library(
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:fingerprint_strategy',
-    'src/python/pants/fs:fs',
+    'src/python/pants/fs',
   ],
 )
 

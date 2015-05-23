@@ -11,6 +11,7 @@ from collections import defaultdict
 from pants.backend.android.tasks.dx_compile import DxCompile
 from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree, touch
 from pants_test.android.test_android_base import TestAndroidBase, distribution
 
@@ -26,7 +27,8 @@ class DxCompileTest(TestAndroidBase):
     return DxCompile
 
   @classmethod
-  def base_unpacked_files(cls, package, app, version):
+  def base_unpacked_files(cls, package, app, version, location=None):
+    location = location or cls.UNPACKED_LIBS_LOC
     unpacked_classes = {}
     class_files = ['Example.class', 'Hello.class', 'World.class']
 
@@ -35,7 +37,7 @@ class DxCompileTest(TestAndroidBase):
     unpacked_classes[unpacked_location] = []
     for filename in class_files:
       new_file = os.path.join('a/b/c', filename)
-      touch(os.path.join(cls.UNPACKED_LIBS_LOC, unpacked_location, new_file))
+      touch(os.path.join(location, unpacked_location, new_file))
       unpacked_classes[unpacked_location].append(new_file)
     return unpacked_classes
 
@@ -93,7 +95,7 @@ class DxCompileTest(TestAndroidBase):
         self.assertIn(file_path, class_files)
 
   def test_gather_classes_from_deps(self):
-    # Make sure classes are being gathered from a binary's android_library dependencies.
+    # Make sure classes_by_target are being gathered from a binary's android_library dependencies.
     with self.android_library() as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
@@ -208,6 +210,20 @@ class DxCompileTest(TestAndroidBase):
   # more than one copy of a class is packed into the dex file and it is very easy to fetch
   # duplicate libraries (as well as conflicting versions) from the Android SDK. As long as the
   # version number is the same, pants silently dedupes. Version conflicts raise an exception.
+
+  def test_filter_unpacked_dir(self):
+    with self.android_library() as android_library:
+      with self.android_binary(dependencies=[android_library]) as binary:
+        context = self.context(target_roots=binary)
+        unpacked_classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
+        task_context = self._mock_unpacked_libraries(context, android_library, unpacked_classes)
+        dx_task = self.create_task(task_context)
+
+        gathered_classes = dx_task._filter_unpacked_dir(android_library, self.UNPACKED_LIBS_LOC, {})
+        for location in unpacked_classes:
+          for class_file in unpacked_classes[location]:
+            file_path = os.path.join(self.UNPACKED_LIBS_LOC, location, class_file)
+            self.assertIn(file_path, gathered_classes)
 
   def test_duplicate_library_version_deps(self):
     with self.android_library() as library:

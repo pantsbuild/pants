@@ -82,66 +82,64 @@ class DxCompile(AndroidTask, NailgunTask):
                         args=args, workunit_name='dx')
 
 
+  def _filter_unpacked_dir(self, target, unpacked_dir, class_files):
+    # The Dx tool returns failure if more than one copy of a class is packed into the dex file and
+    #  it is easy to fetch duplicate libraries (as well as conflicting versions) from the SDK repos.
+    # This filters the contents of the unpacked_dir against the include/exclude patterns of the
+    # target, then compares the filtered files against previously gathered class_files to
+    # dedupe and detect version conflicts.
+
+    file_filter = UnpackJars.get_unpack_filter(target)
+    for root, _, file_names in os.walk(unpacked_dir):
+      for filename in file_names:
+        # Calculate the filename relative to the unpacked_dir and then filter.
+        relative_dir = os.path.relpath(root, unpacked_dir)
+        class_file = os.path.join(relative_dir, filename)
+        if file_filter(class_file):
+          class_location = os.path.join(root, filename)
+
+          # If the class_file (e.g. 'a/b/c/Hello.class') has already been added, then compare the
+          # full path. If the full path is identical then we can ignore it as a duplicate. If
+          # the path is different, that means that there is probably conflicting version
+          # numbers amongst the library deps and so we raise an exception.
+          if class_file in class_files:
+            if class_files[class_file] != class_location:
+              raise TaskError("Dependency:\n{}\n\nConflicts\n1: {} "
+                              "\n2: {}".format(target, class_location, class_files[class_file]))
+          class_files[class_file] = class_location
+    return class_files.values()
+
   def _gather_classes(self, target):
-    # Gather relevant classes from a walk of AndroidBinary's dependency graph. This includes the
-    # target's compiled classes_by_target as well as classes found in unpacked AndroidDependency
-    # libs. These unpacked libraries are filtered by their associated AndroidLibrary
-    # include/exclude patterns and deduped.
+    # Gather relevant classes from a walk of AndroidBinary's dependency graph.
     classes_by_target = self.context.products.get_data('classes_by_target')
     unpacked_archives = self.context.products.get('unpacked_libraries')
-    classes = set()
+
+    gathered_classes = set()
     class_files = {}
 
     def get_classes(tgt):
-      def add_classes(target_products):
-        for _, products in target_products.abs_paths():
-          for prod in products:
-            classes.update([prod])
-
+      # Gather compiled classes.
       target_classes = classes_by_target.get(tgt) if classes_by_target else None
-
       if target_classes:
-        add_classes(target_classes)
+        for _, products in target_classes.abs_paths():
+          gathered_classes.update(products)
 
+      # Gather classes from the contents of unpacked libraries.
       unpacked = unpacked_archives.get(tgt)
       if unpacked:
         # If there are unpacked_archives then we know this target is an AndroidLibrary.
         for archives in unpacked.values():
           for unpacked_dir in archives:
-            # TODO (mateor) move get_unpack_filter() from UnpackJars to fs.archive or
-            # an Unpack base class.
-            file_filter = UnpackJars.get_unpack_filter(tgt)
-            for root, _, file_names in os.walk(unpacked_dir):
-              for filename in file_names:
-                relative_dir = os.path.relpath(root, unpacked_dir)
-                # Check against the library's include/exclude patterns and include if True.
-                class_file = os.path.join(relative_dir, filename)
-                if file_filter(class_file):
-                  class_location = os.path.join(root, filename)
-
-                  # The Dx tool returns failure if more than one copy of a class is packed into the
-                  # dex file and it is very easy to fetch duplicate libraries (as well as
-                  # conflicting versions) from the Android SDK repos.
-
-                  # If the class_file (e.g. 'a/b/c/Hello.class') has already been added, compare the
-                  # full path. If the path is identical then we can ignore it as a duplicate. If
-                  # the path is different, that means that there is probably conflicting version
-                  # numbers amongst the library deps and so we raise an exception.
-
-                  if class_file in class_files:
-                    if class_files[class_file] != class_location:
-                      raise self.DuplicateClassFileException(
-                         "Adding duplicate class files from separate libraries into dex file! "
-                         "This likely indicates a version conflict in the target's dependencies.\n"
-                         "Target: {}\nConflicts\n"
-                         "1: {} \n2: {}".format(target, os.path.join(class_location, class_file),
-                                                os.path.join(class_files[class_file], class_file)))
-                  # Keep a dict of class_files and file paths to check for dupes/conflicts.
-                  class_files[class_file] = class_location
-                  classes.update([class_location])
+            try:
+              gathered_classes.update(self._filter_unpacked_dir(tgt, unpacked_dir, class_files))
+            except TaskError as e:
+              raise self.DuplicateClassFileException(
+                  "Attempted to add duplicate class files from separate libraries into dex file! "
+                  "This likely indicates a version conflict in the target's dependencies.\n"
+                  "\nTarget:\n{}\n{}".format(target, e))
 
     target.walk(get_classes)
-    return classes
+    return gathered_classes
 
   def execute(self):
     targets = self.context.targets(self.is_dextarget)

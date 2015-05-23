@@ -12,8 +12,8 @@ from pants.base.exceptions import TargetDefinitionException
 class AndroidBinary(AndroidTarget):
   """Produces an Android binary."""
 
-  def __init__(self, **kwargs):
-    super(AndroidBinary, self).__init__(**kwargs)
+  def __init__(self, *args, **kwargs):
+    super(AndroidBinary, self).__init__(*args, **kwargs)
     self._target_sdk = None
 
   @property

@@ -58,9 +58,9 @@ class AaptBuilder(AaptTask):
     args.extend(['package', '-f'])
     args.extend(['-M', target.manifest.path])
     args.append('--auto-add-overlay')
-    while resource_dirs:
-      # Priority for resources is left to right, so reverse the collection order of DFS preorder.
-      args.extend(['-S', resource_dirs.pop()])
+    # Priority for resources is left to right, so reverse the collection order of DFS preorder.
+    for resource_dir in reversed(resource_dirs):
+      args.extend(['-S', resource_dir])
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
     args.extend(['-F', os.path.join(self.workdir,

@@ -42,6 +42,7 @@ class UnpackLibraries(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(UnpackLibraries, cls).prepare(options, round_manager)
+    round_manager.require_data('ivy_imports')
 
   @classmethod
   def product_types(cls):
