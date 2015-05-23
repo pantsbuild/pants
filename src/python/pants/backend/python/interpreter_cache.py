@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import uuid
 
 from pex.archiver import Archiver
 from pex.crawler import Crawler
@@ -16,7 +15,7 @@ from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.iterator import Iterator
 from pex.package import EggPackage, SourcePackage
 
-from pants.util.dirutil import safe_concurrent_rename, safe_mkdir
+from pants.util.dirutil import safe_concurrent_create, safe_mkdir
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -75,12 +74,11 @@ class PythonInterpreterCache(object):
     return None
 
   def _setup_interpreter(self, interpreter, cache_path):
-    cache_path_tmp = '{0}.tmp.{1}'.format(cache_path, uuid.uuid4().hex)
-    os.makedirs(cache_path_tmp)
-    os.symlink(interpreter.binary, os.path.join(cache_path_tmp, 'python'))
-    ret = self._resolve(interpreter, cache_path_tmp)
-    safe_concurrent_rename(cache_path_tmp, cache_path)
-    return ret
+    def resolve_interpreter(path):
+      os.mkdir(path)  # Parent will already have been created by safe_concurrent_create.
+      os.symlink(interpreter.binary, os.path.join(path, 'python'))
+      return self._resolve(interpreter, path)
+    return safe_concurrent_create(resolve_interpreter, cache_path)
 
   def _setup_cached(self, filters):
     """Find all currently-cached interpreters."""

@@ -12,6 +12,7 @@ import shutil
 import stat
 import tempfile
 import threading
+import uuid
 from collections import defaultdict
 
 from pants.util.strutil import ensure_text
@@ -99,8 +100,7 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
 
 def safe_rmtree(directory):
   """Delete a directory if it's present. If it's not present, no-op."""
-  if os.path.exists(directory):
-    shutil.rmtree(directory, True)
+  shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):
@@ -121,13 +121,35 @@ def safe_delete(filename):
 def safe_concurrent_rename(src, dst):
   """Rename src to dst, ignoring errors due to dst already existing.
 
-  Useful when concurrent processes my attempt to create dst, and it doesn't matter who wins.
+  Useful when concurrent processes may attempt to create dst, and it doesn't matter who wins.
   """
+  # Delete dst, in case it existed (with old content) even before any concurrent processes
+  # attempted this write. This ensures that at least one process writes the new content.
+  if os.path.isdir(src):  # Note that dst may not exist, so we test for the type of src.
+    safe_rmtree(dst)
+  else:
+    safe_delete(dst)
   try:
     shutil.move(src, dst)
   except IOError as e:
     if e.errno != errno.EEXIST:
       raise
+
+
+def safe_concurrent_create(func, path):
+  """Safely execute code that creates a file at a well-known path.
+
+  Useful when concurrent processes may attempt to create a file, and it doesn't matter who wins.
+
+  :param func: A callable that takes a single path argument and creates a file at that path.
+  :param path: The path to execute the callable on.
+  :return: func(path)'s return value.
+  """
+  safe_mkdir_for(path)
+  tmp_path = '{0}.tmp.{1}'.format(path, uuid.uuid4().hex)
+  ret = func(tmp_path)
+  safe_concurrent_rename(tmp_path, path)
+  return ret
 
 
 def chmod_plus_x(path):
