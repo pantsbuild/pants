@@ -28,15 +28,9 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
         workdir, 'examples/src/java/org/pantsbuild/example/hello/main', strategy,
         extra_args=['--compile-zinc-java-enabled', '-ldebug'], clean_all=True
       )
-      # self.assertTrue('Attempting to call com.sun.tools.javac.api.JavacTool' in pants_run.stdout_data)
-      self.assertTrue('Attempting to call javac directly' in pants_run.stdout_data)
-      self.assertFalse('Forking javac' in pants_run.stdout_data)
+      self.assertIn('Attempting to call com.sun.tools.javac.api.JavacTool', pants_run.stdout_data)
+      self.assertNotIn('Forking javac', pants_run.stdout_data)
 
-  @unittest.skip("""
-    Zinc 1.0.3 isn't published yet.
-    Don't forget to uncomment and replace an assertion in #test_in_process above
-    by moving to sbt 0.13.8 the output will be a bit different.
-  """)
   @provide_compile_strategies
   def test_log_level(self, strategy):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -44,5 +38,5 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
       pants_run = self.run_test_compile(
         workdir, target, strategy, extra_args=['--compile-zinc-java-enabled', '--no-color'], clean_all=True
       )
-      self.assertTrue('[warn] sun.security.x509.X500Name' in pants_run.stdout_data)
-      self.assertTrue('[error] System2.out' in pants_run.stdout_data)
+      self.assertIn('[warn] sun.security.x509.X500Name', pants_run.stdout_data)
+      self.assertIn('[error] System2.out', pants_run.stdout_data)
