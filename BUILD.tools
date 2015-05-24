@@ -78,6 +78,23 @@ jar_library(name = 'zinc',
               jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.3')
             ])
 
+SBT_REV = '0.13.8'
+
+jar_library(name = 'compiler-interface',
+            jars = [
+              jar(org = 'com.typesafe.sbt', name = 'compiler-interface', rev = SBT_REV,
+                  classifier='sources',
+                  # We just want the single compiler-interface jar and not its dep on scala-lang
+                  intransitive=True)
+            ])
+
+jar_library(name = 'sbt-interface',
+            jars = [
+              jar(org = 'com.typesafe.sbt', name = 'sbt-interface', rev = SBT_REV,
+                  # We just want the single sbt-interface jar and not its dep on scala-lang
+                  intransitive=True)
+            ])
+
 # common rev for all org.scala-lang%* artifacts
 SCALA_REV = '2.10.4'
 

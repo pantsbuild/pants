@@ -87,16 +87,9 @@ class JvmToolMixin(object):
 
     Returns a list of paths.
     """
-    return self.lazy_tool_classpath_from_products(products, key, scope)()
-
-  def lazy_tool_classpath_from_products(self, products, key, scope):
-    """Get a lazy classpath for the tool previously registered under the key in the given scope.
-
-    Returns a no-arg callable. Invoking it returns a list of paths.
-    """
     callback_product_map = products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(scope, {}).get(key)
     if not callback:
-      raise TaskError('No bootstrap callback registered for {key} in {scope}'.format(
-        key=key, scope=scope))
-    return callback
+      raise TaskError('No bootstrap callback registered for {key} in {scope}'
+                      .format(key=key, scope=scope))
+    return callback()
