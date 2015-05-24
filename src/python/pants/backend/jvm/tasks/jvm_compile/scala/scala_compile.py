@@ -80,7 +80,9 @@ class ZincCompile(JvmCompile):
                           custom_rules=[
                             # The compiler-interface and sbt-interface tool jars carry xsbt and
                             # xsbti interfaces that are used across the shaded tool jar boundary so
-                            # we preserve these root packages wholesale.
+                            # we preserve these root packages wholesale along with the core scala
+                            # APIs.
+                            Shader.exclude_package('scala', recursive=True),
                             Shader.exclude_package('xsbt', recursive=True),
                             Shader.exclude_package('xsbti', recursive=True),
                           ])
