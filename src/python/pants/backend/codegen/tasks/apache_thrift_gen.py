@@ -87,6 +87,7 @@ class ApacheThriftGen(CodeGen):
     # self.setup_artifact_cache()
 
   _thrift_binary = None
+
   @property
   def thrift_binary(self):
     if self._thrift_binary is None:
@@ -105,6 +106,7 @@ class ApacheThriftGen(CodeGen):
     return self.GenInfo(gen, deps)
 
   _gen_java = None
+
   @property
   def gen_java(self):
     if self._gen_java is None:
@@ -112,6 +114,7 @@ class ApacheThriftGen(CodeGen):
     return self._gen_java
 
   _gen_python = None
+
   @property
   def gen_python(self):
     if self._gen_python is None:
@@ -125,7 +128,7 @@ class ApacheThriftGen(CodeGen):
 
   def is_gentarget(self, target):
     return ((isinstance(target, JavaThriftLibrary)
-             and target.compiler(self.context.options) == 'thrift')
+             and target.compiler == 'thrift')
             or isinstance(target, PythonThriftLibrary))
 
   def is_forced(self, lang):
@@ -279,6 +282,7 @@ def calculate_gen(source):
 
 def calculate_python_genfiles(namespace, types):
   basepath = namespace.replace('.', '/')
+
   def path(name):
     return os.path.join(basepath, '{}.py'.format(name))
   yield path('__init__')
@@ -293,6 +297,7 @@ def calculate_python_genfiles(namespace, types):
 
 def calculate_java_genfiles(namespace, types):
   basepath = namespace.replace('.', '/')
+
   def path(name):
     return os.path.join(basepath, '{}.java'.format(name))
   if 'const' in types:

@@ -37,22 +37,18 @@ class ScroogeGenTest(TaskTestBase):
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()
-    self.task_outdir =  os.path.join(self.build_root, 'scrooge', 'gen-java')
-
+    self.task_outdir = os.path.join(self.build_root, 'scrooge', 'gen-java')
 
   def tearDown(self):
     super(ScroogeGenTest, self).tearDown()
     safe_rmtree(self.task_outdir)
 
   def test_validate(self):
-    # Set synthetic defaults for the global scope.
-    option_values = {'thrift_default_compiler': 'scrooge',
-                     'thrift_default_language': 'bf',
-                     'thrift_default_rpc_style': 'async'}
-    options = create_options({'': option_values})
-
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
+        compiler='thrift',
+        language='scala',
+        rpc_style='ostrich',
         sources=[],
         dependencies=[],
       )
@@ -60,6 +56,8 @@ class ScroogeGenTest(TaskTestBase):
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='two',
+        language='scala',
+        rpc_style='ostrich',
         sources=[],
         dependencies=[':one'],
       )
@@ -70,14 +68,24 @@ class ScroogeGenTest(TaskTestBase):
         sources=[],
         dependencies=[':one'],
         rpc_style='finagle',
+        language='scala',
       )
     '''))
 
-    ScroogeGen._validate(options, [self.target('test_validate:one')])
-    ScroogeGen._validate(options, [self.target('test_validate:two')])
+    target = self.target('test_validate:one')
+    ScroogeGen._validate([target])
+    self.assertEquals('ostrich', target.rpc_style)
+    self.assertEquals('thrift', target.compiler)
+    self.assertEquals('scala', target.language)
+
+    target = self.target('test_validate:two')
+    ScroogeGen._validate([target])
+    self.assertEquals('ostrich', target.rpc_style)
+    self.assertEquals('thrift', target.compiler)
+    self.assertEquals('scala', target.language)
 
     with pytest.raises(TaskError):
-      ScroogeGen._validate(options, [self.target('test_validate:three')])
+      ScroogeGen._validate([self.target('test_validate:three')])
 
   def test_smoke(self):
     contents = dedent('''namespace java org.pantsbuild.example
