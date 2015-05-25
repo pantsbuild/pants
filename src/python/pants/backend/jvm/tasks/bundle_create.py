@@ -62,10 +62,10 @@ class BundleCreate(JvmBinaryTask):
     for target in self.context.target_roots:
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
-        // NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since 
-        // the bundle is re-created every time, this shouldn't cause a problem, but if we ever
-        // expect the product to be cached, a user running an 'rm' on the dist/ directory could 
-        // cause inconsistencies.
+        # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since 
+        # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
+        # expect the product to be cached, a user running an 'rm' on the dist/ directory could 
+        # cause inconsistencies.
         jvm_bundles_product = self.context.products.get('jvm_bundles')
         jvm_bundles_product.add(target, os.path.dirname(basedir)).append(os.path.basename(basedir))
         if archiver:
