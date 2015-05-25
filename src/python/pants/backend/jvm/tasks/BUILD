@@ -67,12 +67,14 @@ python_library(
   dependencies = [
     ':ivy_task_mixin',
     ':jar_task',
+    'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/ivy',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
-    'src/python/pants/subsystem',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -315,7 +317,7 @@ python_library(
   sources = ['jvm_tool_task_mixin.py'],
   dependencies = [
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
-    'src/python/pants/ivy',
+    'src/python/pants/base:exceptions',
   ],
 )
 
