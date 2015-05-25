@@ -75,7 +75,6 @@ class ZincCompile(JvmCompile):
 
     cls.register_jvm_tool(register,
                           'zinc',
-                          # Don't shade the scala-library
                           main=cls._ZINC_MAIN,
                           custom_rules=[
                             # The compiler-interface and sbt-interface tool jars carry xsbt and
@@ -219,7 +218,12 @@ class ZincCompile(JvmCompile):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
-    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
+    # TODO(John Sirois): Do we need to do this at all?  If adding scala-library to the classpath is
+    # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
+    # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
+    # appropriate level and certainly at a more appropriate granularity.
+    # relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
+    relativized_classpath = relativize_paths(classpath, get_buildroot())
 
     zinc_args = []
 
