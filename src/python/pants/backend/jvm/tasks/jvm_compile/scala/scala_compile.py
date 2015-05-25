@@ -222,8 +222,7 @@ class ZincCompile(JvmCompile):
     # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
     # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
     # appropriate level and certainly at a more appropriate granularity.
-    # relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
-    relativized_classpath = relativize_paths(classpath, get_buildroot())
+    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
 
     zinc_args = []
 
