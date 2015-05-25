@@ -31,6 +31,10 @@ class BundleCreate(JvmBinaryTask):
     register('--archive-prefix', action='store_true', default=False,
              help='If --archive is specified, use the target basename as the path prefix.')
 
+  @classmethod
+  def product_types(cls):
+    return ['jvm_bundles']
+
   def __init__(self, *args, **kwargs):
     super(BundleCreate, self).__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
@@ -58,6 +62,12 @@ class BundleCreate(JvmBinaryTask):
     for target in self.context.target_roots:
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
+        // NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since 
+        // the bundle is re-created every time, this shouldn't cause a problem, but if we ever
+        // expect the product to be cached, a user running an 'rm' on the dist/ directory could 
+        // cause inconsistencies.
+        jvm_bundles_product = self.context.products.get('jvm_bundles')
+        jvm_bundles_product.add(target, os.path.dirname(basedir)).append(os.path.basename(basedir))
         if archiver:
           archivepath = archiver.create(
             basedir,
