@@ -32,7 +32,7 @@ class SimpleCompileProgress (logPhases: Boolean, printProgress: Boolean, heartbe
   def advance(current: Int, total: Int): Boolean = {
     if (printProgress) {
       val percent = (current * 100) / total
-      log.logRaw(s"\rProgress: ${percent}")
+      log.logRaw(s"\rProgress: ${percent}%")
     }
     if (heartbeatSecs > 0) {
       val currentTimeMillis = System.currentTimeMillis
