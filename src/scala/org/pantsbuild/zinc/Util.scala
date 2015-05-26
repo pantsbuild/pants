@@ -16,21 +16,33 @@ object Util {
   /**
    * Create a new logger based on quiet, level, and color settings.
    */
-  def logger(quiet: Boolean, level: Level.Value, color: Boolean): Logger = {
+  def logger(quiet: Boolean, level: Level.Value, color: Boolean): LoggerRaw = {
     if (quiet) {
       new SilentLogger
     } else {
-      val log = ConsoleLogger(useColor = ConsoleLogger.formatEnabled && color); log.setLevel(level); log
+      val out = ConsoleLogger.systemOut
+      val consoleLogger = ConsoleLogger(out = out, useColor = ConsoleLogger.formatEnabled && color); consoleLogger.setLevel(level)
+      new LoggerRaw() {
+        def trace(t: => Throwable): Unit = consoleLogger.trace(t)
+        def success(message: => String): Unit = consoleLogger.success(message)
+        def log(level: Level.Value, message: => String): Unit = consoleLogger.log(level, message)
+        def logRaw(message: => String): Unit = out.print(message)
+      }
     }
   }
 
   /**
    * A logger that does nothing.
    */
-  class SilentLogger extends Logger {
+  class SilentLogger extends LoggerRaw {
     def trace(t: => Throwable): Unit = ()
     def success(message: => String): Unit = ()
     def log(level: Level.Value, message: => String): Unit = ()
+    def logRaw(message: => String): Unit = ()
+  }
+
+  trait LoggerRaw extends Logger {
+    def logRaw(message: => String): Unit
   }
 
   //
