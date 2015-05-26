@@ -61,7 +61,8 @@ class TaskTestBase(BaseTest):
     """
     options_scope = uuid.uuid4().hex
     subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
-    return type(subclass_name, (task_type,), {'options_scope': options_scope}), options_scope
+    return type(subclass_name, (task_type,), {'_stable_name': task_type.__name__,
+                                              'options_scope': options_scope}), options_scope
 
   def set_options(self, **kwargs):
     self.set_options_for_scope(self.options_scope, **kwargs)
