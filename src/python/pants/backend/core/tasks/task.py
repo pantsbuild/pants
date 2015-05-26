@@ -61,7 +61,11 @@ class TaskBase(AbstractClass):
     may have random names (e.g., in tests), so this gives us a stable name to use across runs,
     e.g., in artifact cache references.
     """
-    return cls._stable_name or cls.__name__
+    return cls._stable_name or cls._compute_stable_name()
+
+  @classmethod
+  def _compute_stable_name(cls):
+    return '{}.{}'.format(cls.__module__, cls.__name)
 
   @classmethod
   def global_subsystems(cls):
