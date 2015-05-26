@@ -106,6 +106,10 @@ object Main {
         val message = e.getMessage
         if (message ne null) log.error(message)
         sys.exit(1)
+    } finally {
+      if (settings.logOptions.printProgress || settings.logOptions.heartbeatSecs > 0) {
+          log.logRaw("Done.")
+      }
     }
   }
 }
