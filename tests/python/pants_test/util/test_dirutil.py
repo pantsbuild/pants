@@ -14,7 +14,7 @@ import mox
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import _mkdtemp_unregister_cleaner, safe_mkdir
+from pants.util.dirutil import _mkdtemp_unregister_cleaner, relativize_paths, safe_mkdir
 
 
 class DirutilTest(unittest.TestCase):
@@ -50,10 +50,10 @@ class DirutilTest(unittest.TestCase):
       self.assertEquals(DIR1, dirutil.safe_mkdtemp(dir='1', cleaner=faux_cleaner))
       self.assertEquals(DIR2, dirutil.safe_mkdtemp(dir='2', cleaner=faux_cleaner))
       self.assertIn('unicorn', dirutil._MKDTEMP_DIRS)
-      self.assertEquals(set([DIR1, DIR2]), dirutil._MKDTEMP_DIRS['unicorn'])
+      self.assertEquals({DIR1, DIR2}, dirutil._MKDTEMP_DIRS['unicorn'])
       dirutil._mkdtemp_atexit_cleaner()
       self.assertNotIn('unicorn', dirutil._MKDTEMP_DIRS)
-      self.assertEquals(set(['yoyo']), dirutil._MKDTEMP_DIRS['fluffypants'])
+      self.assertEquals({'yoyo'}, dirutil._MKDTEMP_DIRS['fluffypants'])
     finally:
       dirutil._MKDTEMP_DIRS.pop('unicorn', None)
       dirutil._MKDTEMP_DIRS.pop('fluffypants', None)
@@ -68,3 +68,11 @@ class DirutilTest(unittest.TestCase):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
         self.assertTrue(all(isinstance(dirname, unicode) for dirname in dirs))
+
+  def test_relativize_paths(self):
+    build_root = '/build-root'
+    jar_outside_build_root = os.path.join('/outside-build-root', 'bar.jar')
+    classpath = [os.path.join(build_root, 'foo.jar'), jar_outside_build_root]
+    relativized_classpath = relativize_paths(classpath, build_root)
+    jar_relpath = os.path.relpath(jar_outside_build_root, build_root)
+    self.assertEquals(['foo.jar', jar_relpath], relativized_classpath)

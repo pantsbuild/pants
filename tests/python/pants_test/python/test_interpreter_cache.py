@@ -32,7 +32,7 @@ class TestInterpreterCache(unittest.TestCase):
       return_value=interpreter_requirement)
 
     with temporary_dir() as path:
-      mock_setup.scratch_dir = path
+      mock_setup.interpreter_cache_dir = path
       cache = PythonInterpreterCache(mock_setup, mock.MagicMock())
 
       def set_interpreters(_):

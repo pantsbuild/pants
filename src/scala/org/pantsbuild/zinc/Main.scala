@@ -32,7 +32,7 @@ object Main {
     val isDebug = (!settings.logOptions.quiet && settings.logOptions.logLevel == Level.Debug)
 
     // bail out on any command-line option errors
-    if (!errors.isEmpty) {
+    if (errors.nonEmpty) {
       for (error <- errors) log.error(error)
       log.error("See %s -help for information about options" format Setup.Command)
       sys.exit(1)
