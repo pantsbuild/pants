@@ -4,7 +4,7 @@
 
 package org.pantsbuild.zinc
 
-import java.io.File
+import java.io.{ File, PrintStream }
 import sbt.{ ConsoleLogger, Hash, IO, Level, Logger }
 
 object Util {
@@ -27,6 +27,8 @@ object Util {
         def success(message: => String): Unit = consoleLogger.success(message)
         def log(level: Level.Value, message: => String): Unit = consoleLogger.log(level, message)
         def logRaw(message: => String): Unit = out.print(message)
+        /** This only works because systemOut is backed by System.out */
+        def logRawFlush(message: => String): Unit = out.print(message); System.out.flush()
       }
     }
   }
@@ -39,10 +41,15 @@ object Util {
     def success(message: => String): Unit = ()
     def log(level: Level.Value, message: => String): Unit = ()
     def logRaw(message: => String): Unit = ()
+    def logRawFlush(message: => String): Unit = ()
   }
 
+  /**
+   * A logger with direct printer access, as well as the ability to print immediately.
+   */
   trait LoggerRaw extends Logger {
     def logRaw(message: => String): Unit
+    def logRawFlush(message: => String): Unit
   }
 
   //

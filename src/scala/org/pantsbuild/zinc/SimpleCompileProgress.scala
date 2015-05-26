@@ -38,7 +38,7 @@ class SimpleCompileProgress (logPhases: Boolean, printProgress: Boolean, heartbe
       val currentTimeMillis = System.currentTimeMillis
       val delta = currentTimeMillis - lastHeartbeatMillis
       if (delta > (1000 * heartbeatSecs)) {
-        log.logRaw(".")
+        log.logRawFlush(".")
         lastHeartbeatMillis = currentTimeMillis
       }
     }
