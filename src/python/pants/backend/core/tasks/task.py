@@ -51,7 +51,7 @@ class TaskBase(AbstractClass):
   """
   # Tests may override this to provide a stable name despite the class name being a unique,
   # synthetic name.
-  _stable_name = __name__
+  _stable_name = None
 
   @classmethod
   def stable_name(cls):
@@ -61,7 +61,7 @@ class TaskBase(AbstractClass):
     may have random names (e.g., in tests), so this gives us a stable name to use across runs,
     e.g., in artifact cache references.
     """
-    return cls._stable_name
+    return cls._stable_name or cls.__name__
 
   @classmethod
   def global_subsystems(cls):
