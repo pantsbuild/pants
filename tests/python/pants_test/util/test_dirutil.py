@@ -14,7 +14,8 @@ import mox
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import _mkdtemp_unregister_cleaner, relativize_paths, safe_mkdir
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, relative_symlink, relativize_paths,
+                                safe_mkdir)
 
 
 class DirutilTest(unittest.TestCase):
@@ -76,3 +77,52 @@ class DirutilTest(unittest.TestCase):
     relativized_classpath = relativize_paths(classpath, build_root)
     jar_relpath = os.path.relpath(jar_outside_build_root, build_root)
     self.assertEquals(['foo.jar', jar_relpath], relativized_classpath)
+
+  def test_relative_symlink(self):
+    with temporary_dir() as tmpdir_1: # source and link in same dir
+      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      link = os.path.join(tmpdir_1, 'link')
+      rel_path = os.path.relpath(source, os.path.dirname(link))
+      relative_symlink(source, link)
+      self.assertTrue(os.path.islink(link))
+      self.assertEquals(rel_path, os.readlink(link))
+
+  def test_relative_symlink_source_parent(self):
+    with temporary_dir() as tmpdir_1: # source in parent dir of link
+      os.mkdir(os.path.join(tmpdir_1, 'foo'))
+      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      link = os.path.join(tmpdir_1, 'foo', 'link')
+      relative_symlink(source, link)
+      rel_path = os.path.relpath(source, os.path.dirname(link))
+      self.assertTrue(os.path.islink(link))
+      self.assertEquals(rel_path, os.readlink(link))
+
+  def test_relative_symlink_link_parent(self):
+    with temporary_dir() as tmpdir_1: # link in parent dir of source
+      os.mkdir(os.path.join(tmpdir_1, 'foo'))
+      source = tempfile.mkstemp(dir=os.path.join(tmpdir_1, 'foo'))[1]
+      link = os.path.join(tmpdir_1, 'link')
+      relative_symlink(source, link)
+      rel_path = os.path.relpath(source, os.path.dirname(link))
+      self.assertTrue(os.path.islink(link))
+      self.assertEquals(rel_path, os.readlink(link))
+
+  def test_relative_symlink_same_paths(self):
+    with temporary_dir() as tmpdir_1: # source is link
+      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      with self.assertRaisesRegexp(ValueError, r'Path for link is identical to source'):
+        relative_symlink(source, source)
+
+  def test_relative_symlink_bad_source(self):
+    with temporary_dir() as tmpdir_1: # source is not absolute
+      source = 'foo/bar'
+      link = os.path.join(tmpdir_1, 'link')
+      with self.assertRaisesRegexp(ValueError, r'Path for source.*absolute'):
+        relative_symlink(source, link)
+
+  def test_relative_symlink_bad_link(self):
+    with temporary_dir() as tmpdir_1: # link is not absolute
+      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      link = 'foo/bar'
+      with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
+        relative_symlink(source, link)

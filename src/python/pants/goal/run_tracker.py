@@ -23,6 +23,7 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import relative_symlink
 
 
 class RunTracker(Subsystem):
@@ -85,14 +86,7 @@ class RunTracker(Subsystem):
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
     link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
 
-    try:
-      if os.path.lexists(link_to_latest):
-        os.unlink(link_to_latest)
-      os.symlink(self.run_info_dir, link_to_latest)
-    except OSError as e:
-      # Another run may beat us to deletion or creation.
-      if not (e.errno == errno.EEXIST or e.errno == errno.ENOENT):
-        raise
+    relative_symlink(self.run_info_dir, link_to_latest)
 
     # Time spent in a workunit, including its children.
     self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,

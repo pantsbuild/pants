@@ -165,6 +165,30 @@ def chmod_plus_x(path):
   os.chmod(path, path_mode)
 
 
+def relative_symlink(source_path, link_path):
+  """Create a symlink at link_path pointing to relative source
+
+  :param source_path: Absolute path to source file
+  :param link_path: Absolute path to intended symlink
+  :raises ValueError if source_path or link_path are not unique, absolute paths
+  :raises OSError on failure UNLESS file already exists or no such file/directory
+  """
+  if not (os.path.isabs(source_path)):
+    raise ValueError("Path for source:{} must be absolute".format(source_path))
+  if not (os.path.isabs(link_path)):
+    raise ValueError("Path for link:{} must be absolute".format(link_path))
+  if source_path == link_path:
+    raise ValueError("Path for link is identical to source:{}".format(source_path))
+  try:
+    if os.path.lexists(link_path):
+      os.unlink(link_path)
+    rel_path = os.path.relpath(source_path, os.path.dirname(link_path))
+    os.symlink(rel_path, link_path)
+  except OSError as e:
+    # Another run may beat us to deletion or creation.
+    if not (e.errno == errno.EEXIST or e.errno == errno.ENOENT):
+      raise
+
 def relativize_path(path, rootdir):
   # Note that we can't test for length and return the shorter of the two, because we need these
   # paths to be stable across systems (e.g., because they get embedded in analysis files),
