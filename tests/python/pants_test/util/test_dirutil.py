@@ -80,7 +80,7 @@ class DirutilTest(unittest.TestCase):
 
   def test_relative_symlink(self):
     with temporary_dir() as tmpdir_1: # source and link in same dir
-      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      source = tempfile.mkstemp()[1]
       link = os.path.join(tmpdir_1, 'link')
       rel_path = os.path.relpath(source, os.path.dirname(link))
       relative_symlink(source, link)
@@ -90,7 +90,7 @@ class DirutilTest(unittest.TestCase):
   def test_relative_symlink_source_parent(self):
     with temporary_dir() as tmpdir_1: # source in parent dir of link
       os.mkdir(os.path.join(tmpdir_1, 'foo'))
-      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      source = tempfile.mkstemp()[1]
       link = os.path.join(tmpdir_1, 'foo', 'link')
       relative_symlink(source, link)
       rel_path = os.path.relpath(source, os.path.dirname(link))
@@ -99,17 +99,17 @@ class DirutilTest(unittest.TestCase):
 
   def test_relative_symlink_link_parent(self):
     with temporary_dir() as tmpdir_1: # link in parent dir of source
-      os.mkdir(os.path.join(tmpdir_1, 'foo'))
-      source = tempfile.mkstemp(dir=os.path.join(tmpdir_1, 'foo'))[1]
-      link = os.path.join(tmpdir_1, 'link')
-      relative_symlink(source, link)
-      rel_path = os.path.relpath(source, os.path.dirname(link))
-      self.assertTrue(os.path.islink(link))
-      self.assertEquals(rel_path, os.readlink(link))
+      with temporary_dir(root_dir=tmpdir_1) as tmpdir_2:
+        source = tempfile.mkstemp()[1]
+        link = os.path.join(tmpdir_1, 'link')
+        relative_symlink(source, link)
+        rel_path = os.path.relpath(source, os.path.dirname(link))
+        self.assertTrue(os.path.islink(link))
+        self.assertEquals(rel_path, os.readlink(link))
 
   def test_relative_symlink_same_paths(self):
     with temporary_dir() as tmpdir_1: # source is link
-      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      source = tempfile.mkstemp()[1]
       with self.assertRaisesRegexp(ValueError, r'Path for link is identical to source'):
         relative_symlink(source, source)
 
@@ -122,7 +122,7 @@ class DirutilTest(unittest.TestCase):
 
   def test_relative_symlink_bad_link(self):
     with temporary_dir() as tmpdir_1: # link is not absolute
-      source = tempfile.mkstemp(dir=tmpdir_1)[1]
+      source = tempfile.mkstemp()[1]
       link = 'foo/bar'
       with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
