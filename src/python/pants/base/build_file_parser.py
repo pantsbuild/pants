@@ -141,6 +141,9 @@ class BuildFileParser(object):
                                              error_type=warn.category.__name__,
                                              message=warn.message))
     except Exception as e:
+      import traceback
+      traceback.print_exc()
+      import pdb; pdb.set_trace()
       raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
                               .format(message=e, build_file=build_file))
 

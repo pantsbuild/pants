@@ -287,7 +287,7 @@ class FilesystemBuildFile(BuildFile):
   def source(self):
     """Returns the source code for this BUILD file."""
     with open(self.full_path, 'rb') as source:
-      return source.read()
+      return source.read()#.decode('utf-8')
 
   def _isdir(self, path):
     return os.path.isdir(path)
