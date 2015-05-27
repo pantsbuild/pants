@@ -81,6 +81,10 @@ def load_plugins(build_configuration, plugins, load_from=None):
     if 'register_goals' in entries:
       entries['register_goals'].load()()
 
+    if 'global_subsystems' in entries:
+      subsystems = entries['global_subsystems'].load()()
+      build_configuration.register_subsystems(subsystems)
+
     loaded[dist.as_requirement().key] = dist
 
 
@@ -134,5 +138,9 @@ def load_backend(build_configuration, backend_package):
   build_file_aliases = invoke_entrypoint('build_file_aliases')
   if build_file_aliases:
     build_configuration.register_aliases(build_file_aliases)
+
+  subsystems = invoke_entrypoint('global_subsystems')
+  if subsystems:
+    build_configuration.register_subsystems(subsystems)
 
   invoke_entrypoint('register_goals')

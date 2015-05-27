@@ -84,7 +84,7 @@ class LoaderTest(unittest.TestCase):
     Goal.clear()
 
   @contextmanager
-  def create_register(self, build_file_aliases=None, register_goals=None, module_name='register'):
+  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None, module_name='register'):
 
     package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
     self.assertFalse(package_name in sys.modules)
@@ -102,6 +102,7 @@ class LoaderTest(unittest.TestCase):
           setattr(register_module, function_name, function)
 
       register_entrypoint('build_file_aliases', build_file_aliases)
+      register_entrypoint('global_subsystems', global_subsystems)
       register_entrypoint('register_goals', register_goals)
 
       yield package_name
@@ -274,4 +275,12 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(DummyObject1, registered_aliases.objects['FROMPLUGIN1'])
     self.assertEqual(DummyObject2, registered_aliases.objects['FROMPLUGIN2'])
     self.assertEqual(self.build_configuration.subsystem_types(),
-                     set([DummySubsystem1, DummySubsystem2]))
+                     {DummySubsystem1, DummySubsystem2})
+
+  def test_subsystems(self):
+    def global_subsystems():
+      return {DummySubsystem1, DummySubsystem2}
+    with self.create_register(global_subsystems=global_subsystems) as backend_package:
+      load_backend(self.build_configuration, backend_package)
+      self.assertEqual(self.build_configuration.subsystem_types(),
+                       {DummySubsystem1, DummySubsystem2})
