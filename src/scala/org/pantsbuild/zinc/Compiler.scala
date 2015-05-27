@@ -39,7 +39,7 @@ object Compiler {
   /**
    * Get or create a zinc compiler based on compiler setup.
    */
-  def apply(setup: Setup, log: LoggerRaw): Compiler =
+  def apply(setup: Setup, log: Logger): Compiler =
     compilerCache.getOrElseUpdate(setup) {
       create(setup, log)
     }
@@ -47,12 +47,12 @@ object Compiler {
   /**
    * Java API for creating compiler.
    */
-  def getOrCreate(setup: Setup, log: LoggerRaw): Compiler = apply(setup, log)
+  def getOrCreate(setup: Setup, log: Logger): Compiler = apply(setup, log)
 
   /**
    * Create a new zinc compiler based on compiler setup.
    */
-  def create(setup: Setup, log: LoggerRaw): Compiler = {
+  def create(setup: Setup, log: Logger): Compiler = {
     val instance     = scalaInstance(setup)
     val interfaceJar = compilerInterface(setup, instance, log)
     val scalac       = newScalaCompiler(instance, interfaceJar)
@@ -156,7 +156,7 @@ object Compiler {
   /**
    * Get the compiler interface for this compiler setup. Compile it if not already cached.
    */
-  def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: LoggerRaw): File = {
+  def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: Logger): File = {
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
     val interfaceJar = dir / (CompilerInterfaceId + ".jar")
     if (!interfaceJar.exists) {
@@ -178,14 +178,14 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
    * Run a compile. The resulting analysis is also cached in memory.
    *  Note:  This variant automatically contructs an error-reporter.
    */
-  def compile(inputs: Inputs)(log: LoggerRaw): Analysis = compile(inputs, None)(log)
+  def compile(inputs: Inputs)(log: Logger): Analysis = compile(inputs, None)(log)
 
   /**
    * Run a compile. The resulting analysis is also cached in memory.
    *
    *  Note:  This variant automatically contructs an error-reporter.
    */
-  def compile(inputs: Inputs, cwd: Option[File])(log: LoggerRaw): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
     val maxErrors     = 100
     compile(inputs, cwd, new LoggerReporter(maxErrors, log, identity))(log)
   }
@@ -195,7 +195,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
    *
    *  Note: This variant does not report progress updates
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: LoggerRaw): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
     val progress = Some(new SimpleCompileProgress(setup.logOptions.logPhases, setup.logOptions.printProgress, setup.logOptions.heartbeatSecs)(log))
     compile(inputs, cwd, reporter, progress)(log)
   }
@@ -203,7 +203,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
   /**
    * Run a compile. The resulting analysis is also cached in memory.
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: LoggerRaw): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Analysis = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
     val getAnalysis: File => Option[Analysis] = analysisMap.get
