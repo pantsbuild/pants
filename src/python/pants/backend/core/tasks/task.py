@@ -65,7 +65,7 @@ class TaskBase(AbstractClass):
 
   @classmethod
   def _compute_stable_name(cls):
-    return '{}.{}'.format(cls.__module__, cls.__name)
+    return '{}.{}'.format(cls.__module__, cls.__name__)
 
   @classmethod
   def global_subsystems(cls):
