@@ -44,14 +44,6 @@ object Util {
     def logRawFlush(message: => String): Unit = ()
   }
 
-  /**
-   * A logger with direct printer access, as well as the ability to print immediately.
-   */
-  trait LoggerRaw extends Logger {
-    def logRaw(message: => String): Unit
-    def logRawFlush(message: => String): Unit
-  }
-
   //
   // Time
   //
@@ -299,4 +291,12 @@ object Util {
   def counted(count: Int, prefix: String, single: String, plural: String): String = {
     count.toString + " " + prefix + (if (count == 1) single else plural)
   }
+}
+
+/**
+ * A logger with direct printer access, as well as the ability to print immediately.
+ */
+trait LoggerRaw extends Logger {
+  def logRaw(message: => String): Unit
+  def logRawFlush(message: => String): Unit
 }

@@ -199,7 +199,7 @@ object Setup {
   /**
    * Verify that necessary jars exist.
    */
-  def verify(setup: Setup, log: Util.LoggerRaw): Boolean = {
+  def verify(setup: Setup, log: LoggerRaw): Boolean = {
     requireFile(setup.scalaCompiler, log) &&
     requireFile(setup.scalaLibrary, log) &&
     requireFile(setup.sbtInterface, log) &&
@@ -209,7 +209,7 @@ object Setup {
   /**
    * Check file exists. Log error if it doesn't.
    */
-  def requireFile(file: File, log: Util.LoggerRaw): Boolean = {
+  def requireFile(file: File, log: LoggerRaw): Boolean = {
     val exists = file.exists
     if (!exists) log.error("Required file not found: " + file.getName)
     exists

@@ -7,7 +7,7 @@ import sbt.Logger
  * SimpleCompileProgress implements CompileProgress to add output to zinc scala compilations, but
  * does not implement the capability to cancel compilations via the `advance` method.
  */
-class SimpleCompileProgress(logPhases: Boolean, printProgress: Boolean, heartbeatSecs: Int)(log: Util.LoggerRaw) extends CompileProgress {
+class SimpleCompileProgress(logPhases: Boolean, printProgress: Boolean, heartbeatSecs: Int)(log: LoggerRaw) extends CompileProgress {
   @volatile private var lastHeartbeatMillis: Long = 0
 
   /**

@@ -19,7 +19,7 @@ import xsbti.compile.CompileOrder
 case class Settings(
   help: Boolean              = false,
   version: Boolean           = false,
-  logOptions: LogOptions   = LogOptions(),
+  logOptions: LogOptions     = LogOptions(),
   sources: Seq[File]         = Seq.empty,
   classpath: Seq[File]       = Seq.empty,
   classesDirectory: File     = new File("."),
