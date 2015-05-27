@@ -3,7 +3,8 @@
 
 java_wire_library(name='element',
   sources=[
-    'elements.proto',
+    'elements.proto', # Order matters here.
+    'compound.proto',
   ],
   dependencies=[
     'examples/src/wire/org/pantsbuild/example/temperature',

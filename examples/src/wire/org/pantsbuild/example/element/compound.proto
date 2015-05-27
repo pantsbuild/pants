@@ -1,0 +1,14 @@
+// Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+package org.pantsbuild.example.element;
+
+/**
+ * Describes a compound of two elements.
+ */
+message Compound {
+  required string name = 1;
+  optional org.pantsbuild.example.element.Element primary_element = 2;
+  optional org.pantsbuild.example.element.Element secondary_element = 3;
+}
+
