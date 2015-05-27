@@ -177,7 +177,7 @@ def relative_symlink(source_path, link_path):
     raise ValueError("Path for source:{} must be absolute".format(source_path))
   if not (os.path.isabs(link_path)):
     raise ValueError("Path for link:{} must be absolute".format(link_path))
-  if source_path is link_path:
+  if source_path == link_path:
     raise ValueError("Path for link is identical to source:{}".format(source_path))
   try:
     if os.path.lexists(link_path):
