@@ -4,4 +4,4 @@
 python_library(name='nonasciibuild',
   sources=globs('*'),
 )
-'å'
+'åß'
