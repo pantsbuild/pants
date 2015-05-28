@@ -7,31 +7,28 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import os
-import re
 import subprocess
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
+from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 
 
-class ProtobufGen(CodeGen):
+class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
@@ -63,10 +60,6 @@ class ProtobufGen(CodeGen):
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
              default=['3rdparty:protobuf-java'])
-    register('--pythondeps', advanced=True, action='append',
-             help='Dependencies to bootstrap this task for generating python code.  When changing '
-                  'this parameter, you may also need to update --version.',
-             default=[])
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
@@ -79,18 +72,8 @@ class ProtobufGen(CodeGen):
   def __init__(self, *args, **kwargs):
     """Generates Java and Python files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
-
     self.plugins = self.get_options().plugins
     self._extra_paths = self.get_options().extra_path
-
-    self.java_out = os.path.join(self.workdir, 'gen-java')
-    self.py_out = os.path.join(self.workdir, 'gen-py')
-
-    self.gen_langs = set(self.get_options().lang)
-    for lang in ('java', 'python'):
-      if self.context.products.isrequired(lang):
-        self.gen_langs.add(lang)
-
     self.protobuf_binary = BinaryUtil.from_options(self.get_options()).select_binary('protoc')
 
   def resolve_deps(self, deps_list, key):
@@ -103,55 +86,49 @@ class ProtobufGen(CodeGen):
                                   .format(message=e, key=key))
     return deps
 
+  def invalidate_for_files(self):
+    return [self.protobuf_binary]
+
   @property
   def javadeps(self):
     return self.resolve_deps(self.get_options().javadeps, 'javadeps')
 
   @property
-  def pythondeps(self):
-    return self.resolve_deps(self.get_options().pythondeps, 'pythondeps')
+  def synthetic_target_type(self):
+    return JavaLibrary
 
-  def invalidate_for_files(self):
-    return [self.protobuf_binary]
+  def synthetic_target_extra_dependencies(self, target):
+    # We need to add in the proto imports jars.
+    jars_address = SyntheticAddress(
+        os.path.relpath(self.codegen_workdir(target), get_buildroot()),
+        target.id + '-rjars')
+    jars_target = self.context.add_new_target(jars_address,
+                                              JarLibrary,
+                                              jars=target.imported_jars,
+                                              derived_from=target)
+    deps = OrderedSet([jars_target])
+    deps.update(self.javadeps)
+    return deps
 
   def is_gentarget(self, target):
     return isinstance(target, JavaProtobufLibrary)
 
-  def is_forced(self, lang):
-    return lang in self.gen_langs
+  def execute_codegen(self, invalid_targets):
+    # TODO(gm): Change this logic depending on isolation strategy, when that exists.
+    # This particular logic is global.
+    self._execute_individual_codegen(invalid_targets)
 
-  def genlangs(self):
-    return Target.LANG_DISCRIMINATORS
+  def sources_generated_by_target(self, target):
+    genfiles = []
+    for source in target.sources_relative_to_source_root():
+      path = os.path.join(target.target_base, source)
+      genfiles.extend(self.calculate_genfiles(path, source))
+    return genfiles
 
-  def _jars_to_directories(self, target):
-    """Extracts and maps jars to directories containing their contents.
+  def _execute_individual_codegen(self, targets):
+    if not targets:
+      raise ValueError('Protobuffer code-generation targets set is empty.')
 
-    :returns: a set of filepaths to directories containing the contents of jar.
-    """
-    files = set()
-    jarmap = self.context.products.get('ivy_imports')
-    for folder, names in jarmap.by_target[target].items():
-      for name in names:
-        files.add(self._extract_jar(os.path.join(folder, name)))
-    return files
-
-  def _extract_jar(self, jar_path):
-    """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
-    with open(jar_path, 'rb') as f:
-      outdir = os.path.join(self.workdir, 'extracted', sha1(f.read()).hexdigest())
-    if not os.path.exists(outdir):
-      ZIP.extract(jar_path, outdir)
-      self.context.log.debug('Extracting jar at {jar_path}.'.format(jar_path=jar_path))
-    else:
-      self.context.log.debug('Jar already extracted at {jar_path}.'.format(jar_path=jar_path))
-    return outdir
-
-  def _proto_path_imports(self, proto_targets):
-    for target in proto_targets:
-      for path in self._jars_to_directories(target):
-        yield os.path.relpath(path, get_buildroot())
-
-  def genlang(self, lang, targets):
     sources_by_base = self._calculate_sources(targets)
     sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
 
@@ -165,14 +142,16 @@ class ProtobufGen(CodeGen):
     bases.update(self._proto_path_imports(targets))
     check_duplicate_conflicting_protos(self, sources_by_base, sources, self.context.log)
 
-    if lang == 'java':
-      output_dir = self.java_out
-      gen_flag = '--java_out'
-    elif lang == 'python':
-      output_dir = self.py_out
-      gen_flag = '--python_out'
-    else:
-      raise TaskError('Unrecognized protobuf gen lang: {0}'.format(lang))
+    for target in targets:
+      # NOTE(gm): If the strategy is set to 'isolated' (once codegen strategies are implemented), then
+      # 'targets' should contain only a single element, which means this simply sets the output
+      # directory depending on that element.
+      # If the strategy is set to 'global', the target passed in as a parameter here will be
+      # completely arbitrary, but that's OK because the codegen_workdir function completely
+      # ignores the target parameter when using a global strategy.
+      output_dir = self.codegen_workdir(target)
+      break
+    gen_flag = '--java_out'
 
     safe_mkdir(output_dir)
     gen = '{0}={1}'.format(gen_flag, output_dir)
@@ -203,11 +182,6 @@ class ProtobufGen(CodeGen):
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
-    """
-    Find the appropriate source roots used for sources.
-
-    :return: mapping of source roots to  set of sources under the roots
-    """
     gentargets = OrderedSet()
     def add_to_gentargets(target):
       if self.is_gentarget(target):
@@ -232,72 +206,38 @@ class ProtobufGen(CodeGen):
         sources_by_base[base].add(source)
     return sources_by_base
 
-  def createtarget(self, lang, gentarget, dependees):
-    if lang == 'java':
-      return self._create_java_target(gentarget, dependees)
-    elif lang == 'python':
-      return self._create_python_target(gentarget, dependees)
+  def _jars_to_directories(self, target):
+    """Extracts and maps jars to directories containing their contents.
+
+    :returns: a set of filepaths to directories containing the contents of jar.
+    """
+    files = set()
+    jarmap = self.context.products.get('ivy_imports')
+    for folder, names in jarmap.by_target[target].items():
+      for name in names:
+        files.add(self._extract_jar(os.path.join(folder, name)))
+    return files
+
+  def _extract_jar(self, jar_path):
+    """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
+    with open(jar_path, 'rb') as f:
+      outdir = os.path.join(self.workdir, 'extracted', sha1(f.read()).hexdigest())
+    if not os.path.exists(outdir):
+      ZIP.extract(jar_path, outdir)
+      self.context.log.debug('Extracting jar at {jar_path}.'.format(jar_path=jar_path))
     else:
-      raise TaskError('Unrecognized protobuf gen lang: {0}'.format(lang))
+      self.context.log.debug('Jar already extracted at {jar_path}.'.format(jar_path=jar_path))
+    return outdir
 
-  def _create_java_target(self, target, dependees):
-    genfiles = []
-    for source in target.sources_relative_to_source_root():
-      path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source).get('java', []))
-    spec_path = os.path.relpath(self.java_out, get_buildroot())
-    address = SyntheticAddress(spec_path, target.id)
-    deps = OrderedSet(self.javadeps)
-    import_jars = target.imported_jars
-    jars_tgt = self.context.add_new_target(SyntheticAddress(spec_path, target.id+str('-rjars')),
-                                           JarLibrary,
-                                           jars=import_jars,
-                                           derived_from=target)
-    # Add in the 'spec-rjars' target, which contains all the JarDependency targets passed in via the
-    # imports parameter. Each of these jars is expected to contain .proto files bundled together
-    # with their .class files.
-    deps.add(jars_tgt)
-    tgt = self.context.add_new_target(address,
-                                      JavaLibrary,
-                                      derived_from=target,
-                                      sources=genfiles,
-                                      provides=target.provides,
-                                      dependencies=deps,
-                                      excludes=target.payload.get_field_value('excludes'))
-    for dependee in dependees:
-      dependee.inject_dependency(tgt.address)
-    return tgt
-
-  def _create_python_target(self, target, dependees):
-    genfiles = []
-    for source in target.sources_relative_to_source_root():
-      path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source).get('py', []))
-    spec_path = os.path.relpath(self.py_out, get_buildroot())
-    address = SyntheticAddress(spec_path, target.id)
-    tgt = self.context.add_new_target(address,
-                                      PythonLibrary,
-                                      derived_from=target,
-                                      sources=genfiles,
-                                      dependencies=self.pythondeps)
-    for dependee in dependees:
-      dependee.inject_dependency(tgt.address)
-    return tgt
-
+  def _proto_path_imports(self, proto_targets):
+    for target in proto_targets:
+      for path in self._jars_to_directories(target):
+        yield os.path.relpath(path, get_buildroot())
 
   def calculate_genfiles(self, path, source):
     protobuf_parse = ProtobufParse(path, source)
     protobuf_parse.parse()
-
-    genfiles = defaultdict(set)
-    genfiles['py'].update(self.calculate_python_genfiles(source))
-    genfiles['java'].update(self.calculate_java_genfiles(protobuf_parse))
-    return genfiles
-
-
-  def calculate_python_genfiles(self, source):
-    yield re.sub(r'\.proto$', '_pb2.py', source)
-
+    return set(self.calculate_java_genfiles(protobuf_parse))
 
   def calculate_java_genfiles(self, protobuf_parse):
     basepath = protobuf_parse.package.replace('.', os.path.sep)
@@ -342,22 +282,21 @@ def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
       source = path[len(base):]
 
       genfiles = task.calculate_genfiles(path, source)
-      for key in genfiles.keys():
-        for genfile in genfiles[key]:
-          if genfile in sources_by_genfile:
-            # Possible conflict!
-            prev = sources_by_genfile[genfile]
-            if not prev in sources:
-              # Must have been culled by an earlier pass.
-              continue
-            if not _same_contents(path, prev):
-              log.error('Proto conflict detected (.proto files are different):\n'
-                        '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
-            else:
-              log.warn('Proto duplication detected (.proto files are identical):\n'
-                       '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
-            log.warn('  Arbitrarily favoring proto 1.')
-            if path in sources:
-              sources.remove(path) # Favor the first version.
+      for genfile in genfiles:
+        if genfile in sources_by_genfile:
+          # Possible conflict!
+          prev = sources_by_genfile[genfile]
+          if not prev in sources:
+            # Must have been culled by an earlier pass.
             continue
-          sources_by_genfile[genfile] = path
+          if not _same_contents(path, prev):
+            log.error('Proto conflict detected (.proto files are different):\n'
+                      '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
+          else:
+            log.warn('Proto duplication detected (.proto files are identical):\n'
+                     '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
+          log.warn('  Arbitrarily favoring proto 1.')
+          if path in sources:
+            sources.remove(path) # Favor the first version.
+          continue
+        sources_by_genfile[genfile] = path
