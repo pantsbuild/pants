@@ -1,4 +1,4 @@
-# coding=utf-8
+coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -11,6 +11,7 @@ import re
 from collections import defaultdict
 from itertools import chain
 
+from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -21,8 +22,12 @@ from pants.base.source_root import SourceRoot
 from pants.option.options import Options
 from twitter.common.dirutil import safe_mkdir
 
-from pants.contrib.spindle.targets.spindle_thrift_library import SpindleThriftLibrary
+class ScalaRecordLibrary(ExportableJvmLibrary):
+  """Defines a target that builds scala_record stubs from a thrift IDL file."""
 
+  def __init__(self, *args, **kwargs):
+    super(ScalaRecordLibrary, self).__init__(*args, **kwargs)
+    self.add_labels('scala', 'codegen', 'synthetic')
 
 class SpindleGen(NailgunTask):
   def __init__(self, context, workdir):
@@ -76,7 +81,7 @@ class SpindleGen(NailgunTask):
     return os.path.join(self.workdir, 'scala_record')
 
   def codegen_targets(self):
-    return self.context.targets(lambda t: isinstance(t, SpindleThriftLibrary))
+    return self.context.targets(lambda t: isinstance(t, ScalaRecordLibrary))
 
   def sources_generated_by_target(self, target):
     return [
@@ -86,7 +91,11 @@ class SpindleGen(NailgunTask):
     ]
 
   def execute_codegen(self, targets):
-    bases, sources = self._calculate_sources(targets, lambda t: isinstance(t, SpindleThriftLibrary))
+    sources = self._calculate_sources(targets, lambda t: isinstance(t, ScalaRecordLibrary))
+    bases = set(
+      target.target_base
+      for target in self.context.targets(lambda t: isinstance(t, ScalaRecordLibrary))
+    )
     scalate_workdir = os.path.join(self.workdir, 'scalate_workdir')
     safe_mkdir(self.namespace_out)
     safe_mkdir(scalate_workdir)
@@ -209,16 +218,13 @@ class SpindleGen(NailgunTask):
         self.update_artifact_cache(vts_artifactfiles_pairs.items())
 
   def _calculate_sources(self, thrift_targets, target_filter):
-    bases = set()
     sources = set()
     def collect_sources(target):
       if target_filter(target):
-        bases.add(target.target_base)
         sources.update(target.sources_relative_to_buildroot())
-
     for target in thrift_targets:
       target.walk(collect_sources)
-    return bases, sources
+    return sources
 
 
 # Slightly hacky way to figure out which files get generated from a particular thrift source.
