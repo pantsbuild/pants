@@ -124,11 +124,12 @@ class ApacheThriftGen(CodeGen):
     return [self.thrift_binary]
 
   def is_gentarget(self, target):
-    def use_thrift_compiler(self, options):
-      compiler = target.compiler or self.context.options.for_global_scope().thrift_default_compiler
+    def use_thrift_compiler(options):
+      compiler = target.compiler or options.for_global_scope().thrift_default_compiler
       return compiler == 'thrift'
 
-    is_java_thrift_finagle = isinstance(target, JavaThriftLibrary) and use_thrift_compiler(target)
+    is_java_thrift_finagle = (isinstance(target, JavaThriftLibrary) and
+                              use_thrift_compiler(self.context.options))
     return is_java_thrift_finagle or isinstance(target, PythonThriftLibrary)
 
   def is_forced(self, lang):
