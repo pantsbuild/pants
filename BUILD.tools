@@ -75,7 +75,7 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.3')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.4')
             ])
 
 SBT_REV = '0.13.8'
@@ -150,7 +150,7 @@ jar_library(name = 'spindle-codegen',
 
 jar_library(name = 'jar-tool',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'jar-tool', rev = '0.0.4')
+              jar(org = 'org.pantsbuild', name = 'jar-tool', rev = '0.0.5')
             ])
 
 jar_library(name = 'jarjar',
