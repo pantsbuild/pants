@@ -37,8 +37,7 @@ class ScroogeGenTest(TaskTestBase):
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()
-    self.task_outdir =  os.path.join(self.build_root, 'scrooge', 'gen-java')
-
+    self.task_outdir = os.path.join(self.build_root, 'scrooge', 'gen-java')
 
   def tearDown(self):
     super(ScroogeGenTest, self).tearDown()
