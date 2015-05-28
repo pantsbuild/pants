@@ -13,13 +13,7 @@ import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -182,12 +176,6 @@ public class ConsoleRunner {
       this.printToOriginalOutputs = printToOriginalOutputs;
     }
 
-    @Override
-    public void testRunStarted(Description description) throws Exception {
-      registerTests(description.getChildren());
-      super.testRunStarted(description);
-    }
-
     private void registerTests(Iterable<Description> tests) throws IOException {
       for (Description test : tests) {
         registerTests(test.getChildren());
@@ -219,6 +207,7 @@ public class ConsoleRunner {
 
     @Override
     public void testStarted(Description description) throws Exception {
+      registerTests(Collections.singletonList(description));
       captures.get(description.getTestClass()).open();
       super.testStarted(description);
     }
