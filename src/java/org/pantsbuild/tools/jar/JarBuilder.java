@@ -1187,6 +1187,14 @@ public class JarBuilder implements Closeable {
   }
 
   private JarWriter jarWriter(File path, boolean compress) throws IOException {
+    // The JAR-writing process seems to be I/O bound. To make writes to disk less frequent,
+    // BufferedOutputStream is used. This way, compressed data is stored in a buffer before being
+    // flushed to disk.
+    // For benchmarking, "./pants binary --no-use-nailgun" command was executed on a large project.
+    // The machine was 2013 MPB with SSD. The resulting project JAR is about 500 MB.
+    // Without BufferedOutputStream, the jar-tool step took on average about 113 seconds.
+    // With BufferedOutputStream and 1MB buffer, the jar-tool step took on average about 80 seconds.
+    // The performance gain on this particular project on this particular machine is 30%.
     FileOutputStream fout = closer.register(new FileOutputStream(path));
     BufferedOutputStream bout = closer.register(new BufferedOutputStream(fout, 1024 * 1024));
     final JarOutputStream jar = closer.register(new JarOutputStream(bout));
