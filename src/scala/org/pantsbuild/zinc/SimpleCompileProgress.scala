@@ -1,13 +1,13 @@
 package org.pantsbuild.zinc
 
 import xsbti.compile.CompileProgress
-import sbt.Logger
+import org.pantsbuild.zinc.{LoggerRaw => Logger}
 
 /**
  * SimpleCompileProgress implements CompileProgress to add output to zinc scala compilations, but
  * does not implement the capability to cancel compilations via the `advance` method.
  */
-class SimpleCompileProgress(logPhases: Boolean, printProgress: Boolean, heartbeatSecs: Int)(log: LoggerRaw) extends CompileProgress {
+class SimpleCompileProgress(logPhases: Boolean, printProgress: Boolean, heartbeatSecs: Int)(log: Logger) extends CompileProgress {
   @volatile private var lastHeartbeatMillis: Long = 0
 
   /**
@@ -21,8 +21,8 @@ class SimpleCompileProgress(logPhases: Boolean, printProgress: Boolean, heartbea
 
   /**
    * advance Optionally emit the percentage of steps completed, and/or a heartbeat ('.' character)
-   * roughly every `heartbeatSecs` seconds. If `heartbeatSecs` is not greater than 0, no heartbeat
-   * is emitted.
+   * roughly every `heartbeatSecs` seconds (though buffering may make the actual interval
+   * imprecise.) If `heartbeatSecs` is not greater than 0, no heartbeat is emitted.
    *
    * advance is periodically called during compilation, indicating the total number of compilation
    * steps completed (`current`) out of the total number of steps necessary. The method returns
