@@ -32,6 +32,7 @@
     "publish": "dist/markdown/html/src/docs/publish.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
     "release": "dist/markdown/html/src/python/pants/docs/release.html",
+    "release_jvm": "dist/markdown/html/src/python/pants/docs/release_jvm.html",
     "scala": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/readme.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
@@ -49,6 +50,9 @@
     "images/intellij-project-structure-project.png": "src/python/pants/docs/images/intellij-project-structure-project.png",
     "images/intellij-run.png": "src/python/pants/docs/images/intellij-run.png",
     "images/intellij-select-venv.png": "src/python/pants/docs/images/intellij-select-venv.png",
+    "images/ossrh-publish-close-staging-repo.png": "src/python/pants/docs/images/ossrh-publish-close-staging-repo.png",
+    "images/ossrh-publish-find-staging-repo.png": "src/python/pants/docs/images/ossrh-publish-find-staging-repo.png",
+    "images/ossrh-publish-release-staging-repo.png": "src/python/pants/docs/images/ossrh-publish-release-staging-repo.png",
     "images/report-server-page.png": "src/docs/images/report-server-page.png",
     "robots.txt": "src/docs/robots.txt",
     "logo.ico": "src/python/pants/docs/pants-logo.ico",
@@ -107,7 +111,11 @@
             { "page": "howto_plugin" },
             { "page": "intellij" },
             { "page": "internals" },
-            { "page": "release" },
+            { "page": "release",
+              "children": [
+                { "page": "release_jvm" }
+              ]
+            },
             { "page": "docs" },
             { "page": "credits" }
         ]}
