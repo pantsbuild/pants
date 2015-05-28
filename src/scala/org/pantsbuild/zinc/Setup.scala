@@ -21,8 +21,7 @@ case class Setup(
   javaHome: Option[File],
   forkJava: Boolean,
   cacheDir: File,
-  logOptions: LogOptions
-  )
+  logOptions: LogOptions)
 
 /**
  * Jar file description for locating jars.

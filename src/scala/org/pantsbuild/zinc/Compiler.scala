@@ -68,7 +68,7 @@ object Compiler {
   }
 
   /**
-
+   * Create a new java compiler.
    */
   def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
     val compiler =
