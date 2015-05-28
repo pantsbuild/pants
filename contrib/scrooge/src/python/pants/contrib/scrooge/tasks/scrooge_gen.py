@@ -25,6 +25,9 @@ from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
 from twitter.common.collections import OrderedSet
 
+from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
+  JavaThriftLibraryFingerprintStrategy
+
 
 _CONFIG_SECTION = 'scrooge-gen'
 
@@ -131,8 +134,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                        self._resolve_deps(self.get_options().structs_deps))
 
     for target in gentargets:
-      language = target.language(self.context.options)
-      rpc_style = target.rpc_style(self.context.options)
+      language = self._get_thrift_language(target)
+      rpc_style = self._get_thrift_rpc_style(target)
       partial_cmd = self.PartialCmd(
           language=language,
           rpc_style=rpc_style,
@@ -157,7 +160,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
             langtarget.inject_dependency(langtarget_by_gentarget[dep].address)
 
   def gen(self, partial_cmd, targets):
-    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
+    fp_strategy = JavaThriftLibraryFingerprintStrategy(self.context.options)
+    with self.invalidated(targets, fingerprint_strategy=fp_strategy,
+                          invalidate_dependents=True) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)
@@ -243,7 +248,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genfiles = gen_files_for_source[source]
       has_service = has_service or services
       files.extend(genfiles)
-    language = target.language(self.context.options)
+    language = self._get_thrift_language(target)
     target_type = _TARGET_TYPE_FOR_LANG[language]
     deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language])
     deps.update(target.dependencies)
@@ -297,10 +302,10 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if target.compiler(self.context.options) != 'scrooge':
+    if self._get_thrift_compiler(target) != 'scrooge':
       return False
 
-    language = target.language(self.context.options)
+    language = self._get_thrift_language(target)
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
@@ -308,8 +313,18 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def _validate_compiler_configs(self, targets):
     self._validate(self.context.options, targets)
 
-  @staticmethod
-  def _validate(options, targets):
+  # TODO: move these options into a subsystem
+  # see comments in https://rbcommons.com/s/twitter/r/2265/
+  def _get_thrift_language(self, target):
+    return target.language or self.context.options.for_global_scope().thrift_default_language
+
+  def _get_thrift_rpc_style(self, target):
+    return target.rpc_style or self.context.options.for_global_scope().thrift_default_rpc_style
+
+  def _get_thrift_compiler(self, target):
+    return target.compiler or self.context.options.for_global_scope().thrift_default_compiler
+
+  def _validate(self, options, targets):
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
@@ -319,8 +334,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       # sources. As there's no permutation allowing the creation of
       # incompatible sources with the same language+rpc_style we omit
       # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=tgt.language(options),
-                                    rpc_style=tgt.rpc_style(options))
+      return ValidateCompilerConfig(language=self._get_thrift_language(tgt),
+                                    rpc_style=self._get_thrift_rpc_style(tgt))
 
     mismatched_compiler_configs = defaultdict(set)
 
