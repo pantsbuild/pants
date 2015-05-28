@@ -89,9 +89,10 @@ class DirutilTest(unittest.TestCase):
 
   def test_relative_symlink_source_parent(self):
     with temporary_dir() as tmpdir_1: # source in parent dir of link
-      os.mkdir(os.path.join(tmpdir_1, 'foo'))
+      child = os.path.join(tmpdir_1, 'child')
+      os.mkdir(child)
       source = os.path.join(tmpdir_1, 'source')
-      link = os.path.join(tmpdir_1, 'foo', 'link')
+      link = os.path.join(child, 'link')
       relative_symlink(source, link)
       rel_path = os.path.relpath(source, os.path.dirname(link))
       self.assertTrue(os.path.islink(link))
@@ -99,13 +100,13 @@ class DirutilTest(unittest.TestCase):
 
   def test_relative_symlink_link_parent(self):
     with temporary_dir() as tmpdir_1: # link in parent dir of source
-      with temporary_dir(root_dir=tmpdir_1) as tmpdir_2:
-        source = os.path.join(tmpdir_1, 'source')
-        link = os.path.join(tmpdir_1, 'link')
-        relative_symlink(source, link)
-        rel_path = os.path.relpath(source, os.path.dirname(link))
-        self.assertTrue(os.path.islink(link))
-        self.assertEquals(rel_path, os.readlink(link))
+      child = os.path.join(tmpdir_1, 'child')
+      source = os.path.join(child, 'source')
+      link = os.path.join(tmpdir_1, 'link')
+      relative_symlink(source, link)
+      rel_path = os.path.relpath(source, os.path.dirname(link))
+      self.assertTrue(os.path.islink(link))
+      self.assertEquals(rel_path, os.readlink(link))
 
   def test_relative_symlink_same_paths(self):
     with temporary_dir() as tmpdir_1: # source is link
