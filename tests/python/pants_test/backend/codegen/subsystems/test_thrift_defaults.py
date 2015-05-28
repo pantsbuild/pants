@@ -15,7 +15,7 @@ from pants_test.base.context_utils import create_option_values
 from pants_test.base_test import BaseTest
 
 
-class IvySubsystemTest(BaseTest):
+class TestThriftDefaults(BaseTest):
   def create_thrift_defaults(self, compiler=None, language=None, rpc_style=None):
     option_values = dict(compiler=compiler, language=language, rpc_style=rpc_style)
     return ThriftDefaults('test-scope', create_option_values(option_values))
