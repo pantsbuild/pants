@@ -75,7 +75,7 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.4')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.5')
             ])
 
 SBT_REV = '0.13.8'
@@ -130,7 +130,7 @@ jar_library(name = 'checkstyle',
 jar_library(name = 'junit',
             jars = [
               jar(org = 'junit', name = 'junit', rev = '4.12'),
-              jar(org = 'org.pantsbuild', name = 'junit-runner', rev = '0.0.4'),
+              jar(org = 'org.pantsbuild', name = 'junit-runner', rev = '0.0.5'),
             ])
 
 jar_library(name = 'scrooge-gen',
