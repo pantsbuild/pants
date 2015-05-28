@@ -4,7 +4,7 @@
 
 package org.pantsbuild.zinc
 
-import java.io.{ File }
+import java.io.File
 import sbt.{ ConsoleLogger, Hash, IO, Level, Logger }
 
 object Util {
