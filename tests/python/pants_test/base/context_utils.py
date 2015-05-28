@@ -47,6 +47,9 @@ def create_options(options):
     def passthru_args_for_scope(self, scope):
       return []
 
+    def items(self):
+      return options.items()
+
     def __getitem__(self, key):
       return self.for_scope(key)
   return TestOptions()
