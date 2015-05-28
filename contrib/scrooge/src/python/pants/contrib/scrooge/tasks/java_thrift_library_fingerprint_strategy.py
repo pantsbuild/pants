@@ -12,6 +12,10 @@ from pants.base.fingerprint_strategy import FingerprintStrategy
 
 
 class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
+  """
+  JavaThriftLibrary fingerprint strategy was added so that scrooge fields will only be part
+  of the fingerprint when they are used.
+  """
   def __init__(self, options):
     self._options = options
 
@@ -25,9 +29,9 @@ class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
 
     hasher = hashlib.sha1()
     hasher.update(fp)
-    hasher.update(target.compiler(self._options))
-    hasher.update(target.language(self._options))
-    hasher.update(target.rpc_style(self._options))
+    hasher.update(target.compiler or self._options.for_global_scope().thrift_default_compiler)
+    hasher.update(target.language or self._options.for_global_scope().thrift_default_language)
+    hasher.update(target.rpc_style or self._options.for_global_scope().thrift_default_rpc_style)
     return hasher.hexdigest()
 
   def __hash__(self):

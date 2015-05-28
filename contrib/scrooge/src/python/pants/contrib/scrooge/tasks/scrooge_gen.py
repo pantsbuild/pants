@@ -134,8 +134,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                        self._resolve_deps(self.get_options().structs_deps))
 
     for target in gentargets:
-      language = target.language(self.context.options)
-      rpc_style = target.rpc_style(self.context.options)
+      language = self._get_thrift_language(target, self.context.options)
+      rpc_style = self._get_thrift_rpc_style(target, self.context.options)
       partial_cmd = self.PartialCmd(
           language=language,
           rpc_style=rpc_style,
@@ -248,7 +248,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genfiles = gen_files_for_source[source]
       has_service = has_service or services
       files.extend(genfiles)
-    language = target.language(self.context.options)
+    language = self._get_thrift_language(target, self.context.options)
     target_type = _TARGET_TYPE_FOR_LANG[language]
     deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language])
     deps.update(target.dependencies)
@@ -302,16 +302,28 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if target.compiler(self.context.options) != 'scrooge':
+    if self._get_thrift_compiler(target, self.context.options) != 'scrooge':
       return False
 
-    language = target.language(self.context.options)
+    language = self._get_thrift_language(target, self.context.options)
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 
   def _validate_compiler_configs(self, targets):
     self._validate(self.context.options, targets)
+
+  @staticmethod
+  def _get_thrift_language(target, options):
+    return target.language or options.for_global_scope().thrift_default_language
+
+  @staticmethod
+  def _get_thrift_rpc_style(target, options):
+    return target.rpc_style or options.for_global_scope().thrift_default_rpc_style
+
+  @staticmethod
+  def _get_thrift_compiler(target, options):
+    return target.compiler or options.for_global_scope().thrift_default_compiler
 
   @staticmethod
   def _validate(options, targets):
@@ -324,8 +336,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       # sources. As there's no permutation allowing the creation of
       # incompatible sources with the same language+rpc_style we omit
       # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=tgt.language(options),
-                                    rpc_style=tgt.rpc_style(options))
+      return ValidateCompilerConfig(language=ScroogeGen._get_thrift_language(tgt, options),
+                                    rpc_style=ScroogeGen._get_thrift_rpc_style(tgt, options))
 
     mismatched_compiler_configs = defaultdict(set)
 
