@@ -11,6 +11,7 @@ import re
 import tempfile
 from collections import defaultdict, namedtuple
 
+from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -71,11 +72,16 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
+  def global_subsystems(cls):
+    return (ThriftDefaults,)
+
+  @classmethod
   def product_types(cls):
     return ['java', 'scala']
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
+    self._thrift_defaults = ThriftDefaults.global_instance()
     self._depinfo = None
 
   @property
@@ -134,8 +140,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
                                        self._resolve_deps(self.get_options().structs_deps))
 
     for target in gentargets:
-      language = self._get_thrift_language(target)
-      rpc_style = self._get_thrift_rpc_style(target)
+      language = self._thrift_defaults.language(target)
+      rpc_style = self._thrift_defaults.rpc_style(target)
       partial_cmd = self.PartialCmd(
           language=language,
           rpc_style=rpc_style,
@@ -160,8 +166,9 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
             langtarget.inject_dependency(langtarget_by_gentarget[dep].address)
 
   def gen(self, partial_cmd, targets):
-    fp_strategy = JavaThriftLibraryFingerprintStrategy(self.context.options)
-    with self.invalidated(targets, fingerprint_strategy=fp_strategy,
+    fp_strategy = JavaThriftLibraryFingerprintStrategy(self._thrift_defaults)
+    with self.invalidated(targets,
+                          fingerprint_strategy=fp_strategy,
                           invalidate_dependents=True) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
@@ -248,7 +255,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       genfiles = gen_files_for_source[source]
       has_service = has_service or services
       files.extend(genfiles)
-    language = self._get_thrift_language(target)
+    language = self._thrift_defaults.language(target)
     target_type = _TARGET_TYPE_FOR_LANG[language]
     deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language])
     deps.update(target.dependencies)
@@ -302,29 +309,15 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
 
     # We only handle requests for 'scrooge' compilation and not, for example 'thrift', aka the
     # Apache thrift compiler
-    if self._get_thrift_compiler(target) != 'scrooge':
+    if self._thrift_defaults.compiler(target) != 'scrooge':
       return False
 
-    language = self._get_thrift_language(target)
+    language = self._thrift_defaults.language(target)
     if language not in ('scala', 'java'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 
   def _validate_compiler_configs(self, targets):
-    self._validate(self.context.options, targets)
-
-  # TODO: move these options into a subsystem
-  # see comments in https://rbcommons.com/s/twitter/r/2265/
-  def _get_thrift_language(self, target):
-    return target.language or self.context.options.for_global_scope().thrift_default_language
-
-  def _get_thrift_rpc_style(self, target):
-    return target.rpc_style or self.context.options.for_global_scope().thrift_default_rpc_style
-
-  def _get_thrift_compiler(self, target):
-    return target.compiler or self.context.options.for_global_scope().thrift_default_compiler
-
-  def _validate(self, options, targets):
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
@@ -334,8 +327,8 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       # sources. As there's no permutation allowing the creation of
       # incompatible sources with the same language+rpc_style we omit
       # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=self._get_thrift_language(tgt),
-                                    rpc_style=self._get_thrift_rpc_style(tgt))
+      return ValidateCompilerConfig(language=self._thrift_defaults.language(tgt),
+                                    rpc_style=self._thrift_defaults.rpc_style(tgt))
 
     mismatched_compiler_configs = defaultdict(set)
 

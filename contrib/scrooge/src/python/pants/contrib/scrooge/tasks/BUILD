@@ -15,6 +15,7 @@ python_library(
   dependencies = [
     ':java_thrift_library_fingerprint_strategy',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
