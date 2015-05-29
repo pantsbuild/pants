@@ -8,9 +8,9 @@ jar_library(
   name='incremental-compiler',
   jars=[
     jar(org='com.typesafe.sbt', name='incremental-compiler', rev=SBT_REV, intransitive=True),
-    jar(org='com.typesafe.sbt', name='sbt-interface', rev=SBT_REV, intransitive=True)
   ],
   dependencies=[
+    '//:sbt-interface',
     '//:scala-compiler',
     '//:scala-library',
   ]
