@@ -45,7 +45,7 @@ satisfy in order to be able publish to Maven Central:
     they can use as a template.  Once this is done and you've performed
     your 1st release, add yourself to the [Releasers](#releasers)
     section below.
-  - Create a `~/.pantsbuild.pants.pgp.properties` file to store the
+  - Create a `~/.config/pants/release/jvm/pgp.properties` file to store the
     credentials Pants needs to sign artifacts uploaded to sonatype.org.
     This process is [described below](#pgp-credentials).
 
@@ -62,7 +62,9 @@ First you'll need to create a secure
 to hold your pgp credentials:
 
     :::bash
-    $ touch ~/.pantsbuild.pants.pgp.properties && chmod 600 ~/.pantsbuild.pants.pgp.properties
+    $ mkdir -p ~/.config/pants/release/jvm && \
+      touch ~/.config/pants/release/jvm/pgp.properties && \
+      chmod 600 ~/.config/pants/release/jvm/pgp.properties
 
 The properties file supports the following keys with noted defaults if omitted:
 
@@ -92,7 +94,7 @@ The properties file supports the following keys with noted defaults if omitted:
     setting if you prefer to be explicit like so:
 
         :::bash
-        $ echo pgp.keyid=67B5C626 >> ~/.pantsbuild.pants.pgp.properties
+        $ echo pgp.keyid=67B5C626 >> ~/.config/pants/release/jvm/pgp.properties
 
   - `pgp.password`
 
