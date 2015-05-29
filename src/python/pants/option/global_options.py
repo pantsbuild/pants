@@ -89,11 +89,3 @@ def register_global_options(register):
   register('--build-file-rev',
            help='Read BUILD files from this scm rev instead of from the working tree.  This is '
            'useful for implementing pants-aware sparse checkouts.')
-
-  # The following options are specific to java_thrift_library targets.
-  register('--thrift-default-compiler', type=str, advanced=True, default='thrift',
-           help='The default compiler to use for java_thrift_library targets.')
-  register('--thrift-default-language', type=str, advanced=True, default='java',
-           help='The default language to generate for java_thrift_library targets.')
-  register('--thrift-default-rpc-style', type=str, advanced=True, default='sync',
-           help='The default rpc-style to generate for java_thrift_library targets.')

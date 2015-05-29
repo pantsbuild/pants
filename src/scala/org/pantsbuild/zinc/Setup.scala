@@ -20,7 +20,8 @@ case class Setup(
   compilerInterfaceSrc: File,
   javaHome: Option[File],
   forkJava: Boolean,
-  cacheDir: File)
+  cacheDir: File,
+  logOptions: LogOptions)
 
 /**
  * Jar file description for locating jars.
@@ -61,7 +62,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava, settings.logOptions)
   }
 
   /**
@@ -74,7 +75,8 @@ object Setup {
     sbtInterface: File,
     compilerInterfaceSrc: File,
     javaHomeDir: Option[File],
-    forkJava: Boolean): Setup =
+    forkJava: Boolean,
+    logOptions: LogOptions): Setup =
   {
     val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
@@ -84,7 +86,7 @@ object Setup {
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
     val cacheDir             = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir, logOptions)
   }
 
   /**
@@ -97,7 +99,8 @@ object Setup {
     sbtInterface: File,
     compilerInterfaceSrc: File,
     javaHome: File,
-    forkJava: Boolean): Setup =
+    forkJava: Boolean,
+    logOptions: LogOptions): Setup =
   setup(
     scalaCompiler,
     scalaLibrary,
@@ -105,7 +108,8 @@ object Setup {
     sbtInterface,
     compilerInterfaceSrc,
     Option(javaHome),
-    forkJava
+    forkJava,
+    logOptions
   )
 
   @deprecated("Use variant that takes forkJava parameter instead.", "0.3.6")
@@ -117,7 +121,7 @@ object Setup {
     compilerInterfaceSrc: File,
     javaHome: File): Setup =
       create(scalaCompiler, scalaLibrary, scalaExtra, sbtInterface,
-        compilerInterfaceSrc, javaHome, false)
+        compilerInterfaceSrc, javaHome, false, LogOptions())
 
   /**
    * Java API for creating Setup with ScalaLocation and SbtJars.
@@ -137,7 +141,8 @@ object Setup {
       sbtInterface,
       compilerInterfaceSrc,
       Option(javaHome),
-      forkJava
+      forkJava,
+      LogOptions()
     )
   }
 
@@ -193,7 +198,7 @@ object Setup {
   /**
    * Verify that necessary jars exist.
    */
-  def verify(setup: Setup, log: sbt.Logger): Boolean = {
+  def verify(setup: Setup, log: LoggerRaw): Boolean = {
     requireFile(setup.scalaCompiler, log) &&
     requireFile(setup.scalaLibrary, log) &&
     requireFile(setup.sbtInterface, log) &&
@@ -203,7 +208,7 @@ object Setup {
   /**
    * Check file exists. Log error if it doesn't.
    */
-  def requireFile(file: File, log: sbt.Logger): Boolean = {
+  def requireFile(file: File, log: LoggerRaw): Boolean = {
     val exists = file.exists
     if (!exists) log.error("Required file not found: " + file.getName)
     exists

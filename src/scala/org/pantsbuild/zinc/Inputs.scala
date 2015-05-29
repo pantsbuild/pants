@@ -36,7 +36,7 @@ object Inputs {
   /**
    * Create inputs based on command-line settings.
    */
-  def apply(log: sbt.Logger, settings: Settings): Inputs = {
+  def apply(log: LoggerRaw, settings: Settings): Inputs = {
     import settings._
     inputs(
       log,
@@ -57,7 +57,7 @@ object Inputs {
   }
 
   /** An overridden definesClass to use analysis for an input directory if it is available. */
-  def definesClass(log: sbt.Logger, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
+  def definesClass(log: LoggerRaw, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
     analysisMap.get(entry).map { analysis =>
       log.debug(s"Hit analysis cache for class definitions with ${entry}")
       (s: String) => analysis.relations.definesClass(s).nonEmpty
@@ -69,7 +69,7 @@ object Inputs {
    * Create normalised and defaulted Inputs.
    */
   def inputs(
-    log: sbt.Logger,
+    log: LoggerRaw,
     classpath: Seq[File],
     sources: Seq[File],
     classesDirectory: File,
@@ -117,7 +117,7 @@ object Inputs {
    * Java API for creating Inputs.
    */
   def create(
-    log: sbt.Logger,
+    log: LoggerRaw,
     classpath: JList[File],
     sources: JList[File],
     classesDirectory: File,
@@ -148,7 +148,7 @@ object Inputs {
 
   @deprecated("Use the variant that takes `incOptions` parameter, instead.", "0.3.5.3")
   def create(
-    log: sbt.Logger,
+    log: LoggerRaw,
     classpath: JList[File],
     sources: JList[File],
     classesDirectory: File,

@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -71,8 +72,13 @@ class ApacheThriftGen(CodeGen):
     register('--java', advanced=True, type=Options.dict, help='GenInfo for Java.')
     register('--python', advanced=True, type=Options.dict, help='GenInfo for Python.')
 
+  @classmethod
+  def global_subsystems(cls):
+    return (ThriftDefaults,)
+
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
+    self._thrift_defaults = ThriftDefaults.global_instance()
     self.combined_dir = os.path.join(self.workdir, 'combined')
     self.combined_relpath = os.path.relpath(self.combined_dir, get_buildroot())
     self.session_dir = os.path.join(self.workdir, 'sessions')
@@ -124,9 +130,11 @@ class ApacheThriftGen(CodeGen):
     return [self.thrift_binary]
 
   def is_gentarget(self, target):
-    return ((isinstance(target, JavaThriftLibrary)
-             and target.compiler(self.context.options) == 'thrift')
-            or isinstance(target, PythonThriftLibrary))
+    if isinstance(target, PythonThriftLibrary):
+      return True
+
+    return (isinstance(target, JavaThriftLibrary) and
+            'thrift' == self._thrift_defaults.compiler(target))
 
   def is_forced(self, lang):
     return lang in self.gen_langs
