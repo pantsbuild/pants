@@ -147,6 +147,7 @@ python_library(
     ':common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/util:memo',
   ],
 )
 
