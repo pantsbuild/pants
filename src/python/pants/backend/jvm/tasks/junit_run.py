@@ -756,13 +756,17 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
       self._runner = _JUnitRunner(task_exports, self.context)
 
   def execute(self):
-    if not self.get_options().skip:
-      targets = self.context.targets()
-      # TODO: move this check to an optional phase in goal_runner, so
-      # that missing sources can be detected early.
-      for target in targets:
-        if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-          msg = 'JavaTests target {} must include a non-empty set of sources.'.format(target.address.spec)
-          raise TargetDefinitionException(target, msg)
+    def is_junit_test(target):
+      return isinstance(target, junit_tests)
 
-      self._runner.execute(targets)
+    if not self.get_options().skip:
+      targets = list(filter(is_junit_test, self.context.targets()))
+      if targets:
+        for target in targets:
+          # TODO: move this check to an optional phase in goal_runner, so
+          # that missing sources can be detected early.
+          if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
+            msg = 'JavaTests target {} must include a non-empty set of sources.'.format(target.address.spec)
+            raise TargetDefinitionException(target, msg)
+
+        self._runner.execute(targets)
