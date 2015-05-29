@@ -31,6 +31,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':code_gen',
     'src/python/pants:thrift_util',
+    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/jvm/targets:java',
