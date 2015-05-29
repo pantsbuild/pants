@@ -243,7 +243,7 @@ class _JUnitRunner(object):
 
     for test, target in tests_and_targets.items():
       if target is None:
-        self._context.log.warning('Unknown target for test %{0}'.format(test))
+        self._context.log.warn('Unknown target for test %{0}'.format(test))
 
       filename = get_test_filename(test)
 
