@@ -3,10 +3,9 @@
 This page describes how to make a versioned release of the Pants jvm
 tools to Maven Central.
 
-Before reading further, you should familiarize yourself with the
-standard Pants [[jar publishing support|pants('src/docs:publish')]].
-This is used for Maven Central staging day to day and only some initial
-one-time setup is non-standard.
+Releasing jvm tools largely follows the
+[[standard jar publishing process|pants('src/docs:publish')]], but has
+some non-standard initial one-time setup.
 
 At a high level, releasing pants jvm artifacts involves:
 
@@ -21,7 +20,7 @@ At a high level, releasing pants jvm artifacts involves:
 
 ## Prerequisites ##
 
-You must be a at least a
+You must be at least a
 [committer](https://github.com/orgs/pantsbuild/teams/committers) in
 the pantsbuild GitHub organisation to publish pants artifacts.  If you
 aren't yet, you need only ping the
@@ -44,7 +43,7 @@ satisfy in order to be able publish to Maven Central:
     sonatype.org JIRA account id. Here's an
     [example ticket](https://issues.sonatype.org/browse/OSSRH-12754)
     they can use as a template.  Once this is done and you've performed
-    your 1st release, add yourself to the [releasers](#releasers)
+    your 1st release, add yourself to the [Releasers](#releasers)
     section below.
   - Create a `~/.pantsbuild.pants.pgp.properties` file to store the
     credentials Pants needs to sign artifacts uploaded to sonatype.org.
@@ -88,7 +87,7 @@ The properties file supports the following keys with noted defaults if omitted:
         gpg: writing to stdout
         gpg: RSA/SHA256 signature from: "67B5C626 John Sirois <john.sirois@gmail.com>"
 
-    In this case the default key id is `67B5C626`.  You can add a entry
+    In this case the default key id is `67B5C626`.  You can add an entry
     to the properties file instead of relying on the default `auto`
     setting if you prefer to be explicit like so:
 
@@ -105,7 +104,7 @@ The properties file supports the following keys with noted defaults if omitted:
 ## Dry Run ##
 
 Releases should only be published from master, so get on master and
-ensure the changes to want to publish are present. After confirming
+ensure the changes you want to publish are present. After confirming
 this, you can test out the publish in 2 ways:
 
   1. A dry run to get a preview of what will be published and why:
@@ -121,7 +120,7 @@ this, you can test out the publish in 2 ways:
 
      Note that this "dry-run" technique somewhat confusingly passes
      `--no-dryrun` but only because the publish is local and to a
-     temporary fir (the argument to `--local`).  You can also poke
+     temporary dir (the argument to `--local`).  You can also poke
      around in the `/tmp/m2` local maven repo if you're curious or want
      to double-check fine details of exactly what will be pushed.
 
@@ -136,7 +135,7 @@ tags for the staging releases you do here, but in the worst case the
 tags will point to releases never promoted to Maven Central, which is
 fine.
 
-To do the staging release, its a normal pants publish and its easiest
+To do the staging release, it's a normal pants publish and it's easiest
 to use the following command, which will publish everything that's
 changed and only those things that have changed since the last publish:
 
