@@ -13,6 +13,7 @@ from textwrap import dedent
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.goal.products import MultipleRootedProducts
@@ -43,6 +44,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases.create(
       targets={
         'java_tests': JavaTests,
+        'python_tests': PythonTests,
       },
     ))
 
@@ -137,6 +139,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # Finally execute the task.
     self.execute(context)
 
+  def test_junit_runner_on_non_junit_target(self):
+    self.add_to_build_file('foo', dedent('''
+        python_tests(
+          name='hello',
+          sources=['some_file.py'],
+        )
+        '''
+    ))
+    task = self.create_task(self.context(target_roots=[self.target('foo:hello')]))
+    task.execute()
+
   def test_empty_sources(self):
     self.add_to_build_file('foo', dedent('''
         java_tests(
@@ -147,7 +160,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ))
     task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r':empty must include a non-empty set of sources'):
+                                 r'must include a non-empty set of sources'):
       task.execute()
 
 
