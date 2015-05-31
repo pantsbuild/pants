@@ -103,7 +103,6 @@ class Export(ConsoleTask):
     super(Export, self).__init__(*args, **kwargs)
     self.format = self.get_options().formatted
     self.target_aliases_map = None
-    self.ivy_jar_memo = {}
 
   def console_output(self, targets):
     targets_map = {}
