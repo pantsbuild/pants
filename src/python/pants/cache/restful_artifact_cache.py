@@ -11,11 +11,8 @@ import urlparse
 import requests
 from requests import RequestException
 
-from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import (ArtifactCache, ArtifactCacheError,
                                         NonfatalArtifactCacheError, UnreadableArtifact)
-from pants.cache.local_artifact_cache import TempLocalArtifactCache
-from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
 
 logger = logging.getLogger(__name__)

@@ -26,7 +26,6 @@ python_library(
     'python_thrift_library.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/python/targets:python',
   ],
 )

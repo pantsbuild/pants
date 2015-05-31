@@ -7,6 +7,7 @@ import os
 import re
 import sys
 
+
 if len(sys.argv) != 3:
   print("Usage: publish_migration.py <publish.properties> <directory to write new files>")
   exit(1)

@@ -28,7 +28,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
-from pants.base.build_graph import BuildGraph, sort_targets
+from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.meta import AbstractClass

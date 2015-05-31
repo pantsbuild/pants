@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import sys
 
-import lockfile
 import psutil
 from lockfile import pidlockfile
 

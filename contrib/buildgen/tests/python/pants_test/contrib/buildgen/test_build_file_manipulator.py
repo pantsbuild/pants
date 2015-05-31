@@ -5,15 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import tempfile
-from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.address import SyntheticAddress
 from pants_test.base_test import BaseTest
 
 from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
-                                                           BuildTargetParseError, DependencySpec)
+                                                           BuildTargetParseError)
 
 
 class BuildFileManipulatorTest(BaseTest):
