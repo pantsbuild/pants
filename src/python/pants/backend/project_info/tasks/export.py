@@ -140,9 +140,11 @@ class Export(ConsoleTask):
             return Export.SourceRootTypes.SOURCE
 
       def get_transitive_jars(jar_lib):
-        if not self.get_options().libraries:
-          return []
-        if not ivy_info:
+        """
+        :type jar_lib: pants.backend.jvm.targets.jar_library.JarLibrary
+        :rtype: twitter.common.collections.orderedset.OrderedSet
+        """
+        if not ivy_info or not self.get_options().libraries:
           return OrderedSet()
         transitive_jars = OrderedSet()
         for jar in jar_lib.jar_dependencies:
