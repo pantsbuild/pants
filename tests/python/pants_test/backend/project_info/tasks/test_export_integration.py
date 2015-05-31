@@ -14,48 +14,47 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ExportIntegrationTest(PantsRunIntegrationTest):
-  _resolve_args = [
-    'resolve',
+  _confs_args = [
     '--resolve-ivy-confs=default',
     '--resolve-ivy-confs=sources',
     '--resolve-ivy-confs=javadoc',
   ]
 
-  def run_export(self, test_target, workdir, extra_args = list()):
+  def run_export(self, test_target, workdir, load_libs = False, extra_args = list()):
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    pants_run = self.run_pants_with_workdir(extra_args + [
-        'export',
-        '--output-file={out_file}'.format(out_file=export_out_file),
-        test_target],
-        workdir)
+    args = ['export', '--output-file={out_file}'.format(out_file=export_out_file), test_target]
+    libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
+    pants_run = self.run_pants_with_workdir(args + libs_args + extra_args, workdir)
     self.assert_success(pants_run)
     self.assertTrue(os.path.exists(export_out_file),
                     msg='Could not find export output file in {out_file}'
                         .format(out_file=export_out_file))
     with open(export_out_file) as json_file:
       json_data = json.load(json_file)
+      if not load_libs:
+        self.assertIsNone(json_data.get('libraries'))
       return json_data
 
   def test_export_code_gen(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
-      json_data = self.run_export(test_target, workdir)
+      json_data = self.run_export(test_target, workdir, load_libs=True)
       thrift_target_name = 'examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java'
       codegen_target = os.path.join(os.path.relpath(workdir, get_buildroot()),
                                     'gen/thrift/combined/gen-java:%s' % thrift_target_name)
-      self.assertIn(codegen_target, json_data.get('targets'))
+      self.assertIn(codegen_target, json_data.get('targets').keys())
 
   def test_export_json_transitive_jar(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
-      json_data = self.run_export(test_target, workdir)
+      json_data = self.run_export(test_target, workdir, load_libs=True)
       targets = json_data.get('targets')
       self.assertIn('org.hamcrest:hamcrest-core:1.3', targets[test_target]['libraries'])
 
   def test_export_jar_path_with_excludes(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
-      json_data = self.run_export(test_target, workdir, ['resolve'])
+      json_data = self.run_export(test_target, workdir, load_libs=True)
       self.assertIsNone(json_data.get('libraries').get('com.typesafe.sbt:incremental-compiler:0.13.7'))
       foo_target = json_data.get('targets').get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo')
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
@@ -63,7 +62,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
   def test_export_jar_path_with_excludes_soft(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
-      json_data = self.run_export(test_target, workdir, ['resolve', '--resolve-ivy-soft-excludes'])
+      json_data = self.run_export(test_target, workdir, load_libs=True, extra_args=['--resolve-ivy-soft-excludes'])
       self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
       foo_target = json_data.get('targets').get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo')
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
@@ -71,7 +70,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
   def test_export_jar_path(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
-      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      json_data = self.run_export(test_target, workdir, load_libs=True)
       # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
       # to get in a test that isn't a subclass of TaskTestBase.
       # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
@@ -101,7 +100,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
   def test_sources_and_javadocs(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
-      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      json_data = self.run_export(test_target, workdir, load_libs=True)
       scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.4')
       self.assertIsNotNone(scala_lang_lib)
       self.assertIsNotNone(scala_lang_lib['default'])
@@ -111,7 +110,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
   def test_ivy_classifiers(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
-      json_data = self.run_export(test_target, workdir, self._resolve_args)
+      json_data = self.run_export(test_target, workdir, load_libs=True)
       # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
       # to get in a test that isn't a subclass of TaskTestBase.
       # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
