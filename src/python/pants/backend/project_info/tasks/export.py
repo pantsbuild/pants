@@ -121,6 +121,7 @@ class Export(ConsoleTask):
         )
         ivy_info = ivy_info_list[0]
 
+    ivy_jar_memo = {}
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target
@@ -138,6 +139,18 @@ class Export(ConsoleTask):
           else:
             return Export.SourceRootTypes.SOURCE
 
+      def get_transitive_jars(jar_lib):
+        """
+        :type jar_lib: pants.backend.jvm.targets.jar_library.JarLibrary
+        :rtype: twitter.common.collections.orderedset.OrderedSet
+        """
+        if not ivy_info or not self.get_options().libraries:
+          return OrderedSet()
+        transitive_jars = OrderedSet()
+        for jar in jar_lib.jar_dependencies:
+          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar, memo=ivy_jar_memo))
+        return transitive_jars
+
       info = {
         'targets': [],
         'libraries': [],
@@ -154,14 +167,14 @@ class Export(ConsoleTask):
 
       target_libraries = set()
       if isinstance(current_target, JarLibrary):
-        target_libraries = self._get_transitive_jars(current_target, ivy_info)
+        target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
         info['targets'].append(self._address(dep.address))
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
           # Add all the jars pulled in by this jar_library
-          target_libraries.update(self._get_transitive_jars(dep, ivy_info))
+          target_libraries.update(get_transitive_jars(dep))
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
 
@@ -197,18 +210,6 @@ class Export(ConsoleTask):
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
       return [json.dumps(graph_info)]
-
-  def _get_transitive_jars(self, jar_lib, ivy_info):
-    """
-    :type jar_lib: pants.backend.jvm.targets.jar_library.JarLibrary
-    :rtype: twitter.common.collections.orderedset.OrderedSet
-    """
-    if not ivy_info or not self.get_options().libraries:
-      return OrderedSet()
-    transitive_jars = OrderedSet()
-    for jar in jar_lib.jar_dependencies:
-      transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar, memo=self.ivy_jar_memo))
-    return transitive_jars
 
   def _resolve_jars_info(self):
     """Consults ivy_jar_products to export the external libraries.
