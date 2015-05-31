@@ -108,6 +108,7 @@ class Export(ConsoleTask):
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
+    ivy_info = None
     if self.get_options().libraries:
       ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
       # This product is a list for historical reasons (exclusives groups) but in practice should
@@ -119,8 +120,6 @@ class Export(ConsoleTask):
           ' since we no longer have exclusives groups.'
         )
         ivy_info = ivy_info_list[0]
-      else:
-        ivy_info = None
 
     def process_target(current_target):
       """
