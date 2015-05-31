@@ -24,3 +24,8 @@ java_thrift_library(
   sources = ['good.thrift'],
   thrift_linter_strict=True,
 )
+
+java_thrift_library(
+  name = 'all-thrift',
+  sources = globs('*.thrift'),
+)
