@@ -21,6 +21,7 @@ from twitter.common.dirutil import safe_mkdir
 
 from pants.contrib.spindle.targets.spindle_thrift_library import SpindleThriftLibrary
 
+
 class SpindleGen(NailgunTask):
   def __init__(self, context, workdir):
     super(SpindleGen, self).__init__(context, workdir)
