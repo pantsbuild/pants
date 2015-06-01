@@ -21,6 +21,11 @@ from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
+class FakeRunTracker(object):
+  def register_thread(self, one):
+    pass
+
+
 class JarCreateTestBase(JarTaskTestBase):
   @classmethod
   def task_type(cls):
@@ -41,6 +46,7 @@ class JarCreateTestBase(JarTaskTestBase):
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):
@@ -118,7 +124,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
       target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
 
-
   def assert_jar_contents(self, context, product_type, target, *contents):
     jar_mapping = context.products.get(product_type).get(target)
     self.assertEqual(1, len(jar_mapping))
@@ -133,6 +138,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_classfile_jar_contents(self):
     context = self.context()
+    context.run_tracker = FakeRunTracker()
+
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
         with self.add_data(context.products, 'classes_by_target', self.binary, 'b.class'):
@@ -154,6 +161,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_empty_scala_files(self):
     context = self.context()
+    context.run_tracker = FakeRunTracker()
+
     with self.add_data(context.products, 'classes_by_target', self.empty_sl):
       with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
         self.execute(context)
