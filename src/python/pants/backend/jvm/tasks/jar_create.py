@@ -54,7 +54,7 @@ class JarCreate(JarTask):
   def register_options(cls, register):
     super(JarCreate, cls).register_options(register)
     register('--compressed', default=True, action='store_true', help='Create compressed jars.')
-    register('--worker_count', default=multiprocessing.cpu_count(), action='store', type=int,
+    register('--jar_worker_count', default=multiprocessing.cpu_count(), action='store', type=int,
              help='Number of workers (threads) to use for jar creation.')
 
   @classmethod
@@ -70,7 +70,7 @@ class JarCreate(JarTask):
     super(JarCreate, self).__init__(*args, **kwargs)
 
     self.compressed = self.get_options().compressed
-    self.worker_count = self.get_options().worker_count
+    self.worker_count = self.get_options().jar_worker_count
     self._jars = {}
 
   def _construct_jobs(self, jar_targets):
