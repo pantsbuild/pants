@@ -259,7 +259,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       options=dict(libraries=False),
       targets=[self.target('project_info:java_test')]
     ))
-    self.assertIsNone(result['targets']['project_info:java_test']['libraries'])
+    self.assertEqual([],
+                     result['targets']['project_info:java_test']['libraries'])
 
   def test_java_test(self):
     result = get_json(self.execute_console_task(
