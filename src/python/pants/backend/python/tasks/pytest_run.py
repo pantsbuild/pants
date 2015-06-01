@@ -76,7 +76,7 @@ def deprecated_env_accessors(removal_version, **replacement_mapping):
   """
   def create_accessor(env_name, option_name):
     @deprecated(removal_version=removal_version,
-                hint_message=' Use the {option} option instead of the deprecated {env} environment'
+                hint_message='Use the {option} option instead of the deprecated {env} environment '
                              'variable'.format(option=option_name, env=env_name))
     def deprecated_accessor():
       return os.environ.get(env_name)
@@ -249,7 +249,6 @@ class PytestRun(PythonTask):
   def _maybe_emit_junit_xml(self, targets):
     args = []
     xml_base = self.get_DEPRECATED_JUNIT_XML_BASE()
-    print('>>> found junit-xml of: {}'.format(xml_base))
     if xml_base and targets:
       xml_base = os.path.realpath(xml_base)
       xml_path = os.path.join(xml_base, Target.maybe_readable_identify(targets) + '.xml')

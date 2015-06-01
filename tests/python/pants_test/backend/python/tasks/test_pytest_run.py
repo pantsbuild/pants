@@ -171,14 +171,14 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     files = glob.glob(os.path.join(report_basedir, '*.xml'))
     self.assertEqual(1, len(files), 'Expected 1 file, found: {}'.format(files))
     junit_xml = files[0]
-    with open(junit_xml) as fp:
-      print(fp.read())
     root = DOM.parse(junit_xml).documentElement
+
     self.assertEqual(2, len(root.childNodes))
     self.assertEqual(2, int(root.getAttribute('tests')))
     self.assertEqual(1, int(root.getAttribute('failures')))
     self.assertEqual(0, int(root.getAttribute('errors')))
     self.assertEqual(0, int(root.getAttribute('skips')))
+
     children_by_test_name = dict((elem.getAttribute('name'), elem) for elem in root.childNodes)
     self.assertEqual(0, len(children_by_test_name['test_one'].childNodes))
     self.assertEqual(1, len(children_by_test_name['test_two'].childNodes))
