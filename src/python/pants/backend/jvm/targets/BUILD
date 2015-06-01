@@ -38,6 +38,7 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/base:validation',
     'src/python/pants/util:meta',
+    'src/python/pants/util:memo',
   ],
 )
 
