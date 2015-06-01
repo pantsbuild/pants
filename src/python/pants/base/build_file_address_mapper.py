@@ -146,6 +146,9 @@ class BuildFileAddressMapper(object):
                                                 spec_path=spec_path))
         mapping = self._build_file_parser.address_map_from_build_file(build_file)
       except BuildFileParser.BuildFileParserError as e:
+        import traceback
+        traceback.print_exc()
+        import pdb; pdb.set_trace()
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
                                  .format(message=e, spec_path=spec_path))
 
