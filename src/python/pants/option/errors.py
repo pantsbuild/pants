@@ -11,11 +11,6 @@ class OptionsError(Exception):
   pass
 
 
-class BootstrapError(OptionsError):
-  """An error at options bootstrapping time."""
-  pass
-
-
 class RegistrationError(OptionsError):
   """An error at option registration time."""
   pass

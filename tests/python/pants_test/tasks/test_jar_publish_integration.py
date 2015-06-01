@@ -30,18 +30,18 @@ def shared_artifacts(version, extra_jar=None):
 # TODO: Right now some options are set via config and some via cmd-line flags. Normalize this?
 def publish_extra_config(unique_config):
   return {
-          'publish.jar': {
-            'publish_extras': {
-              'extra_test_jar_example': unique_config,
-              },
-            },
-          'backends': {
-            'packages': [
-              'example.pants_publish_plugin',
-              'internal_backend.repositories',
-              ],
-            },
-          }
+    b'DEFAULT': {
+      b'backend_packages': [
+        b'example.pants_publish_plugin',
+        b'internal_backend.repositories',
+      ],
+    },
+    b'publish.jar': {
+      b'publish_extras': {
+        b'extra_test_jar_example': unique_config,
+      },
+    },
+  }
 
 
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
@@ -62,8 +62,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   def tearDown(self):
     safe_rmtree(self.pushdb_root)
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
-                      reason='No scaladoc binary on the PATH.')
   def test_scala_publish(self):
     unique_artifacts = {'org/pantsbuild/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
