@@ -11,7 +11,7 @@ import sys
 import traceback
 import warnings
 
-from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
 
 
