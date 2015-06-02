@@ -226,7 +226,8 @@ class SpindleGen(NailgunTask):
 NAMESPACE_PARSER = re.compile(r'^\s*namespace\s+([^\s]+)\s+([^\s]+)\s*$')
 
 def calculate_genfiles(source):
-  with open(source, 'r') as thrift:
+  abs_source = os.path.join(get_buildroot(), source)
+  with open(abs_source, 'r') as thrift:
     lines = thrift.readlines()
   namespaces = {}
   for line in lines:
@@ -240,9 +241,9 @@ def calculate_genfiles(source):
   namespace = namespaces.get('java')
 
   if not namespace:
-    raise TaskError('No namespace provided in source: {}'.format(source))
+    raise TaskError('No namespace provided in source: {}'.format(abs_source))
 
-  return calculate_scala_record_genfiles(namespace, source)
+  return calculate_scala_record_genfiles(namespace, abs_source)
 
 
 def calculate_scala_record_genfiles(namespace, source):
