@@ -29,7 +29,7 @@ from pants.option.options import Options
 logger = logging.getLogger(__name__)
 
 
-class WireGen(SimpleCodegenTask, JvmToolTaskMixin):
+class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)

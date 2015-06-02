@@ -80,6 +80,7 @@ python_library(
   dependencies = [
     ':code_gen',
     ':common',
+    ':simple_codegen_task',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:address',
