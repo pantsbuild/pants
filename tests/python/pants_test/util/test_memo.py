@@ -96,6 +96,50 @@ class MemoizeTest(unittest.TestCase):
 
     self.assertEqual([2, 3, 2], calculations)
 
+  def test_forget(self):
+    calculations = []
+
+    @memoized
+    def square(num):
+      calculations.append(num)
+      return num * num
+
+    self.assertEqual(4, square(2))
+    self.assertEqual(4, square(2))
+    self.assertEqual(9, square(3))
+    self.assertEqual(9, square(3))
+
+    square.forget(2)
+
+    self.assertEqual(4, square(2))
+    self.assertEqual(4, square(2))
+    self.assertEqual(9, square(3))
+    self.assertEqual(9, square(3))
+
+    self.assertEqual([2, 3, 2], calculations)
+
+  def test_clear(self):
+    calculations = []
+
+    @memoized
+    def square(num):
+      calculations.append(num)
+      return num * num
+
+    self.assertEqual(4, square(2))
+    self.assertEqual(4, square(2))
+    self.assertEqual(9, square(3))
+    self.assertEqual(9, square(3))
+
+    square.clear()
+
+    self.assertEqual(4, square(2))
+    self.assertEqual(4, square(2))
+    self.assertEqual(9, square(3))
+    self.assertEqual(9, square(3))
+
+    self.assertEqual([2, 3, 2, 3], calculations)
+
   class _Called(object):
     def __init__(self, increment):
       self._calls = 0
@@ -191,3 +235,36 @@ class MemoizeTest(unittest.TestCase):
     foo2 = Foo(2)
     self.assertEqual(2, foo2.calls)
     self.assertEqual(2, foo2.calls)
+
+    del foo2.calls
+
+    self.assertEqual(4, foo2.calls)
+    self.assertEqual(4, foo2.calls)
+
+  def test_memoized_property_forget(self):
+    class Foo(self._Called):
+      @memoized_property
+      def calls(self):
+        return self._called()
+
+    foo1 = Foo(1)
+
+    # Forgetting before caching should be a harmless noop
+    del foo1.calls
+
+    self.assertEqual(1, foo1.calls)
+    self.assertEqual(1, foo1.calls)
+
+    foo2 = Foo(2)
+    self.assertEqual(2, foo2.calls)
+    self.assertEqual(2, foo2.calls)
+
+    # Now un-cache foo2's calls result and observe no effect on foo1.calls, but a re-compute for
+    # foo2.calls
+    del foo2.calls
+
+    self.assertEqual(1, foo1.calls)
+    self.assertEqual(1, foo1.calls)
+
+    self.assertEqual(4, foo2.calls)
+    self.assertEqual(4, foo2.calls)

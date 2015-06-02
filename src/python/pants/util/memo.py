@@ -22,7 +22,7 @@ def per_instance(*args, **kwargs):
   is used when forming the key.
 
   This is a useful key factory when you want to enforce memoization happens per-instance for an
-  instance method in a class hierarchy that defines a custom `__eq__`.
+  instance method in a class hierarchy that defines a custom `__hash__`/`__eq__`.
   """
   # For methods, the cache should be per-instance, so we take the id of the self/cls argument
   # instead of relying on `==` since different instances may evaluate as `==`.
@@ -38,6 +38,13 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
   Note that memoization is not thread-safe and the default result cache will grow without bound;
   so care must be taken to only apply this decorator to functions with single threaded access and
   an expected reasonably small set of unique call parameters.
+
+  Note that the wrapped function comes equipped with 2 helper function attributes:
+
+  + `forget(*args, **kwargs)`: Takes the same arguments as the memoized function and causes the
+                               memoization cache to forget the computed value, if any, for those
+                               arguments.
+  + `clear()`: Causes the memoization cache to be fully cleared.
 
   :param func: The function to wrap.  Only generally passed by the python runtime and should be
                omitted when passing a custom `key_factory` or `cache_factory`.
@@ -78,6 +85,17 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
     result = func(*args, **kwargs)
     memoized_results[key] = result
     return result
+
+  def forget(*args, **kwargs):
+    key = key_func(*args, **kwargs)
+    if key in memoized_results:
+      del memoized_results[key]
+  memoize.forget = forget
+
+  def clear():
+    memoized_results.clear()
+  memoize.clear = clear
+
   return memoize
 
 
@@ -141,12 +159,39 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   ...   def name(self):
   ...     pass
 
-  :param func: The function to wrap.  Only generally passed by the python runtime and should be
-               omitted when passing a custom `key_factory` or `cache_factory`.
+  By default a deleter for the property is setup that un-caches the property such that a subsequent
+  property access re-computes the value.  In other words, for this `now` @memoized_property:
+
+  >>> import time
+  >>> class Bar(object):
+  ...   @memoized_property
+  ...   def now(self):
+  ...     return time.time()
+
+  You could write code like so:
+
+  >>> bar = Bar()
+  >>> bar.now
+  1433267312.622095
+  >>> time.sleep(5)
+  >>> bar.now
+  1433267312.622095
+  >>> del bar.now
+  >>> bar.now
+  1433267424.056189
+  >>> time.sleep(5)
+  >>> bar.now
+  1433267424.056189
+  >>>
+
+  :param func: The property getter method to wrap.  Only generally passed by the python runtime and
+               should be omitted when passing a custom `key_factory` or `cache_factory`.
   :param key_factory: A function that can form a cache key from the arguments passed to the
                       wrapped, memoized function; by default `per_instance`.
   :param kwargs: Any extra keyword args accepted by `memoized`.
   :raises: `ValueError` if the wrapper is applied to anything other than a function.
-  :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
+  :returns: A read-only property that memoizes its calculated value and un-caches its value when
+            `del`ed.
   """
-  return property(memoized_method(func=func, key_factory=key_factory, **kwargs))
+  getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
+  return property(fget=getter, fdel=lambda self: getter.forget(self))
