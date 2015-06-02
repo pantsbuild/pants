@@ -29,7 +29,7 @@ class TestSetupPy(PythonTaskTest):
   def setUp(self):
     super(TestSetupPy, self).setUp()
 
-    distdir = os.path.join(self._tmpdir, 'dist')
+    distdir = os.path.join(self.pants_workdir, 'dist')
     self.set_options(pants_distdir=distdir)
 
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
