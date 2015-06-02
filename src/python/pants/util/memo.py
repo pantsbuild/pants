@@ -150,4 +150,3 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
   """
   return property(memoized_method(func=func, key_factory=key_factory, **kwargs))
-
