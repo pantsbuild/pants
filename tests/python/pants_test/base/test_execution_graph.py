@@ -7,9 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job, JobExistsError,
-                                                                 NoRootJobError, UnknownJobError)
+from pants.base.execution_graph import (ExecutionFailure, ExecutionGraph, Job, JobExistsError,
+                                        NoRootJobError, UnknownJobError)
 
 
 class ImmediatelyExecutingPool(object):

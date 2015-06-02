@@ -227,14 +227,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'execution_graph',
-  sources = ['test_execution_graph.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
-    ]
-)
-
-python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [

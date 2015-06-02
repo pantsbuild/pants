@@ -327,6 +327,14 @@ python_library(
 )
 
 python_library(
+  name = 'execution_graph',
+  sources = ['execution_graph.py'],
+  dependencies = [
+    ':worker_pool',
+  ],
+)
+
+python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[

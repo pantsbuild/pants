@@ -9,12 +9,11 @@ import os
 from collections import defaultdict
 from contextlib import contextmanager
 
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job)
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.execution_graph import ExecutionFailure, ExecutionGraph, Job
 from pants.base.worker_pool import Work, WorkerPool
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_walk
 

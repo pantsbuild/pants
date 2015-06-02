@@ -11,9 +11,8 @@ from contextlib import contextmanager
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarTask
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job)
 from pants.base.exceptions import TaskError
+from pants.base.execution_graph import ExecutionFailure, ExecutionGraph, Job
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnit
 from pants.fs.fs import safe_filename
