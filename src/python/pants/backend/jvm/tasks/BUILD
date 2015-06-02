@@ -177,6 +177,7 @@ python_library(
     ':jar_task',
     ':scaladoc_gen',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:execution_graph',
     'src/python/pants/fs',
     'src/python/pants/java/jar:manifest',
     'src/python/pants/backend/jvm/targets:jvm',

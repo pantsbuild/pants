@@ -27,7 +27,6 @@ target(
     ':console_task',
     ':dependees',
     ':detect_duplicates',
-    ':execution_graph',
     ':filter',
     ':group_task',
     ':jar_create',
