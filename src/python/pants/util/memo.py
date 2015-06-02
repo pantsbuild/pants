@@ -151,6 +151,3 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   """
   return property(memoized_method(func=func, key_factory=key_factory, **kwargs))
 
-
-# TODO(John Sirois): consider adding support for a memoized_classmethod convenience should the
-# usage arise or be identified as already existing in the codebase.
