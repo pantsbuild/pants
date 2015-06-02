@@ -13,7 +13,7 @@ from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.parser_hierarchy import ParserHierarchy
+from pants.option.parser import Parser
 
 
 class Options(object):
@@ -95,7 +95,7 @@ class Options(object):
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
     self._help_request = splitter.help_request
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, self._help_request)
+    self._scoped_parsers = scoped_parsers(env, config, known_scopes, self._help_request)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scopes = set(known_scopes)
@@ -161,7 +161,7 @@ class Options(object):
 
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
-    return self._parser_hierarchy.get_parser_by_scope(scope)
+    return self._scoped_parsers[scope]
 
   def get_global_parser(self):
     """Returns the parser for the global scope, so code can register on it directly."""
@@ -185,7 +185,7 @@ class Options(object):
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
+    self._scoped_parsers[scope].parse_args(flags_in_scope, values)
     self._values_by_scope[scope] = values
     return values
 
@@ -265,3 +265,12 @@ class Options(object):
   def _format_help_for_scope(self, scope):
     """Generate a help message for options at the specified scope."""
     return self.get_parser(scope).format_help()
+
+
+def scoped_parsers(env, config, all_scopes, help_request):
+  parsers = {}
+  # Sort so ancestors precede descendants.
+  for s in sorted({GLOBAL_SCOPE} | set(all_scopes)):
+    parent_parser = None if s == GLOBAL_SCOPE else parsers[s.rpartition('.')[0]]
+    parsers[s] = Parser(env, config, s, help_request, parent_parser)
+  return parsers
