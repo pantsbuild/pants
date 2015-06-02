@@ -11,7 +11,9 @@ import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
 import sbt.Level
 import sbt.Path._
 import scala.collection.JavaConverters._
+import scala.util.matching.Regex
 import xsbti.compile.CompileOrder
+
 
 /**
  * All parsed command-line options.
@@ -45,7 +47,8 @@ case class LogOptions(
   color: Boolean             = true,
   logPhases: Boolean         = false,
   printProgress: Boolean     = false,
-  heartbeatSecs: Int         = 0
+  heartbeatSecs: Int         = 0,
+  logFilters: Seq[Regex]     = Seq.empty
 )
 
 /**
@@ -205,7 +208,7 @@ object Settings {
     boolean(   "-log-phases",                  "Log phases of compilation for each file",    (s: Settings) => s.copy(logOptions = s.logOptions.copy(logPhases = true))),
     boolean(   "-print-progress",              "Periodically print compilation progress",    (s: Settings) => s.copy(logOptions = s.logOptions.copy(printProgress = true))),
     int(       "-heartbeat", "interval (sec)", "Print '.' every n seconds while compiling",  (s: Settings, b: Int) => s.copy(logOptions = s.logOptions.copy(heartbeatSecs = b))),
-
+    string(    "-log-filter", "regex",         "Filter log messages matching the regex",     (s: Settings, re: String) => s.copy(logOptions = s.logOptions.copy(logFilters = s.logOptions.logFilters :+ re.r))),
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
