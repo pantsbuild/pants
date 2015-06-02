@@ -9,6 +9,7 @@ import six
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.address_lookup_error import AddressLookupError
+from pants.util.memo import memoized_property
 
 
 class ImportJarsMixin(object):
@@ -31,44 +32,36 @@ class ImportJarsMixin(object):
       "This target {0} must provide an implementation of the import_jar_library_specs property."
       .format(type(self)))
 
-  # TODO(Patrick Lawson) Follow up with a cached_property utility for pants to substitute for
-  # this way of caching instance attributes using a placeholder class attribute.
-  _imported_jars = None
-  @property
+  @memoized_property
   def imported_jars(self):
     """:returns: the string specs of JarDependencies referenced by imported_jar_library_specs
     :rtype: list of string
     """
-    if self._imported_jars is None:
-      self._imported_jars =  JarLibrary.to_jar_dependencies(self.address,
-                                                            self.imported_jar_library_specs,
-                                                            self._build_graph)
-    return self._imported_jars
+    return JarLibrary.to_jar_dependencies(self.address,
+                                          self.imported_jar_library_specs,
+                                          self._build_graph)
 
-  _imported_jar_libraries = None
-  @property
+  @memoized_property
   def imported_jar_libraries(self):
     """:returns: target instances for specs referenced by imported_jar_library_specs.
     :rtype: list of JarLibrary
     """
-    if self._imported_jar_libraries is None:
-      libs = []
-      if self.imported_jar_library_specs:
-        for spec in self.imported_jar_library_specs:
-          resolved_target = self._build_graph.get_target_from_spec(spec,
-                                                                     relative_to=self.address.spec_path)
-          if not resolved_target:
-            raise self.UnresolvedImportError(
-              'Could not find JarLibrary target {spec} referenced from {relative_to}'
-              .format(spec=spec, relative_to=self.address.spec))
-          if not isinstance(resolved_target, JarLibrary):
-            raise self.ExpectedJarLibraryError(
-              'Expected JarLibrary got {target_type} for jar imports in {spec} referenced from {relative_to}'
-              .format(target_type=type(resolved_target), spec=spec,
-                      relative_to=self.address.spec))
-          libs.append(resolved_target)
-      self._imported_jar_libraries = libs
-    return self._imported_jar_libraries
+    libs = []
+    if self.imported_jar_library_specs:
+      for spec in self.imported_jar_library_specs:
+        resolved_target = self._build_graph.get_target_from_spec(spec,
+                                                                   relative_to=self.address.spec_path)
+        if not resolved_target:
+          raise self.UnresolvedImportError(
+            'Could not find JarLibrary target {spec} referenced from {relative_to}'
+            .format(spec=spec, relative_to=self.address.spec))
+        if not isinstance(resolved_target, JarLibrary):
+          raise self.ExpectedJarLibraryError(
+            'Expected JarLibrary got {target_type} for jar imports in {spec} referenced from {relative_to}'
+            .format(target_type=type(resolved_target), spec=spec,
+                    relative_to=self.address.spec))
+        libs.append(resolved_target)
+    return libs
 
   @property
   def traversable_specs(self):
