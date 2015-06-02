@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from textwrap import dedent
-
 from pants.base.address import SyntheticAddress, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_graph import BuildGraph

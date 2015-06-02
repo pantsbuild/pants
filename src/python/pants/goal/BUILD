@@ -5,9 +5,7 @@ python_library(
   name = 'task_registrar',
   sources = ['task_registrar.py'],
   dependencies = [
-    ':error',
     ':goal',
-    'src/python/pants/backend/core/tasks:task',
   ],
 )
 
@@ -83,6 +81,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/reporting', # XXX(fixme)
     'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
   ],
 )
 

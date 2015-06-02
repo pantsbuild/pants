@@ -28,11 +28,11 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.logger(settings.quiet, settings.logLevel, settings.color)
-    val isDebug = (!settings.quiet && settings.logLevel == Level.Debug)
+    val log = Util.logger(settings.logOptions.quiet, settings.logOptions.logLevel, settings.logOptions.color)
+    val isDebug = (!settings.logOptions.quiet && settings.logOptions.logLevel == Level.Debug)
 
     // bail out on any command-line option errors
-    if (!errors.isEmpty) {
+    if (errors.nonEmpty) {
       for (error <- errors) log.error(error)
       log.error("See %s -help for information about options" format Setup.Command)
       sys.exit(1)
@@ -106,6 +106,10 @@ object Main {
         val message = e.getMessage
         if (message ne null) log.error(message)
         sys.exit(1)
+    } finally {
+      if (settings.logOptions.printProgress || settings.logOptions.heartbeatSecs > 0) {
+          log.logRaw("Done.")
+      }
     }
   }
 }

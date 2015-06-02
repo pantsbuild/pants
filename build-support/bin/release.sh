@@ -43,9 +43,21 @@ function pkg_pants_testinfra_install_test() {
   python -c "import pants_test"
 }
 
+PKG_PANTS_BACKEND_ANDROID=(
+  "pantsbuild.pants.backend.android"
+  "//src/python/pants/backend/android:plugin"
+  "pkg_pants_backend_android_install_test"
+)
+function pkg_pants_backend_android_install_test() {
+  PIP_ARGS="$@"
+  pip install ${PIP_ARGS} pantsbuild.pants.backend.android==$(local_version) && \
+  python -c "from pants.backend.android import *"
+}
+
 # Once an individual (new) package is declared above, insert it into the array below)
 RELEASE_PACKAGES=(
   PKG_PANTS
+  PKG_PANTS_BACKEND_ANDROID
   PKG_PANTS_TESTINFRA
   ${CONTRIB_PACKAGES[*]}
 )
@@ -68,9 +80,25 @@ function run_local_pants() {
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
 function execute_packaged_pants_with_internal_backends() {
+  local extra_backend_packages
+  if [[ "$1" =~ "extra_backend_packages=" ]]; then
+    extra_backend_packages=${1#*=}
+    shift
+  fi
+
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  pants "$@"
+  pants \
+    --pythonpath="['pants-plugins/src/python']" \
+    --backend-packages="[ \
+        'internal_backend.optional', \
+        'internal_backend.repositories', \
+        'internal_backend.sitegen', \
+        'internal_backend.utilities', \
+        ${extra_backend_packages}
+      ]" \
+    --goals-bootstrap-buildfiles="['${ROOT}/BUILD']" \
+    "$@"
 }
 
 function pkg_name() {

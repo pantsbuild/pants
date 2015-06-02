@@ -97,6 +97,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     _, excludes = IvyUtils.calculate_classpath([self.b])
     self.assertEqual(excludes, set([Exclude(org=self.b_org, name=self.b_name)]))
 
+  def test_exclude_exported_disabled(self):
+    _, excludes = IvyUtils.calculate_classpath([self.b], automatic_excludes=False)
+    self.assertSetEqual(excludes, set())
+
   def test_classifiers(self):
     jars, _ = IvyUtils.calculate_classpath([self.c])
     self.assertEquals(2, len(jars))

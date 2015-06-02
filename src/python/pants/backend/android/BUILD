@@ -4,13 +4,18 @@
 
 python_library(
   name = 'plugin',
-  sources = ['__init__.py', 'register.py'],
+  sources = ['register.py'],
   dependencies = [
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:all',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
+  provides = pants_setup_py(
+    name = 'pantsbuild.pants.backend.android',
+    description = 'Support for android projects.',
+    namespace_packages = ['pants', 'pants.backend'],
+  )
 )
 
 python_library(

@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import glob
 import os
 import re
 from collections import defaultdict
-from itertools import chain
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -86,7 +84,11 @@ class SpindleGen(NailgunTask):
     ]
 
   def execute_codegen(self, targets):
-    bases, sources = self._calculate_sources(targets, lambda t: isinstance(t, SpindleThriftLibrary))
+    sources = self._calculate_sources(targets, lambda t: isinstance(t, SpindleThriftLibrary))
+    bases = set(
+      target.target_base
+      for target in self.context.targets(lambda t: isinstance(t, SpindleThriftLibrary))
+    )
     scalate_workdir = os.path.join(self.workdir, 'scalate_workdir')
     safe_mkdir(self.namespace_out)
     safe_mkdir(scalate_workdir)
@@ -209,16 +211,13 @@ class SpindleGen(NailgunTask):
         self.update_artifact_cache(vts_artifactfiles_pairs.items())
 
   def _calculate_sources(self, thrift_targets, target_filter):
-    bases = set()
     sources = set()
     def collect_sources(target):
       if target_filter(target):
-        bases.add(target.target_base)
         sources.update(target.sources_relative_to_buildroot())
-
     for target in thrift_targets:
       target.walk(collect_sources)
-    return bases, sources
+    return sources
 
 
 # Slightly hacky way to figure out which files get generated from a particular thrift source.

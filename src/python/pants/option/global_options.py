@@ -46,10 +46,6 @@ def register_global_options(register):
                 'Multiple patterns may be specified by setting this flag multiple times.',
            recursive=True)
 
-  # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load time.
-  register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
-           help='Initialize state by evaluating these buildfiles.')
-
   # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
   # options to there. When we do that, also drop the cumbersome word 'artifact' from these
   # option names. There's only one cache concept that users care about.
@@ -93,11 +89,3 @@ def register_global_options(register):
   register('--build-file-rev',
            help='Read BUILD files from this scm rev instead of from the working tree.  This is '
            'useful for implementing pants-aware sparse checkouts.')
-
-  # The following options are specific to java_thrift_library targets.
-  register('--thrift-default-compiler', type=str, advanced=True, default='thrift',
-           help='The default compiler to use for java_thrift_library targets.')
-  register('--thrift-default-language', type=str, advanced=True, default='java',
-           help='The default language to generate for java_thrift_library targets.')
-  register('--thrift-default-rpc-style', type=str, advanced=True, default='sync',
-           help='The default rpc-style to generate for java_thrift_library targets.')

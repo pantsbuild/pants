@@ -36,3 +36,19 @@ class UnionProductsTest(BaseTest):
     c = self.make_target('c')
     self.products.add_for_target(c, [3])
     self.assertTrue(self.products.get_for_target(c))
+
+  def test_target_for_product_existing_product(self):
+    c = self.make_target('c')
+    self.products.add_for_target(c, [3])
+
+    found_target = self.products.target_for_product(3)
+
+    self.assertEqual(c, found_target)
+
+  def test_target_for_product_nonexistent_product(self):
+    c = self.make_target('c')
+    self.products.add_for_target(c, [3])
+
+    found_target = self.products.target_for_product(1000)
+
+    self.assertIsNone(found_target)

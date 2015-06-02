@@ -189,13 +189,6 @@ class JvmCompileStrategy(object):
       raise TaskError('self._sources_by_target not computed yet.')
     return self._sources_by_target.get(target, [])
 
-  def _validate_classpath(self, classpath):
-    """Validates that all files are located within the working copy, to simplify relativization."""
-    buildroot = get_buildroot()
-    for _, f in classpath:
-      if os.path.relpath(f, buildroot).startswith('..'):
-        raise TaskError('Classpath entry {f} is located outside the buildroot.'.format(f=f))
-
   def _find_locally_changed_targets(self, sources_by_target):
     """Finds the targets whose sources have been modified locally.
 

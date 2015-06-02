@@ -23,10 +23,12 @@ class JvmRunTest(TaskTestBase):
     self.set_options(only_write_cmd_line='a')
 
   def test_cmdline_only(self):
-    jvm_binary = self.make_target('src/java/org/pantsbuild:binary', JvmBinary, main='org.pantsbuild.Binary')
+    jvm_binary = self.make_target('src/java/org/pantsbuild:binary', JvmBinary,
+                                  main='org.pantsbuild.Binary')
     context = self.context(target_roots=[jvm_binary])
     jvm_run =  self.create_task(context, 'unused')
-    self.populate_compile_classpath(context=jvm_run.context, classpath=['bob', 'fred'])
+    classpath = [os.path.join(self.build_root, c) for c in ['bob', 'fred']]
+    self.populate_compile_classpath(context=jvm_run.context, classpath=classpath)
 
     with temporary_dir() as pwd:
       with pushd(pwd):
@@ -36,5 +38,6 @@ class JvmRunTest(TaskTestBase):
         self.assertTrue(os.path.exists(cmdline_file))
         with open(cmdline_file) as fp:
           contents = fp.read()
-          expected_suffix = 'java -cp bob:fred org.pantsbuild.Binary'
+          expected_suffix = 'java -cp {} org.pantsbuild.Binary'.format(
+            os.path.pathsep.join(classpath))
           self.assertEquals(expected_suffix, contents[-len(expected_suffix):])

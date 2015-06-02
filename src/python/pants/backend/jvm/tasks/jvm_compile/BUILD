@@ -81,6 +81,7 @@ python_library(
     ':jvm_compile_strategy',
     ':jvm_dependency_analyzer',
     ':resource_mapping',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
@@ -97,6 +98,7 @@ python_library(
   dependencies = [
     ':jvm_compile_strategy',
     ':resource_mapping',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:execution_graph',
     'src/python/pants/base:target',
@@ -166,6 +168,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:workunit',
+    'src/python/pants/java/jar:shader',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

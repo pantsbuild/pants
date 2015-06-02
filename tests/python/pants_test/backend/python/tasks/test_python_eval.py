@@ -10,7 +10,6 @@ from textwrap import dedent
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_eval import PythonEval
-from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
@@ -116,7 +115,7 @@ class PythonEvalTest(PythonTaskTest):
   def test_compile_fail_closure(self):
     python_eval = self._create_task(target_roots=[self.b_library], options={'closure': True})
 
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([self.a_library], e.exception.compiled)
     self.assertEqual([self.b_library], e.exception.failed)
@@ -124,7 +123,7 @@ class PythonEvalTest(PythonTaskTest):
   def test_compile_incremental_progress(self):
     python_eval = self._create_task(target_roots=[self.b_library], options={'closure': True})
 
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([self.a_library], e.exception.compiled)
     self.assertEqual([self.b_library], e.exception.failed)
@@ -146,7 +145,7 @@ class PythonEvalTest(PythonTaskTest):
   def test_compile_fail_compile_time_check_decorator(self):
     python_eval = self._create_task(target_roots=[self.b_library])
 
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
     self.assertEqual([self.b_library], e.exception.failed)
@@ -155,7 +154,7 @@ class PythonEvalTest(PythonTaskTest):
     python_eval = self._create_task(target_roots=[self.a_library, self.b_library, self.d_library],
                                     options={'fail_slow': True})
 
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual({self.a_library, self.d_library}, set(e.exception.compiled))
     self.assertEqual([self.b_library], e.exception.failed)
@@ -175,7 +174,7 @@ class PythonEvalTest(PythonTaskTest):
   def test_entry_point_does_not_exist(self):
     python_eval = self._create_task(target_roots=[self.g_binary])
 
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
     self.assertEqual([self.g_binary], e.exception.failed)
@@ -183,7 +182,7 @@ class PythonEvalTest(PythonTaskTest):
   def test_entry_point_missing_build_dep(self):
     python_eval = self._create_task(target_roots=[self.h_binary])
 
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([], e.exception.compiled)
     self.assertEqual([self.h_binary], e.exception.failed)

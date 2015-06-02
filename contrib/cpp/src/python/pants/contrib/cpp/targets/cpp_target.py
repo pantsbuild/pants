@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.payload import Payload
-from pants.base.payload_field import SourcesField
 from pants.base.target import Target
 
 

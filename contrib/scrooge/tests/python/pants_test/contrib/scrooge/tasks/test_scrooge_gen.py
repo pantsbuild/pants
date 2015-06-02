@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-import pytest
 from mock import MagicMock, patch
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -37,19 +36,18 @@ class ScroogeGenTest(TaskTestBase):
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()
-    self.task_outdir =  os.path.join(self.build_root, 'scrooge', 'gen-java')
-
+    self.task_outdir = os.path.join(self.build_root, 'scrooge', 'gen-java')
 
   def tearDown(self):
     super(ScroogeGenTest, self).tearDown()
     safe_rmtree(self.task_outdir)
 
-  def test_validate(self):
+  def test_validate_compiler_configs(self):
     # Set synthetic defaults for the global scope.
-    option_values = {'thrift_default_compiler': 'scrooge',
-                     'thrift_default_language': 'bf',
-                     'thrift_default_rpc_style': 'async'}
-    options = create_options({'': option_values})
+    option_values = {'compiler': 'scrooge',
+                     'language': 'bf',
+                     'rpc_style': 'async'}
+    options = create_options({'thrift-defaults': option_values})
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
@@ -73,11 +71,14 @@ class ScroogeGenTest(TaskTestBase):
       )
     '''))
 
-    ScroogeGen._validate(options, [self.target('test_validate:one')])
-    ScroogeGen._validate(options, [self.target('test_validate:two')])
+    target = self.target('test_validate:one')
+    context = self.context(options=options, target_roots=[target])
+    task = self.create_task(context)
+    task._validate_compiler_configs([self.target('test_validate:one')])
+    task._validate_compiler_configs([self.target('test_validate:two')])
 
-    with pytest.raises(TaskError):
-      ScroogeGen._validate(options, [self.target('test_validate:three')])
+    with self.assertRaises(TaskError):
+      task._validate_compiler_configs([self.target('test_validate:three')])
 
   def test_smoke(self):
     contents = dedent('''namespace java org.pantsbuild.example

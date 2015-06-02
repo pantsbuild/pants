@@ -92,7 +92,11 @@ class BuildConfiguration(object):
     self._exposed_objects[alias] = obj
     # obj doesn't implement any common base class, so we have to test for this attr.
     if hasattr(obj, 'subsystems'):
-      self._subsystems.update(obj.subsystems())
+      self.register_subsystems(obj.subsystems())
+
+  def register_subsystems(self, subsystems):
+    """Registers the given subsystems."""
+    self._subsystems.update(subsystems)
 
   def register_addressable_alias(self, alias, addressable_type):
     """Registers a general Addressable type under the given alias.

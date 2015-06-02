@@ -31,6 +31,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':code_gen',
     'src/python/pants:thrift_util',
+    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/jvm/targets:java',
@@ -137,6 +138,16 @@ python_library(
 )
 
 python_library(
+  name = 'simple_codegen_task',
+  sources = ['simple_codegen_task.py'],
+  dependencies = [
+    ':common',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
+  ],
+)
+
+python_library(
   name = 'wire_gen',
   sources = ['wire_gen.py'],
   dependencies = [
@@ -144,6 +155,7 @@ python_library(
     ':code_gen',
     ':protobuf_gen',
     ':protobuf_parse',
+    ':simple_codegen_task',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
