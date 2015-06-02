@@ -153,8 +153,8 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
-    PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
+      --fail-slow \
         $(./pants.pex list pants-plugins/tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests)
   ) || die "Internal backend python test failure"
@@ -166,9 +166,10 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   banner "Running core python tests${shard_desc}"
   (
-    PANTS_PY_COVERAGE=paths:pants/ \
-      PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_unit_shard} \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
+      --fail-slow \
+      --coverage=paths:pants/ \
+      --shard=${python_unit_shard} \
         $(./pants.pex list tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests | \
             grep -v integration)
@@ -182,7 +183,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    PANTS_PYTHON_TEST_FAILSOFT=1 ./pants.pex ${PANTS_ARGS[@]} test.pytest --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 
@@ -192,11 +193,10 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    PANTS_PYTHON_TEST_FAILSOFT=1 \
-      ./pants.pex ${PANTS_ARGS[@]} test.pytest --shard=${python_intg_shard} \
-        $(./pants.pex list tests/python:: | \
-            xargs ./pants.pex filter --filter-type=python_tests | \
-            grep integration)
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
+      $(./pants.pex list tests/python:: | \
+          xargs ./pants.pex filter --filter-type=python_tests | \
+          grep integration)
   ) || die "Pants Integration test failure"
 fi
 
