@@ -29,6 +29,7 @@ class UnpackedJarsTest(BaseTest):
     with self.assertRaises(UnpackedJars.ExpectedLibrariesError):
       self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
 
+
   def test_simple(self):
     build_file = self.add_to_build_file('BUILD', dedent('''
     unpacked_jars(name='foo',
@@ -51,6 +52,7 @@ class UnpackedJarsTest(BaseTest):
     self.assertEquals(1, len(target.imported_jars))
     import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
+
 
   def test_bad_libraries_ref(self):
     build_file = self.add_to_build_file('BUILD', dedent('''
