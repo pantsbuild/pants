@@ -236,11 +236,6 @@ class MemoizeTest(unittest.TestCase):
     self.assertEqual(2, foo2.calls)
     self.assertEqual(2, foo2.calls)
 
-    del foo2.calls
-
-    self.assertEqual(4, foo2.calls)
-    self.assertEqual(4, foo2.calls)
-
   def test_memoized_property_forget(self):
     class Foo(self._Called):
       @memoized_property
