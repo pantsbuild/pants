@@ -194,32 +194,64 @@ depends on) the modules you want:
     >>> from pants.backend.core.targets import repository
     >>>
 
-Debugging a JVM Tool
---------------------
+Developing and Debugging a JVM Tool
+-----------------------------------
 
-Some Pants tools are imported as external JVM dependencies. If you need
-to debug one of these tools and change code, see
-<a pantsref="test_3rdparty_jvm_snapshot">Using a SNAPSHOT JVM Dependency</a>
+Some Pants tools are written in Java and Scala. If you need
+to debug one of these tools and change code, keep in mind that these tools don't
+run straight from the Pants source tree.  They expect their jar dependencies to be 
+resolved through external jar dependencies.  This means that to use a development 
+version of a tool you will need to adjust the external dependency information 
+in `BUILD.tools` to point Pants at a development version of your jar file.
+
+First, create a jar file for the tool with the `binary` goal.
+
+    :::bash
+    $ ./pants binary src/scala/org/pantsbuild/zinc::
+
+The above command will create `dist/main.jar` according to the _jvm_binary_
+target defined in `src/scala/org/pantsbuild/zinc/BUILD`
+
+
+You'll need to update the jar dependency that this tool uses for Pants to see the
+development version.  See 
+<a pantsref="test_3rdparty_jvm_snapshot">Using a SNAPSHOT JVM Dependency</a> 
 which describes how to specify the `url` and `mutable` attributes of a `jar`
 dependency found on the local filesystem:
 
     :::python
-    jar_library(name='jmake',
+    jar_library(name='zinc',
         jars=[
-          jar(org='com.sun.tools', name='jmake', rev='1.3.8-4-SNAPSHOT',
-              url='file://squarepants/lib/jmake.jar', mutable=True),
+          jar(org='org.pantsbuild', name='zinc', rev='1.2.3-SNAPSHOT',
+              url='file:///Users/squarepants/Src/pants/dist/main.jar', mutable=True),
       ],
     )
 
-Append JVM args to turn on the debugger for the appropriate tool in
+For debugging, append JVM args to turn on the debugger for the appropriate tool in
 `pants.ini`:
 
     :::ini
-    [jar-tool]
-    jvm_args: ['-Xmx300m', '-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=%(debug_port)s']
+    [compile.zinc-java]
+    jvm_options: ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
-Note that some tools run under nailgun by default. The easiest way to
+Note that most tools run under nailgun by default. The easiest way to
 debug them is to disable nailgun by specifying the command line option
-`--no-ng-daemons`. If you need to debug the tool under nailgun, make
-sure you run `pants goal ng-killall` or `pants goal clean-all` so that
-any running nailgun servers are restarted.
+`--no-use-nailgun` or setting `use_nailgun: False` in the specific tool section or in the 
+`[DEFAULT]` section of `pants.ini`.
+
+    :::ini
+    [DEFAULT]
+    use_nailgun: False
+
+If you need to debug the tool under nailgun, make
+sure you run `pants goal ng-killall` or `pants goal clean-all` after you update the
+jar file so that any running nailgun servers are restarted on the next invocation
+of Pants.
+
+
+Also, you may need to clean up some additional state when testing a tool. Some tools 
+cache a shaded version under `~/.cache/pants/artifact_cache/`.  Clear out the cache
+before testing a new version of the tool as follows:
+
+    :::bash
+    $ rm -rf ~/.cache.pants/artifact_cache
