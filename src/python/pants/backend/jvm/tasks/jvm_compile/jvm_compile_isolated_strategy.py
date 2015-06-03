@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from collections import OrderedDict, defaultdict
+import shutil
+import uuid
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -37,6 +39,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
+
+
+    # A temporary, but well-known, dir in which to munge analysis/dependency files in before
+    # caching. It must be well-known so we know where to find the files when we retrieve them from
+    # the cache.
+    self._analysis_tmpdir = os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
 
     try:
       worker_count = options.worker_count
@@ -69,10 +77,15 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
+    if not os.path.exists(self._analysis_tmpdir):
+      os.makedirs(self._analysis_tmpdir)
+
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
                                                             relevant_targets)
+
+    # TODO: Look for invalid analysis files like in Global's pre_compile() ?
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -165,16 +178,25 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                                      target_closure,
                                                      compile_context,
                                                      extra_compile_time_classpath)
+
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
+        tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
+        safe_mkdir(tmpdir)
+
         with self._empty_analysis_cleanup(compile_context):
+          tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
+              tmpdir, compile_context.target)
+          if os.path.exists(compile_context.analysis_file):
+            shutil.copy(compile_context.analysis_file, tmp_analysis_file)
           compile_vts(vts,
                       compile_context.sources,
-                      compile_context.analysis_file,
+                      tmp_analysis_file,
                       upstream_analysis,
                       cp_entries,
                       compile_context.classes_dir,
                       progress_message)
+          shutil.copy(tmp_analysis_file, compile_context.analysis_file)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
