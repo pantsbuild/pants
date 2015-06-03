@@ -120,6 +120,13 @@ python_library(
   sources = ['classpath_util.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+  ],
+)
+
+python_library(
+  name = 'classpath_products',
+  sources = ['classpath_products.py'],
+  dependencies = [
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
@@ -153,6 +160,7 @@ python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
   dependencies = [
+    ':classpath_products',
     ':ivy_task_mixin',
     ':nailgun_task',
     'src/python/pants:binary_util',
