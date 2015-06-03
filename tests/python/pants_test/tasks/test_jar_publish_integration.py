@@ -8,13 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-import pytest
-
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.tasks.task_test_base import is_exe
 
 
 def shared_artifacts(version, extra_jar=None):
@@ -55,8 +52,6 @@ def publish_extra_config(unique_config):
 
 
 class JarPublishIntegrationTest(PantsRunIntegrationTest):
-  SCALADOC = is_exe('scaladoc')
-  JAVADOC = is_exe('javadoc')
   GOLDEN_DATA_DIR = 'tests/python/pants_test/tasks/jar_publish_resources/'
 
   # This is where all pushdb properties files will end up.
@@ -92,8 +87,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       expected_primary_artifact_count=3,
                       assert_publish_config_contents=True)
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.JAVADOC',
-                      reason='No javadoc binary on the PATH.')
   def test_java_publish(self):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
@@ -190,8 +183,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                                artifact_name='hello-greet-0.0.1-SNAPSHOT.jar',
                                success_expected=False)
 
-  @pytest.mark.skipif('not JarPublishIntegrationTest.SCALADOC',
-                      reason='No scaladoc binary on the PATH.')
   def test_scala_publish_classifiers(self):
     self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
                       dict({
