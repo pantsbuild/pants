@@ -54,6 +54,20 @@ class MemoizeTest(unittest.TestCase):
     self.assertEqual([(('a',), {'fred': 42, 'jane': True}),
                       (('a', 42), {'jane': True})], calculations)
 
+  def test_function_application_potentially_ambiguous_parameters(self):
+    calculations = []
+
+    @memoized
+    def func(*args, **kwargs):
+      calculations.append((args, kwargs))
+      return args, kwargs
+
+    self.assertEqual(((('a', 42),), {}), func(('a', 42)))
+    self.assertEqual(((), {'a': 42}), func(a=42))
+
+    self.assertEqual([((('a', 42),), {}),
+                      ((), {'a': 42})], calculations)
+
   def test_key_factory(self):
     def create_key(num):
       return num % 2

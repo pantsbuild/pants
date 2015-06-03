@@ -9,11 +9,16 @@ import functools
 import inspect
 
 
+# Used as a sentinel that disambiguates tuples passed in *args from coincidentally matching tuples
+# formed from kwargs item pairs.
+_kwargs_separator = (object(),)
+
+
 def equal_args(*args, **kwargs):
   """A memoized key factory that compares the equality (`==`) of a stable sort of the parameters."""
   key = args
   if kwargs:
-    key += tuple(sorted(kwargs.items()))
+    key += _kwargs_separator + tuple(sorted(kwargs.items()))
   return key
 
 
@@ -25,8 +30,13 @@ def per_instance(*args, **kwargs):
   instance method in a class hierarchy that defines a custom `__hash__`/`__eq__`.
   """
   # For methods, the cache should be per-instance, so we take the id of the self/cls argument
-  # instead of relying on `==` since different instances may evaluate as `==`.
-  instance_and_rest = (id(args[0]),) + args[1:]
+  # instead of relying on `==` since different instances may evaluate as `==`.  Additionally, we
+  # pair the id with the instance to ensure the instance is not GC'd since `id` allows for re-use
+  # of ids under GC.
+  instance = args[0]
+  unique_retained_instance = (id(instance), instance)
+
+  instance_and_rest = (unique_retained_instance,) + args[1:]
   return equal_args(*instance_and_rest, **kwargs)
 
 
