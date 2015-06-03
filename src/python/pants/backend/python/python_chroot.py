@@ -75,9 +75,7 @@ class PythonChroot(object):
                                           interpreter=self._interpreter)
 
     # Note: unrelated to the general pants artifact cache.
-    self._egg_cache_root = os.path.join(
-      self._python_setup.scratch_dir, 'artifacts', str(self._interpreter.identity))
-
+    self._egg_cache_root = self._python_setup.artifact_cache_dir
     self._key_generator = CacheKeyGenerator()
     self._build_invalidator = BuildInvalidator(self._egg_cache_root)
 
