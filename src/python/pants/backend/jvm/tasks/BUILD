@@ -247,9 +247,9 @@ python_library(
   sources = ['javadoc_gen.py'],
   dependencies = [
     ':jvmdoc_gen',
-    'pants/java/distribution',
-    'pants/java:executor',
-    'pants/util:memo',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:memo',
   ],
 )
 
