@@ -13,10 +13,10 @@ from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
 
 
-def _exclude_filter(exclude_patterns):
-  def excluded(path):
-    return any(excluded in path for excluded in exclude_patterns)
-  return excluded
+def _not_excluded_filter(exclude_patterns):
+  def not_excluded(path):
+    return not any(excluded in path for excluded in exclude_patterns)
+  return not_excluded
 
 
 def _validate_path_in_buildroot(buildroot, tuple, classpath_products):
@@ -74,7 +74,7 @@ class ClasspathProducts(object):
 
   def _filter_by_excludes(self, classpath_tuples, root_targets):
     exclude_patterns = self._exclude_patterns.get_for_targets(root_targets)
-    filtered_classpath_tuples = filter(_exclude_filter(exclude_patterns),
+    filtered_classpath_tuples = filter(_not_excluded_filter(exclude_patterns),
                                        classpath_tuples)
     return filtered_classpath_tuples
 
