@@ -33,8 +33,8 @@ def per_instance(*args, **kwargs):
   # instead of relying on `==` since different instances may evaluate as `==`.  Additionally, we
   # pair the id with the instance to ensure the instance is not GC'd since `id` allows for re-use
   # of ids under GC.
-  instace = args[0]
-  unique_retained_instance = (id(instace), instace)
+  instance = args[0]
+  unique_retained_instance = (id(instance), instance)
 
   instance_and_rest = (unique_retained_instance,) + args[1:]
   return equal_args(*instance_and_rest, **kwargs)
