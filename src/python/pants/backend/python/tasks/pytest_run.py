@@ -16,7 +16,6 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
@@ -445,8 +444,6 @@ class PytestRun(PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
-    builder = PEXBuilder(interpreter=interpreter)
-    builder.info.entry_point = 'pytest'
     with self.temporary_chroot(interpreter=interpreter,
                                pex_info=pex_info,
                                targets=targets,
