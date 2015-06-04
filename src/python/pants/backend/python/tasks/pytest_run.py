@@ -16,11 +16,10 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
+from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
@@ -442,30 +441,22 @@ class PytestRun(PythonTask):
   @contextmanager
   def _test_runner(self, targets, workunit):
     interpreter = self.select_interpreter_for_targets(targets)
-    builder = PEXBuilder(interpreter=interpreter)
-    builder.info.entry_point = 'pytest'
-    chroot = PythonChroot(
-      context=self.context,
-      python_setup=PythonSetup.global_instance(),
-      python_repos=PythonRepos.global_instance(),
-      targets=targets,
-      extra_requirements=self._TESTING_TARGETS,
-      builder=builder,
-      platforms=('current',),
-      interpreter=interpreter)
-    try:
-      builder = chroot.dump()
-      builder.freeze()
-      pex = PEX(builder.path(), interpreter=interpreter)
+    pex_info = PexInfo.default()
+    pex_info.entry_point = 'pytest'
+
+    with self.temporary_chroot(interpreter=interpreter,
+                               pex_info=pex_info,
+                               targets=targets,
+                               extra_requirements=self._TESTING_TARGETS,
+                               platforms=('current',)) as chroot:
+      pex = PEX(chroot.path(), interpreter=interpreter)
       with self._maybe_shard() as shard_args:
         with self._maybe_emit_junit_xml(targets) as junit_args:
           with self._maybe_emit_coverage_data(targets,
-                                              builder.path(),
+                                              chroot.path(),
                                               pex,
                                               workunit) as coverage_args:
             yield pex, shard_args + junit_args + coverage_args
-    finally:
-      chroot.delete()
 
   def _do_run_tests_with_args(self, pex, workunit, args):
     try:
