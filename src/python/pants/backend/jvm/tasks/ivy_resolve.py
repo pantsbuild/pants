@@ -19,7 +19,6 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.goal.products import UnionProducts
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
