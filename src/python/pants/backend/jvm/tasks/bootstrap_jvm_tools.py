@@ -198,8 +198,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
 
       if self.artifact_cache_writes_enabled():
-        tool_vts = self.tool_vts(invalidation_check)
-        self.update_artifact_cache([(tool_vts, [shaded_jar])])
+        self.update_artifact_cache([(shaded_tool_vts, [shaded_jar])])
 
       return [shaded_jar]
 
