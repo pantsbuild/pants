@@ -36,12 +36,15 @@ class PythonSetup(Subsystem):
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
                   'If unspecified, a standard path under the workdir is used.')
-    register('--egg-cache-dir', advanced=True, default=None, metavar='<dir>',
-             help='The parent directory for the egg cache. '
+    register('--resolver-cache-dir', advanced=True, default=None, metavar='<dir>',
+             help='The parent directory for the requirement resolver cache. '
                   'If unspecified, a standard path under the workdir is used.')
+    register('--resolver-cache-ttl', type=int, metavar='<seconds>',
+             default=10 * 365 * 86400,  # 10 years.
+             help='The time in seconds before we consider re-resolving an open-ended requirement, '
+                  'e.g. "flask>=0.2" if a matching distribution is available on disk.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
-             help='The parent directory for the python artifact cache. '
-                  'If unspecified, a standard path under the workdir is used.')
+             help='The parent directory for the python artifact cache. ')
 
   @property
   def interpreter_requirement(self):
@@ -65,9 +68,13 @@ class PythonSetup(Subsystem):
             os.path.join(self.scratch_dir, 'interpreters'))
 
   @property
-  def egg_cache_dir(self):
-    return (self.get_options().egg_cache_dir or
-            os.path.join(self.scratch_dir, 'eggs'))
+  def resolver_cache_dir(self):
+    return (self.get_options().resolver_cache_dir or
+            os.path.join(self.scratch_dir, 'resolved_requirements'))
+
+  @property
+  def resolver_cache_ttl(self):
+    return self.get_options().resolver_cache_ttl
 
   @property
   def artifact_cache_dir(self):
