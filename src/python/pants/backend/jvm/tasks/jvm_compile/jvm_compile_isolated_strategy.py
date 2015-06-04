@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -57,6 +57,13 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                classes_dir,
                                self._sources_for_target(target))
 
+  def _create_compile_contexts_for_targets(self, targets):
+    compile_contexts = OrderedDict()
+    for target in targets:
+      compile_context = self.compile_context(target)
+      compile_contexts[target] = compile_context
+    return compile_contexts
+
   def pre_compile(self):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
     safe_mkdir(self._analysis_dir)
@@ -90,14 +97,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # No partitioning.
     return (0, None)
 
-  def _upstream_analysis(self, compile_contexts, target_closure):
-    """Returns tuples of classes_dir->analysis_file for the closure of the target."""
-    # If we have a compile context for the target, include it.
-    for dep in target_closure:
-      if dep in compile_contexts:
-        compile_context = compile_contexts[dep]
-        yield compile_context.classes_dir, compile_context.analysis_file
-
   def compute_classes_by_source(self, compile_contexts):
     buildroot = get_buildroot()
     classes_by_src_by_context = defaultdict(dict)
@@ -116,11 +115,25 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                  target_closure,
                                  compile_context,
                                  extra_compile_time_classpath):
-    # Generate a classpath specific to this compile and target, and include analysis
-    # for upstream targets.
+    # Generate a classpath specific to this compile and target.
     return ClasspathUtil.compute_classpath_for_target(compile_context.target, compile_classpaths,
                                                       extra_compile_time_classpath, self._confs,
                                                       target_closure)
+
+  def _upstream_analysis(self, compile_contexts, classpath_entries):
+    """Returns tuples of classes_dir->analysis_file for the closure of the target."""
+    # Reorganize the compile_contexts by class directory.
+    compile_contexts_by_directory = {}
+    for compile_context in compile_contexts.values():
+      compile_contexts_by_directory[compile_context.classes_dir] = compile_context
+    # If we have a compile context for the target, include it.
+    for entry in classpath_entries:
+      if not entry.endswith('.jar'):
+        compile_context = compile_contexts_by_directory.get(entry)
+        if not compile_context:
+          self.context.log.debug('Missing upstream analysis for {}'.format(entry))
+        else:
+          yield compile_context.classes_dir, compile_context.analysis_file
 
   def exec_graph_key_for_target(self, compile_target):
     return "compile-{}".format(compile_target.address.spec)
@@ -147,12 +160,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     def create_work_for_vts(vts, compile_context, target_closure):
       def work():
         progress_message = vts.targets[0].address.spec
-        upstream_analysis = dict(self._upstream_analysis(compile_contexts,
-                                                         target_closure))
         cp_entries = self._compute_classpath_entries(compile_classpaths,
                                                      target_closure,
                                                      compile_context,
                                                      extra_compile_time_classpath)
+        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+
         with self._empty_analysis_cleanup(compile_context):
           compile_vts(vts,
                       compile_context.sources,
@@ -211,13 +224,14 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     extra_compile_time_classpath = self._compute_extra_classpath(
       extra_compile_time_classpath_elements)
 
-    compile_contexts = self._create_compile_contexts_for_targets(relevant_targets)
+    compile_contexts = self._create_compile_contexts_for_targets(all_targets)
 
     # Now create compile jobs for each invalid target one by one.
     jobs = self._create_compile_jobs(compile_classpaths,
                                      compile_contexts,
                                      extra_compile_time_classpath,
-                                     invalid_targets, invalidation_check.invalid_vts_partitioned,
+                                     invalid_targets,
+                                     invalidation_check.invalid_vts_partitioned,
                                      compile_vts,
                                      register_vts,
                                      update_artifact_cache_vts_work)

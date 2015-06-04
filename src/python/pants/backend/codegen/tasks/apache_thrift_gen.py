@@ -26,6 +26,7 @@ from pants.base.target import Target
 from pants.option.options import Options
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.memo import memoized_property
 
 
 INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
@@ -92,12 +93,9 @@ class ApacheThriftGen(CodeGen):
     # for combined python thrift packages.
     # self.setup_artifact_cache()
 
-  _thrift_binary = None
-  @property
+  @memoized_property
   def thrift_binary(self):
-    if self._thrift_binary is None:
-      self._thrift_binary = select_thrift_binary(self.get_options())
-    return self._thrift_binary
+    return select_thrift_binary(self.get_options())
 
   def create_geninfo(self, key):
     gen_info = self.get_options()[key]
@@ -110,19 +108,13 @@ class ApacheThriftGen(CodeGen):
         dependencies.update(self.context.resolve(depspec))
     return self.GenInfo(gen, deps)
 
-  _gen_java = None
-  @property
+  @memoized_property
   def gen_java(self):
-    if self._gen_java is None:
-      self._gen_java = self.create_geninfo('java')
-    return self._gen_java
+    return self.create_geninfo('java')
 
-  _gen_python = None
-  @property
+  @memoized_property
   def gen_python(self):
-    if self._gen_python is None:
-      self._gen_python = self.create_geninfo('python')
-    return self._gen_python
+    return self.create_geninfo('python')
 
   def invalidate_for_files(self):
     # TODO: This will prevent artifact caching across platforms.

@@ -7,9 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.tasks.task import Task
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 
 
 class SimpleCodegenTask(Task):
@@ -90,14 +93,25 @@ class SimpleCodegenTask(Task):
     # collisions.
     return self.workdir
 
+  def assert_sources_present(self, sources, targets):
+    """Throws a TaskError if sources is empty.
+
+    Shared for all SimpleCodegenTask subclasses to help keep errors consistent and descriptive.
+    """
+    if not sources:
+      formatted_targets = '\n'.join([t.address.spec for t in targets])
+      raise TaskError('Had {count} targets but no sources?\n targets={targets}'
+                      .format(count=len(targets), targets=formatted_targets))
+
   def execute(self):
     targets = self.codegen_targets()
     with self.invalidated(targets,
                           invalidate_dependents=True,
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
+      invalid_targets = OrderedSet()
       for vts in invalidation_check.invalid_vts:
-        invalid_targets = vts.targets
-        self.execute_codegen(invalid_targets)
+        invalid_targets.update(vts.targets)
+      self.execute_codegen(invalid_targets)
 
       invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
       vts_artifactfiles_pairs = []
@@ -106,8 +120,7 @@ class SimpleCodegenTask(Task):
         target_workdir = self.codegen_workdir(target)
         synthetic_name = target.id
         sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
-        spec_path = '{0}{1}'.format(type(self).__name__, sources_rel_path)
-        synthetic_address = SyntheticAddress(spec_path, synthetic_name)
+        synthetic_address = SyntheticAddress(sources_rel_path, synthetic_name)
         # TODO(gm): sources_generated_by_target() shouldn't be necessary for the isolated codegen
         # strategy, once that exists.
         raw_generated_sources = self.sources_generated_by_target(target)
@@ -132,7 +145,7 @@ class SimpleCodegenTask(Task):
 
         build_graph = self.context.build_graph
 
-        # NOTE(pl): This bypasses the convenience function (Target.inject_dependency) in order
+        # NB(pl): This bypasses the convenience function (Target.inject_dependency) in order
         # to improve performance.  Note that we can walk the transitive dependee subgraph once
         # for transitive invalidation rather than walking a smaller subgraph for every single
         # dependency injected.
@@ -141,7 +154,7 @@ class SimpleCodegenTask(Task):
             dependent=dependent_address,
             dependency=synthetic_target.address,
           )
-        # NOTE(pl): See the above comment.  The same note applies.
+        # NB(pl): See the above comment.  The same note applies.
         for concrete_dependency_address in build_graph.dependencies_of(target.address):
           build_graph.inject_dependency(
             dependent=synthetic_target.address,
