@@ -36,6 +36,12 @@ class PythonSetup(Subsystem):
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
                   'If unspecified, a standard path under the workdir is used.')
+    register('--egg-cache-dir', advanced=True, default=None, metavar='<dir>',
+             help='The parent directory for the egg cache. '
+                  'If unspecified, a standard path under the workdir is used.')
+    register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
+             help='The parent directory for the python artifact cache. '
+                  'If unspecified, a standard path under the workdir is used.')
 
   @property
   def interpreter_requirement(self):
@@ -57,6 +63,17 @@ class PythonSetup(Subsystem):
   def interpreter_cache_dir(self):
     return (self.get_options().interpreter_cache_dir or
             os.path.join(self.scratch_dir, 'interpreters'))
+
+  @property
+  def egg_cache_dir(self):
+    return (self.get_options().egg_cache_dir or
+            os.path.join(self.scratch_dir, 'eggs'))
+
+  @property
+  def artifact_cache_dir(self):
+    """ Note that this is unrelated to the general pants artifact cache."""
+    return (self.get_options().artifact_cache_dir or
+            os.path.join(self.scratch_dir, 'artifacts'))
 
   @property
   def scratch_dir(self):
