@@ -154,9 +154,15 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           # We're the only dependent in reality since we shade.
                           invalidate_dependents=False,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+      shaded_tool_vts = self.tool_vts(invalidation_check)
 
-      if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
-        return [shaded_jar]
+      if not invalidation_check.invalid_vts:
+        if not os.path.exists(shaded_jar) and self.artifact_cache_reads_enabled():
+          self.context.log.debug('Cache entry for \'{}\' tool was found, '
+                                 'but an actual jar doesn\'t exist. Extracting again...'.format(key))
+          self.get_artifact_cache().use_cached_files(shaded_tool_vts.cache_key)
+        if os.path.exists(shaded_jar):
+          return [shaded_jar]
 
       # Ensure we have a single binary jar we can shade.
       binary_jar = os.path.join(self._tool_cache_path,
@@ -192,8 +198,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
 
       if self.artifact_cache_writes_enabled():
-        tool_vts = self.tool_vts(invalidation_check)
-        self.update_artifact_cache([(tool_vts, [shaded_jar])])
+        self.update_artifact_cache([(shaded_tool_vts, [shaded_jar])])
 
       return [shaded_jar]
 
