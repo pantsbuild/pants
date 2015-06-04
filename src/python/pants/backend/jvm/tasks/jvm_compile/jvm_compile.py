@@ -68,6 +68,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
 
+    register('--delete-scratch', default=True, action='store_true',
+             help='Leave intermediate scratch files around, for debugging build problems.')
+
     JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
     JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
 

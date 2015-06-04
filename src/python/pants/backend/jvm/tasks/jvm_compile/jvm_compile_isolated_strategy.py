@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import OrderedDict, defaultdict
 import shutil
 import uuid
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -20,6 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_walk
+from pants.util.memo import memoized_property
 
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
@@ -39,12 +40,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
-
-
-    # A temporary, but well-known, dir in which to munge analysis/dependency files in before
-    # caching. It must be well-known so we know where to find the files when we retrieve them from
-    # the cache.
-    self._analysis_tmpdir = os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
 
     try:
       worker_count = options.worker_count
@@ -77,8 +72,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
-    if not os.path.exists(self._analysis_tmpdir):
-      os.makedirs(self._analysis_tmpdir)
+    self.ensure_analysis_tmpdir()
 
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
@@ -181,7 +175,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
-        tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
+        tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
         safe_mkdir(tmpdir)
 
         with self._empty_analysis_cleanup(compile_context):
@@ -321,3 +315,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
+
+  @memoized_property
+  def analysis_tmpdir(self):
+    """A temporary, but well-known, dir in which to munge analysis/dependency files in before
+    caching. It must be well-known so we know where to find the files when we retrieve them from
+    the cache.
+    :return:
+    """
+    return os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')

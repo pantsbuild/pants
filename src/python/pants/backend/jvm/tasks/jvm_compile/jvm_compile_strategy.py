@@ -6,14 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import ABCMeta, abstractmethod
-from collections import OrderedDict, defaultdict
+from abc import ABCMeta, abstractmethod, abstractproperty
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_delete
+from pants.util.dirutil import safe_delete, safe_rmtree
 
 
 class JvmCompileStrategy(object):
@@ -67,6 +67,8 @@ class JvmCompileStrategy(object):
     self.context = context
     self._analysis_tools = analysis_tools
 
+    self._delete_scratch = options.delete_scratch
+
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
     self._sources_predicate = sources_predicate
@@ -78,12 +80,10 @@ class JvmCompileStrategy(object):
   @abstractmethod
   def name(self):
     """A readable, unique name for this strategy."""
-    pass
 
   @abstractmethod
   def invalidation_hints(self, relevant_targets):
     """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
-    pass
 
   @abstractmethod
   def compile_context(self, target):
@@ -91,7 +91,6 @@ class JvmCompileStrategy(object):
 
     Temporary compile contexts are private to the strategy.
     """
-    pass
 
   @abstractmethod
   def compute_classes_by_source(self, compile_contexts):
@@ -100,7 +99,6 @@ class JvmCompileStrategy(object):
     It's possible (although unfortunate) for multiple targets to own the same sources, hence
     the top level division. Srcs are relative to buildroot. Classes are absolute paths.
     """
-    pass
 
   @abstractmethod
   def compile_chunk(self,
@@ -113,12 +111,10 @@ class JvmCompileStrategy(object):
                     register_vts,
                     update_artifact_cache_vts_work):
     """Executes compilations for that invalid targets contained in a single language chunk."""
-    pass
 
   @abstractmethod
   def post_process_cached_vts(self, cached_vts):
     """Post processes VTS that have been fetched from the cache."""
-    pass
 
   @abstractmethod
   def compute_resource_mapping(self, compile_contexts):
@@ -126,7 +122,10 @@ class JvmCompileStrategy(object):
 
     Since classes should live in exactly one context, a merged mapping is unambiguous.
     """
-    pass
+
+  @abstractproperty
+  def analysis_tmpdir(self):
+    """Post processes VTS that have been fetched from the cache."""
 
   def pre_compile(self):
     """Executed once before any compiles."""
@@ -226,3 +225,18 @@ class JvmCompileStrategy(object):
           yield (conf, jar)
 
     return list(extra_compile_classpath_iter())
+
+
+  def ensure_analysis_tmpdir(self):
+    """Work in a tmpdir so we don't stomp the main analysis files on error.
+
+    The tmpdir is cleaned up in a shutdown hook, because background work
+    may need to access files we create there even after this method returns
+    """
+    # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
+    if not os.path.exists(self.analysis_tmpdir):
+      os.makedirs(self.analysis_tmpdir)
+      if self._delete_scratch:
+        self.context.background_worker_pool().add_shutdown_hook(
+          lambda: safe_rmtree(self.analysis_tmpdir))
+
