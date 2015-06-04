@@ -38,16 +38,10 @@ class ReadWriteArtifactCache(ArtifactCache):
       self._write_artifact_cache.insert(cache_key, paths, overwrite)
 
   def has(self, cache_key):
-    if self._read_artifact_cache:
-      return self._read_artifact_cache.has(cache_key)
-    else:
-      return False
+    return self._read_artifact_cache and self._read_artifact_cache.has(cache_key)
 
   def use_cached_files(self, cache_key):
-    if self._read_artifact_cache:
-      return self._read_artifact_cache.use_cached_files(cache_key)
-    else:
-      return None
+    return self._read_artifact_cache and self._read_artifact_cache.use_cached_files(cache_key)
 
   def delete(self, cache_key):
     if self._write_artifact_cache:

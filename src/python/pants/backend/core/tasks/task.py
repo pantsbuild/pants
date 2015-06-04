@@ -345,24 +345,9 @@ class TaskBase(AbstractClass):
     invalidation_check = cache_manager.check(targets, partition_size_hint, colors, topological_order=topological_order)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
-      with self.context.new_workunit('cache'):
-        cached_vts, uncached_vts = \
-          self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
-      if cached_vts:
-        cached_targets = [vt.target for vt in cached_vts]
-        for t in cached_targets:
-          self.context.run_tracker.artifact_cache_stats.add_hit('default', t)
-        if not silent:
-          self._report_targets('Using cached artifacts for ', cached_targets, '.')
-      if uncached_vts:
-        uncached_targets = [vt.target for vt in uncached_vts]
-        for t in uncached_targets:
-          self.context.run_tracker.artifact_cache_stats.add_miss('default', t)
-        if not silent:
-          self._report_targets('No cached artifacts for ', uncached_targets, '.')
+      _, uncached_vts = self.check_cache_and_report(self.check_artifact_cache_for(invalidation_check), silent)
       # Now that we've checked the cache, re-partition whatever is still invalid.
-      invalidation_check = \
-        InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
+      invalidation_check = InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
 
     if not silent:
       targets = []
@@ -382,6 +367,23 @@ class TaskBase(AbstractClass):
     yield invalidation_check
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
+
+  def check_cache_and_report(self, vts_to_invalidate, silent=False):
+    with self.context.new_workunit('cache'):
+      cached_vts, uncached_vts = self.check_artifact_cache(vts_to_invalidate)
+    if cached_vts:
+      cached_targets = [vt.target for vt in cached_vts]
+      for t in cached_targets:
+        self.context.run_tracker.artifact_cache_stats.add_hit('default', t)
+      if not silent:
+        self._report_targets('Using cached artifacts for ', cached_targets, '.')
+    if uncached_vts:
+      uncached_targets = [vt.target for vt in uncached_vts]
+      for t in uncached_targets:
+        self.context.run_tracker.artifact_cache_stats.add_miss('default', t)
+      if not silent:
+        self._report_targets('No cached artifacts for ', uncached_targets, '.')
+    return cached_vts, uncached_vts
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
