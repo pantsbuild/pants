@@ -158,8 +158,9 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
       if not invalidation_check.invalid_vts:
         if not os.path.exists(shaded_jar) and self.artifact_cache_reads_enabled():
-          # check cache and extract shaded jar if needed
-          self.check_cache_and_report([shaded_tool_vts])
+          self.context.log.debug('Cache entry for \'{}\' tool was found, '
+                                 'but an actual jar doesn\'t exist. Extracting again...'.format(key))
+          self.get_artifact_cache().use_cached_files(shaded_tool_vts.cache_key)
         if os.path.exists(shaded_jar):
           return [shaded_jar]
 
@@ -197,7 +198,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
 
       if self.artifact_cache_writes_enabled():
-        self.update_artifact_cache([(shaded_tool_vts, [shaded_jar])])
+        tool_vts = self.tool_vts(invalidation_check)
+        self.update_artifact_cache([(tool_vts, [shaded_jar])])
 
       return [shaded_jar]
 
