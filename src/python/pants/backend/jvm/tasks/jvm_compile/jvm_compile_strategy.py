@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import ABCMeta, abstractmethod, abstractproperty
+import shutil
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -60,14 +61,15 @@ class JvmCompileStrategy(object):
 
     The abstract base class does not register any options itself: those are left to JvmCompile.
     """
-    pass
 
   def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
     self._language = language
     self.context = context
     self._analysis_tools = analysis_tools
 
-    self._delete_scratch = options.delete_scratch
+    self._workdir = workdir
+    self.delete_scratch = options.delete_scratch
+    self._analysis_tmpdir = self.ensure_analysis_tmpdir()
 
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
@@ -123,13 +125,8 @@ class JvmCompileStrategy(object):
     Since classes should live in exactly one context, a merged mapping is unambiguous.
     """
 
-  @abstractproperty
-  def analysis_tmpdir(self):
-    """Post processes VTS that have been fetched from the cache."""
-
   def pre_compile(self):
     """Executed once before any compiles."""
-    pass
 
   def validate_analysis(self, path):
     """Throws a TaskError for invalid analysis files."""
@@ -226,17 +223,19 @@ class JvmCompileStrategy(object):
 
     return list(extra_compile_classpath_iter())
 
-
   def ensure_analysis_tmpdir(self):
     """Work in a tmpdir so we don't stomp the main analysis files on error.
 
-    The tmpdir is cleaned up in a shutdown hook, because background work
+    A temporary, but well-known, dir in which to munge analysis/dependency files in before
+    caching. It must be well-known so we know where to find the files when we retrieve them from
+    the cache. The tmpdir is cleaned up in a shutdown hook, because background work
     may need to access files we create there even after this method returns
+    :return: path of temporary analysis directory
     """
-    # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
-    if not os.path.exists(self.analysis_tmpdir):
-      os.makedirs(self.analysis_tmpdir)
-      if self._delete_scratch:
-        self.context.background_worker_pool().add_shutdown_hook(
-          lambda: safe_rmtree(self.analysis_tmpdir))
-
+    analysis_tmpdir = os.path.join(self._workdir, 'analysis_tmpdir')
+    if self.delete_scratch:
+      self.context.background_worker_pool().add_shutdown_hook(
+        lambda: safe_rmtree(analysis_tmpdir))
+    if not os.path.exists(analysis_tmpdir):
+      os.makedirs(analysis_tmpdir)
+    return analysis_tmpdir

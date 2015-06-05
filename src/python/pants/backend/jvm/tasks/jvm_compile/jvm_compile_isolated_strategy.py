@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_walk
-from pants.util.memo import memoized_property
+from pants.util.fileutil import atomic_copy
 
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
@@ -73,7 +73,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
     self.ensure_analysis_tmpdir()
-
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
@@ -175,14 +174,14 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
-        tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
+        tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
         safe_mkdir(tmpdir)
 
         with self._empty_analysis_cleanup(compile_context):
           tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
               tmpdir, compile_context.target)
           if os.path.exists(compile_context.analysis_file):
-            shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+            atomic_copy(compile_context.analysis_file, tmp_analysis_file)
           compile_vts(vts,
                       compile_context.sources,
                       tmp_analysis_file,
@@ -190,7 +189,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                       cp_entries,
                       compile_context.classes_dir,
                       progress_message)
-          shutil.copy(tmp_analysis_file, compile_context.analysis_file)
+          atomic_copy(tmp_analysis_file, compile_context.analysis_file)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
@@ -253,7 +252,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                      register_vts,
                                      update_artifact_cache_vts_work)
 
-
     exec_graph = ExecutionGraph(jobs)
     try:
       exec_graph.execute(self._worker_pool, self.context.log)
@@ -315,12 +313,3 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
-
-  @memoized_property
-  def analysis_tmpdir(self):
-    """A temporary, but well-known, dir in which to munge analysis/dependency files in before
-    caching. It must be well-known so we know where to find the files when we retrieve them from
-    the cache.
-    :return:
-    """
-    return os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')

@@ -24,7 +24,6 @@ from pants.base.worker_pool import Work
 from pants.option.options import Options
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants.util.memo import memoized_property
 
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
@@ -57,7 +56,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     register('--changed-targets-heuristic-limit', type=int, default=0,
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
-
 
   def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools,
@@ -123,7 +121,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                                self._sources_for_target(target))
 
   def move(self, src, dst):
-    if self._delete_scratch:
+    if self.delete_scratch:
       shutil.move(src, dst)
     else:
       shutil.copy(src, dst)
@@ -158,8 +156,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       invalid_sources = list(itertools.chain.from_iterable(invalid_sources_by_target.values()))
       self._deleted_sources = self._compute_deleted_sources()
 
-      self.ensure_analysis_tmpdir()
-      tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
+      tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
       os.mkdir(tmpdir)
       valid_analysis_tmp = os.path.join(tmpdir, 'valid_analysis')
       newly_invalid_analysis_tmp = os.path.join(tmpdir, 'newly_invalid_analysis')
@@ -225,7 +222,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Find the invalid sources for this chunk.
     invalid_sources_by_target = {t: self._sources_for_target(t) for t in invalid_targets}
 
-    tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
+    tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
     os.mkdir(tmpdir)
 
     # Figure out the sources and analysis belonging to each partition.
@@ -362,9 +359,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     Class files are retrieved directly into their final locations in the global classes dir.
     """
 
-    # TODO: why is this called again?
-    self.ensure_analysis_tmpdir()
-
     # Get all the targets whose artifacts we found in the cache.
     cached_targets = []
     for vt in cached_vts:
@@ -382,8 +376,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Localize the cached analyses.
     analyses_to_merge = []
     for target in cached_targets:
-      analysis_file = JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, target)
-      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(self.analysis_tmpdir,
+      analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, target)
+      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(self._anlysis_tmpdir,
                                                                         target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, analysis_file)
@@ -424,9 +418,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     # Determine locations for analysis files that will be split in the background.
     split_analysis_files = [
-        JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._analysis_for_target(self._anlysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompileStrategy._portable_analysis_for_target(self.analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._portable_analysis_for_target(self._anlysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
     splits = zip([self._sources_for_target(t) for t in vts_targets], split_analysis_files)
@@ -458,7 +452,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         # NOTE: analysis_file doesn't exist yet.
         vts_artifactfiles_pairs.append(
             (vt,
-             artifacts + [JvmCompileStrategy._portable_analysis_for_target(self.analysis_tmpdir, target)]))
+             artifacts + [JvmCompileStrategy._portable_analysis_for_target(
+               self._analysis_tmpdir, target)]))
 
     update_artifact_cache_work = get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
@@ -575,12 +570,3 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Note that this order matters: it reflects the classloading order.
     bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
     return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
-
-  @memoized_property
-  def analysis_tmpdir(self):
-    """A temporary, but well-known, dir in which to munge analysis/dependency files in before
-    caching. It must be well-known so we know where to find the files when we retrieve them from
-    the cache.
-    :return:
-    """
-    return os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
