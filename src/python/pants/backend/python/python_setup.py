@@ -39,7 +39,7 @@ class PythonSetup(Subsystem):
     register('--resolver-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the requirement resolver cache. '
                   'If unspecified, a standard path under the workdir is used.')
-    register('--resolver-cache-ttl', type=int, metavar='<seconds>',
+    register('--resolver-cache-ttl', advanced=True, type=int, metavar='<seconds>',
              default=10 * 365 * 86400,  # 10 years.
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')

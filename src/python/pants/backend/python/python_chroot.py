@@ -54,10 +54,7 @@ class PythonChroot(object):
 
   @staticmethod
   def get_platforms(platform_list):
-    def translate(platform):
-      return Platform.current() if platform == 'current' else platform
-    return tuple(set(map(translate, platform_list)))
-
+    return tuple({Platform.current() if p == 'current' else p for p in platform_list})
 
   # TODO: A little extra push and we can get rid of the 'context' argument.
   def __init__(self,
@@ -233,7 +230,6 @@ class PythonChroot(object):
       print('WARNING: Target has multiple python_binary targets!', file=sys.stderr)
 
     return self._builder
-
 
   def _resolve_multi(self, requirements, find_links):
     """Multi-platform dependency resolution for PEX files.
