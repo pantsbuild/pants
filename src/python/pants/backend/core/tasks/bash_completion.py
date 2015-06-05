@@ -13,7 +13,7 @@ from pkg_resources import resource_string
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
-from pants.base.generator import Generator, TemplateData
+from pants.base.generator import Generator
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import GLOBAL_SCOPE
 
