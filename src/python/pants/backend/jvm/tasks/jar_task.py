@@ -246,7 +246,7 @@ class JarTask(NailgunTask):
     # control.
 
   @contextmanager
-  def open_jar_args(self, jar, path, overwrite, compressed, jar_rules):
+  def _jar_tool_args(self, jar, path, overwrite, compressed, jar_rules):
     with jar._render_jar_tool_args(self.get_options()) as args:
       if args:
         args.append('-update={}'.format(self._flag(not overwrite)))
@@ -293,7 +293,7 @@ class JarTask(NailgunTask):
     except jar.Error as e:
       raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
 
-    with self.open_jar_args(jar, path, overwrite, compressed, jar_rules) as args:
+    with self._jar_tool_args(jar, path, overwrite, compressed, jar_rules) as args:
       if args: # Don't build an empty jar.
         JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args)
 

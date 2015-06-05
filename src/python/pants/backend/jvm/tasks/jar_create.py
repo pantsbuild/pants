@@ -53,7 +53,7 @@ class JarCreate(JarTask):
   def register_options(cls, register):
     super(JarCreate, cls).register_options(register)
     register('--compressed', default=True, action='store_true', help='Create compressed jars.')
-    register('--jar_worker_count', default=multiprocessing.cpu_count(), action='store', type=int,
+    register('--jar-worker-count', default=multiprocessing.cpu_count(), action='store', type=int,
              help='Number of workers (threads) to use for jar creation.')
 
   @classmethod
@@ -82,14 +82,10 @@ class JarCreate(JarTask):
               self.context.products.get('jars').add(target, self.workdir).append(jar_name)
       return work
 
-    def error_handler():
-      raise TaskError('Jar creation failure')
-
     for target, jar_name, jar_path in jar_targets:
-      yield Job(key=target,
+      yield Job(key=target.address.spec,
                 fn=jar_target(target, jar_name, jar_path),
-                dependencies=[],
-                on_failure=error_handler)
+                dependencies=[])
 
   def _prepare_jar_target(self, target):
     """Crafts an input tuple for a given target and checks for path collisions."""
@@ -107,15 +103,18 @@ class JarCreate(JarTask):
     safe_mkdir(self.workdir)
 
     with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]) as workunit:
-      self.context.log.debug('Initializing jar-create WorkerPool, workers=%s' % self.worker_count)
+      self.context.log.debug(
+        'Initializing jar-create WorkerPool, workers={}'.format(self.worker_count))
       worker_pool = WorkerPool(workunit, self.context.run_tracker, self.worker_count)
       jar_targets = [self._prepare_jar_target(t) for t in self.context.targets(is_jvm_library)]
 
-      if jar_targets:
-        jobs = self._construct_jobs(jar_targets)
+      if not jar_targets:
+        return
 
-        exec_graph = ExecutionGraph(jobs)
-        try:
-          exec_graph.execute(worker_pool, self.context.log)
-        except ExecutionFailure as e:
-          raise TaskError('Jar creation failure: {}'.format(e))
+      jobs = self._construct_jobs(jar_targets)
+
+      exec_graph = ExecutionGraph(jobs)
+      try:
+        exec_graph.execute(worker_pool, self.context.log)
+      except ExecutionFailure as e:
+        raise TaskError('Jar creation failure: {}'.format(e))
