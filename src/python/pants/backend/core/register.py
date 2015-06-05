@@ -13,6 +13,7 @@ from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDepe
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
+from pants.backend.core.tasks.bash_completion import BashCompletionTask
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
@@ -184,3 +185,6 @@ def register_goals():
 
   task(name='deferred-sources', action=DeferredSourcesMapper).install().with_description(
     'Map unpacked sources from archives.')
+
+  task(name='bash-completion', action=BashCompletionTask).install().with_description(
+    'Dump bash shell script for autocompletion of pants command lines.')
