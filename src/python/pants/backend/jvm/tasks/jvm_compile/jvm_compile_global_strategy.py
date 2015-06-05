@@ -127,6 +127,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       shutil.copy(src, dst)
 
   def pre_compile(self):
+    super(JvmCompileGlobalStrategy, self).pre_compile()
+
     # Only create these working dirs during execution phase, otherwise, they
     # would be wiped out by clean-all goal/task if it's specified.
     safe_mkdir(self._target_sources_dir)
@@ -156,7 +158,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       invalid_sources = list(itertools.chain.from_iterable(invalid_sources_by_target.values()))
       self._deleted_sources = self._compute_deleted_sources()
 
-      tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
+      tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
       os.mkdir(tmpdir)
       valid_analysis_tmp = os.path.join(tmpdir, 'valid_analysis')
       newly_invalid_analysis_tmp = os.path.join(tmpdir, 'newly_invalid_analysis')
@@ -222,7 +224,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Find the invalid sources for this chunk.
     invalid_sources_by_target = {t: self._sources_for_target(t) for t in invalid_targets}
 
-    tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
+    tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
     os.mkdir(tmpdir)
 
     # Figure out the sources and analysis belonging to each partition.
@@ -330,13 +332,13 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for compile_context in compile_contexts:
       if compile_context.classes_dir != self._classes_dir:
         raise TaskError('Unrecognized classes directory for the global strategy: {}'.format(
-          compile_context.classes_dir))
+            compile_context.classes_dir))
       if not analysis_file:
         analysis_file = compile_context.analysis_file
       else:
         if compile_context.analysis_file != analysis_file:
           raise TaskError('Inconsistent analysis file for the global strategy: {} vs {}'.format(
-            compile_context.analysis_file, analysis_file))
+              compile_context.analysis_file, analysis_file))
 
     classes_by_src_by_context = defaultdict(dict)
     if os.path.exists(analysis_file):
@@ -376,9 +378,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Localize the cached analyses.
     analyses_to_merge = []
     for target in cached_targets:
-      analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, target)
-      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(self._anlysis_tmpdir,
-                                                                        target)
+      analysis_file = JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, target)
+      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
+          self._anlysis_tmpdir, target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, analysis_file)
       if os.path.exists(analysis_file):
@@ -451,9 +453,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       if vt is not None:
         # NOTE: analysis_file doesn't exist yet.
         vts_artifactfiles_pairs.append(
-            (vt,
-             artifacts + [JvmCompileStrategy._portable_analysis_for_target(
-               self._analysis_tmpdir, target)]))
+            (vt, artifacts + [JvmCompileStrategy._portable_analysis_for_target(
+                self.analysis_tmpdir, target)]))
 
     update_artifact_cache_work = get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
@@ -532,7 +533,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       classpath_entries = filter(non_product, classpath)
       for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
         # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-        if os.path.isfile(cp_entry) and ((cp_entry.endswith('.jar') or cp_entry.endswith('.zip'))):
+        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
           with open_zip(cp_entry, 'r') as jar:
             for cls in jar.namelist():
               # First jar with a given class wins, just like when classloading.

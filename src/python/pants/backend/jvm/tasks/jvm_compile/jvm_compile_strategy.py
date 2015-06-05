@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
@@ -14,7 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_delete, safe_rmtree
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree
 
 
 class JvmCompileStrategy(object):
@@ -69,7 +68,6 @@ class JvmCompileStrategy(object):
 
     self._workdir = workdir
     self.delete_scratch = options.delete_scratch
-    self._analysis_tmpdir = self.ensure_analysis_tmpdir()
 
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
@@ -127,6 +125,7 @@ class JvmCompileStrategy(object):
 
   def pre_compile(self):
     """Executed once before any compiles."""
+    self.analysis_tmpdir = self.ensure_analysis_tmpdir()
 
   def validate_analysis(self, path):
     """Throws a TaskError for invalid analysis files."""
@@ -236,6 +235,5 @@ class JvmCompileStrategy(object):
     if self.delete_scratch:
       self.context.background_worker_pool().add_shutdown_hook(
         lambda: safe_rmtree(analysis_tmpdir))
-    if not os.path.exists(analysis_tmpdir):
-      os.makedirs(analysis_tmpdir)
+    safe_mkdir(analysis_tmpdir)
     return analysis_tmpdir
