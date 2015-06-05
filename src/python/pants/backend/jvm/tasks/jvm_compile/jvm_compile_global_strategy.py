@@ -380,7 +380,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for target in cached_targets:
       analysis_file = JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, target)
       portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
-          self._anlysis_tmpdir, target)
+          self.analysis_tmpdir, target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, analysis_file)
       if os.path.exists(analysis_file):
@@ -420,9 +420,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     # Determine locations for analysis files that will be split in the background.
     split_analysis_files = [
-        JvmCompileStrategy._analysis_for_target(self._anlysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompileStrategy._portable_analysis_for_target(self._anlysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._portable_analysis_for_target(self.analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
     splits = zip([self._sources_for_target(t) for t in vts_targets], split_analysis_files)

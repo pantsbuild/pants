@@ -158,10 +158,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         safe_delete(compile_context.analysis_file)
       raise
 
-  def _create_compile_jobs(self, compile_classpaths,
-                           compile_contexts, extra_compile_time_classpath,
-                     invalid_targets, invalid_vts_partitioned,  compile_vts, register_vts,
-                     update_artifact_cache_vts_work):
+  def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
+                           invalid_targets, invalid_vts_partitioned, compile_vts, register_vts,
+                           update_artifact_cache_vts_work):
     def create_work_for_vts(vts, compile_context, target_closure):
       def work():
         progress_message = vts.targets[0].address.spec
@@ -171,7 +170,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                                      extra_compile_time_classpath)
 
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
-        tmpdir = os.path.join(self.analysis_tmpdir, vts.targets[0].name)
+        tmpdir = os.path.join(self.analysis_tmpdir, vts.targets[0].id)
         safe_mkdir(tmpdir)
 
         with self._empty_analysis_cleanup(compile_context):
@@ -305,7 +304,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # And execute it.
     if update_artifact_cache_work:
       work_chain = [
-        Work(self._analysis_tools.relativize, [relativize_args_tuple], 'relativize'),
-        update_artifact_cache_work
+          Work(self._analysis_tools.relativize, [relativize_args_tuple], 'relativize'),
+          update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
