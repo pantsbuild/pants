@@ -388,5 +388,8 @@ python_library(
     ':common',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/jvm/targets:jvm',
-  ]
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/fs:fs',
+    ]
 )

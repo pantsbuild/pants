@@ -48,5 +48,5 @@ class TestZipalign(TestAndroidBase):
         expected_args = [os.path.join(dist, 'build-tools', target.build_tools_version, 'zipalign'),
                          '-f', '4', 'package/path',
                          os.path.join(task._distdir, target.name,
-                                      '{0}.signed.apk'.format(target.name))]
+                                      '{0}.signed.apk'.format(target.manifest.package_name))]
         self.assertEqual(task._render_args('package/path', target), expected_args)

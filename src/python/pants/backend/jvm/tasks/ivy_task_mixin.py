@@ -216,11 +216,8 @@ class IvyTaskMixin(object):
     """
     mapdir = self.mapjar_workdir(target)
     safe_mkdir(mapdir, clean=True)
-    ivyargs = [
-      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
-                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
-      '-symlink',
-    ]
+    ivyargs = self._get_ivy_args(mapdir)
+
     confs = maybe_list(target.payload.get_field_value('configurations') or [])
     self.exec_ivy(mapdir,
                   [target],
@@ -302,3 +299,15 @@ class IvyTaskMixin(object):
       """
       return (exclude.org, exclude.name) not in jars
     return exclude_filter
+
+  @staticmethod
+  def _get_ivy_args(mapdir):
+    # At least one task(android.unpack_libraries) relies on mapped jars filenames being unique and
+    # including the version number. This method is being used to create a regression test to protect
+    # that interest.
+    ivy_args = [
+      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
+      '-symlink',
+      ]
+    return ivy_args
