@@ -36,15 +36,30 @@ def list_type(s):
 
 
 def _convert(val, acceptable_types):
-  """Ensure that val is one of the acceptable types, converting it if needed."""
+  """Ensure that val is one of the acceptable types, converting it if needed.
+
+  :param val: The value we're parsing.
+  :param acceptable_types: A tuple of expected types for val.
+  :returns: The parsed value
+  """
   if isinstance(val, acceptable_types):
     return val
   try:
     parsed_value = eval(val, {}, {})
   except Exception as e:
-    raise _parse_error(val, 'Value cannot be evaluated: {msg}\n{value}'.format(
-      msg=e.message, value=Config.format_raw_value(val)))
+    raise _parse_error(val, 'Value cannot be evaluated as an expression: '
+                            '{msg}\n{value}\nAcceptable types: '
+                            '{expected}'.format(
+                                msg=e, value=Config.format_raw_value(val),
+                                expected=format_type_tuple(acceptable_types)))
   if not isinstance(parsed_value, acceptable_types):
-    raise _parse_error(val, 'Value is not of the acceptable types: {msg}\n{value}'.format(
-      msg=acceptable_types, value=Config.format_raw_value(val)))
+    raise _parse_error(val, 'Value is not of the acceptable types: '
+                            '{msg}\n{''value}'.format(
+                                msg=format_type_tuple(acceptable_types),
+                                value=Config.format_raw_value(val)))
   return parsed_value
+
+
+def format_type_tuple(type_tuple):
+  """Return a list of type names from tuple of types."""
+  return ", ".join([item.__name__ for item in type_tuple])

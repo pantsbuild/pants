@@ -12,9 +12,9 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.base.build_environment import get_pants_cachedir
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -36,15 +36,32 @@ class JvmToolTaskTestBase(TaskTestBase):
   def setUp(self):
     super(JvmToolTaskTestBase, self).setUp()
 
-    # Use a synthetic subclass for bootstrapping within the test, to isolate this from
-    # any bootstrapping the pants run executing the test might need.
-    self.bootstrap_task_type, bootstrap_scope = self.synthesize_task_subtype(BootstrapJvmTools)
+    # Use a synthetic subclass for proper isolation when bootstrapping within the test.
+    bootstrap_scope = 'bootstrap_scope'
+    self.bootstrap_task_type = self.synthesize_task_subtype(BootstrapJvmTools, bootstrap_scope)
     JvmToolMixin.reset_registered_tools()
 
-    # Cap BootstrapJvmTools memory usage in tests.  The Xmx was empirically arrived upon using
-    # -Xloggc and verifying no full gcs for a test using the full gamut of resolving a multi-jar
-    # tool, constructing a fat jar and then shading that fat jar.
-    self.set_options_for_scope(bootstrap_scope, jvm_options=['-Xmx128m'])
+    # Set some options:
+
+    # 1. Cap BootstrapJvmTools memory usage in tests.  The Xmx was empirically arrived upon using
+    #    -Xloggc and verifying no full gcs for a test using the full gamut of resolving a multi-jar
+    #    tool, constructing a fat jar and then shading that fat jar.
+    #
+    # 2. Allow tests to read/write tool jars from the real artifact cache, so they don't
+    #    each have to resolve and shade them every single time, which is a huge slowdown.
+    #    Note that local artifact cache writes are atomic, so it's fine for multiple concurrent
+    #    tests to write to it.
+    #
+    # Note that we don't have access to the invoking pants instance's options, so we assume that
+    # its artifact cache is in the standard location.  If it isn't, worst case the tests will
+    # populate a second cache at the standard location, which is no big deal.
+    # TODO: We really need a straightforward way for pants's own tests to get to the enclosing
+    # pants instance's options values.
+    artifact_caches = [os.path.join(get_pants_cachedir(), 'artifact_cache')]
+    self.set_options_for_scope(bootstrap_scope,
+                               jvm_options=['-Xmx128m'],
+                               read_artifact_caches=artifact_caches,
+                               write_artifact_caches=artifact_caches)
 
     # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it
     # into our test workspace.
@@ -62,34 +79,32 @@ class JvmToolTaskTestBase(TaskTestBase):
                                                     console_outstream=console_outstream,
                                                     workspace=workspace)
 
-  def prepare_execute(self, context, workdir):
-    """Prepares a jvm tool using task for execution, ensuring any required jvm tools are
-    bootstrapped.
+  def prepare_execute(self, context):
+    """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.
 
-    NB: Other task pre-requisites will not be ensured and tests must instead setup their own product
-    requirements if any.
+    Note: Other task pre-requisites will not be ensured and tests must instead setup their own
+          product requirements if any.
 
-    :returns: The prepared Task
+    :returns: The prepared Task instance.
     """
-    # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
-    # instead it should probably just be using an Engine.
-    task = self.create_task(context, workdir)
+    task = self.create_task(context)
     task.invalidate()
-    bootstrap_workdir = os.path.join(workdir, '_bootstrap_jvm_tools')
+
+    # Bootstrap the tools needed by the task under test.
+    # We need the bootstrap task's workdir to be under the test's .pants.d, so that it can
+    # use artifact caching.  Making it a sibling of the main task's workdir achieves this.
+    bootstrap_workdir = os.path.join(os.path.dirname(task.workdir), 'bootstrap_jvm_tools')
     self.bootstrap_task_type(context, bootstrap_workdir).execute()
     return task
 
   def execute(self, context):
-    """Executes the given task ensuring any required jvm tools are bootstrapped.
+    """Executes a jvm tool-using task, first bootstrapping any required jvm tools.
 
-    NB: Other task pre-requisites will not be ensured and tests must instead setup their own product
-    requirements if any.
+    Note: Other task pre-requisites will not be ensured and tests must instead setup their own
+          product requirements if any.
 
-    :returns: The Task that was executed
+    :returns: The Task instance that was executed.
     """
-    # TODO(John Sirois): This is emulating Engine behavior - construct reverse order, then execute;
-    # instead it should probably just be using an Engine.
-    workdir = safe_mkdtemp(dir=self.build_root)
-    task = self.prepare_execute(context, workdir)
+    task = self.prepare_execute(context)
     task.execute()
     return task

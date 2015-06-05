@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.binary_util import BinaryUtil
-from pants_test.base.context_utils import create_options
 from pants_test.base_test import BaseTest
 
 

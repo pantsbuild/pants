@@ -9,7 +9,6 @@ import os
 from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
 
 
 class LazySourceMapper(object):

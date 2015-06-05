@@ -73,10 +73,6 @@ class JvmdocGen(JvmTask):
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
 
-    jvmdoc_tool_name = self.jvmdoc().tool_name
-
-    config_section = '{}-gen'.format(jvmdoc_tool_name)
-
     options = self.get_options()
     self._include_codegen = options.include_codegen
     self.transitive = options.transitive

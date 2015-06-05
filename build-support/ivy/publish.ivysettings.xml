@@ -6,10 +6,10 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 <ivysettings>
   <!-- TODO(John Sirois): Find a better way to get the pgp passphrase than this
-       by-convention-only, chmod 400 file.  This may require writing an ivy signer
+       by-convention-only, chmod 600 file.  This may require writing an ivy signer
        plugin that shells out to pgp and invokes it password dialog. Tracked by:
        https://github.com/pantsbuild/pants/issues/1407 -->
-  <properties file="${user.home}/.pantsbuild.pants.pgp.properties"/>
+  <properties file="${user.home}/.config/pants/release/jvm/pgp.properties"/>
   <property name="pgp.secring" value="${user.home}/.gnupg/secring.gpg" override="false"/>
   <property name="pgp.keyid" value="auto" override="false"/>
 

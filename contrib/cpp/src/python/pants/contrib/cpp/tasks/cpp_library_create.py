@@ -10,7 +10,6 @@ import os
 from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
-from pants.contrib.cpp.targets.cpp_library import CppLibrary
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
 

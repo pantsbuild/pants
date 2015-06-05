@@ -7,6 +7,7 @@ target(
     ':contextutil',
     ':dirutil',
     ':fileutil',
+    ':memo',
     ':meta',
     ':strutil',
     ':xml_parser',
@@ -29,6 +30,14 @@ python_tests(
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'memo',
+  sources = ['test_memo.py'],
+  dependencies = [
+    'src/python/pants/util:memo',
   ]
 )
 

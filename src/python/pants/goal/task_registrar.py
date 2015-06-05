@@ -5,14 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
-import inspect
 import sys
 import traceback
 from textwrap import dedent
 
-from pants.backend.core.tasks.task import Task
-from pants.goal.error import GoalError
 from pants.goal.goal import Goal
 
 

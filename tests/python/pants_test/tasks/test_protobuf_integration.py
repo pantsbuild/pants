@@ -9,6 +9,8 @@ import os
 import re
 import subprocess
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -96,23 +98,26 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
         'Expected there to be exactly one protoc compilation group! (Were {count}.)\n{out}'
         .format(count=len(all_blocks), out=pants_run.stderr_data))
 
-    block = all_blocks[0]
-    seen_extracted = False
-    last_proto = -1
-    for line in block:
-      # Make sure import bases appear after the bases for actual sources.
-      if line.startswith('--proto_path='):
-        if re.search(r'\bextracted\b', line):
-          seen_extracted = True
-        else:
-          self.assertFalse(seen_extracted,
-              'Local protoc bases must be ordered before imported bases!')
-        continue
-      # Check to make sure, eg, testproto4.proto never preceedes testproto2.proto.
-      match = re.search(r'(?P<sequence>\d+)\.proto\\?$', line)
-      if match:
-        number = int(match.group('sequence'))
-        self.assertTrue(number > last_proto, '{proto} succeeded proto #{number}!'.format(
-            proto=line, number=last_proto))
-        last_proto = number
-    self.assertEquals(last_proto, 6, 'Not all protos were seen!')
+    biggest_proto = -1
+    for block in all_blocks:
+      last_proto = -1
+      seen_extracted = False
+      for line in block:
+        # Make sure import bases appear after the bases for actual sources.
+        if line.startswith('--proto_path='):
+          if re.search(r'\bextracted\b', line):
+            seen_extracted = True
+          else:
+            self.assertFalse(seen_extracted,
+                             'Local protoc bases must be ordered before imported bases!')
+          continue
+        # Check to make sure, eg, testproto4.proto never precedes testproto2.proto.
+        match = re.search(r'(?P<sequence>\d+)\.proto\\?$', line)
+        if match:
+          number = int(match.group('sequence'))
+          self.assertTrue(number > last_proto, '{proto} succeeded proto #{number}!'
+                          .format(proto=line, number=last_proto))
+          last_proto = number
+      if last_proto > biggest_proto:
+        biggest_proto = last_proto
+    self.assertEquals(biggest_proto, 6, 'Not all protos were seen!')

@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.base.target import Target
