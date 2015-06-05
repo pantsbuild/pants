@@ -186,8 +186,6 @@ python_library(
   sources = ['jar_create.py'],
   dependencies = [
     ':jar_task',
-    ':scaladoc_gen',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:execution_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
