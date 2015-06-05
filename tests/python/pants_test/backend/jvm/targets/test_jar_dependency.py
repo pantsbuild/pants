@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from textwrap import dedent
-
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants_test.base_test import BaseTest
 

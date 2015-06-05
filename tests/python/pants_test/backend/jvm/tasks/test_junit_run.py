@@ -147,7 +147,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
         '''
     ))
-    task = self.create_task(self.context(target_roots=[self.target('foo:hello')]))
+    options = defaultdict(dict)
+    options['test.junit'] = {
+      'test': '#abc'
+    }
+    task = self.create_task(self.context(target_roots=[self.target('foo:hello')], options=options))
     task.execute()
 
   def test_empty_sources(self):

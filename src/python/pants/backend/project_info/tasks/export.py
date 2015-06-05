@@ -107,6 +107,7 @@ class Export(ConsoleTask):
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
+    ivy_info = None
     if self.get_options().libraries:
       ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
       # This product is a list for historical reasons (exclusives groups) but in practice should
@@ -118,8 +119,6 @@ class Export(ConsoleTask):
           ' since we no longer have exclusives groups.'
         )
         ivy_info = ivy_info_list[0]
-      else:
-        ivy_info = None
 
     ivy_jar_memo = {}
     def process_target(current_target):
@@ -140,9 +139,11 @@ class Export(ConsoleTask):
             return Export.SourceRootTypes.SOURCE
 
       def get_transitive_jars(jar_lib):
-        if not self.get_options().libraries:
-          return []
-        if not ivy_info:
+        """
+        :type jar_lib: pants.backend.jvm.targets.jar_library.JarLibrary
+        :rtype: twitter.common.collections.orderedset.OrderedSet
+        """
+        if not ivy_info or not self.get_options().libraries:
           return OrderedSet()
         transitive_jars = OrderedSet()
         for jar in jar_lib.jar_dependencies:

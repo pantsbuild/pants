@@ -215,13 +215,6 @@ class JvmCompileStrategy(object):
   def _analysis_parser(self):
     return self._analysis_tools.parser
 
-  def _create_compile_contexts_for_targets(self, relevant_targets):
-    compile_contexts = OrderedDict()
-    for target in relevant_targets:
-      compile_context = self.compile_context(target)
-      compile_contexts[target] = compile_context
-    return compile_contexts
-
   # Compute any extra compile-time-only classpath elements.
   # TODO(benjy): Model compile-time vs. runtime classpaths more explicitly.
   # TODO(benjy): Add a pre-execute goal for injecting deps into targets, so e.g.,

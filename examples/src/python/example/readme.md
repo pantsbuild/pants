@@ -331,11 +331,11 @@ parameters:
 
 ### Code Coverage
 
-To get code coverage data, set the `PANTS_PY_COVERAGE` environment variable. If you don't
-configured coverage data, it doesn't do much:
+To get code coverage data, set the `--coverage` flag in `test.pytest` scope.
+If you haven't configured coverage data, it doesn't do much:
 
     :::bash
-    $ PANTS_PY_COVERAGE=1 ./pants test examples/tests/python/example_test/hello/greet:greet
+    $ ./pants test.pytest --coverage=1 examples/tests/python/example_test/hello/greet:greet
         ...lots of build output...
                          ============ 2 passed in 0.23 seconds ============
                          Name    Stmts   Miss  Cover
@@ -357,12 +357,11 @@ There are 2 alternatives to specifying coverage attributes on all
 attributes in-play to form a global coverage specification for the test
 run.
 
-`PANTS_PY_COVERAGE=modules:[module1](,...,[moduleN])` allows
-specification of package or module names to track coverage against. For
-example:
+`--coverage=modules:[module1](,...,[moduleN])` allows specification of
+package or module names to track coverage against. For example:
 
     :::bash
-    $ PANTS_PY_COVERAGE=modules:example.hello.greet,example.hello.main ./pants test examples/tests/python/example_test/hello/greet:greet
+    $ ./pants test.pytest --coverage=modules:example.hello.greet,example.hello.main examples/tests/python/example_test/hello/greet:greet
         ...lots of build output...
                      ============ 2 passed in 0.22 seconds ============
                      Name                                               Stmts   Miss Branch BrMiss  Cover
@@ -379,7 +378,7 @@ Similarly, a set of base paths can be specified containing the code for
 coverage to be measured over:
 
     :::bash
-    $ PANTS_PY_COVERAGE=paths:example/hello ./pants test examples/tests/python/example_test/hello/greet:greet
+    $ ./pants test.pytest --coverage=paths:example/hello examples/tests/python/example_test/hello/greet:greet
         ...lots of build output...
                      ============ 2 passed in 0.23 seconds ============
                      Name                                               Stmts   Miss Branch BrMiss  Cover

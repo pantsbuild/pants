@@ -185,15 +185,11 @@ python_library(
   name = 'jar_create',
   sources = ['jar_create.py'],
   dependencies = [
-    ':common',
-    ':javadoc_gen',
     ':jar_task',
-    ':scaladoc_gen',
-    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
     'src/python/pants/fs',
-    'src/python/pants/java/jar:manifest',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -251,6 +247,9 @@ python_library(
   sources = ['javadoc_gen.py'],
   dependencies = [
     ':jvmdoc_gen',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:memo',
   ],
 )
 
@@ -325,9 +324,9 @@ python_library(
   name = 'jvmdoc_gen',
   sources = ['jvmdoc_gen.py'],
   dependencies = [
-    ':common',
     ':jvm_task',
     'src/python/pants:binary_util',
+    'src/python/pants/base:exceptions',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -365,6 +364,9 @@ python_library(
   sources = ['scaladoc_gen.py'],
   dependencies = [
     ':jvmdoc_gen',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:memo',
   ],
 )
 

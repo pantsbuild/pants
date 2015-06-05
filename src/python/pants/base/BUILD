@@ -205,7 +205,6 @@ python_library(
   name = 'lazy_source_mapper',
   sources = ['lazy_source_mapper.py'],
   dependencies = [
-    ':build_file',
     ':build_environment',
   ]
 )
@@ -285,7 +284,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
     ':build_environment',
-    ':build_manual',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',

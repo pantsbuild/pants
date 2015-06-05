@@ -9,7 +9,6 @@ import os
 import re
 
 from pants.base.address import SyntheticAddress
-from pants.base.build_file import BuildFile
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target

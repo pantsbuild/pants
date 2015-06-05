@@ -11,6 +11,11 @@ python_library(
 )
 
 python_library(
+  name = 'memo',
+  sources = ['memo.py'],
+)
+
+python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [
