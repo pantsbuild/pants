@@ -173,6 +173,9 @@ class Parser(object):
     """Return a help message for the options registered on this object."""
     return self._help_argparser.format_help() if self._has_help_options else ''
 
+  def get_help_argparser(self):
+    return self._help_argparser if self._has_help_options else None
+
   def register(self, *args, **kwargs):
     """Register an option, using argparse params.
 
