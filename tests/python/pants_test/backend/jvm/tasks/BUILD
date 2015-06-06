@@ -13,6 +13,9 @@ target(
     ':ivy_resolve',
     ':ivy_utils',
     ':junit_run',
+    ':resources_task',
+    ':prepare_resources',
+    ':prepare_services',
     ':scalastyle',
     ':unpack_jars',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
@@ -145,6 +148,47 @@ python_tests(
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ],
+)
+
+python_tests(
+  name = 'resources_task',
+  sources = ['test_resources_task.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:resources_task',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/base:target',
+    'src/python/pants/goal:products',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'prepare_resources',
+  sources = ['test_prepare_resources.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:prepare_resources',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'prepare_services',
+  sources = ['test_prepare_services.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:prepare_services',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
 )
 
 python_tests(

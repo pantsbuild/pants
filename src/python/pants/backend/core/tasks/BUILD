@@ -23,7 +23,6 @@ target(
     ':noop',
     ':pathdeps',
     ':paths',
-    ':prepare_resources',
     ':reporting_server',
     ':roots',
     ':run_prep_command',
@@ -232,17 +231,6 @@ python_library(
   dependencies = [
     ':console_task',
     'src/python/pants/base:exceptions',
-  ],
-)
-
-python_library(
-  name = 'prepare_resources',
-  sources = ['prepare_resources.py'],
-  dependencies = [
-    ':common',
-    'src/python/pants/goal:products',
-    'src/python/pants/option',
-    'src/python/pants/util:dirutil',
   ],
 )
 
