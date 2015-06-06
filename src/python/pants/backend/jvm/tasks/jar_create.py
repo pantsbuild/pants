@@ -7,13 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import multiprocessing
 import os
-from contextlib import contextmanager
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.exceptions import TaskError
 from pants.base.execution_graph import ExecutionFailure, ExecutionGraph, Job
-from pants.base.worker_pool import Work, WorkerPool
+from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnit
 from pants.fs.fs import safe_filename
 from pants.util.dirutil import safe_mkdir
