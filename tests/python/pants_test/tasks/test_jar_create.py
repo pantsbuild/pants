@@ -9,6 +9,8 @@ import os
 from contextlib import closing
 from textwrap import dedent
 
+import mock
+
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -19,11 +21,6 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
-
-
-class FakeRunTracker(object):
-  def register_thread(self, one):
-    pass
 
 
 class JarCreateTestBase(JarTaskTestBase):
@@ -138,7 +135,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_classfile_jar_contents(self):
     context = self.context()
-    context.run_tracker = FakeRunTracker()
+    context.run_tracker = mock.Mock()
 
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
@@ -161,7 +158,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_empty_scala_files(self):
     context = self.context()
-    context.run_tracker = FakeRunTracker()
+    context.run_tracker = mock.Mock()
 
     with self.add_data(context.products, 'classes_by_target', self.empty_sl):
       with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):

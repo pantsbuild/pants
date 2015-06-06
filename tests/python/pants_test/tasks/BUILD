@@ -291,6 +291,7 @@ python_tests(
   name = 'jar_create',
   sources = ['test_jar_create.py'],
   dependencies = [
+    '3rdparty/python:mock',
     ':task_test_base',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/codegen/targets:java',
