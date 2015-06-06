@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.tasks.code_gen import CodeGen
@@ -25,6 +26,7 @@ from pants.base.target import Target
 from pants.option.options import Options
 from pants.thrift_util import calculate_compile_roots, select_thrift_binary
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.memo import memoized_property
 
 
 INCLUDE_RE = re.compile(r'include (?:"(.*?)"|\'(.*?)\')')
@@ -71,8 +73,13 @@ class ApacheThriftGen(CodeGen):
     register('--java', advanced=True, type=Options.dict, help='GenInfo for Java.')
     register('--python', advanced=True, type=Options.dict, help='GenInfo for Python.')
 
+  @classmethod
+  def global_subsystems(cls):
+    return (ThriftDefaults,)
+
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
+    self._thrift_defaults = ThriftDefaults.global_instance()
     self.combined_dir = os.path.join(self.workdir, 'combined')
     self.combined_relpath = os.path.relpath(self.combined_dir, get_buildroot())
     self.session_dir = os.path.join(self.workdir, 'sessions')
@@ -86,12 +93,9 @@ class ApacheThriftGen(CodeGen):
     # for combined python thrift packages.
     # self.setup_artifact_cache()
 
-  _thrift_binary = None
-  @property
+  @memoized_property
   def thrift_binary(self):
-    if self._thrift_binary is None:
-      self._thrift_binary = select_thrift_binary(self.get_options())
-    return self._thrift_binary
+    return select_thrift_binary(self.get_options())
 
   def create_geninfo(self, key):
     gen_info = self.get_options()[key]
@@ -104,19 +108,13 @@ class ApacheThriftGen(CodeGen):
         dependencies.update(self.context.resolve(depspec))
     return self.GenInfo(gen, deps)
 
-  _gen_java = None
-  @property
+  @memoized_property
   def gen_java(self):
-    if self._gen_java is None:
-      self._gen_java = self.create_geninfo('java')
-    return self._gen_java
+    return self.create_geninfo('java')
 
-  _gen_python = None
-  @property
+  @memoized_property
   def gen_python(self):
-    if self._gen_python is None:
-      self._gen_python = self.create_geninfo('python')
-    return self._gen_python
+    return self.create_geninfo('python')
 
   def invalidate_for_files(self):
     # TODO: This will prevent artifact caching across platforms.
@@ -124,9 +122,11 @@ class ApacheThriftGen(CodeGen):
     return [self.thrift_binary]
 
   def is_gentarget(self, target):
-    return ((isinstance(target, JavaThriftLibrary)
-             and target.compiler(self.context.options) == 'thrift')
-            or isinstance(target, PythonThriftLibrary))
+    if isinstance(target, PythonThriftLibrary):
+      return True
+
+    return (isinstance(target, JavaThriftLibrary) and
+            'thrift' == self._thrift_defaults.compiler(target))
 
   def is_forced(self, lang):
     return lang in self.gen_langs

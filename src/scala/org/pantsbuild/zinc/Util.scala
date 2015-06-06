@@ -6,6 +6,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import sbt.{ ConsoleLogger, Hash, IO, Level, Logger }
+import scala.util.matching.Regex
 
 object Util {
 
@@ -16,21 +17,40 @@ object Util {
   /**
    * Create a new logger based on quiet, level, and color settings.
    */
-  def logger(quiet: Boolean, level: Level.Value, color: Boolean): Logger = {
+  def logger(quiet: Boolean, level: Level.Value, color: Boolean, filters: Seq[Regex]): LoggerRaw = {
     if (quiet) {
       new SilentLogger
     } else {
-      val log = ConsoleLogger(useColor = ConsoleLogger.formatEnabled && color); log.setLevel(level); log
+      val out = ConsoleLogger.systemOut
+      val consoleLogger = ConsoleLogger(out = out, useColor = ConsoleLogger.formatEnabled && color); consoleLogger.setLevel(level)
+      new LoggerRaw() {
+        def isFiltered(message: => String): Boolean = {
+          filters.exists(_.findFirstIn(message).isDefined)
+        }
+        def trace(t: => Throwable): Unit = consoleLogger.trace(t)
+        def success(message: => String): Unit = consoleLogger.success(message)
+        def log(level: Level.Value, message: => String): Unit = {
+          if (!isFiltered(message)) {
+            consoleLogger.log(level, message)
+          }
+        }
+        def logRaw(message: => String): Unit = {
+          if (!isFiltered(message)) {
+            out.print(message)
+          }
+        }
+      }
     }
   }
 
   /**
    * A logger that does nothing.
    */
-  class SilentLogger extends Logger {
+  class SilentLogger extends LoggerRaw {
     def trace(t: => Throwable): Unit = ()
     def success(message: => String): Unit = ()
     def log(level: Level.Value, message: => String): Unit = ()
+    def logRaw(message: => String): Unit = ()
   }
 
   //
@@ -280,4 +300,11 @@ object Util {
   def counted(count: Int, prefix: String, single: String, plural: String): String = {
     count.toString + " " + prefix + (if (count == 1) single else plural)
   }
+}
+
+/**
+ * A logger with direct printer access, as well as the ability to print immediately.
+ */
+trait LoggerRaw extends Logger {
+  def logRaw(message: => String): Unit
 }

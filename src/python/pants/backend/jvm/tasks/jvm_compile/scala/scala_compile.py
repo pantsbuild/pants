@@ -16,13 +16,15 @@ from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_utils import ZincUtils
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.hash_utils import hash_file
+from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
+from pants.java.jar.shader import Shader
 from pants.option.options import Options
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import relativize_paths, safe_open
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -30,6 +32,8 @@ _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 
 class ZincCompile(JvmCompile):
+  _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
+
   _supports_concurrent_execution = True
 
   @staticmethod
@@ -68,19 +72,26 @@ class ZincCompile(JvmCompile):
     register('--plugin-args', advanced=True, type=Options.dict, default={},
              help='Map from plugin name to list of arguments for that plugin.')
     register('--name-hashing', action='store_true', default=False, help='Use zinc name hashing.')
-    cls.register_jvm_tool(register, 'zinc')
+
+    cls.register_jvm_tool(register,
+                          'zinc',
+                          main=cls._ZINC_MAIN,
+                          custom_rules=[
+                            # The compiler-interface and sbt-interface tool jars carry xsbt and
+                            # xsbti interfaces that are used across the shaded tool jar boundary so
+                            # we preserve these root packages wholesale along with the core scala
+                            # APIs.
+                            Shader.exclude_package('scala', recursive=True),
+                            Shader.exclude_package('xsbt', recursive=True),
+                            Shader.exclude_package('xsbti', recursive=True),
+                          ])
+    cls.register_jvm_tool(register, 'compiler-interface')
+    cls.register_jvm_tool(register, 'sbt-interface')
+
     cls.register_jvm_tool(register, 'plugin-jars')
 
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
-
-    # Set up the zinc utils.
-    color = self.get_options().colors
-    self._zinc_utils = ZincUtils(context=self.context,
-                                 nailgun_task=self,
-                                 jvm_options=self._jvm_options,
-                                 color=color,
-                                 log_level=self.get_options().level)
 
     # A directory independent of any other classpath which can contain per-target
     # plugin resource files.
@@ -122,15 +133,12 @@ class ZincCompile(JvmCompile):
       self._lazy_plugin_args = self._create_plugin_args()
     return self._lazy_plugin_args
 
-  def name_hashing(self):
-    return self.get_options().name_hashing
-
   def _create_plugin_args(self):
     if not self.get_options().plugins:
       return []
 
     plugin_args = self.get_options().plugin_args
-    active_plugins = self.find_plugins()
+    active_plugins = self._find_plugins()
     ret = []
     for name, jar in active_plugins.items():
       ret.append('-S-Xplugin:{}'.format(jar))
@@ -207,9 +215,56 @@ class ZincCompile(JvmCompile):
     return ret
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
-    return self._zinc_utils.compile(args, classpath, sources,
-                                    classes_output_dir, analysis_file, upstream_analysis)
+    # We add compiler_classpath to ensure the scala-library jar is on the classpath.
+    # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
+    # usually need. Be more selective?
+    # TODO(John Sirois): Do we need to do this at all?  If adding scala-library to the classpath is
+    # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
+    # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
+    # appropriate level and certainly at a more appropriate granularity.
+    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
 
+    zinc_args = []
+
+    zinc_args.extend([
+      '-log-level', self.get_options().level,
+      '-analysis-cache', analysis_file,
+      '-classpath', ':'.join(relativized_classpath),
+      '-d', classes_output_dir
+    ])
+    if not self.get_options().colors:
+      zinc_args.append('-no-color')
+    if not self.get_options().name_hashing:
+      zinc_args.append('-no-name-hashing')
+
+    zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
+    zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
+    zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
+
+    zinc_args += self.plugin_args()
+    if upstream_analysis:
+      zinc_args.extend(['-analysis-map',
+                        ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
+
+    zinc_args += args
+
+    zinc_args.extend(sources)
+
+    self.log_zinc_file(analysis_file)
+    if self.runjava(classpath=self.zinc_classpath(),
+                    main=self._ZINC_MAIN,
+                    jvm_options=self._jvm_options,
+                    args=zinc_args,
+                    workunit_name='zinc',
+                    workunit_labels=[WorkUnit.COMPILER]):
+      raise TaskError('Zinc compile failed.')
+
+  def log_zinc_file(self, analysis_file):
+    self.context.log.debug('Calling zinc on: {} ({})'
+                           .format(analysis_file,
+                                   hash_file(analysis_file).upper()
+                                   if os.path.exists(analysis_file)
+                                   else 'nonexistent'))
 
 class ScalaZincCompile(ZincCompile):
   _language = 'scala'

@@ -12,6 +12,7 @@ import shutil
 import stat
 import tempfile
 import threading
+import uuid
 from collections import defaultdict
 
 from pants.util.strutil import ensure_text
@@ -31,9 +32,9 @@ def safe_mkdir(directory, clean=False):
 
 
 def safe_mkdir_for(path, clean=False):
-  """
-    Ensure that the parent directory for a file is present.  If it's not there, create it.
-    If it is, no-op. If clean is True, ensure the directory is empty.
+  """Ensure that the parent directory for a file is present.
+
+  If it's not there, create it. If it is, no-op. If clean is True, ensure the directory is empty.
   """
   safe_mkdir(os.path.dirname(path), clean)
 
@@ -98,26 +99,18 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
 
 
 def safe_rmtree(directory):
-  """
-    Delete a directory if it's present. If it's not present, no-op.
-  """
-  if os.path.exists(directory):
-    shutil.rmtree(directory, True)
+  """Delete a directory if it's present. If it's not present, no-op."""
+  shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):
-  """
-    Open a file safely (ensuring that the directory components leading up to it
-    have been created first.)
-  """
+  """Open a file safely, ensuring that its directory exists."""
   safe_mkdir(os.path.dirname(filename))
   return open(filename, *args, **kwargs)
 
 
 def safe_delete(filename):
-  """
-    Delete a file safely. If it's not present, no-op.
-  """
+  """Delete a file safely. If it's not present, no-op."""
   try:
     os.unlink(filename)
   except OSError as e:
@@ -125,10 +118,42 @@ def safe_delete(filename):
       raise
 
 
+def safe_concurrent_rename(src, dst):
+  """Rename src to dst, ignoring errors due to dst already existing.
+
+  Useful when concurrent processes may attempt to create dst, and it doesn't matter who wins.
+  """
+  # Delete dst, in case it existed (with old content) even before any concurrent processes
+  # attempted this write. This ensures that at least one process writes the new content.
+  if os.path.isdir(src):  # Note that dst may not exist, so we test for the type of src.
+    safe_rmtree(dst)
+  else:
+    safe_delete(dst)
+  try:
+    shutil.move(src, dst)
+  except IOError as e:
+    if e.errno != errno.EEXIST:
+      raise
+
+
+def safe_concurrent_create(func, path):
+  """Safely execute code that creates a file at a well-known path.
+
+  Useful when concurrent processes may attempt to create a file, and it doesn't matter who wins.
+
+  :param func: A callable that takes a single path argument and creates a file at that path.
+  :param path: The path to execute the callable on.
+  :return: func(path)'s return value.
+  """
+  safe_mkdir_for(path)
+  tmp_path = '{0}.tmp.{1}'.format(path, uuid.uuid4().hex)
+  ret = func(tmp_path)
+  safe_concurrent_rename(tmp_path, path)
+  return ret
+
+
 def chmod_plus_x(path):
-  """
-    Equivalent of unix `chmod a+x path`
-  """
+  """Equivalent of unix `chmod a+x path`"""
   path_mode = os.stat(path).st_mode
   path_mode &= int('777', 8)
   if path_mode & stat.S_IRUSR:
@@ -138,6 +163,31 @@ def chmod_plus_x(path):
   if path_mode & stat.S_IROTH:
     path_mode |= stat.S_IXOTH
   os.chmod(path, path_mode)
+
+
+def relative_symlink(source_path, link_path):
+  """Create a symlink at link_path pointing to relative source
+
+  :param source_path: Absolute path to source file
+  :param link_path: Absolute path to intended symlink
+  :raises ValueError if source_path or link_path are not unique, absolute paths
+  :raises OSError on failure UNLESS file already exists or no such file/directory
+  """
+  if not os.path.isabs(source_path):
+    raise ValueError("Path for source:{} must be absolute".format(source_path))
+  if not os.path.isabs(link_path):
+    raise ValueError("Path for link:{} must be absolute".format(link_path))
+  if source_path == link_path:
+    raise ValueError("Path for link is identical to source:{}".format(source_path))
+  try:
+    if os.path.lexists(link_path):
+      os.unlink(link_path)
+    rel_path = os.path.relpath(source_path, os.path.dirname(link_path))
+    os.symlink(rel_path, link_path)
+  except OSError as e:
+    # Another run may beat us to deletion or creation.
+    if not (e.errno == errno.EEXIST or e.errno == errno.ENOENT):
+      raise
 
 
 def relativize_path(path, rootdir):

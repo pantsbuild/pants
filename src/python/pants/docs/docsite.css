@@ -43,7 +43,7 @@ ul, ol, dl {
   padding: 0px;
 }
 
-ul li {
+ul li, ol li {
   margin-left: 24px;
 }
 

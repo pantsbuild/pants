@@ -23,7 +23,6 @@ from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.resolver import resolve_multi
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -76,11 +75,10 @@ class PythonChroot(object):
                                           interpreter=self._interpreter)
 
     # Note: unrelated to the general pants artifact cache.
-    self._egg_cache_root = os.path.join(
-      self._python_setup.scratch_dir, 'artifacts', str(self._interpreter.identity))
-
+    self._artifact_cache_root = os.path.join(
+      self._python_setup.artifact_cache_dir, str(self._interpreter.identity))
     self._key_generator = CacheKeyGenerator()
-    self._build_invalidator = BuildInvalidator( self._egg_cache_root)
+    self._build_invalidator = BuildInvalidator(self._artifact_cache_root)
 
   def delete(self):
     """Deletes this chroot from disk if it has been dumped."""
@@ -143,7 +141,7 @@ class PythonChroot(object):
     builder = builder_cls(library, get_buildroot(),
                           self.context.options, '-' + library_key.hash[:8])
 
-    cache_dir = os.path.join(self._egg_cache_root, library_key.id)
+    cache_dir = os.path.join(self._artifact_cache_root, library_key.id)
     if self._build_invalidator.needs_update(library_key):
       sdist = builder.build(interpreter=self._interpreter)
       safe_mkdir(cache_dir)

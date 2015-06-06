@@ -163,8 +163,7 @@ python_library(
   dependencies = [
     ':exceptions',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/android:plugin',
-    'src/python/pants/backend/authentication:authentication',
+    'src/python/pants/backend/authentication',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
@@ -206,7 +205,6 @@ python_library(
   name = 'lazy_source_mapper',
   sources = ['lazy_source_mapper.py'],
   dependencies = [
-    ':build_file',
     ':build_environment',
   ]
 )
@@ -286,7 +284,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
     ':build_environment',
-    ':build_manual',
     ':fingerprint_strategy',
     ':hash_utils',
     ':lazy_source_mapper',

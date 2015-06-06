@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.address import SyntheticAddress
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -18,6 +17,13 @@ class PythonTaskTest(TaskTestBase):
   def setUp(self):
     super(PythonTaskTest, self).setUp()
     self.set_options_for_scope('', python_chroot_requirements_ttl=1000000000)
+    # Use the "real" interpreter cache, so tests don't waste huge amounts of time recreating it.
+    # It would be nice to get the location of the real interpreter cache from PythonSetup,
+    # but unfortunately real subsystems aren't available here (for example, we have no access
+    # to the enclosing pants instance's options), so we have to hard-code it.
+    self.set_options_for_scope('python-setup',
+        interpreter_cache_dir=os.path.join(self.real_build_root, '.pants.d',
+                                           'python-setup', 'interpreters'))
 
   @property
   def alias_groups(self):

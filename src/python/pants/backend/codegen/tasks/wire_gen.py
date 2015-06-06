@@ -8,18 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import logging
 import os
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 
-from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
-from pants.backend.codegen.tasks.code_gen import CodeGen
 from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
+from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -31,7 +29,7 @@ from pants.option.options import Options
 logger = logging.getLogger(__name__)
 
 
-class WireGen(CodeGen, JvmToolTaskMixin):
+class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)
@@ -42,7 +40,23 @@ class WireGen(CodeGen, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
     super(WireGen, self).__init__(*args, **kwargs)
-    self.java_out = os.path.join(self.workdir, 'gen-java')
+
+  @property
+  def synthetic_target_type(self):
+    return JavaLibrary
+
+  def is_gentarget(self, target):
+    return isinstance(target, JavaWireLibrary)
+
+  def sources_generated_by_target(self, target):
+    genfiles = []
+    for source in target.sources_relative_to_source_root():
+      path = os.path.join(target.target_base, source)
+      genfiles.extend(self.calculate_genfiles(
+        path,
+        source,
+        target.payload.service_writer))
+    return genfiles
 
   def resolve_deps(self, unresolved_deps):
     deps = OrderedSet()
@@ -53,20 +67,10 @@ class WireGen(CodeGen, JvmToolTaskMixin):
         raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
     return deps
 
-  @property
-  def javadeps(self):
+  def synthetic_target_extra_dependencies(self, target):
     return self.resolve_deps(self.get_options().javadeps)
 
-  def is_gentarget(self, target):
-    return isinstance(target, JavaWireLibrary)
-
-  def is_proto_target(self, target):
-    return isinstance(target, JavaProtobufLibrary)
-
-  def genlangs(self):
-    return {'java': lambda t: t.is_jvm}
-
-  def genlang(self, lang, targets):
+  def execute_codegen(self, targets):
     # Invoke the generator once per target.  Because the wire compiler has flags that try to reduce
     # the amount of code emitted, Invoking them all together will break if one target specifies a
     # service_writer and another does not, or if one specifies roots and another does not.
@@ -82,10 +86,7 @@ class WireGen(CodeGen, JvmToolTaskMixin):
         relative_sources.add(relative_source)
       check_duplicate_conflicting_protos(self, sources_by_base, relative_sources, self.context.log)
 
-      if lang != 'java':
-        raise TaskError('Unrecognized wire gen lang: {0}'.format(lang))
-
-      args = ['--java_out={0}'.format(self.java_out)]
+      args = ['--java_out={0}'.format(self.codegen_workdir(target))]
 
       # Add all params in payload to args
 
@@ -134,36 +135,6 @@ class WireGen(CodeGen, JvmToolTaskMixin):
       sources_by_base[base].update(sources)
     return sources_by_base
 
-  def createtarget(self, lang, gentarget, dependees):
-    if lang == 'java':
-      return self._create_java_target(gentarget, dependees)
-    else:
-      raise TaskError('Unrecognized wire gen lang: {0}'.format(lang))
-
-  def _create_java_target(self, target, dependees):
-    genfiles = []
-    for source in target.sources_relative_to_source_root():
-      path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(
-        path,
-        source,
-        target.payload.service_writer).get('java', []))
-
-    spec_path = os.path.relpath(self.java_out, get_buildroot())
-    address = SyntheticAddress(spec_path, target.id)
-    deps = OrderedSet(self.javadeps)
-    tgt = self.context.add_new_target(address,
-                                      JavaLibrary,
-                                      derived_from=target,
-                                      sources=genfiles,
-                                      provides=target.provides,
-                                      dependencies=deps,
-                                      excludes=target.payload.excludes)
-    for dependee in dependees:
-      dependee.inject_dependency(tgt.address)
-    return tgt
-
-
   def calculate_genfiles(self, path, source, service_writer):
     protobuf_parse = ProtobufParse(path, source)
     protobuf_parse.parse()
@@ -176,16 +147,11 @@ class WireGen(CodeGen, JvmToolTaskMixin):
     if protobuf_parse.extends:
       types |= set(["Ext_{0}".format(protobuf_parse.filename)])
 
-    genfiles = defaultdict(set)
-    java_files = list(self.calculate_java_genfiles(protobuf_parse.package, types))
+    java_files = self.calculate_java_genfiles(protobuf_parse.package, types)
     logger.debug('Path {path} yielded types {types} got files {java_files}'
                  .format(path=path, types=types, java_files=java_files))
-    genfiles['java'].update(java_files)
-    return genfiles
+    return set(java_files)
 
   def calculate_java_genfiles(self, package, types):
     basepath = package.replace('.', '/')
-    for type_ in types:
-      filename = os.path.join(basepath, '{0}.java'.format(type_))
-      logger.debug("Expecting {filename} from type {type_}".format(filename=filename, type_=type_))
-      yield filename
+    return [os.path.join(basepath, '{0}.java'.format(t)) for t in types]

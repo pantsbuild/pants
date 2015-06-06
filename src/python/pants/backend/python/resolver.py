@@ -50,7 +50,7 @@ def resolve_multi(python_setup,
   if not isinstance(interpreter, PythonInterpreter):
     raise TypeError('Expected interpreter to be a PythonInterpreter, got {}'.format(type(interpreter)))
 
-  cache = os.path.join(python_setup.scratch_dir, 'eggs')
+  cache = python_setup.egg_cache_dir
   platforms = get_platforms(platforms or python_setup.platforms)
   fetchers = python_repos.get_fetchers()
   if find_links:

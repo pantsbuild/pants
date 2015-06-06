@@ -49,6 +49,23 @@ class TaskBase(AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+  # Tests may override this to provide a stable name despite the class name being a unique,
+  # synthetic name.
+  _stable_name = None
+
+  @classmethod
+  def stable_name(cls):
+    """The stable name of this task type.
+
+    We synthesize subclasses of the task types at runtime, and these synthesized subclasses
+    may have random names (e.g., in tests), so this gives us a stable name to use across runs,
+    e.g., in artifact cache references.
+    """
+    return cls._stable_name or cls._compute_stable_name()
+
+  @classmethod
+  def _compute_stable_name(cls):
+    return '{}_{}'.format(cls.__module__, cls.__name__).replace('.', '_')
 
   @classmethod
   def global_subsystems(cls):
@@ -172,7 +189,7 @@ class TaskBase(AbstractClass):
     self._build_invalidator_dir = os.path.join(
       self.context.options.for_global_scope().pants_workdir,
       'build_invalidator',
-      self.__class__.__name__)
+      self.stable_name())
 
   def get_options(self):
     """Returns the option values for this task's scope."""
@@ -180,7 +197,7 @@ class TaskBase(AbstractClass):
 
   def get_passthru_args(self):
     if not self.supports_passthru_args():
-      raise TaskError('{0} Does not support passthru args.'.format(self.__class__.__name__))
+      raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
 
@@ -217,12 +234,11 @@ class TaskBase(AbstractClass):
     if len(spec) > 0:
       pants_workdir = self.context.options.for_global_scope().pants_workdir
       compression = self.get_options().cache_compression
-      my_name = self.__class__.__name__
       return create_artifact_cache(
         log=self.context.log,
         artifact_root=pants_workdir,
         spec=spec,
-        task_name=my_name,
+        task_name=self.stable_name(),
         compression=compression,
         action=action)
     else:

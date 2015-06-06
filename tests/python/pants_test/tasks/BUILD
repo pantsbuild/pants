@@ -333,8 +333,9 @@ python_tests(
   name = 'jar_publish_integration',
   sources = ['test_jar_publish_integration.py'],
   dependencies = [
-    ':task_test_base',
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
 )

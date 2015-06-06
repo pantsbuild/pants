@@ -16,16 +16,16 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
+from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.deprecated import deprecated
+from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -67,6 +67,43 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
+def deprecated_env_accessors(removal_version, **replacement_mapping):
+  """Generates accessors for legacy env ver/replacement option pairs.
+
+  The generated accessors issue a deprecation warning when the deprecated env var is present and
+  enjoy the "compile" time removal forcing that normal @deprecated functions and methods do.
+  """
+  def create_accessor(env_name, option_name):
+    @deprecated(removal_version=removal_version,
+                hint_message='Use the {option} option instead of the deprecated {env} environment '
+                             'variable'.format(option=option_name, env=env_name))
+    def deprecated_accessor():
+      return os.environ.get(env_name)
+
+    def accessor(self):
+      value = None
+      if env_name in os.environ:
+        value = deprecated_accessor()
+      sanitized_option_name = option_name.lstrip('-').replace('-', '_')
+      value = self.get_options()[sanitized_option_name] or value
+      return value
+    return accessor
+
+  def decorator(clazz):
+    for env_name, option_name in replacement_mapping.items():
+      setattr(clazz, 'get_DEPRECATED_{}'.format(env_name), create_accessor(env_name, option_name))
+    return clazz
+
+  return decorator
+
+
+# TODO(John Sirois): Replace this helper and use of the accessors it generates with direct options
+# access prior to releasing 0.0.35
+@deprecated_env_accessors(removal_version='0.0.35',
+                          JUNIT_XML_BASE='--junit-xml-dir',
+                          PANTS_PROFILE='--profile',
+                          PANTS_PYTHON_TEST_FAILSOFT='--fail-slow',
+                          PANTS_PY_COVERAGE='--coverage')
 class PytestRun(PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
@@ -90,10 +127,24 @@ class PytestRun(PythonTask):
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower, but more correct, as the'
                   'isolation verifies that all dependencies are correctly declared.')
+    register('--fail-slow', action='store_true', default=False,
+             help='Do not fail fast on the first test failure in a suite; instead run all tests '
+                  'and report errors only after all tests complete.')
+    register('--junit-xml-dir', metavar='<DIR>',
+             help='Specifying a directory causes junit xml results files to be emitted under '
+                  'that dir for each test run.')
+    register('--profile', metavar='<FILE>',
+             help="Specifying a file path causes tests to be profiled with the profiling data "
+                  "emitted to that file (prefix). Note that tests may run in a different cwd, so "
+                  "it's best to use an absolute path to make it easy to find the subprocess "
+                  "profiles later.")
     register('--options', action='append', help='Pass these options to pytest.')
     register('--coverage',
              help='Emit coverage information for specified paths/modules. Value has two forms: '
                   '"module:list,of,modules" or "path:list,of,paths"')
+    register('--shard',
+             help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
+                  'run tests number 2, 5, 8, 11, ...')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -101,10 +152,6 @@ class PytestRun(PythonTask):
 
   def execute(self):
     def is_python_test(target):
-      # Note that we ignore PythonTestSuite, because we'll see the PythonTests targets
-      # it depends on anyway,so if we don't we'll end up running the tests twice.
-      # TODO(benjy): Once we're off the 'build' command we can get rid of python_test_suite,
-      # or make it an alias of dependencies().
       return isinstance(target, PythonTests)
 
     test_targets = list(filter(is_python_test, self.context.targets()))
@@ -128,8 +175,8 @@ class PytestRun(PythonTask):
     else:
       results = {}
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
-      fail_hard = ('PANTS_PYTHON_TEST_FAILSOFT' not in os.environ and
-                   'PANTS_PY_COVERAGE' not in os.environ)
+      fail_hard = (not self.get_DEPRECATED_PANTS_PYTHON_TEST_FAILSOFT() and
+                   not self.get_DEPRECATED_PANTS_PY_COVERAGE())
       for target in targets:
         if isinstance(target, PythonTests):
           rv = self._do_run_tests([target], workunit)
@@ -144,10 +191,63 @@ class PytestRun(PythonTask):
       if failed_targets:
         raise TestFailedTaskError(failed_targets=failed_targets)
 
+  class InvalidShardSpecification(TaskError):
+    """Indicates an invalid `--shard` option."""
+
+  @contextmanager
+  def _maybe_shard(self):
+    shard_spec = self.get_options().shard
+    if not shard_spec:
+      yield []
+      return
+
+    components = shard_spec.split('/', 1)
+    if len(components) != 2:
+      raise self.InvalidShardSpecification("Invalid shard specification '{}', should be of form: "
+                                           "[shard index]/[total shards]".format(shard_spec))
+
+    def ensure_int(item):
+      try:
+        return int(item)
+      except ValueError:
+        raise self.InvalidShardSpecification("Invalid shard specification '{}', item {} is not an "
+                                             "int".format(shard_spec, item))
+
+    shard = ensure_int(components[0])
+    total = ensure_int(components[1])
+    if not (0 <= shard and shard < total):
+      raise self.InvalidShardSpecification("Invalid shard specification '{}', shard must "
+                                           "be >= 0 and < {}".format(shard_spec, total))
+    if total < 2:
+      yield []
+      return
+
+    with temporary_dir() as tmp:
+      path = os.path.join(tmp, 'conftest.py')
+      with open(path, 'w') as fp:
+        fp.write(dedent("""
+          def pytest_report_header(config):
+            return 'shard: {shard} of {total} (0-based shard numbering)'
+
+
+          def pytest_collection_modifyitems(session, config, items):
+            total_count = len(items)
+            removed = 0
+            for i, item in enumerate(list(items)):
+              if i % {total} != {shard}:
+                del items[i - removed]
+                removed += 1
+            reporter = config.pluginmanager.getplugin('terminalreporter')
+            reporter.write_line('Only executing {{}} of {{}} total tests in shard {shard} of '
+                                '{total}'.format(total_count - removed, total_count),
+                                bold=True, invert=True, yellow=True)
+        """.format(shard=shard, total=total)))
+      yield [path]
+
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):
     args = []
-    xml_base = os.getenv('JUNIT_XML_BASE')
+    xml_base = self.get_DEPRECATED_JUNIT_XML_BASE()
     if xml_base and targets:
       xml_base = os.path.realpath(xml_base)
       xml_path = os.path.join(xml_base, Target.maybe_readable_identify(targets) + '.xml')
@@ -276,7 +376,7 @@ class PytestRun(PythonTask):
 
   @contextmanager
   def _maybe_emit_coverage_data(self, targets, chroot, pex, workunit):
-    coverage = os.environ.get('PANTS_PY_COVERAGE')
+    coverage = self.get_DEPRECATED_PANTS_PY_COVERAGE()
     if coverage is None:
       yield []
       return
@@ -341,29 +441,22 @@ class PytestRun(PythonTask):
   @contextmanager
   def _test_runner(self, targets, workunit):
     interpreter = self.select_interpreter_for_targets(targets)
-    builder = PEXBuilder(interpreter=interpreter)
-    builder.info.entry_point = 'pytest'
-    chroot = PythonChroot(
-      context=self.context,
-      python_setup=PythonSetup.global_instance(),
-      python_repos=PythonRepos.global_instance(),
-      targets=targets,
-      extra_requirements=self._TESTING_TARGETS,
-      builder=builder,
-      platforms=('current',),
-      interpreter=interpreter)
-    try:
-      builder = chroot.dump()
-      builder.freeze()
-      pex = PEX(builder.path(), interpreter=interpreter)
-      with self._maybe_emit_junit_xml(targets) as junit_args:
-        with self._maybe_emit_coverage_data(targets,
-                                            builder.path(),
-                                            pex,
-                                            workunit) as coverage_args:
-          yield pex, junit_args + coverage_args
-    finally:
-      chroot.delete()
+    pex_info = PexInfo.default()
+    pex_info.entry_point = 'pytest'
+
+    with self.temporary_chroot(interpreter=interpreter,
+                               pex_info=pex_info,
+                               targets=targets,
+                               extra_requirements=self._TESTING_TARGETS,
+                               platforms=('current',)) as chroot:
+      pex = PEX(chroot.path(), interpreter=interpreter)
+      with self._maybe_shard() as shard_args:
+        with self._maybe_emit_junit_xml(targets) as junit_args:
+          with self._maybe_emit_coverage_data(targets,
+                                              chroot.path(),
+                                              pex,
+                                              workunit) as coverage_args:
+            yield pex, shard_args + junit_args + coverage_args
 
   def _do_run_tests_with_args(self, pex, workunit, args):
     try:
@@ -375,12 +468,9 @@ class PytestRun(PythonTask):
       env = {
         'PYTHONUNBUFFERED': '1',
       }
-      # If profiling a test run, this will enable profiling on the test code itself.
-      # Note that tests may run in a different cwd, so it's best to set PANTS_PROFILE
-      # to an absolute path to make it easy to find the subprocess profiles later.
-      if 'PANTS_PROFILE' in os.environ:
-        env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(os.environ['PANTS_PROFILE'],
-                                                             time.time())
+      profile = self.get_DEPRECATED_PANTS_PROFILE()
+      if profile:
+        env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       with environment_as(**env):
         rc = self._pex_run(pex, workunit, args=args, setsid=True)
         return PythonTestResult.rc(rc)

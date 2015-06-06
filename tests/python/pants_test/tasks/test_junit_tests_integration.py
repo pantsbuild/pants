@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from xml.etree import ElementTree
 
 from pants.util.contextutil import temporary_dir

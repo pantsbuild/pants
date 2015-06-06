@@ -5,23 +5,27 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
-
-
-scaladoc = Jvmdoc(tool_name='scaladoc', product_type='scaladoc')
-
-
-def is_scala(target):
-  return target.has_sources('.scala')
+from pants.java.executor import SubprocessExecutor
+from pants.util.memo import memoized
 
 
 class ScaladocGen(JvmdocGen):
   @classmethod
+  @memoized
   def jvmdoc(cls):
-    return scaladoc
+    return Jvmdoc(tool_name='scaladoc', product_type='scaladoc')
+
+  @classmethod
+  def task_subsystems(cls):
+    return (ScalaPlatform,)
 
   def execute(self):
-    self.generate_doc(lambda t: t.is_scala, self.create_scaladoc_command)
+    def is_scala(target):
+      return target.has_sources('.scala')
+
+    self.generate_doc(is_scala, self.create_scaladoc_command)
 
   def create_scaladoc_command(self, classpath, gendir, *targets):
     sources = []
@@ -34,21 +38,20 @@ class ScaladocGen(JvmdocGen):
     if not sources:
       return None
 
-    # TODO(John Chee): try scala.tools.nsc.ScalaDoc via ng
-    command = [
-      'scaladoc',
-      '-usejavacp',
-      '-classpath', ':'.join(classpath),
-      '-d', gendir,
-    ]
+    scala_platform = ScalaPlatform.global_instance()
+    tool_classpath = scala_platform.compiler_classpath(self.context.products)
 
-    for jvm_option in self.jvm_options:
-      if jvm_option.startswith('-D'):
-        command.append(jvm_option)  # Scaladoc takes sysprop settings directly.
-      else:
-        command.append('-J{0}'.format(jvm_option))
+    args = ['-usejavacp',
+            '-classpath', ':'.join(classpath),
+            '-d', gendir]
 
-    command.extend(self.args)
+    args.extend(self.args)
 
-    command.extend(sources)
-    return command
+    args.extend(sources)
+
+    java_executor = SubprocessExecutor()
+    runner = java_executor.runner(jvm_options=self.jvm_options,
+                                  classpath=tool_classpath,
+                                  main='scala.tools.nsc.ScalaDoc',
+                                  args=args)
+    return runner.command

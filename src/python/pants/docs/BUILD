@@ -13,6 +13,7 @@ page(
     ':intellij',
     ':internals',
     ':release',
+    ':release_jvm',
   ]
 )
 
@@ -95,5 +96,16 @@ page(
 page(
   name='release',
   source='release.md',
+  links=[
+    ':release_jvm',
+  ]
+)
+
+page(
+  name='release_jvm',
+  source='release_jvm.md',
+  links=[
+    'src/docs:publish',
+  ]
 )
 

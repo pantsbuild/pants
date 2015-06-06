@@ -49,7 +49,8 @@ class JavaThriftLibrary(JvmTarget):
                                         .format(arg, ', or '.join(map(repr, values)), value))
       return value
 
-    # TODO(pl): These should all live in payload fields
+    # The following fields are only added to the fingerprint via FingerprintStrategy when their
+    # values impact the outcome of the task.  See JavaThriftLibraryFingerprintStrategy.
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = check_value_for_arg('language', language, self._LANGUAGES)
     self._rpc_style = check_value_for_arg('rpc_style', rpc_style, self._RPC_STYLES)
@@ -57,14 +58,17 @@ class JavaThriftLibrary(JvmTarget):
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
 
-  def compiler(self, options):
-    return self._compiler or options.for_global_scope().thrift_default_compiler
+  @property
+  def compiler(self):
+    return self._compiler
 
-  def language(self, options):
-    return self._language or options.for_global_scope().thrift_default_language
+  @property
+  def language(self):
+    return self._language
 
-  def rpc_style(self, options):
-    return self._rpc_style or options.for_global_scope().thrift_default_rpc_style
+  @property
+  def rpc_style(self):
+    return self._rpc_style
 
   # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
   @property

@@ -15,7 +15,7 @@ from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.iterator import Iterator
 from pex.package import EggPackage, SourcePackage
 
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_concurrent_create, safe_mkdir
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -50,7 +50,7 @@ class PythonInterpreterCache(object):
   def __init__(self, python_setup, python_repos, logger=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
-    self._cache_dir = os.path.join(python_setup.scratch_dir, 'interpreters')
+    self._cache_dir = python_setup.interpreter_cache_dir
     safe_mkdir(self._cache_dir)
     self._interpreters = set()
     self._logger = logger or (lambda msg: True)
@@ -74,11 +74,14 @@ class PythonInterpreterCache(object):
     return None
 
   def _setup_interpreter(self, interpreter, cache_path):
-    safe_mkdir(cache_path)
-    _safe_link(interpreter.binary, os.path.join(cache_path, 'python'))
-    return self._resolve(interpreter)
+    def resolve_interpreter(path):
+      os.mkdir(path)  # Parent will already have been created by safe_concurrent_create.
+      os.symlink(interpreter.binary, os.path.join(path, 'python'))
+      return self._resolve(interpreter, path)
+    return safe_concurrent_create(resolve_interpreter, cache_path)
 
   def _setup_cached(self, filters):
+    """Find all currently-cached interpreters."""
     for interpreter_dir in os.listdir(self._cache_dir):
       path = os.path.join(self._cache_dir, interpreter_dir)
       pi = self._interpreter_from_path(path, filters)
@@ -87,6 +90,7 @@ class PythonInterpreterCache(object):
         self._interpreters.add(pi)
 
   def _setup_paths(self, paths, filters):
+    """Find interpreters under paths, and cache them."""
     for interpreter in self._matching(PythonInterpreter.all(paths), filters):
       identity_str = str(interpreter.identity)
       cache_path = os.path.join(self._cache_dir, identity_str)
@@ -134,22 +138,27 @@ class PythonInterpreterCache(object):
       self._logger('Found no valid interpreters!')
     return matches
 
-  def _resolve(self, interpreter):
+  def _resolve(self, interpreter, interpreter_dir=None):
     """Resolve and cache an interpreter with a setuptools and wheel capability."""
-    interpreter = self._resolve_interpreter(interpreter,
+    interpreter = self._resolve_interpreter(interpreter, interpreter_dir,
                                             self._python_setup.setuptools_requirement())
     if interpreter:
-      return self._resolve_interpreter(interpreter, self._python_setup.wheel_requirement())
+      return self._resolve_interpreter(interpreter, interpreter_dir,
+                                       self._python_setup.wheel_requirement())
 
 
-  def _resolve_interpreter(self, interpreter, requirement):
+  def _resolve_interpreter(self, interpreter, interpreter_dir, requirement):
     """Given a :class:`PythonInterpreter` and a requirement, return an interpreter with the
     capability of resolving that requirement or ``None`` if it's not possible to install a
     suitable requirement.
+
+    If interpreter_dir is unspecified, operates on the default location.
     """
-    interpreter_dir = os.path.join(self._cache_dir, str(interpreter.identity))
     if interpreter.satisfies([requirement]):
       return interpreter
+
+    if not interpreter_dir:
+      interpreter_dir = os.path.join(self._cache_dir, str(interpreter.identity))
 
     def installer_provider(sdist):
       return EggInstaller(

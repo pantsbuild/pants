@@ -12,6 +12,7 @@ from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.payload import Payload
 from pants.base.payload_field import ConfigurationsField, ExcludesField
 from pants.base.target import Target
+from pants.util.memo import memoized_property
 
 
 class JvmTarget(Target, Jarable):
@@ -57,15 +58,12 @@ class JvmTarget(Target, Jarable):
     if no_cache:
       self.add_labels('no_cache')
 
-  _jar_dependencies = None
-  @property
+  @memoized_property
   def jar_dependencies(self):
-    if self._jar_dependencies is None:
-      self._jar_dependencies = set(self.get_jar_dependencies())
-    return self._jar_dependencies
+    return set(self.get_jar_dependencies())
 
   def mark_extra_invalidation_hash_dirty(self):
-    self._jar_dependencies = None
+    del self.jar_dependencies
 
   def get_jar_dependencies(self):
     jar_deps = set()

@@ -39,7 +39,7 @@ def load_plugins(build_configuration, plugins, load_from=None):
   is already on the path and an error will be thrown if it is not. Plugins should define their
   entrypoints in the `pantsbuild.plugin` group when configuring their distribution.
 
-  Like source backends, the `build_file_aliases` method and `register_goals` methods are called if
+  Like source backends, the `build_file_aliases`, `global_subsystems` and `register_goals` methods are called if
   those entry points are defined.
 
   * Plugins are loaded in the order they are provided. *
@@ -81,6 +81,10 @@ def load_plugins(build_configuration, plugins, load_from=None):
     if 'register_goals' in entries:
       entries['register_goals'].load()()
 
+    if 'global_subsystems' in entries:
+      subsystems = entries['global_subsystems'].load()()
+      build_configuration.register_subsystems(subsystems)
+
     loaded[dist.as_requirement().key] = dist
 
 
@@ -99,8 +103,7 @@ def load_build_configuration_from_source(build_configuration, additional_backend
                       'pants.backend.jvm',
                       'pants.backend.codegen',
                       'pants.backend.maven_layout',
-                      'pants.backend.project_info',
-                      'pants.backend.android']
+                      'pants.backend.project_info']
 
   for backend_package in OrderedSet(backend_packages + (additional_backends or [])):
     load_backend(build_configuration, backend_package)
@@ -135,5 +138,9 @@ def load_backend(build_configuration, backend_package):
   build_file_aliases = invoke_entrypoint('build_file_aliases')
   if build_file_aliases:
     build_configuration.register_aliases(build_file_aliases)
+
+  subsystems = invoke_entrypoint('global_subsystems')
+  if subsystems:
+    build_configuration.register_subsystems(subsystems)
 
   invoke_entrypoint('register_goals')

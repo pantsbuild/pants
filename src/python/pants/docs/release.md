@@ -2,7 +2,10 @@ Release Process
 ===============
 
 This page describes how to make a versioned release of Pants and and
-other related packages to PyPi.
+other related packages to PyPi.  If you need to release pants jvm tools
+(jars), see the
+[[JVM Artifact Release Process|pants('src/python/pants/docs:release_jvm')]]
+page.
 
 At a high level, releasing pants involves:
 

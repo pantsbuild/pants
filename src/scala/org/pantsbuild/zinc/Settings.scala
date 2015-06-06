@@ -11,7 +11,9 @@ import sbt.inc.IncOptions.{ Default => DefaultIncOptions }
 import sbt.Level
 import sbt.Path._
 import scala.collection.JavaConverters._
+import scala.util.matching.Regex
 import xsbti.compile.CompileOrder
+
 
 /**
  * All parsed command-line options.
@@ -19,9 +21,7 @@ import xsbti.compile.CompileOrder
 case class Settings(
   help: Boolean              = false,
   version: Boolean           = false,
-  quiet: Boolean             = false,
-  logLevel: Level.Value      = Level.Info,
-  color: Boolean             = true,
+  logOptions: LogOptions     = LogOptions(),
   sources: Seq[File]         = Seq.empty,
   classpath: Seq[File]       = Seq.empty,
   classesDirectory: File     = new File("."),
@@ -37,6 +37,18 @@ case class Settings(
   analysis: AnalysisOptions  = AnalysisOptions(),
   analysisUtil: AnalysisUtil = AnalysisUtil(),
   properties: Seq[String]    = Seq.empty
+)
+
+/** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
+ * TODO: further break options into sensible subgroups. */
+case class LogOptions(
+  quiet: Boolean             = false,
+  logLevel: Level.Value      = Level.Info,
+  color: Boolean             = true,
+  logPhases: Boolean         = false,
+  printProgress: Boolean     = false,
+  heartbeatSecs: Int         = 0,
+  logFilters: Seq[Regex]     = Seq.empty
 )
 
 /**
@@ -187,11 +199,16 @@ object Settings {
     header("Output options:"),
     boolean(  ("-help", "-h"),                 "Print this usage message",                   (s: Settings) => s.copy(help = true)),
     boolean(   "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
-    boolean(  ("-quiet", "-q"),                "Silence all logging",                        (s: Settings) => s.copy(quiet = true)),
-    boolean(   "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logLevel = Level.Debug)),
-    string(    "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logLevel = Level.withName(l))),
-    boolean(   "-no-color",                    "No color in logging",                        (s: Settings) => s.copy(color = false)),
 
+    header("Logging Options:"),
+    boolean(  ("-quiet", "-q"),                "Silence all logging",                        (s: Settings) => s.copy(logOptions = s.logOptions.copy(quiet = true))),
+    boolean(   "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logOptions = s.logOptions.copy(logLevel = Level.Debug))),
+    string(    "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logOptions = s.logOptions.copy(logLevel = Level.withName(l)))),
+    boolean(   "-no-color",                    "No color in logging",                        (s: Settings) => s.copy(logOptions = s.logOptions.copy(color = false))),
+    boolean(   "-log-phases",                  "Log phases of compilation for each file",    (s: Settings) => s.copy(logOptions = s.logOptions.copy(logPhases = true))),
+    boolean(   "-print-progress",              "Periodically print compilation progress",    (s: Settings) => s.copy(logOptions = s.logOptions.copy(printProgress = true))),
+    int(       "-heartbeat", "interval (sec)", "Print '.' every n seconds while compiling",  (s: Settings, b: Int) => s.copy(logOptions = s.logOptions.copy(heartbeatSecs = b))),
+    string(    "-log-filter", "regex",         "Filter log messages matching the regex",     (s: Settings, re: String) => s.copy(logOptions = s.logOptions.copy(logFilters = s.logOptions.logFilters :+ re.r))),
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),

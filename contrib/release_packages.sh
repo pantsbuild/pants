@@ -22,8 +22,10 @@ PKG_SCROOGE=(
 function pkg_scrooge_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants.contrib.scrooge==$(local_version) && \
-  execute_packaged_pants_with_internal_backends --explain gen | grep "scrooge" &> /dev/null && \
-  execute_packaged_pants_with_internal_backends goals | grep "thrift-linter" &> /dev/null
+  execute_packaged_pants_with_internal_backends "extra_backend_packages='pants.contrib.scrooge'" \
+    --explain gen | grep "scrooge" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends "extra_backend_packages='pants.contrib.scrooge'" \
+    goals | grep "thrift-linter" &> /dev/null
 }
 
 PKG_BUILDGEN=(
@@ -34,11 +36,24 @@ PKG_BUILDGEN=(
 function pkg_buildgen_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants.contrib.buildgen==$(local_version) && \
-  execute_packaged_pants_with_internal_backends test contrib/buildgen::
+  python -c "from pants.contrib.buildgen.build_file_manipulator import *"
+}
+
+PKG_SPINDLE=(
+  "pantsbuild.pants.contrib.spindle"
+  "//contrib/spindle/src/python/pants/contrib/spindle:plugin"
+  "pkg_spindle_install_test"
+)
+function pkg_spindle_install_test() {
+  PIP_ARGS="$@"
+  pip install ${PIP_ARGS} pantsbuild.pants.contrib.spindle==$(local_version) && \
+  execute_packaged_pants_with_internal_backends "extra_backend_packages='pants.contrib.spindle'" \
+    --explain gen | grep "spindle" &> /dev/null
 }
 
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_SCROOGE
   PKG_BUILDGEN
+  PKG_SPINDLE
 )

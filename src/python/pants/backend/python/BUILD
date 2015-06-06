@@ -98,7 +98,6 @@ python_library(
   dependencies = [
     ':antlr_builder',
     ':python_requirement',
-    ':python_setup',
     ':resolver',
     ':thrift_builder',
     '3rdparty/python:pex',
