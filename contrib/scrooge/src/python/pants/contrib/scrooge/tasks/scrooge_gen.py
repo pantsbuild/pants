@@ -20,7 +20,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.option.options import Options
 from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -121,6 +121,7 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
   def execute(self):
     targets = self.context.targets()
     self._validate_compiler_configs(targets)
+    self._must_have_sources(targets)
 
     gentargets_by_dependee = self.context.dependents(
         on_predicate=self.is_scroogetarget,
@@ -173,7 +174,6 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)
-
       import_paths, changed_srcs = calculate_compile_sources(invalid_targets, self.is_scroogetarget)
       outdir = self._outdir(partial_cmd)
       if changed_srcs:
@@ -347,6 +347,12 @@ class ScroogeGen(NailgunTask, JvmToolTaskMixin):
           msg.append('    %s - %s\n' % (dep, compiler_config(dep)))
       raise TaskError(''.join(msg))
 
+  def _must_have_sources(self, targets):
+    for target in targets:
+      if isinstance(target, JavaThriftLibrary) and not target.payload.sources.source_paths:
+        msg = 'thrift target {} must include a non-empty set of sources.'.format(
+          target.address.spec)
+        raise TargetDefinitionException(target, msg)
 
 NAMESPACE_PARSER = re.compile(r'^\s*namespace\s+([^\s]+)\s+([^\s]+)\s*$')
 TYPE_PARSER = re.compile(r'^\s*(const|enum|exception|service|struct|union)\s+([^\s{]+).*')
