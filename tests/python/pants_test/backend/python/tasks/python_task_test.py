@@ -23,6 +23,8 @@ class PythonTaskTest(TaskTestBase):
     self.set_options_for_scope('python-setup',
         interpreter_cache_dir=os.path.join(self.real_build_root, '.pants.d',
                                            'python-setup', 'interpreters'),
+        chroot_cache_dir=os.path.join(self.real_build_root, '.pants.d',
+                                      'python-setup', 'chroots'),
         resolver_cache_ttl=1000000000)  # TODO: Do we need this now that there's a default?
 
   @property

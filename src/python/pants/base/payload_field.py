@@ -55,6 +55,13 @@ class PayloadField(AbstractClass):
   def value(self):
     return self
 
+  def clear_memo(self):
+    """Make this payload field forget its memoized fingerprint.
+
+    Useful in tests.
+    """
+    self._fingerprint_memo = None
+
 
 class FingerprintedMixin(object):
   """Mixin this class to make your class suitable for passing to FingerprintedField."""

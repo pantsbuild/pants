@@ -43,6 +43,7 @@ class PythonEvalTest(PythonTaskTest):
       pass
     """)})
 
+    # TODO: Presumably this was supposed to be c_library, not override b_library. Unravel and fix.
     self.b_library = self.create_python_library('src/c', 'c', {'c.py': dedent("""
     from a.a import compile_time_check_decorator
 
@@ -61,6 +62,7 @@ class PythonEvalTest(PythonTaskTest):
       class BazC(object):
         pass
       """))
+      self.b_library.payload.clear_memo()
     self.fix_c_source = fix_c_source
 
     self.d_library = self.create_python_library('src/d', 'd', { 'd.py': dedent("""
