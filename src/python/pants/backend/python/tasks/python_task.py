@@ -88,8 +88,8 @@ class PythonTask(Task):
     return interpreter
 
   @contextmanager
-  def temporary_chroot(self, interpreter=None, pex_info=None, targets=None,
-                       extra_requirements=None, platforms=None, pre_freeze=None):
+  def temporary_chroot(self, interpreter, pex_info, targets, platforms,
+                       extra_requirements=None, pre_freeze=None):
     """Yields a temporary PythonChroot created with the specified args.
 
     pre_freeze is an optional function run on the chroot just before freezing its builder,
@@ -102,11 +102,11 @@ class PythonTask(Task):
         context=self.context,
         python_setup=PythonSetup.global_instance(),
         python_repos=PythonRepos.global_instance(),
-        targets=targets,
-        extra_requirements=extra_requirements,
+        interpreter=interpreter,
         builder=builder,
+        targets=targets,
         platforms=platforms,
-        interpreter=interpreter)
+        extra_requirements=extra_requirements)
       chroot.dump()
       if pre_freeze:
         pre_freeze(chroot)

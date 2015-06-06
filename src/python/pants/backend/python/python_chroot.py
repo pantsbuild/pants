@@ -9,12 +9,12 @@ import logging
 import os
 import shutil
 import sys
-import tempfile
 from collections import defaultdict
 
-from pex.interpreter import PythonInterpreter
-from pex.pex_builder import PEXBuilder
+from pex.fetcher import Fetcher
+from pex.pex import PEX
 from pex.platforms import Platform
+from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
@@ -23,7 +23,6 @@ from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.resolver import resolve_multi
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -53,26 +52,29 @@ class PythonChroot(object):
     def __init__(self, target):
       Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
 
+  @staticmethod
+  def get_platforms(platform_list):
+    return tuple({Platform.current() if p == 'current' else p for p in platform_list})
+
   # TODO: A little extra push and we can get rid of the 'context' argument.
   def __init__(self,
                context,
                python_setup,
                python_repos,
+               interpreter,
+               builder,
                targets,
-               extra_requirements=None,
-               builder=None,
-               platforms=None,
-               interpreter=None):
+               platforms,
+               extra_requirements=None):
     self.context = context
     self._python_setup = python_setup
     self._python_repos = python_repos
 
+    self._interpreter = interpreter
+    self._builder = builder
     self._targets = targets
-    self._extra_requirements = list(extra_requirements) if extra_requirements else []
     self._platforms = platforms
-    self._interpreter = interpreter or PythonInterpreter.get()
-    self._builder = builder or PEXBuilder(os.path.realpath(tempfile.mkdtemp()),
-                                          interpreter=self._interpreter)
+    self._extra_requirements = list(extra_requirements) if extra_requirements else []
 
     # Note: unrelated to the general pants artifact cache.
     self._artifact_cache_root = os.path.join(
@@ -90,16 +92,25 @@ class PythonChroot(object):
     else:
       self.debug('Left chroot at {}'.format(self.path()))
 
-  @property
-  def builder(self):
-    return self._builder
-
   def debug(self, msg, indent=0):
     if os.getenv('PANTS_VERBOSE') is not None:
       print('{}{}'.format(' ' * indent, msg))
 
   def path(self):
     return os.path.realpath(self._builder.path())
+
+  def set_executable(self, filename, env_filename=None):
+    self._builder.set_executable(filename, env_filename)
+
+  def pex(self):
+    return PEX(os.path.realpath(self._builder.path()), interpreter=self._interpreter)
+
+  def package_pex(self, filename):
+    """Package into a PEX zipfile.
+
+    :param filename: The filename where the PEX should be stored.
+    """
+    self._builder.build(filename)
 
   def _dump_library(self, library):
     def copy_to_chroot(base, path, add_function):
@@ -121,7 +132,7 @@ class PythonChroot(object):
         try:
           copy_to_chroot(resources_tgt.target_base, resource_file_from_source_root,
                          self._builder.add_resource)
-        except OSError as e:
+        except OSError:
           logger.error("Failed to copy {path} for resource {resource}"
                        .format(path=os.path.join(resources_tgt.target_base,
                                                  resource_file_from_source_root),
@@ -206,14 +217,7 @@ class PythonChroot(object):
       if req.repository:
         find_links.append(req.repository)
 
-    distributions = resolve_multi(
-         self._python_setup,
-         self._python_repos,
-         reqs_to_build,
-         interpreter=self._interpreter,
-         platforms=self._platforms,
-         ttl=self.context.options.for_global_scope().python_chroot_requirements_ttl,
-         find_links=find_links)
+    distributions = self._resolve_multi(reqs_to_build, find_links)
 
     locations = set()
     for platform, dist_set in distributions.items():
@@ -226,3 +230,31 @@ class PythonChroot(object):
       print('WARNING: Target has multiple python_binary targets!', file=sys.stderr)
 
     return self._builder
+
+  def _resolve_multi(self, requirements, find_links):
+    """Multi-platform dependency resolution for PEX files.
+
+       Given a pants configuration and a set of requirements, return a list of distributions
+       that must be included in order to satisfy them.  That may involve distributions for
+       multiple platforms.
+
+       :param requirements: A list of :class:`PythonRequirement` objects to resolve.
+       :param find_links: Additional paths to search for source packages during resolution.
+    """
+    distributions = dict()
+    platforms = self.get_platforms(self._platforms or self._python_setup.platforms)
+    fetchers = self._python_repos.get_fetchers()
+    fetchers.extend(Fetcher([path]) for path in find_links)
+    context = self._python_repos.get_network_context()
+
+    for platform in platforms:
+      distributions[platform] = resolve(
+        requirements=requirements,
+        interpreter=self._interpreter,
+        fetchers=fetchers,
+        platform=platform,
+        context=context,
+        cache=self._python_setup.resolver_cache_dir,
+        cache_ttl=self._python_setup.resolver_cache_ttl)
+
+    return distributions
