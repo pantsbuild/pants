@@ -4,6 +4,14 @@
 # cache configured below.
 sudo: false
 
+
+before_cache:
+  # The ivydata files' effect on resolution time is in the noise, but
+  # they are re-timestamped in a comment on each run and lead to cache
+  # thrash.  Kill these files before the cache check to avoid un-needed
+  # cache re-packing and re-upload (a ~100s operation).
+  - find $HOME/.ivy2 -type f -name "ivydata-*.properties" -delete
+
 cache:
   directories:
     - $HOME/.cache/pants
