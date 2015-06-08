@@ -165,8 +165,11 @@ class RGlobs(FilesetRelPathWrapper):
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
   def to_filespec(self, args, root='', excludes=None):
-    # In rglobs, * at the beginning of a path component means
-    # **/*.  * anywhere else just means *.
+    # In rglobs, * at the beginning of a path component means "any
+    # number of directories, including 0".  Unfortunately, "**" in
+    # some other systems, e.g. git means "one or more directories".
+    # So every time we see ^* or **, we need to output both
+    # "**/whatever" and "whatever".
     rglobs = []
     for arg in args:
       components = arg.split(os.path.sep)
@@ -179,7 +182,29 @@ class RGlobs(FilesetRelPathWrapper):
         else:
           out.append(component)
 
-      rglobs.append(os.path.join(*out))
+      def rglob_path(beginning, rest):
+        if not rest:
+          return [beginning]
+        endings = []
+        for i, item in enumerate(rest):
+          if beginning:
+            beginning += os.path.sep
+          if item.startswith('**'):
+            for ending in rglob_path(beginning + item, rest[i+1:]):
+              endings.append(ending)
+            for ending in rglob_path(beginning + item[3:], rest[i+1:]):
+              endings.append(ending)
+            return endings
+          else:
+            if beginning:
+              beginning += os.path.sep + item
+            else:
+              beginning = item
+
+        return [beginning]
+
+      rglobs.extend(rglob_path('', out))
+
     return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
 
 class ZGlobs(FilesetRelPathWrapper):
