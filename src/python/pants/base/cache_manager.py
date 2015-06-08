@@ -7,10 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from pants.base.exceptions import TaskError
 from pants.base.build_graph import sort_targets
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.exceptions import TaskError
 from pants.base.target import Target
+
 
 try:
   import cPickle as pickle
