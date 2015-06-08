@@ -140,6 +140,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.execute(context)
 
   def test_junit_runner_raises_no_error_on_non_junit_target(self):
+    """Run pants against a `python_tests` target, but set an option for the `test.junit` task. This
+    should execute without error.
+    """
     self.add_to_build_file('foo', dedent('''
         python_tests(
           name='hello',
@@ -147,11 +150,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
         '''
     ))
-    options = defaultdict(dict)
-    options['test.junit'] = {
-      'test': '#abc'
-    }
-    task = self.create_task(self.context(target_roots=[self.target('foo:hello')], options=options))
+    self.set_options(test='#abc')
+    task = self.create_task(self.context(target_roots=[self.target('foo:hello')]))
     task.execute()
 
   def test_empty_sources(self):
