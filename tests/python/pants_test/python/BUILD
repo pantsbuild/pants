@@ -13,7 +13,6 @@ target(
   dependencies = [
     ':test_antlr_builder',
     ':test_interpreter_cache',
-    ':test_resolver',
     ':test_thrift_namespace_packages',
   ]
 )
@@ -46,14 +45,6 @@ python_tests(
   dependencies = [
     'testprojects/src/thrift/org/pantsbuild/testing:duck-py',
     'testprojects/src/thrift/org/pantsbuild/testing:goose-py',
-  ],
-)
-
-python_tests(name = 'test_resolver',
-  sources = ['test_resolver.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-    'src/python/pants/backend/python:resolver',
   ],
 )
 

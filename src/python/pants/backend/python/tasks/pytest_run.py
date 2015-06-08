@@ -15,7 +15,6 @@ import traceback
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pex.pex import PEX
 from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
@@ -447,9 +446,9 @@ class PytestRun(PythonTask):
     with self.temporary_chroot(interpreter=interpreter,
                                pex_info=pex_info,
                                targets=targets,
-                               extra_requirements=self._TESTING_TARGETS,
-                               platforms=('current',)) as chroot:
-      pex = PEX(chroot.path(), interpreter=interpreter)
+                               platforms=('current',),
+                               extra_requirements=self._TESTING_TARGETS) as chroot:
+      pex = chroot.pex()
       with self._maybe_shard() as shard_args:
         with self._maybe_emit_junit_xml(targets) as junit_args:
           with self._maybe_emit_coverage_data(targets,

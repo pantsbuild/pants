@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import signal
 
-from pex.pex import PEX
-
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
@@ -36,8 +34,9 @@ class PythonRun(PythonTask):
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
       # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
       interpreter = self.select_interpreter_for_targets(self.context.targets())
-      with self.temporary_chroot(interpreter=interpreter, pex_info=binary.pexinfo, targets=[binary], platforms=binary.platforms) as chroot:
-        pex = PEX(chroot.builder.path(), interpreter=interpreter)
+      with self.temporary_chroot(interpreter=interpreter, pex_info=binary.pexinfo,
+                                 targets=[binary], platforms=binary.platforms) as chroot:
+        pex = chroot.pex()
         self.context.release_lock()
         with self.context.new_workunit(name='run', labels=[WorkUnit.RUN]):
           args = []
