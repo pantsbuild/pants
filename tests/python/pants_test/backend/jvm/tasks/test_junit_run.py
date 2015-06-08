@@ -139,7 +139,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # Finally execute the task.
     self.execute(context)
 
-  def test_junit_runner_on_non_junit_target(self):
+  def test_junit_runner_raises_no_error_on_non_junit_target(self):
     self.add_to_build_file('foo', dedent('''
         python_tests(
           name='hello',

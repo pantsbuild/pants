@@ -205,8 +205,9 @@ class _JUnitRunner(object):
     java_tests_targets = list(self._test_target_candidates(targets))
     tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
 
-    if self._tests_to_run:
-      # Find matching targets to any requested test.
+    if java_tests_targets and self._tests_to_run:
+      # If there are some junit_test targets in the graph, find ones that match the requested
+      # test(s).
       tests_with_targets = {}
       for test in self._get_tests_to_run():
         # A test might contain #specific_method, which is not needed to find a target.
@@ -756,16 +757,13 @@ class JUnitRun(JvmTask, JvmToolTaskMixin):
       self._runner = _JUnitRunner(task_exports, self.context)
 
   def execute(self):
-    def is_junit_test(target):
-      return isinstance(target, junit_tests)
-
     if not self.get_options().skip:
-      targets = list(filter(is_junit_test, self.context.targets()))
+      targets = self.context.targets()
       if targets:
         for target in targets:
           # TODO: move this check to an optional phase in goal_runner, so
           # that missing sources can be detected early.
-          if not target.payload.sources.source_paths:
+          if isinstance(target, junit_tests) and not  target.payload.sources.source_paths:
             msg = 'JavaTests target {} must include a non-empty set of sources.'.format(target.address.spec)
             raise TargetDefinitionException(target, msg)
 
