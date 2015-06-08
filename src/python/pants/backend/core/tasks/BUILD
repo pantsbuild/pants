@@ -4,6 +4,7 @@
 target(
   name = 'all',
   dependencies = [
+    ':bash_completion',
     ':builddictionary',
     ':changed_target_goals',
     ':clean',
@@ -41,6 +42,18 @@ target(
     'src/python/pants/base:exceptions',
   ]
 )
+
+python_library(
+  name = 'bash_completion',
+  sources = ['bash_completion.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:generator',
+    'src/python/pants/goal',
+    'src/python/pants/option',
+    ],
+  )
 
 python_library(
   name = 'builddictionary',
