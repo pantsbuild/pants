@@ -69,8 +69,8 @@ class PrepareServicesTest(TaskTestBase):
     self.reset_build_graph()
     target = self.make_target('java:target',
                               target_type=JavaLibrary,
-                              services={'com.foo.bars.Baz': ['com.spam.bars.BaxImplA',
-                                                             'com.spam.bars.BaxImplB']})
+                              services={'com.foo.bars.Baz': ['com.spam.bars.BazImplA',
+                                                             'com.spam.bars.BazImplB']})
     fingerprint4 = invalidation_strategy.fingerprint_target(target)
     self.assertIsNotNone(fingerprint4)
     self.assertNotEqual(fingerprint1, fingerprint4)

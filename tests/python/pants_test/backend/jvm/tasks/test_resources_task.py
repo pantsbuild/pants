@@ -210,7 +210,6 @@ class CustomInvalidationStrategtResourcesTaskTest(ResourcesTaskTestBase):
     self.assert_products(task, self.target('b:1'), 1)
 
 
-
 class CustomRelativeResourcePathsResourcesTaskTest(ResourcesTaskTestBase):
   class CustomRelativeResourcePathsResourcesTask(ResourcesTaskTestBase.MinimalImplResourcesTask):
     def relative_resource_paths(self, target, chroot):
