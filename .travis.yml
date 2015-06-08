@@ -12,7 +12,7 @@ before_cache:
   # travis-ci cache thrash.  Kill these files before the cache check
   # to avoid un-needed cache re-packing and re-upload (a ~100s
   # operation).
-  - find $HOME/.ivy2 -type f -name "ivydata-*.properties" -o -name "resolved-*.xml" -print -delete
+  - find $HOME/.ivy2 -type f \( -name "ivydata-*.properties" -o -name "resolved-*.xml" \) -print -delete
 
 cache:
   directories:
