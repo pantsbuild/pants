@@ -149,7 +149,8 @@ class IvyTaskMixin(object):
             executor=executor,
             ivy=ivy,
             workunit_name=workunit_name,
-            confs=confs)
+            confs=confs,
+            use_soft_excludes=self.get_options().soft_excludes)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
           raise TaskError('Ivy failed to create classpath file at {}'
@@ -229,7 +230,8 @@ class IvyTaskMixin(object):
                   confs=confs,
                   ivy=Bootstrapper.default_ivy(),
                   workunit_name='map-jars',
-                  jars=jars)
+                  jars=jars,
+                  use_soft_excludes=False)
 
     for org in os.listdir(mapdir):
       orgdir = os.path.join(mapdir, org)
@@ -257,7 +259,8 @@ class IvyTaskMixin(object):
                confs=None,
                ivy=None,
                workunit_name='ivy',
-               jars=None):
+               jars=None,
+               use_soft_excludes=False):
     ivy_jvm_options = copy.copy(self.get_options().jvm_options)
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
@@ -267,7 +270,7 @@ class IvyTaskMixin(object):
 
     if not jars:
       jars, excludes = IvyUtils.calculate_classpath(targets, self.get_options().automatic_excludes)
-      if self.get_options().soft_excludes:
+      if use_soft_excludes:
         excludes = filter(self._exclude_is_not_contained_in_jars(jars), excludes)
     else:
       excludes = set()
