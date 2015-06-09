@@ -176,9 +176,15 @@ class RGlobs(FilesetRelPathWrapper):
       out = []
       for component in components:
         if component == '**':
+          if out and out[-1].startswith("**"):
+            continue
           out.append(component)
         elif component[0] == '*':
-          out.append('**/' + component)
+          if out and out[-1].startswith("**"):
+            # We want to translate **/*.py to **/*.py, not **/**/*.py
+            out.append(component)
+          else:
+            out.append('**/' + component)
         else:
           out.append(component)
 
@@ -187,19 +193,21 @@ class RGlobs(FilesetRelPathWrapper):
           return [beginning]
         endings = []
         for i, item in enumerate(rest):
-          if beginning:
+          if beginning and not beginning.endswith(os.path.sep):
             beginning += os.path.sep
           if item.startswith('**'):
+            # .../**/*.java
             for ending in rglob_path(beginning + item, rest[i+1:]):
               endings.append(ending)
+            # .../*.java
             for ending in rglob_path(beginning + item[3:], rest[i+1:]):
               endings.append(ending)
             return endings
           else:
-            if beginning:
+            if beginning and not beginning.endswith(os.path.sep):
               beginning += os.path.sep + item
             else:
-              beginning = item
+              beginning += item
 
         return [beginning]
 
