@@ -4,10 +4,21 @@
 # cache configured below.
 sudo: false
 
+
+before_cache:
+  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
+  # effect on resolution time is in the noise, but they are
+  # re-timestamped in internal comments and fields on each run and this
+  # leads to travis-ci cache thrash.  Kill these files before the cache
+  # check to avoid un-needed cache re-packing and re-upload (a ~100s
+  # operation).
+  - find $HOME/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
+  - rm -fv $HOME/.ivy2/pants/*.{css,properties,xml,xsl}
+
 cache:
   directories:
     - $HOME/.cache/pants
-    - $HOME/.ivy2
+    - $HOME/.ivy2/pants
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
