@@ -9,6 +9,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import list_option
+from pants.thrift_util import calculate_compile_sources
 
 
 class ThriftLintError(Exception):
@@ -91,9 +92,14 @@ class ThriftLinter(NailgunTask):
     if not self._is_strict(target):
       config_args.append('--ignore-errors')
 
-    paths = target.sources_relative_to_buildroot()
+    from pants.thrift_util import calculate_compile_sources
+    include_paths , paths = calculate_compile_sources([target], self._is_thrift)
+    for p in include_paths:
+      config_args.extend(['--include-path', p])
 
-    args = config_args + paths
+    args = config_args + list(paths)
+
+
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.
