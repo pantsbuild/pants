@@ -29,7 +29,6 @@ from pants.backend.core.tasks.minimal_cover import MinimalCover
 from pants.backend.core.tasks.noop import NoopCompile, NoopTest
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
-from pants.backend.core.tasks.prepare_resources import PrepareResources
 from pants.backend.core.tasks.reporting_server import KillServer, RunServer
 from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
@@ -128,9 +127,6 @@ def register_goals():
 
   task(name='killserver', action=KillServer, serialize=False).install().with_description(
       'Kill the reporting server.')
-
-  # Bootstrapping.
-  task(name='prepare', action=PrepareResources).install('resources')
 
   task(name='markdown', action=MarkdownToHtml).install('markdown').with_description(
       'Generate html from markdown docs.')

@@ -42,6 +42,8 @@ from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCom
                                                                      ScalaZincCompile)
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
+from pants.backend.jvm.tasks.prepare_resources import PrepareResources
+from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
@@ -110,8 +112,11 @@ def register_goals():
   task(name='unpack-jars', action=UnpackJars).install().with_description(
     'Unpack artifacts specified by unpacked_jars() targets.')
 
-  # Compilation.
+  # Resource preparation.
+  task(name='prepare', action=PrepareResources).install('resources')
+  task(name='services', action=PrepareServices).install('resources')
 
+  # Compilation.
   jvm_compile = GroupTask.named(
       'jvm-compilers',
       product_type=['classes_by_target', 'classes_by_source'],
