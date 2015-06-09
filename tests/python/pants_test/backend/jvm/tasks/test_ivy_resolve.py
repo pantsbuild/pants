@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.util.contextutil import temporary_dir
@@ -175,12 +176,30 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertEquals(0, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
 
+  def test_mapjars_excludes_excludes_all_in_jar_dependencies_even_with_soft_excludes(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+
+    junit_jar_lib = self.make_target('//:junit_lib', JarLibrary, jars=[junit_dep])
+    excluding_target = self.make_target('//:excluding_bin', JvmBinary, dependencies=[junit_jar_lib],
+                                        excludes=[Exclude('junit', 'junit')],
+                                        configurations=['default'])
+
+    self.set_options(soft_excludes=True)
+    context = self.context(target_roots=[junit_jar_lib, excluding_target])
+    context.products.require('jar_dependencies', predicate=lambda t: isinstance(t, JvmBinary))
+
+    with temporary_dir() as workdir:
+      self.create_task(context, workdir).execute()
+
+    jardepmap = context.products.get('jar_dependencies')
+    self.assertIsNone(jardepmap.get((excluding_target, 'default')))
+
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', ScalaLibrary)
     self.assertTrue(self.resolve([target]))
 
-  def test_resolve_symkinked_cache(self):
+  def test_resolve_symlinked_cache(self):
     """Test to make sure resolve works when --ivy-cache-dir is a symlinked path.
 
     When ivy returns the path to a resolved jar file, it might be the realpath to the jar file,
