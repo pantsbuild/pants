@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 import subprocess
 
 from pants.base.build_environment import get_buildroot
@@ -24,14 +25,20 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                                 'examples/src/java/org/pantsbuild/example/wire/temperature'])
     self.assert_success(pants_run)
 
+    expected_patterns = [
+      '/gen/wire/{subdir}/org/pantsbuild/example/temperature/Temperature.java'.format(
+          subdir=r'((global)|(isolated/[a-zA-Z0-9._-]+))'),
+    ]
     expected_outputs = [
       'Compiling proto source file',
       'Created output directory',
       'Writing generated code',
-      '/gen/wire/org/pantsbuild/example/temperature/Temperature.java',
     ]
     for expected_output in expected_outputs:
       self.assertIn(expected_output, pants_run.stdout_data)
+    for pattern in expected_patterns:
+      self.assertTrue(re.search(pattern, pants_run.stdout_data) is not None, 'Expected pattern: '
+                      '{0}'.format(pattern))
 
   def test_bundle_wire_normal(self):
     pants_run = self.run_pants(['bundle',

@@ -1,0 +1,237 @@
+# coding=utf-8
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+import os
+from textwrap import dedent
+
+from pants.backend.codegen.register import build_file_aliases as register_codegen
+from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
+from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.build_file_aliases import BuildFileAliases
+from pants_test.tasks.task_test_base import TaskTestBase
+
+
+class SimpleCodegenTaskTest(TaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return cls.DummyGen
+
+  @property
+  def alias_groups(self):
+      return register_core().merge(register_codegen()).merge(BuildFileAliases.create({
+        'dummy_library': SimpleCodegenTaskTest.DummyLibrary
+      }))
+
+  def _create_dummy_task(self, target_roots=None, forced_codegen_strategy=None, **options):
+    self.set_options(**options)
+    task = self.create_task(self.context(target_roots=target_roots))
+    task.setup_for_testing(self, target_roots or [], forced_codegen_strategy)
+    return task
+
+  def _create_dummy_library_targets(self, target_specs):
+    for spec in target_specs:
+      spec_path, spec_name = spec.split(':')
+      self.add_to_build_file(spec_path, dedent('''
+          dummy_library(name='{name}',
+            sources=[],
+          )
+        '''.format(name=spec_name)))
+    return set([self.target(spec) for spec in target_specs])
+
+
+  def test_codegen_strategy(self):
+    self.set_options(strategy='global')
+    task = self.create_task(self.context())
+    self.assertEqual('global', task.get_options().strategy)
+    self.assertEqual('global', task.codegen_strategy.name())
+
+    self.set_options(strategy='isolated')
+    task = self.create_task(self.context())
+    self.assertEqual('isolated', task.codegen_strategy.name())
+
+    task = self._create_dummy_task(strategy='global', forced_codegen_strategy='global')
+    self.assertEqual('global', task.codegen_strategy.name())
+    task = self._create_dummy_task(strategy='isolated', forced_codegen_strategy='global')
+    self.assertEqual('global', task.codegen_strategy.name())
+
+  def test_codegen_workdir_suffix(self):
+    targets = self._create_dummy_library_targets([
+      'project/src/main/foogen/foo-lib:foo-target-a',
+      'project/src/main/foogen/foo-lib:foo-target-b',
+      'project/src/main/foogen/foo-bar:foo-target-a',
+      'project/src/main/genfoo/foo-bar:foo-target-a',
+    ])
+
+    task = self.create_task(self.context())
+
+    def get_suffix(target, strategy):
+      return task._codegen_strategy_for_name(strategy).codegen_workdir_suffix(target)
+
+    for target in targets:
+      self.assertEqual('global', get_suffix(target, 'global'))
+      self.assertTrue('isolated' in get_suffix(target, 'isolated'))
+
+    global_dirs = set(get_suffix(target, 'global') for target in targets)
+    isolated_dirs = set(get_suffix(target, 'isolated') for target in targets)
+
+    self.assertEqual(1, len(global_dirs), 'There should only be one global directory suffix!')
+    self.assertEqual(len(targets), len(isolated_dirs),
+                     'There should be exactly one directory suffix per unique target!')
+
+  def test_codegen_workdir_suffix_stability(self):
+    specs = ['project/src/main/foogen/foo-lib:foo-target-a']
+    for target in self._create_dummy_library_targets(specs):
+      for strategy in (SimpleCodegenTask.IsolatedCodegenStrategy(None),
+                       SimpleCodegenTaskTest.DummyGen.DummyGlobalStrategy(None)):
+        self.assertEqual(strategy.codegen_workdir_suffix(target),
+                         strategy.codegen_workdir_suffix(target),
+                         'Codegen workdir suffix should be stable given the same target!\n'
+                         '  target: {}'.format(target.address.spec))
+
+  def test_execute(self):
+    dummy_suffixes = ['a', 'b', 'c',]
+
+    self.add_to_build_file('gen-lib', '\n'.join(dedent('''
+      dummy_library(name='{suffix}',
+        sources=['org/pantsbuild/example/foo{suffix}.dummy'],
+      )
+    ''').format(suffix=suffix) for suffix in dummy_suffixes))
+
+    for suffix in dummy_suffixes:
+      self.create_file('gen-lib/org/pantsbuild/example/foo{suffix}.dummy'.format(suffix=suffix),
+                       'org.pantsbuild.example Foo{0}'.format(suffix))
+
+    targets = [self.target('gen-lib:{suffix}'.format(suffix=suffix)) for suffix in dummy_suffixes]
+    for strategy in ('global', 'isolated',):
+      task = self._create_dummy_task(target_roots=targets, strategy=strategy)
+      expected_targets = set(targets)
+      found_targets = set(task.codegen_targets())
+      self.assertEqual(expected_targets, found_targets,
+                       'TestGen failed to find codegen target {expected}! Found: [{found}].'
+                       .format(expected=', '.join(t.id for t in expected_targets),
+                               found=', '.join(t.id for t in found_targets)))
+      task.execute()
+
+
+  class DummyLibrary(JvmTarget):
+    """Library of .dummy files, which are just text files which generate empty java files.
+
+    As the name implies, this is purely for testing the behavior of the simple_codegen_task.
+
+    For example, a .dummy file with the contents:
+    org.company.package Main
+    org.company.package Foobar
+    org.company.other Barfoo
+
+    Would generate the files:
+    org/company/package/Main.java,
+    org/company/package/Foobar.java,
+    org/company/other/Barfoo.java,
+
+    Which would compile, but do nothing.
+    """
+
+
+  class DummyGen(SimpleCodegenTask):
+    """Task which generates .java files for DummyLibraries.
+
+    In addition to fulfilling the bare-minimum requirements of being a SimpleCodegenTask subclass,
+    the methods in this class perform some validation to ensure that they are being called correctly
+    by SimpleCodegenTask.
+    """
+    _forced_codegen_strategy = None
+
+    def __init__(self, *vargs, **kwargs):
+      super(SimpleCodegenTaskTest.DummyGen, self).__init__(*vargs, **kwargs)
+      self._test_case = None
+      self._all_targets = None
+      self.setup_for_testing(None, None, None)
+
+    def setup_for_testing(self, test_case, all_targets, forced_codegen_strategy=None):
+      """Gets this dummy generator class ready for testing.
+
+      :param TaskTestBase test_case: the 'parent' test-case using this task. Used for asserts, etc.
+      :param set all_targets: the set of all valid code-gen targets for this task, for validating
+        the correctness of the chosen strategy.
+      :param str forced_codegen_strategy: the name of the forced codegen strategy ('isolated' or
+        'global') is this task should force a particular strategy, or None if no strategy should be
+        forced.
+      """
+      self._test_case = test_case
+      self._all_targets = all_targets
+      SimpleCodegenTaskTest.DummyGen._forced_codegen_strategy = forced_codegen_strategy
+
+    @classmethod
+    def supported_strategy_types(cls):
+      if cls._forced_codegen_strategy is None:
+        return [cls.IsolatedCodegenStrategy, cls.DummyGlobalStrategy,]
+      elif cls._forced_codegen_strategy == 'global':
+        return [cls.DummyGlobalStrategy,]
+      elif cls._forced_codegen_strategy == 'isolated':
+        return [cls.IsolatedCodegenStrategy,]
+      raise ValueError('Unrecognized _forced_codegen_strategy for test ({}).'
+                       .format(cls._forced_codegen_strategy))
+
+    def is_gentarget(self, target):
+      return isinstance(target, SimpleCodegenTaskTest.DummyLibrary)
+
+    def execute_codegen(self, invalid_targets):
+      if self.codegen_strategy.name() == 'isolated':
+        self._test_case.assertEqual(1, len(invalid_targets),
+                                    'Codegen should execute individually in isolated mode.')
+      elif self.codegen_strategy.name() == 'global':
+        self._test_case.assertEqual(len(self._all_targets), len(invalid_targets),
+                                    'Codegen should execute all together in global mode.'
+                                    '\n all_targets={0}\n gen_targets={1}\n targets: '
+                                    .format(len(self._all_targets), len(invalid_targets),
+                                            ', '.join(t.address.spec for t in invalid_targets)))
+      else:
+        raise ValueError('Unknown codegen strategy "{}".'.format(self.codegen_strategy.name()))
+
+      for target in invalid_targets:
+        for path in self.sources_generated_by_target(target):
+          class_name = os.path.basename(path).split('.')[0]
+          package_name = os.path.relpath(os.path.dirname(path),
+                                         self.codegen_workdir(target)).replace(os.path.sep, '.')
+          if not os.path.exists(os.path.join(self._test_case.build_root, os.path.basename(path))):
+            self._test_case.create_dir(os.path.basename(path))
+          self._test_case.create_file(path)
+          with open(path, 'w') as f:
+            f.write('package {0};\n\n'.format(package_name))
+            f.write('public class {0} '.format(class_name))
+            f.write('{\n\\\\ ... nothing ... \n}\n')
+
+    def sources_generated_by_target(self, target):
+      self._test_case.assertEqual('global', self.codegen_strategy.name(),
+                            'sources_generated_by_target should only be called for '
+                            'strategy=global.')
+      for source in target.sources_relative_to_buildroot():
+        source = os.path.join(self._test_case.build_root, source)
+        with open(source, 'r') as f:
+          for line in f:
+            line = line.strip()
+            if line:
+              package_name, class_name = line.split(' ')
+              yield os.path.join(self.codegen_workdir(target),
+                                 os.path.join(*package_name.split('.')),
+                                 class_name)
+
+    def _find_sources_generated_by_target(self, target):
+      self._test_case.assertEqual('isolated', self.codegen_strategy.name(),
+                            '_find_sources_generated_by_target should only be called for '
+                            'strategy=isolated.')
+      return super(SimpleCodegenTaskTest.DummyGen, self)._find_sources_generated_by_target(target)
+
+    @property
+    def synthetic_target_type(self):
+      return JavaLibrary
+
+    class DummyGlobalStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
+      def find_sources(self, target):
+        return self._task.sources_generated_by_target(target)

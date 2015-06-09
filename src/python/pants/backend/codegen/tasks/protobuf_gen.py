@@ -110,6 +110,10 @@ class ProtobufGen(SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaProtobufLibrary)
 
+  @classmethod
+  def supported_strategy_types(cls):
+    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy,]
+
   def sources_generated_by_target(self, target):
     genfiles = []
     for source in target.sources_relative_to_source_root():
@@ -122,9 +126,15 @@ class ProtobufGen(SimpleCodegenTask):
       return
 
     sources_by_base = self._calculate_sources(targets)
-    sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
+    if self.codegen_strategy.name() == 'isolated':
+      sources = OrderedSet()
+      for target in targets:
+        sources.update(target.sources_relative_to_buildroot())
+    else:
+      sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
 
-    self.assert_sources_present(sources, targets)
+    if not self.validate_sources_present(sources, targets):
+      return
 
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports(targets))
@@ -236,6 +246,11 @@ class ProtobufGen(SimpleCodegenTask):
 
     for classname in classnames:
       yield os.path.join(basepath, '{0}.java'.format(classname))
+
+
+  class ProtobufGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
+    def find_sources(self, target):
+      return self._task.sources_generated_by_target(target)
 
 
 def _same_contents(a, b):
