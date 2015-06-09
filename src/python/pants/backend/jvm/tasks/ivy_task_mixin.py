@@ -260,8 +260,7 @@ class IvyTaskMixin(object):
                ivy=None,
                workunit_name='ivy',
                jars=None,
-               use_soft_excludes=False
-               ):
+               use_soft_excludes=False):
     ivy_jvm_options = copy.copy(self.get_options().jvm_options)
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
