@@ -192,7 +192,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       self.create_task(context, workdir).execute()
 
     jardepmap = context.products.get('jar_dependencies')
-    self.assertIsNone(jardepmap.get((excluding_target, 'default')))
+    self.assertTrue(jardepmap.empty(), 'jardepmap')
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
