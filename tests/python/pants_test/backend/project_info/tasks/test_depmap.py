@@ -294,6 +294,19 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('src/java/b:b_java')]
     )
 
+  def test_graph(self):
+    self.assert_console_output_ordered(
+      'digraph "common.h.h" {',
+      '  node [shape=rectangle, colorscheme=set312;];',
+      '  rankdir=LR;',
+      '  "internal-common.h.h" [style="filled", fillcolor="2"];',
+      '  "internal-common.h.h" -> "internal-common.f.f";',
+      '  "internal-common.f.f" [style="filled", fillcolor="1"];',
+      '}',
+      targets=[self.target('common/h')],
+      options={'graph': True}
+    )
+
 
 class ProjectInfoTest(ConsoleTaskTestBase):
   @classmethod

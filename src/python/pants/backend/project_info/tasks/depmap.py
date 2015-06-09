@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import json
 import os
 from collections import defaultdict
@@ -69,6 +70,8 @@ class Depmap(ConsoleTask):
     register('--graph', default=False, action='store_true',
              help='Specifies the internal dependency graph should be output in the dot digraph '
                   'format.')
+    register('--tree', default=False, action='store_true',
+             help='For text output, show an ascii tree to help visually line up indentions.')
     register('--project-info', default=False, action='store_true',
              deprecated_version='0.0.33',
              deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
@@ -102,6 +105,7 @@ class Depmap(ConsoleTask):
 
     self.is_minimal = self.get_options().minimal
     self.is_graph = self.get_options().graph
+    self.should_tree = self.get_options().tree
     self.path_to = self.get_options().path_to
     self.separator = self.get_options().separator
     self.project_info = self.get_options().project_info
@@ -111,20 +115,21 @@ class Depmap(ConsoleTask):
   def console_output(self, targets):
     if len(self.context.target_roots) == 0:
       raise TaskError("One or more target addresses are required.")
+
     if self.project_info and self.is_graph:
       raise TaskError('-graph and -project-info are mutually exclusive; please choose one.')
+
     if self.project_info:
       output = self.project_info_output(targets)
       for line in output:
         yield line
       return
+
     for target in self.context.target_roots:
-      if self.is_graph:
-        for line in self._output_digraph(target):
-          yield line
-      else:
-        for line in self._output_dependency_tree(target):
-          yield line
+      out = self._output_digraph(target) if self.is_graph else self._output_dependency_tree(target)
+      for line in out:
+        print(line)
+        yield line
 
   def _dep_id(self, dependency):
     """Returns a tuple of dependency_id , is_internal_dep."""
@@ -135,60 +140,65 @@ class Depmap(ConsoleTask):
     else:
       params.update(org='internal', name=dependency.id)
 
-    if params.get('rev'):
+    if params.get('rev') is not None:
       return "{org}{sep}{name}{sep}{rev}".format(**params), False
     else:
       return "{org}{sep}{name}".format(**params), True
 
-  def _output_dependency_tree(self, target):
-    def output_dep(dep, indent):
-      return "{}{}".format(indent * "  ", dep)
+  def check_path_to(self, jar_dep_id):
+    """Check that jar_dep_id is the dep we are looking for with path_to
+       (or that path_to is not enabled)"""
+    return jar_dep_id == self.path_to or not self.path_to
 
-    def check_path_to(jar_dep_id):
-      """
-      Check that jar_dep_id is the dep we are looking for with path_to
-      (or that path_to is not enabled)
-      """
-      return jar_dep_id == self.path_to or not self.path_to
+  def _iter_jar_deps(self, jar_deps, outputted):
+    """Recursive jar dependency output helper."""
+    for jar_dep in jar_deps:
+      jar_dep_id, is_internal = self._dep_id(jar_dep)
+      if not is_internal:
+        if jar_dep_id not in outputted or (not self.is_minimal and not self.is_external_only):
+          if self.check_path_to(jar_dep_id):
+            # TODO(kwilson): broken
+            yield make_line(jar_dep_id, indent)
+          outputted.add(jar_dep_id)
+
+  def _output_dependency_tree(self, target):
+    """Plain-text depmap output handler."""
+
+    def make_line(dep, indent):
+      indent_join, indent_chars = ('--', '  |') if self.should_tree else ('', '  ')
+      return '{}{}{}'.format(indent * indent_chars, indent_join, dep)
 
     def output_deps(dep, indent=0, outputted=set()):
-      dep_id, _ = self._dep_id(dep)
+      dep_id = self._dep_id(dep)[0]
+
       if dep_id in outputted:
-        return [output_dep("*{}".format(dep_id), indent)] if not self.is_minimal else []
+        if not self.is_minimal:
+          yield make_line('*{}'.format(dep_id), indent)
       else:
-        output = []
         if not self.is_external_only:
           indent += 1
 
-        jar_output = []
-        if not self.is_internal_only:
-          if self._is_jvm(dep):
-            for jar_dep in dep.jar_dependencies:
-              jar_dep_id, internal = self._dep_id(jar_dep)
-              if not internal:
-                if jar_dep_id not in outputted or (not self.is_minimal
-                                                   and not self.is_external_only):
-                  if check_path_to(jar_dep_id):
-                    jar_output.append(output_dep(jar_dep_id, indent))
-                  outputted.add(jar_dep_id)
-
         dep_output = []
-        for internal_dep in dep.dependencies:
-          dep_output.extend(output_deps(internal_dep, indent, outputted))
+        if not self.is_internal_only and self._is_jvm(dep):
+          dep_output = [x for x in self._iter_jar_deps(dep.jar_dependencies, outputted)]
 
-        if not check_path_to(dep_id) and not (jar_output or dep_output):
-          return []
+        dep_output += [
+          x for x in itertools.chain(*(output_deps(x, indent, outputted) for x in dep.dependencies))
+        ]
 
-        if not self.is_external_only:
-          output.append(output_dep(dep_id, indent - 1))
-          outputted.add(dep_id)
+        if self.check_path_to(dep_id) or dep_output:
+          if not self.is_external_only:
+            yield make_line(dep_id, indent - 1)
+            outputted.add(dep_id)
 
-        output.extend(dep_output)
-        output.extend(jar_output)
-        return output
-    return output_deps(target)
+          for item in dep_output:
+            yield item
+
+    for item in output_deps(target):
+      yield item
 
   def _output_digraph(self, target):
+    """Graphviz format depmap output handler."""
     color_by_type = {}
 
     def output_candidate(internal):
@@ -196,50 +206,43 @@ class Depmap(ConsoleTask):
                or (self.is_external_only and not internal)
                or (not self.is_internal_only and not self.is_external_only))
 
-    def output_dep(dep):
-      dep_id, internal = self._dep_id(dep)
-      if internal:
-        fmt = '  "{id}" [style=filled, fillcolor="{color}"];'
-      else:
-        fmt = '  "{id}" [style=filled, fillcolor="{color}", shape=ellipse];'
+    def make_line(dep, dep_id, internal):
+      line_fmt = '  "{id}" [style="filled", fillcolor="{color}{internal}"];'
+      int_shape = '", shape="ellipse"' if not internal else ''
+
       if type(dep) not in color_by_type:
         color_by_type[type(dep)] = len(color_by_type.keys()) + 1
-      return fmt.format(id=dep_id, color=color_by_type[type(dep)])
 
-    def output_deps(outputted, dep, parent=None):
-      output = []
+      return line_fmt.format(id=dep_id, internal=int_shape, color=color_by_type[type(dep)])
 
-      if dep not in outputted:
-        outputted.add(dep)
-        output.append(output_dep(dep))
-        if parent:
-          output.append('  "{}" -> "{}";'.format(self._dep_id(parent)[0], self._dep_id(dep)[0]))
+    def output_deps(dep, outputted, parent=None):
+      dep_id, internal = self._dep_id(dep)
 
-        # TODO: This is broken. 'dependency' doesn't exist here, and we don't have
-        # internal_dependencies any more anyway.
-        if self._is_jvm(dependency):
-          for internal_dependency in dependency.internal_dependencies:
-            output += output_deps(outputted, internal_dependency, dependency)
+      # if dep_id in outputted and parent:
+      if parent:
+        yield '  "{}" -> "{}";'.format(self._dep_id(parent)[0], dep_id)
 
-        for jar in (dependency.jar_dependencies if self._is_jvm(dependency) else [dependency]):
-          jar_id, internal = self._dep_id(jar)
-          if output_candidate(internal):
-            if jar not in outputted:
-              output += [output_dep(jar)]
-              outputted.add(jar)
+      if dep_id not in outputted:
+        dep_output = [
+          x for x in itertools.chain(*(output_deps(x, outputted, dep) for x in dep.dependencies))
+        ]
+        if not self.is_internal_only and self._is_jvm(dep):
+          dep_output += [x for x in self._iter_jar_deps(dep.jar_dependencies, outputted)]
 
-            target_id, _ = self._dep_id(target)
-            dep_id, _ = self._dep_id(dependency)
-            left_id = target_id if self.is_external_only else dep_id
-            if (left_id, jar_id) not in outputted:
-              styled = internal and not self.is_internal_only
-              output += ['  "{}" -> "{}"{};'.format(left_id, jar_id,
-                                                    ' [style="dashed"]' if styled else '')]
-              outputted.add((left_id, jar_id))
-      return output
-    header = ['digraph "{}" {{'.format(target.id)]
-    graph_attr = ['  node [shape=rectangle, colorscheme=set312;];', '  rankdir=LR;']
-    return header + graph_attr + output_deps(set(), target) + ['}']
+        if self.check_path_to(dep_id) or dep_output:
+          if not self.is_external_only:
+            yield make_line(dep, dep_id, internal)
+            outputted.add(dep_id)
+
+          for item in dep_output:
+            yield item
+
+    yield 'digraph "{}" {{'.format(target.id)
+    yield '  node [shape=rectangle, colorscheme=set312;];'
+    yield '  rankdir=LR;'
+    for line in output_deps(target, set()):
+      yield line
+    yield '}'
 
   @deprecated(removal_version='0.0.33',
       hint_message='Information from "depmap --project-info" should now be accessed through the "export" goal')
