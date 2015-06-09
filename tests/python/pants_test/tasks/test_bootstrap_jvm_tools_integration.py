@@ -18,12 +18,12 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
         "--read-artifact-caches=['{}']".format(artifact_cache)
       ]
 
-      # scala compilation should bootstrap and shade zinc
+      # Scala compilation should bootstrap and shade zinc.
       pants_run = self.run_pants(bootstrap_args + ['compile', 'examples/src/scala/org/pantsbuild/example/hello'])
       self.assert_success(pants_run)
       self.assertTrue('[shade-zinc]' in pants_run.stdout_data)
 
-      # java compilation shouldn't bootstrap and shade zinc after clean-all
+      # Java compilation shouldn't bootstrap and shade zinc after clean-all.
       pants_run = self.run_pants(bootstrap_args +
                                  ['clean-all',
                                   'compile',
