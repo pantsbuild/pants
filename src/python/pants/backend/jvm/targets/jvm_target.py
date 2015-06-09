@@ -43,7 +43,7 @@ class JvmTarget(Target, Jarable):
     :param services: A dict mapping service interface names to the classes owned by this target
                      that implement them.  Keys are fully qualified service class names, values are
                      lists of strings, each string the fully qualified class name of a class owned
-                     by this target that implements the service interface and should by
+                     by this target that implements the service interface and should be
                      discoverable by the jvm service provider discovery mechanism described here:
                      https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
     """
@@ -64,7 +64,7 @@ class JvmTarget(Target, Jarable):
 
     # Service info is only used when generating resources, it should not affect, for example, a
     # compile fingerprint or javadoc fingerprint.  As such, its not a payload field.
-    self._services = services
+    self._services = services or {}
 
     self.add_labels('jvm')
     if no_cache:
@@ -114,4 +114,4 @@ class JvmTarget(Target, Jarable):
 
   @property
   def services(self):
-    return dict(self._services or {})
+    return self._services
