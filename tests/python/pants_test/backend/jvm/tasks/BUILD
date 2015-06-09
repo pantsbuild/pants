@@ -131,6 +131,7 @@ python_tests(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
+    'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'src/python/pants/goal:products',
