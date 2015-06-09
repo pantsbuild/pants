@@ -26,14 +26,12 @@ from pants.util.dirutil import safe_mkdir_for
 
 
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
-  def __init__(self, main, scope, key, custom_rules=None):
+  def __init__(self, main, custom_rules=None):
     # The bootstrapper uses no custom confs in its resolves.
     super(ShadedToolFingerprintStrategy, self).__init__(confs=None)
 
     self._main = main
     self._custom_rules = custom_rules
-    self._scope = scope
-    self._key = key
 
   def compute_fingerprint(self, target):
     hasher = hashlib.sha1()
@@ -41,13 +39,12 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
     if base_fingerprint is None:
       return None
 
+    hasher.update('version=2')
     hasher.update(base_fingerprint)
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
     # to ensure proper invalidation.
     hasher.update(self._main)
-    hasher.update(self._scope)
-    hasher.update(self._key)
     if self._custom_rules:
       for rule in self._custom_rules:
         hasher.update(rule.render())
@@ -57,7 +54,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
   def _tuple(self):
     # NB: this tuple's slots - used for `==/hash()` - must be kept in agreement with the hashed
     # fields in `compute_fingerprint` to ensure proper invalidation.
-    return self._main, self._scope, self._key, tuple(self._custom_rules or ())
+    return self._main, tuple(self._custom_rules or ())
 
   def __hash__(self):
     return hash((type(self),) + self._tuple())
@@ -149,22 +146,23 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return self._shader
 
   def _bootstrap_shaded_jvm_tool(self, key, scope, tools, main, custom_rules=None):
-    shaded_jar = os.path.join(self._tool_cache_path,
-                              'shaded_jars', scope, key, '{}.jar'.format(main))
-
     targets = list(self._resolve_tool_targets(tools, key, scope))
-    fingerprint_strategy = ShadedToolFingerprintStrategy(main, scope, key, custom_rules=custom_rules)
+    fingerprint_strategy = ShadedToolFingerprintStrategy(main, custom_rules=custom_rules)
+
     with self.invalidated(targets,
                           # We're the only dependent in reality since we shade.
                           invalidate_dependents=False,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
 
+      tool_vts = self.tool_vts(invalidation_check)
+      jar_name = '{main}-{hash}.jar'.format(main=main, hash=tool_vts.cache_key.hash)
+      shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
+
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
         return [shaded_jar]
 
       # Ensure we have a single binary jar we can shade.
-      binary_jar = os.path.join(self._tool_cache_path,
-                                'binary_jars', scope, key, '{}.jar'.format(main))
+      binary_jar = os.path.join(self._tool_cache_path, 'binary_jars', jar_name)
       safe_mkdir_for(binary_jar)
 
       classpath = self._bootstrap_classpath(key, targets)
@@ -196,7 +194,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
 
       if self.artifact_cache_writes_enabled():
-        tool_vts = self.tool_vts(invalidation_check)
         self.update_artifact_cache([(tool_vts, [shaded_jar])])
 
       return [shaded_jar]
