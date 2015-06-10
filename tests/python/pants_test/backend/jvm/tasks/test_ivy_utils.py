@@ -88,25 +88,52 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             )
         """.format(org=self.b_org, name=self.b_name)))
 
+    self.add_to_build_file('src/java/targets',
+        dedent("""
+            java_library(
+              name='e',
+              dependencies=[
+                '3rdparty:example-morx',
+                '3rdparty:example-fleem',
+              ],
+              excludes=[exclude(org='commons-lang', name='commons-lang')],
+              sources=['w.java'],
+            )
+        """.format(org=self.b_org, name=self.b_name)))
+
     self.a = self.target('src/java/targets:a')
     self.b = self.target('src/java/targets:b')
     self.c = self.target('src/java/targets:c')
-    context = self.context()
+    self.e = self.target('src/java/targets:e')
 
   def test_exclude_exported(self):
     _, excludes = IvyUtils.calculate_classpath([self.b])
-    self.assertEqual(excludes, set([Exclude(org=self.b_org, name=self.b_name)]))
+    self.assertEqual(excludes, {Exclude(org=self.b_org, name=self.b_name)})
 
   def test_exclude_exported_disabled(self):
     _, excludes = IvyUtils.calculate_classpath([self.b], automatic_excludes=False)
     self.assertSetEqual(excludes, set())
 
+  def test_exclude_exported_disabled_when_no_excludes_gathered(self):
+    _, excludes = IvyUtils.calculate_classpath([self.b], gather_excludes=False)
+    self.assertSetEqual(excludes, set())
+
+
+  def test_excludes_generated_when_requested(self):
+    _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=True)
+    self.assertSetEqual(excludes, {Exclude(org='commons-lang', name='commons-lang')})
+
+  def test_excludes_empty_when_not_requested(self):
+    _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=False)
+    self.assertSetEqual(excludes, set())
+
+
   def test_classifiers(self):
     jars, _ = IvyUtils.calculate_classpath([self.c])
-    self.assertEquals(2, len(jars))
+
     jars.sort(key=lambda jar : jar.classifier)
-    self.assertEquals('fleem', jars[0].classifier)
-    self.assertEquals('morx', jars[1].classifier)
+
+    self.assertEquals(['fleem', 'morx'], [jar.classifier for jar in jars])
 
   def test_force_override(self):
     jars = list(self.a.payload.jars)

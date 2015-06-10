@@ -269,9 +269,10 @@ class IvyTaskMixin(object):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
 
     if not jars:
-      jars, excludes = IvyUtils.calculate_classpath(targets, self.get_options().automatic_excludes)
-      if use_soft_excludes:
-        excludes = filter(self._exclude_is_not_contained_in_jars(jars), excludes)
+      automatic_excludes = self.get_options().automatic_excludes
+      jars, excludes = IvyUtils.calculate_classpath(targets,
+                                                    gather_excludes=not use_soft_excludes,
+                                                    automatic_excludes=automatic_excludes)
     else:
       excludes = set()
 
