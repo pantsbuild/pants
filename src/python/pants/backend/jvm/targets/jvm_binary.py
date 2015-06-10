@@ -171,6 +171,7 @@ class JarRules(FingerprintedMixin):
     rules = [Skip(r'^META-INF/[^/]+\.SF$'),  # signature file
              Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
              Skip(r'^META-INF/[^/]+\.RSA$'),  # default signature alg. file
+             Skip(r'^META-INF/INDEX.LIST'), # Interferes with Class-Path: see man jar for i option
              Duplicate(r'^META-INF/services/', Duplicate.CONCAT)]  # 1 svc fqcn per line
 
     return JarRules(rules=rules + additional_rules, default_dup_action=default_dup_action)
