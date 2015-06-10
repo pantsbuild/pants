@@ -72,6 +72,8 @@ class Depmap(ConsoleTask):
                   'format.')
     register('--tree', default=False, action='store_true',
              help='For text output, show an ascii tree to help visually line up indentions.')
+    register('--show-types', default=False, action='store_true',
+             help='Show types of objects in depmap.')
     register('--project-info', default=False, action='store_true',
              deprecated_version='0.0.33',
              deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
@@ -106,6 +108,7 @@ class Depmap(ConsoleTask):
     self.is_minimal = self.get_options().minimal
     self.is_graph = self.get_options().graph
     self.should_tree = self.get_options().tree
+    self.show_types = self.get_options().show_types
     self.path_to = self.get_options().path_to
     self.separator = self.get_options().separator
     self.project_info = self.get_options().project_info
@@ -199,14 +202,19 @@ class Depmap(ConsoleTask):
     """Graphviz format depmap output handler."""
     color_by_type = {}
 
+    def maybe_add_type(dep, dep_id):
+      """Add a class type to a dependency id if --show-types is passed."""
+      return dep_id if not self.show_types else '\n'.join((dep_id, dep.__class__.__name__))
+
     def make_node(dep, dep_id, internal):
       line_fmt = '  "{id}" [style=filled, fillcolor={color}{internal}];'
       int_shape = ', shape=ellipse' if not internal else ''
 
-      if type(dep) not in color_by_type:
-        color_by_type[type(dep)] = len(color_by_type.keys()) + 1
+      dep_class = dep.__class__.__name__
+      if dep_class not in color_by_type:
+        color_by_type[dep_class] = len(color_by_type.keys()) + 1
 
-      return line_fmt.format(id=dep_id, internal=int_shape, color=color_by_type[type(dep)])
+      return line_fmt.format(id=dep_id, internal=int_shape, color=color_by_type[dep_class])
 
     def make_edge(from_dep_id, to_dep_id):
       return '  "{}" -> "{}";'.format(from_dep_id, to_dep_id)
@@ -215,9 +223,10 @@ class Depmap(ConsoleTask):
       dep_id, internal = self._dep_id(dep)
 
       if dep_id not in outputted and self.maybe_check_path_to(dep_id):
-        yield make_node(dep, dep_id, internal)
+        yield make_node(dep, maybe_add_type(dep, dep_id), internal)
+
         if parent:
-          yield make_edge(parent_id, dep_id)
+          yield make_edge(maybe_add_type(parent, parent_id), maybe_add_type(dep, dep_id))
         outputted.add(dep_id)
 
       for sub_dep, sub_dep_id, _ in self._enumerate_visible_deps(dep, self.output_candidate):
