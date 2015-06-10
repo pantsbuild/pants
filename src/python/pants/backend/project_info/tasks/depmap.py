@@ -87,7 +87,7 @@ class Depmap(ConsoleTask):
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
     register('--path-to',
-             help='Show only items on the path to the given target.')
+             help='Show only items on the path to the given target. This is a no-op for --graph.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -169,7 +169,7 @@ class Depmap(ConsoleTask):
     for inner_dep in dependencies:
       dep_id, internal = self._dep_id(inner_dep)
       if predicate(internal):
-        yield inner_dep, dep_id, internal
+        yield inner_dep
 
   def output_candidate(self, internal):
     return ((not self.is_internal_only and not self.is_external_only)
@@ -191,7 +191,7 @@ class Depmap(ConsoleTask):
         yield make_line(dep_id, indent, is_dupe=dep_id in outputted)
         outputted.add(dep_id)
 
-      for sub_dep, _, _ in self._enumerate_visible_deps(dep, self.output_candidate):
+      for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
         for item in output_deps(sub_dep, indent + 1, outputted):
           yield item
 
@@ -204,7 +204,7 @@ class Depmap(ConsoleTask):
 
     def maybe_add_type(dep, dep_id):
       """Add a class type to a dependency id if --show-types is passed."""
-      return dep_id if not self.show_types else '\n'.join((dep_id, dep.__class__.__name__))
+      return dep_id if not self.show_types else '\\n'.join((dep_id, dep.__class__.__name__))
 
     def make_node(dep, dep_id, internal):
       line_fmt = '  "{id}" [style=filled, fillcolor={color}{internal}];'
@@ -222,14 +222,17 @@ class Depmap(ConsoleTask):
     def output_deps(dep, parent, parent_id, outputted):
       dep_id, internal = self._dep_id(dep)
 
-      if dep_id not in outputted and self.maybe_check_path_to(dep_id):
+      if dep_id not in outputted:
         yield make_node(dep, maybe_add_type(dep, dep_id), internal)
-
-        if parent:
-          yield make_edge(maybe_add_type(parent, parent_id), maybe_add_type(dep, dep_id))
         outputted.add(dep_id)
 
-      for sub_dep, sub_dep_id, _ in self._enumerate_visible_deps(dep, self.output_candidate):
+      if parent:
+        edge_id = (parent_id, dep_id)
+        if edge_id not in outputted:
+          yield make_edge(maybe_add_type(parent, parent_id), maybe_add_type(dep, dep_id))
+          outputted.add(edge_id)
+
+      for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
         for item in output_deps(sub_dep, dep, dep_id, outputted):
           yield item
 
