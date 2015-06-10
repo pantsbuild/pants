@@ -110,11 +110,11 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
       if registry_class:
         args.append('--registry_class={0}'.format(registry_class))
 
-      for root in target.payload.roots:
-        args.append('--roots={0}'.format(root))
+      if target.payload.roots:
+        args.append('--roots={0}'.format(','.join(target.payload.roots)))
 
-      for enum_option in target.payload.enum_options:
-        args.append('--enum_options={0}'.format(enum_option))
+      if target.payload.enum_options:
+        args.append('--enum_options={0}'.format(','.join(target.payload.enum_options)))
 
       args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
                                                          SourceRoot.find(target))))
