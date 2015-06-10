@@ -157,7 +157,7 @@ class Depmap(ConsoleTask):
           if self.check_path_to(jar_dep_id):
             yield jar_dep_id
 
-  def _enumerate_visible_deps(self, dep, is_visible):
+  def _enumerate_visible_deps(self, dep, predicate):
     dep_id, internal = self._dep_id(dep)
 
     dependencies = sorted([x for x in getattr(dep, 'dependencies', [])]) + sorted(
@@ -165,7 +165,7 @@ class Depmap(ConsoleTask):
 
     for inner_dep in dependencies:
       dep_id, internal = self._dep_id(inner_dep)
-      if is_visible(internal):
+      if predicate(internal):
         yield inner_dep, dep_id, internal
 
   def output_candidate(self, internal):
@@ -201,7 +201,7 @@ class Depmap(ConsoleTask):
 
     def make_node(dep, dep_id, internal):
       line_fmt = '  "{id}" [style=filled, fillcolor={color}{internal}];'
-      int_shape = '", shape=ellipse' if not internal else ''
+      int_shape = ', shape=ellipse' if not internal else ''
 
       if type(dep) not in color_by_type:
         color_by_type[type(dep)] = len(color_by_type.keys()) + 1
