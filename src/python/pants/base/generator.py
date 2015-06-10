@@ -47,8 +47,12 @@ class Generator(object):
     self._template = MustacheRenderer.parse_template(template_text)
     self.template_data = template_data
 
+  def render(self):
+    """Applies the template to the template data and returns the output."""
+    return pystache.render(self._template, self.template_data)
+
   def write(self, stream):
     """Applies the template to the template data and writes the result to the given file-like
     stream."""
 
-    stream.write(pystache.render(self._template, self.template_data))
+    stream.write(self.render())

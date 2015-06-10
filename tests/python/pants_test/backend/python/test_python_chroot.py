@@ -9,11 +9,11 @@ import unittest
 
 from pex.platforms import Platform
 
-from pants.backend.python.resolver import get_platforms
+from pants.backend.python.python_chroot import PythonChroot
 
 
-class ResolverTest(unittest.TestCase):
+class PythonChrootTest(unittest.TestCase):
   def test_get_current_platform(self):
     expected_platforms = [Platform.current(), 'linux-x86_64']
     self.assertEqual(set(expected_platforms),
-                     set(get_platforms(['current', 'linux-x86_64'])))
+                     set(PythonChroot.get_platforms(['current', 'linux-x86_64'])))

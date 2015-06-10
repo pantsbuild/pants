@@ -72,10 +72,6 @@ def register_global_options(register):
   register('--fail-fast', action='store_true',
            help='When parsing specs, will stop on the first erronous BUILD file encountered. '
                 'Otherwise, will parse all builds in a spec and then throw an Exception.')
-  register('--python-chroot-requirements-ttl', type=int, metavar='<seconds>',
-           default=10 * 365 * 86400,  # 10 years.
-           help='the time in seconds before we consider re-resolving an open-ended '
-                'requirement, e.g. "flask>=0.2" if a matching distribution is available on disk.')
   register('--pants-support-baseurls', type=Options.list, advanced=True, recursive=True,
            default = [ 'https://dl.bintray.com/pantsbuild/bin/build-support' ],
            help='List of urls from which binary tools are downloaded.  Urls are searched in order'

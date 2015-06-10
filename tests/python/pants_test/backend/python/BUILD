@@ -5,7 +5,17 @@ target(
   name='python',
   dependencies=[
     ':test_python_requirement_list',
+    ':test_python_chroot',
     'tests/python/pants_test/backend/python/tasks'
+  ]
+)
+
+python_tests(
+  name='test_python_chroot',
+  sources=['test_python_chroot.py'],
+  dependencies=[
+    '3rdparty/python:pex',
+    'src/python/pants/backend/python:python_chroot',
   ]
 )
 

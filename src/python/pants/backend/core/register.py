@@ -13,6 +13,7 @@ from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDepe
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
+from pants.backend.core.tasks.bash_completion import BashCompletionTask
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
@@ -28,7 +29,6 @@ from pants.backend.core.tasks.minimal_cover import MinimalCover
 from pants.backend.core.tasks.noop import NoopCompile, NoopTest
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
-from pants.backend.core.tasks.prepare_resources import PrepareResources
 from pants.backend.core.tasks.reporting_server import KillServer, RunServer
 from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
@@ -128,9 +128,6 @@ def register_goals():
   task(name='killserver', action=KillServer, serialize=False).install().with_description(
       'Kill the reporting server.')
 
-  # Bootstrapping.
-  task(name='prepare', action=PrepareResources).install('resources')
-
   task(name='markdown', action=MarkdownToHtml).install('markdown').with_description(
       'Generate html from markdown docs.')
 
@@ -184,3 +181,6 @@ def register_goals():
 
   task(name='deferred-sources', action=DeferredSourcesMapper).install().with_description(
     'Map unpacked sources from archives.')
+
+  task(name='bash-completion', action=BashCompletionTask).install().with_description(
+    'Dump bash shell script for autocompletion of pants command lines.')

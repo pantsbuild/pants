@@ -23,7 +23,7 @@ from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.option.options import Options
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
@@ -57,9 +57,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
 
-    register('--delete-scratch', default=True, action='store_true',
-             help='Leave intermediate scratch files around, for debugging build problems.')
-
   def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools,
                                                    language, sources_predicate)
@@ -70,17 +67,10 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     self._analysis_dir = os.path.join(workdir, 'analysis')
     self._classes_dir = os.path.join(workdir, 'classes')
 
-    self._delete_scratch = options.delete_scratch
-
     self._analysis_file = os.path.join(self._analysis_dir, 'global_analysis.valid')
     self._invalid_analysis_file = os.path.join(self._analysis_dir, 'global_analysis.invalid')
 
     self._target_sources_dir = os.path.join(workdir, 'target_sources')
-
-    # A temporary, but well-known, dir in which to munge analysis/dependency files in before
-    # caching. It must be well-known so we know where to find the files when we retrieve them from
-    # the cache.
-    self._analysis_tmpdir = os.path.join(self._analysis_dir, 'artifact_cache_tmpdir')
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = options.partition_size_hint
@@ -131,12 +121,14 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                                self._sources_for_target(target))
 
   def move(self, src, dst):
-    if self._delete_scratch:
+    if self.delete_scratch:
       shutil.move(src, dst)
     else:
       shutil.copy(src, dst)
 
   def pre_compile(self):
+    super(JvmCompileGlobalStrategy, self).pre_compile()
+
     # Only create these working dirs during execution phase, otherwise, they
     # would be wiped out by clean-all goal/task if it's specified.
     safe_mkdir(self._target_sources_dir)
@@ -166,8 +158,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       invalid_sources = list(itertools.chain.from_iterable(invalid_sources_by_target.values()))
       self._deleted_sources = self._compute_deleted_sources()
 
-      self._ensure_analysis_tmpdir()
-      tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
+      tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
       os.mkdir(tmpdir)
       valid_analysis_tmp = os.path.join(tmpdir, 'valid_analysis')
       newly_invalid_analysis_tmp = os.path.join(tmpdir, 'newly_invalid_analysis')
@@ -233,7 +224,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Find the invalid sources for this chunk.
     invalid_sources_by_target = {t: self._sources_for_target(t) for t in invalid_targets}
 
-    tmpdir = os.path.join(self._analysis_tmpdir, str(uuid.uuid4()))
+    tmpdir = os.path.join(self.analysis_tmpdir, str(uuid.uuid4()))
     os.mkdir(tmpdir)
 
     # Figure out the sources and analysis belonging to each partition.
@@ -341,13 +332,13 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for compile_context in compile_contexts:
       if compile_context.classes_dir != self._classes_dir:
         raise TaskError('Unrecognized classes directory for the global strategy: {}'.format(
-          compile_context.classes_dir))
+            compile_context.classes_dir))
       if not analysis_file:
         analysis_file = compile_context.analysis_file
       else:
         if compile_context.analysis_file != analysis_file:
           raise TaskError('Inconsistent analysis file for the global strategy: {} vs {}'.format(
-            compile_context.analysis_file, analysis_file))
+              compile_context.analysis_file, analysis_file))
 
     classes_by_src_by_context = defaultdict(dict)
     if os.path.exists(analysis_file):
@@ -369,7 +360,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     Class files are retrieved directly into their final locations in the global classes dir.
     """
-    self._ensure_analysis_tmpdir()
 
     # Get all the targets whose artifacts we found in the cache.
     cached_targets = []
@@ -388,9 +378,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Localize the cached analyses.
     analyses_to_merge = []
     for target in cached_targets:
-      analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, target)
-      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir,
-                                                                        target)
+      analysis_file = JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, target)
+      portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
+          self.analysis_tmpdir, target)
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, analysis_file)
       if os.path.exists(analysis_file):
@@ -430,9 +420,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     # Determine locations for analysis files that will be split in the background.
     split_analysis_files = [
-        JvmCompileStrategy._analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._analysis_for_target(self.analysis_tmpdir, t) for t in vts_targets]
     portable_split_analysis_files = [
-        JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, t) for t in vts_targets]
+        JvmCompileStrategy._portable_analysis_for_target(self.analysis_tmpdir, t) for t in vts_targets]
 
     # Set up args for splitting the analysis into per-target files.
     splits = zip([self._sources_for_target(t) for t in vts_targets], split_analysis_files)
@@ -463,8 +453,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       if vt is not None:
         # NOTE: analysis_file doesn't exist yet.
         vts_artifactfiles_pairs.append(
-            (vt,
-             artifacts + [JvmCompileStrategy._portable_analysis_for_target(self._analysis_tmpdir, target)]))
+            (vt, artifacts + [JvmCompileStrategy._portable_analysis_for_target(
+                self.analysis_tmpdir, target)]))
 
     update_artifact_cache_work = get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
@@ -543,7 +533,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       classpath_entries = filter(non_product, classpath)
       for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
         # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-        if os.path.isfile(cp_entry) and ((cp_entry.endswith('.jar') or cp_entry.endswith('.zip'))):
+        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
           with open_zip(cp_entry, 'r') as jar:
             for cls in jar.namelist():
               # First jar with a given class wins, just like when classloading.
@@ -581,14 +571,3 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Note that this order matters: it reflects the classloading order.
     bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
     return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
-
-  # Work in a tmpdir so we don't stomp the main analysis files on error.
-  # The tmpdir is cleaned up in a shutdown hook, because background work
-  # may need to access files we create there even after this method returns.
-  def _ensure_analysis_tmpdir(self):
-    # Do this lazily, so we don't trigger creation of a worker pool unless we need it.
-    if not os.path.exists(self._analysis_tmpdir):
-      os.makedirs(self._analysis_tmpdir)
-      if self._delete_scratch:
-        self.context.background_worker_pool().add_shutdown_hook(
-            lambda: safe_rmtree(self._analysis_tmpdir))

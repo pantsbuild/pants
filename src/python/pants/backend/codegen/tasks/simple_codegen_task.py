@@ -5,18 +5,48 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
+from abc import abstractmethod
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
+from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.memo import memoized_property
+from pants.util.meta import AbstractClass
 
+
+logger = logging.getLogger(__name__)
 
 class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language."""
+
+  @classmethod
+  def register_options(cls, register):
+    super(SimpleCodegenTask, cls).register_options(register)
+    register('--allow-empty', action='store_true', default=True,
+             help='Skip targets with no sources defined.',
+             advanced=True)
+    if cls.forced_codegen_strategy() is None:
+      strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
+      register('--strategy', choices=strategy_names,
+               default=strategy_names[0],
+               help='Selects the compilation strategy to use. The "global" strategy uses a shared '
+                    'global directory for all generated code, and the "isolated" strategy uses '
+                    'per-target codegen directories.',
+               advanced=True)
+      if 'isolated' in strategy_names:
+        register('--allow-dups', action='store_true', default=False,
+                 help='Allow multiple targets specifying the same sources when using the isolated '
+                      'strategy. If duplicates are allowed, the logic of find_sources in '
+                      'IsolatedCodegenStrategy will associate generated sources with '
+                      'least-dependent targets that generate them.',
+                 advanced=True)
 
   @classmethod
   def get_fingerprint_strategy(cls):
@@ -63,20 +93,71 @@ class SimpleCodegenTask(Task):
     """
     raise NotImplementedError
 
-  def sources_generated_by_target(self, target):
-    """Predicts what source files will be generated from the given codegen target.
-
-    :param Target target: the codegen target in question (eg a .proto library).
-    :return: an iterable of strings containing the file system paths to the sources files.
-    """
-    raise NotImplementedError
-
   def codegen_targets(self):
     """Finds codegen targets in the dependency graph.
 
     :return: an iterable of dependency targets.
     """
     return self.context.targets(self.is_gentarget)
+
+  @classmethod
+  def supported_strategy_types(cls):
+    """The CodegenStrategy subclasses that this codegen task supports.
+
+    This list is used to generate the options for the --strategy flag. The first item in the list
+    is used as the default value.
+
+    By default, this only supports the IsolatedCodegenStrategy. Subclasses which desire global
+    generation should subclass the GlobalCodegenStrategy.
+    :return: the list of types (classes, not instances) that extend from CodegenStrategy.
+    :rtype: list
+    """
+    return [cls.IsolatedCodegenStrategy,]
+
+  @classmethod
+  def forced_codegen_strategy(cls):
+    """If only a single codegen strategy is supported, returns its name.
+
+    This value of this function is automatically computed from the supported_strategy_types.
+    :return: the forced code generation strategy, or None if multiple options are supported.
+    """
+    strategy_types = cls.supported_strategy_types()
+    if not strategy_types:
+      raise TaskError("{} doesn't support any codegen strategies.".format(cls.__name__))
+    if len(strategy_types) == 1:
+      return strategy_types[0].name()
+    return None
+
+  @classmethod
+  def _codegen_strategy_map(cls):
+    """Returns a dict which maps names to codegen strategy types.
+
+    This is generated from the supported_strategy_types list.
+    """
+    return { strategy.name() : strategy for strategy in cls.supported_strategy_types() }
+
+  def _codegen_strategy_for_name(self, name):
+    strategy_type_map = self._codegen_strategy_map()
+    if name not in strategy_type_map:
+      raise self.UnsupportedStrategyError('Unsupported codegen strategy "{}".'.format(name))
+    return strategy_type_map[name](self)
+
+  @memoized_property
+  def codegen_strategy(self):
+    """Returns the codegen strategy object used by this codegen.
+
+    This is controlled first by the forced_codegen_strategy method, then by user-specified
+    options if the former returns None.
+
+    If you just want the name ('global' or 'isolated') of the strategy, use codegen_strategy.name().
+
+    :return: the codegen strategy object.
+    :rtype: SimpleCodegenTask.CodegenStrategy
+    """
+    strategy = self.forced_codegen_strategy()
+    if strategy is None:
+      strategy = self.get_options().strategy
+    return self._codegen_strategy_for_name(strategy)
 
   def codegen_workdir(self, target):
     """The path to the directory code should be generated in.
@@ -85,23 +166,33 @@ class SimpleCodegenTask(Task):
     Generally, subclasses should not need to override this method. If they do, it is crucial that
     the implementation is /deterministic/ -- that is, the return value of this method should always
     be the same for the same input target.
+    :param Target target: the codegen target (e.g., a java_protobuf_library).
     :return: The absolute file path.
     """
-    # TODO(gm): This method will power the isolated/global strategies for what directories to put
-    # generated code in, once that exists. This will work in a similar fashion to the jvm_compile
-    # tasks' isolated vs global strategies, generated code per-target in a way that avoids
-    # collisions.
-    return self.workdir
+    return os.path.join(self.workdir, self.codegen_strategy.codegen_workdir_suffix(target))
 
-  def assert_sources_present(self, sources, targets):
-    """Throws a TaskError if sources is empty.
+  def validate_sources_present(self, sources, targets):
+    """Checks whether sources is empty, and either raises a TaskError or just returns False.
+
+    The specifics of this behavior are defined by whether the user sets --allow-empty to True/False:
+    --allow-empty=False will result in a TaskError being raised in the event of an empty source
+    set. If --allow-empty=True, this method will just return false and log a warning.
 
     Shared for all SimpleCodegenTask subclasses to help keep errors consistent and descriptive.
+    :param sources: the sources from the given targets.
+    :param targets: the targets the sources are from, included just for error message generation.
+    :return: True if sources is not empty, False otherwise.
     """
     if not sources:
       formatted_targets = '\n'.join([t.address.spec for t in targets])
-      raise TaskError('Had {count} targets but no sources?\n targets={targets}'
-                      .format(count=len(targets), targets=formatted_targets))
+      message = ('Had {count} targets but no sources?\n targets={targets}'
+                 .format(count=len(targets), targets=formatted_targets))
+      if not self.get_options().allow_empty:
+        raise TaskError(message)
+      else:
+        logging.warn(message)
+        return False
+    return True
 
   def execute(self):
     targets = self.codegen_targets()
@@ -111,7 +202,7 @@ class SimpleCodegenTask(Task):
       invalid_targets = OrderedSet()
       for vts in invalidation_check.invalid_vts:
         invalid_targets.update(vts.targets)
-      self.execute_codegen(invalid_targets)
+      self.codegen_strategy.execute_codegen(invalid_targets)
 
       invalid_vts_by_target = dict([(vt.target, vt) for vt in invalidation_check.invalid_vts])
       vts_artifactfiles_pairs = []
@@ -121,9 +212,7 @@ class SimpleCodegenTask(Task):
         synthetic_name = target.id
         sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
         synthetic_address = SyntheticAddress(sources_rel_path, synthetic_name)
-        # TODO(gm): sources_generated_by_target() shouldn't be necessary for the isolated codegen
-        # strategy, once that exists.
-        raw_generated_sources = self.sources_generated_by_target(target)
+        raw_generated_sources = list(self.codegen_strategy.find_sources(target))
         # Make the sources robust regardless of whether subclasses return relative paths, or
         # absolute paths that are subclasses of the workdir.
         generated_sources = [src if src.startswith(target_workdir)
@@ -172,3 +261,181 @@ class SimpleCodegenTask(Task):
 
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache(vts_artifactfiles_pairs)
+
+
+  class CodegenStrategy(AbstractClass):
+    """Abstract strategies for running codegen.
+
+    Includes predicting generated sources, partitioning targets for execution, etc.
+    """
+
+    @classmethod
+    def name(self):
+      """The name of this strategy (eg, 'isolated').
+
+      This is used for generating the list of valid options for the --strategy flag.
+      """
+      raise NotImplementedError
+
+    @abstractmethod
+    def execute_codegen(self, targets):
+      """Invokes the task's execute_codegen on the targets.
+
+      Subclasses decide how the targets are partitioned before being sent to the task's
+      execute_codegen method.
+      :targets: a set of targets.
+      """
+
+    @abstractmethod
+    def find_sources(self, target):
+      """Finds (or predicts) the sources generated by the given target."""
+
+    @abstractmethod
+    def codegen_workdir_suffix(self, target):
+      """The working directory suffix for the given target's generated code."""
+
+    def __str__(self):
+      return self.name()
+
+
+  class GlobalCodegenStrategy(CodegenStrategy):
+    """Code generation strategy which generates all code together, in base directory."""
+
+    def __init__(self, task):
+      self._task = task
+
+    @classmethod
+    def name(cls):
+      return 'global'
+
+    def execute_codegen(self, targets):
+      self._task.execute_codegen(targets)
+
+    @abstractmethod
+    def find_sources(self, target):
+      """Predicts what sources the codegen target will generate.
+
+      The exact implementation of this is left to the GlobalCodegenStrategy subclass.
+      :param Target target: the target for which to find generated sources.
+      :return: a set of relative filepaths.
+      :rtype: OrderedSet
+      """
+
+    def codegen_workdir_suffix(self, target):
+      return self.name()
+
+
+  class IsolatedCodegenStrategy(CodegenStrategy):
+    """Code generate strategy which generates the code for each target separately.
+
+    Code is generated in a unique parent directory per target.
+    """
+
+    def __init__(self, task):
+      self._task = task
+      # NOTE(gm): This memoization yields a ~10% performance increase on my machine.
+      self._generated_sources_cache = {}
+
+    @classmethod
+    def name(cls):
+      return 'isolated'
+
+    def execute_codegen(self, targets):
+      ordered = [target for target in reversed(sort_targets(targets)) if target in targets]
+      for target in ordered:
+        # TODO(gm): add a test-case to ensure this is correctly eliminating stale generated code.
+        safe_rmtree(self._task.codegen_workdir(target))
+        self._task.execute_codegen([target])
+
+    def find_sources(self, target):
+      """Determines what sources were generated by the target after the fact.
+
+      This is done by searching the directory where this target's code was generated. This is only
+      possible because each target has its own unique directory in this CodegenStrategy.
+      :param Target target: the target for which to find generated sources.
+      :return: a set of relative filepaths.
+      :rtype: OrderedSet
+      """
+      return self._find_sources_strictly_generated_by_target(target)
+
+    def codegen_workdir_suffix(self, target):
+      return os.path.join(self.name(), target.id)
+
+    def _find_sources_generated_by_target(self, target):
+      if target.id in self._generated_sources_cache:
+        for source in self._generated_sources_cache[target.id]:
+          yield source
+        return
+      target_workdir = self._task.codegen_workdir(target)
+      if not os.path.exists(target_workdir):
+        return
+      for root, dirs, files in safe_walk(target_workdir):
+        for name in files:
+          yield os.path.join(root, name)
+
+    def _find_sources_generated_by_dependencies(self, target):
+      sources = OrderedSet()
+      def add_sources(dep):
+        if dep is not target:
+          dep_sources = self._find_sources_generated_by_target(dep)
+          dep_sources = [self._relative_source(dep, source) for source in dep_sources]
+          sources.update(dep_sources)
+      target.walk(add_sources)
+      return sources
+
+    def _relative_source(self, target, source):
+      return os.path.relpath(source, self._task.codegen_workdir(target))
+
+    def _find_sources_strictly_generated_by_target(self, target):
+      # NB(gm): Some code generators may re-generate code that their dependent libraries generate.
+      # This results in targets claiming to generate sources that they really don't, so we try to
+      # filter out sources that were actually generated by dependencies of the target. This causes
+      # the code generated by the dependencies to 'win' over the code generated by dependees. By
+      # default, this behavior is disabled, and duplication in generated sources will raise a
+      # TaskError. This is controlled by the --allow-dups flag.
+      if target.id in self._generated_sources_cache:
+        return self._generated_sources_cache[target.id]
+      by_target = OrderedSet(self._find_sources_generated_by_target(target))
+      by_dependencies = self._find_sources_generated_by_dependencies(target)
+      strict = [t for t in by_target if self._relative_source(target, t) not in by_dependencies]
+      if len(strict) != len(by_target):
+        messages = ['{target} generated sources that had already been generated by dependencies.'
+                    .format(target=target.address.spec)]
+        # Doing some extra work for the sake of helpful error messages.
+        duplicate_sources = set([self._relative_source(target, source)
+                             for source in sorted(set(by_target) - set(strict))])
+        duplicates_by_targets = {}
+
+        def record_duplicates(dep):
+          if dep == target:
+            return
+          sources = [self._relative_source(dep, s)
+                     for s in self._find_sources_generated_by_target(dep)]
+          sources = [s for s in sources if s in duplicate_sources]
+          if sources:
+            duplicates_by_targets[dep] = sources
+
+        target.walk(record_duplicates)
+        for dependency in sorted(duplicates_by_targets, key=lambda t: t.address.spec):
+          messages.append('\t{} also generated:'.format(dependency.address.spec))
+          messages.extend(['\t\t{}'.format(source) for source in duplicates_by_targets[dependency]])
+        message = '\n'.join(messages)
+        # TODO(gm): Add a test to ensure duplicate detection and reporting are working correctly.
+        if self._task.get_options().allow_dups:
+          logger.warn(message)
+        else:
+          raise self.DuplicateSourceError(message)
+
+      self._generated_sources_cache[target.id] = strict
+      return strict
+
+
+    class DuplicateSourceError(TaskError):
+      """A target generated the same code that was generated by one of its dependencies.
+
+      This is only thrown when --allow-dups=False.
+      """
+
+
+    class UnsupportedStrategyError(TaskError):
+      """Generated when there is no strategy for a given name."""
