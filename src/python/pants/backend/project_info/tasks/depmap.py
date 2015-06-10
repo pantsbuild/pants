@@ -39,7 +39,7 @@ class Depmap(ConsoleTask):
 
   @staticmethod
   def _is_jvm(dep):
-    return dep.is_jvm or isinstance(dep, JvmApp)
+    return isinstance(dep, JvmApp) or getattr(dep, 'is_jvm', False)
 
   @staticmethod
   def _jar_id(jar):
@@ -128,7 +128,6 @@ class Depmap(ConsoleTask):
     for target in self.context.target_roots:
       out = self._output_digraph(target) if self.is_graph else self._output_dependency_tree(target)
       for line in out:
-        print(line)
         yield line
 
   def _dep_id(self, dependency):
@@ -145,10 +144,9 @@ class Depmap(ConsoleTask):
     else:
       return "{org}{sep}{name}".format(**params), True
 
-  def check_path_to(self, jar_dep_id):
-    """Check that jar_dep_id is the dep we are looking for with path_to
-       (or that path_to is not enabled)"""
-    return jar_dep_id == self.path_to or not self.path_to
+  def maybe_check_path_to(self, jar_dep_id):
+    """If path_to is enabled, check that jar_dep_id is the dep we are looking for with path_to."""
+    return not self.path_to or jar_dep_id == self.path_to
 
   def _iter_jar_deps(self, jar_deps, outputted):
     """Recursive jar dependency output helper."""
@@ -157,90 +155,79 @@ class Depmap(ConsoleTask):
       if not is_internal:
         if jar_dep_id not in outputted or (not self.is_minimal and not self.is_external_only):
           if self.check_path_to(jar_dep_id):
-            # TODO(kwilson): broken
-            yield make_line(jar_dep_id, indent)
-          outputted.add(jar_dep_id)
+            yield jar_dep_id
+
+  def _enumerate_visible_deps(self, dep, is_visible):
+    dep_id, internal = self._dep_id(dep)
+
+    dependencies = sorted([x for x in getattr(dep, 'dependencies', [])]) + sorted(
+      [x for x in getattr(dep, 'jar_dependencies', [])] if not self.is_internal_only else [])
+
+    for inner_dep in dependencies:
+      dep_id, internal = self._dep_id(inner_dep)
+      if is_visible(internal):
+        yield inner_dep, dep_id, internal
+
+  def output_candidate(self, internal):
+    return ((not self.is_internal_only and not self.is_external_only)
+            or (self.is_internal_only and internal)
+            or (self.is_external_only and not internal))
 
   def _output_dependency_tree(self, target):
     """Plain-text depmap output handler."""
 
-    def make_line(dep, indent):
+    def make_line(dep, indent, is_dupe=False):
       indent_join, indent_chars = ('--', '  |') if self.should_tree else ('', '  ')
-      return '{}{}{}'.format(indent * indent_chars, indent_join, dep)
+      dupe_char = '*' if is_dupe else ''
+      return '{}{}{}{}'.format(indent * indent_chars, indent_join, dupe_char, dep)
 
-    def output_deps(dep, indent=0, outputted=set()):
-      dep_id = self._dep_id(dep)[0]
+    def output_deps(dep, indent, outputted):
+      dep_id, internal = self._dep_id(dep)
 
-      if dep_id in outputted:
-        if not self.is_minimal:
-          yield make_line('*{}'.format(dep_id), indent)
-      else:
-        if not self.is_external_only:
-          indent += 1
+      if not (dep_id in outputted and self.is_minimal) and self.maybe_check_path_to(dep_id):
+        yield make_line(dep_id, indent, is_dupe=dep_id in outputted)
+        outputted.add(dep_id)
 
-        dep_output = []
-        if not self.is_internal_only and self._is_jvm(dep):
-          dep_output = [x for x in self._iter_jar_deps(dep.jar_dependencies, outputted)]
+      for sub_dep, _, _ in self._enumerate_visible_deps(dep, self.output_candidate):
+        for item in output_deps(sub_dep, indent + 1, outputted):
+          yield item
 
-        dep_output += [
-          x for x in itertools.chain(*(output_deps(x, indent, outputted) for x in dep.dependencies))
-        ]
-
-        if self.check_path_to(dep_id) or dep_output:
-          if not self.is_external_only:
-            yield make_line(dep_id, indent - 1)
-            outputted.add(dep_id)
-
-          for item in dep_output:
-            yield item
-
-    for item in output_deps(target):
+    for item in output_deps(target, 0, set()):
       yield item
 
   def _output_digraph(self, target):
     """Graphviz format depmap output handler."""
     color_by_type = {}
 
-    def output_candidate(internal):
-      return ((self.is_internal_only and internal)
-               or (self.is_external_only and not internal)
-               or (not self.is_internal_only and not self.is_external_only))
-
-    def make_line(dep, dep_id, internal):
-      line_fmt = '  "{id}" [style="filled", fillcolor="{color}{internal}"];'
-      int_shape = '", shape="ellipse"' if not internal else ''
+    def make_node(dep, dep_id, internal):
+      line_fmt = '  "{id}" [style=filled, fillcolor={color}{internal}];'
+      int_shape = '", shape=ellipse' if not internal else ''
 
       if type(dep) not in color_by_type:
         color_by_type[type(dep)] = len(color_by_type.keys()) + 1
 
       return line_fmt.format(id=dep_id, internal=int_shape, color=color_by_type[type(dep)])
 
-    def output_deps(dep, outputted, parent=None):
+    def make_edge(from_dep_id, to_dep_id):
+      return '  "{}" -> "{}";'.format(from_dep_id, to_dep_id)
+
+    def output_deps(dep, parent, parent_id, outputted):
       dep_id, internal = self._dep_id(dep)
 
-      # if dep_id in outputted and parent:
-      if parent:
-        yield '  "{}" -> "{}";'.format(self._dep_id(parent)[0], dep_id)
+      if dep_id not in outputted and self.maybe_check_path_to(dep_id):
+        yield make_node(dep, dep_id, internal)
+        if parent:
+          yield make_edge(parent_id, dep_id)
+        outputted.add(dep_id)
 
-      if dep_id not in outputted:
-        dep_output = [
-          x for x in itertools.chain(*(output_deps(x, outputted, dep) for x in dep.dependencies))
-        ]
-        if not self.is_internal_only and self._is_jvm(dep):
-          dep_output += [x for x in self._iter_jar_deps(dep.jar_dependencies, outputted)]
-
-        if self.check_path_to(dep_id) or dep_output:
-          if not self.is_external_only:
-            yield make_line(dep, dep_id, internal)
-            outputted.add(dep_id)
-
-          for item in dep_output:
-            yield item
+      for sub_dep, sub_dep_id, _ in self._enumerate_visible_deps(dep, self.output_candidate):
+        for item in output_deps(sub_dep, dep, dep_id, outputted):
+          yield item
 
     yield 'digraph "{}" {{'.format(target.id)
     yield '  node [shape=rectangle, colorscheme=set312;];'
     yield '  rankdir=LR;'
-    for line in output_deps(target, set()):
+    for line in output_deps(target, parent=None, parent_id=None, outputted=set()):
       yield line
     yield '}'
 

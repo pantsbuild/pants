@@ -299,9 +299,9 @@ class DepmapTest(BaseDepmapTest):
       'digraph "common.h.h" {',
       '  node [shape=rectangle, colorscheme=set312;];',
       '  rankdir=LR;',
-      '  "internal-common.h.h" [style="filled", fillcolor="2"];',
+      '  "internal-common.h.h" [style=filled, fillcolor=1];',
+      '  "internal-common.f.f" [style=filled, fillcolor=2];',
       '  "internal-common.h.h" -> "internal-common.f.f";',
-      '  "internal-common.f.f" [style="filled", fillcolor="1"];',
       '}',
       targets=[self.target('common/h')],
       options={'graph': True}
