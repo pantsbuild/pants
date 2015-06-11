@@ -170,6 +170,7 @@ class Depmap(ConsoleTask):
       dep_id, internal = self._dep_id(dep)
 
       if self.path_to:
+        # If we hit the search target from self.path_to, yield the stack items and bail.
         if dep_id == self.path_to:
           for dep_id, indent in stack + [(dep_id, indent)]:
             yield make_line(dep_id, indent)
