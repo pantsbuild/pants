@@ -307,6 +307,18 @@ class DepmapTest(BaseDepmapTest):
       options={'graph': True}
     )
 
+  def test_tree(self):
+    self.assert_console_output_ordered(
+      '--internal-overlaps.two',
+      '  |--internal-overlaps.one',
+      '  |  |--internal-common.h.h',
+      '  |  |  |--internal-common.f.f',
+      '  |  |--internal-common.i.i',
+      '  |  |  |--internal-common.g.g',
+      '  |  |  |  |--*internal-common.f.f',
+      targets=[self.target('overlaps:two')],
+      options={'tree': True}
+    )
 
 class ProjectInfoTest(ConsoleTaskTestBase):
   @classmethod
