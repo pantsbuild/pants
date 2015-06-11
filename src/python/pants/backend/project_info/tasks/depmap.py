@@ -147,15 +147,6 @@ class Depmap(ConsoleTask):
     else:
       return "{org}{sep}{name}".format(**params), True
 
-  def _iter_jar_deps(self, jar_deps, outputted):
-    """Recursive jar dependency output helper."""
-    for jar_dep in jar_deps:
-      jar_dep_id, is_internal = self._dep_id(jar_dep)
-      if not is_internal:
-        if jar_dep_id not in outputted or (not self.is_minimal and not self.is_external_only):
-          if self.check_path_to(jar_dep_id):
-            yield jar_dep_id
-
   def _enumerate_visible_deps(self, dep, predicate):
     dep_id, internal = self._dep_id(dep)
 
