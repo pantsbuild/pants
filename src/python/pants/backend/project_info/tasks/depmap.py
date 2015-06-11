@@ -68,7 +68,7 @@ class Depmap(ConsoleTask):
     register('--tree', default=False, action='store_true',
              help='For text output, show an ascii tree to help visually line up indentions.')
     register('--show-types', default=False, action='store_true',
-             help='Show types of objects in depmap.')
+             help='Show types of objects in depmap --graph.')
     register('--project-info', default=False, action='store_true',
              deprecated_version='0.0.33',
              deprecated_hint='Use the export goal instead of depmap to get info for the IDE.',
