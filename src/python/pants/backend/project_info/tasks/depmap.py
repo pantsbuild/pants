@@ -66,7 +66,7 @@ class Depmap(ConsoleTask):
                   'output (only external jars).')
     register('--minimal', default=False, action='store_true',
              help='For a textual dependency tree, only prints a dependency the 1st '
-                  'time it is encountered.  For graph output this does nothing.')
+                  'time it is encountered. This is a no-op for --graph.')
     register('--graph', default=False, action='store_true',
              help='Specifies the internal dependency graph should be output in the dot digraph '
                   'format.')
@@ -147,10 +147,6 @@ class Depmap(ConsoleTask):
     else:
       return "{org}{sep}{name}".format(**params), True
 
-  def maybe_check_path_to(self, jar_dep_id):
-    """If path_to is enabled, check that jar_dep_id is the dep we are looking for with path_to."""
-    return not self.path_to or jar_dep_id == self.path_to
-
   def _iter_jar_deps(self, jar_deps, outputted):
     """Recursive jar dependency output helper."""
     for jar_dep in jar_deps:
@@ -184,18 +180,25 @@ class Depmap(ConsoleTask):
       dupe_char = '*' if is_dupe else ''
       return '{}{}{}{}'.format(indent * indent_chars, indent_join, dupe_char, dep)
 
-    def output_deps(dep, indent, outputted):
+    def output_deps(dep, indent, outputted, stack):
       dep_id, internal = self._dep_id(dep)
 
-      if not (dep_id in outputted and self.is_minimal) and self.maybe_check_path_to(dep_id):
-        yield make_line(dep_id, indent, is_dupe=dep_id in outputted)
-        outputted.add(dep_id)
+      if self.path_to:
+        # If we hit the desired search path, unwind the stack and bail out of the generator.
+        if dep_id == self.path_to:
+          for dep_id, indent in stack + [(dep_id, indent)]:
+            yield make_line(dep_id, indent)
+          return
+      else:
+        if not (dep_id in outputted and self.is_minimal):
+          yield make_line(dep_id, indent, is_dupe=dep_id in outputted)
+          outputted.add(dep_id)
 
       for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
-        for item in output_deps(sub_dep, indent + 1, outputted):
+        for item in output_deps(sub_dep, indent + 1, outputted, stack + [(dep_id, indent)]):
           yield item
 
-    for item in output_deps(target, 0, set()):
+    for item in output_deps(target, 0, set(), []):
       yield item
 
   def _output_digraph(self, target):
