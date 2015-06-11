@@ -48,6 +48,10 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaWireLibrary)
 
+  @classmethod
+  def supported_strategy_types(cls):
+    return [cls.IsolatedCodegenStrategy,]
+
   def sources_generated_by_target(self, target):
     genfiles = []
     for source in target.sources_relative_to_source_root():
@@ -76,7 +80,12 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     # service_writer and another does not, or if one specifies roots and another does not.
     for target in targets:
       sources_by_base = self._calculate_sources([target])
-      sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
+      if self.codegen_strategy.name() == 'isolated':
+        sources = OrderedSet(target.sources_relative_to_buildroot())
+      else:
+        sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
+      if not self.validate_sources_present(sources, [target]):
+        continue
       relative_sources = OrderedSet()
       for source in sources:
         source_root = SourceRoot.find_by_path(source)

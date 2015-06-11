@@ -9,6 +9,7 @@ target(
     ':protobuf_gen',
     ':protobuf_parse',
     ':ragel_gen',
+    ':simple_codegen_task',
     ':wire_gen',
   ],
 )
@@ -70,6 +71,19 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal:context',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
+  name = 'simple_codegen_task',
+  sources = ['test_simple_codegen_task.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/tasks:simple_codegen_task',
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
   ],

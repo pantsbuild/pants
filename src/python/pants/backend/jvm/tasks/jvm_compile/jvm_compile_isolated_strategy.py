@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 from collections import OrderedDict, defaultdict
-from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -18,7 +17,7 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy
 
 
@@ -75,8 +74,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
                                                             relevant_targets)
-
-    # TODO(jessrosenfield): Should we for invalid analysis files like in the global pre_compile?
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -143,21 +140,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def exec_graph_key_for_target(self, compile_target):
     return "compile-{}".format(compile_target.address.spec)
 
-  @contextmanager
-  def _empty_analysis_cleanup(self, compile_context):
-    """Addresses cases where failed compilations leave behind invalid analysis.
-
-    If compilation was creating analysis for the first time, and it fails, then the analysis
-    will be empty/invalid.
-    """
-    preexisting_analysis = os.path.exists(compile_context.analysis_file)
-    try:
-      yield
-    except:
-      if not preexisting_analysis:
-        safe_delete(compile_context.analysis_file)
-      raise
-
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                            invalid_targets, invalid_vts_partitioned, compile_vts, register_vts,
                            update_artifact_cache_vts_work):
@@ -173,19 +155,18 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         tmpdir = os.path.join(self.analysis_tmpdir, vts.targets[0].id)
         safe_mkdir(tmpdir)
 
-        with self._empty_analysis_cleanup(compile_context):
-          tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
-              tmpdir, compile_context.target)
-          if os.path.exists(compile_context.analysis_file):
-             shutil.copy(compile_context.analysis_file, tmp_analysis_file)
-          compile_vts(vts,
-                      compile_context.sources,
-                      tmp_analysis_file,
-                      upstream_analysis,
-                      cp_entries,
-                      compile_context.classes_dir,
-                      progress_message)
-          atomic_copy(tmp_analysis_file, compile_context.analysis_file)
+        tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
+            tmpdir, compile_context.target)
+        if os.path.exists(compile_context.analysis_file):
+           shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+        compile_vts(vts,
+                    compile_context.sources,
+                    tmp_analysis_file,
+                    upstream_analysis,
+                    cp_entries,
+                    compile_context.classes_dir,
+                    progress_message)
+        atomic_copy(tmp_analysis_file, compile_context.analysis_file)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
@@ -282,7 +263,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     vt = vts.versioned_targets[0]
 
     # Set up args to relativize analysis in the background.
-    # TODO: GlobalStrategy puts portable analysis in a tmp directory... shall we?
     portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
         self._analysis_dir, compile_context.target)
     relativize_args_tuple = (compile_context.analysis_file, portable_analysis_file)
