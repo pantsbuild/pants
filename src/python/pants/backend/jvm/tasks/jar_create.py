@@ -102,9 +102,6 @@ class JarCreate(JarTask):
     safe_mkdir(self.workdir)
 
     with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]) as workunit:
-      self.context.log.debug(
-        'Initializing jar-create WorkerPool, workers={}'.format(self.worker_count))
-      worker_pool = WorkerPool(workunit, self.context.run_tracker, self.worker_count)
       jar_targets = [self._prepare_jar_target(t) for t in self.context.targets(is_jvm_library)]
 
       if not jar_targets:
@@ -112,8 +109,12 @@ class JarCreate(JarTask):
 
       jobs = self._construct_jobs(jar_targets)
 
-      exec_graph = ExecutionGraph(jobs)
-      try:
-        exec_graph.execute(worker_pool, self.context.log)
-      except ExecutionFailure as e:
-        raise TaskError('Jar creation failure: {}'.format(e))
+      self.context.log.debug(
+        'Initializing jar-create WorkerPool, workers={}'.format(self.worker_count))
+
+      with WorkerPool(workunit, self.context.run_tracker, self.worker_count) as worker_pool:
+        exec_graph = ExecutionGraph(jobs)
+        try:
+          exec_graph.execute(worker_pool, self.context.log)
+        except ExecutionFailure as e:
+          raise TaskError('Jar creation failure: {}'.format(e))

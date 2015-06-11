@@ -30,7 +30,7 @@ class Work(object):
 
 
 class WorkerPool(object):
-  """A pool of workers.
+  """A pool of workers. Can be used as a context manager to automatically call self.shutdown().
 
   Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
   may not be effective. Use this class primarily for IO-bound work.
@@ -48,6 +48,13 @@ class WorkerPool(object):
     self._pending_workchains_cond = threading.Condition()  # Protects self._pending_workchains.
 
     self._shutdown_hooks = []
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args, **kwargs):
+    self.shutdown()
+    return False
 
   def add_shutdown_hook(self, hook):
     self._shutdown_hooks.append(hook)
