@@ -104,6 +104,7 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:fileutil',
   ],
 )
 

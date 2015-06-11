@@ -28,7 +28,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
       'Compiling proto source file',
       'Created output directory',
       'Writing generated code',
-      '/gen/wire/gen-java/org/pantsbuild/example/temperature/Temperature.java',
+      '/gen/wire/org/pantsbuild/example/temperature/Temperature.java',
     ]
     for expected_output in expected_outputs:
       self.assertIn(expected_output, pants_run.stdout_data)
@@ -66,3 +66,6 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('Element{symbol=Hg, name=Mercury, atomic_number=80, '
                   'melting_point=Temperature{unit=celsius, number=-39}, '
                   'boiling_point=Temperature{unit=celsius, number=357}}', java_out)
+    self.assertIn('Compound{name=Water, primary_element=Element{symbol=O, name=Oxygen, '
+                  'atomic_number=8}, secondary_element=Element{symbol=H, name=Hydrogen, '
+                  'atomic_number=1}}', java_out)

@@ -18,8 +18,8 @@ class JaxbLibrary(JvmTarget):
     :param package: java package (com.company.package) in which to generate the output java files.
       If unspecified, Pants guesses it from the file path leading to the schema
       (xsd) file. This guess is accurate only if the .xsd file is in a path like
-      ``.../com/company/package/schema.xsd``. This guess is probably less
-      accurate than setting the package explicitly in the ``BUILD`` file.
+      ``.../com/company/package/schema.xsd``. Pants looks for packages that start with 'com', 'org',
+      or 'net'.
     :param string language: only 'java' is supported. Default: 'java'
     """
 

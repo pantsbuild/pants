@@ -15,7 +15,6 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.subsystems.jar_tool import JarTool
 from pants.backend.jvm.targets.java_agent import JavaAgent
-from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -290,7 +289,8 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
-        JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args)
+        if JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args):
+          raise TaskError('jar-tool failed')
 
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""

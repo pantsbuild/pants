@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-import tempfile
-import uuid
 from contextlib import closing
 from StringIO import StringIO
 
@@ -34,11 +32,12 @@ class TaskTestBase(BaseTest):
 
   def setUp(self):
     super(TaskTestBase, self).setUp()
-    self._testing_task_type, self.options_scope = self.synthesize_task_subtype(self.task_type())
+    self.options_scope = 'test_scope'
+    self._testing_task_type = self.synthesize_task_subtype(self.task_type(), self.options_scope)
     # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
-    # BaseTest cleans this up, so we don't need to.
-    self._tmpdir = tempfile.mkdtemp(dir=self.pants_workdir)
-    self._test_workdir = os.path.join(self._tmpdir, 'workdir')
+    # BaseTest cleans this up, so we don't need to.  We give it a stable name, so that we can
+    # use artifact caching to speed up tests.
+    self._test_workdir = os.path.join(self.pants_workdir, self.task_type().stable_name())
     os.mkdir(self._test_workdir)
     # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
     # action in this non-JVM-specific, high-level base class.
@@ -48,21 +47,23 @@ class TaskTestBase(BaseTest):
   def test_workdir(self):
     return self._test_workdir
 
-  def synthesize_task_subtype(self, task_type):
+  def synthesize_task_subtype(self, task_type, options_scope):
     """Creates a synthetic subclass of the task type.
 
-    The returned type has a unique options scope, to ensure proper test isolation (unfortunately
-    we currently rely on class-level state in Task.)
+    Note that passing in a stable options scope will speed up some tests, as the scope may appear
+    in the paths of tools used by the task, and if these are stable, tests can get artifact
+    cache hits when bootstrapping these tools. This doesn't hurt test isolation, as we reset
+    class-level state between each test.
 
-    # TODO: Get rid of this once we re-do the Task lifecycle.
+    # TODO: Use the task type directly once we re-do the Task lifecycle.
 
     :param task_type: The task type to subtype.
+    :param options_scope: The scope to give options on the generated task type.
     :return: A pair (type, options_scope)
     """
-    options_scope = uuid.uuid4().hex
     subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
     return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
-                                              'options_scope': options_scope}), options_scope
+                                              'options_scope': options_scope})
 
   def set_options(self, **kwargs):
     self.set_options_for_scope(self.options_scope, **kwargs)

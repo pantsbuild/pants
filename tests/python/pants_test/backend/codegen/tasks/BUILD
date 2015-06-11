@@ -32,7 +32,9 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/codegen/tasks:jaxb_gen',
     'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )
 

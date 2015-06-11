@@ -5,17 +5,22 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
+from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
+from pants.backend.core.register import build_file_aliases as register_core
 from pants.util.contextutil import temporary_file
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class JaxbGenTestBase(unittest.TestCase):
-  """Basically copied from test_protobuf_gen.py.
+class JaxbGenJavaTest(TaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return JaxbGen
 
-  Contains helper method to check generated temp files.
-  """
+  @property
+  def alias_groups(self):
+    return register_core().merge(register_codegen())
+
   def assert_files(self, package, contents, *expected_files):
     with temporary_file() as fp:
       fp.write(contents)
@@ -38,13 +43,6 @@ class JaxbGenTestBase(unittest.TestCase):
               </xsd:sequence>
             </xsd:complexType>'''.format(name=name)
     )
-
-class JaxbGenJavaTest(JaxbGenTestBase):
-  """Test the java code generation.
-
-  Mostly just tests that code would be put in the proper package, since that's the easiest point of
-  failure.
-  """
 
   def test_plain(self):
     self.assert_files(
@@ -78,3 +76,41 @@ class JaxbGenJavaTest(JaxbGenTestBase):
       'com/actual/package/Aardvark.java',
       'com/actual/package/Apple.java'
     )
+
+  def test_correct_package(self):
+    fix = JaxbGen._correct_package
+    self.assertEqual(fix('com.foo.bar'), 'com.foo.bar', 'Expected no change.')
+    self.assertEqual(fix('com/foo/bar'), 'com.foo.bar', 'Expected slashes to dots.')
+    self.assertEqual(fix('.com.foo.bar'), 'com.foo.bar', 'Should have trimmed leading dots.')
+    self.assertEqual(fix('com.foo.bar.'), 'com.foo.bar', 'Should have trimmed trialing dots.')
+    self.assertEqual(fix('org/pantsbuild/example/foo'), 'org.pantsbuild.example.foo',
+                     'Should work on packages other than com.foo.bar.')
+    with self.assertRaises(ValueError):
+      fix('po..ta..to')
+    with self.assertRaises(ValueError):
+      fix('po.ta..to')
+    with self.assertRaises(ValueError):
+      fix('..po.ta..to...')
+    self.assertEqual(fix('///org.pantsbuild/example...'), 'org.pantsbuild.example')
+
+  def test_guess_package(self):
+    guess_history = []
+    def guess(path):
+      result = JaxbGen._correct_package(JaxbGen._guess_package(path))
+      guess_history.append(result)
+      return result
+    supported_prefixes = ('com', 'org', 'net',)
+    for prefix in supported_prefixes:
+      self.assertEqual(guess('.pants.d/foo.bar/{0}/pantsbuild/potato/Potato.java'.format(prefix)),
+                       '{0}.pantsbuild.potato'.format(prefix),
+                       'Failed for prefix {0}: {1}.'.format(prefix, guess_history[-1]))
+      self.assertEqual(guess('{0}/pantsbuild/potato/Potato.java'.format(prefix)),
+                       '{0}.pantsbuild.potato'.format(prefix),
+                       'Failed for prefix {0}: {1}.'.format(prefix, guess_history[-1]))
+      self.assertEqual(guess('/User/foo/bar/.pants.d/gen/jaxb/foo/bar/'
+                             '{0}/company/project/a/File.java'.format(prefix)),
+                             '{0}.company.project.a'.format(prefix),
+                             'Failed for prefix {0}: {1}.'.format(prefix, guess_history[-1]))
+    self.assertEqual(guess('pantsbuild/potato/Potato.java'),
+                     'pantsbuild.potato',
+                     'Failed with no prefix: {0}'.format(guess_history[-1]))

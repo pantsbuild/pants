@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
@@ -27,17 +28,17 @@ class WireGenTest(TaskTestBase):
   def alias_groups(self):
     return register_core().merge(register_codegen())
 
-  def assert_files(self, task, lang, rel_path, contents, service_writer, expected_files):
+  def assert_files(self, task, rel_path, contents, service_writer, expected_files):
     assert_list(expected_files)
 
     with temporary_file() as fp:
       fp.write(contents)
       fp.close()
       self.assertEqual(set(expected_files),
-                       task.calculate_genfiles(fp.name, rel_path, service_writer)[lang])
+                       task.calculate_genfiles(fp.name, rel_path, service_writer))
 
   def assert_java_files(self, task, rel_path, contents, service_writer, expected_files):
-    self.assert_files(task, 'java', rel_path, contents, service_writer, expected_files)
+    self.assert_files(task, rel_path, contents, service_writer, expected_files)
 
   def test_plain(self):
     task = self.create_task(self.context())
@@ -158,3 +159,31 @@ class WireGenTest(TaskTestBase):
     result = task._calculate_sources([target])
     self.assertEquals(1, len(result.keys()))
     self.assertEquals(OrderedSet(['project/src/main/wire/wire-lib/foo.proto']), result['project/src/main/wire'])
+
+  def test_sources_generated_by_target(self):
+    root_path = os.path.join('project', 'src', 'main', 'wire')
+    wire_path = os.path.join(root_path, 'wire-lib')
+    file_path = os.path.join(wire_path, 'org', 'pantsbuild', 'example', 'foo.proto')
+    SourceRoot.register(root_path)
+    self.add_to_build_file(wire_path, dedent('''
+      java_wire_library(name='wire-target',
+        sources=['{0}'],
+      )
+    '''.format(os.path.relpath(file_path, wire_path))))
+    self.create_dir(os.path.dirname(file_path))
+    self.create_file(file_path, dedent('''
+      package org.pantsbuild.example;
+
+      message Foo {
+        optional string bar = 1;
+        optional string foobar = 2;
+      }
+    '''))
+    target = self.target('project/src/main/wire/wire-lib:wire-target')
+    context = self.context(target_roots=[target])
+    task = self.create_task(context)
+    previous_working_directory = os.path.abspath('.')
+    os.chdir(os.path.abspath(self.build_root))
+    result = task.sources_generated_by_target(target)
+    os.chdir(previous_working_directory)
+    self.assertEquals(OrderedSet(['org/pantsbuild/example/Foo.java']), OrderedSet(result))

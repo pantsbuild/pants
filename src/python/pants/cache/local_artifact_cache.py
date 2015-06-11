@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import shutil
-import uuid
 from contextlib import contextmanager
 
 from pants.cache.artifact import TarballArtifact

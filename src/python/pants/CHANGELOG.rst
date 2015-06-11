@@ -4,8 +4,19 @@ RELEASE HISTORY
 0.0.33 (unreleased)
 -------------------
 
-API Changes
-~~~~~~~~~~~
+445 log entries from eddf2f0e6b16bc8d3d80c70a2abd5c5495c73ca4 to 70b92c787842987e84bf23e1026d246abfc441d0
+
+Release Notes
+~~~~~~~~~~~~~
+
+The migrate config tool will help you migrate your pants.ini settings
+for this new release.  Download the pants source code and run:
+
+.. code::
+
+  ./pants run migrations/options/src/python:migrate_config --  <path
+  to your pants.ini>
+
 
 Folks who use a custom ivysettings.xml but have no ivy.ivy_settings
 option defined in pants.ini pointing to it must now add one like so:
@@ -14,6 +25,504 @@ option defined in pants.ini pointing to it must now add one like so:
 
   [ivy]
   ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
+
+API Changes
+~~~~~~~~~~~
+
+* Add Subsystems for options that live outside a single task, use them
+  to replace config settings in pants.ini
+  `RB #2288 <https://rbcommons.com/s/twitter/r/2288>`_
+  `RB #2276 <https://rbcommons.com/s/twitter/r/2276>`_
+  `RB #2226 <https://rbcommons.com/s/twitter/r/2226>`_
+  `RB #2176 <https://rbcommons.com/s/twitter/r/2176>`_
+  `RB #2174 <https://rbcommons.com/s/twitter/r/2174>`_
+  `RB #2139 <https://rbcommons.com/s/twitter/r/2139>`_
+  `RB #2122 <https://rbcommons.com/s/twitter/r/2122>`_
+  `RB #2100 <https://rbcommons.com/s/twitter/r/2100>`_
+  `RB #2081 <https://rbcommons.com/s/twitter/r/2081>`_
+  `RB #2063 <https://rbcommons.com/s/twitter/r/2063>`_
+
+* Read backend and bootstrap BUILD file settings from options instead of config.
+  `RB #2229 <https://rbcommons.com/s/twitter/r/2229>`_
+
+* Migrating internal tools into the pants repo and renaming to org.pantsbuild
+  `RB #2278 <https://rbcommons.com/s/twitter/r/2278>`_
+  `RB #2211 <https://rbcommons.com/s/twitter/r/2211>`_
+  `RB #2207 <https://rbcommons.com/s/twitter/r/2207>`_
+  `RB #2205 <https://rbcommons.com/s/twitter/r/2205>`_
+  `RB #2186 <https://rbcommons.com/s/twitter/r/2186>`_
+  `RB #2195 <https://rbcommons.com/s/twitter/r/2195>`_
+  `RB #2193 <https://rbcommons.com/s/twitter/r/2193>`_
+  `RB #2192 <https://rbcommons.com/s/twitter/r/2192>`_
+  `RB #2191 <https://rbcommons.com/s/twitter/r/2191>`_
+  `RB #2191 <https://rbcommons.com/s/twitter/r/2191>`_
+  `RB #2137 <https://rbcommons.com/s/twitter/r/2137>`_
+  `RB #2071 <https://rbcommons.com/s/twitter/r/2071>`_
+  `RB #2043 <https://rbcommons.com/s/twitter/r/2043>`_
+
+* Kill scala specs support.
+  `RB #2208 <https://rbcommons.com/s/twitter/r/2208>`_
+
+* Use the default ivysettings.xml provided by ivy.
+  `RB #2204 <https://rbcommons.com/s/twitter/r/2204>`_
+
+* Eliminate the globs.__sub__ use in option package.
+  `RB #2082 <https://rbcommons.com/s/twitter/r/2082>`_
+  `RB #2197 <https://rbcommons.com/s/twitter/r/2197>`_
+
+* Kill obsolete global publish.properties file.
+  `RB #994 <https://rbcommons.com/s/twitter/r/994>`_
+  `RB #2069 <https://rbcommons.com/s/twitter/r/2069>`_
+
+* Upgrade zinc to latest for perf wins.
+  `RB #2194 <https://rbcommons.com/s/twitter/r/2194>`_
+  `RB #2168 <https://rbcommons.com/s/twitter/r/2168>`_
+  `RB #2154 <https://rbcommons.com/s/twitter/r/2154>`_
+  `RB #2154 <https://rbcommons.com/s/twitter/r/2154>`_
+  `RB #2149 <https://rbcommons.com/s/twitter/r/2149>`_
+  `RB #2125 <https://rbcommons.com/s/twitter/r/2125>`_
+
+* Migrate jar_publish config scope.
+  `RB #2175 <https://rbcommons.com/s/twitter/r/2175>`_
+
+* Add a version number to the export format and a page with some documentation.
+  `RB #2162 <https://rbcommons.com/s/twitter/r/2162>`_
+
+* Make exclude_target_regexp option recursive
+  `RB #2136 <https://rbcommons.com/s/twitter/r/2136>`_
+
+* Kill pantsbuild dependence on maven.twttr.com.
+  `RB #2019 <https://rbcommons.com/s/twitter/r/2019>`_
+
+* Fold PythonTestBuilder into the PytestRun task.
+  `RB #1993 <https://rbcommons.com/s/twitter/r/1993>`_
+
+Bugfixes
+~~~~~~~~
+
+* Two changes that affect invalidation and artifact caching.
+  `RB #2269 <https://rbcommons.com/s/twitter/r/2269>`_
+
+* Add java_thrift_library fingerprint strategy
+  `RB #2265 <https://rbcommons.com/s/twitter/r/2265>`_
+
+* Moved creation of per test data to testStarted method.
+  `RB #2257 <https://rbcommons.com/s/twitter/r/2257>`_
+
+* Updated zinc to use sbt 0.13.8 and new java compilers that provide a proper log level with their output.
+  `RB #2248 <https://rbcommons.com/s/twitter/r/2248>`_
+
+* Apply excludes consistently across classpaths
+  `RB #2247 <https://rbcommons.com/s/twitter/r/2247>`_
+
+* Put all extra classpath elements (e.g., plugins) at the end (scala compile)
+  `RB #2210 <https://rbcommons.com/s/twitter/r/2210>`_
+
+* Fix missing import in git.py
+  `RB #2202 <https://rbcommons.com/s/twitter/r/2202>`_
+
+* Move a comment to work around a pytest bug.
+  `RB #2201 <https://rbcommons.com/s/twitter/r/2201>`_
+
+* More fixes for working with classifiers on jars.
+  `Issue #1489 <https://github.com/pantsbuild/pants/issues/1489>`_
+  `RB #2163 <https://rbcommons.com/s/twitter/r/2163>`_
+
+* Have ConsoleRunner halt(1) on exit(x)
+  `RB #2180 <https://rbcommons.com/s/twitter/r/2180>`_
+
+* Fix scm_build_file in symlinked directories
+  `RB #2152 <https://rbcommons.com/s/twitter/r/2152>`_
+  `RB #2157 <https://rbcommons.com/s/twitter/r/2157>`_
+
+* Added support for the ivy cache being under a symlink'ed dir
+  `RB #2085 <https://rbcommons.com/s/twitter/r/2085>`_
+  `RB #2129 <https://rbcommons.com/s/twitter/r/2129>`_
+  `RB #2148 <https://rbcommons.com/s/twitter/r/2148>`_
+
+* Make subclasses of ChangedTargetTask respect spec_excludes
+  `RB #2146 <https://rbcommons.com/s/twitter/r/2146>`_
+
+* propagate keyboard interrupts from worker threads
+  `RB #2143 <https://rbcommons.com/s/twitter/r/2143>`_
+
+* Only add resources to the relevant target
+  `RB #2103 <https://rbcommons.com/s/twitter/r/2103>`_
+  `RB #2130 <https://rbcommons.com/s/twitter/r/2130>`_
+
+* Cleanup analysis left behind from failed isolation compiles
+  `RB #2127 <https://rbcommons.com/s/twitter/r/2127>`_
+
+* test glob operators, fix glob + error
+  `RB #2104 <https://rbcommons.com/s/twitter/r/2104>`_
+
+* Wrap lock around nailgun spawning to protect against worker threads racing to spawn servers
+  `RB #2102 <https://rbcommons.com/s/twitter/r/2102>`_
+
+* Force some files to be treated as binary.
+  `RB #2099 <https://rbcommons.com/s/twitter/r/2099>`_
+
+* Convert JarRule and JarRules to use Payload to help fingerprint its configuration
+  `RB #2096 <https://rbcommons.com/s/twitter/r/2096>`_
+
+* Fix `./pants server` output
+  `RB #2067 <https://rbcommons.com/s/twitter/r/2067>`_
+
+* Fix issue with isolated strategy and sources owned by multiple targets
+  `RB #2061 <https://rbcommons.com/s/twitter/r/2061>`_
+
+* Handle broken resource mapping files (by throwing exceptions).
+  `RB #2038 <https://rbcommons.com/s/twitter/r/2038>`_
+
+* Change subproc sigint handler to exit more cleanly
+  `RB #2024 <https://rbcommons.com/s/twitter/r/2024>`_
+
+* Include classifier in JarDependency equality / hashing
+  `RB #2029 <https://rbcommons.com/s/twitter/r/2029>`_
+
+* Migrating more data to payload fields in jvm_app and jvm_binary targets
+  `RB #2011 <https://rbcommons.com/s/twitter/r/2011>`_
+
+* Fix ivy_resolve message: Missing expected ivy output file .../.ivy2/pants/internal-...-default.xml
+  `RB #2015 <https://rbcommons.com/s/twitter/r/2015>`_
+
+* Fix ignored invalidation data in ScalaCompile
+  `RB #2018 <https://rbcommons.com/s/twitter/r/2018>`_
+
+* Don't specify the jmake depfile if it doesn't exist
+  `RB #2009 <https://rbcommons.com/s/twitter/r/2009>`_
+  `RB #2012 <https://rbcommons.com/s/twitter/r/2012>`_
+
+* Force java generation on for protobuf_gen, get rid of spurious warning
+  `RB #1994 <https://rbcommons.com/s/twitter/r/1994>`_
+
+* Fix typo in ragel-gen entries (migrate-config)
+  `RB #1995 <https://rbcommons.com/s/twitter/r/1995>`_
+
+* Fix include dependees options.
+  `RB #1760 <https://rbcommons.com/s/twitter/r/1760>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Document the pantsbuild jvm tool release process.
+  `RB #2289 <https://rbcommons.com/s/twitter/r/2289>`_
+
+* Fix publishing docs for new 'publish.jar' syntax
+  `RB #2255 <https://rbcommons.com/s/twitter/r/2255>`_
+
+* Example configuration for the isolated strategy.
+  `RB #2185 <https://rbcommons.com/s/twitter/r/2185>`_
+
+* doc: uploading timing stats
+  `RB #1700 <https://rbcommons.com/s/twitter/r/1700>`_
+
+* Add robots.txt to exclude crawlers from walking a 'staging' test publishing dir
+  `RB #2072 <https://rbcommons.com/s/twitter/r/2072>`_
+
+* Add a note indicating that pants bootstrap requires a compiler
+  `RB #2057 <https://rbcommons.com/s/twitter/r/2057>`_
+
+* Fix docs to mention automatic excludes.
+  `RB #2014 <https://rbcommons.com/s/twitter/r/2014>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Adds a product to bundle_create
+  `RB #2254 <https://rbcommons.com/s/twitter/r/2254>`_
+
+* Add flag to disable automatic excludes
+  `RB #2252 <https://rbcommons.com/s/twitter/r/2252>`_
+
+* Find java distributions in well known locations.
+  `RB #2242 <https://rbcommons.com/s/twitter/r/2242>`_
+
+* Added information about excludes to export goal
+  `RB #2238 <https://rbcommons.com/s/twitter/r/2238>`_
+
+* In process java compilation in Zinc #1555
+  `RB #2206 <https://rbcommons.com/s/twitter/r/2206>`_
+
+* Add support for extra publication metadata.
+  `RB #2184 <https://rbcommons.com/s/twitter/r/2184>`_
+  `RB #2240 <https://rbcommons.com/s/twitter/r/2240>`_
+
+* Extract the android plugin as an sdist.
+  `RB #2249 <https://rbcommons.com/s/twitter/r/2249>`_
+
+* Adds optional output during zinc compilation.
+  `RB #2233 <https://rbcommons.com/s/twitter/r/2233>`_
+
+* Jvm Tools release process
+  `RB #2292 <https://rbcommons.com/s/twitter/r/2292>`_
+
+* Make it possible to create xml reports and output to console at the same time from ConsoleRunner.
+  `RB #2183 <https://rbcommons.com/s/twitter/r/2183>`_
+
+* Adding a product to binary_create so that we can depend on it in an external plugin.
+  `RB #2172 <https://rbcommons.com/s/twitter/r/2172>`_
+
+* Publishing to Maven Central
+  `RB #2068 <https://rbcommons.com/s/twitter/r/2068>`_
+  `RB #2188 <https://rbcommons.com/s/twitter/r/2188>`_
+
+* Provide global option to look up BUILD files in git history
+  `RB #2121 <https://rbcommons.com/s/twitter/r/2121>`_
+  `RB #2164 <https://rbcommons.com/s/twitter/r/2164>`_
+
+* Compile Java with Zinc
+  `RB #2156 <https://rbcommons.com/s/twitter/r/2156>`_
+
+* Add BuildFileManipulator implementation and tests to contrib
+  `RB #977 <https://rbcommons.com/s/twitter/r/977>`_
+
+* Add option to suppress printing the changelog during publishing
+  `RB #2140 <https://rbcommons.com/s/twitter/r/2140>`_
+
+* Filtering by targets' tags
+  `RB #2106 <https://rbcommons.com/s/twitter/r/2106>`_
+
+* Adds the ability to specify explicit fields in MANIFEST.MF in a jvm_binary target.
+  `RB #2199 <https://rbcommons.com/s/twitter/r/2199>`_
+  `RB #2084 <https://rbcommons.com/s/twitter/r/2084>`_
+  `RB #2119 <https://rbcommons.com/s/twitter/r/2119>`_
+  `RB #2005 <https://rbcommons.com/s/twitter/r/2005>`_
+
+* Parallelize isolated jvm compile strategy's chunk execution.
+  `RB #2109 <https://rbcommons.com/s/twitter/r/2109>`_
+
+* Make test tasks specify which target failed in exception.
+  `RB #2090 <https://rbcommons.com/s/twitter/r/2090>`_
+  `RB #2113 <https://rbcommons.com/s/twitter/r/2113>`_
+  `RB #2112 <https://rbcommons.com/s/twitter/r/2112>`_
+
+* Support glob output in filedeps.
+  `RB #2092 <https://rbcommons.com/s/twitter/r/2092>`_
+
+* Export: support export of sources and globs
+  `RB #2082 <https://rbcommons.com/s/twitter/r/2082>`_
+  `RB #2094 <https://rbcommons.com/s/twitter/r/2094>`_
+
+* Classpath isolation: make ivy resolution locally accurate.
+  `RB #2064 <https://rbcommons.com/s/twitter/r/2064>`_
+
+* Add support for a postscript to jar_publish commit messages.
+  `RB #2070 <https://rbcommons.com/s/twitter/r/2070>`_
+
+* Add optional support for auto-shading jvm tools.
+  `RB #2052 <https://rbcommons.com/s/twitter/r/2052>`_
+  `RB #2073 <https://rbcommons.com/s/twitter/r/2073>`_
+
+* Introduce a jvm binary shader.
+  `RB #2050 <https://rbcommons.com/s/twitter/r/2050>`_
+
+* Open source the spindle plugin for pants into contrib.
+  `RB #2033 <https://rbcommons.com/s/twitter/r/2033>`_
+
+* Implement an exported ownership model.
+  `RB #2010 <https://rbcommons.com/s/twitter/r/2010>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Integrating Patrick's SimpleCodegenTask base class with WireGen.
+  `RB #2274 <https://rbcommons.com/s/twitter/r/2274>`_
+
+* Fix bad log statement in junit_run.py.
+  `RB #2290 <https://rbcommons.com/s/twitter/r/2290>`_
+
+* Provide more specific value parsing errors
+  `RB #2283 <https://rbcommons.com/s/twitter/r/2283>`_
+
+* Dry up incremental-compiler dep on sbt-interface.
+  `RB #2279 <https://rbcommons.com/s/twitter/r/2279>`_
+
+* Use BufferedOutputStream in jar-tool
+  `RB #2270 <https://rbcommons.com/s/twitter/r/2270>`_
+
+* Add relative_symlink to dirutil for latest run report
+  `RB #2271 <https://rbcommons.com/s/twitter/r/2271>`_
+
+* Shade zinc.
+  `RB #2268 <https://rbcommons.com/s/twitter/r/2268>`_
+
+* rm Exception.message calls
+  `RB #2245 <https://rbcommons.com/s/twitter/r/2245>`_
+
+* sanity check on generated cobertura xml report
+  `RB #2231 <https://rbcommons.com/s/twitter/r/2231>`_
+
+* [pants/jar] Fix a typo
+  `RB #2230 <https://rbcommons.com/s/twitter/r/2230>`_
+
+* Convert validation.assert_list isinstance checking to be lazy
+  `RB #2228 <https://rbcommons.com/s/twitter/r/2228>`_
+
+* use workunit output for cpp command running
+  `RB #2223 <https://rbcommons.com/s/twitter/r/2223>`_
+
+* Remove all global config state.
+  `RB #2222 <https://rbcommons.com/s/twitter/r/2222>`_
+  `RB #2181 <https://rbncommons.com/s/twitter/r/2181>`_
+  `RB #2160 <https://rbcommons.com/s/twitter/r/2160>`_
+  `RB #2159 <https://rbcommons.com/s/twitter/r/2159>`_
+  `RB #2151 <https://rbcommons.com/s/twitter/r/2151>`_
+  `RB #2142 <https://rbcommons.com/s/twitter/r/2142>`_
+  `RB #2141 <https://rbcommons.com/s/twitter/r/2141>`_
+
+* Make the version of specs in BUILD.tools match the one in 3rdparty/BUILD.
+  `RB #2203 <https://rbcommons.com/s/twitter/r/2203>`_
+
+* Handle warnings in BUILD file context.
+  `RB #2198 <https://rbcommons.com/s/twitter/r/2198>`_
+
+* Replace custom softreference cache with a guava cache.  (zinc)
+  `RB #2190 <https://rbcommons.com/s/twitter/r/2190>`_
+
+* Establish a source_root for pants scala code.
+  `RB #2189 <https://rbcommons.com/s/twitter/r/2189>`_
+
+* Zinc patches to improve roundtrip time
+  `RB #2178 <https://rbcommons.com/s/twitter/r/2178>`_
+
+* cache parsed mustache templates as they are requested
+  `RB #2171 <https://rbcommons.com/s/twitter/r/2171>`_
+
+* memoize linkify to reduce reporting file stat calls
+  `RB #2170 <https://rbcommons.com/s/twitter/r/2170>`_
+
+* Refactor BuildFile and BuildFileAdressMapper
+  `RB #2110 <https://rbcommons.com/s/twitter/r/2110>`_
+
+* fix whitespace in workerpool test, rm unused import
+  `RB #2144 <https://rbcommons.com/s/twitter/r/2144>`_
+
+* Use jvm-compilers as the parent of isolation workunits instead of 'isolation', add workunits for analysis
+  `RB #2134 <https://rbcommons.com/s/twitter/r/2134>`_
+
+* Improve the error message when a tool fails to bootstrap.
+  `RB #2135 <https://rbcommons.com/s/twitter/r/2135>`_
+
+* Fix rglobs-to-filespec code.
+  `RB #2133 <https://rbcommons.com/s/twitter/r/2133>`_
+
+* Send workunit output to stderr during tests
+  `RB #2108 <https://rbcommons.com/s/twitter/r/2108>`_
+
+* Changes to zinc analysis split/merge test data generation:
+  `RB #2095 <https://rbcommons.com/s/twitter/r/2095>`_
+
+* Add a dummy workunit to the end of the run to print out a timestamp that includes the time spent in the last task.
+  `RB #2054 <https://rbcommons.com/s/twitter/r/2054>`_
+
+* Add 'java-resource' and 'java-test-resource' content type for Resources Roots.
+  `RB #2046 <https://rbcommons.com/s/twitter/r/2046>`_
+
+* Upgrade virtualenv from 12.0.7 to 12.1.1.
+  `RB #2047 <https://rbcommons.com/s/twitter/r/2047>`_
+
+* convert all % formatted strings under src/ to str.format format
+  `RB #2042 <https://rbcommons.com/s/twitter/r/2042>`_
+
+* Move overrides for registrations to debug.
+  `RB #2023 <https://rbcommons.com/s/twitter/r/2023>`_
+
+* Split jvm_binary.py into jvm_binary.py and jvm_app.py.
+  `RB #2006 <https://rbcommons.com/s/twitter/r/2006>`_
+
+* Validate analysis earlier, and handle it explicitly
+  `RB #1999 <https://rbcommons.com/s/twitter/r/1999>`_
+
+* Switch to importlib
+  `RB #2003 <https://rbcommons.com/s/twitter/r/2003>`_
+
+* Some refactoring and tidying-up in workunit.
+  `RB #1981 <https://rbcommons.com/s/twitter/r/1981>`_
+
+* Remove virtualenv tarball from CI cache.
+  `RB #2281 <https://rbcommons.com/s/twitter/r/2281>`_
+
+* Moved testing of examples and testprojects to tests
+  `RB #2158 <https://rbcommons.com/s/twitter/r/2158>`_
+
+* Share the python interpreter/egg caches between tests.
+  `RB #2256 <https://rbcommons.com/s/twitter/r/2256>`_
+
+* Add support for python test sharding.
+  `RB #2243 <https://rbcommons.com/s/twitter/r/2243>`_
+
+* Fixup OSX CI breaks.
+  `RB #2241 <https://rbcommons.com/s/twitter/r/2241>`_
+
+* fix test class name c&p error
+  `RB #2227 <https://rbcommons.com/s/twitter/r/2227>`_
+
+* Remove the pytest skip tag for scala publish integration test as it uses --doc-scaladoc-skip
+  `RB #2225 <https://rbcommons.com/s/twitter/r/2225>`_
+
+* integration test for classifiers
+  `RB #2216 <https://rbcommons.com/s/twitter/r/2216>`_
+  `RB #2218 <https://rbcommons.com/s/twitter/r/2218>`_
+  `RB #2232 <https://rbcommons.com/s/twitter/r/2232>`_
+
+* Use 2 IT shards to avoid OSX CI timeouts.
+  `RB #2217 <https://rbcommons.com/s/twitter/r/2217>`_
+
+* Don't have JvmToolTaskTestBase require access to "real" option values.
+  `RB #2213 <https://rbcommons.com/s/twitter/r/2213>`_
+
+* There were two test_export_integration.py tests.
+  `RB #2215 <https://rbcommons.com/s/twitter/r/2215>`_
+
+* Do not include integration tests in non-integration tests.
+  `RB #2173 <https://rbcommons.com/s/twitter/r/2173>`_
+
+* Streamline some test setup.
+  `RB #2167 <https://rbcommons.com/s/twitter/r/2167>`_
+
+* Ensure that certain test cleanup always happens, even if setUp fails.
+  `RB #2166 <https://rbcommons.com/s/twitter/r/2166>`_
+
+* Added a test of the bootstrapper logic with no cached bootstrap.jar
+  `RB #2126 <https://rbcommons.com/s/twitter/r/2126>`_
+
+* Remove integration tests from default targets in test BUILD files
+  `RB #2086 <https://rbcommons.com/s/twitter/r/2086>`_
+
+* Cap BootstrapJvmTools mem in JvmToolTaskTestBase.
+  `RB #2077 <https://rbcommons.com/s/twitter/r/2077>`_
+
+* Re-establish no nailguns under TravisCI.
+  `RB #1852 <https://rbcommons.com/s/twitter/r/1852>`_
+  `RB #2065 <https://rbcommons.com/s/twitter/r/2065>`_
+
+* Further cleanup of test context setup.
+  `RB #2053 <https://rbcommons.com/s/twitter/r/2053>`_
+
+* Remove plumbing for custom test config.
+  `RB #2051 <https://rbcommons.com/s/twitter/r/2051>`_
+
+* Use a fake context when testing.
+  `RB #2049 <https://rbcommons.com/s/twitter/r/2049>`_
+
+* Remove old TaskTest base class.
+  `RB #2039 <https://rbcommons.com/s/twitter/r/2039>`_
+  `RB #2031 <https://rbcommons.com/s/twitter/r/2031>`_
+  `RB #2027 <https://rbcommons.com/s/twitter/r/2027>`_
+  `RB #2022 <https://rbcommons.com/s/twitter/r/2022>`_
+  `RB #2017 <https://rbcommons.com/s/twitter/r/2017>`_
+  `RB #2016 <https://rbcommons.com/s/twitter/r/2016>`_
+
+* Refactor com.pants package to org.pantsbuild in examples and testprojects
+  `RB #2037 <https://rbcommons.com/s/twitter/r/2037>`_
+
+* Added a simple 'HelloWorld' java example.
+  `RB #2028 <https://rbcommons.com/s/twitter/r/2028>`_
+
+* Place the workdir below the pants_workdir
+  `RB #2007 <https://rbcommons.com/s/twitter/r/2007>`_
+
 
 0.0.32 (3/26/2015)
 ------------------
@@ -2123,4 +2632,3 @@ Bugfixes
 ------------------
 
 * Initial published version of ``pantsbuild.pants``
-

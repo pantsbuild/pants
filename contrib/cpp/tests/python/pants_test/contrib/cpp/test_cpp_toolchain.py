@@ -9,7 +9,7 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.util.contextutil import environment_as, temporary_dir, temporary_file
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, touch
 
 from pants.contrib.cpp.toolchain.cpp_toolchain import CppToolchain

@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import pkgutil
 
-from pex.pex import PEX
-
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_task import PythonTask
@@ -140,12 +138,12 @@ class PythonEval(PythonTask):
                                 modules=modules)
           generator.write(imports_file)
           imports_file.close()
-          chroot.builder.set_executable(imports_file.name, '__pants_python_eval__.py')
+          chroot.set_executable(imports_file.name, '__pants_python_eval__.py')
 
         with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo,
                                    targets=[target], platforms=platforms,
                                    pre_freeze=pre_freeze) as chroot:
-          pex = PEX(chroot.builder.path(), interpreter=interpreter)
+          pex = chroot.pex()
           with self.context.new_workunit(name='eval',
                                          labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
                                          cmd=' '.join(pex.cmdline())) as workunit:

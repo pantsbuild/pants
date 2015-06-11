@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-import pytest
-
 
 """Helpers to provide compile strategies to unit tests.
 

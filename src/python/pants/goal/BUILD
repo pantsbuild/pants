@@ -5,9 +5,7 @@ python_library(
   name = 'task_registrar',
   sources = ['task_registrar.py'],
   dependencies = [
-    ':error',
     ':goal',
-    'src/python/pants/backend/core/tasks:task',
   ],
 )
 
