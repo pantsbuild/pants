@@ -48,6 +48,7 @@ class PythonBinaryCreate(PythonTask):
     pexinfo = binary.pexinfo.copy()
     pexinfo.build_properties = build_properties
 
-    with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo, targets=[binary], platforms=binary.platforms) as chroot:
+    with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo, targets=[binary],
+                               platforms=binary.platforms) as chroot:
       pex_path = os.path.join(self._distdir, '{}.pex'.format(binary.name))
-      chroot.builder.build(pex_path)
+      chroot.package_pex(pex_path)

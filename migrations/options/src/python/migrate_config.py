@@ -242,6 +242,9 @@ migrations = {
   ('DEFAULT', 'thrift_default_compiler'): ('thrift-defaults', 'compiler'),
   ('DEFAULT', 'thrift_default_language'): ('thrift-defaults', 'language'),
   ('DEFAULT', 'thrift_default_rpc_style'): ('thrift-defaults', 'rpc_style'),
+
+  ('python-setup', 'egg_cache_dir'): ('python_setup', 'resolver_cache_dir'),
+  ('DEFAULT', 'python_chroot_requirements_ttl'): ('python-setup', 'resolver_cache_ttl'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '

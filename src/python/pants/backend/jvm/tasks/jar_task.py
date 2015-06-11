@@ -296,7 +296,8 @@ class JarTask(NailgunTask):
 
     with self._jar_tool_args(jar, path, overwrite, compressed, jar_rules) as args:
       if args:     # Don't build an empty jar.
-        JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args)
+        if JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args):
+          raise TaskError('jar-tool failed')
 
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""

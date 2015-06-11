@@ -39,6 +39,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
     if base_fingerprint is None:
       return None
 
+    hasher.update('version=2')
     hasher.update(base_fingerprint)
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
@@ -145,22 +146,23 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return self._shader
 
   def _bootstrap_shaded_jvm_tool(self, key, scope, tools, main, custom_rules=None):
-    shaded_jar = os.path.join(self._tool_cache_path,
-                              'shaded_jars', scope, key, '{}.jar'.format(main))
-
     targets = list(self._resolve_tool_targets(tools, key, scope))
     fingerprint_strategy = ShadedToolFingerprintStrategy(main, custom_rules=custom_rules)
+
     with self.invalidated(targets,
                           # We're the only dependent in reality since we shade.
                           invalidate_dependents=False,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
 
+      tool_vts = self.tool_vts(invalidation_check)
+      jar_name = '{main}-{hash}.jar'.format(main=main, hash=tool_vts.cache_key.hash)
+      shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
+
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
         return [shaded_jar]
 
       # Ensure we have a single binary jar we can shade.
-      binary_jar = os.path.join(self._tool_cache_path,
-                                'binary_jars', scope, key, '{}.jar'.format(main))
+      binary_jar = os.path.join(self._tool_cache_path, 'binary_jars', jar_name)
       safe_mkdir_for(binary_jar)
 
       classpath = self._bootstrap_classpath(key, targets)
@@ -192,7 +194,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           "with: {exception}".format(key=key, main=main, scope=scope, exception=e))
 
       if self.artifact_cache_writes_enabled():
-        tool_vts = self.tool_vts(invalidation_check)
         self.update_artifact_cache([(tool_vts, [shaded_jar])])
 
       return [shaded_jar]

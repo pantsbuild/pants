@@ -51,6 +51,7 @@ target(
   name = 'integration',
   dependencies = [
     ':antlr_integration',
+    ':bootstrap_jvm_tools_integration',
     ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
@@ -125,6 +126,15 @@ python_tests(
   name = 'jvm_run_integration',
   sources = ['test_jvm_run_integration.py'],
   dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name = 'bootstrap_jvm_tools_integration',
+  sources = ['test_bootstrap_jvm_tools_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
 )
