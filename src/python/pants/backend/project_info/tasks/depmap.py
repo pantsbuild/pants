@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import json
 import os
 from collections import defaultdict
@@ -36,10 +35,6 @@ class Depmap(ConsoleTask):
     EXCLUDED = 'EXCLUDED'  # Excluded Target
     RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
     TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
-
-  @staticmethod
-  def _is_jvm(dep):
-    return isinstance(dep, JvmApp) or getattr(dep, 'is_jvm', False)
 
   @staticmethod
   def _jar_id(jar):
@@ -175,7 +170,6 @@ class Depmap(ConsoleTask):
       dep_id, internal = self._dep_id(dep)
 
       if self.path_to:
-        # If we hit the desired search path, unwind the stack and bail out of the generator.
         if dep_id == self.path_to:
           for dep_id, indent in stack + [(dep_id, indent)]:
             yield make_line(dep_id, indent)
