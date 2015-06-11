@@ -307,6 +307,19 @@ class DepmapTest(BaseDepmapTest):
       options={'graph': True}
     )
 
+  def test_graph_show_types(self):
+    self.assert_console_output_ordered(
+      'digraph "common.h.h" {',
+      '  node [shape=rectangle, colorscheme=set312;];',
+      '  rankdir=LR;',
+      '  "internal-common.h.h\\nJvmApp" [style=filled, fillcolor=1];',
+      '  "internal-common.f.f\\nJvmBinary" [style=filled, fillcolor=2];',
+      '  "internal-common.h.h\\nJvmApp" -> "internal-common.f.f\\nJvmBinary";',
+      '}',
+      targets=[self.target('common/h')],
+      options={'graph': True, 'show_types': True}
+    )
+
   def test_tree(self):
     self.assert_console_output_ordered(
       '--internal-overlaps.two',
