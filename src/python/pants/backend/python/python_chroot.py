@@ -86,12 +86,6 @@ class PythonChroot(object):
     """Deletes this chroot from disk if it has been dumped."""
     safe_rmtree(self.path())
 
-  def __del__(self):
-    if os.getenv('PANTS_LEAVE_CHROOT') is None:
-      self.delete()
-    else:
-      self.debug('Left chroot at {}'.format(self.path()))
-
   def debug(self, msg, indent=0):
     if os.getenv('PANTS_VERBOSE') is not None:
       print('{}{}'.format(' ' * indent, msg))
@@ -99,11 +93,8 @@ class PythonChroot(object):
   def path(self):
     return os.path.realpath(self._builder.path())
 
-  def set_executable(self, filename, env_filename=None):
-    self._builder.set_executable(filename, env_filename)
-
   def pex(self):
-    return PEX(os.path.realpath(self._builder.path()), interpreter=self._interpreter)
+    return PEX(self.path(), interpreter=self._interpreter)
 
   def package_pex(self, filename):
     """Package into a PEX zipfile.
@@ -121,7 +112,7 @@ class PythonChroot(object):
     for relpath in library.sources_relative_to_source_root():
       try:
         copy_to_chroot(library.target_base, relpath, self._builder.add_source)
-      except OSError as e:
+      except OSError:
         logger.error("Failed to copy {path} for library {library}"
                      .format(path=os.path.join(library.target_base, relpath),
                              library=library))
