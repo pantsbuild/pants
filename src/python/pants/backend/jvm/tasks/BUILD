@@ -42,6 +42,7 @@ python_library(
     ':jvm_task',
     ':jvm_tool_task_mixin',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:workunit',
     'src/python/pants/java:util',
   ],
 )
