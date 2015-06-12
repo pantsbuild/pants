@@ -30,7 +30,8 @@ class UnpackedJars(ImportJarsMixin, Target):
       targets which contain .proto definitions.
     :param list libraries: addresses of jar_library targets that specify the jars you want to unpack
     :param list include_patterns: fileset patterns to include from the archive
-    :param list exclude_patterns: fileset patterns to exclude from the archive
+    :param list exclude_patterns: fileset patterns to exclude from the archive. Exclude patterns
+      are processed before include_patterns.
     """
     payload = payload or Payload()
     payload.add_fields({
