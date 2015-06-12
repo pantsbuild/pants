@@ -19,21 +19,6 @@ def _not_excluded_filter(exclude_patterns):
   return not_excluded
 
 
-def _validate_path_in_buildroot(buildroot, tuple, classpath_products):
-  conf, path = tuple
-  if os.path.relpath(path, buildroot).startswith('..'):
-    target = classpath_products.target_for_product((conf, path))
-    raise TaskError(
-      'Classpath entry {} for target {} is located outside the buildroot.'
-      .format(path, target.address.spec))
-
-
-def _validate_classpath_tuples(classpath, classpath_products):
-  """Validates that all files are located within the working copy, to simplify relativization."""
-  buildroot = get_buildroot()
-  for tuple in classpath:
-    _validate_path_in_buildroot(buildroot, tuple, classpath_products)
-
 class ClasspathProducts(object):
   def __init__(self):
     self._classpaths = UnionProducts()
@@ -61,15 +46,12 @@ class ClasspathProducts(object):
 
     filtered_classpath_tuples = self._filter_by_excludes(classpath_tuples, [target])
 
-    _validate_classpath_tuples(filtered_classpath_tuples, self._classpaths)
     return filtered_classpath_tuples
 
   def get_for_targets(self, targets):
     classpath_tuples = self._classpaths.get_for_targets(targets)
-
     filtered_classpath_tuples = self._filter_by_excludes(classpath_tuples, targets)
 
-    _validate_classpath_tuples(filtered_classpath_tuples, self._classpaths)
     return filtered_classpath_tuples
 
   def _filter_by_excludes(self, classpath_tuples, root_targets):
