@@ -215,15 +215,15 @@ class Depmap(ConsoleTask):
         yield make_node(dep, maybe_add_type(dep, dep_id), internal)
         outputted.add(dep_id)
 
+        for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
+          for item in output_deps(sub_dep, dep, dep_id, outputted):
+            yield item
+
       if parent:
         edge_id = (parent_id, dep_id)
         if edge_id not in outputted:
           yield make_edge(maybe_add_type(parent, parent_id), maybe_add_type(dep, dep_id), internal)
           outputted.add(edge_id)
-
-      for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
-        for item in output_deps(sub_dep, dep, dep_id, outputted):
-          yield item
 
     yield 'digraph "{}" {{'.format(target.id)
     yield '  node [shape=rectangle, colorscheme=set312;];'
