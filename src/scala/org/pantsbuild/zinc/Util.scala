@@ -5,7 +5,7 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import sbt.{ ConsoleLogger, Hash, IO, Level, Logger }
+import sbt.{ ConsoleLogger, ConsoleOut, Hash, IO, Level, Logger }
 import scala.util.matching.Regex
 
 object Util {
@@ -21,7 +21,7 @@ object Util {
     if (quiet) {
       new SilentLogger
     } else {
-      val out = ConsoleLogger.systemOut
+      val out = ConsoleOut.systemOut
       val consoleLogger = ConsoleLogger(out = out, useColor = ConsoleLogger.formatEnabled && color); consoleLogger.setLevel(level)
       new LoggerRaw() {
         def isFiltered(message: => String): Boolean = {
@@ -29,12 +29,14 @@ object Util {
         }
         def trace(t: => Throwable): Unit = consoleLogger.trace(t)
         def success(message: => String): Unit = consoleLogger.success(message)
-        def log(level: Level.Value, message: => String): Unit = {
+        def log(level: Level.Value, msg: => String): Unit = {
+          lazy val message = msg
           if (!isFiltered(message)) {
             consoleLogger.log(level, message)
           }
         }
-        def logRaw(message: => String): Unit = {
+        def logRaw(msg: => String): Unit = {
+          lazy val message = msg
           if (!isFiltered(message)) {
             out.print(message)
           }
