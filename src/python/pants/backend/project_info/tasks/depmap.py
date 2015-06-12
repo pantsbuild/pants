@@ -129,18 +129,17 @@ class Depmap(ConsoleTask):
         yield line
 
   def _dep_id(self, dependency):
-    """Returns a tuple of dependency_id , is_internal_dep."""
-
+    """Returns a tuple of dependency_id, is_internal_dep."""
     params = dict(sep=self.separator)
-    if isinstance(dependency, JarDependency):
+    is_external_dep = isinstance(dependency, JarDependency) and dependency.get('rev') is not None
+
+    if is_external_dep:
       params.update(org=dependency.org, name=dependency.name, rev=dependency.rev)
     else:
       params.update(org='internal', name=dependency.id)
 
-    if params.get('rev') is not None:
-      return "{org}{sep}{name}{sep}{rev}".format(**params), False
-    else:
-      return "{org}{sep}{name}".format(**params), True
+    return ('{org}{sep}{name}{sep}{rev}' if params.get('rev') else
+            '{org}{sep}{name}').format(**params), not is_external_dep
 
   def _enumerate_visible_deps(self, dep, predicate):
     dep_id, internal = self._dep_id(dep)
@@ -164,7 +163,7 @@ class Depmap(ConsoleTask):
     def make_line(dep, indent, is_dupe=False):
       indent_join, indent_chars = ('--', '  |') if self.should_tree else ('', '  ')
       dupe_char = '*' if is_dupe else ''
-      return '{}{}{}{}'.format(indent * indent_chars, indent_join, dupe_char, dep)
+      return ''.join((indent * indent_chars, indent_join, dupe_char, dep))
 
     def output_deps(dep, indent, outputted, stack):
       dep_id, internal = self._dep_id(dep)
