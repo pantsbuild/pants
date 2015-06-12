@@ -131,7 +131,7 @@ class Depmap(ConsoleTask):
   def _dep_id(self, dependency):
     """Returns a tuple of dependency_id, is_internal_dep."""
     params = dict(sep=self.separator)
-    is_external_dep = isinstance(dependency, JarDependency) and dependency.get('rev') is not None
+    is_external_dep = isinstance(dependency, JarDependency) and hasattr(dependency, 'rev')
 
     if is_external_dep:
       params.update(org=dependency.org, name=dependency.name, rev=dependency.rev)
