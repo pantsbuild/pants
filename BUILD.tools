@@ -59,9 +59,11 @@ jar_library(name = 'cobertura-report',
 
 jar_library(name = 'benchmark-caliper-0.5',
             jars = [
-              # TODO(Eric Ayers) Caliper is old and breaks with guava 16. Add jmh support?
+              # TODO (Eric Ayers) Caliper is old. Add jmh support?
               jar(org = 'com.google.caliper', name = 'caliper', rev = '0.5-rc1')
-                .exclude(org='com.google.guava', name='guava')
+                .exclude(org='com.google.guava', name='guava'),
+              # The caliper tool is shaded, and so shouldn't interfer with Guava 16.
+              jar(org='com.google.guava', name='guava', rev='15.0', force=True),
             ])
 
 jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
