@@ -41,10 +41,10 @@ class JavaAgent(JavaLibrary):
 
     super(JavaAgent, self).__init__(
         name=name,
-        sources=self.assert_list(sources),
+        sources=self.assert_list(sources, field_name='sources'),
         provides=None,
-        excludes=self.assert_list(excludes),
-        resources=self.assert_list(resources),
+        excludes=self.assert_list(excludes, field_name='excludes'),
+        resources=self.assert_list(resources, field_name='resources'),
         **kwargs)
 
     if not (premain or agent_class):

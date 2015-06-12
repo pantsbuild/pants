@@ -103,7 +103,7 @@ class JarDependency(object):
     self.transitive = not intransitive
     self.apidocs = apidocs
     self.mutable = mutable
-    self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact))
+    self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact, field_name='artifacts'))
 
     if ext or url or type_ or classifier:
       self.append_artifact(name,

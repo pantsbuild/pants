@@ -37,7 +37,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     :param resources: An optional list of paths (DEPRECATED) or ``resources``
       targets containing resources that belong on this library's classpath.
     """
-    self._java_sources_specs = self.assert_list(java_sources)
+    self._java_sources_specs = self.assert_list(java_sources, field_name='java_sources')
     super(ScalaLibrary, self).__init__(**kwargs)
     self.add_labels('scala')
 

@@ -27,8 +27,8 @@ class Resources(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'sources': self.create_sources_field(sources=self.assert_list(sources),
-                                           sources_rel_path=address.spec_path),
+      'sources': self.create_sources_field(sources=self.assert_list(sources, field_name='sources'),
+                                           sources_rel_path=address.spec_path, field_name='sources'),
     })
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 

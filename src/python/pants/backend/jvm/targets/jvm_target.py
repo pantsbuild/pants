@@ -54,10 +54,10 @@ class JvmTarget(Target, Jarable):
     payload.add_fields({
       'sources': self.create_sources_field(sources, sources_rel_path, address),
       'provides': provides,
-      'excludes': ExcludesField(self.assert_list(excludes, expected_type=Exclude)),
-      'configurations': ConfigurationsField(self.assert_list(configurations)),
+      'excludes': ExcludesField(self.assert_list(excludes, expected_type=Exclude, field_name='excludes')),
+      'configurations': ConfigurationsField(self.assert_list(configurations, field_name='configurations')),
     })
-    self._resource_specs = self.assert_list(resources)
+    self._resource_specs = self.assert_list(resources, field_name='resources')
 
     super(JvmTarget, self).__init__(address=address, payload=payload,
                                     **kwargs)
