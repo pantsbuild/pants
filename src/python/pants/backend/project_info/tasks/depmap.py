@@ -204,8 +204,9 @@ class Depmap(ConsoleTask):
 
       return line_fmt.format(id=dep_id, internal=int_shape, color=color_by_type[dep_class])
 
-    def make_edge(from_dep_id, to_dep_id):
-      return '  "{}" -> "{}";'.format(from_dep_id, to_dep_id)
+    def make_edge(from_dep_id, to_dep_id, internal):
+      style = ' [style=dashed]' if not internal else ''
+      return '  "{}" -> "{}"{};'.format(from_dep_id, to_dep_id, style)
 
     def output_deps(dep, parent, parent_id, outputted):
       dep_id, internal = self._dep_id(dep)
@@ -217,7 +218,7 @@ class Depmap(ConsoleTask):
       if parent:
         edge_id = (parent_id, dep_id)
         if edge_id not in outputted:
-          yield make_edge(maybe_add_type(parent, parent_id), maybe_add_type(dep, dep_id))
+          yield make_edge(maybe_add_type(parent, parent_id), maybe_add_type(dep, dep_id), internal)
           outputted.add(edge_id)
 
       for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
