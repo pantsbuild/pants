@@ -108,16 +108,6 @@ class Payload(object):
     else:
       return hasher.hexdigest()
 
-  def clear_memo(self):
-    """Make this payload forget its memoized fingerprint.
-
-    Useful in tests.
-    """
-    self._fingerprint_memo_map = {}
-    for field in self._fields.values():
-      if field is not None:
-        field.clear_memo()
-
   def __getattr__(self, attr):
     field = self._fields[attr]
     if field is not None:

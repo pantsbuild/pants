@@ -21,8 +21,15 @@ class PythonEvalTest(PythonTaskTest):
 
   def setUp(self):
     super(PythonEvalTest, self).setUp()
-
     SourceRoot.register('src', PythonBinary, PythonLibrary)
+    self._create_graph(broken_b_library=True)
+
+  def tearDown(self):
+    super(PythonEvalTest, self).tearDown()
+    SourceRoot.reset()
+
+  def _create_graph(self, broken_b_library):
+    self.reset_build_graph()
 
     self.a_library = self.create_python_library('src/a', 'a', {'a.py': dedent("""
     import inspect
@@ -49,21 +56,10 @@ class PythonEvalTest(PythonTaskTest):
 
 
     @compile_time_check_decorator
-    def baz_c():
+    {}:
       pass
-    """)}, dependencies=['//src/a'])
-
-    def fix_c_source():
-      self.create_file('src/c/c.py', contents=dedent("""
-      from a.a import compile_time_check_decorator
-
-      # Change from decorated function baz_c to decorated class BazC.
-      @compile_time_check_decorator
-      class BazC(object):
-        pass
-      """))
-      self.b_library.payload.clear_memo()
-    self.fix_c_source = fix_c_source
+    """.format('def baz_c()' if broken_b_library else 'class BazC(object)')
+    )}, dependencies=['//src/a'])
 
     self.d_library = self.create_python_library('src/d', 'd', { 'd.py': dedent("""
     from a.a import compile_time_check_decorator
@@ -80,10 +76,6 @@ class PythonEvalTest(PythonTaskTest):
     self.g_binary = self.create_python_binary('src/g', 'g', 'a.a:does_not_exist',
                                               dependencies=['//src/a'])
     self.h_binary = self.create_python_binary('src/h', 'h', 'a.a')
-
-  def tearDown(self):
-    super(PythonEvalTest, self).tearDown()
-    SourceRoot.reset()
 
   def _create_task(self, target_roots, options=None):
     if options:
@@ -130,7 +122,7 @@ class PythonEvalTest(PythonTaskTest):
     self.assertEqual([self.a_library], e.exception.compiled)
     self.assertEqual([self.b_library], e.exception.failed)
 
-    self.fix_c_source()
+    self._create_graph(broken_b_library=False)
     python_eval = self._create_task(target_roots=[self.b_library], options={'closure': True})
 
     compiled = python_eval.execute()

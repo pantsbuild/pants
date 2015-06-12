@@ -106,6 +106,9 @@ class PythonTask(Task):
     The returned chroot will be cached for future use.
 
     TODO: Garbage-collect old chroots, so they don't pile up?
+    TODO: Ideally chroots would just be products produced by some other task. But that's
+          a bit too complicated to implement right now, as we'd need a way to request
+          chroots for a variety of sets of targets.
     """
     # This PexInfo contains any customizations specified by the caller.
     # The process of building a pex modifies it further.
@@ -141,7 +144,7 @@ class PythonTask(Task):
   @contextmanager
   def temporary_chroot(self, interpreter, pex_info, targets, platforms,
                        extra_requirements=None, executable_file_content=None):
-    path = tempfile.mkdtemp()
+    path = tempfile.mkdtemp()  # Not a contextmanager: chroot.delete() will clean this up anyway.
     pex_info = pex_info or PexInfo.default()
     chroot = self._build_chroot(path, interpreter, pex_info, targets, platforms,
                                 extra_requirements, executable_file_content)
