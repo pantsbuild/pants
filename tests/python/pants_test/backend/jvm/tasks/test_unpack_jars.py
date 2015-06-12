@@ -9,6 +9,8 @@ import os
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -53,27 +55,43 @@ class UnpackJarsTest(TaskTestBase):
     with self.assertRaises(UnpackJars.InvalidPatternError):
       UnpackJars._compile_patterns([45])
 
+  def _run_filter(self, filename, include_patterns=None, exclude_patterns=None):
+    return UnpackJars._unpack_filter(
+      filename,
+      UnpackJars._compile_patterns(include_patterns or []),
+      UnpackJars._compile_patterns(exclude_patterns or []))
+
   def test_unpack_filter(self):
-    def run_filter(filename, include_patterns=None, exclude_patterns=None):
-      return UnpackJars._unpack_filter(
-        filename,
-        UnpackJars._compile_patterns(include_patterns or []),
-        UnpackJars._compile_patterns(exclude_patterns or []))
-
     # If no patterns are specified, everything goes through
-    self.assertTrue(run_filter("foo/bar.java"))
+    self.assertTrue(self._run_filter("foo/bar.java"))
 
-    self.assertTrue(run_filter("foo/bar.java",
+    self.assertTrue(self._run_filter("foo/bar.java",
                                include_patterns=["**/*.java"]))
-    self.assertTrue(run_filter("bar.java",
+    self.assertTrue(self._run_filter("bar.java",
                                 include_patterns=["**/*.java"]))
-    self.assertTrue(run_filter("bar.java",
+    self.assertTrue(self._run_filter("bar.java",
                                include_patterns=["**/*.java", "*.java"]))
-    self.assertFalse(run_filter("foo/bar.java",
+    self.assertFalse(self._run_filter("foo/bar.java",
                                 exclude_patterns=["**/bar.*"]))
-    self.assertFalse(run_filter("foo/bar.java",
+    self.assertFalse(self._run_filter("foo/bar.java",
                                 include_patterns=["**/*/java"],
                                 exclude_patterns=["**/bar.*"]))
+
+    # exclude patterns should be computed before include patterns
+    self.assertFalse(self._run_filter("foo/bar.java",
+                                include_patterns=["foo/*.java"],
+                                exclude_patterns=["foo/b*.java"]))
+    self.assertTrue(self._run_filter("foo/bar.java",
+                               include_patterns=["foo/*.java"],
+                               exclude_patterns=["foo/x*.java"]))
+
+  @pytest.mark.xfail
+  def test_problematic_cases(self):
+    """These should pass, but don't"""
+    # See https://github.com/twitter/commons/issues/380.  'foo*bar' doesn't match 'foobar'
+    self.assertFalse(self._run_filter("foo/bar.java",
+                                      include_patterns=['foo/*.java'],
+                                      exclude_patterns=['foo/bar*.java']))
 
   def _make_jar_library(self, version):
     build_path = os.path.join(self.build_root, 'unpack', 'jars', 'BUILD')
