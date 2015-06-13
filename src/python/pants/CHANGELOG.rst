@@ -1,10 +1,8 @@
 RELEASE HISTORY
 ===============
 
-0.0.33 (unreleased)
--------------------
-
-445 log entries from eddf2f0e6b16bc8d3d80c70a2abd5c5495c73ca4 to 70b92c787842987e84bf23e1026d246abfc441d0
+0.0.33 (6/13/2015)
+------------------
 
 Release Notes
 ~~~~~~~~~~~~~
@@ -28,6 +26,12 @@ option defined in pants.ini pointing to it must now add one like so:
 
 API Changes
 ~~~~~~~~~~~
+
+* Removed --project-info flag from depmap goal
+  `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
+
+* Deprecate PytestRun env vars.
+  `RB #2299 <https://rbcommons.com/s/twitter/r/2299>`_
 
 * Add Subsystems for options that live outside a single task, use them
   to replace config settings in pants.ini
@@ -75,6 +79,7 @@ API Changes
   `RB #2069 <https://rbcommons.com/s/twitter/r/2069>`_
 
 * Upgrade zinc to latest for perf wins.
+  `RB #2355 <https://rbcommons.com/s/twitter/r/2355>`_
   `RB #2194 <https://rbcommons.com/s/twitter/r/2194>`_
   `RB #2168 <https://rbcommons.com/s/twitter/r/2168>`_
   `RB #2154 <https://rbcommons.com/s/twitter/r/2154>`_
@@ -99,6 +104,38 @@ API Changes
 
 Bugfixes
 ~~~~~~~~
+* Fixed errors in how arguments are passed to wire_gen.
+  `RB #2354 <https://rbcommons.com/s/twitter/r/2354>`_
+
+* Compute exclude_patterns first when unpacking jars
+  `RB #2352 <https://rbcommons.com/s/twitter/r/2352>`_
+
+* Add INDEX.LIST to as a Skip JarRule when creating a fat jar
+  `RB #2342 <https://rbcommons.com/s/twitter/r/2342>`_
+
+* wrapped-globs: make rglobs output git-compatible
+  `RB #2332 <https://rbcommons.com/s/twitter/r/2332>`_
+
+* Add a coherent error message when scrooge has no sources.
+  `RB #2329 <https://rbcommons.com/s/twitter/r/2329>`_
+
+* Only run junit when there are junit_test targets in the graph.
+  `RB #2291 <https://rbcommons.com/s/twitter/r/2291>`_
+
+* Fix bootstrap local cache.
+  `RB #2336 <https://rbcommons.com/s/twitter/r/2336>`_
+
+* Added a hash to a jar name for a bootstrapped jvm tool
+  `RB #2334 <https://rbcommons.com/s/twitter/r/2334>`_
+
+* Raise TaskError to exit non-zero if jar-tool fails
+  `RB #2150 <https://rbcommons.com/s/twitter/r/2150>`_
+
+* Fix java zinc isolated compile analysis corruption described github issue #1626
+  `RB #2325 <https://rbcommons.com/s/twitter/r/2325>`_
+
+* Upstream analysis fix
+  `RB #2312 <https://rbcommons.com/s/twitter/r/2312>`_
 
 * Two changes that affect invalidation and artifact caching.
   `RB #2269 <https://rbcommons.com/s/twitter/r/2269>`_
@@ -202,8 +239,18 @@ Bugfixes
 * Fix include dependees options.
   `RB #1760 <https://rbcommons.com/s/twitter/r/1760>`_
 
+
 Documentation
 ~~~~~~~~~~~~~
+
+* Be explicit that pants requires python 2.7.x to run.
+  `RB #2343 <https://rbcommons.com/s/twitter/r/2343>`_
+
+* Update documentation on how to develop and document a JVM tool used by Pants
+  `RB #2318 <https://rbcommons.com/s/twitter/r/2318>`_
+
+* Updates to changelog since 0.0.32 in preparation for next release.
+  `RB #2294 <https://rbcommons.com/s/twitter/r/2294>`_
 
 * Document the pantsbuild jvm tool release process.
   `RB #2289 <https://rbcommons.com/s/twitter/r/2289>`_
@@ -228,6 +275,25 @@ Documentation
 
 New Features
 ~~~~~~~~~~~~
+
+* Add support for ServiceLoader service providers.
+  `RB #2331 <https://rbcommons.com/s/twitter/r/2331>`_
+
+* Implemented isolated code-generation strategy for simple_codegen_task.
+  `RB #2322 <https://rbcommons.com/s/twitter/r/2322>`_
+
+* Add options for specifying python cache dirs.
+  `RB #2320 <https://rbcommons.com/s/twitter/r/2320>`_
+
+* bash autocompletion support
+  `RB #2307 <https://rbcommons.com/s/twitter/r/2307>`_
+  `RB #2326 <https://rbcommons.com/s/twitter/r/2326>`_
+
+* Invoke jvm doc tools via java.
+  `RB #2313 <https://rbcommons.com/s/twitter/r/2313>`_
+
+* Add -log-filter option to the zinc task
+  `RB #2315 <https://rbcommons.com/s/twitter/r/2315>`_
 
 * Adds a product to bundle_create
   `RB #2254 <https://rbcommons.com/s/twitter/r/2254>`_
@@ -318,6 +384,10 @@ New Features
   `RB #2050 <https://rbcommons.com/s/twitter/r/2050>`_
 
 * Open source the spindle plugin for pants into contrib.
+  `RB #2306 <https://rbcommons.com/s/twitter/r/2306>`_
+  `RB #2301 <https://rbcommons.com/s/twitter/r/2301>`_
+  `RB #2304 <https://rbcommons.com/s/twitter/r/2304>`_
+  `RB #2282 <https://rbcommons.com/s/twitter/r/2282>`_
   `RB #2033 <https://rbcommons.com/s/twitter/r/2033>`_
 
 * Implement an exported ownership model.
@@ -325,6 +395,52 @@ New Features
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Support caching chroots for reuse across pants runs.
+  `RB #2349 <https://rbcommons.com/s/twitter/r/2349>`_
+
+* Upgrade RBT to the latest release
+  `RB #2360 <https://rbcommons.com/s/twitter/r/2360>`_
+
+* Make sure arg to logRaw and log are only eval'ed once. (zinc)
+  `RB #2338 <https://rbcommons.com/s/twitter/r/2338>`_
+
+* Clean up unnecessary code
+  `RB #2339 <https://rbcommons.com/s/twitter/r/2339>`_
+
+* Exclude the com.example org from travis ivy cache.
+  `RB #2344 <https://rbcommons.com/s/twitter/r/2344>`_
+
+* Avoid ivy cache thrash due to ivydata updates.
+  `RB #2333 <https://rbcommons.com/s/twitter/r/2333>`_
+
+* Various refactoring of PythonChroot and related code.
+  `RB #2327 <https://rbcommons.com/s/twitter/r/2327>`_
+
+* Have pytest_run create its chroots via its base class.
+  `RB #2314 <https://rbcommons.com/s/twitter/r/2314>`_
+
+* Add a set of memoization decorators for functions.
+  `RB #2308 <https://rbcommons.com/s/twitter/r/2308>`_
+  `RB #2317 <https://rbcommons.com/s/twitter/r/2317>`_
+
+* Allow jvm tool tests to bootstrap from the artifact cache.
+  `RB #2311 <https://rbcommons.com/s/twitter/r/2311>`_
+
+* Fixed 'has no attribute' exception + better tests for export goal
+  `RB #2305 <https://rbcommons.com/s/twitter/r/2305>`_
+
+* Refactoring ProtobufGen to use SimpleCodeGen.
+  `RB #2302 <https://rbcommons.com/s/twitter/r/2302>`_
+
+* Refactoring JaxbGen to use SimpleCodeGen.
+  `RB #2303 <https://rbcommons.com/s/twitter/r/2303>`_
+
+* Add pants header to assorted python files
+  `RB #2298 <https://rbcommons.com/s/twitter/r/2298>`_
+
+* Remove unused imports from python files
+  `RB #2295 <https://rbcommons.com/s/twitter/r/2295>`_
 
 * Integrating Patrick's SimpleCodegenTask base class with WireGen.
   `RB #2274 <https://rbcommons.com/s/twitter/r/2274>`_
@@ -522,7 +638,6 @@ Small improvements, Refactoring and Tooling
 
 * Place the workdir below the pants_workdir
   `RB #2007 <https://rbcommons.com/s/twitter/r/2007>`_
-
 
 0.0.32 (3/26/2015)
 ------------------
