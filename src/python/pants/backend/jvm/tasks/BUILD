@@ -182,6 +182,7 @@ python_library(
   dependencies = [
     ':jar_task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:execution_graph',
     'src/python/pants/base:workunit',
     'src/python/pants/fs',
     'src/python/pants/backend/jvm/targets:jvm',

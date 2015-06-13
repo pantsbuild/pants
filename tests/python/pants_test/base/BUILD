@@ -165,7 +165,6 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name = 'build_file_parser',
   sources = ['test_build_file_parser.py'],
@@ -362,6 +361,14 @@ python_tests(
   dependencies = [
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'execution_graph',
+  sources = ['test_execution_graph.py'],
+  dependencies = [
+    'src/python/pants/base:execution_graph'
   ]
 )
 

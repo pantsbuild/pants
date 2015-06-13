@@ -9,6 +9,8 @@ import os
 from contextlib import closing
 from textwrap import dedent
 
+import mock
+
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -41,6 +43,7 @@ class JarCreateTestBase(JarTaskTestBase):
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+
 
 class JarCreateMiscTest(JarCreateTestBase):
   def test_jar_create_init(self):
@@ -118,7 +121,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
       target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
 
-
   def assert_jar_contents(self, context, product_type, target, *contents):
     jar_mapping = context.products.get(product_type).get(target)
     self.assertEqual(1, len(jar_mapping))
@@ -133,6 +135,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_classfile_jar_contents(self):
     context = self.context()
+    context.run_tracker = mock.Mock()
+
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
       with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
         with self.add_data(context.products, 'classes_by_target', self.binary, 'b.class'):
@@ -154,6 +158,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_empty_scala_files(self):
     context = self.context()
+    context.run_tracker = mock.Mock()
+
     with self.add_data(context.products, 'classes_by_target', self.empty_sl):
       with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
         self.execute(context)

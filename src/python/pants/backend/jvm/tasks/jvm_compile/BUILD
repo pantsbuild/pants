@@ -96,23 +96,15 @@ python_library(
   name = 'jvm_compile_isolated_strategy',
   sources = ['jvm_compile_isolated_strategy.py'],
   dependencies = [
-    ':execution_graph',
     ':jvm_compile_strategy',
     ':resource_mapping',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:execution_graph',
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
-  ],
-)
-
-python_library(
-  name = 'execution_graph',
-  sources = ['execution_graph.py'],
-  dependencies = [
-    'src/python/pants/base:worker_pool',
   ],
 )
 

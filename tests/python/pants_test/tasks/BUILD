@@ -27,7 +27,6 @@ target(
     ':console_task',
     ':dependees',
     ':detect_duplicates',
-    ':execution_graph',
     ':filter',
     ':group_task',
     ':jar_create',
@@ -237,14 +236,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'execution_graph',
-  sources = ['test_execution_graph.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
-    ]
-)
-
-python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [
@@ -310,6 +301,7 @@ python_tests(
   name = 'jar_create',
   sources = ['test_jar_create.py'],
   dependencies = [
+    '3rdparty/python:mock',
     ':task_test_base',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/codegen/targets:java',

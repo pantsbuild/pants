@@ -30,7 +30,7 @@ class Work(object):
 
 
 class WorkerPool(object):
-  """A pool of workers.
+  """A pool of workers. Can be used as a context manager to automatically call self.shutdown().
 
   Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
   may not be effective. Use this class primarily for IO-bound work.
@@ -41,13 +41,20 @@ class WorkerPool(object):
     # All workers accrue work to the same root.
     self._pool = ThreadPool(processes=num_workers,
                             initializer=self._run_tracker.register_thread,
-                            initargs=(parent_workunit, ))
+                            initargs=(parent_workunit,))
     # We mustn't shutdown when there are pending workchains, as they may need to submit work
     # in the future, and the pool doesn't know about this yet.
     self._pending_workchains = 0
     self._pending_workchains_cond = threading.Condition()  # Protects self._pending_workchains.
 
     self._shutdown_hooks = []
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args, **kwargs):
+    self.shutdown()
+    return False
 
   def add_shutdown_hook(self, hook):
     self._shutdown_hooks.append(hook)
@@ -163,6 +170,7 @@ class WorkerPool(object):
 
   def abort(self):
     self._pool.terminate()
+
 
 class SubprocPool(object):
   """Singleton for managing multiprocessing.Pool instances

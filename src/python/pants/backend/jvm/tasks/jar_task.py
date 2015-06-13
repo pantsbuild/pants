@@ -216,6 +216,7 @@ class JarTask(NailgunTask):
   All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
   invocations.
   """
+
   @classmethod
   def global_subsystems(cls):
     return super(JarTask, cls).global_subsystems() + (JarTool, )
@@ -246,23 +247,9 @@ class JarTask(NailgunTask):
     # control.
 
   @contextmanager
-  def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
-    """Yields a Jar that will be written when the context exits.
-
-    :param string path: the path to the jar file
-    :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:
-      update the pre-existing jar at ``path``
-    :param bool compressed: entries added to the jar should be compressed; ``True`` by default
-    :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
-    """
-    jar = Jar()
-    try:
-      yield jar
-    except jar.Error as e:
-      raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
-
+  def _jar_tool_args(self, jar, path, overwrite, compressed, jar_rules):
     with jar._render_jar_tool_args(self.get_options()) as args:
-      if args:  # Don't build an empty jar
+      if args:
         args.append('-update={}'.format(self._flag(not overwrite)))
         args.append('-compress={}'.format(self._flag(compressed)))
 
@@ -289,6 +276,26 @@ class JarTask(NailgunTask):
 
         args.append(path)
 
+      yield args
+
+  @contextmanager
+  def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
+    """Yields a Jar that will be written when the context exits.
+
+    :param string path: the path to the jar file
+    :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:
+      update the pre-existing jar at ``path``
+    :param bool compressed: entries added to the jar should be compressed; ``True`` by default
+    :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
+    """
+    jar = Jar()
+    try:
+      yield jar
+    except jar.Error as e:
+      raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
+
+    with self._jar_tool_args(jar, path, overwrite, compressed, jar_rules) as args:
+      if args:     # Don't build an empty jar.
         if JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args):
           raise TaskError('jar-tool failed')
 
@@ -337,7 +344,6 @@ class JarTask(NailgunTask):
       self._context = context
       self._jar = jar
       self._manifest = Manifest()
-
 
     def add_target(self, target, recursive=False):
       """Adds the classes and resources for a target to an open jar.
