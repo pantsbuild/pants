@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from textwrap import dedent
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.base.payload import Payload
@@ -50,12 +49,6 @@ class JavaWireLibrary(ExportableJvmLibrary):
 
     if service_writer_options:
       logger.warn('The service_writer_options flag is ignored.')
-    if roots:
-      logger.warn(dedent('''
-          It is known that passing in roots may not work as intended. Pants tries to predict what
-          files Wire will generate then does a verification to see if all of those files were
-          generated.  With the roots flag set, it may be the case that not all predicted files will
-          be generated and the verification will fail.'''))
 
     super(JavaWireLibrary, self).__init__(payload=payload, **kwargs)
     self.add_labels('codegen')
