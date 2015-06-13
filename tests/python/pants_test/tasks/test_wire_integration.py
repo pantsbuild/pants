@@ -10,6 +10,7 @@ import re
 import subprocess
 
 from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import open_zip
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -76,3 +77,23 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('Compound{name=Water, primary_element=Element{symbol=O, name=Oxygen, '
                   'atomic_number=8}, secondary_element=Element{symbol=H, name=Hydrogen, '
                   'atomic_number=1}}', java_out)
+
+  def test_compile_wire_roots(self):
+    pants_run = self.run_pants(['bundle', '--deployjar',
+                                'examples/src/java/org/pantsbuild/example/wire/roots'])
+    self.assert_success(pants_run)
+    out_path = os.path.join(get_buildroot(), 'dist', 'wire-roots-example.jar')
+    with open_zip(out_path) as zipfile:
+      jar_entries = zipfile.namelist()
+
+    def is_relevant(entry):
+      return (entry.startswith('org/pantsbuild/example/roots/') and entry.endswith('.class')
+              and '$' not in entry)
+
+    expected_classes = {
+      'org/pantsbuild/example/roots/Bar.class',
+      'org/pantsbuild/example/roots/Foobar.class',
+      'org/pantsbuild/example/roots/Fooboo.class',
+    }
+    received_classes = {entry for entry in jar_entries if is_relevant(entry)}
+    self.assertEqual(expected_classes, received_classes)
