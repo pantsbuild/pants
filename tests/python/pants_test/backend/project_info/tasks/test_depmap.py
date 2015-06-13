@@ -138,6 +138,16 @@ class DepmapTest(BaseDepmapTest):
       )
     """))
 
+    self.add_to_build_file('src/java/c', dedent('''
+      jar_library(
+        name='c_jar_lib',
+        jars=[
+          jar(org='org.pantsbuild.test', name='c_test', rev='1.0'),
+          jar(org='org.pantsbuild.test', name='d_test', rev=''),
+        ]
+      )
+    '''))
+
     # It makes no sense whatsoever to have a java_library that depends
     # on a Python library, but we want to ensure that depmap handles
     # cases like this anyway because there might be other cases which
@@ -332,6 +342,15 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('overlaps:two')],
       options={'tree': True}
     )
+
+  def test_jar_library_external(self):
+    self.assert_console_output_ordered(
+      'org.pantsbuild.test-c_test-1.0',
+      'org.pantsbuild.test-d_test',
+      targets=[self.target('src/java/c:c_jar_lib')],
+      options={'external_only': True}
+    )
+
 
 class ProjectInfoTest(ConsoleTaskTestBase):
   @classmethod

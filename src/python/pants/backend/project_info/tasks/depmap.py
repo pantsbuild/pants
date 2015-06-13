@@ -131,15 +131,16 @@ class Depmap(ConsoleTask):
   def _dep_id(self, dependency):
     """Returns a tuple of dependency_id, is_internal_dep."""
     params = dict(sep=self.separator)
-    is_external_dep = isinstance(dependency, JarDependency) and hasattr(dependency, 'rev')
 
-    if is_external_dep:
+    if isinstance(dependency, JarDependency):
       params.update(org=dependency.org, name=dependency.name, rev=dependency.rev)
+      is_internal_dep = False
     else:
       params.update(org='internal', name=dependency.id)
+      is_internal_dep = True
 
     return ('{org}{sep}{name}{sep}{rev}' if params.get('rev') else
-            '{org}{sep}{name}').format(**params), not is_external_dep
+            '{org}{sep}{name}').format(**params), is_internal_dep
 
   def _enumerate_visible_deps(self, dep, predicate):
     dep_id, internal = self._dep_id(dep)
@@ -175,8 +176,10 @@ class Depmap(ConsoleTask):
             yield make_line(dep_id, indent)
           return
       else:
-        if not (dep_id in outputted and self.is_minimal):
-          yield make_line(dep_id, indent, is_dupe=dep_id in outputted)
+        if not (dep_id in outputted and self.is_minimal) and self.output_candidate(internal):
+          yield make_line(dep_id,
+                          0 if self.is_external_only else indent,
+                          is_dupe=dep_id in outputted)
           outputted.add(dep_id)
 
       for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
