@@ -50,7 +50,7 @@ class PantsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
             invert_flag = ''
             option_flag = option_string[2:]
 
-          arg_name = action.metavar.upper() if action.metavar else action.dest.upper()
+          arg_name = action.metavar if action.metavar else action.dest
           arg_value = '' if action.nargs == 0 else '={0}'.format(arg_name)
 
           return '--{invert_flag}{heading}-{option_flag}{arg_value}\n'.format(

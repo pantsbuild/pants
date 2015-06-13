@@ -95,6 +95,9 @@ def build_file_aliases():
 
 
 def register_goals():
+  # TODO: Most of these (and most tasks in other backends) can probably have their
+  # with_description() removed, as their docstring will be used instead.
+
   # Getting help.
   task(name='goals', action=ListGoals).install().with_description('List all documented goals.')
 
@@ -154,8 +157,7 @@ def register_goals():
   task(name='minimize', action=MinimalCover).install().with_description(
       'Print the minimal cover of the given targets.')
 
-  task(name='filter', action=Filter).install().with_description(
-      'Filter the input targets based on various criteria.')
+  task(name='filter', action=Filter).install()
 
   task(name='sort', action=SortTargets).install().with_description(
       'Topologically sort the targets.')

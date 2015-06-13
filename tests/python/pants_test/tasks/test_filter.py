@@ -144,25 +144,14 @@ class FilterTest(BaseFilterTest):
       'overlaps:three',
       'overlaps:foo',
       targets=self.targets('::'),
+      # Note that the comma is inside the string, so these are ORed.
       options={'type': ['python_requirement_library,'
                         'pants.backend.python.targets.python_library.PythonLibrary']}
     )
 
-  @pytest.mark.xfail
   def test_filter_multiple_types(self):
-    # TODO: The 'type' option should accept lists of multiple items, but this doesn't
-    # currently work. Ditto for the other filter flag.
+    # A target can only have one type, so the output should be empty.
     self.assert_console_output(
-      'common/a:a',
-      'common/a:foo',
-      'common/b:b',
-      'common/b:foo',
-      'common/c:c',
-      'common/c:foo',
-      'overlaps:one',
-      'overlaps:two',
-      'overlaps:three',
-      'overlaps:foo',
       targets=self.targets('::'),
       options={'type': ['python_requirement_library',
                         'pants.backend.python.targets.python_library.PythonLibrary']}
@@ -210,9 +199,9 @@ class FilterTest(BaseFilterTest):
     )
 
   def test_filter_ancestor_out_of_context(self):
-    """Tests that targets outside of the context used as filters are parsed before use"""
+    """Tests that targets outside of the context used as filters are parsed before use."""
 
-    # add an additional un-injected target, and then use it as a filter
+    # Add an additional un-injected target, and then use it as a filter.
     self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
 
     self.assert_console_output(
@@ -229,9 +218,9 @@ class FilterTest(BaseFilterTest):
     )
 
   def test_filter_ancestor_not_passed_targets(self):
-    """Tests filtering targets based on an ancestor not in that list of targets"""
+    """Tests filtering targets based on an ancestor not in that list of targets."""
 
-    # add an additional un-injected target, and then use it as a filter
+    # Add an additional un-injected target, and then use it as a filter.
     self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
 
     self.assert_console_output(
@@ -244,7 +233,7 @@ class FilterTest(BaseFilterTest):
     )
 
     self.assert_console_output(
-      'common/a:a', # a: _should_ show up if we don't filter
+      'common/a:a', # a: _should_ show up if we don't filter.
       'common/a:foo',
       'common/b:b',
       'common/b:foo',
@@ -286,21 +275,21 @@ class FilterTest(BaseFilterTest):
       options={ 'regex': ['-^common,foo$'] }
     )
 
-    # Invalid regex
+    # Invalid regex.
     self.assert_console_raises(TaskError,
       targets=self.targets('::'),
       options={ 'regex': ['abc)']}
     )
 
   def test_filter_tag_regex(self):
-    # Filter two
+    # Filter two.
     self.assert_console_output(
       'overlaps:three',
       targets=self.targets('::'),
       options={ 'tag_regex': ['+e(?=e)'] }
     )
 
-    # Removals
+    # Removals.
     self.assert_console_output(
       'common/a:a',
       'common/a:foo',
@@ -314,21 +303,21 @@ class FilterTest(BaseFilterTest):
       options={ 'tag_regex': ['-one|two'] }
     )
 
-    # Invalid regex
+    # Invalid regex.
     self.assert_console_raises(TaskError,
       targets=self.targets('::'),
       options={ 'tag_regex': ['abc)']}
     )
 
   def test_filter_tag(self):
-    # One match
+    # One match.
     self.assert_console_output(
       'common/a:a',
       targets=self.targets('::'),
       options={ 'tag': ['+a_tag'] }
     )
 
-    # Two matches
+    # Two matches.
     self.assert_console_output(
       'common/a:a',
       'common/b:b',
@@ -336,7 +325,7 @@ class FilterTest(BaseFilterTest):
       options={ 'tag': ['+a_tag,b_tag'] }
     )
 
-    # One removal
+    # One removal.
     self.assert_console_output(
       'common/a:a',
       'common/a:foo',
@@ -351,7 +340,7 @@ class FilterTest(BaseFilterTest):
       options={ 'tag': ['-one_tag'] }
     )
 
-    # Two removals
+    # Two removals.
     self.assert_console_output(
       'common/a:a',
       'common/a:foo',
@@ -365,8 +354,14 @@ class FilterTest(BaseFilterTest):
       options={ 'tag': ['-one_tag,two_tag'] }
     )
 
-    # No match
+    # No match.
     self.assert_console_output(
       targets=self.targets('::'),
       options={ 'tag': ['+abcdefg_tag'] }
+    )
+
+    # No match due to AND of separate predicates.
+    self.assert_console_output(
+      targets=self.targets('::'),
+      options={ 'tag': ['a_tag', 'b_tag'] }
     )

@@ -59,10 +59,21 @@ class _Goal(object):
     Create goals only through the Goal.by_name() factory.
     """
     self.name = name
-    self.description = None
+    self._description = ''
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
+
+  @property
+  def description(self):
+    if self._description:
+      return self._description
+    # Return the docstring for the Task registered under the same name as this goal, if any.
+    # This is a very common case, and therefore a useful idiom.
+    namesake_task = self._task_type_by_name.get(self.name)
+    if namesake_task:
+      return namesake_task.__doc__
+    return ''
 
   def register_options(self, options):
     for task_type in sorted(self.task_types(), key=lambda cls: cls.options_scope):
@@ -92,10 +103,13 @@ class _Goal(object):
     # a task *instance* know its scope, but this means converting option registration from
     # a class method to an instance method, and instantiating the task much sooner in the
     # lifecycle.
-
-    subclass_name = b'{0}_{1}'.format(task_registrar.task_type.__name__,
+    superclass = task_registrar.task_type
+    subclass_name = b'{0}_{1}'.format(superclass.__name__,
                                       options_scope.replace('.', '_').replace('-', '_'))
-    task_type = type(subclass_name, (task_registrar.task_type,), {'options_scope': options_scope})
+    task_type = type(subclass_name, (superclass,), {
+      '__doc__': superclass.__doc__,
+      'options_scope': options_scope
+    })
 
     otn = self._ordered_task_names
     if replace:
@@ -121,7 +135,7 @@ class _Goal(object):
 
   def with_description(self, description):
     """Add a description to this goal."""
-    self.description = description
+    self._description = description
     return self
 
   def uninstall_task(self, name):
