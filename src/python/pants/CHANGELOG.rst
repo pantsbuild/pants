@@ -297,6 +297,25 @@ New Features
 * Add -log-filter option to the zinc task
   `RB #2315 <https://rbcommons.com/s/twitter/r/2315>`_
 
+* Add support for ServiceLoader service providers.
+  `RB #2331 <https://rbcommons.com/s/twitter/r/2331>`_
+
+* Implemented isolated code-generation strategy for simple_codegen_task.
+  `RB #2322 <https://rbcommons.com/s/twitter/r/2322>`_
+
+* Add options for specifying python cache dirs.
+  `RB #2320 <https://rbcommons.com/s/twitter/r/2320>`_
+
+* bash autocompletion support
+  `RB #2307 <https://rbcommons.com/s/twitter/r/2307>`_
+  `RB #2326 <https://rbcommons.com/s/twitter/r/2326>`_
+
+* Invoke jvm doc tools via java.
+  `RB #2313 <https://rbcommons.com/s/twitter/r/2313>`_
+
+* Add -log-filter option to the zinc task
+  `RB #2315 <https://rbcommons.com/s/twitter/r/2315>`_
+
 * Adds a product to bundle_create
   `RB #2254 <https://rbcommons.com/s/twitter/r/2254>`_
 
