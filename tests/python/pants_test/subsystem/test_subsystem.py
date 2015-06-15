@@ -17,7 +17,7 @@ class DummySubsystem(Subsystem):
 
 
 class DummyOptions(object):
-  def for_scope(self, scope):
+  def for_scope(self, scope, qualified=False):
     return object()
 
 

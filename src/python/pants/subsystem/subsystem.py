@@ -84,7 +84,7 @@ class Subsystem(object):
     key = (cls, scope)
     if key not in cls._scoped_instances:
       qscope = cls.qualify_scope(scope)
-      cls._scoped_instances[key] = cls(qscope, cls._options.for_scope(qscope))
+      cls._scoped_instances[key] = cls(qscope, cls._options.for_scope(qscope, qualified=True))
     return cls._scoped_instances[key]
 
   def __init__(self, scope, scoped_options):
