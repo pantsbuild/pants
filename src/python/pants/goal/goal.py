@@ -44,13 +44,13 @@ class Goal(object):
     return [pair[1] for pair in sorted(Goal._goal_by_name.items())]
 
   @classmethod
-  def global_subsystem_types(cls):
+  def subsystems(cls):
     """Returns all global subsystem types used by all tasks, in no particular order."""
     ret = set()
     for goal in cls.all():
-      ret.update(goal.global_subsystem_types())
+      ret.update(goal.global_subsystems())
+      ret.update(goal.task_subsystems())
     return ret
-
 
 class _Goal(object):
   def __init__(self, name):
@@ -153,23 +153,30 @@ class _Goal(object):
     else:
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
-  def known_scopes(self):
-    """Yields all known scopes under this goal (including its own.)"""
-    yield self.name
+  def gather_scopes(self, scope_hierarchy):
+    goal_scope = self.name
+    scope_hierarchy.register(goal_scope)
+    # Ensure that, e.g., goal.subsystem exists, so it can act as a parent for goal.task.subsystem.
+    for subsystem in self.task_subsystems():
+      scope_hierarchy.register(subsystem.qualify_scope(goal_scope), qualified=True)
     for task_type in self.task_types():
-      for scope in task_type.known_scopes():
-        if scope != self.name:
-          yield scope
-        # Also allow any subsystems in task scope (for the cases when different tasks want to
-        # configure the same subsystem differently).
-        for subsystem in task_type.task_subsystems():
-          yield subsystem.qualify_scope(scope)
+      # Note that if task scope == goal scope (because the task had the same name as the goal,
+      # and we collapsed foo.foo into foo at task registration time) then we'll gather twice,
+      # but with the same arguments, which is fine.
+      task_type.gather_scopes(scope_hierarchy)
 
-  def global_subsystem_types(self):
+  def global_subsystems(self):
     """Returns all global subsystem types used by tasks in this goal, in no particular order."""
     ret = set()
     for task_type in self.task_types():
       ret.update(task_type.global_subsystems())
+    return ret
+
+  def task_subsystems(self):
+    """Returns all per-task subsystem types used by tasks in this goal, in no particular order."""
+    ret = set()
+    for task_type in self.task_types():
+      ret.update(task_type.task_subsystems())
     return ret
 
   def ordered_task_names(self):

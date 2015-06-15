@@ -12,9 +12,9 @@ import sys
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.base.config import Config
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options import Options
 from pants.option.parser import Parser
+from pants.option.scope_hierarchy import ScopeHierarchy
 
 
 def register_bootstrap_options(register, buildroot=None):
@@ -120,7 +120,7 @@ class OptionsBootstrapper(object):
 
       def bootstrap_options_from_config(config):
         bootstrap_options = Options(env=self._env, config=config,
-                                    known_scopes=[GLOBAL_SCOPE], args=bargs)
+                                    scope_hierarchy=ScopeHierarchy(), args=bargs)
         register_bootstrap_options(bootstrap_options.register_global, buildroot=self._buildroot)
         return bootstrap_options
 
@@ -146,14 +146,14 @@ class OptionsBootstrapper(object):
 
     return self._bootstrap_options
 
-  def get_full_options(self, known_scopes):
+  def get_full_options(self, scope_hierarchy):
     if not self._full_options:
       # Note: Don't inline this into the Options() call, as this populates
       # self._post_bootstrap_config, which is another argument to that call.
       bootstrap_options = self.get_bootstrap_options()
       self._full_options = Options(self._env,
                                    self._post_bootstrap_config,
-                                   known_scopes,
+                                   scope_hierarchy,
                                    args=self._args,
                                    bootstrap_option_values=bootstrap_options.for_global_scope())
 

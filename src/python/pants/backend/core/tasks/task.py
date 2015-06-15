@@ -97,9 +97,11 @@ class TaskBase(AbstractClass):
   options_scope = None
 
   @classmethod
-  def known_scopes(cls):
-    """Yields all known scopes under this task (usually just its own.)"""
-    yield cls.options_scope
+  def gather_scopes(cls, scope_hierarchy):
+    task_scope = cls.options_scope
+    scope_hierarchy.register(task_scope)
+    for subsystem in cls.task_subsystems():
+      scope_hierarchy.register(subsystem.qualify_scope(task_scope), qualified=True)
 
   @classmethod
   def register_options_on_scope(cls, options):

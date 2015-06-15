@@ -29,6 +29,7 @@ from pants.logging.setup import setup_logging
 from pants.option.global_options import register_global_options
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope_hierarchy import ScopeHierarchy
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
@@ -98,23 +99,23 @@ class GoalRunner(object):
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
 
-    known_scopes = ['']
+    scope_hierarchy = ScopeHierarchy()
 
-    # Add scopes for global subsystem instances.
-    global_subsystems = (set(self.subsystems) |
-                         Goal.global_subsystem_types() |
-                         build_configuration.subsystem_types())
-    for subsystem_type in global_subsystems:
-      known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
+    # Add top-level scopes for all subsystems.  We need these even when we only use per-task
+    # instances of the subsystems, so that those can inherit option values from the top-level
+    # scope. E.g., so the user can set values in scope `foo.subsystem` and `bar.subsystem` by
+    # just setting the value in `subsystem`.
+    subsystems = (set(self.subsystems) | Goal.subsystems() | build_configuration.subsystem_types())
+    for subsystem_type in subsystems:
+      scope_hierarchy.register(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE), qualified=True)
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
-      # Note that enclosing scopes will appear before scopes they enclose.
-      known_scopes.extend(filter(None, goal.known_scopes()))
+      goal.gather_scopes(scope_hierarchy)
 
-    # Now that we have the known scopes we can get the full options.
-    self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
-    self.register_subsystem_options(global_subsystems)
+    # Now that we have the scope hierarchy we can get the full options.
+    self.options = options_bootstrapper.get_full_options(scope_hierarchy=scope_hierarchy)
+    self.register_options(subsystems)
 
     # Make the options values available to all subsystems.
     Subsystem._options = self.options
@@ -164,18 +165,18 @@ class GoalRunner(object):
   def global_options(self):
     return self.options.for_global_scope()
 
-  def register_subsystem_options(self, global_subsystems):
+  def register_options(self, subsystems):
     # Standalone global options.
     register_global_options(self.options.registration_function_for_global_scope())
 
-    # Options for global-level subsystems.
-    for subsystem_type in global_subsystems:
+    # Top-level options for subsystems.
+    for subsystem_type in subsystems:
       subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
     # be a subsystem?
     for goal in Goal.all():
-      # Register task options (including per-task subsystem options).
+      # Register task options (including task-level subsystem options).
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):

@@ -9,6 +9,7 @@ import unittest
 from textwrap import dedent
 
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope_hierarchy import ScopeHierarchy
 from pants.util.contextutil import temporary_file
 
 
@@ -104,7 +105,10 @@ class BootstrapOptionsTest(unittest.TestCase):
                                          },
                                          configpath=fp.name,
                                          args=['--pants-workdir=/qux'])
-      opts = bootstrapper.get_full_options(known_scopes=['', 'foo', 'fruit'])
+      scope_hierarchy = ScopeHierarchy()
+      scope_hierarchy.register('foo')
+      scope_hierarchy.register('fruit')
+      opts = bootstrapper.get_full_options(scope_hierarchy=scope_hierarchy)
       opts.register('foo', '--bar')
       opts.register('fruit', '--apple')
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)

@@ -16,6 +16,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope_hierarchy import ScopeHierarchy
 
 
 class BashCompletionTask(ConsoleTask):
@@ -81,7 +82,9 @@ class BashCompletionTask(ConsoleTask):
       option_strings_by_scope[scope] |= self.expand_option_strings(option_strings)
 
     for goal in goals:
-      for scope in goal.known_scopes():
+      scope_hierarchy = ScopeHierarchy()
+      goal.gather_scopes(scope_hierarchy)
+      for scope in scope_hierarchy.get_known_scopes():
         all_scopes.add(scope)
 
         option_strings_for_scope = set()

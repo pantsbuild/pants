@@ -191,7 +191,7 @@ class GroupTask(Task):
   from the dependency relationships between the targets selected by the groups members.
   """
 
-  _GROUPS = dict()
+  _GROUPS = {}
 
   @classmethod
   def named(cls, name, product_type, flag_namespace=None):
@@ -228,10 +228,12 @@ class GroupTask(Task):
         parent_options_scope = '.'.join(flag_namespace)
 
         @classmethod
-        def known_scopes(cls):
-          """Yields all known scopes under this task (i.e., those of its member types.)"""
+        def gather_scopes(cls, scope_hierarchy):
+          scope_hierarchy.register(name)
+          for subsystem in (set(cls.global_subsystems()) | set(cls.task_subsystems())):
+            scope_hierarchy.register(subsystem.qualify_scope(name), qualified=True)
           for member_type in cls._member_types():
-            yield member_type.options_scope
+            member_type.gather_scopes(scope_hierarchy)
 
         @classmethod
         def register_options_on_scope(cls, options):
