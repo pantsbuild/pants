@@ -243,6 +243,8 @@ debug them is to disable nailgun by specifying the command line option
     [DEFAULT]
     use_nailgun: False
 
+###JVM Tool Development Tips
+
 If you need to debug the tool under nailgun, make
 sure you run `pants goal ng-killall` or `pants goal clean-all` after you update the
 jar file so that any running nailgun servers are restarted on the next invocation
@@ -254,3 +256,21 @@ before testing a new version of the tool as follows:
 
     :::bash
     $ rm -rf ~/.cache.pants/artifact_cache
+
+If you have trouble resolving the file with Ivy after making the
+above changes to `BUILD.tools`:
+
+  - Make sure your url is absolute and contains three slashes (`///`) at the start
+of the path.
+  - If your repo has an `ivysettings.xml` file (the pants repo currently does not),
+try adding a minimal `<filesystem>` resolver that doesn't enforce a pom being
+present as follows:
+
+        :::xml
+        <resolvers>
+          <chain name="chain-repos" returnFirst="true">
+            <filesystem name="internal"></filesystem>
+            ...
+          </chain>
+        </resolvers>
+
