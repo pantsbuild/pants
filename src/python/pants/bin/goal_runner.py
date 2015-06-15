@@ -32,6 +32,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
+from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
@@ -197,10 +198,15 @@ class GoalRunner(object):
                                       spec_excludes=self.spec_excludes,
                                       exclude_target_regexps=self.global_options.exclude_target_regexp)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+        def filter_for_tag(tag):
+          return lambda target: tag in map(str, target.tags)
+        tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
             self.build_graph.inject_address_closure(address)
-            self.targets.append(self.build_graph.get_target(address))
+            tgt = self.build_graph.get_target(address)
+            if tag_filter(tgt):
+              self.targets.append(tgt)
     self.goals = [Goal.by_name(goal) for goal in goals]
 
   def run(self):

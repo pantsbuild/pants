@@ -39,12 +39,18 @@ def register_global_options(register):
                 "are used.  Multiple constraints may be added.  They will be ORed together.")
   register('--colors', action='store_true', default=True, recursive=True,
            help='Set whether log messages are displayed in color.')
+
   register('--spec-excludes', action='append', default=[register.bootstrap.pants_workdir],
-           help='Exclude these paths when computing the command-line target specs.')
+           help='Ignore these paths when evaluating the command-line target specs.  Useful with '
+                '::, to avoid descending into unneeded directories.')
   register('--exclude-target-regexp', action='append', default=[], metavar='<regexp>',
-           help='Regex pattern to exclude from the target list (useful in conjunction with ::). '
-                'Multiple patterns may be specified by setting this flag multiple times.',
-           recursive=True)
+           help='Exclude targets that match these regexes. Useful with ::, to ignore broken '
+                'BUILD files.',
+           recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
+  register('--tag', action='append', metavar='[+-]tag1,tag2,...',
+           help="Include only targets with these tags (optional '+' prefix) or without these "
+                "tags ('-' prefix).  Useful with ::, to find subsets of targets "
+                "(e.g., integration tests.)")
 
   # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
   # options to there. When we do that, also drop the cumbersome word 'artifact' from these
