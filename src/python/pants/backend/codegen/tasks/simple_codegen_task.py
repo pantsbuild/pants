@@ -32,21 +32,21 @@ class SimpleCodegenTask(Task):
     register('--allow-empty', action='store_true', default=True,
              help='Skip targets with no sources defined.',
              advanced=True)
+    strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
     if cls.forced_codegen_strategy() is None:
-      strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
       register('--strategy', choices=strategy_names,
                default=strategy_names[0],
                help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                     'global directory for all generated code, and the "isolated" strategy uses '
                     'per-target codegen directories.',
                advanced=True)
-      if 'isolated' in strategy_names:
-        register('--allow-dups', action='store_true', default=False,
-                 help='Allow multiple targets specifying the same sources when using the isolated '
-                      'strategy. If duplicates are allowed, the logic of find_sources in '
-                      'IsolatedCodegenStrategy will associate generated sources with '
-                      'least-dependent targets that generate them.',
-                 advanced=True)
+    if 'isolated' in strategy_names:
+      register('--allow-dups', action='store_true', default=False,
+               help='Allow multiple targets specifying the same sources when using the isolated '
+                    'strategy. If duplicates are allowed, the logic of find_sources in '
+                    'IsolatedCodegenStrategy will associate generated sources with '
+                    'least-dependent targets that generate them.',
+               advanced=True)
 
   @classmethod
   def get_fingerprint_strategy(cls):
@@ -420,7 +420,6 @@ class SimpleCodegenTask(Task):
           messages.append('\t{} also generated:'.format(dependency.address.spec))
           messages.extend(['\t\t{}'.format(source) for source in duplicates_by_targets[dependency]])
         message = '\n'.join(messages)
-        # TODO(gm): Add a test to ensure duplicate detection and reporting are working correctly.
         if self._task.get_options().allow_dups:
           logger.warn(message)
         else:
@@ -437,5 +436,5 @@ class SimpleCodegenTask(Task):
       """
 
 
-    class UnsupportedStrategyError(TaskError):
-      """Generated when there is no strategy for a given name."""
+  class UnsupportedStrategyError(TaskError):
+    """Generated when there is no strategy for a given name."""
