@@ -148,6 +148,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:target',
+    'src/python/pants/util:filtering',
   ],
 )
 
