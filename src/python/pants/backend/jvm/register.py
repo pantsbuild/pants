@@ -168,7 +168,7 @@ def register_goals():
 
   # Testing.
   task(name='junit', action=JUnitRun).install('test').with_description('Test compiled code.')
-  task(name='bench', action=BenchmarkRun).install('bench')
+  task(name='bench', action=BenchmarkRun).install('bench').with_description('Run benchmark tests.')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run').with_description(
