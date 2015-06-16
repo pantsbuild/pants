@@ -1,3 +1,14 @@
+# We use the mailmap to map email addresses to canonical full names.
+# Some folks submit changes under several different email addresses
+# and sometimes the full names associated with those email addresses
+# varies.  The entries below correct the full names for alternate
+# email addresses such that all email addresses used by a single
+# person are associated with the same full name.
+#
+# See `git help shortlog` which has a section describing
+# 'MAPPING AUTHORS', which can also be found here:
+# ftp://www.kernel.org/pub/software/scm/git/docs/git-shortlog.html
+
 Benjy Weinberger <benjy@foursquare.com>
 Benjy Weinberger <benjyw@gmail.com>
 Brian Wickman <wickman@apache.org>
