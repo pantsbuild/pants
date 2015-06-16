@@ -21,9 +21,7 @@ from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
 
 
 class Reporting(Subsystem):
-  @classmethod
-  def scope_qualifier(cls):
-    return 'reporting'
+  options_scope = 'reporting'
 
   @classmethod
   def register_options(cls, register):

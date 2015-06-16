@@ -98,8 +98,12 @@ class TaskBase(AbstractClass):
 
   @classmethod
   def known_scopes(cls):
-    """Yields all known scopes under this task (usually just its own.)"""
+    """Yields all known scopes for this task, in no particular order."""
+    # The task's own scope.
     yield cls.options_scope
+    # The scopes of any task-specific subsystems it uses.
+    for subsystem in cls.task_subsystems():
+      yield subsystem.subscope(cls.options_scope)
 
   @classmethod
   def register_options_on_scope(cls, options):
@@ -108,8 +112,6 @@ class TaskBase(AbstractClass):
     Subclasses should not generally need to override this method.
     """
     cls.register_options(options.registration_function_for_scope(cls.options_scope))
-    for subsystem_type in cls.task_subsystems():
-      subsystem_type.register_options_on_scope(options, cls.options_scope)
 
   @classmethod
   def register_options(cls, register):
