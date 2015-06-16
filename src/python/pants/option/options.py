@@ -73,17 +73,19 @@ class Options(object):
   list = staticmethod(custom_types.list_type)
 
 
-  def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
+  def __init__(self, env, config, scope_hierarchy, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
     :param config: data from a config file (must support config.get[list](section, name, default=)).
-    :param known_scopes: a list of all possible scopes that may be encountered.
+    :param scope_hierarchy: a `ScopeHierarchy` reflecting the parent-child relationships between
+                            any scopes we may encounter.
     :param args: a list of cmd-line args.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
     """
-    splitter = ArgSplitter(known_scopes)
+    self._known_scopes = set(scope_hierarchy.get_known_scopes())
+    splitter = ArgSplitter(self._known_scopes)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
 
@@ -95,10 +97,9 @@ class Options(object):
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
     self._help_request = splitter.help_request
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, self._help_request)
+    self._parser_hierarchy = ParserHierarchy(env, config, scope_hierarchy, self._help_request)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
-    self._known_scopes = set(known_scopes)
 
   @property
   def target_specs(self):

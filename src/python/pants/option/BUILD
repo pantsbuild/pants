@@ -6,6 +6,7 @@ python_library(
   sources=globs('*.py'),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.util',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:config',
     'src/python/pants/base:deprecated',

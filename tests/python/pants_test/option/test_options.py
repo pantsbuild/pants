@@ -17,11 +17,18 @@ from pants.option.errors import ParseError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
+from pants.option.scope_hierarchy import ScopeHierarchy
 from pants_test.option.fake_config import FakeConfig
 
 
 class OptionsTest(unittest.TestCase):
-  _known_scopes = ['compile', 'compile.java', 'compile.scala', 'stale', 'test', 'test.junit']
+  _scope_hierarchy = ScopeHierarchy()
+  _scope_hierarchy.register('compile')
+  _scope_hierarchy.register('compile.java')
+  _scope_hierarchy.register('compile.scala')
+  _scope_hierarchy.register('stale')
+  _scope_hierarchy.register('test')
+  _scope_hierarchy.register('test.junit')
 
   def _register(self, options):
     options.register_global('-v', '--verbose', action='store_true', help='Verbose output.',
@@ -71,7 +78,7 @@ class OptionsTest(unittest.TestCase):
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args,
+    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._scope_hierarchy, args,
                       bootstrap_option_values=bootstrap_option_values)
     self._register(options)
     return options
@@ -248,7 +255,7 @@ class OptionsTest(unittest.TestCase):
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
-    for scope in self._known_scopes:
+    for scope in self._scope_hierarchy.get_known_scopes():
       self.assertTrue(options.is_known_scope(scope))
     self.assertFalse(options.is_known_scope('nonexistent_scope'))
 
@@ -353,7 +360,7 @@ class OptionsTest(unittest.TestCase):
 
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
-      options = Options({}, FakeConfig({}), OptionsTest._known_scopes, "./pants")
+      options = Options({}, FakeConfig({}), OptionsTest._scope_hierarchy, "./pants")
       options.register_global('--too-old-option',
                               deprecated_version='0.0.24',
                               deprecated_hint='The semver for this option has already passed.')
