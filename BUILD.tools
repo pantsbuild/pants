@@ -78,11 +78,11 @@ jar_library(name = 'zinc',
               jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.6')
             ])
 
-SBT_REV = '0.13.8'
+SBT_REV = '0.13.8-stuhood-javac-analysis-7'
 
 jar_library(name = 'compiler-interface',
             jars = [
-              jar(org = 'com.typesafe.sbt', name = 'compiler-interface', rev = SBT_REV,
+              jar(org = 'org.scala-sbt', name = 'compiler-interface', rev = SBT_REV,
                   classifier='sources',
                   # We just want the single compiler-interface jar and not its dep on scala-lang
                   intransitive=True)
@@ -90,7 +90,7 @@ jar_library(name = 'compiler-interface',
 
 jar_library(name = 'sbt-interface',
             jars = [
-              jar(org = 'com.typesafe.sbt', name = 'sbt-interface', rev = SBT_REV,
+              jar(org = 'org.scala-sbt', name = 'interface', rev = SBT_REV,
                   # We just want the single sbt-interface jar and not its dep on scala-lang
                   intransitive=True)
             ])
