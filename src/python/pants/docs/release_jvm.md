@@ -35,8 +35,10 @@ satisfy in order to be able publish to Maven Central:
     Sonatype does provide
     [some instructions](http://central.sonatype.org/pages/working-with-pgp-signatures.html)
     you might follow.
+
   - [Create a sonatype.org JIRA account](https://issues.sonatype.org/secure/Signup!default.jspa)
     if you don't already have one.
+
   - Ask an existing Pants Maven Central [releaser](#releasers) to
     create a sonatype.org JIRA ticket to get you added to the
     org.pantsbuild maintainers.  You'll need to give them your
@@ -45,9 +47,16 @@ satisfy in order to be able publish to Maven Central:
     they can use as a template.  Once this is done and you've performed
     your 1st release, add yourself to the [Releasers](#releasers)
     section below.
+
   - Create a `~/.config/pants/release/jvm/pgp.properties` file to store the
     credentials Pants needs to sign artifacts uploaded to sonatype.org.
     This process is [described below](#pgp-credentials).
+
+  - Create an entry in your `~/.netrc` file to enable authentication to Sonatype.
+
+        machine oss.sonatype.org
+          login jsirois
+          password XYX
 
 ### PGP Credentials ###
 
@@ -173,7 +182,8 @@ but the process is also described below:
   3. Close the selected staging repository.
 
      As shown below, with the staging repository selected, there will
-     be a 'Close' button available.  Click it.
+     be a 'Close' button available.  Look for in in the menu bar across
+     the top of the repository list.  Click it.
 
     ![image](images/ossrh-publish-close-staging-repo.png)
 

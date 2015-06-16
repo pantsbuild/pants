@@ -26,6 +26,7 @@ python_library(
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/console:stty_utils',

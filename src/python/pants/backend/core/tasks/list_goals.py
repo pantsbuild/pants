@@ -25,8 +25,10 @@ class ListGoals(ConsoleTask):
       undocumented = []
       max_width = 0
       for goal in Goal.all():
-        if goal.description:
-          documented_rows.append((goal.name, goal.description))
+        desc = goal.description
+        if desc:
+          first_sentence = desc.partition('\n')[0]
+          documented_rows.append((goal.name, first_sentence))
           max_width = max(max_width, len(goal.name))
         elif self.get_options().all:
           undocumented.append(goal.name)
