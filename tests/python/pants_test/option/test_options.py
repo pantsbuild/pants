@@ -76,6 +76,22 @@ class OptionsTest(unittest.TestCase):
     self._register(options)
     return options
 
+  def test_compute_inheritance_scope(self):
+    def unqualified(scope):
+      return Options.compute_inheritance_scope(scope, qualified=False)
+
+    def qualified(scope):
+      return Options.compute_inheritance_scope(scope, qualified=True)
+
+    self.assertEquals('foo.bar', unqualified('foo.bar.baz'))
+    self.assertEquals('foo', unqualified('foo.bar'))
+    self.assertEquals('', unqualified('foo'))
+
+    self.assertEquals('foo.bar.qual', qualified('foo.bar.baz.qual'))
+    self.assertEquals('foo.qual', qualified('foo.bar.qual'))
+    self.assertEquals('qual', qualified('foo.qual'))
+    self.assertEquals('', qualified('qual'))
+
   def test_arg_scoping(self):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')

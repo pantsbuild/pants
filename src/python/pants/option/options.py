@@ -72,6 +72,32 @@ class Options(object):
   # will replace the default with the cmd-line value.
   list = staticmethod(custom_types.list_type)
 
+  @classmethod
+  def compute_inheritance_scope(cls, scope, qualified=False):
+    """Compute the scope that the given scope inherits option values from.
+
+    If the scope is unqualified, this is simply the immediately enclosing scope.
+    If the scope is qualified, this is the immediately enclosing scope of the unqualified scope,
+    qualified.  So qualification is a monad, if you want to get technical.
+
+    For example:
+    - `foo.bar` inherits from `foo`, which inherits from the global scope.
+    - `foo.bar.qualifier` inherits from `foo.qualifier`, which inherits from `qualifier`.
+    - `qualifier` inherits from the global scope.
+
+    :param scope: Return the option values for this scope.
+    :param qualified: Whether the scope is qualified.
+    """
+    if qualified:
+      parent, _, qualifier = scope.rpartition('.')
+      if parent == '':
+        ret = cls.GLOBAL_SCOPE
+      else:
+        unqualified_parent = parent.rpartition('.')[0]
+        ret = '{}.{}'.format(unqualified_parent, qualifier) if unqualified_parent else qualifier
+    else:
+      ret = scope.rpartition('.')[0]
+    return ret
 
   def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
@@ -167,11 +193,12 @@ class Options(object):
     """Returns the parser for the global scope, so code can register on it directly."""
     return self.get_parser(GLOBAL_SCOPE)
 
-  def for_scope(self, scope):
-    """Return the option values for the given scope.
+  def for_scope(self, scope, qualified=False):
+    """Return the option values for the given scope, computed lazily per scope.
 
-    Values are attributes of the returned object, e.g., options.foo.
-    Computed lazily per scope.
+    Values are attributes of the returned object, e.g., options.foo.  They include the
+    values recursively inherited from the enclosing scope, with qualification propagated
+    as explained in `compute_inheritance_scope()` above.
     """
     # Short-circuit, if already computed.
     if scope in self._values_by_scope:
@@ -181,7 +208,7 @@ class Options(object):
     if scope == GLOBAL_SCOPE:
       values = OptionValueContainer()
     else:
-      values = copy.deepcopy(self.for_scope(scope.rpartition('.')[0]))
+      values = copy.deepcopy(self.for_scope(self.compute_inheritance_scope(scope, qualified)))
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])

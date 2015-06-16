@@ -39,7 +39,10 @@ def create_options(options):
   :param dict options: A dict of scope -> (dict of option name -> value).
   """
   class TestOptions(object):
-    def for_scope(self, scope):
+    def for_scope(self, scope, qualified=False):
+      # We ignore the qualified arg here, as we don't do option inheritance in tests.
+      # It's up to each test to set option values appropriately on the scopes they're
+      # going to be read from.
       return create_option_values(options[scope])
 
     def for_global_scope(self):
