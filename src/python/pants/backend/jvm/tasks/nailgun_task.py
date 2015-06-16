@@ -69,7 +69,7 @@ class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
       client = SubprocessExecutor(self._dist)
     return client
 
-  def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
+  def runjava(self, classpath, main, jvm_options, args=None, workunit_name=None,
               workunit_labels=None):
     """Runs the java main using the given classpath and args.
 

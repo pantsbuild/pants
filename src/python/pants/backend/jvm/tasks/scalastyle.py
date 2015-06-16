@@ -122,6 +122,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
         cp = self.tool_classpath('scalastyle')
         return self.runjava(classpath=cp,
                             main=self._MAIN,
+                            jvm_options=self.get_options().jvm_options,
                             args=['-c', scalastyle_config] + srcs)
       result = Xargs(call).execute(scala_sources)
       if result != 0:

@@ -84,6 +84,7 @@ class AntlrGen(CodeGen, NailgunTask):
       args.extend(sources)
 
       result = self.runjava(classpath=antlr_classpath, main=java_main,
+                            jvm_options=self.get_options().jvm_options,
                             args=args, workunit_name='antlr')
       if result != 0:
         raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
