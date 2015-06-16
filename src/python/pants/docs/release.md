@@ -21,6 +21,10 @@ At a high level, releasing pants involves:
 The current list of packages that are part of this release process:
 
 -   pantsbuild.pants
+-   pantsbuild.pants.backend.android
+-   pantsbuild.pants.contrib.buildgen
+-   pantsbuild.pants.contrib.scrooge
+-   pantsbuild.pants.contrib.spindle
 -   pantsbuild.pants.testinfra
 
 Prepare Release
@@ -31,11 +35,20 @@ Index](https://pypi.python.org/pypi) per the Python community
 convention.
 
 Although the build and publish are automated, the version bumping and
-CHANGELOG management are not. You'll need to edit the version number in
+CHANGELOG  and CONTRIBUTORS management are not.
+
+You'll need to edit the version number in
 [src/python/pants/version.py](https://github.com/pantsbuild/pants/tree/master/src/python/pants/version.py)
 and add an entry in the CHANGELOG at
-[src/python/pants/CHANGELOG.rst](https://github.com/pantsbuild/pants/tree/master/src/python/pants/CHANGELOG.rst)
-then send this out for review.
+[src/python/pants/CHANGELOG.rst](https://github.com/pantsbuild/pants/tree/master/src/python/pants/CHANGELOG.rst).
+You can run `./build-support/bin/release-changelog-helper.sh` to get a
+head-start on the CHANGELOG entry.
+
+To bring the CONTRIBUTORS roster in
+[CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
+up to date you just run `build-support/bin/contributors.sh`.
+
+Finally, send these three changes out for review.
 
 Dry Run
 -------
