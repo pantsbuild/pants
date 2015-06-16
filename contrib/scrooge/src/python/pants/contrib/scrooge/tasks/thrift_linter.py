@@ -93,6 +93,7 @@ class ThriftLinter(NailgunTask, JvmToolTaskMixin):
     # FAILURE, and there is no way to wrap this here.
     returncode = self.runjava(classpath=classpath,
                               main='com.twitter.scrooge.linter.Main',
+                              jvm_options=self.get_options().jvm_options,
                               args=args,
                               workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
 

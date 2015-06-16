@@ -233,6 +233,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       args.extend(['-param', 'extension', 'html'])
 
       if 0 != self.runjava(classpath=tool_classpath, main='org.apache.xalan.xslt.Process',
+                           jvm_options=self.get_options().jvm_options,
                            args=args, workunit_name='report'):
         raise IvyResolve.Error('Failed to create html report from xml ivy report.')
 

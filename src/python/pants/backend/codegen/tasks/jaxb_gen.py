@@ -36,7 +36,9 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
   def _compile_schema(self, args):
     classpath = Distribution.cached(jdk=True).find_libs(['tools.jar'])
     java_main = 'com.sun.tools.internal.xjc.Driver'
-    return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
+    return self.runjava(classpath=classpath, main=java_main,
+                        jvm_options=self.get_options().jvm_options,
+                        args=args, workunit_name='xjc')
 
   @property
   def synthetic_target_type(self):
