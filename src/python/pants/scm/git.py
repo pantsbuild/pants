@@ -9,7 +9,6 @@ import os
 import StringIO
 import subprocess
 import traceback
-from collections import namedtuple
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
