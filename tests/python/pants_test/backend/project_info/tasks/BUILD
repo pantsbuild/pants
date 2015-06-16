@@ -31,6 +31,7 @@ python_tests(
 python_tests(
   name = 'depmap',
   sources = ['test_depmap.py'],
+  coverage = ['pants.backend.project_info.tasks.depmap'],
   dependencies = [
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/targets:common',
