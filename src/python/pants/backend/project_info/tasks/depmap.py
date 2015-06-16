@@ -133,6 +133,7 @@ class Depmap(ConsoleTask):
     params = dict(sep=self.separator)
 
     if isinstance(dependency, JarDependency):
+      # TODO(kwilson): handle 'classifier' and 'type'.
       params.update(org=dependency.org, name=dependency.name, rev=dependency.rev)
       is_internal_dep = False
     else:
