@@ -1,92 +1,92 @@
 Created by running `./build-support/bin/contributors.sh`.
 
-Alexander Johnson
-Andy Reitz
-Antoine Tollenaere
-Benjy Weinberger
-Bill Farner
-Brian Larson
-Brian Wickman
-Chris Aniszczyk
-Chris Chen
-Craig Schertz
-Dan Davydov
-Daniel Anderson
-David Taylor
-David Turner
-Divij Rajkumar
-Dominic Hamon
-Dumitru Daniliuc
-Eric Ayers
-Eric Danielson
-Eric Lindvall
-Evan Jones
-Fedor Korotkov
-Florian Leibert
-Garrett Malmquist
-Harley Cooper
-Hwasung Lee
-Igor Morozov
-Itay Donanhirsh
-Ity Kaul
-Jackson Davis
-Jake Donham
-James Mouradian
-Jason Jackson
-Jeff Jenkins
-Jessica Rosenfield
-Jin Feng
-Joe Crobak
-Joe Ennever
-Joe Smith
-Johan Oskarsson
-John Chee
-John Gallagher
-John Ioannidis
-John Sirois
-John Townsend
-Jon Boulle
-Jonathan Coveney
-Jonathan Sokolowski
-Joshua Cohen
-Joshua Humphries
-Ken Kawamoto
-Kevin Sweeney
-Kris Wilson
-Kushal Dave
-Larry Hosken
-Lei Wang
-Leo Kim
-Marc Abramowitz
-Marius Eriksen
-Mark Chu-Carroll
-Mark McBride
-Mateo Rodriguez
-Mathew Jennings
-Matthew Jeffryes
-Maxim Khutornenko
-Michael Doherty
-Mike Lindsey
-Misho Krastev
-Neil Sanchala
-Nick Howard
-Nik Shkrob
-Oliver Gould
-Patrick Lawson
-Paul Groudas
-Peiyu Wang
-Peter Seibel
-Ryan Williams
-Senthil Kumaran
-Sergey Serebryakov
-Simeon Franklin
-Stu Hood
-Ted Dziuba
-Tejal Desai
-Tien Nguyen
-Tina Huang
-Todd Stumpf
-Tom Dyas
-Tom Howland
-Travis Crawford
-Ugo Di Girolamo
++ Alexander Johnson
++ Andy Reitz
++ Antoine Tollenaere
++ Benjy Weinberger
++ Bill Farner
++ Brian Larson
++ Brian Wickman
++ Chris Aniszczyk
++ Chris Chen
++ Craig Schertz
++ Dan Davydov
++ Daniel Anderson
++ David Taylor
++ David Turner
++ Divij Rajkumar
++ Dominic Hamon
++ Dumitru Daniliuc
++ Eric Ayers
++ Eric Danielson
++ Eric Lindvall
++ Evan Jones
++ Fedor Korotkov
++ Florian Leibert
++ Garrett Malmquist
++ Harley Cooper
++ Hwasung Lee
++ Igor Morozov
++ Itay Donanhirsh
++ Ity Kaul
++ Jackson Davis
++ Jake Donham
++ James Mouradian
++ Jason Jackson
++ Jeff Jenkins
++ Jessica Rosenfield
++ Jin Feng
++ Joe Crobak
++ Joe Ennever
++ Joe Smith
++ Johan Oskarsson
++ John Chee
++ John Gallagher
++ John Ioannidis
++ John Sirois
++ John Townsend
++ Jon Boulle
++ Jonathan Coveney
++ Jonathan Sokolowski
++ Joshua Cohen
++ Joshua Humphries
++ Ken Kawamoto
++ Kevin Sweeney
++ Kris Wilson
++ Kushal Dave
++ Larry Hosken
++ Lei Wang
++ Leo Kim
++ Marc Abramowitz
++ Marius Eriksen
++ Mark Chu-Carroll
++ Mark McBride
++ Mateo Rodriguez
++ Mathew Jennings
++ Matthew Jeffryes
++ Maxim Khutornenko
++ Michael Doherty
++ Mike Lindsey
++ Misho Krastev
++ Neil Sanchala
++ Nick Howard
++ Nik Shkrob
++ Oliver Gould
++ Patrick Lawson
++ Paul Groudas
++ Peiyu Wang
++ Peter Seibel
++ Ryan Williams
++ Senthil Kumaran
++ Sergey Serebryakov
++ Simeon Franklin
++ Stu Hood
++ Ted Dziuba
++ Tejal Desai
++ Tien Nguyen
++ Tina Huang
++ Todd Stumpf
++ Tom Dyas
++ Tom Howland
++ Travis Crawford
++ Ugo Di Girolamo

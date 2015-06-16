@@ -50,5 +50,5 @@ Created by running \`$0\`.
 
 HEADER
 
-  contributors | sort -u >> CONTRIBUTORS.md
+  contributors | sort -u | sed -E -e "s|^|+ |" >> CONTRIBUTORS.md
 fi
