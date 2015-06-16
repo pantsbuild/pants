@@ -120,9 +120,11 @@ class Globs(FilesetRelPathWrapper):
   E.g., ``sources = globs('*java'),`` to get .java files in this directory.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
-  strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
-  'foo.py'])`` gives all files in this directory except ``.java``
-  files and ``foo.py``.
+    strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
+    'foo.py'])`` gives all files in this directory except ``.java``
+    files and ``foo.py``.
+  :return: FilesetWithSpec containing matching files in same directory as this BUILD file.
+  :rtype: FilesetWithSpec
 
   Deprecated:
   You might see that old code uses "math" on the return value of
@@ -130,10 +132,6 @@ class Globs(FilesetRelPathWrapper):
   in this directory *except* ``.java`` files.  Please use exclude
   instead, since pants is moving to make BUILD files easier to parse,
   and the new grammar will not support arithmetic.
-
-  :returns FilesetWithSpec containing matching files in same directory as this BUILD file.
-  :rtype FilesetWithSpec
-
   """
   wrapped_fn = Fileset.globs
 
@@ -145,16 +143,16 @@ class RGlobs(FilesetRelPathWrapper):
   the config, config/foo, config/foo/bar directories.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
-  strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
-  'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
+    strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
+    'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
+  :return: FilesetWithSpec matching files in this directory and its descendents.
+  :rtype: FilesetWithSpec
 
   Deprecated:
   You might see that old code uses "math" on the return value of ``rglobs()``. E.g.,
   ``rglobs('config/*') - rglobs('config/foo/*')`` gives all files under `config` *except*
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
-  :returns FilesetWithSpec matching files in this directory and its descendents.
-  :rtype FilesetWithSpec
   """
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
