@@ -32,7 +32,7 @@ class Scm(AbstractClass):
 
   @abstractproperty
   def server_url(self):
-    """Returns the url of the remote server."""
+    """Returns the url of the (default) remote server."""
 
   @abstractproperty
   def tag_name(self):
@@ -101,7 +101,6 @@ class Scm(AbstractClass):
 
     Subclasses should raise LocalException if there is a problem adding the paths.
     """
-
 
   @abstractmethod
   def push(self):
