@@ -28,31 +28,31 @@ like to go though this list ahead of time rather than have the release
 script fail:
 
   - Create a pgp signing key if you don't already have one.
-  
+
     You might use the gpg implemntation of pgp and start here:
     https://www.gnupg.org/gph/en/manual/c14.html
-  
+
   - Configure git to use your pgp key for signing release tags.
-    
+
     A description of the configuration can be found here:
     https://git-scm.com/book/tr/v2/Git-Tools-Signing-Your-Work#GPG-Introduction
-  
+
   - Create a pypi account if you don't already have one.
-  
+
     You can register here: https://pypi.python.org/pypi?%3Aaction=register_form
     Don't forget to include your pgp key id even though pypi considers
     this step optional.
-    
+
   - Get your pypi account added as an `owner` for all pantsbuild.pants packages.
-  
+
     You can ask any one of the [Owners](#owners) listed below to do this.
     Once this is done and you've performed your 1st release, add yourself to
     the [Owners](#owners) section below.
-  
+
   - Configure your pypi credentials locally in `~/.pypirc`
-  
+
     This will do it:
-    
+
         :::bash
         cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
         [server-login]
@@ -144,7 +144,7 @@ pantsbuild.pants sdists:
 
 Name             | Email                 | PYPI Usename
 -----------------|-----------------------|-------------
-John Sirois      | john.sirois@gmail.com | john.sirois 
+John Sirois      | john.sirois@gmail.com | john.sirois
 Benjy Weinberger | benjyw@gmail.com      | benjyw
 Eric Ayers       | zundel@squareup.com   | ericzundel
 Ity Kaul         | itykaul@gmail.com     | ity
@@ -152,10 +152,10 @@ Stu Hood         | stuhood@gmail.com     | stuhood
 
 And the current list of packages that these folks can release can
 be obtained via:
-   
+
     :::bash
     $ ./build-support/bin/release.sh -l
-   
+
 Right now that's:
 
 - pantsbuild.pants
