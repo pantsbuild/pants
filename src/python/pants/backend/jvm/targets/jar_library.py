@@ -31,7 +31,7 @@ class JarLibrary(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'jars': JarsField(self.assert_list(jars, expected_type=JarDependency)),
+      'jars': JarsField(self.assert_list(jars, expected_type=JarDependency, key_arg='jars')),
       'excludes': ExcludesField([]),
     })
     super(JarLibrary, self).__init__(payload=payload, **kwargs)
