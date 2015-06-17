@@ -27,8 +27,7 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
       # Use the same temporary workdir because generated target's name includes the workdir.
       # Use the same artifact_cache dir to share artifacts across two runs.
       with temporary_dir(root_dir=self.workdir_root()) as tmp_workdir:
-        #with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
-          artifact_cache='/tmp/cache'
+        with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
           compile_antlr_args = [
             'clean-all',
             'compile',
