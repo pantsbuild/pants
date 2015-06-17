@@ -36,8 +36,8 @@ class Optionable(AbstractClass):
     # non-instantiable subclasses (such as TaskBase, Task, Subsystem and other domain-specific
     # intermediate classes) don't define options_scope, so we can only apply this check to
     # instantiable classes. And the easiest way to know if a class is instantiable is to hook into
-    #  its __init__, as we do here.
+    # its __init__, as we do here. We usually only create a single instance of an Optionable
+    # subclass anyway.
     cls = type(self)
-    options_scope = getattr(cls, 'options_scope', None)
-    if not isinstance(options_scope, basestring):
+    if not isinstance(cls.options_scope, basestring):
       raise NotImplementedError('{} must set an options_scope class-level property.'.format(cls))

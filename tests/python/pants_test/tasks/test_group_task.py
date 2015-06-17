@@ -22,7 +22,7 @@ class GroupIteratorTestBase(BaseTest):
   def group_member(self, name, predicate):
     class TestMember(GroupMember):
       options_scope = 'test_member'
-      
+
       @classmethod
       def name(cls):
         return name
