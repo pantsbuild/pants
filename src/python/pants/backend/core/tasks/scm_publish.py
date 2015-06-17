@@ -124,6 +124,15 @@ class ScmPublishMixin(object):
   * has the method get_options
   """
 
+  class InvalidBranchError(TaskError):
+    """Indicates the current branch is not an allowed branch to publish from."""
+
+  class InvalidRemoteError(TaskError):
+    """Indicates the current default remote server is not an allowed remote server to publish to."""
+
+  class DirtyWorkspaceError(TaskError):
+    """Indicates the current workspace is dirty and thus unsuitable for publishing from."""
+
   _SCM_PUSH_ATTEMPTS = 5
 
   @classmethod
@@ -133,32 +142,51 @@ class ScmPublishMixin(object):
              help='Try pushing the pushdb to the SCM this many times before aborting.')
     register('--restrict-push-branches', advanced=True, type=Options.list,
              help='Allow pushes only from one of these branches.')
+    register('--restrict-push-urls', advanced=True, type=Options.list,
+             help='Allow pushes to only one of these urls.')
 
   @property
   def restrict_push_branches(self):
     return self.get_options().restrict_push_branches
 
   @property
+  def restrict_push_urls(self):
+    return self.get_options().restrict_push_urls
+
+  @property
   def scm_push_attempts(self):
     return self.get_options().scm_push_attempts
 
   def check_clean_master(self, commit=False):
-    """Check for uncommitted tracked files and ensure on an allowed branch.
+    """Perform a sanity check on SCM publishing constraints.
 
-    :raise TaskError: on failure"""
+    Checks for uncommitted tracked files and ensures we're on an allowed branch configured to push
+    to an allowed server if `commit` is `True`.
+
+    :param bool commit: `True` if a commit is in progress.
+    :raise TaskError: on failure
+    """
     if commit:
       if self.restrict_push_branches:
         branch = self.scm.branch_name
         if branch not in self.restrict_push_branches:
-          raise TaskError('Can only push from {}, currently on branch: {}'.format(
-            ' '.join(sorted(self.restrict_push_branches)), branch
-          ))
+          raise self.InvalidBranchError('Can only push from {}, currently on branch: {}'
+                                        .format(' '.join(sorted(self.restrict_push_branches)),
+                                                branch))
+
+      if self.restrict_push_urls:
+        url = self.scm.server_url
+        if url not in self.restrict_push_urls:
+          raise self.InvalidRemoteError('Can only push to {}, currently the remote url is: {}'
+                                        .format(' '.join(sorted(self.restrict_push_urls)), url))
 
       changed_files = self.scm.changed_files()
       if changed_files:
-        raise TaskError('Can only push from a clean branch, found : {}'.format(' '.join(changed_files)))
+        raise self.DirtyWorkspaceError('Can only push from a clean branch, found : {}'
+                                       .format(' '.join(changed_files)))
     else:
-      self.log.info('Skipping check for a clean {} branch in test mode.'.format(self.scm.branch_name))
+      self.log.info('Skipping check for a clean {} branch in test mode.'
+                    .format(self.scm.branch_name))
 
   def commit_pushdb(self, coordinates, postscript=None):
     """Commit changes to the pushdb with a message containing the provided coordinates."""
