@@ -130,9 +130,10 @@ class AntlrGen(CodeGen, NailgunTask):
 
     syn_target_sourceroot = os.path.join(self._java_out(target), target.target_base)
 
-    # Removes timestamps in generated source to get stable fingerprint for buildcache.
-    for source in generated_sources:
-      self._scrub_generated_timestamp(os.path.join(syn_target_sourceroot, source))
+    if (target.compiler == 'antlr3'):
+      # Removes timestamps in generated source to get stable fingerprint for buildcache.
+      for source in generated_sources:
+        self._scrub_generated_timestamp(os.path.join(syn_target_sourceroot, source))
 
     # The runtime deps are the same JAR files as those of the tool used to compile.
     # TODO: In antlr4 there is a separate runtime-only JAR, so use that.
@@ -153,13 +154,16 @@ class AntlrGen(CodeGen, NailgunTask):
 
   _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
   def _scrub_generated_timestamp(self, source):
-    lines = None
+    # Removes the first line of comment if it contains a timestamp
     with open(source) as f:
       lines = f.readlines()
+    if len(lines) < 1:
+      return
     with open(source, 'w') as f:
-      for line in lines:
-        if not self._COMMENT_WITH_TIMESTAMP_RE.match(line):
-          f.write(line)
+      if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
+        f.write(lines[0])
+      for line in lines[1:]:
+        f.write(line)
 
   def _resolve_java_deps(self, target):
     dep_specs = self.get_options()[target.compiler]
