@@ -17,10 +17,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class PythonSetup(Subsystem):
   """A python environment."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'python-setup'
+  options_scope = 'python-setup'
 
   @classmethod
   def register_options(cls, register):
@@ -116,10 +113,7 @@ class PythonSetup(Subsystem):
 
 class PythonRepos(Subsystem):
   """A python code repository."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'python-repos'
+  options_scope = 'python-repos'
 
   @classmethod
   def register_options(cls, register):
