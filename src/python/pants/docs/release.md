@@ -18,14 +18,47 @@ At a high level, releasing pants involves:
 -   Publishing the release to PyPi.
 -   Announce the release on pants-devel.
 
-The current list of packages that are part of this release process:
+Prerequisites
+-------------
 
--   pantsbuild.pants
--   pantsbuild.pants.backend.android
--   pantsbuild.pants.contrib.buildgen
--   pantsbuild.pants.contrib.scrooge
--   pantsbuild.pants.contrib.spindle
--   pantsbuild.pants.testinfra
+There are several things that require one-time setup in order to be
+able to perform pants releases.  The release script checks that all
+these steps have been performed in one way or another, but you might
+like to go though this list ahead of time rather than have the release
+script fail:
+
+  - Create a pgp signing key if you don't already have one.
+  
+    You might use the gpg implemntation of pgp and start here:
+    https://www.gnupg.org/gph/en/manual/c14.html
+  
+  - Configure git to use your pgp key for signing release tags.
+    
+    A description of the configuration can be found here:
+    https://git-scm.com/book/tr/v2/Git-Tools-Signing-Your-Work#GPG-Introduction
+  
+  - Create a pypi account if you don't already have one.
+  
+    You can register here: https://pypi.python.org/pypi?%3Aaction=register_form
+    Don't forget to include your pgp key id even though pypi considers
+    this step optional.
+    
+  - Get your pypi account added as an `owner` for all pantsbuild.pants packages.
+  
+    You can ask any one of the [Owners](#owners) listed below to do this.
+    Once this is done and you've performed your 1st release, add yourself to
+    the [Owners](#owners) section below.
+  
+  - Configure your pypi credentials locally in `~/.pypirc`
+  
+    This will do it:
+    
+        :::bash
+        cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
+        [server-login]
+        username: <fill me in>
+        password: <fill me in>
+        EOF
 
 Prepare Release
 ---------------
@@ -35,7 +68,7 @@ Index](https://pypi.python.org/pypi) per the Python community
 convention.
 
 Although the build and publish are automated, the version bumping and
-CHANGELOG  and CONTRIBUTORS management are not.
+CHANGELOG and CONTRIBUTORS management are not.
 
 You'll need to edit the version number in
 [src/python/pants/version.py](https://github.com/pantsbuild/pants/tree/master/src/python/pants/version.py)
@@ -50,26 +83,13 @@ up to date you just run `build-support/bin/contributors.sh`.
 
 Finally, send these three changes out for review.
 
-Dry Run
--------
+Dry Run (Optional)
+------------------
 
-In order to publish the prepared release you'll need to be a
-pantsbuild.pants package owner; otherwise you'll need to hand off to
-someone who is. The list is on the [pantsbuild.pants package index
-page](https://pypi.python.org/pypi/pantsbuild.pants) in the
-Package Index Owner field:
-
-    :::bash
-    $ curl -s "https://pypi.python.org`(curl -s https://pypi.python.org/pypi/pantsbuild.pants | grep -oE  "/pypi/pantsbuild.pants/[0-9]*\.[0-9]*\.[0-9]*" | head -n1)`" | grep -A1 "Owner"
-    <strong>Package Index Owner:</strong>
-    <span>john.sirois, benjyw, traviscrawford, ericzundel, ity</span>
-
-All the other packages that are part of this simultaneous release
-process must have the same owner list or the release script would break.
-
-Releases should only be published from master, so get on master and
-ensure your version number commit is present. After confirming this,
-publish locally and verify the release.
+A dry run is not strictly required since CI includes one, but you might
+like to try one anyway; if so, releases should only be published from
+master, so get on master and ensure your version number commit is present.
+After confirming this, run.
 
     :::bash
     $ ./build-support/bin/release.sh -n
@@ -78,8 +98,9 @@ This will perform a dry run local build of the pantsbuild.pants sdist
 and other related package sdists, install them in a virtualenv and then
 smoke test basic operations.
 
-Note that the release publish flow also performs a mandatory dry run so
-executing a dry run separately is not required.
+Note that in addition to CI checking dry runs work, the release publish
+flow also performs a mandatory dry run so executing a dry run separately
+is not required.
 
 Publish to PyPi
 ---------------
@@ -108,5 +129,44 @@ To test the packages are installable:
 This will attempt to install the just-published packages from pypi and
 then smoke test them.
 
-Finally, announce the release to pants-devel.
+Finally, announce the release to pants-devel.  You can get a
+contributor list for the email by running the following where `<tag>`
+if the tag for the prior release (eg: release_0.0.33)
 
+    :::bash
+    $ ./build-support/bin/contributors.sh -s <tag>
+
+Owners
+------
+
+The following folks are set up to publish to pypi for
+pantsbuild.pants sdists:
+
+Name             | Email                 | PYPI Usename
+-----------------|-----------------------|-------------
+John Sirois      | john.sirois@gmail.com | john.sirois 
+Benjy Weinberger | benjyw@gmail.com      | benjyw
+Eric Ayers       | zundel@squareup.com   | ericzundel
+Ity Kaul         | itykaul@gmail.com     | ity
+Stu Hood         | stuhood@gmail.com     | stuhood
+
+And the current list of packages that these folks can release can
+be obtained via:
+   
+    :::bash
+    $ ./build-support/bin/release.sh -l
+   
+Right now that's:
+
+- pantsbuild.pants
+- pantsbuild.pants.backend.android
+- pantsbuild.pants.contrib.buildgen
+- pantsbuild.pants.contrib.scrooge
+- pantsbuild.pants.contrib.spindle
+- pantsbuild.pants.testinfra
+
+You can run the following to get a full ownership roster for each
+package :
+
+    :::bash
+    $ ./build-support/bin/release.sh -o
