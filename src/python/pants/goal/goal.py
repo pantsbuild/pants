@@ -44,11 +44,11 @@ class Goal(object):
     return [pair[1] for pair in sorted(Goal._goal_by_name.items())]
 
   @classmethod
-  def global_subsystem_types(cls):
-    """Returns all global subsystem types used by all tasks, in no particular order."""
+  def subsystems(cls):
+    """Returns all subsystem types used by all tasks, in no particular order."""
     ret = set()
     for goal in cls.all():
-      ret.update(goal.global_subsystem_types())
+      ret.update(goal.subsystems())
     return ret
 
 
@@ -154,22 +154,29 @@ class _Goal(object):
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
   def known_scopes(self):
-    """Yields all known scopes under this goal (including its own.)"""
-    yield self.name
+    """Yields all known scopes under this goal (including its own) in no particular order."""
+    goal_scope = self.name
+    yield goal_scope
+
+    # Yield an intermediate scope via which task subsystems can inherit options.
+    subsystems = set()
+    for task_type in self.task_types():
+      subsystems.update(task_type.task_subsystems())
+    for subsystem in subsystems:
+      yield subsystem.subscope(goal_scope)
+
+    # Yield scopes for tasks in this goal.
     for task_type in self.task_types():
       for scope in task_type.known_scopes():
-        if scope != self.name:
+        if scope != goal_scope:
           yield scope
-        # Also allow any subsystems in task scope (for the cases when different tasks want to
-        # configure the same subsystem differently).
-        for subsystem in task_type.task_subsystems():
-          yield subsystem.qualify_scope(scope)
 
-  def global_subsystem_types(self):
-    """Returns all global subsystem types used by tasks in this goal, in no particular order."""
+  def subsystems(self):
+    """Returns all subsystem types used by tasks in this goal, in no particular order."""
     ret = set()
     for task_type in self.task_types():
       ret.update(task_type.global_subsystems())
+      ret.update(task_type.task_subsystems())
     return ret
 
   def ordered_task_names(self):

@@ -229,9 +229,10 @@ class GroupTask(Task):
 
         @classmethod
         def known_scopes(cls):
-          """Yields all known scopes under this task (i.e., those of its member types.)"""
+          """Yields all known scopes for this task (i.e., those of its member types.)"""
           for member_type in cls._member_types():
-            yield member_type.options_scope
+            for scope in member_type.known_scopes():
+              yield scope
 
         @classmethod
         def register_options_on_scope(cls, options):
