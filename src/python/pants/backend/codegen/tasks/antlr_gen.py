@@ -154,7 +154,7 @@ class AntlrGen(CodeGen, NailgunTask):
 
   _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
   def _scrub_generated_timestamp(self, source):
-    # Removes the first line of comment if it contains a timestamp
+    # Removes the first line of comment if it contains a timestamp.
     with open(source) as f:
       lines = f.readlines()
     if len(lines) < 1:

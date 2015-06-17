@@ -21,7 +21,7 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals('42.0', stdout_data.rstrip(), msg="got output:{0}".format(stdout_data))
 
 
-  # Test that antlr3 and antlr4 generated java targets are cache-able
+  # Test that antlr3 and antlr4 generated java targets are cache-able.
   def test_compile_antlr_cached(self):
     for enable_zinc_java in ['--compile-zinc-java-enabled', '--no-compile-zinc-java-enabled']:
       # Use the same temporary workdir because generated target's name includes the workdir.
@@ -36,12 +36,12 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
             enable_zinc_java,
             'examples/src/antlr/org/pantsbuild/example/exp::'
           ]
-          # First run should generate and cache artifacts
+          # First run should generate and cache artifacts.
           pants_run = self.run_pants_with_workdir(compile_antlr_args, tmp_workdir)
           self.assert_success(pants_run)
           self.assertIn('Caching artifacts for 2 targets.', pants_run.stdout_data)
 
-          # Second run should use the cached artifacts (even with clean-all)
+          # Second run should use the cached artifacts (even with clean-all).
           pants_run = self.run_pants_with_workdir(compile_antlr_args, tmp_workdir)
           self.assert_success(pants_run)
           self.assertIn('Using cached artifacts for 2 targets.', pants_run.stdout_data)
