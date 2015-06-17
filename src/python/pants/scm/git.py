@@ -115,11 +115,18 @@ class Git(Scm):
   @property
   def server_url(self):
     git_output = self._check_output(['remote', '--verbose'], raise_type=Scm.LocalException)
-    origin_push_line = [line.split()[1] for line in git_output.splitlines()
-                                        if 'origin' in line and '(push)' in line]
-    if len(origin_push_line) != 1:
-      raise Scm.LocalException('Unable to find origin remote amongst: ' + git_output)
-    return origin_push_line[0]
+
+    def origin_urls():
+      for line in git_output.splitlines():
+        name, url, action = line.split()
+        if name == 'origin' and action == '(push)':
+          yield url
+
+    origins = list(origin_urls())
+    if len(origins) != 1:
+      raise Scm.LocalException("Unable to find remote named 'origin' that accepts pushes "
+                               "amongst:\n{}".format(git_output))
+    return origins[0]
 
   @property
   def tag_name(self):
@@ -218,7 +225,6 @@ class Git(Scm):
 
   def add(self, *paths):
     self._check_call(['add'] + list(paths), raise_type=Scm.LocalException)
-
 
   def commit_date(self, commit_reference):
     return self._check_output(['log', '-1', '--pretty=tformat:%ci', commit_reference],
