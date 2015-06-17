@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.option.optionable import Optionable
+
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-class Subsystem(object):
+class Subsystem(Optionable):
   """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
@@ -29,25 +31,10 @@ class Subsystem(object):
 
   TODO(benjy): Model dependencies between subsystems? Registration of subsystems?
   """
-  # Subclasses should override.
-  options_scope = None
-
   @classmethod
   def subscope(cls, scope):
     """Create a subscope under this Subsystem's scope."""
     return '{0}.{1}'.format(cls.options_scope, scope)
-
-  @classmethod
-  def register_options(cls, register):
-    """Register options for this subsystem.
-
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
-    """
-
-  @classmethod
-  def register_options_on_scope(cls, options, scope):
-    """Trigger registration of this subsystem's options under a given scope."""
-    cls.register_options(options.registration_function_for_scope(scope))
 
   # The full Options object for this pants run.  Will be set after options are parsed.
   # TODO: A less clunky way to make option values available?
@@ -90,6 +77,7 @@ class Subsystem(object):
     Task code should call instance_for_scope() or global_instance() to get a subsystem instance.
     Tests can call this constructor directly though.
     """
+    super(Subsystem, self).__init__()
     self._scope = scope
     self._scoped_options = scoped_options
 

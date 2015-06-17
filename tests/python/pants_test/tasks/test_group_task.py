@@ -21,6 +21,8 @@ from pants_test.base_test import BaseTest
 class GroupIteratorTestBase(BaseTest):
   def group_member(self, name, predicate):
     class TestMember(GroupMember):
+      options_scope = 'test_member'
+      
       @classmethod
       def name(cls):
         return name

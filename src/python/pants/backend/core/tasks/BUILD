@@ -327,6 +327,7 @@ python_library(
     'src/python/pants/cache',
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
+    'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:meta',
   ],

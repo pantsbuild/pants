@@ -167,7 +167,7 @@ class GoalRunner(object):
 
     # Options for subsystems.
     for subsystem in subsystems:
-      subsystem.register_options_on_scope(self.options, subsystem.options_scope)
+      subsystem.register_options_on_scope(self.options)
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
     # be a subsystem?
