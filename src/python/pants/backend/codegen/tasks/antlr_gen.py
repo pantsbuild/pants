@@ -129,16 +129,16 @@ class AntlrGen(CodeGen, NailgunTask):
         generated_sources.append(source_base + suffix)
 
     syn_target_sourceroot = os.path.join(self._java_out(target), target.target_base)
-    spec_path = os.path.relpath(syn_target_sourceroot, get_buildroot())
 
     # Removes timestamps in generated source to get stable fingerprint for buildcache.
     for source in generated_sources:
-      self._scrub_generated_timestamp(os.path.join(spec_path, source))
+      self._scrub_generated_timestamp(os.path.join(syn_target_sourceroot, source))
 
     # The runtime deps are the same JAR files as those of the tool used to compile.
     # TODO: In antlr4 there is a separate runtime-only JAR, so use that.
     deps = self._resolve_java_deps(target)
 
+    spec_path = os.path.relpath(syn_target_sourceroot, get_buildroot())
     address = SyntheticAddress(spec_path=spec_path, target_name=target.id)
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
