@@ -4,9 +4,11 @@
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
+
 import os
 
 from twitter.common.collections import OrderedSet
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 
