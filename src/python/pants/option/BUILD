@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/base:config',
     'src/python/pants/base:deprecated',
     'src/python/pants/goal',
+    'src/python/pants/util:meta',
   ]
 )
 

@@ -37,3 +37,10 @@ class SubsystemTest(unittest.TestCase):
     task = DummyTask()
     task_instance = DummySubsystem.instance_for_task(task)
     self.assertIs(task_instance, DummySubsystem.instance_for_task(task))
+
+  def test_invalid_subsystem_class(self):
+    class NoScopeSubsystem(Subsystem):
+      pass
+    NoScopeSubsystem._options = DummyOptions()
+    with self.assertRaises(NotImplementedError):
+      NoScopeSubsystem.global_instance()

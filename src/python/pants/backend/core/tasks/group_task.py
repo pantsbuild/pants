@@ -223,9 +223,9 @@ class GroupTask(Task):
         def product_types(cls):
           return product_type
 
-        # We'd prefer to get the parent_options_scope from cls.options_scope,
+        # We'd prefer to get the options_scope from cls.options_scope,
         # but unfortunately that hasn't been set yet.
-        parent_options_scope = '.'.join(flag_namespace)
+        options_scope = '.'.join(flag_namespace)
 
         @classmethod
         def known_scopes(cls):
@@ -284,7 +284,7 @@ class GroupTask(Task):
       raise ValueError('Only GroupMember subclasses can join a GroupTask, '
                        'given {} of type {}'.format(group_member, type(group_member)))
 
-    group_member.options_scope = Goal.scope(cls.parent_options_scope, group_member.name())
+    group_member.options_scope = Goal.scope(cls.options_scope, group_member.name())
     cls._member_types().append(group_member)
 
   def __init__(self, *args, **kwargs):
