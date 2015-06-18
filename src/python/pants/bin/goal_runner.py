@@ -107,8 +107,6 @@ class GoalRunner(object):
       # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
 
-    known_scopes = sorted(known_scopes)
-
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
     self.register_options(subsystems)
