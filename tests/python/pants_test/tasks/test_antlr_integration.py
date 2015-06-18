@@ -28,6 +28,12 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
       # Use the same artifact_cache dir to share artifacts across two runs.
       with temporary_dir(root_dir=self.workdir_root()) as tmp_workdir:
         with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
+          # Note that this only works as a test with clean-all because AntlrGen does not use
+          # the artifact cache, just the local build invalidator.  As such, the clean-all
+          # actually forces it to re-gen _unlike_ the jvm compile tasks.  If AntlrGen starts
+          # using the artifact cache this test will pass even if the generated synthetic target
+          # was uncacheable due to changing fingerprints, because the .g files have not changed
+          # between runs and AntlrGen will not re-gen.
           compile_antlr_args = [
             'clean-all',
             'compile',

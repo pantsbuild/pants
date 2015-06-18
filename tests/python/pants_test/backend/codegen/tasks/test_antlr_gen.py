@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+import time
 from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
@@ -40,6 +41,8 @@ class AntlrGenTest(NailgunTaskTestBase):
            'name': 'smoke',
            'prefix': 'SMOKE'}
 
+  VERSIONS = {'3', '4'}
+
   PACKAGE_RE = re.compile(r'^\s*package\s+(?P<package_name>[^\s]+)\s*;\s*$')
 
   def setUp(self):
@@ -48,27 +51,29 @@ class AntlrGenTest(NailgunTaskTestBase):
       source_root('{srcroot}', java_antlr_library)
     """.format(**self.PARTS)))
 
-    self.create_file(relpath='{srcroot}/{dir}/{prefix}.g4'.format(**self.PARTS),
-                     contents=dedent("""
-      grammar {prefix};
-      ////////////////////
-      start  : letter EOF ;
-      letter : LETTER ;
-      ////////////////////
-      fragment LETTER : [a-zA-Z] ;
-    """.format(**self.PARTS)))
+    for ver in self.VERSIONS:
+      self.create_file(
+        relpath='{srcroot}/{dir}/{prefix}.g{version}'.format(version=ver, **self.PARTS),
+        contents=dedent("""
+        grammar {prefix};
+        ////////////////////
+        start  : letter EOF ;
+        letter : LETTER ;
+        ////////////////////
+        fragment LETTER : 'a'..'z' | 'A'..'Z' ;
+      """.format(**self.PARTS)))
 
   def create_context(self):
     # generate a context to contain the build graph for the input target, then execute
     antlr_target = self.target('{srcroot}/{dir}:{name}'.format(**self.PARTS))
     return self.context(target_roots=[antlr_target])
 
-  def execute_antlr4_test(self, expected_package):
+  def execute_antlr_test(self, expected_package, version):
     context = self.create_context()
     task = self.execute(context)
 
     # get the synthetic target from the private graph
-    task_outdir = os.path.join(task.workdir, 'antlr4', 'gen-java')
+    task_outdir = os.path.join(task.workdir, 'antlr' + version, 'gen-java')
     syn_sourceroot = os.path.join(task_outdir, self.PARTS['srcroot'])
     syn_target_name = ('{srcroot}/{dir}.{name}'.format(**self.PARTS)).replace('/', '.')
     syn_address = SyntheticAddress(spec_path=os.path.relpath(syn_sourceroot, self.build_root),
@@ -101,30 +106,42 @@ class AntlrGenTest(NailgunTaskTestBase):
 
       self.assertIn(syn_target, context.targets())
 
-  def test_explicit_package(self):
+  def test_explicit_package_v3(self):
+    self._test_explicit_package(None, '3')
+
+  def test_explicit_package_v4(self):
+    self._test_explicit_package('this.is.a.package', '4')
+
+  def _test_explicit_package(self, expected_package, version):
     self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent("""
       java_antlr_library(
         name='{name}',
-        compiler='antlr4',
+        compiler='antlr{version}',
         package='this.is.a.package',
-        sources=['{prefix}.g4'],
+        sources=['{prefix}.g{version}'],
       )
-    """.format(**self.PARTS)))
+    """.format(version=version, **self.PARTS)))
 
-    self.execute_antlr4_test('this.is.a.package')
+    self.execute_antlr_test(expected_package, version)
 
-  def test_derived_package(self):
+  def test_derived_package_v3(self):
+    self._test_derived_package(None, '3')
+
+  def test_derived_package_v4(self):
+    self._test_derived_package(self.PARTS['dir'].replace('/', '.'), '4')
+
+  def _test_derived_package(self, expected_package, version):
     self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent("""
       java_antlr_library(
         name='{name}',
-        compiler='antlr4',
-        sources=['{prefix}.g4'],
+        compiler='antlr{version}',
+        sources=['{prefix}.g{version}'],
       )
-    """.format(**self.PARTS)))
+    """.format(version=version, **self.PARTS)))
 
-    self.execute_antlr4_test(self.PARTS['dir'].replace('/', '.'))
+    self.execute_antlr_test(expected_package, version)
 
-  def test_derived_package_invalid(self):
+  def test_derived_package_invalid_v4(self):
     self.create_file(relpath='{srcroot}/{dir}/sub/not_read.g4'.format(**self.PARTS),
                      contents='// does not matter')
 
@@ -138,3 +155,41 @@ class AntlrGenTest(NailgunTaskTestBase):
 
     with self.assertRaises(AntlrGen.AmbiguousPackageError):
       self.execute(self.create_context())
+
+
+  def test_generated_target_fingerprint_stable_v3(self):
+    self._test_generated_target_fingerprint_stable('3')
+
+  def test_generated_target_fingerprint_stable_v4(self):
+    self._test_generated_target_fingerprint_stable('4')
+
+  def _test_generated_target_fingerprint_stable(self, version):
+
+    def execute_and_get_synthetic_target_hash():
+      # Rerun setUp() to clear up the build graph of injected synthetic targets.
+      self.setUp()
+      self.add_to_build_file('{srcroot}/{dir}/BUILD'.format(**self.PARTS), dedent("""
+        java_antlr_library(
+          name='{name}',
+          compiler='antlr{version}',
+          sources=['{prefix}.g{version}'],
+        )
+      """.format(version=version, **self.PARTS)))
+
+      context = self.create_context()
+      task = self.execute(context)
+
+      # get the synthetic target from the private graph
+      task_outdir = os.path.join(task.workdir, 'antlr' + version, 'gen-java')
+      syn_sourceroot = os.path.join(task_outdir, self.PARTS['srcroot'])
+      syn_target_name = ('{srcroot}/{dir}.{name}'.format(**self.PARTS)).replace('/', '.')
+      syn_address = SyntheticAddress(spec_path=os.path.relpath(syn_sourceroot, self.build_root),
+                                     target_name=syn_target_name)
+      syn_target = context.build_graph.get_target(syn_address)
+      return syn_target.transitive_invalidation_hash()
+
+    fp1 = execute_and_get_synthetic_target_hash()
+    time.sleep(1)
+    fp2 = execute_and_get_synthetic_target_hash()
+    self.assertEqual(fp1, fp2,
+        'Hash of generated synthetic target is not stable. {} != {}'.format(fp1, fp2))
