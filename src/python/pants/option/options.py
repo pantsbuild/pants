@@ -72,6 +72,19 @@ class Options(object):
   # will replace the default with the cmd-line value.
   list = staticmethod(custom_types.list_type)
 
+  @classmethod
+  def complete_scopes(cls, scopes):
+    """Expand a set of scopes to include all enclosing scopes.
+
+    E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
+    """
+    ret = {''}
+    for scope in scopes:
+      while scope != '':
+        ret.add(scope)
+        scope = scope.rpartition('.')[0]
+    return ret
+
 
   def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
@@ -95,7 +108,10 @@ class Options(object):
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
     self._help_request = splitter.help_request
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, self._help_request)
+    # We need parsers for all the intermediate scopes, so inherited option values
+    # can propagate through them.
+    complete_known_scopes = self.complete_scopes(known_scopes)
+    self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scopes, self._help_request)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scopes = set(known_scopes)
