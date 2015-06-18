@@ -96,7 +96,10 @@ class Options(object):
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
     """
-    splitter = ArgSplitter(known_scopes)
+    # We need parsers for all the intermediate scopes, so inherited option values
+    # can propagate through them.
+    complete_known_scopes = self.complete_scopes(known_scopes)
+    splitter = ArgSplitter(complete_known_scopes)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
 
@@ -108,9 +111,7 @@ class Options(object):
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
     self._help_request = splitter.help_request
-    # We need parsers for all the intermediate scopes, so inherited option values
-    # can propagate through them.
-    complete_known_scopes = self.complete_scopes(known_scopes)
+
     self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scopes, self._help_request)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
