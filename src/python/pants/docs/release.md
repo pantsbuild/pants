@@ -24,7 +24,7 @@ Prerequisites
 There are several things that require one-time setup in order to be
 able to perform pants releases.  The release script checks that all
 these steps have been performed in one way or another, but you might
-like to go though this list ahead of time rather than have the release
+like to go through this list ahead of time rather than have the release
 script fail:
 
   - Create a pgp signing key if you don't already have one.

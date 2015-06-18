@@ -307,11 +307,14 @@ function list_packages() {
 function get_owners() {
   package_name="$1"
 
-  curl -s "https://pypi.python.org$(curl -s https://pypi.python.org/pypi/${package_name} | \
-    grep -oE  "/pypi/${package_name}/[0-9]*\.[0-9]*\.[0-9]*" | head -n1)" | \
+  latest_package_path=$(
+    curl -s https://pypi.python.org/pypi/${package_name} | \
+      grep -oE  "/pypi/${package_name}/[0-9]*\.[0-9]*\.[0-9]*" | head -n1
+  )
+  curl -s "https://pypi.python.org${latest_package_path}" | \
     grep -A1 "Owner" | tail -1 | \
     cut -d'>' -f2 | cut -d'<' -f1 | \
-    tr ',' ' ' | sed -E -e "s|\s+| |g"
+    tr ',' ' ' | sed -E -e "s|[[:space:]]+| |g"
 }
 
 function list_owners() {
