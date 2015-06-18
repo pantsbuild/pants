@@ -65,7 +65,7 @@ class ArgSplitter(object):
   _VERSION_ARGS = ('-V', '--version')
 
   def __init__(self, known_scopes):
-    self._known_scopes = set(known_scopes + ['help', 'help-advanced', 'help-all'])
+    self._known_scopes = set(known_scopes) | {'help', 'help-advanced', 'help-all'}
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._help_request = None  # Will be set if we encounter any help flags.
 

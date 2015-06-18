@@ -154,22 +154,11 @@ class _Goal(object):
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
   def known_scopes(self):
-    """Yields all known scopes under this goal (including its own) in no particular order."""
-    goal_scope = self.name
-    yield goal_scope
-
-    # Yield an intermediate scope via which task subsystems can inherit options.
-    subsystems = set()
-    for task_type in self.task_types():
-      subsystems.update(task_type.task_subsystems())
-    for subsystem in subsystems:
-      yield subsystem.subscope(goal_scope)
-
+    """Yields all known scopes under this goal in no particular order."""
     # Yield scopes for tasks in this goal.
     for task_type in self.task_types():
       for scope in task_type.known_scopes():
-        if scope != goal_scope:
-          yield scope
+        yield scope
 
   def subsystems(self):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""
