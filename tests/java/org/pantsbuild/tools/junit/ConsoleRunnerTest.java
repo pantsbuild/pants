@@ -130,7 +130,6 @@ public class ConsoleRunnerTest {
     }
   }
 
-
   private String[] asArgsArray(String cmdLine) {
     String[] args = cmdLine.split(" ");
     for (int i = 0; i < args.length; i++) {
