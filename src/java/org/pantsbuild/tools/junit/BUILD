@@ -19,7 +19,7 @@ java_library(
     '3rdparty/jvm/commons-io:commons-io',
     'src/java/org/pantsbuild/args4j',
     'src/java/org/pantsbuild/junit/annotations',
-    'src/java/org/pantsbuild/tools/junit/withretry',r
+    'src/java/org/pantsbuild/tools/junit/withretry',
   ],
   sources=globs('*.java', 'impl/*.java')
 )
