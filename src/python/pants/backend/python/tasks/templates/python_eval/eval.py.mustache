@@ -15,8 +15,9 @@ def backtrace_to_here():
     frame = info[0]
     tb = inspect.getframeinfo(frame)
     filename = tb.filename
-    if filename.startswith('{{chroot}}'):
-      relpath = os.path.relpath(filename, '{{chroot}}')
+    if filename.startswith('{{chroot_parent}}'):
+      relpath_parent = os.path.relpath(filename, '{{chroot_parent}}')
+      relpath = relpath_parent.split(os.sep, 1)[1]
       filename = os.path.join('[srcroot]', relpath)
     line_text = tb.code_context[tb.index]
     pre_processed.append((filename, tb.lineno, tb.function, line_text))

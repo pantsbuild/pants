@@ -36,7 +36,7 @@ class BuildConfiguration(object):
     self._exposed_context_aware_object_factories = {}
     self._subsystems = set()
 
-  def subsystem_types(self):
+  def subsystems(self):
     return self._subsystems
 
   def registered_aliases(self):

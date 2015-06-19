@@ -1,23 +1,26 @@
-package org.pantsbuild.tools.junit;
+package org.pantsbuild.tools.junit.impl;
 
 import org.hamcrest.CoreMatchers;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 
+import org.pantsbuild.junit.annotations.TestSerial;
+
+@TestSerial
 public class ConsoleRunnerTestHelper {
 
   @Before
   public void setUp() {
-    ConsoleRunner.setCallSystemExitOnFinish(false);
-    ConsoleRunner.setExitStatus(0);
+    ConsoleRunnerImpl.setCallSystemExitOnFinish(false);
+    ConsoleRunnerImpl.setExitStatus(0);
     TestRegistry.reset();
   }
 
   @After
   public void tearDown() {
-    ConsoleRunner.setCallSystemExitOnFinish(true);
-    ConsoleRunner.setExitStatus(0);
+    ConsoleRunnerImpl.setCallSystemExitOnFinish(true);
+    ConsoleRunnerImpl.setExitStatus(0);
   }
 
   protected void assertContainsTestOutput(String output) {

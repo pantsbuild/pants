@@ -120,9 +120,11 @@ class Globs(FilesetRelPathWrapper):
   E.g., ``sources = globs('*java'),`` to get .java files in this directory.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
-  strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
-  'foo.py'])`` gives all files in this directory except ``.java``
-  files and ``foo.py``.
+    strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
+    'foo.py'])`` gives all files in this directory except ``.java``
+    files and ``foo.py``.
+  :return: FilesetWithSpec containing matching files in same directory as this BUILD file.
+  :rtype: FilesetWithSpec
 
   Deprecated:
   You might see that old code uses "math" on the return value of
@@ -130,10 +132,6 @@ class Globs(FilesetRelPathWrapper):
   in this directory *except* ``.java`` files.  Please use exclude
   instead, since pants is moving to make BUILD files easier to parse,
   and the new grammar will not support arithmetic.
-
-  :returns FilesetWithSpec containing matching files in same directory as this BUILD file.
-  :rtype FilesetWithSpec
-
   """
   wrapped_fn = Fileset.globs
 
@@ -145,16 +143,16 @@ class RGlobs(FilesetRelPathWrapper):
   the config, config/foo, config/foo/bar directories.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
-  strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
-  'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
+    strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
+    'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
+  :return: FilesetWithSpec matching files in this directory and its descendents.
+  :rtype: FilesetWithSpec
 
   Deprecated:
   You might see that old code uses "math" on the return value of ``rglobs()``. E.g.,
   ``rglobs('config/*') - rglobs('config/foo/*')`` gives all files under `config` *except*
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
-  :returns FilesetWithSpec matching files in this directory and its descendents.
-  :rtype FilesetWithSpec
   """
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
@@ -165,21 +163,54 @@ class RGlobs(FilesetRelPathWrapper):
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
   def to_filespec(self, args, root='', excludes=None):
-    # In rglobs, * at the beginning of a path component means
-    # **/*.  * anywhere else just means *.
+    # In rglobs, * at the beginning of a path component means "any
+    # number of directories, including 0".  Unfortunately, "**" in
+    # some other systems, e.g. git means "one or more directories".
+    # So every time we see ^* or **, we need to output both
+    # "**/whatever" and "whatever".
     rglobs = []
     for arg in args:
       components = arg.split(os.path.sep)
       out = []
       for component in components:
         if component == '**':
+          if out and out[-1].startswith("**"):
+            continue
           out.append(component)
         elif component[0] == '*':
-          out.append('**/' + component)
+          if out and out[-1].startswith("**"):
+            # We want to translate **/*.py to **/*.py, not **/**/*.py
+            out.append(component)
+          else:
+            out.append('**/' + component)
         else:
           out.append(component)
 
-      rglobs.append(os.path.join(*out))
+      def rglob_path(beginning, rest):
+        if not rest:
+          return [beginning]
+        endings = []
+        for i, item in enumerate(rest):
+          if beginning and not beginning.endswith(os.path.sep):
+            beginning += os.path.sep
+          if item.startswith('**'):
+            # .../**/*.java
+            for ending in rglob_path(beginning + item, rest[i+1:]):
+              endings.append(ending)
+            # .../*.java
+            for ending in rglob_path(beginning + item[3:], rest[i+1:]):
+              endings.append(ending)
+            return endings
+          else:
+            if beginning and not beginning.endswith(os.path.sep):
+              beginning += os.path.sep + item
+            else:
+              beginning += item
+
+        return [beginning]
+
+      rglobs.extend(rglob_path('', out))
+
     return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
 
 class ZGlobs(FilesetRelPathWrapper):

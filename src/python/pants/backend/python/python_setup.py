@@ -17,10 +17,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class PythonSetup(Subsystem):
   """A python environment."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'python-setup'
+  options_scope = 'python-setup'
 
   @classmethod
   def register_options(cls, register):
@@ -36,6 +33,9 @@ class PythonSetup(Subsystem):
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
                   'If unspecified, a standard path under the workdir is used.')
+    register('--chroot-cache-dir', advanced=True, default=None, metavar='<dir>',
+             help='The parent directory for the chroot cache. '
+                  'If unspecified, a standard path under the workdir is used.')
     register('--resolver-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the requirement resolver cache. '
                   'If unspecified, a standard path under the workdir is used.')
@@ -44,7 +44,8 @@ class PythonSetup(Subsystem):
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
-             help='The parent directory for the python artifact cache. ')
+             help='The parent directory for the python artifact cache. '
+                  'If unspecified, a standard path under the workdir is used.')
 
   @property
   def interpreter_requirement(self):
@@ -66,6 +67,11 @@ class PythonSetup(Subsystem):
   def interpreter_cache_dir(self):
     return (self.get_options().interpreter_cache_dir or
             os.path.join(self.scratch_dir, 'interpreters'))
+
+  @property
+  def chroot_cache_dir(self):
+    return (self.get_options().chroot_cache_dir or
+            os.path.join(self.scratch_dir, 'chroots'))
 
   @property
   def resolver_cache_dir(self):
@@ -107,10 +113,7 @@ class PythonSetup(Subsystem):
 
 class PythonRepos(Subsystem):
   """A python code repository."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'python-repos'
+  options_scope = 'python-repos'
 
   @classmethod
   def register_options(cls, register):

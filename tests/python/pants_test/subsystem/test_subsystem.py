@@ -11,9 +11,7 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class DummySubsystem(Subsystem):
-  @classmethod
-  def scope_qualifier(cls):
-    return 'dummy'
+  options_scope = 'dummy'
 
 
 class DummyOptions(object):
@@ -29,11 +27,6 @@ class SubsystemTest(unittest.TestCase):
   def setUp(self):
     DummySubsystem._options = DummyOptions()
 
-  def test_qualify_scope(self):
-    self.assertEquals('dummy', DummySubsystem.qualify_scope(''))
-    self.assertEquals('foo.dummy', DummySubsystem.qualify_scope('foo'))
-    self.assertEquals('foo.bar.dummy', DummySubsystem.qualify_scope('foo.bar'))
-
   def test_global_instance(self):
     # Verify that we get the same instance back every time.
     global_instance = DummySubsystem.global_instance()
@@ -44,3 +37,10 @@ class SubsystemTest(unittest.TestCase):
     task = DummyTask()
     task_instance = DummySubsystem.instance_for_task(task)
     self.assertIs(task_instance, DummySubsystem.instance_for_task(task))
+
+  def test_invalid_subsystem_class(self):
+    class NoScopeSubsystem(Subsystem):
+      pass
+    NoScopeSubsystem._options = DummyOptions()
+    with self.assertRaises(NotImplementedError):
+      NoScopeSubsystem.global_instance()

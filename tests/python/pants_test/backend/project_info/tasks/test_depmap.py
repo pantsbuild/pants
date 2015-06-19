@@ -138,6 +138,16 @@ class DepmapTest(BaseDepmapTest):
       )
     """))
 
+    self.add_to_build_file('src/java/c', dedent('''
+      jar_library(
+        name='c_jar_lib',
+        jars=[
+          jar(org='org.pantsbuild.test', name='c_test', rev='1.0'),
+          jar(org='org.pantsbuild.test', name='d_test', rev=''),
+        ]
+      )
+    '''))
+
     # It makes no sense whatsoever to have a java_library that depends
     # on a Python library, but we want to ensure that depmap handles
     # cases like this anyway because there might be other cases which
@@ -294,209 +304,49 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('src/java/b:b_java')]
     )
 
-
-class ProjectInfoTest(ConsoleTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return Depmap
-
-  @property
-  def alias_groups(self):
-    return register_core().merge(register_jvm())
-
-  def setUp(self):
-    super(ProjectInfoTest, self).setUp()
-
-    self.make_target(
-      'project_info:first',
-      target_type=JarLibrary,
+  def test_graph(self):
+    self.assert_console_output_ordered(
+      'digraph "common.h.h" {',
+      '  node [shape=rectangle, colorscheme=set312;];',
+      '  rankdir=LR;',
+      '  "internal-common.h.h" [style=filled, fillcolor=1];',
+      '  "internal-common.f.f" [style=filled, fillcolor=2];',
+      '  "internal-common.h.h" -> "internal-common.f.f";',
+      '}',
+      targets=[self.target('common/h')],
+      options={'graph': True}
     )
 
-    jar_lib = self.make_target(
-      'project_info:jar_lib',
-      target_type=JarLibrary,
-      jars=[JarDependency('org.apache', 'apache-jar', '12.12.2012')],
+  def test_graph_show_types(self):
+    self.assert_console_output_ordered(
+      'digraph "common.h.h" {',
+      '  node [shape=rectangle, colorscheme=set312;];',
+      '  rankdir=LR;',
+      '  "internal-common.h.h\\nJvmApp" [style=filled, fillcolor=1];',
+      '  "internal-common.f.f\\nJvmBinary" [style=filled, fillcolor=2];',
+      '  "internal-common.h.h\\nJvmApp" -> "internal-common.f.f\\nJvmBinary";',
+      '}',
+      targets=[self.target('common/h')],
+      options={'graph': True, 'show_types': True}
     )
 
-    self.make_target(
-      'java/project_info:java_lib',
-      target_type=JavaLibrary,
-      sources=['com/foo/Bar.java', 'com/foo/Baz.java'],
+  def test_tree(self):
+    self.assert_console_output_ordered(
+      '--internal-overlaps.two',
+      '  |--internal-overlaps.one',
+      '  |  |--internal-common.h.h',
+      '  |  |  |--internal-common.f.f',
+      '  |  |--internal-common.i.i',
+      '  |  |  |--internal-common.g.g',
+      '  |  |  |  |--*internal-common.f.f',
+      targets=[self.target('overlaps:two')],
+      options={'tree': True}
     )
 
-    self.make_target(
-      'project_info:third',
-      target_type=ScalaLibrary,
-      dependencies=[jar_lib],
-      java_sources=['java/project_info:java_lib'],
-      sources=['com/foo/Bar.scala', 'com/foo/Baz.scala'],
+  def test_jar_library_external(self):
+    self.assert_console_output_ordered(
+      'org.pantsbuild.test-c_test-1.0',
+      'org.pantsbuild.test-d_test',
+      targets=[self.target('src/java/c:c_jar_lib')],
+      options={'external_only': True}
     )
-
-    self.make_target(
-      'project_info:jvm_app',
-      target_type=JvmApp,
-      dependencies=[jar_lib],
-    )
-
-    self.make_target(
-      'project_info:jvm_target',
-      target_type=ScalaLibrary,
-      dependencies=[jar_lib],
-      sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
-    )
-
-    test_resource = self.make_target(
-      'project_info:test_resource',
-      target_type=Resources,
-      sources=['y_resource', 'z_resource'],
-    )
-
-    self.make_target(
-      'project_info:java_test',
-      target_type=JavaTests,
-      dependencies=[jar_lib],
-      sources=['this/is/a/test/source/FooTest.scala'],
-      resources=[test_resource],
-    )
-
-    jvm_binary = self.make_target(
-      'project_info:jvm_binary',
-      target_type=JvmBinary,
-      dependencies=[jar_lib],
-    )
-
-    self.make_target(
-      'project_info:top_dependency',
-      target_type=Dependencies,
-      dependencies=[jvm_binary],
-    )
-
-    src_resource = self.make_target(
-      'project_info:resource',
-      target_type=Resources,
-      sources=['a_resource', 'b_resource'],
-    )
-
-    self.make_target(
-        'project_info:target_type',
-        target_type=ScalaLibrary,
-        dependencies=[jvm_binary],
-        resources=[src_resource],
-    )
-
-    self.make_target(
-      'project_info:unrecognized_target_type',
-      target_type=JvmTarget,
-      dependencies=[],
-      resources=[],
-    )
-
-  # TODO: All these tests require the deprecated project_info option to be True.
-  # They will need to be rewritten in order to remove that option.
-  def get_depmap_task_result(self, targets, extra_options=None):
-    options = { 'project_info': True }
-    if extra_options:
-      options.update(extra_options)
-    return self.execute_console_task(targets=targets, options=options)
-
-  def get_depmap_task_json(self, targets):
-    self.set_options(project_info=True)
-    return json.loads(''.join(self.get_depmap_task_result(targets=targets)))
-
-  def test_without_dependencies(self):
-    # Are these tests failing?  --project-info is to be removed
-    # from the depmap target in 0.0.31.  The ProjectInfoTest suite
-    # has already been moved to test_export.py so you can remove
-    # this class from test_depmap.py when it goes away.
-    result = self.get_depmap_task_json(targets=[self.target('project_info:first')])
-    self.assertEqual({}, result['libraries'])
-
-  def test_with_dependencies(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:third')])
-
-    self.assertEqual(
-      [
-        'java/project_info:java_lib',
-        'project_info:jar_lib'
-      ],
-      sorted(result['targets']['project_info:third']['targets'])
-    )
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:third']['libraries'])
-
-    self.assertEqual(1, len(result['targets']['project_info:third']['roots']))
-    source_root = result['targets']['project_info:third']['roots'][0]
-    self.assertEqual('com.foo', source_root['package_prefix'])
-    self.assertEqual(
-      '{0}/project_info/com/foo'.format(self.build_root),
-      source_root['source_root']
-    )
-
-  def test_jvm_app(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:jvm_app')])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:jvm_app']['libraries'])
-
-  def test_jvm_target(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:jvm_target')])
-    jvm_target = result['targets']['project_info:jvm_target']
-    expected_jmv_target = {
-      'libraries': ['org.apache:apache-jar:12.12.2012'],
-      'is_code_gen': False,
-      'targets': ['project_info:jar_lib'],
-      'roots': [
-         {
-           'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
-           'package_prefix': 'this.is.a.source'
-         },
-      ],
-      'target_type': 'SOURCE',
-      'pants_target_type': 'scala_library'
-    }
-    self.assertEqual(jvm_target, expected_jmv_target)
-
-  def test_java_test(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:java_test')])
-    self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:java_test']['libraries'])
-    self.assertEqual('TEST_RESOURCE',
-                     result['targets']['project_info:test_resource']['target_type'])
-
-  def test_jvm_binary(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:jvm_binary')])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
-                     result['targets']['project_info:jvm_binary']['libraries'])
-
-  def test_top_dependency(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:top_dependency')])
-    self.assertEqual([], result['targets']['project_info:top_dependency']['libraries'])
-    self.assertEqual(['project_info:jvm_binary'],
-                     result['targets']['project_info:top_dependency']['targets'])
-
-  def test_format_flag(self):
-    result = self.get_depmap_task_result(targets=[self.target('project_info:third')],
-                                         extra_options={'project_info_formatted': False})
-    # confirms only one line of output, which is what -format should produce
-    self.assertEqual(1, len(result))
-
-  def test_target_types(self):
-    result = self.get_depmap_task_json(targets=[self.target('project_info:target_type')])
-    self.assertEqual('SOURCE',
-                     result['targets']['project_info:target_type']['target_type'])
-    self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
-
-  def test_output_file(self):
-    outfile = os.path.join(self.build_root, '.pants.d', 'test')
-    self.get_depmap_task_result(targets=[self.target('project_info:target_type')],
-                                extra_options={'output_file': outfile})
-    self.assertTrue(os.path.exists(outfile))
-
-  def test_output_file_error(self):
-    with self.assertRaises(TaskError):
-      self.get_depmap_task_result(targets=[self.target('project_info:target_type')],
-                                  extra_options={'output_file': self.build_root})
-
-  def test_unrecognized_target_type(self):
-    with self.assertRaises(TaskError):
-      self.get_depmap_task_result(targets=[self.target('project_info:unrecognized_target_type')])

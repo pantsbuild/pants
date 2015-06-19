@@ -1,4 +1,4 @@
-package org.pantsbuild.tools.junit;
+package org.pantsbuild.tools.junit.impl;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -11,6 +11,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+
+import org.pantsbuild.junit.annotations.TestSerial;
+
+@TestSerial
 public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
   final static ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   final static ByteArrayOutputStream errContent = new ByteArrayOutputStream();
@@ -35,7 +39,7 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
 
   @Test
   public void testConsoleOutput() throws Exception {
-    ConsoleRunner.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
+    ConsoleRunnerImpl.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
     Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
     assertContainsTestOutput(outContent.toString());
   }
@@ -43,7 +47,7 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
   @Test
   public void testOutputDir() throws Exception {
     String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
-    ConsoleRunner.main(asArgsArray(
+    ConsoleRunnerImpl.main(asArgsArray(
         "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
             "-default-parallel -xmlreport -suppress-output -outdir " + outdir));
     Assert.assertEquals("test21 test22 test31 test32 test41 test42",

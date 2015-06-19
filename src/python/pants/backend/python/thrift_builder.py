@@ -33,8 +33,7 @@ class PythonThriftBuilder(CodeGenerator):
     return ['thrift']
 
   def run_thrifts(self):
-    """
-    Generate Python thrift code.
+    """Generate Python thrift code.
 
     Thrift fields conflicting with Python keywords are suffixed with a trailing
     underscore (e.g.: from_).

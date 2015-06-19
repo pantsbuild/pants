@@ -18,8 +18,10 @@ there tends to be a lot of "churn".)
 If you're reading this in an organization that already uses Pants, ask
 your neighbor where your source code is.
 
-There are a few ways to get a runnable version of Pants into a
-developer's workspace.
+There are a few ways to get a runnable version of Pants into a developer's workspace. Before
+beginning, please [consult the README](https://github.com/pantsbuild/pants/blob/master/README.md),
+to make sure your machine fits the requirements. In particular, you'll want to make sure that you
+have Python 2.7.x -- pants itself needs to be hosted on that version.
 
 Virtualenv-based Installation
 -----------------------------

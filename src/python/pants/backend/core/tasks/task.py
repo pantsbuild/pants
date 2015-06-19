@@ -21,11 +21,12 @@ from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import create_artifact_cache
 from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
+from pants.option.optionable import Optionable
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.meta import AbstractClass
 
 
-class TaskBase(AbstractClass):
+class TaskBase(Optionable, AbstractClass):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -93,30 +94,14 @@ class TaskBase(AbstractClass):
     """
     return []
 
-  # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
-  options_scope = None
-
   @classmethod
   def known_scopes(cls):
-    """Yields all known scopes under this task (usually just its own.)"""
+    """Yields all known scopes for this task, in no particular order."""
+    # The task's own scope.
     yield cls.options_scope
-
-  @classmethod
-  def register_options_on_scope(cls, options):
-    """Trigger registration of this task's options.
-
-    Subclasses should not generally need to override this method.
-    """
-    cls.register_options(options.registration_function_for_scope(cls.options_scope))
-    for subsystem_type in cls.task_subsystems():
-      subsystem_type.register_options_on_scope(options, cls.options_scope)
-
-  @classmethod
-  def register_options(cls, register):
-    """Register options for this task.
-
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
-    """
+    # The scopes of any task-specific subsystems it uses.
+    for subsystem in cls.task_subsystems():
+      yield subsystem.subscope(cls.options_scope)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -171,6 +156,7 @@ class TaskBase(AbstractClass):
     changing every subclass. If the subclass does not need its own
     initialization, this method can (and should) be omitted entirely.
     """
+    super(TaskBase, self).__init__()
     self.context = context
     self._workdir = workdir
     # TODO: It would be nice to use self.get_options().cache_key_gen_version here, because then

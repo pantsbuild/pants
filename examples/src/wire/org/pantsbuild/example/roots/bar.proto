@@ -1,0 +1,9 @@
+// Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+package org.pantsbuild.example.roots;
+
+message Bar {
+  optional string param1 = 1;
+  optional string param2 = 2;
+}

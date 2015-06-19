@@ -32,17 +32,15 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
+from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
 
 
 class SourceRootBootstrapper(Subsystem):
-  @classmethod
-  def scope_qualifier(cls):
-    # This is an odd name, but we maintain the legacy scope until we can kill this subsystem
-    # outright.
-    return 'goals'
+  # This is an odd name, but we maintain the legacy scope until we kill this subsystem outright.
+  options_scope = 'goals'
 
   @classmethod
   def register_options(cls, register):
@@ -99,12 +97,10 @@ class GoalRunner(object):
 
     known_scopes = ['']
 
-    # Add scopes for global subsystem instances.
-    global_subsystems = (set(self.subsystems) |
-                         Goal.global_subsystem_types() |
-                         build_configuration.subsystem_types())
-    for subsystem_type in global_subsystems:
-      known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
+    # Add scopes for all needed subsystems.
+    subsystems = (set(self.subsystems) | Goal.subsystems() | build_configuration.subsystems())
+    for subsystem in subsystems:
+      known_scopes.append(subsystem.options_scope)
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
@@ -113,7 +109,7 @@ class GoalRunner(object):
 
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
-    self.register_subsystem_options(global_subsystems)
+    self.register_options(subsystems)
 
     # Make the options values available to all subsystems.
     Subsystem._options = self.options
@@ -163,18 +159,18 @@ class GoalRunner(object):
   def global_options(self):
     return self.options.for_global_scope()
 
-  def register_subsystem_options(self, global_subsystems):
+  def register_options(self, subsystems):
     # Standalone global options.
     register_global_options(self.options.registration_function_for_global_scope())
 
-    # Options for global-level subsystems.
-    for subsystem_type in global_subsystems:
-      subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
+    # Options for subsystems.
+    for subsystem in subsystems:
+      subsystem.register_options_on_scope(self.options)
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
     # be a subsystem?
     for goal in Goal.all():
-      # Register task options (including per-task subsystem options).
+      # Register task options.
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):
@@ -197,10 +193,15 @@ class GoalRunner(object):
                                       spec_excludes=self.spec_excludes,
                                       exclude_target_regexps=self.global_options.exclude_target_regexp)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+        def filter_for_tag(tag):
+          return lambda target: tag in map(str, target.tags)
+        tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
             self.build_graph.inject_address_closure(address)
-            self.targets.append(self.build_graph.get_target(address))
+            tgt = self.build_graph.get_target(address)
+            if tag_filter(tgt):
+              self.targets.append(tgt)
     self.goals = [Goal.by_name(goal) for goal in goals]
 
   def run(self):

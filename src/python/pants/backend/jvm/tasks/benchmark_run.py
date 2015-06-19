@@ -11,16 +11,19 @@ import shutil
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 
 
 class BenchmarkRun(JvmTask, JvmToolTaskMixin):
+  _CALIPER_MAIN = 'com.google.caliper.Runner'
+
   @classmethod
   def register_options(cls, register):
     super(BenchmarkRun, cls).register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
     register('--memory', default=False, action='store_true', help='Enable memory profiling.')
-    cls.register_jvm_tool(register, 'benchmark-tool', default=['//:benchmark-caliper-0.5'])
+    cls.register_jvm_tool(register, 'benchmark-tool', main=cls._CALIPER_MAIN, default=['//:benchmark-caliper-0.5'])
     cls.register_jvm_tool(register, 'benchmark-agent',
                           default=['//:benchmark-java-allocation-instrumenter-2.1'])
 
@@ -65,12 +68,12 @@ class BenchmarkRun(JvmTask, JvmToolTaskMixin):
 
     classpath = self.classpath(self.context.targets(), benchmark_tools_classpath)
 
-    caliper_main = 'com.google.caliper.Runner'
     exit_code = execute_java(classpath=classpath,
-                             main=caliper_main,
+                             main=self._CALIPER_MAIN,
                              jvm_options=self.jvm_options,
                              args=self.args,
                              workunit_factory=self.context.new_workunit,
-                             workunit_name='caliper')
+                             workunit_name='caliper',
+                             workunit_labels=[WorkUnit.RUN])
     if exit_code != 0:
-      raise TaskError('java {} ... exited non-zero ({})'.format(caliper_main, exit_code))
+      raise TaskError('java {} ... exited non-zero ({})'.format(self._CALIPER_MAIN, exit_code))

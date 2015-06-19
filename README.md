@@ -17,6 +17,7 @@ We use [Coveralls](https://coveralls.io) to monitor test coverage
 At a minimum, pants requires the following to run properly:
 
 * Linux or Mac OS X
-* Python 2.7 or later (2.7.8 recommended)
+* Python 2.7.x (the latest stable version of 2.7 is recommended)
+* A C compiler, system headers, Python headers (to compile native Python modules)
 * OpenJDK 7 or greater, Oracle JDK 6 or greater
 * Internet access (so that pants can fully bootstrap itself)

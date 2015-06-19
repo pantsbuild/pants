@@ -25,6 +25,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
+    'src/python/pants/util:filtering',
   ],
 )
 

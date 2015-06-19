@@ -16,10 +16,7 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
   TODO: Rework so there's a way to specify a default as direct pointers to jar coordinates,
   so we don't require specs in BUILD.tools if the default is acceptable.
   """
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'scala-platform'
+  options_scope = 'scala-platform'
 
   @classmethod
   def register_options(cls, register):

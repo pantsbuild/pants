@@ -38,7 +38,6 @@ target(
     ':jvmdoc_gen',
     ':list_goals',
     ':listtargets',
-    ':markdown_to_html',
     ':minimal_cover',
     ':reflect',
     ':roots',
@@ -53,7 +52,6 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
@@ -62,7 +60,6 @@ target(
     ':junit_tests_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
-    ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
     ':wire_integration',
@@ -211,17 +208,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
   ]
-)
-
-python_tests(
-  name = 'depmap_integration',
-  sources = ['test_depmap_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/ivy',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
 )
 
 python_tests(
@@ -383,29 +369,6 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:target',
   ],
-)
-
-python_tests(
-  name = 'markdown_to_html',
-  sources = ['test_markdown_to_html.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/tasks:markdown_to_html',
-  ]
-)
-
-python_tests(
-  name='markdown_to_html_integration',
-  sources=['test_markdown_to_html_integration.py'],
-  dependencies=[
-    'src/python/pants/backend/core/tasks:markdown_to_html',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-  ],
-  coverage=[
-    'pants.backend.core.tasks.markdown_to_html',
-  ]
 )
 
 python_tests(
