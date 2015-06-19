@@ -211,7 +211,8 @@ def rst_to_html(in_rst, stderr):
     sys.stderr = stderr
     pp = publish_parts(in_rst,
                        writer_name='html',
-                       settings_overrides=dict(exit_status_level=1),
+                       # Report and exit at level 2 (warnings) or higher.
+                       settings_overrides=dict(exit_status_level=2, report_level=2),
                        enable_exit_status=True)
   finally:
     sys.exit = orig_sys_exit
