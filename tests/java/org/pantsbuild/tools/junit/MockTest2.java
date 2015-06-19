@@ -9,6 +9,7 @@ public class MockTest2 {
 
   @Test
   public void testMethod21() {
+    System.out.println("iif testMethod21");
     TestRegistry.registerTestCall("test21");
   }
 

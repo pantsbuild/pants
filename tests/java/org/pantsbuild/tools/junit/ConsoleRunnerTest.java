@@ -60,7 +60,7 @@ public class ConsoleRunnerTest {
   @Test
   public void testShardedTesting12WithParallelThreads() throws Exception {
     ConsoleRunner.main(asArgsArray(
-        "MockTest1 MockTest2 MockTest3 -parallel-threads 1" +
+        "MockTest2 -parallel-threads 1" +
                 " -xmlreport"));
     Assert.assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
