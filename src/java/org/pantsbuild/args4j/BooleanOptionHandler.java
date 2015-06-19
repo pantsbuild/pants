@@ -12,12 +12,12 @@ import org.kohsuke.args4j.spi.Setter;
 
 /**
  * An {@code OptionHandler} that parses boolean values but can also set them from presence alone.
- * <p/>
+ * <p>
  * The {@link org.kohsuke.args4j.spi.BooleanOptionHandler built-in args4j boolean parser} takes one
  * argument which is parsed to a {@code boolean} option value. This handler can similarly take a
  * value; although, the value is parsed as per {@link Boolean#parseBoolean(String)}.  In addition
  * this handler will treat no value as {@code true}.
- * <p/>
+ * </p>
  * For example, the following all parse to {@code true}:
  * <ul>
  *   <li>{@code -verbose}</li>

@@ -8,12 +8,15 @@ import javax.annotation.Nullable;
 import org.kohsuke.args4j.OptionDef;
 
 /**
+ * <p>
  * Indicates a problem parsing a command line argument.
- * <p/>
+ * </p>
+ * <p>
  * Although args4j provides {@link org.kohsuke.args4j.CmdLineException} it is difficult to
  * construct one.  As such, this exception is useful for implementing
  * {@link org.kohsuke.args4j.spi.OptionHandler OptionHandlers} that detect and reject malformed
  * values.
+ * </p>
  */
 public class InvalidCmdLineArgumentException extends RuntimeException {
 
