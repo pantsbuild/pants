@@ -5,59 +5,46 @@ package org.pantsbuild.tools.junit;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintStream;
 
-public class MultiOutputStream extends PrintStream {
-  private OutputStream outputStream;
+public class MultiOutputStream extends OutputStream {
+  private final OutputStream[] streams;
 
-  public MultiOutputStream(OutputStream out, OutputStream outputStream) {
-    super(out, false);
-    this.outputStream = outputStream;
+  public MultiOutputStream(OutputStream... streams) {
+    this.streams = streams;
   }
 
   @Override
-  public void write(int b) {
-    super.write(b);
-    try {
-      outputStream.write(b);
-    } catch (IOException e) {
-      setError();
+  public void write(int b) throws IOException {
+    for (OutputStream stream : streams) {
+      stream.write(b);
     }
   }
 
   @Override
-  public void write(byte[] b) throws IOException{
-    super.write(b);
-    outputStream.write(b);
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len){
-    super.write(b, off, len);
-    try {
-      outputStream.write(b);
-    } catch (IOException e){
-      setError();
+  public void write(byte[] b) throws IOException {
+    for (OutputStream stream : streams) {
+      stream.write(b);
     }
   }
 
   @Override
-  public void flush() {
-    super.flush();
-    try {
-      outputStream.flush();;
-    } catch (IOException e){
-      setError();
+  public void write(byte[] b, int off, int len) throws IOException {
+    for (OutputStream stream : streams) {
+      stream.write(b, off, len);
     }
   }
 
   @Override
-  public void close(){
-    super.close();
-    try {
-      outputStream.close();
-    } catch (IOException e){
-      setError();
+  public void flush() throws IOException {
+    for (OutputStream stream : streams) {
+      stream.flush();
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    for (OutputStream stream : streams) {
+      stream.close();
     }
   }
 }

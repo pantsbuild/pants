@@ -24,6 +24,9 @@ public class ConsoleRunnerTest {
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
 
+  private final PrintStream stdout = System.out;
+  private final PrintStream stderr = System.err;
+
   @Before
   public void setUp() {
     System.setOut(new PrintStream(outContent));
@@ -35,10 +38,10 @@ public class ConsoleRunnerTest {
 
   @After
   public void tearDown() {
+    System.setOut(stdout);
+    System.setErr(stderr);
     ConsoleRunner.setCallSystemExitOnFinish(true);
     ConsoleRunner.setExitStatus(0);
-    System.setOut(null);
-    System.setErr(null);
   }
 
   @Test
@@ -117,16 +120,18 @@ public class ConsoleRunnerTest {
   public void testOutput() throws Exception {
     String outdir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
     ConsoleRunner.main(asArgsArray(
-            "MockTest4 -parallel-threads 4 -default-parallel -xmlreport -outdir " + outdir));
-    Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
+            "MockTest4 MockTest2 MockTest3 -parallel-threads 4 " +
+            "-default-parallel -xmlreport -outdir " + outdir));
+    Assert.assertEquals("test21 test22 test31 test32 test41 test42", TestRegistry.getCalledTests());
 
     String prefix = MockTest4.class.getCanonicalName();
     String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
-    String consoleOutputLines = outContent.toString();
-    String expectedTokens[] = {"test41", "start test42", "end test42"};
+    String expectedTokens[] = {"start", "start test42", "end test42"};
     for (String token : expectedTokens) {
-      Assert.assertTrue(fileOutputLines.contains(token));
-      Assert.assertTrue(consoleOutputLines.contains(token));
+      Assert.assertTrue("Test out.txt " + fileOutputLines + " does not contain " + token,
+                        fileOutputLines.contains(token));
+      Assert.assertTrue("Console lines" + outContent + " does not contain " + token,
+              outContent.toString().contains(token));
     }
   }
 

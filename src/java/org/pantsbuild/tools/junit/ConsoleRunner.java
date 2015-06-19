@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 
+import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
 import org.junit.runner.JUnitCore;
@@ -122,8 +123,8 @@ public class ConsoleRunner {
         errstream = new FileOutputStream(err);
       }
       if (printToOriginalOutputs) {
-        SWAPPABLE_OUT.swap(new MultiOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
-        SWAPPABLE_ERR.swap(new MultiOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
+        SWAPPABLE_OUT.swap(new TeeOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
+        SWAPPABLE_ERR.swap(new TeeOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
       } else {
         SWAPPABLE_OUT.swap(outstream);
         SWAPPABLE_ERR.swap(errstream);
