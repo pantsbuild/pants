@@ -7,6 +7,7 @@ package org.pantsbuild.zinc
 import java.io.File
 import sbt.Level
 import xsbti.CompileFailed
+import org.pantsbuild.zinc.logging.Loggers
 
 /**
  * Command-line main class.
@@ -28,8 +29,13 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.logger(settings.consoleLog.logLevel,
-      settings.consoleLog.color, settings.consoleLog.logFilters)
+    val log =
+      Loggers.logger(
+        settings.consoleLog.logLevel,
+        settings.consoleLog.color,
+        settings.consoleLog.logFilters,
+        settings.captureLog
+      )
     val isDebug = settings.consoleLog.logLevel == Level.Debug
 
     // bail out on any command-line option errors

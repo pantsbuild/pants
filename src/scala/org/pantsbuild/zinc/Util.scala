@@ -5,42 +5,9 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import sbt.{ ConsoleLogger, ConsoleOut, Hash, IO, Level, Logger }
-import scala.util.matching.Regex
+import sbt.{ Hash, IO }
 
 object Util {
-
-  //
-  // Logging
-  //
-
-  /**
-   * Create a new logger based on level, color, and filter settings.
-   */
-  def logger(level: Level.Value, color: Boolean, filters: Seq[Regex]): LoggerRaw = {
-    val out = ConsoleOut.systemOut
-    val consoleLogger = ConsoleLogger(out = out, useColor = ConsoleLogger.formatEnabled && color); consoleLogger.setLevel(level)
-    new LoggerRaw() {
-      def isFiltered(message: => String): Boolean = {
-        filters.exists(_.findFirstIn(message).isDefined)
-      }
-      def trace(t: => Throwable): Unit = consoleLogger.trace(t)
-      def success(message: => String): Unit = consoleLogger.success(message)
-      def log(level: Level.Value, msg: => String): Unit = {
-        lazy val message = msg
-        if (!isFiltered(message)) {
-          consoleLogger.log(level, message)
-        }
-      }
-      def logRaw(msg: => String): Unit = {
-        lazy val message = msg
-        if (!isFiltered(message)) {
-          out.print(message)
-        }
-      }
-    }
-  }
-
   //
   // Time
   //
@@ -288,11 +255,4 @@ object Util {
   def counted(count: Int, prefix: String, single: String, plural: String): String = {
     count.toString + " " + prefix + (if (count == 1) single else plural)
   }
-}
-
-/**
- * A logger with direct printer access, as well as the ability to print immediately.
- */
-trait LoggerRaw extends Logger {
-  def logRaw(message: => String): Unit
 }
