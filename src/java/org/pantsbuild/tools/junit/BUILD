@@ -13,14 +13,14 @@ java_library(
     """)
   ),
   dependencies=[
-    '3rdparty:args4j',
-    '3rdparty:guava',
-    '3rdparty:junit',
-    'src/java/org/pantsbuild/args4j',
-    'src/java/org/pantsbuild/junit/annotations',
-    'src/java/org/pantsbuild/tools/junit/withretry',
+      '3rdparty:args4j',
+      '3rdparty:guava',
+      '3rdparty:junit',
+      'src/java/org/pantsbuild/args4j',
+      'src/java/org/pantsbuild/junit/annotations',
+      'src/java/org/pantsbuild/tools/junit/withretry',
   ],
-  sources=globs('*.java')
+  sources=globs('*.java', 'impl/*.java')
 )
 
 jvm_binary(
