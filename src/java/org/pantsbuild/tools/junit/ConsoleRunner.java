@@ -3,6 +3,20 @@
 
 package org.pantsbuild.tools.junit;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FilterOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -12,7 +26,14 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
-import org.junit.runner.*;
+
+import org.junit.runner.Computer;
+import org.junit.runner.Description;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Request;
+import org.junit.runner.Result;
+import org.junit.runner.RunWith;
+import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runners.model.InitializationError;
 import org.kohsuke.args4j.Argument;
@@ -20,16 +41,10 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
+
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
 
-import java.io.*;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
@@ -161,6 +176,12 @@ public class ConsoleRunner {
       this.printToOriginalOutputs = printToOriginalOutputs;
     }
 
+    @Override
+    public void testRunStarted(Description description) throws Exception {
+      registerTests(description.getChildren());
+      super.testRunStarted(description);
+    }
+
     private void registerTests(Iterable<Description> tests) throws IOException {
       for (Description test : tests) {
         registerTests(test.getChildren());
@@ -192,7 +213,6 @@ public class ConsoleRunner {
 
     @Override
     public void testStarted(Description description) throws Exception {
-      registerTests(Collections.singletonList(description));
       captures.get(description.getTestClass()).open();
       super.testStarted(description);
     }

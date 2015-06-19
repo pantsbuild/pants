@@ -11,7 +11,6 @@ import java.io.Writer;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -318,6 +317,11 @@ class AntJunitXmlReportListener extends RunListener {
     this.streamSource = streamSource;
   }
 
+  @Override
+  public void testRunStarted(Description description) throws java.lang.Exception {
+    createSuites(description.getChildren());
+  }
+
   private void createSuites(Iterable<Description> tests) {
     for (Description test : tests) {
       createSuites(test.getChildren());
@@ -337,7 +341,6 @@ class AntJunitXmlReportListener extends RunListener {
 
   @Override
   public void testStarted(Description description) throws java.lang.Exception {
-    createSuites(Collections.singletonList(description));
     suites.get(description.getTestClass()).started();
     cases.get(description).started();
   }

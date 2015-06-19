@@ -3,7 +3,9 @@
 
 package org.pantsbuild.tools.junit;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 
 public class MultiOutputStream extends PrintStream {
   private OutputStream outputStream;

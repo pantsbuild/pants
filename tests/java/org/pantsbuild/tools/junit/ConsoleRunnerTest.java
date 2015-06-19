@@ -3,6 +3,10 @@
 
 package org.pantsbuild.tools.junit;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.PrintStream;
+import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -17,8 +21,13 @@ import org.pantsbuild.junit.annotations.TestSerial;
 @TestSerial
 public class ConsoleRunnerTest {
 
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+
   @Before
   public void setUp() {
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
     ConsoleRunner.setCallSystemExitOnFinish(false);
     ConsoleRunner.setExitStatus(0);
     TestRegistry.reset();
@@ -28,13 +37,15 @@ public class ConsoleRunnerTest {
   public void tearDown() {
     ConsoleRunner.setCallSystemExitOnFinish(true);
     ConsoleRunner.setExitStatus(0);
+    System.setOut(null);
+    System.setErr(null);
   }
 
   @Test
   public void testNormalTesting() throws Exception {
-    ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3 -xmlreport"));
+    ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
     Assert.assertEquals("test11 test12 test13 test21 test22 test31 test32",
-        TestRegistry.getCalledTests());
+      TestRegistry.getCalledTests());
   }
 
   @Test
@@ -60,8 +71,7 @@ public class ConsoleRunnerTest {
   @Test
   public void testShardedTesting12WithParallelThreads() throws Exception {
     ConsoleRunner.main(asArgsArray(
-        "MockTest2 -parallel-threads 1" +
-                " -xmlreport"));
+        "MockTest1 MockTest2 MockTest3 -test-shard 1/2 -parallel-threads 4 -default-parallel"));
     Assert.assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
 
@@ -102,6 +112,24 @@ public class ConsoleRunnerTest {
     // as flaky - that is, it should be invoked only once.
     Assert.assertEquals(1, FlakyTest.numExpectedExceptionMethodInvocations);
   }
+
+  @Test
+  public void testOutput() throws Exception {
+    String outdir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
+    ConsoleRunner.main(asArgsArray(
+            "MockTest4 -parallel-threads 4 -default-parallel -xmlreport -outdir " + outdir));
+    Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
+
+    String prefix = MockTest4.class.getCanonicalName();
+    String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
+    String consoleOutputLines = outContent.toString();
+    String expectedTokens[] = {"test41", "start test42", "end test42"};
+    for (String token : expectedTokens) {
+      Assert.assertTrue(fileOutputLines.contains(token));
+      Assert.assertTrue(consoleOutputLines.contains(token));
+    }
+  }
+
 
   private String[] asArgsArray(String cmdLine) {
     String[] args = cmdLine.split(" ");
