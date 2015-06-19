@@ -28,9 +28,9 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.logger(settings.logOptions.logLevel,
-      settings.logOptions.color, settings.logOptions.logFilters)
-    val isDebug = settings.logOptions.logLevel == Level.Debug
+    val log = Util.logger(settings.consoleLog.logLevel,
+      settings.consoleLog.color, settings.consoleLog.logFilters)
+    val isDebug = settings.consoleLog.logLevel == Level.Debug
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {
@@ -94,7 +94,7 @@ object Main {
         if (message ne null) log.error(message)
         sys.exit(1)
     } finally {
-      if (settings.logOptions.printProgress || settings.logOptions.heartbeatSecs > 0) {
+      if (settings.consoleLog.printProgress || settings.consoleLog.heartbeatSecs > 0) {
           log.logRaw("Done.")
       }
     }

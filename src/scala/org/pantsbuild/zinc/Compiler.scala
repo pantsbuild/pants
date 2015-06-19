@@ -196,7 +196,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
    *  Note: This variant does not report progress updates
    */
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
-    val progress = Some(new SimpleCompileProgress(setup.logOptions.logPhases, setup.logOptions.printProgress, setup.logOptions.heartbeatSecs)(log))
+    val progress = Some(new SimpleCompileProgress(setup.consoleLog.logPhases, setup.consoleLog.printProgress, setup.consoleLog.heartbeatSecs)(log))
     compile(inputs, cwd, reporter, progress)(log)
   }
 
