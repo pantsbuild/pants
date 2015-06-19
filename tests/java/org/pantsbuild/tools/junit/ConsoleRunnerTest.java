@@ -3,53 +3,14 @@
 
 package org.pantsbuild.tools.junit;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.PrintStream;
-import org.apache.commons.io.FileUtils;
-import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-
 
 /**
  * Tests several recently added features in ConsoleRunner.
  * TODO: cover the rest of ConsoleRunner functionality.
  */
-public class ConsoleRunnerTest {
-  final static ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-  final static ByteArrayOutputStream errContent = new ByteArrayOutputStream();
-
-  final static PrintStream stdout = System.out;
-  final static PrintStream stderr = System.err;
-
-  @BeforeClass
-  public static void setUpBeforeClass() throws Exception {
-    System.setOut(new PrintStream(outContent));
-    System.setErr(new PrintStream(errContent));
-  }
-
-  @AfterClass
-  public static void tearDownAfterClass() throws Exception {
-    System.setOut(stdout);
-    System.setErr(stderr);
-  }
-
-  @Before
-  public void setUp() {
-    ConsoleRunner.setCallSystemExitOnFinish(false);
-    ConsoleRunner.setExitStatus(0);
-    TestRegistry.reset();
-  }
-
-  @After
-  public void tearDown() {
-    ConsoleRunner.setCallSystemExitOnFinish(true);
-    ConsoleRunner.setExitStatus(0);
-  }
+public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
 
   @Test
   public void testNormalTesting() throws Exception {
@@ -123,39 +84,4 @@ public class ConsoleRunnerTest {
     Assert.assertEquals(1, FlakyTest.numExpectedExceptionMethodInvocations);
   }
 
-  @Test
-  public void testConsoleOutput() throws Exception {
-    ConsoleRunner.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
-    Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
-    assertContainsTestOutput(outContent.toString());
-  }
-
-  @Test
-  public void testOutputDir() throws Exception {
-    String outdir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
-    ConsoleRunner.main(asArgsArray(
-        "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
-        "-default-parallel -xmlreport -outdir -suppress-output" + outdir));
-    Assert.assertEquals("test21 test22 test31 test32 test41 test42", TestRegistry.getCalledTests());
-
-    String prefix = MockTest4.class.getCanonicalName();
-    String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
-    assertContainsTestOutput(fileOutputLines);
-  }
-
-  private void assertContainsTestOutput(String output) {
-    Assert.assertTrue("String: " + output, output.contains("test41"));
-    Assert.assertTrue("String: " + output,  output.contains("start test42"));
-    Assert.assertTrue("String: " + output, output.contains("end test42"));
-  }
-
-  private String[] asArgsArray(String cmdLine) {
-    String[] args = cmdLine.split(" ");
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].contains("Test")) {
-        args[i] = getClass().getPackage().getName() + '.' + args[i];
-      }
-    }
-    return args;
-  }
 }
