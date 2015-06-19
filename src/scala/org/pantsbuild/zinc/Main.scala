@@ -28,9 +28,9 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.logger(settings.logOptions.quiet, settings.logOptions.logLevel,
+    val log = Util.logger(settings.logOptions.logLevel,
       settings.logOptions.color, settings.logOptions.logFilters)
-    val isDebug = (!settings.logOptions.quiet && settings.logOptions.logLevel == Level.Debug)
+    val isDebug = settings.logOptions.logLevel == Level.Debug
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {

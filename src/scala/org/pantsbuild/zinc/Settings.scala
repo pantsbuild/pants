@@ -41,7 +41,6 @@ case class Settings(
 /** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
  * TODO: further break options into sensible subgroups. */
 case class LogOptions(
-  quiet: Boolean             = false,
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
   logPhases: Boolean         = false,
@@ -185,7 +184,6 @@ object Settings {
     boolean(   "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
 
     header("Logging Options:"),
-    boolean(  ("-quiet", "-q"),                "Silence all logging",                        (s: Settings) => s.copy(logOptions = s.logOptions.copy(quiet = true))),
     boolean(   "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logOptions = s.logOptions.copy(logLevel = Level.Debug))),
     string(    "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logOptions = s.logOptions.copy(logLevel = Level.withName(l)))),
     boolean(   "-no-color",                    "No color in logging",                        (s: Settings) => s.copy(logOptions = s.logOptions.copy(color = false))),

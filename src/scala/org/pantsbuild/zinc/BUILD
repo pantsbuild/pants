@@ -14,11 +14,3 @@ scala_library(
   ],
   sources=globs('*.scala'),
 )
-
-jvm_binary(
-  name='main',
-  main='org.pantsbuild.zinc.Main',
-  dependencies=[
-    ':zinc',
-  ]
-)

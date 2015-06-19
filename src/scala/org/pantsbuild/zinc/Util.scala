@@ -15,44 +15,30 @@ object Util {
   //
 
   /**
-   * Create a new logger based on quiet, level, and color settings.
+   * Create a new logger based on level, color, and filter settings.
    */
-  def logger(quiet: Boolean, level: Level.Value, color: Boolean, filters: Seq[Regex]): LoggerRaw = {
-    if (quiet) {
-      new SilentLogger
-    } else {
-      val out = ConsoleOut.systemOut
-      val consoleLogger = ConsoleLogger(out = out, useColor = ConsoleLogger.formatEnabled && color); consoleLogger.setLevel(level)
-      new LoggerRaw() {
-        def isFiltered(message: => String): Boolean = {
-          filters.exists(_.findFirstIn(message).isDefined)
+  def logger(level: Level.Value, color: Boolean, filters: Seq[Regex]): LoggerRaw = {
+    val out = ConsoleOut.systemOut
+    val consoleLogger = ConsoleLogger(out = out, useColor = ConsoleLogger.formatEnabled && color); consoleLogger.setLevel(level)
+    new LoggerRaw() {
+      def isFiltered(message: => String): Boolean = {
+        filters.exists(_.findFirstIn(message).isDefined)
+      }
+      def trace(t: => Throwable): Unit = consoleLogger.trace(t)
+      def success(message: => String): Unit = consoleLogger.success(message)
+      def log(level: Level.Value, msg: => String): Unit = {
+        lazy val message = msg
+        if (!isFiltered(message)) {
+          consoleLogger.log(level, message)
         }
-        def trace(t: => Throwable): Unit = consoleLogger.trace(t)
-        def success(message: => String): Unit = consoleLogger.success(message)
-        def log(level: Level.Value, msg: => String): Unit = {
-          lazy val message = msg
-          if (!isFiltered(message)) {
-            consoleLogger.log(level, message)
-          }
-        }
-        def logRaw(msg: => String): Unit = {
-          lazy val message = msg
-          if (!isFiltered(message)) {
-            out.print(message)
-          }
+      }
+      def logRaw(msg: => String): Unit = {
+        lazy val message = msg
+        if (!isFiltered(message)) {
+          out.print(message)
         }
       }
     }
-  }
-
-  /**
-   * A logger that does nothing.
-   */
-  class SilentLogger extends LoggerRaw {
-    def trace(t: => Throwable): Unit = ()
-    def success(message: => String): Unit = ()
-    def log(level: Level.Value, message: => String): Unit = ()
-    def logRaw(message: => String): Unit = ()
   }
 
   //
