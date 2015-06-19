@@ -122,11 +122,13 @@ public class ConsoleRunnerTest {
     ConsoleRunner.main(asArgsArray(
             "MockTest4 MockTest2 MockTest3 -parallel-threads 4 " +
             "-default-parallel -xmlreport -outdir " + outdir));
+    System.setOut(stdout);
+    System.setErr(stderr);
     Assert.assertEquals("test21 test22 test31 test32 test41 test42", TestRegistry.getCalledTests());
 
     String prefix = MockTest4.class.getCanonicalName();
     String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
-    String expectedTokens[] = {"start", "start test42", "end test42"};
+    String expectedTokens[] = {"test41", "start test42", "end test42"};
     for (String token : expectedTokens) {
       Assert.assertTrue("Test out.txt " + fileOutputLines + " does not contain " + token,
                         fileOutputLines.contains(token));
