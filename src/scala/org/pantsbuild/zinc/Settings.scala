@@ -35,7 +35,6 @@ case class Settings(
   sbt: SbtJars               = SbtJars(),
   incOptions: IncOptions     = IncOptions(),
   analysis: AnalysisOptions  = AnalysisOptions(),
-  analysisUtil: AnalysisUtil = AnalysisUtil(),
   properties: Seq[String]    = Seq.empty
 )
 
@@ -173,22 +172,7 @@ case class IncOptions(
 case class AnalysisOptions(
   cache: Option[File]           = None,
   cacheMap: Map[File, File]     = Map.empty,
-  forceClean: Boolean           = false,
-  outputRelations: Option[File] = None,
-  outputProducts: Option[File]  = None,
-  mirrorAnalysis: Boolean       = false
-)
-
-/**
- * Configuration for analysis manipulation utilities.
- */
-case class AnalysisUtil(
-  run: Boolean                = false,
-  cache: Option[File]         = None,
-  merge: Seq[File]            = Seq.empty,
-  rebase: Map[File, File]     = Map.empty,
-  split: Map[Seq[File], File] = Map.empty,
-  reload: Seq[File]           = Seq.empty
+  forceClean: Boolean           = false
 )
 
 object Settings {
@@ -250,9 +234,6 @@ object Settings {
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
     boolean(   "-force-clean",                 "Force clean classes on empty analysis",      (s: Settings) => s.copy(analysis = s.analysis.copy(forceClean = true))),
-    boolean(   "-mirror-analysis",             "Store a readable text version of analysis",  (s: Settings) => s.copy(analysis = s.analysis.copy(mirrorAnalysis = true))),
-    file(      "-output-relations", "file",    "Print readable analysis relations to file",  (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputRelations = Some(f)))),
-    file(      "-output-products", "file",     "Print readable source products to file",     (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputProducts = Some(f)))),
 
     header("JVM options:"),
     prefix(    "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
@@ -264,15 +245,7 @@ object Settings {
     dummy(     "-start",                       "Ensure nailgun server is running (if nailed)"),
     dummy(     "-status",                      "Report nailgun server status (if nailed)"),
     dummy(     "-shutdown",                    "Shutdown nailgun server (if nailed)"),
-    dummy(     "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)"),
-
-    header("Analysis manipulation utilities:"),
-    boolean(   "-analysis",                    "Run analysis manipulation utilities",        (s: Settings) => s.copy(analysisUtil = s.analysisUtil.copy(run = true))),
-    file(      "-cache", "file",               "Analysis cache file to alter",               (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(cache = Some(f)))),
-    path(      "-merge", "path",               "Merge analyses, overwrite cached analysis",  (s: Settings, ap: Seq[File]) => s.copy(analysisUtil = s.analysisUtil.copy(merge = ap))),
-    fileMap(   "-rebase",                      "Rebase all analysis paths (from:to,...)",    (s: Settings, m: Map[File, File]) => s.copy(analysisUtil = s.analysisUtil.copy(rebase = m))),
-    fileSeqMap("-split",                       "Split analysis by source directory",         (s: Settings, m: Map[Seq[File], File]) => s.copy(analysisUtil = s.analysisUtil.copy(split = m))),
-    file(      "-reload", "cache-file",        "Reload analysis from cache file",            (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(reload = s.analysisUtil.reload :+ f)))
+    dummy(     "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)")
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -344,16 +317,7 @@ object Settings {
         ),
         analysis = analysis.copy(
           cache = Util.normaliseOpt(cwd)(analysis.cache),
-          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap),
-          outputRelations = Util.normaliseOpt(cwd)(analysis.outputRelations),
-          outputProducts = Util.normaliseOpt(cwd)(analysis.outputProducts)
-        ),
-        analysisUtil = analysisUtil.copy(
-          cache = Util.normaliseOpt(cwd)(analysisUtil.cache),
-          merge = Util.normaliseSeq(cwd)(analysisUtil.merge),
-          rebase = analysisUtil.rebase map Util.normalisePair(cwd),
-          split = Util.normaliseSeqMap(cwd)(analysisUtil.split),
-          reload = Util.normaliseSeq(cwd)(analysisUtil.reload)
+          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap)
         )
       )
     }

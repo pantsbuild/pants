@@ -43,27 +43,13 @@ object Main {
 
     if (settings.help) Settings.printUsage()
 
-    // analysis manipulation utilities
-    if (settings.analysisUtil.run) {
-      val exitCode = try {
-        SbtAnalysis.runUtil(settings.analysisUtil, log, settings.analysis.mirrorAnalysis, cwd)
-      } catch {
-        case e: Exception => log.error(e.getMessage)
-        sys.exit(1)
-      }
-      sys.exit(0) // only run analysis utilities
-    }
-
     val inputs = Inputs(log, settings)
     val setup = Setup(settings)
 
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
     if (inputs.sources.isEmpty) {
-      if (inputs.outputProducts.isDefined || inputs.outputRelations.isDefined) {
-        SbtAnalysis.printOutputs(Compiler.analysis(inputs.cacheFile),
-          inputs.outputRelations, inputs.outputProducts, cwd, inputs.classesDirectory)
-      } else if (!settings.version && !settings.help) {
+      if (!settings.version && !settings.help) {
         Setup.printVersion()
         Settings.printUsage()
         sys.exit(1)

@@ -27,10 +27,7 @@ case class Inputs(
   definesClass: File => String => Boolean,
   javaOnly: Boolean,
   compileOrder: CompileOrder,
-  incOptions: IncOptions,
-  outputRelations: Option[File],
-  outputProducts: Option[File],
-  mirrorAnalysis: Boolean)
+  incOptions: IncOptions)
 
 object Inputs {
   /**
@@ -50,10 +47,7 @@ object Inputs {
       analysis.forceClean,
       javaOnly,
       compileOrder,
-      incOptions,
-      analysis.outputRelations,
-      analysis.outputProducts,
-      analysis.mirrorAnalysis)
+      incOptions)
   }
 
   /** An overridden definesClass to use analysis for an input directory if it is available. */
@@ -80,10 +74,7 @@ object Inputs {
     forceClean: Boolean,
     javaOnly: Boolean,
     compileOrder: CompileOrder,
-    incOptions: IncOptions,
-    outputRelations: Option[File],
-    outputProducts: Option[File],
-    mirrorAnalysis: Boolean): Inputs =
+    incOptions: IncOptions): Inputs =
   {
     val normalise: File => File = { _.getAbsoluteFile }
     val cp               = classpath map normalise
@@ -105,11 +96,9 @@ object Inputs {
       }
     val analysisMap      = (cp map { file => (file, allAnalysisFor(file, classes, upstreamAnalysis)) }).toMap
     val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
-    val printRelations   = outputRelations map normalise
-    val printProducts    = outputProducts map normalise
     new Inputs(
       cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, definesClass(log, validUpstreamAnalysis, _),
-      javaOnly, compileOrder, incOpts, printRelations, printProducts, mirrorAnalysis
+      javaOnly, compileOrder, incOpts
     )
   }
 
@@ -126,8 +115,7 @@ object Inputs {
     analysisCache: File,
     analysisMap: JMap[File, File],
     compileOrder: String,
-    incOptions: IncOptions,
-    mirrorAnalysisCache: Boolean): Inputs =
+    incOptions: IncOptions): Inputs =
   inputs(
     log,
     classpath.asScala,
@@ -140,26 +128,8 @@ object Inputs {
     forceClean = false,
     javaOnly = false,
     Settings.compileOrder(compileOrder),
-    incOptions,
-    outputRelations = None,
-    outputProducts = None,
-    mirrorAnalysis = mirrorAnalysisCache
+    incOptions
   )
-
-  @deprecated("Use the variant that takes `incOptions` parameter, instead.", "0.3.5.3")
-  def create(
-    log: LoggerRaw,
-    classpath: JList[File],
-    sources: JList[File],
-    classesDirectory: File,
-    scalacOptions: JList[String],
-    javacOptions: JList[String],
-    analysisCache: File,
-    analysisMap: JMap[File, File],
-    compileOrder: String,
-    mirrorAnalysisCache: Boolean): Inputs =
-    create(log, classpath, sources, classesDirectory, scalacOptions, javacOptions,
-      analysisCache, analysisMap, compileOrder, IncOptions(), mirrorAnalysisCache)
 
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
@@ -268,9 +238,7 @@ object Inputs {
       "force clean"                  -> forceClean,
       "java only"                    -> javaOnly,
       "compile order"                -> compileOrder,
-      "incremental compiler options" -> incOpts,
-      "output relations"             -> outputRelations,
-      "output products"              -> outputProducts)
+      "incremental compiler options" -> incOpts)
 
     Util.show(("Inputs", values), output)
   }
