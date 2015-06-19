@@ -32,7 +32,7 @@ public class ConsoleRunnerTest {
 
   @Test
   public void testNormalTesting() throws Exception {
-    ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
+    ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3 -xmlreport"));
     Assert.assertEquals("test11 test12 test13 test21 test22 test31 test32",
         TestRegistry.getCalledTests());
   }
@@ -60,7 +60,8 @@ public class ConsoleRunnerTest {
   @Test
   public void testShardedTesting12WithParallelThreads() throws Exception {
     ConsoleRunner.main(asArgsArray(
-        "MockTest1 MockTest2 MockTest3 -test-shard 1/2 -parallel-threads 4 -default-parallel"));
+        "MockTest1 MockTest2 MockTest3 -parallel-threads 1" +
+                " -xmlreport"));
     Assert.assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
 

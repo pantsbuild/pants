@@ -15,5 +15,7 @@ public class MockTest2 {
   @Test
   public void testMethod22() {
     TestRegistry.registerTestCall("test22");
+    System.out.println("iif testMethod22");
+    System.out.println("iif testMethod22");
   }
 }
