@@ -8,8 +8,10 @@ import java.io.File;
 import java.io.PrintStream;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 
@@ -18,12 +20,23 @@ import org.junit.Test;
  * TODO: cover the rest of ConsoleRunner functionality.
  */
 public class ConsoleRunnerTest {
+  final static ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  final static ByteArrayOutputStream errContent = new ByteArrayOutputStream();
 
-  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  final static PrintStream stdout = System.out;
+  final static PrintStream stderr = System.err;
 
-  private final PrintStream stdout = System.out;
-  private final PrintStream stderr = System.err;
+  @BeforeClass
+  public static void setUpBeforeClass() throws Exception {
+    System.setOut(new PrintStream(outContent));
+    System.setErr(new PrintStream(errContent));
+  }
+
+  @AfterClass
+  public static void tearDownAfterClass() throws Exception {
+    System.setOut(stdout);
+    System.setErr(stderr);
+  }
 
   @Before
   public void setUp() {
@@ -42,7 +55,7 @@ public class ConsoleRunnerTest {
   public void testNormalTesting() throws Exception {
     ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
     Assert.assertEquals("test11 test12 test13 test21 test22 test31 test32",
-       TestRegistry.getCalledTests());
+        TestRegistry.getCalledTests());
   }
 
   @Test
@@ -111,11 +124,18 @@ public class ConsoleRunnerTest {
   }
 
   @Test
+  public void testConsoleOutput() throws Exception {
+    ConsoleRunner.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
+    Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
+    assertContainsTestOutput(outContent.toString());
+  }
+
+  @Test
   public void testOutputDir() throws Exception {
     String outdir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
     ConsoleRunner.main(asArgsArray(
-            "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
-                    "-default-parallel -xmlreport -outdir -suppress-output" + outdir));
+        "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
+        "-default-parallel -xmlreport -outdir -suppress-output" + outdir));
     Assert.assertEquals("test21 test22 test31 test32 test41 test42", TestRegistry.getCalledTests());
 
     String prefix = MockTest4.class.getCanonicalName();
