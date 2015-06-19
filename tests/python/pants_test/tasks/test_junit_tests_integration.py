@@ -188,4 +188,5 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'test.junit',
         '--no-suppress-output',
         'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
-    self.assertTrue('Hello from test!' in pants_run.stdout_data)
+    self.assertTrue('Hello from test1!' in pants_run.stdout_data)
+    self.assertTrue('Hello from test2!' in pants_run.stdout_data)

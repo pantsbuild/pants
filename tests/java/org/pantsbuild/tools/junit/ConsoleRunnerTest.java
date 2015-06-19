@@ -12,13 +12,11 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.pantsbuild.junit.annotations.TestSerial;
 
 /**
  * Tests several recently added features in ConsoleRunner.
  * TODO: cover the rest of ConsoleRunner functionality.
  */
-@TestSerial
 public class ConsoleRunnerTest {
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -29,8 +27,6 @@ public class ConsoleRunnerTest {
 
   @Before
   public void setUp() {
-    System.setOut(new PrintStream(outContent));
-    System.setErr(new PrintStream(errContent));
     ConsoleRunner.setCallSystemExitOnFinish(false);
     ConsoleRunner.setExitStatus(0);
     TestRegistry.reset();
@@ -38,8 +34,6 @@ public class ConsoleRunnerTest {
 
   @After
   public void tearDown() {
-    System.setOut(stdout);
-    System.setErr(stderr);
     ConsoleRunner.setCallSystemExitOnFinish(true);
     ConsoleRunner.setExitStatus(0);
   }
@@ -48,7 +42,7 @@ public class ConsoleRunnerTest {
   public void testNormalTesting() throws Exception {
     ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
     Assert.assertEquals("test11 test12 test13 test21 test22 test31 test32",
-      TestRegistry.getCalledTests());
+            TestRegistry.getCalledTests());
   }
 
   @Test
@@ -117,24 +111,22 @@ public class ConsoleRunnerTest {
   }
 
   @Test
-  public void testOutput() throws Exception {
+  public void testOutputDir() throws Exception {
     String outdir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
     ConsoleRunner.main(asArgsArray(
-            "MockTest4 MockTest2 MockTest3 -parallel-threads 4 " +
-            "-default-parallel -xmlreport -outdir " + outdir));
-    System.setOut(stdout);
-    System.setErr(stderr);
+            "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
+                    "-default-parallel -xmlreport -outdir -suppress-output" + outdir));
     Assert.assertEquals("test21 test22 test31 test32 test41 test42", TestRegistry.getCalledTests());
 
     String prefix = MockTest4.class.getCanonicalName();
     String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
-    String expectedTokens[] = {"test41", "start test42", "end test42"};
-    for (String token : expectedTokens) {
-      Assert.assertTrue("Test out.txt " + fileOutputLines + " does not contain " + token,
-                        fileOutputLines.contains(token));
-      Assert.assertTrue("Console lines" + outContent + " does not contain " + token,
-              outContent.toString().contains(token));
-    }
+    assertContainsTestOutput(fileOutputLines);
+  }
+
+  private void assertContainsTestOutput(String output) {
+    Assert.assertTrue("String: " + output, output.contains("test41"));
+    Assert.assertTrue("String: " + output,  output.contains("start test42"));
+    Assert.assertTrue("String: " + output, output.contains("end test42"));
   }
 
   private String[] asArgsArray(String cmdLine) {

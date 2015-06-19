@@ -91,10 +91,10 @@ public class ConsoleRunner {
    */
   static class StreamCapture {
     private final File out;
-    private OutputStream outstream;
+    private FileOutputStream outstream;
 
     private final File err;
-    private OutputStream errstream;
+    private FileOutputStream errstream;
 
     /**
      *  If true capture stdout and stderr to original System.out and System.err
