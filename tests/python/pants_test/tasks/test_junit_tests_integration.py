@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from xml.etree import ElementTree
 
 from pants.util.contextutil import temporary_dir
@@ -189,5 +190,5 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'test.junit',
         '--no-suppress-output',
         'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
-    self.assertIn('Hello from test1!' in pants_run.stdout_data)
-    self.assertIn('Hello from test2!' in pants_run.stdout_data)
+    self.assertIn('Hello from test1!', pants_run.stdout_data)
+    self.assertIn('Hello from test2!', pants_run.stdout_data)
