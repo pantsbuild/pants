@@ -511,6 +511,8 @@ public class ConsoleRunnerImpl {
 
   /**
    * Launcher for JUnitConsoleRunner.
+   *
+   * @param args options from the command line
    */
   public static void main(String[] args) {
     /**
