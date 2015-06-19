@@ -42,7 +42,7 @@ public class ConsoleRunnerTest {
   public void testNormalTesting() throws Exception {
     ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
     Assert.assertEquals("test11 test12 test13 test21 test22 test31 test32",
-            TestRegistry.getCalledTests());
+       TestRegistry.getCalledTests());
   }
 
   @Test
