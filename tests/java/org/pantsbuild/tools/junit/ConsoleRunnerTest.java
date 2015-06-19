@@ -6,18 +6,14 @@ package org.pantsbuild.tools.junit;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.pantsbuild.junit.annotations.TestSerial;
+
 /**
  * Tests several recently added features in ConsoleRunner.
  * TODO: cover the rest of ConsoleRunner functionality.
  */
-public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
-
-  @Test
-  public void testNormalTesting() throws Exception {
-    ConsoleRunner.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
-    Assert.assertEquals("test11 test12 test13 test21 test22 test31 test32",
-        TestRegistry.getCalledTests());
-  }
+@TestSerial
+public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
 
   @Test
   public void testShardedTesting02() throws Exception {
@@ -83,5 +79,4 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper {
     // as flaky - that is, it should be invoked only once.
     Assert.assertEquals(1, FlakyTest.numExpectedExceptionMethodInvocations);
   }
-
 }

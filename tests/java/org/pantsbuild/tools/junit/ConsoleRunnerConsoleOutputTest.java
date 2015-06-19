@@ -54,3 +54,5 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
     assertContainsTestOutput(fileOutputLines);
   }
 }
+
+
