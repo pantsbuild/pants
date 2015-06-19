@@ -57,4 +57,5 @@ def python_requirements(parse_context, requirements_relpath='requirements.txt'):
     req = parse_context.create_object('python_requirement', requirement, repository=repository)
     parse_context.create_object('python_requirement_library',
                                 name=req.project_name,
+                                requirements_relpath=requirements_relpath,
                                 requirements=[req])
