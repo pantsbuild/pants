@@ -17,11 +17,11 @@ Build
 
 Zinc is built using pants:
 
-    ./pants test zinc/
+    ./pants test zinc:
 
 To build a jar use:
 
-    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:bin
+    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:
 
 To consume a jar change zinc target in BUILD.tools:
 
@@ -45,7 +45,7 @@ Options
 
 To get information about options
 
-    ./pants run zinc:bin -- -help
+    ./pants run zinc: -- -help
 
 ### Compile
 

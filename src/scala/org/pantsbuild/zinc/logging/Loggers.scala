@@ -4,12 +4,11 @@
 
 package org.pantsbuild.zinc.logging
 
-import java.io.File
-import sbt.{ AbstractLogger, BasicLogger, ConsoleLogger, ConsoleOut, Level, Logger, MultiLogger }
+import java.io.{ File, PrintWriter }
+import sbt.{ AbstractLogger, ConsoleLogger, FullLogger, ConsoleOut, Level, Logger, MultiLogger }
 import scala.util.matching.Regex
 
 object Loggers {
-
   /**
    * Create a new console logger based on level, color, and filter settings. If captureLog is
    * specified, a compound logger is created that will additionally log all output (unfiltered)
@@ -26,13 +25,18 @@ object Loggers {
     // add filtering if defined
     val filteredLogger =
       if (filters.nonEmpty) {
-        new RegexFilterLogger(consoleLogger, level, filters)
+        new FullLogger(new RegexFilterLogger(consoleLogger, filters))
       } else {
         consoleLogger
       }
     // if a capture log was specified, add it as an additional unfiltered destination
     captureLog.map { captureLogFile =>
-      new MultiLogger(List[AbstractLogger](filteredLogger, new FileLogger(captureLogFile)))
+      new MultiLogger(
+        List(
+          filteredLogger,
+          new FullLogger(new UnfilteredFileLogger(captureLogFile))
+        )
+      )
     }.getOrElse {
       filteredLogger
     }
@@ -40,29 +44,36 @@ object Loggers {
 }
 
 /**
- * A logger for an output file.
+ * An unfiltered logger for an output file (no Level.)
  */
-class FileLogger(file: File) extends BasicLogger {
-  def control(event: sbt.ControlEvent.Value,message: => String): Unit = ???
-  def logAll(events: Seq[sbt.LogEvent]): Unit = ???
-  def log(level: sbt.Level.Value, message: => String): Unit = ???
-  def success(message: => String): Unit = ???
-  def trace(t: => Throwable): Unit = ???
-}
-
-class RegexFilterLogger(underlying: Logger, level: Level.Value, filters: Seq[Regex]) extends BasicLogger {
-  def control(event: sbt.ControlEvent.Value,message: => String): Unit = ???
-  def logAll(events: Seq[sbt.LogEvent]): Unit = ???
+class UnfilteredFileLogger(file: File) extends Logger {
+  private val out = new PrintWriter(file)
 
   override def log(level: Level.Value, msg: => String): Unit = {
+    out.println(s"[${level}]\t${msg}")
+    out.flush()
+  }
+
+  def success(message: => String): Unit =
+    log(Level.Info, message)
+
+  def trace(t: => Throwable): Unit = ()
+}
+
+class RegexFilterLogger(underlying: AbstractLogger, filters: Seq[Regex]) extends Logger {
+  override def log(level: Level.Value, msg: => String): Unit = {
     // only apply filters if there is a chance that the underlying logger will try to log this
-    if (level.id >= this.level.id) {
+    if (level.id >= underlying.getLevel.id) {
       val message = msg
       if (!filters.exists(_.findFirstIn(message).isDefined)) {
         underlying.log(level, message)
       }
     }
   }
-  def success(message: => String): Unit = ???
-  def trace(t: => Throwable): Unit = ???
+
+  def success(message: => String): Unit =
+    underlying.success(message)
+
+  def trace(t: => Throwable): Unit =
+    underlying.trace(t)
 }

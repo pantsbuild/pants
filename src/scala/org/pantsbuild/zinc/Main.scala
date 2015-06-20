@@ -30,7 +30,7 @@ object Main {
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
     val log =
-      Loggers.logger(
+      Loggers.create(
         settings.consoleLog.logLevel,
         settings.consoleLog.color,
         settings.consoleLog.logFilters,

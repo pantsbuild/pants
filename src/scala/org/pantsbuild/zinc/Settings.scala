@@ -192,7 +192,7 @@ object Settings {
     boolean(   "-print-progress",              "Periodically print compilation progress",    (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(printProgress = true))),
     int(       "-heartbeat", "interval (sec)", "Print '.' every n seconds while compiling",  (s: Settings, b: Int) => s.copy(consoleLog = s.consoleLog.copy(heartbeatSecs = b))),
     string(    "-log-filter", "regex",         "Filter log messages matching the regex",     (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(logFilters = s.consoleLog.logFilters :+ re.r))),
-    file(      "-capture-log", "file",         "Captures all logs (unfiltered) to a file",   (s: Settings, f: File) => s.copy(captureLog = Some(f))),
+    file(      "-capture-log", "file",         "Captures all logging (unfiltered) to a file",(s: Settings, f: File) => s.copy(captureLog = Some(f))),
 
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
