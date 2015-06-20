@@ -3,18 +3,13 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
-
-import org.pantsbuild.junit.annotations.TestSerial;
 
 /**
  * Tests several recently added features in ConsoleRunner.
  * TODO: cover the rest of ConsoleRunner functionality.
  */
-@TestSerial
 public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
 
   @Test

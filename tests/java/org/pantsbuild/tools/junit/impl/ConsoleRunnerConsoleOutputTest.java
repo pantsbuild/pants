@@ -11,10 +11,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-
-import org.pantsbuild.junit.annotations.TestSerial;
-
-@TestSerial
 public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
   final static ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   final static ByteArrayOutputStream errContent = new ByteArrayOutputStream();
