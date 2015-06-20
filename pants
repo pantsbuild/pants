@@ -2,13 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# This bootstrap script runs in 2 modes controlled by environment variables.
-#
-# With no special environment variables exported, the script will create a pants.pex from local
-# sources if there is none at the root of the repo and then run that.
-#
-# If PANTS_DEV is exported then this script will instead run pants from the live sources in this
-# repo.
+# This bootstrap script runs pants from the live sources in this repo.
 #
 # If PANTS_PROFILE=results.pstats is exported, then this script will run pants with python profiling
 # enabled. It will create a pstats file named with the value of PANTS_PROFILE that you can analyze.
@@ -58,14 +52,9 @@ if [ ! -z "${PANTS_PROFILE}" ]; then
   export PEX_PROFILE=${PANTS_PROFILE}
 fi
 
-PANTS_BINARY=src/python/pants/bin:pants_local_binary
-PANTS_PEX="${HERE}/pants.pex"
-FAILED_BOOTSTRAP_SENTINEL="${HERE}/.pants.d/BOOTSTRAP_FAILED"
-
 PY=${PY:-$(which python2.7)}
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
-  PANTS_DEV=1
   REQUIREMENTS=(
     $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
     ${REQUIREMENTS[@]}
@@ -76,7 +65,6 @@ PANTS_SRCPATH=(
   ${HERE}/src/python
 )
 if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
-  PANTS_DEV=1
   PANTS_SRCPATH=(
     $(echo ${WRAPPER_SRCPATH} | tr : ' ')
     ${PANTS_SRCPATH[@]}
@@ -84,47 +72,16 @@ if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
 fi
 PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
 
-function run_pants_bare() {
-  activate_pants_venv
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python ${PANTS_EXE} "$@"
-}
-
 function exec_pants_bare() {
   activate_pants_venv
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" exec python ${PANTS_EXE} "$@"
 }
 
-if [ ! -z "${PANTS_DEV}" ]; then
-  log "*** Running pants in dev mode from ${PANTS_EXE} ***"
-  if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
-    log "***   with extra requirements: ${WRAPPER_REQUIREMENTS} ***"
-  fi
-  if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
-    log "***   with extra sources ${WRAPPER_SRCPATH} ***"
-  fi
-  exec_pants_bare "$@"
-else
-  if [ ! -e "${PANTS_PEX}" ]; then
-    if [ -f ${FAILED_BOOTSTRAP_SENTINEL} ] ; then
-      log "Last bootstrap failed, cleaning up .pants.d"
-      rm -rf ${HERE}/.pants.d
-    fi
-    log "Building pants.pex to ${PANTS_PEX}..."
-    # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
-    # target(s).
-    rm -rf ${PANTS_PEX} && \
-    run_pants_bare binary ${PANTS_BINARY} && \
-    mv -v ${HERE}/dist/pants_local_binary.pex ${PANTS_PEX} && \
-    chmod +x ${PANTS_PEX}
-    exit_status=$?
-    if [ $exit_status != 0 ] ; then
-      echo "*** Pants bootstrapping failed."
-      echo "This file is left as a sentinel to record that bootstrapping pants failed." \
-        > ${FAILED_BOOTSTRAP_SENTINEL}
-      exit $exit_status
-    fi
-  fi
-  if [ -e "${PANTS_PEX}" ]; then
-    exec "${PANTS_PEX}" "$@"
-  fi
+if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+  log "*** Running pants with extra requirements: ${WRAPPER_REQUIREMENTS} ***"
 fi
+if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+  log "*** Running pants with extra sources ${WRAPPER_SRCPATH} ***"
+fi
+
+exec_pants_bare "$@"

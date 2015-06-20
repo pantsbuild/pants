@@ -5,7 +5,7 @@ if they change anything under src/java/org/pantsbuild/junit:
 
 I.) On the dev branch:
 1) Create a self-contained binary
-$ PANTS_DEV=1 ./pants binary src/java/org/pantsbuild/tools/junit:main
+$ ./pants binary src/java/org/pantsbuild/tools/junit:main
 
 2) Edit BUILD.tools to pick up the self-contained binary you created in 1,
 so that the end result looks like (modulo the exact path to the binary jar you created in 1):
