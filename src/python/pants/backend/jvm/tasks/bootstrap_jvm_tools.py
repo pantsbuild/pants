@@ -82,7 +82,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   def __init__(self, *args, **kwargs):
     super(BootstrapJvmTools, self).__init__(*args, **kwargs)
-    self.setup_artifact_cache()
     self._shader = None
     self._tool_cache_path = os.path.join(self.workdir, 'tool_cache')
 

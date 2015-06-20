@@ -51,28 +51,8 @@ def register_global_options(register):
            help="Include only targets with these tags (optional '+' prefix) or without these "
                 "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                 "(e.g., integration tests.)")
-
-  # TODO: When we have a model for 'subsystems', create one for artifact caching and move these
-  # options to there. When we do that, also drop the cumbersome word 'artifact' from these
-  # option names. There's only one cache concept that users care about.
-  register('--read-from-artifact-cache', action='store_true', default=True, recursive=True,
-           help='Read build artifacts from cache, if available.')
-  register('--read-artifact-caches', type=Options.list, recursive=True,
-           help='The URIs of artifact caches to read from. Each entry is a URL of a RESTful cache, '
-                'a path of a filesystem cache, or a pipe-separated list of alternate caches to '
-                'choose from.')
-  register('--write-to-artifact-cache', action='store_true', default=True, recursive=True,
-           help='Write build artifacts to cache, if possible.')
-  register('--write-artifact-caches', type=Options.list, recursive=True,
-           help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful cache, '
-                'a path of a filesystem cache, or a pipe-separated list of alternate caches to '
-                'choose from.')
-  register('--overwrite-cache-artifacts', action='store_true', recursive=True,
-           help='If writing to build artifacts to cache, overwrite (instead of skip) existing.')
   register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
            help='The cache key generation. Bump this to invalidate every artifact for a scope.')
-  register('--cache-compression', advanced=True, type=int, default=5, recursive=True,
-           help='The gzip compression level for created artifacts.')
   register('--print-exception-stacktrace', action='store_true',
            help='Print to console the full exception stack trace if encountered.')
   register('--fail-fast', action='store_true',

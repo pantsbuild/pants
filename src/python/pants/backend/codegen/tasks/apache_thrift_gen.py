@@ -89,10 +89,6 @@ class ApacheThriftGen(CodeGen):
       if self.context.products.isrequired(lang):
         self.gen_langs.add(lang)
 
-    # TODO(pl): This is broken because of how __init__.py files are generated/cached
-    # for combined python thrift packages.
-    # self.setup_artifact_cache()
-
   @memoized_property
   def thrift_binary(self):
     return select_thrift_binary(self.get_options())

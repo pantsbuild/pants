@@ -23,10 +23,6 @@ from pants.contrib.spindle.targets.spindle_thrift_library import SpindleThriftLi
 
 
 class SpindleGen(NailgunTask):
-  def __init__(self, context, workdir):
-    super(SpindleGen, self).__init__(context, workdir)
-    self.setup_artifact_cache()
-
   @classmethod
   def product_types(cls):
     return [

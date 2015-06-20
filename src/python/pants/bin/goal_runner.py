@@ -104,7 +104,6 @@ class GoalRunner(object):
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
-      # Note that enclosing scopes will appear before scopes they enclose.
       known_scopes.extend(filter(None, goal.known_scopes()))
 
     # Now that we have the known scopes we can get the full options.

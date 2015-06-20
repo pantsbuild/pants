@@ -187,8 +187,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     else:
       self._args.extend(self.get_options().no_warning_args)
 
-    self.setup_artifact_cache()
-
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
 

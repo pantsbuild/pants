@@ -41,8 +41,8 @@ class RESTfulArtifactCache(ArtifactCache):
   def __init__(self, artifact_root, url_base, local):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
-    :param str url_base: The prefix for urls on some RESTful service. We must be able to PUT and GET to any
-              path under this base.
+    :param str url_base: The prefix for urls on some RESTful service. We must be able to PUT and
+                         GET to any path under this base.
     :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
     """
     super(RESTfulArtifactCache, self).__init__(artifact_root)

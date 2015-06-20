@@ -90,9 +90,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     for arg in self.get_options().args:
       self._args.extend(safe_shlex_split(arg))
 
-    # Typically this should be a local cache only, since classpaths aren't portable.
-    self.setup_artifact_cache()
-
   @property
   def confs(self):
     if self._confs is None:
