@@ -63,12 +63,62 @@ What if you want to create a custom build of pants with some unpublished patches
 In that case, you want to build a production ready version of pants including dependencies for
 all platforms, not just your development environment.
 
-The following command will create a locally built `pants.pex` for all platforms:
+In the following examples, you'll be using 2 local repos.  The path to the pantsbuild/pants clone
+will be `/tmp/pantsbuild` and the path to your repo `/your/repo` in all the examples below; make
+sure to substitute your own paths when adapting this recipe to your environment.
+
+You'll need to setup some files one-time in your own repo:
 
     :::bash
-    $ ./pants binary src/python/pants/bin:pants
-    ...
-    SUCCESS
+    $ cat pants-production.requirements.txt
+    # Replace this path with the path to your pantsbuild.pants clone.
+    -f /tmp/pantsbuild/dist/
+    pantsbuild.pants
+
+    $ cat BUILD.pants-production
+    python_requirements('pants-production.requirements.txt')
+
+    python_binary(
+      name='pants',
+      entry_point='pants.bin.pants_exe:main',
+      # You may want to tweak the list of supported platforms to match your environment.
+      platforms=[
+        'current',
+        'linux-x86_64',
+        'macosx-10.4-x86_64',
+      ],
+      # You may want to adjust the python interpreter constraints, but note that pants requires
+      # python2.7 currently.
+      compatibility='CPython>=2.7,<3',
+      dependencies=[
+        ':pantsbuild.pants',
+        # List any other pants backend local or remote deps here, ie:
+        # ':pantsbuild.pants.contrib.spindle' or 'src/python/your/pants/plugin'
+      ]
+    )
+
+    $ cat pants-production.ini
+    [python-repos]
+    # You should replace these repos with your own housing pre-built eggs or wheels for the
+    # platforms you support.
+    repos: [
+        "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
+        "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
+      ]
+
+    indexes: ["https://pypi.python.org/simple/"]
+
+To (re-)generate a `pants.pex` you then run these 2 commands:
+
+1. In your pantsbuild/pants clone, create a local pants release from master:
+
+        :::bash
+        $ rm -rf dist && ./build-support/bin/releash.sh -n
+
+2. In your own repo the following command will create a locally built `pants.pex` for all platforms:
+
+        :::bash
+        $ /tmp/pantsbuild/pants --config-override=pants-production.ini clean-all binary //:pants
 
 The resulting `pants.pex` will be in the `dist/` directory:
 
@@ -87,13 +137,6 @@ A user can just copy this pex to the top of their Pants workspace and use it:
     :::bash
     $ cp /mnt/fd0/pants.pex .
     $ ./pants.pex goal test examples/tests/java/org/pantsbuild/example/hello/greet:
-
-There are some parameters in `src/python/pants/bin/BUILD` that you may want to tweak for your
-production distribution. For example, you may want to force the Python interpreter to be a
-specific version:
-
-    :::python
-    PANTS_COMPATIBILITY = 'CPython>=2.7,<2.8'
 
 Testing
 -------
