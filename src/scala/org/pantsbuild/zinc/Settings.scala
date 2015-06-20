@@ -21,7 +21,7 @@ import xsbti.compile.CompileOrder
 case class Settings(
   help: Boolean              = false,
   version: Boolean           = false,
-  consoleLog: LogOptions     = LogOptions(),
+  consoleLog: ConsoleOptions = ConsoleOptions(),
   captureLog: Option[File]   = None,
   sources: Seq[File]         = Seq.empty,
   classpath: Seq[File]       = Seq.empty,
@@ -41,7 +41,7 @@ case class Settings(
 
 /** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
  * TODO: further break options into sensible subgroups. */
-case class LogOptions(
+case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
   logPhases: Boolean         = false,

@@ -101,7 +101,7 @@ object Main {
         sys.exit(1)
     } finally {
       if (settings.consoleLog.printProgress || settings.consoleLog.heartbeatSecs > 0) {
-          log.logRaw("Done.")
+        System.out.println("Done.")
       }
     }
   }

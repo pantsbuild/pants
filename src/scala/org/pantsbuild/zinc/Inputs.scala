@@ -6,9 +6,10 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
+import sbt.Logger
+import sbt.Path._
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate }
-import sbt.Path._
 import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
 
@@ -33,7 +34,7 @@ object Inputs {
   /**
    * Create inputs based on command-line settings.
    */
-  def apply(log: LoggerRaw, settings: Settings): Inputs = {
+  def apply(log: Logger, settings: Settings): Inputs = {
     import settings._
     inputs(
       log,
@@ -51,7 +52,7 @@ object Inputs {
   }
 
   /** An overridden definesClass to use analysis for an input directory if it is available. */
-  def definesClass(log: LoggerRaw, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
+  def definesClass(log: Logger, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
     analysisMap.get(entry).map { analysis =>
       log.debug(s"Hit analysis cache for class definitions with ${entry}")
       (s: String) => analysis.relations.definesClass(s).nonEmpty
@@ -63,7 +64,7 @@ object Inputs {
    * Create normalised and defaulted Inputs.
    */
   def inputs(
-    log: LoggerRaw,
+    log: Logger,
     classpath: Seq[File],
     sources: Seq[File],
     classesDirectory: File,
@@ -106,7 +107,7 @@ object Inputs {
    * Java API for creating Inputs.
    */
   def create(
-    log: LoggerRaw,
+    log: Logger,
     classpath: JList[File],
     sources: JList[File],
     classesDirectory: File,

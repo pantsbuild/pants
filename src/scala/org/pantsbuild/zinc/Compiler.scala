@@ -7,12 +7,11 @@ package org.pantsbuild.zinc
 import java.io.File
 import java.net.URLClassLoader
 import sbt.compiler.javac
-import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, LoggerReporter, ScalaInstance }
+import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
 import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
 import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
-import org.pantsbuild.zinc.{LoggerRaw => Logger}
 
 import org.pantsbuild.zinc.Cache.Implicits
 
