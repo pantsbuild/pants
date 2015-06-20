@@ -15,7 +15,7 @@ object Loggers {
    * specified, a compound logger is created that will additionally log all output (unfiltered)
    * to a file.
    */
-  def logger(level: Level.Value, color: Boolean, filters: Seq[Regex], captureLog: Option[File]): Logger = {
+  def create(level: Level.Value, color: Boolean, filters: Seq[Regex], captureLog: Option[File]): Logger = {
     // log to the console at the configured levels
     val out = ConsoleOut.systemOut
     val consoleLogger = {
