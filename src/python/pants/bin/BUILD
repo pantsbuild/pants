@@ -36,7 +36,6 @@ python_library(
 python_binary(
   name = 'pants',
   entry_point = 'pants.bin.pants_exe:main',
-  compatibility='CPython>=2.7,<3',
   dependencies = [
     ':bin',
   ],

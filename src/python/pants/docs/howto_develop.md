@@ -113,7 +113,7 @@ To (re-)generate a `pants.pex` you then run these 2 commands:
 1. In your pantsbuild/pants clone, create a local pants release from master:
 
         :::bash
-        $ rm -rf dist && ./build-support/bin/releash.sh -n
+        $ rm -rf dist && ./build-support/bin/release.sh -n
 
 2. In your own repo the following command will create a locally built `pants.pex` for all platforms:
 
