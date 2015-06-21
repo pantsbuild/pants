@@ -159,6 +159,20 @@ function pre_install() {
 
 function post_install() {
   # this assume pre_install is called and a new temp venv activation has been done.
+  cat <<EOM
+
+Optional: If you want to poke around with the new version of pants that has been
+built and installed in a temporary virtualenv, fire up another shell window and
+type:
+
+  source ${VENV_DIR}/bin/activate
+  cd ${ROOT}
+
+From there, you can run 'pants' (not './pants') to do some testing.
+
+When you're done testing, press enter to continue.
+EOM
+  read
   deactivate
 }
 
@@ -168,6 +182,8 @@ function install_and_test_packages() {
     --quiet
   )
 
+  pre_install || die "Failed to setup virtualenv while testing ${NAME}-$(local_version)!"
+
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
@@ -175,11 +191,12 @@ function install_and_test_packages() {
 
     banner "Installing and testing package ${NAME}-$(local_version) ..."
 
-    pre_install && \
-    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} && \
-    post_install || \
+    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} || \
     die "Failed to install and test package ${NAME}-$(local_version)!"
   done
+
+  post_install || die "Failed to deactivate virtual env while testing ${NAME}-$(local_version)!"
+
 }
 
 function dry_run_install() {
