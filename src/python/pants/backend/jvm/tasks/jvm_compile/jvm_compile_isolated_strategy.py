@@ -29,7 +29,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     if supports_concurrent_execution:
       register('--worker-count', type=int, default=1, advanced=True,
                help='The number of concurrent workers to use compiling {lang} sources with the isolated'
-                    ' strategy. This is a beta feature.'.format(lang=language))
+                    ' strategy.'.format(lang=language))
     register('--capture-log', action='store_true', default=False, advanced=True,
             help='Capture compilation output to per-target logs.')
 
@@ -47,6 +47,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     try:
       worker_count = options.worker_count
     except AttributeError:
+      # tasks that don't support concurrent execution have no worker_count registered
       worker_count = 1
     self._worker_count = worker_count
 
@@ -292,7 +293,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
       artifacts.extend([os.path.join(dirpath, f) for f in filenames])
     log_file = self._capture_log_file(compile_context.target)
-    if log_file and os.path.exists(logfile):
+    if log_file and os.path.exists(log_file):
       artifacts.append(log_file)
 
     # Get the 'work' that will publish these artifacts to the cache.

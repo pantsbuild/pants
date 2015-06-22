@@ -45,7 +45,7 @@ object Loggers {
 }
 
 /**
- * An logger for an output file.
+ * A logger for an output file.
  *
  * TODO: The sbt logging interface doesn't expose `close`, so this flushes for every
  * line to avoid dropping output on shutdown.

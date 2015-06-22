@@ -37,7 +37,7 @@ no_warning_args: [
 [compile.scala]
 runtime-deps: [':scala-library']
 scalac: [':scala-compiler']
-strategy: isolated  
+strategy: isolated
 capture_log: True
 worker_count: 4
 zinc: [':zinc']
