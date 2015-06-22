@@ -153,14 +153,14 @@ if [[ "${skip_jvm:-false}" == "false" ]]; then
 
   banner "Running core jvm tests"
   (
-   JUNIT_TARGETS=$(./pants.pex list tests/java:: | xargs ./pants.pex filter --filter-regex='(junit)')
+   JUNIT_TARGETS=$(./pants.pex list tests/java:: | \
+      xargs ./pants.pex filter --filter-type=junit_tests --filter-regex='(junit)')
    for target in $JUNIT_TARGETS; do
-     echo $target
+     ./pants.pex ${PANTS_ARGS[@]} test.junit $target
    done
   ) || die "Core junit jvm test failure"
 fi
 
-exit(0)
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
