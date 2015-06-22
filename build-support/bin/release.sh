@@ -32,10 +32,21 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
-  execute_packaged_pants_with_internal_backends list src:: && \
+  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) || die "Failed to install pantsbuild.pants $(local_version)!"
+  local_pants_version=$(local_version)
+  tests=(
+    "bash-completion"
+    "builddict"
+    "list src::"
+    "roots"
+    "targets"
+  )
+  for cur_test in "${tests[@]}"; do
+    echo "Executing 'pants ${cur_test}' against version ${local_pants_version}..."
+    execute_packaged_pants_with_internal_backends ${cur_test} 2>&1 >/dev/null || die "Failed to execute 'pants ${cur_test}'!" 
+  done
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "$(local_version)" ]]
+     == "${local_pants_version}" ]] || die "Installed version of pants does match local version!"
 }
 
 PKG_PANTS_TESTINFRA=(
