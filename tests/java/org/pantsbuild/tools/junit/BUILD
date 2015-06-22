@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 CONSOLE_OUTPUT_TEST =  ['impl/ConsoleRunnerConsoleOutputTest.java']
+JUNIT_TEST_LIB = ['impl/ConsoleRunnerTestHelper.java']
 
 java_library(
   name='junit-test-dep',
@@ -11,6 +12,7 @@ java_library(
       'src/java/org/pantsbuild/junit/annotations',
       'src/java/org/pantsbuild/tools/junit',
     ],
+   sources=JUNIT_TEST_LIB
 )
 
 java_tests(
@@ -18,7 +20,7 @@ java_tests(
   dependencies=[
     ':junit-test-dep',
   ],
-  sources=globs('impl/*.java', exclude=[CONSOLE_OUTPUT_TEST])
+  sources=globs('impl/*.java', exclude=[CONSOLE_OUTPUT_TEST, JUNIT_TEST_LIB])
 )
 
 java_tests(
