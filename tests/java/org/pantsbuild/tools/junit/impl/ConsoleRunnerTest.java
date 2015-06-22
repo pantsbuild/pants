@@ -14,8 +14,6 @@ import org.junit.rules.TemporaryFolder;
  */
 public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
 
-
-
   @Test
   public void testNormalTesting() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray("MockTest1 MockTest2 MockTest3"));
