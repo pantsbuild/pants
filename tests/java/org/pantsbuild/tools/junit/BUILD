@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 CONSOLE_OUTPUT_TEST =  ['impl/ConsoleRunnerConsoleOutputTest.java']
-JUNIT_TEST_LIB = ['impl/ConsoleRunnerTestHelper.java']
+JUNIT_TEST_LIB = ['impl/ConsoleRunnerTestHelper.java',
+                  'impl/TestRegistry.java']
 
 java_library(
   name='junit-test-dep',
