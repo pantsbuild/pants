@@ -170,7 +170,8 @@ function pre_install() {
 
 function post_install() {
   # this assume pre_install is called and a new temp venv activation has been done.
-  cat <<EOM
+  if [[ "${debug}" == "true" ]]; then
+    cat <<EOM
 
 Optional: If you want to poke around with the new version of pants that has been
 built and installed in a temporary virtualenv, fire up another shell window and
@@ -183,7 +184,8 @@ From there, you can run 'pants' (not './pants') to do some testing.
 
 When you're done testing, press enter to continue.
 EOM
-  read
+    read
+  fi
   deactivate
 }
 
@@ -408,7 +410,8 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.github.io/release.html"
   echo
-  echo "Usage: $0 (-h|-ntlo)"
+  echo "Usage: $0 [-d] (-h|-ntlo)"
+  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
@@ -420,7 +423,7 @@ function usage() {
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo
-  echo "All options are mutually exclusive."
+  echo "All options (except for '-d') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -429,9 +432,10 @@ function usage() {
   fi
 }
 
-while getopts "hntlo" opt; do
+while getopts "hdntlo" opt; do
   case ${opt} in
     h) usage ;;
+    d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
     l) list_packages && exit 0 ;;
@@ -439,6 +443,10 @@ while getopts "hntlo" opt; do
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
+
+if [[ "${debug}" == "true" ]]; then
+  set -x
+fi
 
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."
