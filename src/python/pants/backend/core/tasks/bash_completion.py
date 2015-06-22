@@ -98,14 +98,19 @@ class BashCompletionTask(ConsoleTask):
             record(outer_scope, scoped_option_strings)
 
     # TODO: This does not currently handle subsystem-specific options.
-    global_argparser = options.get_parser(GLOBAL_SCOPE).get_help_argparser()
-    global_option_strings = self.option_strings_from_parser(global_argparser) or []
-    global_option_strings_set = self.expand_option_strings(global_option_strings)
+    try:
+      global_argparser = options.get_parser(GLOBAL_SCOPE).get_help_argparser()
+      global_option_strings = self.option_strings_from_parser(global_argparser) or []
+      global_option_strings_set = self.expand_option_strings(global_option_strings)
 
-    options_text = '\n'.join([
-      "__pants_options_for_{}='{}'".format(self.bash_scope_name(scope), ' '.join(sorted(list(option_strings))))
-      for scope, option_strings in sorted(option_strings_by_scope.items(), key=lambda x: x[0])
-    ])
+      options_text = '\n'.join([
+        "__pants_options_for_{}='{}'".format(self.bash_scope_name(scope), ' '.join(sorted(list(option_strings))))
+        for scope, option_strings in sorted(option_strings_by_scope.items(), key=lambda x: x[0])
+      ])
+    except AttributeError:
+      # The `options.get_options()` method doesn't exist (probably being invoked from a unit test).
+      options_text = ''
+      global_option_strings_set = set()
 
     generator = Generator(
       resource_string(__name__, os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')),
