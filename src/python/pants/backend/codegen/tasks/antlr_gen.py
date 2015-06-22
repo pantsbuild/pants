@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import re
 
 from twitter.common.collections import OrderedSet
 
@@ -127,11 +128,17 @@ class AntlrGen(CodeGen, NailgunTask):
       for suffix in antlr_files_suffix:
         generated_sources.append(source_base + suffix)
 
+    syn_target_sourceroot = os.path.join(self._java_out(target), target.target_base)
+
+    if (target.compiler == 'antlr3'):
+      # Removes timestamps in generated source to get stable fingerprint for buildcache.
+      for source in generated_sources:
+        self._scrub_generated_timestamp(os.path.join(syn_target_sourceroot, source))
+
     # The runtime deps are the same JAR files as those of the tool used to compile.
     # TODO: In antlr4 there is a separate runtime-only JAR, so use that.
     deps = self._resolve_java_deps(target)
 
-    syn_target_sourceroot = os.path.join(self._java_out(target), target.target_base)
     spec_path = os.path.relpath(syn_target_sourceroot, get_buildroot())
     address = SyntheticAddress(spec_path=spec_path, target_name=target.id)
     tgt = self.context.add_new_target(address,
@@ -144,6 +151,19 @@ class AntlrGen(CodeGen, NailgunTask):
     for dependee in dependees:
       dependee.inject_dependency(tgt.address)
     return tgt
+
+  _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
+  def _scrub_generated_timestamp(self, source):
+    # Removes the first line of comment if it contains a timestamp.
+    with open(source) as f:
+      lines = f.readlines()
+    if len(lines) < 1:
+      return
+    with open(source, 'w') as f:
+      if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
+        f.write(lines[0])
+      for line in lines[1:]:
+        f.write(line)
 
   def _resolve_java_deps(self, target):
     dep_specs = self.get_options()[target.compiler]

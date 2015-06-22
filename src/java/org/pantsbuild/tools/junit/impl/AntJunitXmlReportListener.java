@@ -1,8 +1,15 @@
 // Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-package org.pantsbuild.tools.junit;
+package org.pantsbuild.tools.junit.impl;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.FilterWriter;
@@ -17,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
-
 import javax.xml.bind.JAXB;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
@@ -25,14 +31,6 @@ import javax.xml.bind.annotation.XmlElementRef;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlValue;
-
-import com.google.common.base.Charsets;
-import com.google.common.base.Function;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
 import org.junit.runner.Description;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
@@ -345,16 +343,33 @@ class AntJunitXmlReportListener extends RunListener {
   @Override
   public void testFailure(Failure failure) throws java.lang.Exception {
     Exception exception = new Exception(failure);
-
     Description description = failure.getDescription();
-    TestSuite suite = suites.get(description.getTestClass());
-    TestCase testCase = cases.get(description);
-    if (Util.isAssertionFailure(failure)) {
-      testCase.setFailure(exception);
-      suite.incrementFailures();
+    boolean isFailure = Util.isAssertionFailure(failure);
+    TestSuite suite = null;
+
+    Class<?> testClass = description.getTestClass();
+    if (testClass != null) {
+      suite = suites.get(testClass);
+    }
+    if (suite == null) {
+      incrementUnknownSuiteFailure(description);
     } else {
-      testCase.setError(exception);
-      suite.incrementErrors();
+      if (isFailure) {
+        suite.incrementFailures();
+      } else {
+        suite.incrementErrors();
+      }
+    }
+
+    TestCase testCase = cases.get(description);
+    if (testCase == null) {
+      incrementUnknownTestCaseFailure(description, exception);
+    } else {
+      if (isFailure) {
+        testCase.setFailure(exception);
+      } else {
+        testCase.setError(exception);
+      }
     }
   }
 
@@ -436,7 +451,68 @@ class AntJunitXmlReportListener extends RunListener {
     protected abstract void handleInvalid(int c) throws IOException;
   }
 
+  /**
+   * Placeholder for failures that we can't attribute to a particular test suite.
+   */
+  static class UnknownFailureSuite {
+  }
+
+  /**
+   * Record as much information as we can about test failures that occur before the test
+   * actually gets run.
+   *
+   * Situations where this happens:
+   *   - testFailure() gets passed Desription.TEST_MECHANISM
+   *   - Class initialization fails and the Description passed to testFailure() may only have a
+   *   string description.
+   *
+   * @param description description passed to {@link #testFailure(Failure)}
+   * @param exception exception to record.
+   */
+  private void incrementUnknownSuiteFailure(Description description) {
+    if (description == null || description.getTestClass() == null) {
+      description = Description.createTestDescription(UnknownFailureSuite.class,
+          "unknown");
+    }
+    TestSuite unknownSuite = suites.get(description.getTestClass());
+    if (unknownSuite == null) {
+      unknownSuite = new TestSuite(description);
+      suites.put(description.getTestClass(), unknownSuite);
+    }
+    unknownSuite.incrementFailures();
+  }
+
+  /**
+   * Record as much information as we can about test failures that occur before the test
+   * actually gets run.
+   *
+   * Situations where this happens:
+   *   - testFailure() gets passed Desription.TEST_MECHANISM
+   *   - Class initialization fails and the Description passed to testFailure() may only have a
+   *   string description.
+   *
+   * @param description description passed to {@link #testFailure(Failure)}
+   * @param exception exception to record.
+   */
+  private void incrementUnknownTestCaseFailure(Description description, Exception exception) {
+    TestCase unknownCase = cases.get(description);
+    if (unknownCase == null) {
+      unknownCase = new TestCase(description);
+      cases.put(description, unknownCase);
+    }
+    unknownCase.setFailure(exception);
+  }
+
   private static String convertTimeSpanNs(long timespanNs) {
     return String.format("%f", timespanNs / (double) TimeUnit.SECONDS.toNanos(1));
+  }
+
+  @VisibleForTesting
+  protected Map<Class<?>, TestSuite> getSuites() {
+    return suites;
+  }
+  @VisibleForTesting
+  protected Map<Description, TestCase> getCases() {
+    return cases;
   }
 }

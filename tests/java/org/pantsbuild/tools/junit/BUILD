@@ -8,5 +8,5 @@ java_tests(
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit',
   ],
-  sources=globs('*.java')
+  sources=globs('impl/*.java')
 )
