@@ -184,7 +184,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-cwd',])
     self.assert_failure(pants_run)
 
-  @unittest.skip("junit-runner-0.0.6 is not published yet")
+  @unittest.skip("junit-runner-0.0.7 is not published yet")
   def test_junit_test_suppress_output_flag(self):
     pants_run = self.run_pants([
         'test.junit',
