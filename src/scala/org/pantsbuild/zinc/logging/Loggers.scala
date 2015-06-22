@@ -31,12 +31,12 @@ object Loggers {
       }
     // if a capture log was specified, add it as an additional unfiltered destination
     captureLog.map { captureLogFile =>
-      new MultiLogger(
-        List(
-          filteredLogger,
-          new FullLogger(new UnfilteredFileLogger(captureLogFile))
-        )
-      )
+      val fileLogger = {
+        val fl = new FullLogger(new FileLogger(captureLogFile))
+        fl.setLevel(Level.Debug)
+        fl
+      }
+      new MultiLogger(List(filteredLogger, fileLogger))
     }.getOrElse {
       filteredLogger
     }
@@ -44,9 +44,11 @@ object Loggers {
 }
 
 /**
- * An unfiltered logger for an output file (no Level.)
+ * An logger for an output file.
+ *
+ * NB: The sbt logging interface doesn't expose `close`, so this flushes for every line.
  */
-class UnfilteredFileLogger(file: File) extends Logger {
+class FileLogger(file: File) extends Logger {
   private val out = new PrintWriter(file)
 
   override def log(level: Level.Value, msg: => String): Unit = {
