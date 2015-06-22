@@ -13,7 +13,13 @@ import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +33,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 
+import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
 import org.junit.runner.JUnitCore;
@@ -122,8 +129,8 @@ public class ConsoleRunnerImpl {
         errstream = new FileOutputStream(err);
       }
       if (printToOriginalOutputs) {
-        SWAPPABLE_OUT.swap(new MultiOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
-        SWAPPABLE_ERR.swap(new MultiOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
+        SWAPPABLE_OUT.swap(new TeeOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
+        SWAPPABLE_ERR.swap(new TeeOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
       } else {
         SWAPPABLE_OUT.swap(outstream);
         SWAPPABLE_ERR.swap(errstream);
@@ -176,6 +183,12 @@ public class ConsoleRunnerImpl {
       this.printToOriginalOutputs = printToOriginalOutputs;
     }
 
+    @Override
+    public void testRunStarted(Description description) throws Exception {
+      registerTests(description.getChildren());
+      super.testRunStarted(description);
+    }
+
     private void registerTests(Iterable<Description> tests) throws IOException {
       for (Description test : tests) {
         registerTests(test.getChildren());
@@ -207,7 +220,6 @@ public class ConsoleRunnerImpl {
 
     @Override
     public void testStarted(Description description) throws Exception {
-      registerTests(Collections.singletonList(description));
       captures.get(description.getTestClass()).open();
       super.testStarted(description);
     }
