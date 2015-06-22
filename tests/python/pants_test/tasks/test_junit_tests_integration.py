@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from xml.etree import ElementTree
 
 from pants.util.contextutil import temporary_dir
@@ -183,9 +184,11 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-cwd',])
     self.assert_failure(pants_run)
 
+  @unittest.skip("junit-runner-0.0.7 is not published yet")
   def test_junit_test_suppress_output_flag(self):
     pants_run = self.run_pants([
         'test.junit',
         '--no-suppress-output',
         'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
-    self.assertTrue('Hello from test!' in pants_run.stdout_data)
+    self.assertIn('Hello from test1!', pants_run.stdout_data)
+    self.assertIn('Hello from test2!', pants_run.stdout_data)

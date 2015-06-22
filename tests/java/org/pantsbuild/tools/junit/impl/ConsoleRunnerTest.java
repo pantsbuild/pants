@@ -3,32 +3,14 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
-
-import org.pantsbuild.junit.annotations.TestSerial;
 
 /**
  * Tests several recently added features in ConsoleRunner.
  * TODO: cover the rest of ConsoleRunner functionality.
  */
-@TestSerial
-public class ConsoleRunnerTest {
-
-  @Before
-  public void setUp() {
-    ConsoleRunnerImpl.setCallSystemExitOnFinish(false);
-    ConsoleRunnerImpl.setExitStatus(0);
-    TestRegistry.reset();
-  }
-
-  @After
-  public void tearDown() {
-    ConsoleRunnerImpl.setCallSystemExitOnFinish(true);
-    ConsoleRunnerImpl.setExitStatus(0);
-  }
+public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
 
   @Test
   public void testNormalTesting() throws Exception {
@@ -100,15 +82,5 @@ public class ConsoleRunnerTest {
     // Verify that a method with expected exception is not treated
     // as flaky - that is, it should be invoked only once.
     Assert.assertEquals(1, FlakyTest.numExpectedExceptionMethodInvocations);
-  }
-
-  private String[] asArgsArray(String cmdLine) {
-    String[] args = cmdLine.split(" ");
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].contains("Test")) {
-        args[i] = getClass().getPackage().getName() + '.' + args[i];
-      }
-    }
-    return args;
   }
 }

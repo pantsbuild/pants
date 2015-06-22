@@ -36,10 +36,10 @@ III.) The operation below should be done on MASTER. Publish a jar with:
 1) git checkout master; git pull
 
 2) dry run:
-./pants clean-all publish src/java/org/pantsbuild/junit
+./pants clean-all publish src/java/org/pantsbuild/tools/junit
 
 3) looks ok? do it:
-yes | ./pants publish.jar --no-dryrun src/java/org/pantsbuild/junit
+yes | ./pants publish.jar --no-dryrun src/java/org/pantsbuild/tools/junit
 
 IV.) Switch back to a dev branch. Make a change that bumps the revision number in BUILD.tools and
 un-@Ignores any tests temporarily ignored in step I.
