@@ -45,9 +45,9 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
   public void testOutputDir() throws Exception {
     String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
     ConsoleRunnerImpl.main(asArgsArray(
-        "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
+        "MockTest4 -parallel-threads 1 " +
             "-default-parallel -xmlreport -suppress-output -outdir " + outdir));
-    Assert.assertEquals("test21 test22 test31 test32 test41 test42",
+    Assert.assertEquals("test41 test42",
         TestRegistry.getCalledTests());
 
     String prefix = MockTest4.class.getCanonicalName();
