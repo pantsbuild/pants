@@ -156,7 +156,7 @@ if [[ "${skip_jvm:-false}" == "false" ]]; then
    JUNIT_TARGETS=$(./pants.pex list tests/java:: | \
       xargs ./pants.pex filter --filter-type=junit_tests --filter-regex='(junit)')
    for target in $JUNIT_TARGETS; do
-     ./pants.pex ${PANTS_ARGS[@]} test.junit $target
+     ( ./pants.pex ${PANTS_ARGS[@]} test.junit $target ) || die "Junit test $target failed"
    done
   ) || die "Junit jvm test failure"
 fi
