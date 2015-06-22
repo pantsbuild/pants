@@ -94,7 +94,8 @@ class Page(Target):
         format = 'md'
     payload.add_fields({
       'sources': self.create_sources_field(sources=[source],
-                                           sources_rel_path=address.spec_path),
+                                           sources_rel_path=address.spec_path,
+                                           key_arg='sources'),
       'format': PrimitiveField(format),
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),

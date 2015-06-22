@@ -93,7 +93,7 @@ class SourcesField(PayloadField):
     :param filespec: glob and exclude data that generated this set of sources
     """
     self._rel_path = sources_rel_path
-    self._source_paths = assert_list(sources)
+    self._source_paths = assert_list(sources, key_arg='sources')
     self._ref_address = ref_address
     self._filespec = filespec
 
@@ -180,7 +180,7 @@ class DeferredSourcesField(SourcesField):
       raise self.AlreadyPopulatedError("Called with rel_path={rel_path} sources={sources}"
       .format(rel_path=rel_path, sources=sources))
     self._rel_path = rel_path
-    self._source_paths = assert_list(sources)
+    self._source_paths = assert_list(sources, key_arg='sources')
     self._populated = True
 
   @property

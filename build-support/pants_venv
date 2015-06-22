@@ -12,14 +12,7 @@ REQUIREMENTS=(
 )
 
 function venv_dir() {
-  # You might think PANTS_DEV requirements are the same as regular requirements so we
-  # don't want separate dirs. But we worry that might not play nice with the
-  # pip_extra="--egg" in activate_pants_env
-  if [ ! -z "${PANTS_DEV}" ]; then
-    echo ${REPO_ROOT}/build-support/pants_dev_deps.venv
-  else
-    echo ${REPO_ROOT}/build-support/pants_deps.venv
-  fi
+  echo ${REPO_ROOT}/build-support/pants_dev_deps.venv
 }
 
 function activate_venv() {
@@ -42,16 +35,9 @@ function activate_pants_venv() {
 
   if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
     log "Bootstrapping pants_deps with requirements:"
-    if [ ! -z "${PANTS_DEV}" ]; then
-      # Install as an egg so IDEs can grok all deps. Installing as sources may
-      # run afoul of this bug: http://youtrack.jetbrains.com/issue/PY-6477.
-      # TODO: Remove the --egg once this is resolved. It won't work in the wheel world anyway.
-      # Use -f ${REPO_ROOT}/third_party if patching in local dependencies
-      # pip_extra="--egg -f ${REPO_ROOT}/third_party"
-      pip_extra="--egg"
-    else
-      pip_extra=""
-    fi
+    # Use -f ${REPO_ROOT}/third_party if patching in local dependencies like so
+    # pip_extra="-f ${REPO_ROOT}/third_party"
+    pip_extra=""
 
     for req in ${REQUIREMENTS[@]}; do
       log "  ${req}"

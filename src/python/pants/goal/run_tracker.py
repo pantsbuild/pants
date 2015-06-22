@@ -44,9 +44,7 @@ class RunTracker(Subsystem):
   Can track execution against multiple 'roots', e.g., one for the main thread and another for
   background threads.
   """
-  @classmethod
-  def scope_qualifier(cls):
-    return 'run-tracker'
+  options_scope = 'run-tracker'
 
   # The name of the tracking root for the main thread (and the foreground worker threads).
   DEFAULT_ROOT_NAME = 'main'

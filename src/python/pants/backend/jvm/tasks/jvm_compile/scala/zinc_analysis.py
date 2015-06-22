@@ -28,7 +28,7 @@ class ZincAnalysis(Analysis):
   To run a dev pants against zincutils sources, without having to publish, just add its root dir
   to your PYTHONPATH, e.g.:
 
-  PANTS_DEV=1 PYTHONPATH=/path/to/zincutils/ \
+   PYTHONPATH=/path/to/zincutils/ \
     ./pants test tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala:zinc_analysis
   """
 

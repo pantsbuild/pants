@@ -28,7 +28,7 @@ API Changes
 ~~~~~~~~~~~
 
 * Removed --project-info flag from depmap goal
-  `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
+  `RB #2363 <https://rbcommons.com/s/twitter/r/2363>`_
 
 * Deprecate PytestRun env vars.
   `RB #2299 <https://rbcommons.com/s/twitter/r/2299>`_

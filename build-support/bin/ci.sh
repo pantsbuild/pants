@@ -134,7 +134,7 @@ fi
 if [[ "${skip_distribution:-false}" == "false" ]]; then
   banner "Running pants distribution tests"
   (
-    ./build-support/bin/release.sh -pn
+    ./build-support/bin/release.sh -n
   ) || die "Failed to create pants distributions."
 fi
 

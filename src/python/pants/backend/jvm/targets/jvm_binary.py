@@ -167,7 +167,8 @@ class JarRules(FingerprintedMixin):
     :returns: JarRules
     """
     default_dup_action = Duplicate.validate_action(default_dup_action or Duplicate.SKIP)
-    additional_rules = assert_list(additional_rules, expected_type=(Duplicate, Skip))
+    additional_rules = assert_list(additional_rules,
+                                   expected_type=(Duplicate, Skip))
 
     rules = [Skip(r'^META-INF/[^/]+\.SF$'),  # signature file
              Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
@@ -209,7 +210,7 @@ class JarRules(FingerprintedMixin):
     self.payload.add_fields({
       'default_dup_action' : PrimitiveField(Duplicate.validate_action(default_dup_action))
     })
-    self._rules = assert_list(rules, expected_type=JarRule)
+    self._rules = assert_list(rules, expected_type=JarRule, key_arg="rules")
 
   @property
   def default_dup_action(self):
@@ -333,7 +334,9 @@ class JvmBinary(JvmTarget):
     payload = payload or Payload()
     payload.add_fields({
       'basename' : PrimitiveField(basename or name),
-      'deploy_excludes' : ExcludesField(self.assert_list(deploy_excludes, expected_type=Exclude)),
+      'deploy_excludes' : ExcludesField(self.assert_list(deploy_excludes,
+                                                         expected_type=Exclude,
+                                                         key_arg='deploy_excludes')),
       'deploy_jar_rules' :  FingerprintedField(deploy_jar_rules or JarRules.default()),
       'manifest_entries' : FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
@@ -342,7 +345,7 @@ class JvmBinary(JvmTarget):
     super(JvmBinary, self).__init__(name=name,
                                     address=address,
                                     payload=payload,
-                                    sources=self.assert_list(sources),
+                                    sources=self.assert_list(sources, key_arg='sources'),
                                     **kwargs)
 
   @property

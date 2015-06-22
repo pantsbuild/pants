@@ -11,10 +11,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class ThriftDefaults(Subsystem):
   """Tracks defaults for thrift target attributes that influence code generation."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'thrift-defaults'
+  options_scope = 'thrift-defaults'
 
   @classmethod
   def register_options(cls, register):

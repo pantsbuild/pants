@@ -248,8 +248,10 @@ class GitTest(unittest.TestCase):
 
     with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
       with self.mkremote('origin') as origin_uri:
-        origin_url = self.git.server_url
-        self.assertEqual(origin_url, origin_uri)
+        # We shouldn't be fooled by remotes with origin in their name.
+        with self.mkremote('temp_origin'):
+          origin_url = self.git.server_url
+          self.assertEqual(origin_url, origin_uri)
 
     self.assertTrue(self.git.tag_name.startswith('first-'), msg='un-annotated tags should be found')
     self.assertEqual('master', self.git.branch_name)
@@ -346,7 +348,6 @@ class GitTest(unittest.TestCase):
             os.mkdir(subdir)
           actual = Git.detect_worktree(subdir=subdir)
           self.assertEqual(expected, actual)
-
 
         worktree_relative_to('..', None)
         worktree_relative_to('.', clone)

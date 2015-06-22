@@ -52,14 +52,13 @@ function do_open() {
 }
 
 # generate html from markdown pages.
-${PANTS_EXE} markdown \
-  --markdown-fragment src:: examples:: src/docs:: //:readme \
+${PANTS_EXE} markdown --fragment \
+  src:: examples:: src/docs:: //:readme \
   testprojects/src/java/org/pantsbuild/testproject/page:readme || \
-  die "Failed to generate HTML from markdown'."
+    die "Failed to generate HTML from markdown'."
 
 # invoke doc site generator.
-${PANTS_EXE} sitegen \
-  --sitegen-config-path=src/python/pants/docs/docsite.json || \
+${PANTS_EXE} sitegen --config-path=src/python/pants/docs/docsite.json || \
   die "Failed to generate doc site'."
 
 do_open "${REPO_ROOT}/dist/docsite/index.html"

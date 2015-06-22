@@ -108,7 +108,7 @@ class Developer(object):
     self.url = _validate_maybe_string('url', url)
     self.organization = _validate_maybe_string('organization', organization)
     self.organization_url = _validate_maybe_string('organization_url', organization_url)
-    self.roles = assert_list(roles)
+    self.roles = assert_list(roles, key_arg='roles')
 
   @property
   def has_roles(self):
@@ -136,7 +136,7 @@ class OSSRHPublicationMetadata(PublicationMetadata):
                         will be synthesized.
     """
     def validate_nonempty_list(list_name, item, expected_type):
-      assert_list(item, expected_type=expected_type, can_be_none=False, allowable=(list,))
+      assert_list(item, expected_type=expected_type, can_be_none=False, key_arg='roles', allowable=(list,))
       if not item:
         raise ValueError('At least 1 entry is required in the {} list.'.format(list_name))
       return item
