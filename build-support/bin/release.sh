@@ -380,9 +380,8 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.github.io/release.html"
   echo
-  echo "Usage: $0 (-h|-pntlo)"
+  echo "Usage: $0 (-h|-ntlo)"
   echo " -h  Prints out this help message."
-  echo " -p  Use pants.pex to do the release instead of PANTS_DEV=1 ./pants."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
@@ -402,12 +401,9 @@ function usage() {
   fi
 }
 
-use_pex="false"
-
-while getopts "hpntlo" opt; do
+while getopts "hntlo" opt; do
   case ${opt} in
     h) usage ;;
-    p) use_pex="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
     l) list_packages && exit 0 ;;
@@ -415,10 +411,6 @@ while getopts "hpntlo" opt; do
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
-
-if [[ "${use_pex}" != "true" ]]; then
-  export PANTS_DEV=1
-fi
 
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."

@@ -121,13 +121,13 @@ this, you can test out the publish in 2 ways:
   1. A dry run to get a preview of what will be published and why:
 
         :::bash
-        $ PANTS_DEV=1 ./pants clean-all publish.jar src/{java,scala}::
+        $ ./pants clean-all publish.jar src/{java,scala}::
 
   2. A local publish to get a preview of both what will be published
      and why as well as the changelogs:
 
         :::bash
-        $ PANTS_DEV=1 ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
+        $ ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
 
      Note that this "dry-run" technique somewhat confusingly passes
      `--no-dryrun` but only because the publish is local and to a
@@ -151,7 +151,7 @@ to use the following command, which will publish everything that's
 changed and only those things that have changed since the last publish:
 
     :::bash
-    $ PANTS_DEV=1 ./pants publish.jar --no-dryrun src/{java,scala}::
+    $ ./pants publish.jar --no-dryrun src/{java,scala}::
 
 ## Promoting to Maven Central ##
 

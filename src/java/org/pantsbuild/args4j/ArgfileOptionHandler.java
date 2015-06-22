@@ -14,8 +14,9 @@ import org.kohsuke.args4j.spi.OptionHandler;
 import org.kohsuke.args4j.spi.Parameters;
 
 /**
+ * <p>
  * An {@code OptionHandler} that can read an option value from an "argfile".
- * <p/>
+ * </p>
  * An argfile is just a file containing an option's value as its contents.  These can be useful
  * to avoid command-line argument length limits. An argfile is specified on the command-line by
  * prefixing the option argument value with a {@code @}, like so:

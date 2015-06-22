@@ -14,45 +14,11 @@ Running from sources
 As pants is implemented in python it can be run directly from sources.
 
     :::bash
-    $ PANTS_DEV=1 ./pants goals
-    *** running pants in dev mode from ./src/python/pants/bin/pants_exe.py ***
+    $ ./pants goals
     <remainder of output omitted for brevity>
 
 Notice this invocation specifies the `PANTS_DEV` environment variable.
 By defining `PANTS_DEV` pants will be run from sources.
-
-Building a Pants PEX for Testing
---------------------------------
-
-The `./pants` wrapper provides a convenient way to produce a `.pex` file for testing pants on
-your local workstation. If you call it without the `PANTS_DEV=1` environment described above, it
-
-+   Checks the source tree's top directory for a `pants.pex` and runs
-    it if it exists. Otherwise `./pants`...
-+   Builds a new `pants.pex`, moves it to the source tree's top
-    directory, and runs that.
-
-It looks something like
-
-    :::bash
-    $ rm pants.pex
-    $ ./pants my-new-feature
-    Building pants.pex to /Users/zundel/Src/Pants/pants.pex...
-    ...
-    Build operating on top level addresses: set([BuildFileAddress(/Users/pantsdev/Src/pants/src/python/pants/bin/BUILD, pants_local_binary)])
-    Building PythonBinary PythonBinary(BuildFileAddress(/Users/pantsdev/Src/pants/src/python/pants/bin/BUILD, pants_local_binary)):
-    Wrote /Users/pantsdev/Src/pants/dist/pants_local_binary.pex
-    /Users/pantsdev/Src/Pants/dist/pants_local_binary.pex -> /Users/pantsdev/Src/Pants/pants.pex
-    AMAZING NEW FEATURE PRINTS HERE
-    $ ls pants.pex # gets moved here, though originally "Wrote" to ./dist/
-    pants.pex
-    $ ./pants my-new-feature
-    AMAZING NEW FEATURE PRINTS HERE
-
-Using `./pants` to launch Pants thus gives a handy workflow: generate `pants.pex`.
-Go back and forth between trying the generated `pants.pex` and fixing source code as inspired by
-its misbehaviors. When the fixed source code is in a consistent state, remove `pants.pex` so
-that it will get replaced on the next `./pants` run.
 
 Building a Pants PEX for Production
 -----------------------------------

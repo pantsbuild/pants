@@ -10,11 +10,14 @@ import org.kohsuke.args4j.spi.OneArgumentOptionHandler;
 import org.kohsuke.args4j.spi.Setter;
 
 /**
+ * <p>
  * An {@code OptionHandler} that accepts a list of values to add to an underlying collection option
  * value.
- * <p/>
+ * </p>
+ * <p>
  * This handler interprets the raw option value as a comma-delimited list and passes the individual
  * list values to a delegate {@link ItemParser} strategy to obtain collection members from.
+ * </p>
  *
  * @param <T> The type of the underlying option values stored in the container.
  */

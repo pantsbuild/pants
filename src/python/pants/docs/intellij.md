@@ -27,7 +27,7 @@ the way you want to run pants when iterating and it also prepares a
 virtual environment suitable for IDEs:
 
     :::bash
-    $ PANTS_DEV=1 ./pants
+    $ ./pants
 
 Next open IntelliJ and select "Create New Project".
 
@@ -44,11 +44,7 @@ SDK".
 ![image](images/intellij-new-pythonsdk.png)
 
 This will be a "local" interpreter and you'll need to select the virtual
-environment bootstrapped above; it's in
-`build-support/pants_dev_deps.venv` (not
-`build-support/pants_deps.venv`). This is **important** because the dev
-virtual environment is designed to have 3rdparty dependencies that IDEs
-can handle.
+environment bootstrapped above; it's in `build-support/pants_dev_deps.venv`.
 
 ![image](images/intellij-select-venv.png)
 
