@@ -1,7 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-CONSOLE_OUTPUT_TEST =  ['impl/ConsoleRunnerConsoleOutputTest.java']
+CONSOLE_OUTPUT_TEST =  ['impl/ConsoleRunnerConsoleOutputTest.java',
+                        'impl/MockTest4.java']
+
 JUNIT_TEST_LIB = ['impl/ConsoleRunnerTestHelper.java',
                   'impl/TestRegistry.java']
 

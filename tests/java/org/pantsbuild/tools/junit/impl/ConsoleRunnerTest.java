@@ -3,8 +3,6 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import java.io.File;
-import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -16,8 +14,7 @@ import org.junit.rules.TemporaryFolder;
  */
 public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
 
-  @Rule
-  public TemporaryFolder temporary = new TemporaryFolder();
+
 
   @Test
   public void testNormalTesting() throws Exception {
@@ -89,19 +86,5 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
     // Verify that a method with expected exception is not treated
     // as flaky - that is, it should be invoked only once.
     Assert.assertEquals(1, FlakyTest.numExpectedExceptionMethodInvocations);
-  }
-
-  @Test
-  public void testOutputDir() throws Exception {
-    String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
-    ConsoleRunnerImpl.main(asArgsArray(
-        "MockTest4 MockTest2 MockTest3 -parallel-threads 1 " +
-            "-default-parallel -xmlreport -suppress-output -outdir " + outdir));
-    Assert.assertEquals("test21 test22 test31 test32 test41 test42",
-        TestRegistry.getCalledTests());
-
-    String prefix = MockTest4.class.getCanonicalName();
-    String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
-    assertContainsTestOutput(fileOutputLines);
   }
 }
