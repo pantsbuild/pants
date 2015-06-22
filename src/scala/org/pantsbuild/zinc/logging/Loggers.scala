@@ -4,7 +4,7 @@
 
 package org.pantsbuild.zinc.logging
 
-import java.io.{ File, PrintWriter }
+import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
 import sbt.{ AbstractLogger, ConsoleLogger, FullLogger, ConsoleOut, Level, Logger, MultiLogger }
 import scala.util.matching.Regex
 
@@ -31,8 +31,9 @@ object Loggers {
       }
     // if a capture log was specified, add it as an additional unfiltered destination
     captureLog.map { captureLogFile =>
+      // NB: we append to the capture log, in order to record the complete history of a compile
       val fileLogger = {
-        val fl = new FullLogger(new FileLogger(captureLogFile))
+        val fl = new FullLogger(new FileLogger(captureLogFile, true))
         fl.setLevel(Level.Debug)
         fl
       }
@@ -46,10 +47,11 @@ object Loggers {
 /**
  * An logger for an output file.
  *
- * NB: The sbt logging interface doesn't expose `close`, so this flushes for every line.
+ * TODO: The sbt logging interface doesn't expose `close`, so this flushes for every
+ * line to avoid dropping output on shutdown.
  */
-class FileLogger(file: File) extends Logger {
-  private val out = new PrintWriter(file)
+class FileLogger(file: File, append: Boolean) extends Logger {
+  private val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream(file, append)))
 
   override def log(level: Level.Value, msg: => String): Unit = {
     out.println(s"[${level}]\t${msg}")
