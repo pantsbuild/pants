@@ -7,6 +7,7 @@ import org.apache.commons.io.FileUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -34,6 +35,7 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
     System.setErr(stderr);
   }
 
+  @Ignore("https://github.com/pantsbuild/pants/issues/1720")
   @Test
   public void testConsoleOutput() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
@@ -41,6 +43,7 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
     assertContainsTestOutput(outContent.toString());
   }
 
+  @Ignore("https://github.com/pantsbuild/pants/issues/1720")
   @Test
   public void testOutputDir() throws Exception {
     String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();

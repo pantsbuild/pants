@@ -146,19 +146,8 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.junit \
-         $(./pants.pex list tests/java:: src/{java,scala}:: zinc:: | \
-            xargs ./pants.pex filter --filter-regex='-(junit)')
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
-
-  banner "Running junit jvm tests."
-  (
-   JUNIT_TARGETS=$(./pants.pex list tests/java:: | \
-      xargs ./pants.pex filter --filter-type=junit_tests --filter-regex='(junit)')
-   for target in $JUNIT_TARGETS; do
-     ( ./pants.pex ${PANTS_ARGS[@]} test.junit $target ) || die "Junit test $target failed"
-   done
-  ) || die "Junit jvm test failure"
 fi
 
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
