@@ -10,6 +10,7 @@ enabled: True
 runtime-deps: []
 scalac: [':scala-compile']
 strategy: isolated
+capture_log: True
 worker_count: 4
 zinc: [':zinc']
 jvm_options: [
@@ -37,6 +38,7 @@ no_warning_args: [
 runtime-deps: [':scala-library']
 scalac: [':scala-compiler']
 strategy: isolated  
+capture_log: True
 worker_count: 4
 zinc: [':zinc']
 jvm_options: [
