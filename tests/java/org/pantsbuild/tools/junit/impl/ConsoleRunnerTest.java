@@ -4,9 +4,7 @@
 package org.pantsbuild.tools.junit.impl;
 
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 /**
  * Tests several recently added features in ConsoleRunner.
