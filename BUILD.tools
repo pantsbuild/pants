@@ -131,6 +131,8 @@ jar_library(name = 'junit',
             jars = [
               jar(org = 'junit', name = 'junit', rev = '4.12'),
               jar(org = 'org.pantsbuild', name = 'junit-runner', rev = '0.0.6'),
+                 #, mutable=True,
+                  #url="file:///Users/tdesai/projects/pants/dist/junit-runner.jar"),
             ])
 
 jar_library(name = 'scrooge-gen',

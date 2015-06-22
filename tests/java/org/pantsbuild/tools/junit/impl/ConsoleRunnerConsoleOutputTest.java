@@ -27,7 +27,6 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
     System.setErr(stderr);
   }
 
-  @Ignore("Re-enable this test wil junit 0.0.7 published.")
   @Test
   public void testConsoleOutput() throws Exception {
     ConsoleRunnerImpl.main(asArgsArray("MockTest4 -parallel-threads 1 -xmlreport"));
