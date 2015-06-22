@@ -3,9 +3,10 @@
 
 junit_tests(name='logging',
   dependencies=[
-    'src/scala/org/pantsbuild/zinc/logging',
+    '3rdparty:guava',
     '3rdparty:junit',
-    '3rdparty:specs',
+    '3rdparty:scalatest',
+    'src/scala/org/pantsbuild/zinc/logging',
   ],
   sources=globs('*.scala'),
 )

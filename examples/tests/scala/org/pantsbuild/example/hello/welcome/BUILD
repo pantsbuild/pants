@@ -5,7 +5,7 @@ junit_tests(name='welcome',
   dependencies=[
     'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
     '3rdparty:junit',
-    '3rdparty:specs',
+    '3rdparty:scalatest',
   ],
   sources=globs('*.scala'),
 )

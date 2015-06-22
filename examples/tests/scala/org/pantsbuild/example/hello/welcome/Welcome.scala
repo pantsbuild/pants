@@ -4,10 +4,12 @@
 package org.pantsbuild.example.hello.welcome
 
 import org.junit.runner.RunWith
-import org.specs._
+import org.scalatest.WordSpec
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.matchers.MustMatchers
 
-@RunWith(classOf[runner.JUnitSuiteRunner])
-class WelSpec extends Specification with runner.JUnit {
+@RunWith(classOf[JUnitRunner])
+class WelSpec extends WordSpec with MustMatchers {
   "Welcome" should {
     "greet nobody" in {
       WelcomeEverybody(List()).size mustEqual 0

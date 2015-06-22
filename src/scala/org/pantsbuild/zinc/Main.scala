@@ -34,7 +34,7 @@ object Main {
         settings.consoleLog.logLevel,
         settings.consoleLog.color,
         settings.consoleLog.logFilters,
-        settings.captureLog
+        captureLog = settings.captureLog
       )
     val isDebug = settings.consoleLog.logLevel == Level.Debug
 
