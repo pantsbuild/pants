@@ -12,6 +12,9 @@ import warnings
 logger = logging.getLogger(__name__)
 
 
+def exec_wrapper(code, _globals, _locals=None):
+  exec(code, _globals, _locals or _globals)
+
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  The BulidFileParser is intended to have knowledge of just
 # BuildFile and Address.
@@ -128,7 +131,7 @@ class BuildFileParser(object):
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
       with warnings.catch_warnings(record=True) as warns:
-        exec(build_file_code, parse_state.parse_globals, parse_state.parse_globals)
+        exec_wrapper(build_file_code, parse_state.parse_globals)
         for warn in warns:
           logger.warning(_format_context_msg(lineno=warn.lineno,
                                              offset=None,
