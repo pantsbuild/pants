@@ -6,28 +6,32 @@ package org.pantsbuild.tools.junit;
 import java.io.PrintStream;
 
 import org.junit.runner.Description;
-import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
 
 /**
  * A run listener that shows progress and timing for each test class.
  */
-class PerClassConsoleListener extends ConsoleListener {
+class PerTestConsoleListener extends ConsoleListener {
   private final PrintStream out;
 
-  PerClassConsoleListener(PrintStream out) {
+  PerTestConsoleListener(PrintStream out) {
     super(out);
     this.out = out;
   }
 
   @Override
-  public void testRunStarted(Description description) throws Exception {
-    out.print(description.getDisplayName() + ":");
+  public void testStarted(Description description) {
+    out.print(description.getDisplayName());
   }
 
   @Override
-  public void testRunFinished(Result result) {
-    out.println(" [" + result.getRunTime() + " ms]");
-    super.printFailures(result);
+  public void testFinished(Description description) throws Exception {
+    out.println();
+  }
+
+  @Override
+  public void testFailure(Failure failure) {
+    out.println("FAILED");
   }
 
 }

@@ -291,6 +291,7 @@ public class ConsoleRunner {
           throw new IllegalStateException("Failed to create output directory: " + outdir);
         }
       }
+
       StreamCapturingListener streamCapturingListener =
         new StreamCapturingListener(outdir, !suppressOutput);
       abortableListener.addListener(streamCapturingListener);
@@ -304,7 +305,7 @@ public class ConsoleRunner {
     // abortableListener gets removed when one of the listener throws exceptions in
     // RunNotifier.java. Other listeners should not get removed.
     if (perTestTimer) {
-      abortableListener.addListener(new PerClassConsoleListener(SWAPPABLE_OUT.getOriginal()));
+      abortableListener.addListener(new PerTestConsoleListener(SWAPPABLE_OUT.getOriginal()));
     } else {
       core.addListener(new ConsoleListener(SWAPPABLE_OUT.getOriginal()));
     }
@@ -312,23 +313,23 @@ public class ConsoleRunner {
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
     final Thread abnormalExitHook =
-        createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
+            createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
     int failures = 0;
     try {
       if (this.parallelThreads > 1) {
         ConcurrentCompositeRequest request = new ConcurrentCompositeRequest(
             requests, this.defaultParallel, this.parallelThreads);
-        failures = core.run(request).getFailureCount();
-      } else {
-        for (Request request : requests) {
-          Result result = core.run(request);
-          failures += result.getFailureCount();
-        }
+      failures = core.run(request).getFailureCount();
+    } else {
+      for (Request request : requests) {
+        Result result = core.run(request);
+        failures += result.getFailureCount();
       }
-    } catch (InitializationError initializationError) {
-      failures = 1;
-    } finally {
+    }
+  } catch (InitializationError initializationError) {
+    failures = 1;
+  } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
       Runtime.getRuntime().removeShutdownHook(abnormalExitHook);
@@ -615,6 +616,7 @@ public class ConsoleRunner {
       parser.printUsage(System.err);
       exit(1);
     }
+
 
     ConsoleRunner runner =
         new ConsoleRunner(options.failFast,
