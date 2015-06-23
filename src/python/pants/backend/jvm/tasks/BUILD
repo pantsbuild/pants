@@ -105,6 +105,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':nailgun_task',
+    'src/python/pants/base:cache_manager',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',

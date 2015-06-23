@@ -10,11 +10,12 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.option.options import Options
 from pants.process.xargs import Xargs
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import safe_open, touch
 
 
 class Checkstyle(NailgunTask):
@@ -42,10 +43,21 @@ class Checkstyle(NailgunTask):
     super(Checkstyle, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
 
+  def __init__(self, *args, **kwargs):
+    super(Checkstyle, self).__init__(*args, **kwargs)
+
+    self.setup_artifact_cache()
+    self._results_dir = os.path.join(self.workdir, 'checkstyle-results')
+
   def _is_checked(self, target):
     return (isinstance(target, Target) and
             target.has_sources(self._JAVA_SOURCE_EXTENSION) and
             (not target.is_synthetic))
+
+  def _create_result_file(self, target):
+    result_file = os.path.join(self._results_dir, target.id)
+    touch(result_file)
+    return result_file
 
   def execute(self):
     if self.get_options().skip:
@@ -61,6 +73,12 @@ class Checkstyle(NailgunTask):
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
+        
+        if self.artifact_cache_writes_enabled():
+          result_files = map(lambda t: self._create_result_file(t), invalid_targets)
+          self.update_artifact_cache([(
+            VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts),
+            result_files)])
 
   def calculate_sources(self, targets):
     sources = set()
