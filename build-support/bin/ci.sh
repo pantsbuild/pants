@@ -137,7 +137,7 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
   for cur_test in "${sanity_tests[@]}"; do
     cmd="./pants.pex ${PANTS_ARGS[@]} ${cur_test}"
     echo "Executing command '${cmd}' as a sanity test:"
-    ${cmd} >/dev/null || die "Failed execute '${cmd}'."
+    ${cmd} >/dev/null || die "Failed to execute '${cmd}'."
     echo ""
   done
 fi
