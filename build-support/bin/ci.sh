@@ -146,7 +146,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.junit --no-suppress-output tests/java:: src/{java,scala}:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} test tests/java:: src/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
