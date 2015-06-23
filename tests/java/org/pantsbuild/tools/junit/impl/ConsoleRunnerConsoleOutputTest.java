@@ -33,7 +33,7 @@ public class ConsoleRunnerConsoleOutputTest extends ConsoleRunnerTestHelper {
     String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
     ConsoleRunnerImpl.main(asArgsArray(
         "MockTest4 -parallel-threads 1 " +
-        "-default-parallel -suppress-output -xmlreport -outdir " + outdir));
+        "-default-parallel -suppress-output -xmlreport -outdir=" + outdir));
     Assert.assertEquals("test41 test42", TestRegistry.getCalledTests());
     String prefix = MockTest4.class.getCanonicalName();
     String fileOutputLines = FileUtils.readFileToString(new File(outdir, prefix + ".out.txt"));
