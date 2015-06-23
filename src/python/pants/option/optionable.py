@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from six import string_types
+
 from pants.util.meta import AbstractClass
 
 
@@ -39,5 +41,5 @@ class Optionable(AbstractClass):
     # its __init__, as we do here. We usually only create a single instance of an Optionable
     # subclass anyway.
     cls = type(self)
-    if not isinstance(cls.options_scope, basestring):
+    if not isinstance(cls.options_scope, string_types):
       raise NotImplementedError('{} must set an options_scope class-level property.'.format(cls))
