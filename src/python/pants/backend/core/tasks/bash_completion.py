@@ -69,6 +69,10 @@ class BashCompletionTask(ConsoleTask):
 
   @staticmethod
   def parse_all_tasks_and_help(self):
+    """Loads all goals, and mines the options & help text for each one.
+
+    Returns: a set of all_scopes, options_text string, a set of all option strings
+    """
     options = self.context.options
 
     goals = Goal.all()
@@ -111,12 +115,8 @@ class BashCompletionTask(ConsoleTask):
     if targets:
       raise TaskError('This task does not accept any target addresses.')
 
+    (all_scopes, options_text, global_option_strings_set) = self.parse_all_tasks_and_help(self)
 
-      # # The `options.get_options()` method doesn't exist (probably being invoked from a unit test).
-      # options_text = ''
-      # global_option_strings_set = set()
-
-    (all_scopes, options_text, global_option_strings_set) = parse_all_tasks_and_help()
     generator = Generator(
       resource_string(__name__, os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')),
       scopes_text=' '.join(sorted(list(all_scopes))),
