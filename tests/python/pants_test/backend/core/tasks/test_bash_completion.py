@@ -9,23 +9,16 @@ from pants.backend.core.tasks.bash_completion import BashCompletionTask
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
-class BashCompletionTest(ConsoleTaskTestBase):
-
-  @classmethod
-  def task_type(cls):
-    return BashCompletionTask
-
-  def mocked_parse_all_tasks_and_help(self, _):
+class MockedBashCompletionTask(BashCompletionTask):
+  """A version of the BashCompletionTask, with the goal/help parsing mocked out."""
+  def parse_all_tasks_and_help(self, _):
     return set(), '', set()
 
-  # Override `execute_console_task()`, and mock out the `parse_all_tasks_and_help()` method.
-  def execute_console_task(self, targets=None, extra_targets=None, options=None, workspace=None):
-    options = options or {}
-    self.set_options(**options)
-    context = self.context(target_roots=targets, workspace=workspace)
-    task = self.create_task(context)
-    task.parse_all_tasks_and_help = self.mocked_parse_all_tasks_and_help
-    return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
+
+class BashCompletionTest(ConsoleTaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return MockedBashCompletionTask
 
   def test_bash_completion_loads_template(self):
     self.assert_console_output_contains("# Pants Autocompletion Support")

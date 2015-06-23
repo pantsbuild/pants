@@ -159,7 +159,7 @@ function pre_install() {
 
 function post_install() {
   # this assume pre_install is called and a new temp venv activation has been done.
-  if [[ "${debug}" == "true" ]]; then
+  if [[ "${pause_after_venv_creation}" == "true" ]]; then
     cat <<EOM
 
 If you want to poke around with the new version of pants that has been built
@@ -434,6 +434,7 @@ done
 
 if [[ "${debug}" == "true" ]]; then
   set -x
+  pause_after_venv_creation="true"
 fi
 
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
