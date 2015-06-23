@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import java.awt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -560,6 +561,10 @@ public class ConsoleRunnerImpl {
               usage = "Directory to output test captures too.  Only used if -suppress-output or "
                       + "-xmlreport is set.")
       private File outdir = new File(System.getProperty("java.io.tmpdir"));
+      public void setOutdir(String outdir) {
+        this.outdir = new File(outdir);
+        System.out.println(this.outdir);
+      }
 
       @Option(name = "-per-test-timer",
           usage = "Show progress and timer for each test class.")
