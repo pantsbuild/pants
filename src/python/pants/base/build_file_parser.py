@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def exec_wrapper(code, _globals, _locals=None):
+  """Pure function wrapper around exec to avoid 'SyntaxError: unqualified exec is not allowed in
+  function '...' it contains a nested function with free variables'.
+  """
   exec(code, _globals, _locals or _globals)
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
