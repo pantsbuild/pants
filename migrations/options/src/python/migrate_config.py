@@ -161,8 +161,6 @@ migrations = {
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
 
-  ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
-
   ('reporting', 'reports_template_dir'): ('reporting', 'template_dir'),
 
   ('DEFAULT', 'stats_upload_url'): ('run-tracker', 'stats_upload_url'),
@@ -356,10 +354,10 @@ def check_config_file(path):
     'overwrite_cache_artifacts': 'overwrite',
     'read_artifact_caches': 'read_from',
     'write_artifact_caches': 'write_to',
-    'cache_compression': 'compression',
+    'cache_compression': 'compression_level',
   }
   for src_sec in ['DEFAULT'] + cp.sections():
-    dst_sec = 'cache.{}'.format(src_sec)
+    dst_sec = 'cache' if src_sec == 'DEFAULT' else 'cache.{}'.format(src_sec)
     for src_key, dst_key in artifact_cache_options.items():
       check_option(cp, (src_sec, src_key), (dst_sec, dst_key))
 

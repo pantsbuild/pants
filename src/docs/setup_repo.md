@@ -383,8 +383,8 @@ and having set up such a server, set `cache` options in `pants.ini`:
 When building, Pants first tries to read built things from places in `read_from`.
 If it builds something, it caches those built things in places in  `write_to`.
 (It's handy that these are separate settings; if members of your organization can install wacky
-tools on their laptops, you might not want their builds to write to the cache, but would want
-them to be able to read from it.)
+tools on their laptops, you might not want their builds to write to a particular cache, but would 
+want them to be able to read from it.)
 
 Valid option values include
 

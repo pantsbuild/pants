@@ -9,6 +9,7 @@ import os
 import threading
 import urlparse
 
+from six import string_types
 from six.moves import range
 
 from pants.cache.artifact_cache import ArtifactCacheError
@@ -48,7 +49,7 @@ class CacheSetup(Subsystem):
              help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')
-    register('--compression', advanced=True, type=int, default=5, recursive=True,
+    register('--compression-level', advanced=True, type=int, default=5, recursive=True,
              help='The gzip compression level (0-9) for created artifacts.')
 
   @classmethod
@@ -67,6 +68,7 @@ class CacheFactory(object):
     self._read_cache = None
     self._write_cache = None
 
+    # Protects local filesystem setup, and assignment to the references above.
     self._cache_setup_lock = threading.Lock()
 
     # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
@@ -89,7 +91,8 @@ class CacheFactory(object):
     Returns None if no read cache is configured.
     """
     if self._options.read_from and not self._read_cache:
-      self._read_cache = self._safe_create_artifact_cache(self._options.read_from, 'will read from')
+      with self._cache_setup_lock:
+        self._read_cache = self._do_create_artifact_cache(self._options.read_from, 'will read from')
     return self._read_cache
 
   def get_write_cache(self):
@@ -98,7 +101,8 @@ class CacheFactory(object):
     Returns None if no read cache is configured.
     """
     if self._options.write_to and not self._write_cache:
-      self._write_cache = self._safe_create_artifact_cache(self._options.write_to, 'will write to')
+      with self._cache_setup_lock:
+        self._write_cache = self._do_create_artifact_cache(self._options.write_to, 'will write to')
     return self._write_cache
 
   def select_best_url(self, spec):
@@ -116,10 +120,6 @@ class CacheFactory(object):
     self._log.debug('Best artifact cache is {0}'.format(best_url))
     return best_url
 
-  def _safe_create_artifact_cache(self, spec, action):
-    with self._cache_setup_lock:
-      return self._do_create_artifact_cache(spec, action)
-
   def _do_create_artifact_cache(self, spec, action):
     """Returns an artifact cache for the specified spec.
 
@@ -131,9 +131,9 @@ class CacheFactory(object):
     """
     if not spec:
       raise EmptyCacheSpecError()
-    compression = self._options.compression
+    compression = self._options.compression_level
     if compression not in range(10):
-      raise ValueError('compression must be an integer between 0 and 9: {}'.format(compression))
+      raise ValueError('compression_level must be an integer 0-9: {}'.format(compression))
     artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
@@ -165,7 +165,7 @@ class CacheFactory(object):
       else:
         raise CacheSpecFormatError('Invalid artifact cache spec: {0}'.format(string_spec))
 
-    if isinstance(spec, basestring):
+    if isinstance(spec, string_types):
       return create_cache_from_string_spec(spec)
     elif isinstance(spec, (list, tuple)):
       if len(spec) == 1:
