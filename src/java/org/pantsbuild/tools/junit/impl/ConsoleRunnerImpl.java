@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import java.awt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
