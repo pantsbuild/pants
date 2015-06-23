@@ -9,6 +9,7 @@ import sys
 from collections import namedtuple
 
 from colors import red
+from six import string_types
 
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
@@ -41,7 +42,7 @@ class QuietReporter(Reporter):
     """Implementation of Reporter callback."""
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
-    elements = [e if isinstance(e, basestring) else e[0] for e in msg_elements]
+    elements = [e if isinstance(e, string_types) else e[0] for e in msg_elements]
     msg = '\n' + ''.join(elements)
     if self.settings.color:
       msg = red(msg)

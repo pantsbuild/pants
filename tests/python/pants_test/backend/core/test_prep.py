@@ -15,17 +15,21 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
-from pants_test.base_test import BaseTest
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class PrepTest(BaseTest):
+class PrepTest(TaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return RunPrepCommand
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
       targets={
         'prep_command': PrepCommand,
-        },
-      )
+      },
+    )
 
   def test_prep_order(self):
     with temporary_dir() as workdir:
@@ -38,7 +42,7 @@ class PrepTest(BaseTest):
                              prep_executable='mv', prep_args=[files[1], files[2]])
 
         context = self.context(target_roots=[b])
-        task = RunPrepCommand(context=context, workdir=workdir)
+        task = self.create_task(context=context, workdir=workdir)
         task.execute()
         self.assertTrue(os.path.exists(files[2]))
 
@@ -50,7 +54,7 @@ class PrepTest(BaseTest):
                            prep_environ=True)
 
       context = self.context(target_roots=[a])
-      task = RunPrepCommand(context=context, workdir=workdir)
+      task = self.create_task(context=context, workdir=workdir)
       task.execute()
       self.assertEquals('fleem', os.environ['test_prep_env_var'])
 
@@ -60,7 +64,7 @@ class PrepTest(BaseTest):
                            prep_executable='no_such_executable!$^!$&!$#^$#%!%@!', prep_args=[])
 
       context = self.context(target_roots=[a])
-      task = RunPrepCommand(context=context, workdir='')
+      task = self.create_task(context=context, workdir='')
       task.execute()
 
   def test_prep_command_fails(self):
@@ -70,5 +74,5 @@ class PrepTest(BaseTest):
                                                             '/bogus/destination/place'])
 
       context = self.context(target_roots=[a])
-      task = RunPrepCommand(context=context, workdir='')
+      task = self.create_task(context=context, workdir='')
       task.execute()

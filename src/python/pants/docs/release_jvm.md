@@ -121,13 +121,13 @@ this, you can test out the publish in 2 ways:
   1. A dry run to get a preview of what will be published and why:
 
         :::bash
-        $ PANTS_DEV=1 ./pants clean-all publish.jar src/{java,scala}::
+        $ ./pants clean-all publish.jar src/{java,scala}::
 
   2. A local publish to get a preview of both what will be published
      and why as well as the changelogs:
 
         :::bash
-        $ PANTS_DEV=1 ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
+        $ ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
 
      Note that this "dry-run" technique somewhat confusingly passes
      `--no-dryrun` but only because the publish is local and to a
@@ -151,7 +151,7 @@ to use the following command, which will publish everything that's
 changed and only those things that have changed since the last publish:
 
     :::bash
-    $ PANTS_DEV=1 ./pants publish.jar --no-dryrun src/{java,scala}::
+    $ ./pants publish.jar --no-dryrun src/{java,scala}::
 
 ## Promoting to Maven Central ##
 
@@ -167,7 +167,7 @@ but the process is also described below:
      You should use the the same user id and password you use to login
      to the Sonatype JIRA server.
 
-  2. Find the staging repostitory auto-created when you
+  2. Find the staging repository auto-created when you
      [staged the release](#staging-to-ossrh) above.
 
      As shown below, in the 'Staging Repositories' tab enter
@@ -222,4 +222,6 @@ The following folks are set up to publish to Maven Central for
 org.pantsbuild:
 
 - David Turner <dturner@twopensource.com>
+- Eric Ayers <ericzundel@gmail.com>
 - John Sirois <john.sirois@gmail.com>
+- Stu Hood <stuhood@gmail.com>

@@ -36,6 +36,8 @@ class Checkstyle(NailgunTask):
     register('--confs', default=['default'],
              help='One or more ivy configurations to resolve for this target. This parameter is '
                   'not intended for general use. ')
+    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+             help='Run checkstyle with these extra jvm options.')
     cls.register_jvm_tool(register, 'checkstyle')
 
   @classmethod
@@ -109,6 +111,7 @@ class Checkstyle(NailgunTask):
     # with Xargs since checkstyle does not accept, for example, @argfile style arguments.
     def call(xargs):
       return self.runjava(classpath=union_classpath, main=self._CHECKSTYLE_MAIN,
+                          jvm_options=self.get_options().jvm_options,
                           args=args + xargs, workunit_name='checkstyle')
     checks = Xargs(call)
 

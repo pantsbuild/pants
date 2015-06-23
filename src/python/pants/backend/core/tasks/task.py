@@ -19,13 +19,13 @@ from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
-from pants.cache.cache_setup import create_artifact_cache
-from pants.cache.read_write_artifact_cache import ReadWriteArtifactCache
+from pants.cache.cache_setup import CacheSetup
+from pants.option.optionable import Optionable
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.meta import AbstractClass
 
 
-class TaskBase(AbstractClass):
+class TaskBase(Optionable, AbstractClass):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -81,7 +81,7 @@ class TaskBase(AbstractClass):
 
     A tuple of subsystem types.
     """
-    return tuple()
+    return (CacheSetup,)
 
   @classmethod
   def product_types(cls):
@@ -93,30 +93,14 @@ class TaskBase(AbstractClass):
     """
     return []
 
-  # The scope for this task's options. Will be set (on a synthetic subclass) during registration.
-  options_scope = None
-
   @classmethod
   def known_scopes(cls):
-    """Yields all known scopes under this task (usually just its own.)"""
+    """Yields all known scopes for this task, in no particular order."""
+    # The task's own scope.
     yield cls.options_scope
-
-  @classmethod
-  def register_options_on_scope(cls, options):
-    """Trigger registration of this task's options.
-
-    Subclasses should not generally need to override this method.
-    """
-    cls.register_options(options.registration_function_for_scope(cls.options_scope))
-    for subsystem_type in cls.task_subsystems():
-      subsystem_type.register_options_on_scope(options, cls.options_scope)
-
-  @classmethod
-  def register_options(cls, register):
-    """Register options for this task.
-
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
-    """
+    # The scopes of any task-specific subsystems it uses.
+    for subsystem in cls.task_subsystems():
+      yield subsystem.subscope(cls.options_scope)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -171,6 +155,7 @@ class TaskBase(AbstractClass):
     changing every subclass. If the subclass does not need its own
     initialization, this method can (and should) be omitted entirely.
     """
+    super(TaskBase, self).__init__()
     self.context = context
     self._workdir = workdir
     # TODO: It would be nice to use self.get_options().cache_key_gen_version here, because then
@@ -179,10 +164,6 @@ class TaskBase(AbstractClass):
     # group task's scope, which isn't currently in the known scopes we generate options for.
     self._cache_key_generator = CacheKeyGenerator(
       self.context.options.for_global_scope().cache_key_gen_version)
-    self._read_artifact_cache_spec = None
-    self._write_artifact_cache_spec = None
-    self._artifact_cache = None
-    self._artifact_cache_setup_lock = threading.Lock()
 
     self._cache_key_errors = set()
 
@@ -190,6 +171,8 @@ class TaskBase(AbstractClass):
       self.context.options.for_global_scope().pants_workdir,
       'build_invalidator',
       self.stable_name())
+
+    self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
   def get_options(self):
     """Returns the option values for this task's scope."""
@@ -210,54 +193,11 @@ class TaskBase(AbstractClass):
     """
     return self._workdir
 
-  def setup_artifact_cache(self):
-    """Subclasses can call this in their __init__() to set up artifact caching for that task type.
-
-    Uses the options system to find the cache specs.
-    The cache is created lazily, as needed.
-    """
-    read_spec = self.get_options().read_artifact_caches or []
-    write_spec = self.get_options().write_artifact_caches or []
-    self._setup_artifact_cache_from_specs(read_spec, write_spec)
-
-  def _setup_artifact_cache_from_specs(self, read_spec, write_spec):
-    """Subclasses can call this in their __init__() to set up artifact caching for that task type.
-
-    See docstring for pants.cache.cache_setup.create_artifact_cache() for details on the spec format.
-    The cache is created lazily, as needed.
-
-    """
-    self._read_artifact_cache_spec = read_spec
-    self._write_artifact_cache_spec = write_spec
-
-  def _create_artifact_cache(self, spec, action):
-    if len(spec) > 0:
-      pants_workdir = self.context.options.for_global_scope().pants_workdir
-      compression = self.get_options().cache_compression
-      return create_artifact_cache(
-        log=self.context.log,
-        artifact_root=pants_workdir,
-        spec=spec,
-        task_name=self.stable_name(),
-        compression=compression,
-        action=action)
-    else:
-      return None
-
-  def get_artifact_cache(self):
-    with self._artifact_cache_setup_lock:
-      if (self._artifact_cache is None
-          and (self._read_artifact_cache_spec or self._write_artifact_cache_spec)):
-        self._artifact_cache = ReadWriteArtifactCache(
-            self._create_artifact_cache(self._read_artifact_cache_spec, 'will read from'),
-            self._create_artifact_cache(self._write_artifact_cache_spec, 'will write to'))
-      return self._artifact_cache
-
   def artifact_cache_reads_enabled(self):
-    return bool(self._read_artifact_cache_spec) and self.get_options().read_from_artifact_cache
+    return self._cache_factory.read_cache_available()
 
   def artifact_cache_writes_enabled(self):
-    return bool(self._write_artifact_cache_spec) and self.get_options().write_to_artifact_cache
+    return self._cache_factory.write_cache_available()
 
   def invalidate_for_files(self):
     """Provides extra files that participate in invalidation.
@@ -411,8 +351,8 @@ class TaskBase(AbstractClass):
     cached_vts = []
     uncached_vts = OrderedSet(vts)
 
-    cache = self.get_artifact_cache()
-    items = [(cache, vt.cache_key) for vt in vts]
+    read_cache = self._cache_factory.get_read_cache()
+    items = [(read_cache, vt.cache_key) for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)
 
@@ -446,14 +386,14 @@ class TaskBase(AbstractClass):
       self.context.submit_background_work_chain([update_artifact_cache_work],
                                                 parent_workunit_name='cache')
 
-  def get_update_artifact_cache_work(self, vts_artifactfiles_pairs, cache=None):
-    """Create a Work instance to update the artifact cache, if we're configured to.
+  def get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
+    """Create a Work instance to update an artifact cache, if we're configured to.
 
     vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
       - vts is single VersionedTargetSet.
       - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
     """
-    cache = cache or self.get_artifact_cache()
+    cache = self._cache_factory.get_write_cache()
     if cache:
       if len(vts_artifactfiles_pairs) == 0:
         return None
@@ -463,7 +403,7 @@ class TaskBase(AbstractClass):
         targets.update(vts.targets)
       self._report_targets('Caching artifacts for ', list(targets), '.')
 
-      always_overwrite = self.get_options().overwrite_cache_artifacts
+      always_overwrite = self._cache_factory.overwrite()
 
       # Cache the artifacts.
       args_tuples = []

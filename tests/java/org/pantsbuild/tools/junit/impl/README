@@ -5,7 +5,7 @@ if they change anything under src/java/org/pantsbuild/junit:
 
 I.) On the dev branch:
 1) Create a self-contained binary
-$ PANTS_DEV=1 ./pants binary src/java/org/pantsbuild/tools/junit:main
+$ ./pants binary src/java/org/pantsbuild/tools/junit:main
 
 2) Edit BUILD.tools to pick up the self-contained binary you created in 1,
 so that the end result looks like (modulo the exact path to the binary jar you created in 1):
@@ -36,10 +36,10 @@ III.) The operation below should be done on MASTER. Publish a jar with:
 1) git checkout master; git pull
 
 2) dry run:
-./pants clean-all publish src/java/org/pantsbuild/junit
+./pants clean-all publish src/java/org/pantsbuild/tools/junit
 
 3) looks ok? do it:
-yes | ./pants publish.jar --no-dryrun src/java/org/pantsbuild/junit
+yes | ./pants publish.jar --no-dryrun src/java/org/pantsbuild/tools/junit
 
 IV.) Switch back to a dev branch. Make a change that bumps the revision number in BUILD.tools and
 un-@Ignores any tests temporarily ignored in step I.

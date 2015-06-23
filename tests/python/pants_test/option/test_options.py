@@ -521,3 +521,13 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
+
+  def test_complete_scopes(self):
+    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz'},
+                      Options.complete_scopes({'foo.bar.baz'}))
+    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz'},
+                      Options.complete_scopes({'', 'foo.bar.baz'}))
+    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz'},
+                      Options.complete_scopes({'foo', 'foo.bar.baz'}))
+    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz', 'qux', 'qux.quux'},
+                      Options.complete_scopes({'foo.bar.baz', 'qux.quux'}))

@@ -11,6 +11,7 @@ import re
 import uuid
 from collections import defaultdict, namedtuple
 
+from six import string_types
 from six.moves import range
 
 from pants.base.build_environment import get_buildroot
@@ -153,7 +154,7 @@ class HtmlReporter(Reporter):
     # Update the artifact cache stats.
     def render_cache_stats(artifact_cache_stats):
       def fix_detail_id(e, _id):
-        return e if isinstance(e, basestring) else e + (_id, )
+        return e if isinstance(e, string_types) else e + (_id, )
 
       msg_elements = []
       for cache_name, stat in artifact_cache_stats.stats_per_cache.items():
@@ -231,7 +232,7 @@ class HtmlReporter(Reporter):
       # preserved through refreshes. For example, when looking at the artifact cache stats,
       # if "hits" are open and "misses" are closed, we want to remember that even after
       # the cache stats are updated and the message re-rendered.
-      if isinstance(element, basestring):
+      if isinstance(element, string_types):
         element = [element]
       defaults = ('', None, None, False)
       # Map assumes None for missing values, so this will pick the default for those.

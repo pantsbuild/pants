@@ -23,6 +23,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/backend/core:plugin',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )

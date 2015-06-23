@@ -110,8 +110,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
 class TempLocalArtifactCache(BaseLocalArtifactCache):
   """A local cache that does not actually store any files between calls.
 
-    This implementation does not have a backing _cache_root, and never
-    actually stores files between calls, but is useful for handling file IO for a remote cache.
+  This implementation does not have a backing _cache_root, and never
+  actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
   def __init__(self, artifact_root, compression):
     """

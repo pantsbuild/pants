@@ -32,10 +32,10 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(IvyResolveTest, self).setUp()
-    self.set_options(
-        read_artifact_caches=None,
-        write_artifact_caches=None,
-        use_nailgun=False)
+    self.set_options(use_nailgun=False)
+    self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                               read_from=None,
+                               write_to=None)
 
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
