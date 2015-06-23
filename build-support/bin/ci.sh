@@ -125,10 +125,21 @@ fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
   banner "Sanity checking bootstrapped pants and repo BUILD files"
-  ./pants.pex ${PANTS_ARGS[@]} clean-all || die "Failed to clean-all."
-  ./pants.pex ${PANTS_ARGS[@]} goals || die "Failed to list goals."
-  ./pants.pex ${PANTS_ARGS[@]} list :: || die "Failed to list all targets."
-  ./pants.pex ${PANTS_ARGS[@]} targets || die "Failed to show target help."
+  sanity_tests=(
+    "bash-completion"
+    "builddict"
+    "clean-all"
+    "goals"
+    "list ::"
+    "roots"
+    "targets"
+  )
+  for cur_test in "${sanity_tests[@]}"; do
+    cmd="./pants.pex ${PANTS_ARGS[@]} ${cur_test}"
+    echo "Executing command '${cmd}' as a sanity test:"
+    ${cmd} >/dev/null || die "Failed execute '${cmd}'."
+    echo ""
+  done
 fi
 
 if [[ "${skip_distribution:-false}" == "false" ]]; then
