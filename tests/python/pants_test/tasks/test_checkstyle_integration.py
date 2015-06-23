@@ -5,14 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import time
-
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
-  def test_run_checkstyle(self):
+  def test_checkstyle_cached(self):
     with temporary_dir(root_dir=self.workdir_root()) as tmp_workdir:
       with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
         checkstyle_args = [
