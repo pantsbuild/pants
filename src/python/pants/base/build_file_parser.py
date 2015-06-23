@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import warnings
 
-import six
-
 
 logger = logging.getLogger(__name__)
 
@@ -31,19 +29,15 @@ class BuildFileParser(object):
 
   class BuildFileParserError(Exception):
     """Base class for all exceptions raised in BuildFileParser to make exception handling easier"""
-    pass
 
   class BuildFileScanError(BuildFileParserError):
     """Raised if there was a problem when gathering all addresses in a BUILD file """
-    pass
 
   class AddressableConflictException(BuildFileParserError):
     """Raised if the same address is redefined in a BUILD file"""
-    pass
 
   class SiblingConflictException(BuildFileParserError):
     """Raised if the same address is redefined in another BUILD file in the same directory"""
-    pass
 
   class ParseError(BuildFileParserError):
     """An exception was encountered in the python parser"""
@@ -134,7 +128,7 @@ class BuildFileParser(object):
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
       with warnings.catch_warnings(record=True) as warns:
-        six.exec_(build_file_code, parse_state.parse_globals)
+        exec(build_file_code, parse_state.parse_globals)
         for warn in warns:
           logger.warning(_format_context_msg(lineno=warn.lineno,
                                              offset=None,
