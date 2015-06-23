@@ -156,42 +156,16 @@ the `BUILD.internal` file.
 Configure JVM Artifact Downloads
 --------------------------------
 
-Pants uses `ivy` to fetch libraries external to the repo (also called 3rdparty libraries).
-Ivy uses an XML configuration file.  Pants ships with an ivy configuration under
-`build-support/ivy/ivysettings.xml`.  For your repo, you will need to setup your own.  Here's a
-simple example to get you started:
-
-    :::xml
-    <?xml version="1.0"?>
-
-    <ivysettings>
-
-      <settings defaultResolver="chain-repos"/>
-      <resolvers>
-        <chain name="chain-repos" returnFirst="true">
-          <ibiblio name="maven2"
-                   m2compatible="true"
-                   usepoms="true"
-                   root="https://repo1.maven.org/maven2/"/>
-
-          <!-- This is just for jvm tools used by Pants and not yet published to maven central. -->
-          <ibiblio name="pantsbuild-maven-repo"
-                   m2compatible="true"
-                   usepoms="true"
-                   root="https://dl.bintray.com/pantsbuild/maven/"/>
-
-        </chain>
-      </resolvers>
-    </ivysettings>
-
-Note that the location of this file and the location of the `ivy.cache.dir` property in the
-`ivysettings.xml` file must match up with the ivy configuration in pants.  To modify these, update
-the following settings in `pants.ini`:
+Pants uses `Ivy` to fetch libraries external to the repo (also called 3rdparty libraries).
+Ivy uses an XML configuration file.  By default, pants uses the configuration that ships with Ivy,
+but if you need to change ivy settings you can specify your own in `pants.ini`:
 
     [ivy]
     ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
     cache_dir: ~/.ivy2/pants
 
+Note that the location of this file and the location of the `ivy.cache.dir` property in the
+`ivysettings.xml` file must match up with the Ivy configuration in pants.
 
 For more information on Ivy settings, see the [Ivy documentation](http://ant.apache.org/ivy/)
 
@@ -571,8 +545,8 @@ jvm_options: [
   ]
 ```
 
-Alternatively, you can also set these values through the `<properties>` configuration item in
-`ivysettings.xml`
+Alternatively, if you have a custom `ivysettings.xml` file, you can set these values through
+the `<properties>` configuration item.
 
 
 ## Nexus as proxy
