@@ -21,9 +21,9 @@ def _wrap(testmethod, setupfun):
     for strategy in _STRATEGIES:
       try:
         setupfun(self, testmethod, strategy)
-      except Exception as e:
+      except Exception:
         print("failed for strategy '{}'".format(strategy), file=sys.stderr)
-        raise e
+        raise
   return wrapped
 
 def provide_compile_strategies(testmethod):

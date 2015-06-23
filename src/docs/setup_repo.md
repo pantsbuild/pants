@@ -374,17 +374,17 @@ Outside Caches
 You can tell Pants to use outside caches when building. Pants automatically caches much of its
 work in its working directory. But you can tell it to use (and generate) pre-built things in
 another directory or a remote RESTful server. E.g, to use a shared server for cached builds,
-and having set up such a server, set `..._caches` options in `pants.ini`:
+and having set up such a server, set `cache` options in `pants.ini`:
 
-    [DEFAULT]
-    read_artifact_caches: ['https://myserver.co/pantscache']
-    write_artifact_caches: ['https://myserver.co/pantscache']
+    [cache]
+    read_from: ['https://myserver.co/pantscache']
+    write_to: ['https://myserver.co/pantscache']
 
-When building, Pants first tries to read built things from places in `read_artifact_caches`.
-If it builds something, it caches those built things in places in  `write_artifact_caches`.
+When building, Pants first tries to read built things from places in `read_from`.
+If it builds something, it caches those built things in places in  `write_to`.
 (It's handy that these are separate settings; if members of your organization can install wacky
-tools on their laptops, you might not want their builds to write to the cache, but would want
-them to be able to read from it.)
+tools on their laptops, you might not want their builds to write to a particular cache, but would 
+want them to be able to read from it.)
 
 Valid option values include
 
@@ -393,7 +393,7 @@ Valid option values include
 * `[ 'https://myserver.us/pcache|https://myserver.bf/pcache' ]` pipe-separated list of URLs--Pants pings each and uses fastest
 * `[ '/tmp/pantscache', 'https://myserver.co/pcache' ]` try local fs first, then remote server
 
-For a list of allowed values see the `create_artifact_cache` docstring in
+For a list of allowed values see the `_do_create_artifact_cache` docstring in
 [`cache_setup.py`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/cache/cache_setup.py)
 
 To make a cache server, you need to write it. It's basically a RESTful server that can handle

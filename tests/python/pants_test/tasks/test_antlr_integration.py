@@ -39,8 +39,8 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
           compile_antlr_args = [
             'clean-all',
             'compile',
-            "--write-artifact-caches=['{}']".format(artifact_cache),
-            "--read-artifact-caches=['{}']".format(artifact_cache),
+            "--cache-gen-antlr-write-to=['{}']".format(artifact_cache),
+            "--cache-gen-antlr-read-from=['{}']".format(artifact_cache),
             enable_zinc_java,
             'examples/src/antlr/org/pantsbuild/example/exp::'
           ]

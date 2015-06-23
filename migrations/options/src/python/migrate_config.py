@@ -9,13 +9,12 @@ import sys
 
 from colors import cyan, green, red, yellow
 
-from pants.base.config import Config, SingleFileConfig
+from pants.base.config import Config
 from pants.option import custom_types
 from pants.option.errors import ParseError
 
 
 migrations = {
-
   ('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
   ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
@@ -161,8 +160,6 @@ migrations = {
   ('ide', 'extra_jvm_source_paths'): ('idea', 'extra_jvm_source_paths'),
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
-
-  ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
 
   ('reporting', 'reports_template_dir'): ('reporting', 'template_dir'),
 
@@ -311,38 +308,58 @@ notes = {
 }
 
 
+def check_option(cp, src, dst):
+  def has_explicit_option(section, key):
+    # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
+    # that approach fails for the important case of boolean options.  Since this is a ~short term
+    # tool and its highly likely its lifetime will be shorter than the time the private
+    # ConfigParser_sections API we use here changes, its worth the risk.
+    return cp.has_section(section) and (key in cp._sections[section])
+
+  def section(s):
+    return cyan('[{0}]'.format(s))
+
+  src_section, src_key = src
+  if has_explicit_option(src_section, src_key):
+    if dst is not None:
+      dst_section, dst_key = dst
+      print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
+            '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
+                                    dst_key=green(dst_key), dst_section=section(dst_section)),
+            file=sys.stderr)
+    elif src not in notes:
+      print('Found {src_key} in section {src_section} and there is no automated migration path'
+            'for this option.  Please consult the '
+            'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
+
+    if (src_section, src_key) in notes:
+      print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
+
 def check_config_file(path):
   cp = Config.create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
-  config = SingleFileConfig(path, cp)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
   def section(s):
     return cyan('[{0}]'.format(s))
 
-  for (src_section, src_key), dst in migrations.items():
-    def has_explicit_option(section, key):
-      # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
-      # that approach fails for the important case of boolean options.  Since this is a ~short term
-      # tool and its highly likely its lifetime will be shorter than the time the private
-      # ConfigParser_sections API we use here changes, its worth the risk.
-      return cp.has_section(section) and (key in cp._sections[section])
+  for src, dst in migrations.items():
+    check_option(cp, src, dst)
 
-    if has_explicit_option(src_section, src_key):
-      if dst is not None:
-        dst_section, dst_key = dst
-        print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
-              '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
-                                      dst_key=green(dst_key), dst_section=section(dst_section)),
-                                      file=sys.stderr)
-      elif (src_section, src_key) not in notes:
-        print('Found {src_key} in section {src_section} and there is no automated migration path'
-              'for this option.  Please consult the '
-              'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
-
-      if (src_section, src_key) in notes:
-        print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
+  # Special-case handling of artifact cache options, so we can sweep them up in all sections easily.
+  artifact_cache_options = {
+    'read_from_artifact_cache': 'read',
+    'write_to_artifact_cache': 'write',
+    'overwrite_cache_artifacts': 'overwrite',
+    'read_artifact_caches': 'read_from',
+    'write_artifact_caches': 'write_to',
+    'cache_compression': 'compression_level',
+  }
+  for src_sec in ['DEFAULT'] + cp.sections():
+    dst_sec = 'cache' if src_sec == 'DEFAULT' else 'cache.{}'.format(src_sec)
+    for src_key, dst_key in artifact_cache_options.items():
+      check_option(cp, (src_sec, src_key), (dst_sec, dst_key))
 
   # Check that all values are parseable.
   for sec in ['DEFAULT'] + cp.sections():
