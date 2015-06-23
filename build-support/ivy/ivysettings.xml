@@ -4,30 +4,22 @@ Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
+<!-- Attempts to use default ivy settings, with the exception of local .m2 resolution -->
 <ivysettings>
-  <property name="ivy.cache.dir" value="${user.home}/.ivy2/pants" override="false"/>
+  <include url="${ivy.default.settings.dir}/ivysettings.xml"/>
 
-  <settings defaultResolver="chain-repos"/>
-
-  <macrodef name="_remote_resolvers">
-    <chain returnFirst="true">
-      <ibiblio name="maven2"
-               m2compatible="true"
-               usepoms="true"
-               root="https://repo1.maven.org/maven2/"/>
-    </chain>
-  </macrodef>
+  <settings defaultResolver="pants-chain-repos"/>
 
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
-
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
 
   <resolvers>
-    <chain name="chain-repos" returnFirst="true">
-      <_remote_resolvers name="remote-repos"/>
+    <chain name="pants-chain-repos" returnFirst="true">
+      <!-- the default resolver shipped with ivy -->
+      <resolver ref="default"/>
 
       <!-- mvn standard -->
       <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
@@ -36,8 +28,4 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       </filesystem>
     </chain>
   </resolvers>
-
-  <caches default="default" lockStrategy="no-lock" useOrigin="true">
-    <cache name="default" basedir="${ivy.cache.dir}"/>
-  </caches>
 </ivysettings>
