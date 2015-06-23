@@ -205,6 +205,7 @@ public class ConsoleRunnerImpl {
             String prefix = test.getClassName();
 
             File out = new File(outdir, prefix + ".out.txt");
+            System.out.println(outdir);
             Files.createParentDirs(out);
 
             File err = new File(outdir, prefix + ".err.txt");
