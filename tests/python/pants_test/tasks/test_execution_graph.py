@@ -18,6 +18,9 @@ class ImmediatelyExecutingPool(object):
 
 
 class PrintLogger(object):
+  def error(self, msg):
+    print(msg)
+
   def debug(self, msg):
     print(msg)
 

@@ -6,9 +6,10 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
+import sbt.Logger
+import sbt.Path._
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate }
-import sbt.Path._
 import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
 
@@ -27,16 +28,13 @@ case class Inputs(
   definesClass: File => String => Boolean,
   javaOnly: Boolean,
   compileOrder: CompileOrder,
-  incOptions: IncOptions,
-  outputRelations: Option[File],
-  outputProducts: Option[File],
-  mirrorAnalysis: Boolean)
+  incOptions: IncOptions)
 
 object Inputs {
   /**
    * Create inputs based on command-line settings.
    */
-  def apply(log: LoggerRaw, settings: Settings): Inputs = {
+  def apply(log: Logger, settings: Settings): Inputs = {
     import settings._
     inputs(
       log,
@@ -50,14 +48,11 @@ object Inputs {
       analysis.forceClean,
       javaOnly,
       compileOrder,
-      incOptions,
-      analysis.outputRelations,
-      analysis.outputProducts,
-      analysis.mirrorAnalysis)
+      incOptions)
   }
 
   /** An overridden definesClass to use analysis for an input directory if it is available. */
-  def definesClass(log: LoggerRaw, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
+  def definesClass(log: Logger, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
     analysisMap.get(entry).map { analysis =>
       log.debug(s"Hit analysis cache for class definitions with ${entry}")
       (s: String) => analysis.relations.definesClass(s).nonEmpty
@@ -69,7 +64,7 @@ object Inputs {
    * Create normalised and defaulted Inputs.
    */
   def inputs(
-    log: LoggerRaw,
+    log: Logger,
     classpath: Seq[File],
     sources: Seq[File],
     classesDirectory: File,
@@ -80,10 +75,7 @@ object Inputs {
     forceClean: Boolean,
     javaOnly: Boolean,
     compileOrder: CompileOrder,
-    incOptions: IncOptions,
-    outputRelations: Option[File],
-    outputProducts: Option[File],
-    mirrorAnalysis: Boolean): Inputs =
+    incOptions: IncOptions): Inputs =
   {
     val normalise: File => File = { _.getAbsoluteFile }
     val cp               = classpath map normalise
@@ -105,11 +97,9 @@ object Inputs {
       }
     val analysisMap      = (cp map { file => (file, allAnalysisFor(file, classes, upstreamAnalysis)) }).toMap
     val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
-    val printRelations   = outputRelations map normalise
-    val printProducts    = outputProducts map normalise
     new Inputs(
       cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, definesClass(log, validUpstreamAnalysis, _),
-      javaOnly, compileOrder, incOpts, printRelations, printProducts, mirrorAnalysis
+      javaOnly, compileOrder, incOpts
     )
   }
 
@@ -117,7 +107,7 @@ object Inputs {
    * Java API for creating Inputs.
    */
   def create(
-    log: LoggerRaw,
+    log: Logger,
     classpath: JList[File],
     sources: JList[File],
     classesDirectory: File,
@@ -126,8 +116,7 @@ object Inputs {
     analysisCache: File,
     analysisMap: JMap[File, File],
     compileOrder: String,
-    incOptions: IncOptions,
-    mirrorAnalysisCache: Boolean): Inputs =
+    incOptions: IncOptions): Inputs =
   inputs(
     log,
     classpath.asScala,
@@ -140,26 +129,8 @@ object Inputs {
     forceClean = false,
     javaOnly = false,
     Settings.compileOrder(compileOrder),
-    incOptions,
-    outputRelations = None,
-    outputProducts = None,
-    mirrorAnalysis = mirrorAnalysisCache
+    incOptions
   )
-
-  @deprecated("Use the variant that takes `incOptions` parameter, instead.", "0.3.5.3")
-  def create(
-    log: LoggerRaw,
-    classpath: JList[File],
-    sources: JList[File],
-    classesDirectory: File,
-    scalacOptions: JList[String],
-    javacOptions: JList[String],
-    analysisCache: File,
-    analysisMap: JMap[File, File],
-    compileOrder: String,
-    mirrorAnalysisCache: Boolean): Inputs =
-    create(log, classpath, sources, classesDirectory, scalacOptions, javacOptions,
-      analysisCache, analysisMap, compileOrder, IncOptions(), mirrorAnalysisCache)
 
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
@@ -268,9 +239,7 @@ object Inputs {
       "force clean"                  -> forceClean,
       "java only"                    -> javaOnly,
       "compile order"                -> compileOrder,
-      "incremental compiler options" -> incOpts,
-      "output relations"             -> outputRelations,
-      "output products"              -> outputProducts)
+      "incremental compiler options" -> incOpts)
 
     Util.show(("Inputs", values), output)
   }

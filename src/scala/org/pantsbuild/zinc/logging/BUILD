@@ -1,17 +1,13 @@
 scala_library(
-  name='zinc',
+  name='logging',
   provides=artifact(
     org='org.pantsbuild',
-    name='zinc',
+    name='zinc-logging',
     repo=public,
     publication_metadata=pants_library('The SBT incremental compiler for nailgun')
   ),
   dependencies=[
-    '//:nailgun-server',
     '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
-    '3rdparty:guava',
-    '3rdparty:jsr305',
-    'src/scala/org/pantsbuild/zinc/logging',
   ],
   sources=globs('*.scala'),
 )

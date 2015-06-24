@@ -17,26 +17,19 @@ Build
 
 Zinc is built using pants:
 
-    ./pants test zinc/
+    ./pants test zinc:
 
 To build a jar use:
 
-    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:bin
+    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:
 
-To consume a jar change zinc target in BUILD.tools:
+To consume a jar, change the zinc target in BUILD.tools. To force pants to re-resolve
+and re-shade the artifact, use a new `rev` whenever the artifact has changed.
 
     jar_library(name = 'zinc',
                 jars = [
-                  jar(org = 'org.pantsbuild', name = 'zinc', rev = 'none', mutable = True,
-                      url = 'file:///Users/fkorotkov/workspace/fkorotkov/pants/dist/zinc.jar'),
-                ],
-                dependencies=[
-                  ':nailgun-server',
-                  '3rdparty/jvm/com/typesafe/sbt:compiler-interface',
-                  '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
-                  '3rdparty/jvm/com/typesafe/sbt:sbt-interface',
-                  '3rdparty:guava',
-                  '3rdparty:jsr305',
+                  jar(org = 'org.pantsbuild', name = 'zinc', rev = ???,
+                      url = 'file:///Users/user/pants/dist/zinc.jar'),
                 ])
 
 
@@ -45,7 +38,7 @@ Options
 
 To get information about options
 
-    ./pants run zinc:bin -- -help
+    ./pants run zinc: -- -help
 
 ### Compile
 

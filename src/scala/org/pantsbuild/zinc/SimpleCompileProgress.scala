@@ -1,7 +1,7 @@
 package org.pantsbuild.zinc
 
 import xsbti.compile.CompileProgress
-import org.pantsbuild.zinc.{LoggerRaw => Logger}
+import sbt.Logger
 
 /**
  * SimpleCompileProgress implements CompileProgress to add output to zinc scala compilations, but
@@ -32,13 +32,13 @@ class SimpleCompileProgress(logPhases: Boolean, printProgress: Boolean, heartbea
   def advance(current: Int, total: Int): Boolean = {
     if (printProgress) {
       val percent = (current * 100) / total
-      log.logRaw(s"\rProgress: ${percent}%")
+      System.out.print(s"\rProgress: ${percent}%")
     }
     if (heartbeatSecs > 0) {
       val currentTimeMillis = System.currentTimeMillis
       val delta = currentTimeMillis - lastHeartbeatMillis
       if (delta > (1000 * heartbeatSecs)) {
-        log.logRaw(".")
+        System.out.print(".")
         lastHeartbeatMillis = currentTimeMillis
       }
     }
