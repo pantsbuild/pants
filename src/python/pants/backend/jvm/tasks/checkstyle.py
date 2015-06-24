@@ -48,7 +48,6 @@ class Checkstyle(NailgunTask):
   def __init__(self, *args, **kwargs):
     super(Checkstyle, self).__init__(*args, **kwargs)
 
-    self.setup_artifact_cache()
     self._results_dir = os.path.join(self.workdir, 'checkstyle-results')
 
   def _is_checked(self, target):
