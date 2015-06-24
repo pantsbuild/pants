@@ -16,8 +16,8 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         checkstyle_args = [
           'clean-all',
           'compile.checkstyle',
-          "--write-artifact-caches=['{}']".format(artifact_cache),
-          "--read-artifact-caches=['{}']".format(artifact_cache),
+          "--cache-write-to=['{}']".format(artifact_cache),
+          "--cache-read-from=['{}']".format(artifact_cache),
           'testprojects/src/java/org/pantsbuild/testproject/java_style::'
         ]
 
