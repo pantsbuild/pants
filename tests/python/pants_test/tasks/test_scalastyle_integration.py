@@ -16,7 +16,7 @@ class ScalastyleIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cache:
         scalastyle_args = [
-          # 'clean-all',
+          'clean-all',
           'compile.scalastyle',
           "--cache-write-to=['{}']".format(cache),
           "--cache-read-from=['{}']".format(cache),
