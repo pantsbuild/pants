@@ -164,8 +164,8 @@ but if you need to change ivy settings you can specify your own in `pants.ini`:
     ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
     cache_dir: ~/.ivy2/pants
 
-Note that the location of this file and the location of the `ivy.cache.dir` property in the
-`ivysettings.xml` file must match up with the Ivy configuration in pants.
+Note that pants overrides Ivy's `ivy.cache.dir` property with the value of the --ivy-cache-dir
+pants option.
 
 For more information on Ivy settings, see the [Ivy documentation](http://ant.apache.org/ivy/)
 
