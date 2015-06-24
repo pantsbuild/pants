@@ -3,6 +3,7 @@
 
 package org.pantsbuild.tools.junit.impl;
 
+import java.awt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -56,11 +57,6 @@ import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRe
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
 public class ConsoleRunnerImpl {
-  private static final SwappableStream<PrintStream> SWAPPABLE_OUT =
-      new SwappableStream<PrintStream>(System.out);
-
-  private static final SwappableStream<PrintStream> SWAPPABLE_ERR =
-      new SwappableStream<PrintStream>(System.err);
 
   /** Should be set to false for unit testing via {@link #setCallSystemExitOnFinish} */
   private static boolean callSystemExitOnFinish = true;
@@ -101,6 +97,8 @@ public class ConsoleRunnerImpl {
 
     private final File err;
     private OutputStream errstream;
+    private final SwappableStream<PrintStream> swappableOut;
+    private final SwappableStream<PrintStream> swappableErr;
 
     /**
      *  If true capture stdout and stderr to original System.out and System.err
@@ -111,10 +109,14 @@ public class ConsoleRunnerImpl {
     private int useCount;
     private boolean closed;
 
-    StreamCapture(File out, File err, boolean printToOriginalOutputs) throws IOException {
+    StreamCapture(File out, File err, boolean printToOriginalOutputs,
+                  SwappableStream<PrintStream> swappableOut,
+                  SwappableStream<PrintStream> swappableErr) throws IOException {
       this.out = out;
       this.err = err;
       this.printToOriginalOutputs = printToOriginalOutputs;
+      this.swappableOut = swappableOut;
+      this.swappableErr = swappableErr;
     }
 
     void incrementUseCount() {
@@ -129,11 +131,11 @@ public class ConsoleRunnerImpl {
         errstream = new FileOutputStream(err);
       }
       if (printToOriginalOutputs) {
-        SWAPPABLE_OUT.swap(new TeeOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
-        SWAPPABLE_ERR.swap(new TeeOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
+        swappableOut.swap(new TeeOutputStream(swappableOut.getOriginal(), outstream));
+        swappableErr.swap(new TeeOutputStream(swappableErr.getOriginal(), errstream));
       } else {
-        SWAPPABLE_OUT.swap(outstream);
-        SWAPPABLE_ERR.swap(errstream);
+        swappableOut.swap(outstream);
+        swappableErr.swap(errstream);
       }
     }
 
@@ -177,10 +179,16 @@ public class ConsoleRunnerImpl {
 
     private final File outdir;
     private final boolean printToOriginalOutputs;
+    private final SwappableStream<PrintStream> swappableOut;
+    private final SwappableStream<PrintStream> swappableErr;
 
-    StreamCapturingListener(File outdir, boolean printToOriginalOutputs) {
+    StreamCapturingListener(File outdir, boolean printToOriginalOutputs,
+                            SwappableStream<PrintStream> swappableOut,
+                            SwappableStream<PrintStream> swappableErr) {
       this.outdir = outdir;
       this.printToOriginalOutputs = printToOriginalOutputs;
+      this.swappableOut = swappableOut;
+      this.swappableErr = swappableErr;
     }
 
     @Override
@@ -198,11 +206,13 @@ public class ConsoleRunnerImpl {
             String prefix = test.getClassName();
 
             File out = new File(outdir, prefix + ".out.txt");
+            System.out.println(outdir);
             Files.createParentDirs(out);
 
             File err = new File(outdir, prefix + ".err.txt");
             Files.createParentDirs(err);
-            capture = new StreamCapture(out, err, printToOriginalOutputs);
+            capture = new StreamCapture(out, err, printToOriginalOutputs,
+                                        swappableOut, swappableErr);
             captures.put(test.getTestClass(), capture);
           }
           capture.incrementUseCount();
@@ -253,6 +263,8 @@ public class ConsoleRunnerImpl {
   private final int testShard;
   private final int numTestShards;
   private final int numRetries;
+  private final SwappableStream<PrintStream> swappableOut;
+  private final SwappableStream<PrintStream> swappableErr;
 
   ConsoleRunnerImpl(
       boolean failFast,
@@ -264,7 +276,9 @@ public class ConsoleRunnerImpl {
       int parallelThreads,
       int testShard,
       int numTestShards,
-      int numRetries) {
+      int numRetries,
+      PrintStream out,
+      PrintStream err) {
 
     this.failFast = failFast;
     this.suppressOutput = suppressOutput;
@@ -276,14 +290,16 @@ public class ConsoleRunnerImpl {
     this.testShard = testShard;
     this.numTestShards = numTestShards;
     this.numRetries = numRetries;
+    this.swappableOut = new SwappableStream<PrintStream>(out);
+    this.swappableErr = new SwappableStream<PrintStream>(err);
   }
 
   void run(Iterable<String> tests) {
-    System.setOut(new PrintStream(SWAPPABLE_OUT));
-    System.setErr(new PrintStream(SWAPPABLE_ERR));
+    System.setOut(new PrintStream(swappableOut));
+    System.setErr(new PrintStream(swappableErr  ));
 
     List<Request> requests =
-        parseRequests(SWAPPABLE_OUT.getOriginal(), SWAPPABLE_ERR.getOriginal(), tests);
+        parseRequests(swappableOut.getOriginal(), swappableErr.getOriginal(), tests);
 
     if (numTestShards > 0) {
       requests = setFilterForTestShard(requests);
@@ -304,7 +320,7 @@ public class ConsoleRunnerImpl {
         }
       }
       StreamCapturingListener streamCapturingListener =
-        new StreamCapturingListener(outdir, !suppressOutput);
+        new StreamCapturingListener(outdir, !suppressOutput, swappableOut, swappableErr);
       abortableListener.addListener(streamCapturingListener);
 
       AntJunitXmlReportListener xmlReportListener =
@@ -316,15 +332,15 @@ public class ConsoleRunnerImpl {
     // abortableListener gets removed when one of the listener throws exceptions in
     // RunNotifier.java. Other listeners should not get removed.
     if (perTestTimer) {
-      abortableListener.addListener(new PerClassConsoleListener(SWAPPABLE_OUT.getOriginal()));
+      abortableListener.addListener(new PerClassConsoleListener(swappableOut.getOriginal()));
     } else {
-      core.addListener(new ConsoleListener(SWAPPABLE_OUT.getOriginal()));
+      core.addListener(new ConsoleListener(swappableErr.getOriginal()));
     }
 
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
     final Thread abnormalExitHook =
-        createAbnormalExitHook(abortableListener, SWAPPABLE_OUT.getOriginal());
+        createAbnormalExitHook(abortableListener, swappableOut.getOriginal());
     Runtime.getRuntime().addShutdownHook(abnormalExitHook);
     int failures = 0;
     try {
@@ -640,7 +656,9 @@ public class ConsoleRunnerImpl {
             options.parallelThreads,
             options.testShard,
             options.numTestShards,
-            options.numRetries);
+            options.numRetries,
+            System.out,
+            System.err);
 
     List<String> tests = Lists.newArrayList();
     for (String test : options.tests) {
