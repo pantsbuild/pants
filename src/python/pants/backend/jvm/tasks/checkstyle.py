@@ -48,7 +48,7 @@ class Checkstyle(NailgunTask):
   def __init__(self, *args, **kwargs):
     super(Checkstyle, self).__init__(*args, **kwargs)
 
-    self._results_dir = os.path.join(self.workdir, 'checkstyle-results')
+    self._results_dir = os.path.join(self.workdir, 'results')
 
   def _is_checked(self, target):
     return (isinstance(target, Target) and
@@ -74,7 +74,7 @@ class Checkstyle(NailgunTask):
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
-        
+
         if self.artifact_cache_writes_enabled():
           result_files = map(lambda t: self._create_result_file(t), invalid_targets)
           self.update_artifact_cache([(

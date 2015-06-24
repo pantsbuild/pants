@@ -11,20 +11,24 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
   def test_checkstyle_cached(self):
-    with temporary_dir(root_dir=self.workdir_root()) as tmp_workdir:
-      with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
-        checkstyle_args = [
+    with temporary_dir(root_dir=self.workdir_root()) as cache:
+      checkstyle_args = [
           'clean-all',
           'compile.checkstyle',
-          "--cache-write-to=['{}']".format(artifact_cache),
-          "--cache-read-from=['{}']".format(artifact_cache),
-          'testprojects/src/java/org/pantsbuild/testproject/java_style::'
+          "--cache-write-to=['{}']".format(cache),
+          "--cache-read-from=['{}']".format(cache),
+          'examples/src/java/org/pantsbuild/example/hello/simple',
+          '-ldebug'
         ]
 
-        pants_run = self.run_pants_with_workdir(checkstyle_args, tmp_workdir)
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+        pants_run = self.run_pants_with_workdir(checkstyle_args, workdir)
         self.assert_success(pants_run)
-        self.assertIn('Caching artifacts for 1 target.', pants_run.stdout_data)
+        self.assertIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
+            pants_run.stdout_data)
 
-        pants_run = self.run_pants_with_workdir(checkstyle_args, tmp_workdir)
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+        pants_run = self.run_pants_with_workdir(checkstyle_args, workdir)
         self.assert_success(pants_run)
-        self.assertIn('Using cached artifacts for 1 target.', pants_run.stdout_data)
+        self.assertIn('abc_Checkstyle_compile_checkstyle will read from local artifact cache',
+            pants_run.stdout_data)
