@@ -1,14 +1,8 @@
-target(name='zinc',
-  dependencies=[
-    'src/scala/org/pantsbuild/zinc'
-  ]
-)
-
 jvm_binary(
-  name='bin',
+  name='zinc',
   basename='zinc',
   main='org.pantsbuild.zinc.Main',
   dependencies=[
-    ':zinc'
+    'src/scala/org/pantsbuild/zinc',
   ]
 ).with_description("zinc -- the scala compiler in nailgun")

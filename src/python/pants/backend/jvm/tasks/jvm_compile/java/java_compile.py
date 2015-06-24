@@ -99,7 +99,7 @@ class JavaCompile(JvmCompile):
   def _language_platform_version_info(self):
     return [self.get_options().target] if self.get_options().target else []
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath('jmake')
     args = [

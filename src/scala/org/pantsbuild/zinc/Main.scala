@@ -7,6 +7,7 @@ package org.pantsbuild.zinc
 import java.io.File
 import sbt.Level
 import xsbti.CompileFailed
+import org.pantsbuild.zinc.logging.Loggers
 
 /**
  * Command-line main class.
@@ -28,9 +29,14 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log = Util.logger(settings.logOptions.quiet, settings.logOptions.logLevel,
-      settings.logOptions.color, settings.logOptions.logFilters)
-    val isDebug = (!settings.logOptions.quiet && settings.logOptions.logLevel == Level.Debug)
+    val log =
+      Loggers.create(
+        settings.consoleLog.logLevel,
+        settings.consoleLog.color,
+        settings.consoleLog.logFilters,
+        captureLog = settings.captureLog
+      )
+    val isDebug = settings.consoleLog.logLevel == Level.Debug
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {
@@ -43,27 +49,13 @@ object Main {
 
     if (settings.help) Settings.printUsage()
 
-    // analysis manipulation utilities
-    if (settings.analysisUtil.run) {
-      val exitCode = try {
-        SbtAnalysis.runUtil(settings.analysisUtil, log, settings.analysis.mirrorAnalysis, cwd)
-      } catch {
-        case e: Exception => log.error(e.getMessage)
-        sys.exit(1)
-      }
-      sys.exit(0) // only run analysis utilities
-    }
-
     val inputs = Inputs(log, settings)
     val setup = Setup(settings)
 
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
     if (inputs.sources.isEmpty) {
-      if (inputs.outputProducts.isDefined || inputs.outputRelations.isDefined) {
-        SbtAnalysis.printOutputs(Compiler.analysis(inputs.cacheFile),
-          inputs.outputRelations, inputs.outputProducts, cwd, inputs.classesDirectory)
-      } else if (!settings.version && !settings.help) {
+      if (!settings.version && !settings.help) {
         Setup.printVersion()
         Settings.printUsage()
         sys.exit(1)
@@ -108,8 +100,8 @@ object Main {
         if (message ne null) log.error(message)
         sys.exit(1)
     } finally {
-      if (settings.logOptions.printProgress || settings.logOptions.heartbeatSecs > 0) {
-          log.logRaw("Done.")
+      if (settings.consoleLog.printProgress || settings.consoleLog.heartbeatSecs > 0) {
+        System.out.println("Done.")
       }
     }
   }

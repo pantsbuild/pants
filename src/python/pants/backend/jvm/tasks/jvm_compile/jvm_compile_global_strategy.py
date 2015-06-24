@@ -269,6 +269,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                   upstream_analysis,
                   compile_classpath,
                   self._classes_dir,
+                  None,
                   progress_message)
 
       # No exception was thrown, therefore the compile succeeded and analysis_file is now valid.

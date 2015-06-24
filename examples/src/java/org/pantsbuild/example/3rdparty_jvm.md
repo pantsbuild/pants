@@ -37,7 +37,7 @@ In the appropriate `BUILD` file, you want to find a
 <a pantsref="bdict_jar_library">`jar_library`</a>
 with the <a pantsref="bdict_jar">`jar`</a>s you want:
 
-!inc[start-at=junit&end-before=specs](../../../../../../3rdparty/BUILD)
+!inc[start-at=junit&end-before=scalatest](../../../../../../3rdparty/BUILD)
 
 Here, the
 <a pantsref="bdict_jar_library">`jar_library`</a>'s name

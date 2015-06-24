@@ -183,7 +183,7 @@ jar_library(name='junit',
               jar('junit', 'junit', '4.12')
             ])
 
-jar_library(name='specs',
+jar_library(name='scalatest',
             jars=[
-              jar('org.scala-tools.testing', 'specs_2.10', '1.6.9')
+              jar('org.scalatest', 'scalatest_2.10', '2.2.4')
             ])
