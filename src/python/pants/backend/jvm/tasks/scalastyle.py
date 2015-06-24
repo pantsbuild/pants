@@ -99,7 +99,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
   def __init__(self, *args, **kwargs):
     super(Scalastyle, self).__init__(*args, **kwargs)
 
-    self._results_dir = os.path.join(self.workdir, 'scalastyle-results')
+    self._results_dir = os.path.join(self.workdir, 'results')
 
   def _create_result_file(self, target):
     result_file = os.path.join(self._results_dir, target.id)
@@ -137,7 +137,7 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
           return self.runjava(classpath=cp,
                               main=self._MAIN,
                               args=['-c', scalastyle_config] + srcs)
-        
+
         result = Xargs(call).execute(scala_sources)
         if result != 0:
           raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
