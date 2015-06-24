@@ -407,8 +407,10 @@ python_library(
   dependencies = [
     ':nailgun_task',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:cache_manager',
     'src/python/pants/base:target',
     'src/python/pants/process',
+    'src/python/pants/util:dirutil'
   ],
 )
 

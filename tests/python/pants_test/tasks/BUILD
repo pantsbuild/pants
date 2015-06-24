@@ -67,6 +67,15 @@ target(
 )
 
 python_tests(
+  name = 'scalastyle_integration',
+  sources = ['test_scalastyle_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
   name = 'antlr_integration',
   sources = ['test_antlr_integration.py'],
   dependencies = [

@@ -10,9 +10,11 @@ import re
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.process.xargs import Xargs
+from pants.util.dirutil import touch
 
 
 # TODO: Move somewhere more general?
@@ -94,6 +96,15 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
 
     return scala_sources
 
+  def __init__(self, *args, **kwargs):
+    super(Scalastyle, self).__init__(*args, **kwargs)
+
+    self._results_dir = os.path.join(self.workdir, 'scalastyle-results')
+
+  def _create_result_file(self, target):
+    result_file = os.path.join(self._results_dir, target.id)
+    touch(result_file)
+    return result_file
 
   def execute(self):
     if self.get_options().skip:
@@ -105,28 +116,38 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
     if not targets:
       return
 
-    scalastyle_config = self.validate_scalastyle_config()
-    scalastyle_excluder = self.create_file_excluder()
+    with self.invalidated(targets) as invalidation_check:
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
-    self.context.log.debug('Non synthetic scala targets to be checked:')
-    for target in targets:
-      self.context.log.debug('  {address_spec}'.format(address_spec=target.address.spec))
+      scalastyle_config = self.validate_scalastyle_config()
+      scalastyle_excluder = self.create_file_excluder()
 
-    scala_sources = self.get_non_excluded_scala_sources(scalastyle_excluder, targets)
-    self.context.log.debug('Non excluded scala sources to be checked:')
-    for source in scala_sources:
-      self.context.log.debug('  {source}'.format(source=source))
+      self.context.log.debug('Non synthetic scala targets to be checked:')
+      for target in invalid_targets:
+        self.context.log.debug('  {address_spec}'.format(address_spec=target.address.spec))
 
-    if scala_sources:
-      def call(srcs):
-        cp = self.tool_classpath('scalastyle')
-        return self.runjava(classpath=cp,
-                            main=self._MAIN,
-                            args=['-c', scalastyle_config] + srcs)
-      result = Xargs(call).execute(scala_sources)
-      if result != 0:
-        raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
-          entry=Scalastyle._MAIN, exit_code=result))
+      scala_sources = self.get_non_excluded_scala_sources(scalastyle_excluder, invalid_targets)
+      self.context.log.debug('Non excluded scala sources to be checked:')
+      for source in scala_sources:
+        self.context.log.debug('  {source}'.format(source=source))
+
+      if scala_sources:
+        def call(srcs):
+          cp = self.tool_classpath('scalastyle')
+          return self.runjava(classpath=cp,
+                              main=self._MAIN,
+                              args=['-c', scalastyle_config] + srcs)
+        
+        result = Xargs(call).execute(scala_sources)
+        if result != 0:
+          raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
+            entry=Scalastyle._MAIN, exit_code=result))
+
+        if self.artifact_cache_writes_enabled():
+          result_files = map(lambda t: self._create_result_file(t), invalid_targets)
+          self.update_artifact_cache([(
+            VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts),
+            result_files)])
 
   def validate_scalastyle_config(self):
     scalastyle_config = self.get_options().config
