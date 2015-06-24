@@ -86,10 +86,10 @@ class GroupIterator(object):
     # We want to sort targets topologically, grouping targets of the same type if possible.
     # Algorithm: BFS on the dependency graph with a separate queue per each type.
     # First, enqueue the least dependent targets (roots). Choose a type with a non-empty queue,
-    # and process nodes from this queue while it's non-empty. To process means to add the node
-    # to the resulting list, and to increment the number of "satisfied" dependencies
-    # for all its direct dependees. For every dependee that has all its dependencies satisfied,
-    # enqueue it in the corresponding queue.
+    # and process nodes from this queue until it's exhausted, then move on to the next non-empty
+    # queue. "To process" means to add the node to the resulting list, and to increment
+    # the number of "satisfied" dependencies for all its direct dependees. For every dependee
+    # that has all its dependencies satisfied, enqueue it in the corresponding queue.
     # Since it's a directed acyclic graph, eventually all targets will be processed and added
     # to the resulting list.
     #
@@ -105,33 +105,40 @@ class GroupIterator(object):
 
     (roots, inverted_deps) = invert_dependencies(targets)
 
-    queue = defaultdict(deque)
-    queue_size = 0
+    queues = defaultdict(deque)
+    queues_total_size = 0
+
+    # Enqueue roots.
     for root in roots:
       root_type = discriminator(root)
-      queue[root_type].append(root)
-      queue_size += 1
+      queues[root_type].append(root)
+      queues_total_size += 1
 
     sorted_targets = []
     satisfied_deps = defaultdict(int)
     current_type = None
-    while queue_size > 0:
-      for potential_type in queue:
-        if queue[potential_type]:
+    # Is there anything left to process?
+    while queues_total_size > 0:
+      # Choose a type with a non-empty queue.
+      for potential_type in queues.keys():
+        if queues[potential_type]:
           current_type = potential_type
           break
-      while queue[current_type]:
-        target = queue[current_type].popleft()
-        queue_size -= 1
+      # Process targets of this type while possible - they will form a single chunk.
+      while queues[current_type]:
+        target = queues[current_type].popleft()
+        queues_total_size -= 1
         sorted_targets.append(target)
 
+        # Let the dependees know that one more dependency is satisfied.
         if target in inverted_deps:
           for dependee in inverted_deps[target]:
             satisfied_deps[dependee] += 1
+            # Does the dependee have all its dependencies satisfied now?
             if satisfied_deps[dependee] == len(dependee.dependencies):
               dependee_type = discriminator(dependee)
-              queue[dependee_type].append(dependee)
-              queue_size += 1
+              queues[dependee_type].append(dependee)
+              queues_total_size += 1
 
     # Remove targets that are not claimed by any member.
     sorted_targets = filter(discriminator, sorted_targets)

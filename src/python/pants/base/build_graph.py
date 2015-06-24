@@ -410,7 +410,7 @@ class CycleException(Exception):
     ))
 
 def invert_dependencies(targets):
-  """:return: the full graph of dependencies for `targets`."""
+  """:return: the full graph of dependencies for `targets` and the list of roots."""
   roots = set()
   inverted_deps = defaultdict(OrderedSet)  # target -> dependent targets
   visited = set()
