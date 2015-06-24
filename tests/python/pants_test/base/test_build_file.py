@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile, FilesystemBuildFile
@@ -182,7 +181,7 @@ class BuildFileTest(BuildFileTestBase):
     build_file = self.create_buildfile('BUILD.code')
 
     parsed_locals = {}
-    six.exec_(build_file.code(), {'java_library': dict}, parsed_locals)
+    exec(build_file.code(), {'java_library': dict}, parsed_locals)
     lib = parsed_locals.pop('lib', None)
     self.assertEqual(dict(name='jake', age=42), lib)
 

@@ -8,11 +8,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import warnings
 
-import six
-
 
 logger = logging.getLogger(__name__)
 
+
+def exec_wrapper(code, _globals, _locals=None):
+  """Pure function wrapper around exec to avoid 'SyntaxError: unqualified exec is not
+     allowed in function '...' it contains a nested function with free variables'.
+  """
+  exec(code, _globals, _locals or _globals)
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  The BulidFileParser is intended to have knowledge of just
@@ -31,19 +35,15 @@ class BuildFileParser(object):
 
   class BuildFileParserError(Exception):
     """Base class for all exceptions raised in BuildFileParser to make exception handling easier"""
-    pass
 
   class BuildFileScanError(BuildFileParserError):
     """Raised if there was a problem when gathering all addresses in a BUILD file """
-    pass
 
   class AddressableConflictException(BuildFileParserError):
     """Raised if the same address is redefined in a BUILD file"""
-    pass
 
   class SiblingConflictException(BuildFileParserError):
     """Raised if the same address is redefined in another BUILD file in the same directory"""
-    pass
 
   class ParseError(BuildFileParserError):
     """An exception was encountered in the python parser"""
@@ -134,7 +134,7 @@ class BuildFileParser(object):
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
       with warnings.catch_warnings(record=True) as warns:
-        six.exec_(build_file_code, parse_state.parse_globals)
+        exec_wrapper(build_file_code, parse_state.parse_globals)
         for warn in warns:
           logger.warning(_format_context_msg(lineno=warn.lineno,
                                              offset=None,
