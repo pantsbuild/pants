@@ -117,7 +117,9 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
       return
 
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
+      invalid_targets = []
+      for vt in invalidation_check.invalid_vts:
+        invalid_targets.extend(vt.targets)
 
       scalastyle_config = self.validate_scalastyle_config()
       scalastyle_excluder = self.create_file_excluder()
@@ -144,8 +146,9 @@ class Scalastyle(NailgunTask, JvmToolTaskMixin):
             entry=Scalastyle._MAIN, exit_code=result))
 
         if self.artifact_cache_writes_enabled():
-          self.update_artifact_cache([(vt, [self._create_result_file(vt.target)])
-                                      for vt in invalidation_check.invalid_vts])
+          result_files = lambda vt: map(lambda t: self._create_result_file(t), vt.targets)
+          pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+          self.update_artifact_cache(pairs)
 
   def validate_scalastyle_config(self):
     scalastyle_config = self.get_options().config
