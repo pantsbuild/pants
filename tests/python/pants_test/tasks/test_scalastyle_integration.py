@@ -20,7 +20,7 @@ class ScalastyleIntegrationTest(PantsRunIntegrationTest):
           'compile.scalastyle',
           "--cache-write-to=['{}']".format(cache),
           "--cache-read-from=['{}']".format(cache),
-          'examples/src/scala/org/pantsbuild/example/hello/welcome',
+          'examples/tests/scala/org/pantsbuild/example/hello/welcome',
           '-ldebug'
         ]
 
