@@ -144,7 +144,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     raise NotImplementedError()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -186,8 +186,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self._args.extend(self.get_options().warning_args)
     else:
       self._args.extend(self.get_options().no_warning_args)
-
-    self.setup_artifact_cache()
 
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
@@ -280,7 +278,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
-  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, progress_message):
+  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, log_file, progress_message):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -312,7 +310,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
-        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file)
+        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file, log_file)
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)

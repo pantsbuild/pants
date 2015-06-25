@@ -316,7 +316,7 @@ public class ConsoleRunnerImpl {
     // abortableListener gets removed when one of the listener throws exceptions in
     // RunNotifier.java. Other listeners should not get removed.
     if (perTestTimer) {
-      abortableListener.addListener(new PerClassConsoleListener(SWAPPABLE_OUT.getOriginal()));
+      abortableListener.addListener(new PerTestConsoleListener(SWAPPABLE_OUT.getOriginal()));
     } else {
       core.addListener(new ConsoleListener(SWAPPABLE_OUT.getOriginal()));
     }
@@ -547,7 +547,7 @@ public class ConsoleRunnerImpl {
       private File outdir = new File(System.getProperty("java.io.tmpdir"));
 
       @Option(name = "-per-test-timer",
-          usage = "Show progress and timer for each test class.")
+          usage = "Show a description of each test and timer for each test class.")
       private boolean perTestTimer;
 
       @Option(name = "-default-parallel",

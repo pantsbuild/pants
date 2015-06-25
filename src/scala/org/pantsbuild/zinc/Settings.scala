@@ -21,7 +21,8 @@ import xsbti.compile.CompileOrder
 case class Settings(
   help: Boolean              = false,
   version: Boolean           = false,
-  logOptions: LogOptions     = LogOptions(),
+  consoleLog: ConsoleOptions = ConsoleOptions(),
+  captureLog: Option[File]   = None,
   sources: Seq[File]         = Seq.empty,
   classpath: Seq[File]       = Seq.empty,
   classesDirectory: File     = new File("."),
@@ -35,14 +36,12 @@ case class Settings(
   sbt: SbtJars               = SbtJars(),
   incOptions: IncOptions     = IncOptions(),
   analysis: AnalysisOptions  = AnalysisOptions(),
-  analysisUtil: AnalysisUtil = AnalysisUtil(),
   properties: Seq[String]    = Seq.empty
 )
 
 /** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
  * TODO: further break options into sensible subgroups. */
-case class LogOptions(
-  quiet: Boolean             = false,
+case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
   logPhases: Boolean         = false,
@@ -173,22 +172,7 @@ case class IncOptions(
 case class AnalysisOptions(
   cache: Option[File]           = None,
   cacheMap: Map[File, File]     = Map.empty,
-  forceClean: Boolean           = false,
-  outputRelations: Option[File] = None,
-  outputProducts: Option[File]  = None,
-  mirrorAnalysis: Boolean       = false
-)
-
-/**
- * Configuration for analysis manipulation utilities.
- */
-case class AnalysisUtil(
-  run: Boolean                = false,
-  cache: Option[File]         = None,
-  merge: Seq[File]            = Seq.empty,
-  rebase: Map[File, File]     = Map.empty,
-  split: Map[Seq[File], File] = Map.empty,
-  reload: Seq[File]           = Seq.empty
+  forceClean: Boolean           = false
 )
 
 object Settings {
@@ -201,14 +185,23 @@ object Settings {
     boolean(   "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
 
     header("Logging Options:"),
-    boolean(  ("-quiet", "-q"),                "Silence all logging",                        (s: Settings) => s.copy(logOptions = s.logOptions.copy(quiet = true))),
-    boolean(   "-debug",                       "Set log level to debug",                     (s: Settings) => s.copy(logOptions = s.logOptions.copy(logLevel = Level.Debug))),
-    string(    "-log-level", "level",          "Set log level (debug|info|warn|error)",      (s: Settings, l: String) => s.copy(logOptions = s.logOptions.copy(logLevel = Level.withName(l)))),
-    boolean(   "-no-color",                    "No color in logging",                        (s: Settings) => s.copy(logOptions = s.logOptions.copy(color = false))),
-    boolean(   "-log-phases",                  "Log phases of compilation for each file",    (s: Settings) => s.copy(logOptions = s.logOptions.copy(logPhases = true))),
-    boolean(   "-print-progress",              "Periodically print compilation progress",    (s: Settings) => s.copy(logOptions = s.logOptions.copy(printProgress = true))),
-    int(       "-heartbeat", "interval (sec)", "Print '.' every n seconds while compiling",  (s: Settings, b: Int) => s.copy(logOptions = s.logOptions.copy(heartbeatSecs = b))),
-    string(    "-log-filter", "regex",         "Filter log messages matching the regex",     (s: Settings, re: String) => s.copy(logOptions = s.logOptions.copy(logFilters = s.logOptions.logFilters :+ re.r))),
+    boolean(   "-debug",                       "Set log level for stdout to debug",
+      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.Debug))),
+    string(    "-log-level", "level",          "Set log level for stdout (debug|info|warn|error)",
+      (s: Settings, l: String) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.withName(l)))),
+    boolean(   "-no-color",                    "No color in logging to stdout",
+      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
+    boolean(   "-log-phases",                  "Log phases of compilation for each file to stdout",
+      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(logPhases = true))),
+    boolean(   "-print-progress",              "Periodically print compilation progress to stdout",
+      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(printProgress = true))),
+    int(       "-heartbeat", "interval (sec)", "Print '.' to stdout every n seconds while compiling",
+      (s: Settings, b: Int) => s.copy(consoleLog = s.consoleLog.copy(heartbeatSecs = b))),
+    string(    "-log-filter", "regex",         "Filter log messages matching the regex from stdout",
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(logFilters = s.consoleLog.logFilters :+ re.r))),
+    file(      "-capture-log", "file",         "Captures all logging (unfiltered) to the given file",
+      (s: Settings, f: File) => s.copy(captureLog = Some(f))),
+
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
@@ -250,9 +243,6 @@ object Settings {
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
     boolean(   "-force-clean",                 "Force clean classes on empty analysis",      (s: Settings) => s.copy(analysis = s.analysis.copy(forceClean = true))),
-    boolean(   "-mirror-analysis",             "Store a readable text version of analysis",  (s: Settings) => s.copy(analysis = s.analysis.copy(mirrorAnalysis = true))),
-    file(      "-output-relations", "file",    "Print readable analysis relations to file",  (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputRelations = Some(f)))),
-    file(      "-output-products", "file",     "Print readable source products to file",     (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(outputProducts = Some(f)))),
 
     header("JVM options:"),
     prefix(    "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
@@ -264,15 +254,7 @@ object Settings {
     dummy(     "-start",                       "Ensure nailgun server is running (if nailed)"),
     dummy(     "-status",                      "Report nailgun server status (if nailed)"),
     dummy(     "-shutdown",                    "Shutdown nailgun server (if nailed)"),
-    dummy(     "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)"),
-
-    header("Analysis manipulation utilities:"),
-    boolean(   "-analysis",                    "Run analysis manipulation utilities",        (s: Settings) => s.copy(analysisUtil = s.analysisUtil.copy(run = true))),
-    file(      "-cache", "file",               "Analysis cache file to alter",               (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(cache = Some(f)))),
-    path(      "-merge", "path",               "Merge analyses, overwrite cached analysis",  (s: Settings, ap: Seq[File]) => s.copy(analysisUtil = s.analysisUtil.copy(merge = ap))),
-    fileMap(   "-rebase",                      "Rebase all analysis paths (from:to,...)",    (s: Settings, m: Map[File, File]) => s.copy(analysisUtil = s.analysisUtil.copy(rebase = m))),
-    fileSeqMap("-split",                       "Split analysis by source directory",         (s: Settings, m: Map[Seq[File], File]) => s.copy(analysisUtil = s.analysisUtil.copy(split = m))),
-    file(      "-reload", "cache-file",        "Reload analysis from cache file",            (s: Settings, f: File) => s.copy(analysisUtil = s.analysisUtil.copy(reload = s.analysisUtil.reload :+ f)))
+    dummy(     "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)")
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -344,16 +326,7 @@ object Settings {
         ),
         analysis = analysis.copy(
           cache = Util.normaliseOpt(cwd)(analysis.cache),
-          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap),
-          outputRelations = Util.normaliseOpt(cwd)(analysis.outputRelations),
-          outputProducts = Util.normaliseOpt(cwd)(analysis.outputProducts)
-        ),
-        analysisUtil = analysisUtil.copy(
-          cache = Util.normaliseOpt(cwd)(analysisUtil.cache),
-          merge = Util.normaliseSeq(cwd)(analysisUtil.merge),
-          rebase = analysisUtil.rebase map Util.normalisePair(cwd),
-          split = Util.normaliseSeqMap(cwd)(analysisUtil.split),
-          reload = Util.normaliseSeq(cwd)(analysisUtil.reload)
+          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap)
         )
       )
     }

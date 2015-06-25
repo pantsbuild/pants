@@ -219,6 +219,7 @@ class ExecutionGraph(object):
         direct_dependees = self._dependees[finished_key]
         status_table.mark_as(result_status, finished_key)
 
+        # Queue downstream tasks.
         if result_status is SUCCESSFUL:
           try:
             finished_job.run_success_callback()
@@ -230,19 +231,22 @@ class ExecutionGraph(object):
                              if status_table.are_all_successful(self._jobs[dependee].dependencies)]
 
           submit_jobs(ready_dependees)
-        else:  # failed or canceled
+        else:  # Failed or canceled.
           try:
             finished_job.run_failure_callback()
           except Exception as e:
             log.debug(traceback.format_exc())
             raise ExecutionFailure("Error in on_failure for {}".format(finished_key), e)
 
-          # propagate failures downstream
+          # Propagate failures downstream.
           for dependee in direct_dependees:
             finished_queue.put((dependee, CANCELED, None))
 
-        log.debug("{} finished with status {}".format(finished_key,
-                                                      status_table.get(finished_key)))
+        # Log success or failure for this job.
+        if result_status is FAILED:
+          log.error("{} failed: {}".format(finished_key, value))
+        else:
+          log.debug("{} finished with status {}".format(finished_key, result_status))
     except ExecutionFailure:
       raise
     except Exception as e:

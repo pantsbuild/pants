@@ -167,7 +167,7 @@ but the process is also described below:
      You should use the the same user id and password you use to login
      to the Sonatype JIRA server.
 
-  2. Find the staging repostitory auto-created when you
+  2. Find the staging repository auto-created when you
      [staged the release](#staging-to-ossrh) above.
 
      As shown below, in the 'Staging Repositories' tab enter
@@ -222,4 +222,6 @@ The following folks are set up to publish to Maven Central for
 org.pantsbuild:
 
 - David Turner <dturner@twopensource.com>
+- Eric Ayers <ericzundel@gmail.com>
 - John Sirois <john.sirois@gmail.com>
+- Stu Hood <stuhood@gmail.com>

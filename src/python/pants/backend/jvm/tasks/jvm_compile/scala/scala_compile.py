@@ -214,7 +214,7 @@ class ZincCompile(JvmCompile):
       ret.append((root, [plugin_info_file]))
     return ret
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -236,6 +236,8 @@ class ZincCompile(JvmCompile):
       zinc_args.append('-no-color')
     if not self.get_options().name_hashing:
       zinc_args.append('-no-name-hashing')
+    if log_file:
+      zinc_args.extend(['-capture-log', log_file])
 
     zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])

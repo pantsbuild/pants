@@ -206,9 +206,12 @@ class BaseTest(unittest.TestCase):
         option_values[scope][key] = val
 
     # Make inner scopes inherit option values from their enclosing scopes.
+    all_scopes = set(option_values.keys())
+    for task_type in for_task_types:  # Make sure we know about pre-task subsystem scopes.
+      all_scopes.update(task_type.known_scopes())
     # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
     # and therefore only have to inherit from our immediately enclosing scope.
-    for scope in sorted(option_values.keys()):
+    for scope in sorted(all_scopes):
       if scope != Options.GLOBAL_SCOPE:
         enclosing_scope = scope.rpartition('.')[0]
         opts = option_values[scope]

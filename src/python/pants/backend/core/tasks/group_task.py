@@ -230,6 +230,13 @@ class GroupTask(Task):
         @classmethod
         def known_scopes(cls):
           """Yields all known scopes for this task (i.e., those of its member types.)"""
+          # We need this because task.py initializes a cache factory for every task type,
+          # even if it's never used. This is slightly icky, but is better than forcing tasks
+          # to explicitly call a cache setup method. And we want to kill GroupTask anyway.
+          yield cls.options_scope
+          for subsystem in cls.task_subsystems():
+            yield subsystem.subscope(cls.options_scope)
+
           for member_type in cls._member_types():
             for scope in member_type.known_scopes():
               yield scope
