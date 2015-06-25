@@ -16,7 +16,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
 
 
-class NailgunTaskBase(TaskBase, JvmToolTaskMixin):
+class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   @staticmethod
   def killall(everywhere=False):

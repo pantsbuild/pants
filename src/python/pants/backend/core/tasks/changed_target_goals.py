@@ -14,7 +14,7 @@ from pants.backend.core.tasks.what_changed import ChangedFileTaskMixin
 logger = logging.getLogger(__name__)
 
 
-class ChangedTargetTask(NoopExecTask, ChangedFileTaskMixin):
+class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
   """A base class for tasks that find changed targets to act on.
 
   Frequently other tasks already exist that actually do the desired work eg "compile" or "test".

@@ -711,7 +711,7 @@ class Cobertura(_Coverage):
                         " 'failed to report'".format(main, result))
 
 
-class JUnitRun(JvmTask, JvmToolTaskMixin):
+class JUnitRun(JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod

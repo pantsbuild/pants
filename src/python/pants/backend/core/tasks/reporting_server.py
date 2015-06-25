@@ -18,7 +18,7 @@ from pants.base.build_environment import get_buildroot
 from pants.reporting.reporting_server import ReportingServer, ReportingServerManager
 
 
-class RunServer(Task, QuietTaskMixin):
+class RunServer(QuietTaskMixin, Task):
   """Runs the reporting server."""
 
   @classmethod
@@ -106,7 +106,7 @@ class RunServer(Task, QuietTaskMixin):
     maybe_open(server_port)
 
 
-class KillServer(Task, QuietTaskMixin):
+class KillServer(QuietTaskMixin, Task):
   """Kills the reporting server."""
 
   pidfile_re = re.compile(r'port_(\d+)\.pid')

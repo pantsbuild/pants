@@ -16,7 +16,7 @@ class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinter(NailgunTask, JvmToolTaskMixin):
+class ThriftLinter(NailgunTask):
   """Print linter warnings for thrift files.
   """
 
