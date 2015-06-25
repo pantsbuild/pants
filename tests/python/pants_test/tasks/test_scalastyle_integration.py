@@ -13,20 +13,27 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ScalastyleIntegrationTest(PantsRunIntegrationTest):
   def test_scalastyle_cached(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      with temporary_dir(root_dir=self.workdir_root()) as cache:
+    with temporary_dir(root_dir=self.workdir_root()) as cache:
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
         scalastyle_args = [
           'clean-all',
           'compile.scalastyle',
           "--cache-write-to=['{}']".format(cache),
           "--cache-read-from=['{}']".format(cache),
-          'examples/src/scala/org/pantsbuild/example/hello/welcome'
+          'examples/src/scala/org/pantsbuild/example/hello/welcome',
+          '-ldebug'
         ]
 
         pants_run = self.run_pants_with_workdir(scalastyle_args, workdir)
         self.assert_success(pants_run)
-        self.assertIn('Caching artifacts for 1 target.', pants_run.stdout_data)
+        self.assertIn('abc_Scalastyle_compile_scalastyle will write to local artifact cache',
+            pants_run.stdout_data)
 
         pants_run = self.run_pants_with_workdir(scalastyle_args, workdir)
         self.assert_success(pants_run)
-        self.assertIn('Using cached artifacts for 1 target.', pants_run.stdout_data)
+        self.assertIn('abc_Scalastyle_compile_scalastyle will read from local artifact cache',
+            pants_run.stdout_data)
+        # make sure we are *only* reading from the cache and not also writing,
+        # implying there was as a cache hit
+        self.assertNotIn('abc_Scalastyle_compile_scalastyle will write to local artifact cache',
+            pants_run.stdout_data)
