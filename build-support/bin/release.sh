@@ -398,7 +398,7 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.github.io/release.html"
   echo
-  echo "Usage: $0 [-d] (-h|-ntlo)"
+  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
