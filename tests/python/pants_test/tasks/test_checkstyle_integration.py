@@ -32,3 +32,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run)
         self.assertIn('abc_Checkstyle_compile_checkstyle will read from local artifact cache',
             pants_run.stdout_data)
+        # make sure we are *only* reading from the cache and not also writing,
+        # implying there was as a cache hit
+        self.assertNotIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
+            pants_run.stdout_data)
