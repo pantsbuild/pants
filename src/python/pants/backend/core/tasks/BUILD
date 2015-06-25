@@ -45,6 +45,7 @@ target(
 python_library(
   name = 'bash_completion',
   sources = ['bash_completion.py'],
+  resources = globs('templates/bash_completion/*.mustache'),
   dependencies = [
     ':console_task',
     'src/python/pants/base:exceptions',

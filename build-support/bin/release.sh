@@ -32,10 +32,10 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) && \
-  execute_packaged_pants_with_internal_backends list src:: && \
+  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) || die "pip install of pantsbuild.pants failed!"
+  execute_packaged_pants_with_internal_backends list src:: || die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "$(local_version)" ]]
+     == "$(local_version)" ]] || die "Installed version of pants does match local version!"
 }
 
 PKG_PANTS_TESTINFRA=(
@@ -159,6 +159,21 @@ function pre_install() {
 
 function post_install() {
   # this assume pre_install is called and a new temp venv activation has been done.
+  if [[ "${pause_after_venv_creation}" == "true" ]]; then
+    cat <<EOM
+
+If you want to poke around with the new version of pants that has been built
+and installed in a temporary virtualenv, fire up another shell window and type:
+
+  source ${VENV_DIR}/bin/activate
+  cd ${ROOT}
+
+From there, you can run 'pants' (not './pants') to do some testing.
+
+When you're done testing, press enter to continue.
+EOM
+    read
+  fi
   deactivate
 }
 
@@ -168,6 +183,8 @@ function install_and_test_packages() {
     --quiet
   )
 
+  pre_install || die "Failed to setup virtualenv while testing ${NAME}-$(local_version)!"
+
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
@@ -175,11 +192,12 @@ function install_and_test_packages() {
 
     banner "Installing and testing package ${NAME}-$(local_version) ..."
 
-    pre_install && \
-    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} && \
-    post_install || \
+    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} || \
     die "Failed to install and test package ${NAME}-$(local_version)!"
   done
+
+  post_install || die "Failed to deactivate virtual env while testing ${NAME}-$(local_version)!"
+
 }
 
 function dry_run_install() {
@@ -380,7 +398,8 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.github.io/release.html"
   echo
-  echo "Usage: $0 (-h|-ntlo)"
+  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o)"
+  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
@@ -392,7 +411,7 @@ function usage() {
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo
-  echo "All options are mutually exclusive."
+  echo "All options (except for '-d') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -401,9 +420,10 @@ function usage() {
   fi
 }
 
-while getopts "hntlo" opt; do
+while getopts "hdntlo" opt; do
   case ${opt} in
     h) usage ;;
+    d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
     l) list_packages && exit 0 ;;
@@ -411,6 +431,11 @@ while getopts "hntlo" opt; do
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
+
+if [[ "${debug}" == "true" ]]; then
+  set -x
+  pause_after_venv_creation="true"
+fi
 
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."

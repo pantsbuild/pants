@@ -47,3 +47,14 @@ python_tests(
     'src/python/pants/backend/core/tasks:scm_publish',
   ]
 )
+
+python_tests(
+  name='bash_completion',
+  sources=['test_bash_completion.py'],
+  coverage=['pants.backend.core.tasks.bash_completion'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'src/python/pants/backend/core/tasks:bash_completion',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)

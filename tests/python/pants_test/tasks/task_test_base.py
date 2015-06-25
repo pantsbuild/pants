@@ -149,6 +149,14 @@ class ConsoleTaskTestBase(TaskTestBase):
     """
     self.assertEqual(sorted(output), sorted(self.execute_console_task(**kwargs)))
 
+  def assert_console_output_contains(self, output, **kwargs):
+    """Verifies the expected output string is emitted by the console task under test.
+
+    output:  the expected output entry(ies)
+    **kwargs: additional kwargs passed to execute_console_task.
+    """
+    self.assertIn(output, self.execute_console_task(**kwargs))
+
   def assert_console_output_ordered(self, *output, **kwargs):
     """Verifies the expected output entries are emitted by the console task under test.
 
