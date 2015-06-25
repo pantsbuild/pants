@@ -301,8 +301,7 @@ python_library(
   dependencies = [
     ':classpath_util',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/option',
-    'src/python/pants/util:strutil',
+    'src/python/pants/backend/jvm/subsystems:jvm',
   ],
 )
 

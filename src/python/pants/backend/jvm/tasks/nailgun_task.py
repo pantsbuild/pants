@@ -24,7 +24,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     Returns ``True`` if all nailguns were successfully killed, ``False`` otherwise.
 
-    :param logger: a callable that accepts a message string describing the killed nailgun process
     :param bool everywhere: ``True`` to kill all nailguns servers launched by pants on this machine
     """
     if not NailgunExecutor.killall:
