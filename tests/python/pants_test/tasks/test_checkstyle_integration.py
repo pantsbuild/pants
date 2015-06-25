@@ -21,18 +21,16 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           '-ldebug'
         ]
 
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
-        pants_run = self.run_pants_with_workdir(checkstyle_args, workdir)
-        self.assert_success(pants_run)
-        self.assertIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
-            pants_run.stdout_data)
+      pants_run = self.run_pants(checkstyle_args)
+      self.assert_success(pants_run)
+      self.assertIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
+          pants_run.stdout_data)
 
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
-        pants_run = self.run_pants_with_workdir(checkstyle_args, workdir)
-        self.assert_success(pants_run)
-        self.assertIn('abc_Checkstyle_compile_checkstyle will read from local artifact cache',
-            pants_run.stdout_data)
-        # make sure we are *only* reading from the cache and not also writing,
-        # implying there was as a cache hit
-        self.assertNotIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
-            pants_run.stdout_data)
+      pants_run = self.run_pants(checkstyle_args)
+      self.assert_success(pants_run)
+      self.assertIn('abc_Checkstyle_compile_checkstyle will read from local artifact cache',
+          pants_run.stdout_data)
+      # make sure we are *only* reading from the cache and not also writing,
+      # implying there was as a cache hit
+      self.assertNotIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
+          pants_run.stdout_data)
