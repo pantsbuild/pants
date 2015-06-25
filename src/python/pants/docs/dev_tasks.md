@@ -181,3 +181,42 @@ shows some useful idioms for JVM tasks.
 -   Let organizations/users override the jar in `pants.ini`; it makes it
     easy to use/test a new version.
 
+Enabling Caching For Tasks
+--------------------------
+
+Pants will attempt to read task results from the cache automatically, however,
+Pants cannot write to the cache automatically. In a task's `execute` method,
+you must manually provide each target and it's artifacts as an update to the
+cache. A target's artifacts are the output files produced as a result of
+processing the target via some job. For example, the output files of a `JavaCompile`
+task on a target java library would be the `.class` files produced by compiling
+the library. In this scenario, the java library (i.e. the target) would be used
+to compute a cache key, and the `.class` files would used as the cached value.
+Here is a template for how this process works in the `execute` method:
+
+    def execute(self):
+      targets = self.context.targets()
+      with self.invalidated(targets) as invalidation_check:
+
+        # for each VersionedTarget in invalidation_check.invalid_vts,
+        # run your task on the target and remember where the output files are
+
+        if self.artifact_cache_writes_enabled():
+
+          # build a list of (VersionedTarget, output files) pairs
+
+          self.update_artifact_cache(pairs)
+
+The above implementation writes each target/artifact (key/val) pair to the cache
+independently of all other targets. If you instead want to group multiple
+targets and their artifacts together under a single cache key (TODO: what is a
+good example of when you would want to do this?), you can use a `VersionedTargetSet`
+in place of a `VersionedTarget`, and place the `invalid_vts` within said
+`VersionedTargetSet`. However, because cache reading is handled automatically
+by Pants, Pants will by default check the cache for each individual target.
+You may override this behavior by implementing the `check_artifact_cache_for`
+method in your task, to take the invalid targets in the `InvalidationCheck`
+and group them together when reading from the cache:
+
+    def check_artifact_cache_for(self, invalidation_check):
+      return VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts)
