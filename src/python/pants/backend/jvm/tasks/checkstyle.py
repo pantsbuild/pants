@@ -76,10 +76,9 @@ class Checkstyle(NailgunTask):
             main=self._CHECKSTYLE_MAIN, result=result))
 
         if self.artifact_cache_writes_enabled():
-          result_files = map(lambda t: self._create_result_file(t), invalid_targets)
-          self.update_artifact_cache([(
-            VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts),
-            result_files)])
+          result_files = lambda vt: map(lambda t: self._create_result_file(t), vt.targets)
+          pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+          self.update_artifact_cache(pairs)
 
   def calculate_sources(self, targets):
     sources = set()

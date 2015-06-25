@@ -17,7 +17,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           'compile.checkstyle',
           "--cache-write-to=['{}']".format(cache),
           "--cache-read-from=['{}']".format(cache),
-          'examples/src/java/org/pantsbuild/example/hello/simple',
+          'examples/tests/java/org/pantsbuild/example/hello/greet',
           '-ldebug'
         ]
 
