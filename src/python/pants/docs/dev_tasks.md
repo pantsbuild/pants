@@ -205,21 +205,21 @@ Here is a template for how this process works in the `execute` method:
         output_files = do_some_work()
 
         if self.artifact_cache_writes_enabled():
-
           # build a list of (VersionedTarget, output_files) pairs
           pairs = match_up(invalidation_check.invalid_vts, output_files)
 
           self.update_artifact_cache(pairs)
 
 The above implementation writes each target/artifact (key/val) pair to the cache
-independently of all other targets. If you instead want to group multiple
+independently of all other targets. If you instead want to write multiple
 targets and their artifacts together under a single cache key (TODO: what is a
 good example of when you would want to do this?), you can use a `VersionedTargetSet`
-in place of a `VersionedTarget`, and place the `invalid_vts` within said
-`VersionedTargetSet`. However, Pants will, by default, check the cache for each
-individual target. You may override this behavior by implementing the
-`check_artifact_cache_for` method in your task to take the invalid targets in
-the `InvalidationCheck` and group them together when reading from the cache:
+in place of a `VersionedTarget`, and group the `invalid_vts` within
+`VersionedTargetSet`s. If you choose to do this, however, you must override
+the `check_artifact_cache_for` method in your task to return the groupings
+of targets you want to read (`VersionedTargetSet`s). If you don't, you will miss
+the cache, because by default Pants reads each target from the cache
+independently.
 
     def check_artifact_cache_for(self, invalidation_check):
-      return VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts)
+      return [VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts)]
