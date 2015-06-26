@@ -211,12 +211,15 @@ Here is a template for how this process works in the `execute` method:
           self.update_artifact_cache(pairs)
 
 The above implementation writes each target/artifact (key/val) pair to the cache
-independently of all other targets. If you instead want to write multiple
-targets and their artifacts together under a single cache key (TODO: what is a
-good example of when you would want to do this?), you can use a `VersionedTargetSet`
+independently of all other targets. However you might want to write multiple
+targets and their artifacts together under a single cache key. A good example of
+this is Ivy resolution, where the set of resolved 3rd party dependencies is a property
+of all targets taken together, not of each target individually.
+
+To implement caching for groupings of targets, you can use a `VersionedTargetSet`
 in place of a `VersionedTarget`, and group the `invalid_vts` within
-`VersionedTargetSet`s. If you choose to do this, however, you must override
-the `check_artifact_cache_for` method in your task to return the groupings
+`VersionedTargetSet`s. If you choose to do this, however, you must override the
+`check_artifact_cache_for` method in your task to return the groupings
 of targets you want to read (`VersionedTargetSet`s). If you don't, you will miss
 the cache, because by default Pants reads each target from the cache
 independently.
