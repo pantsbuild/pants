@@ -15,7 +15,7 @@ from pants.base.workunit import WorkUnit
 from pants.java.util import execute_java
 
 
-class BenchmarkRun(JvmTask, JvmToolTaskMixin):
+class BenchmarkRun(JvmToolTaskMixin, JvmTask):
   _CALIPER_MAIN = 'com.google.caliper.Runner'
 
   @classmethod

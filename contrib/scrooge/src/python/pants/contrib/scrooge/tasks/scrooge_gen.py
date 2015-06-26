@@ -35,7 +35,7 @@ _CONFIG_SECTION = 'scrooge-gen'
 _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
 
 
-class ScroogeGen(NailgunTask, JvmToolTaskMixin):
+class ScroogeGen(NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
 
