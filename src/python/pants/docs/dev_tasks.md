@@ -181,3 +181,48 @@ shows some useful idioms for JVM tasks.
 -   Let organizations/users override the jar in `pants.ini`; it makes it
     easy to use/test a new version.
 
+Enabling Caching For Tasks
+--------------------------
+
+Pants will attempt to read task results from the cache automatically, however,
+Pants cannot automatically decide what to write to the cache. In a task's `execute` method,
+you must manually provide each target and its artifacts as an update to the
+cache.
+
+A target's artifacts are the output files produced as a result of
+processing the target via some job. For example, the output files of a `JavaCompile`
+task on a target `java_library` would be the `.class` files produced by compiling
+the library. In this scenario, the `java_library` (i.e. the target) would have its
+sources used to compute a cache key, and the `.class` files would be used as the cached value.
+Here is a template for how this process works in the `execute` method:
+
+    def execute(self):
+      targets = self.context.targets()
+      with self.invalidated(targets) as invalidation_check:
+
+        # for each VersionedTarget in invalidation_check.invalid_vts,
+        # run your task on the target and remember where the output files are
+        output_files = do_some_work()
+
+        if self.artifact_cache_writes_enabled():
+          # build a list of (VersionedTarget, output_files) pairs
+          pairs = match_up(invalidation_check.invalid_vts, output_files)
+
+          self.update_artifact_cache(pairs)
+
+The above implementation writes each target/artifact (key/val) pair to the cache
+independently of all other targets. However you might want to write multiple
+targets and their artifacts together under a single cache key. A good example of
+this is Ivy resolution, where the set of resolved 3rd party dependencies is a property
+of all targets taken together, not of each target individually.
+
+To implement caching for groupings of targets, you can use a `VersionedTargetSet`
+in place of a `VersionedTarget`, and group the `invalid_vts` within
+`VersionedTargetSet`s. If you choose to do this, however, you must override the
+`check_artifact_cache_for` method in your task to return the groupings
+of targets you want to read (`VersionedTargetSet`s). If you don't, you will miss
+the cache, because by default Pants reads each target from the cache
+independently.
+
+    def check_artifact_cache_for(self, invalidation_check):
+      return [VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts)]
