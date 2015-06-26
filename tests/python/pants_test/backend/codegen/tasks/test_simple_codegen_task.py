@@ -14,6 +14,7 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -119,6 +120,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
                                found=', '.join(t.id for t in found_targets)))
       task.execute()
 
+  def test_execute_fail(self):
+    task = self._create_dummy_task()
+    task.should_fail = True
+    self.assertRaisesRegexp(TaskError, 'Failed to generate target(s)', task.execute())
+
   def _get_duplication_test_targets(self):
     self.add_to_build_file('gen-parent', dedent('''
       dummy_library(name='gen-parent',
@@ -222,6 +228,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
       self._test_case = None
       self._all_targets = None
       self.setup_for_testing(None, None, None)
+      self.should_fail = False
 
     def setup_for_testing(self, test_case, all_targets, forced_codegen_strategy=None,
                           hard_strategy_force=False):
@@ -263,6 +270,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
       return isinstance(target, SimpleCodegenTaskTest.DummyLibrary)
 
     def execute_codegen(self, invalid_targets):
+      if self.should_fail: raise TaskError('Failed to generate target(s)')
       if self.codegen_strategy.name() == 'isolated':
         self._test_case.assertEqual(1, len(invalid_targets),
                                     'Codegen should execute individually in isolated mode.')
