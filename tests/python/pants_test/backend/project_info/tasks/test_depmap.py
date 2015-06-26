@@ -294,6 +294,44 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('src/java/b:b_java')]
     )
 
+  def test_graph(self):
+    self.assert_console_output_ordered(
+      'digraph "common.h.h" {',
+      '  node [shape=rectangle, colorscheme=set312;];',
+      '  rankdir=LR;',
+      '  "internal-common.h.h" [style=filled, fillcolor=1];',
+      '  "internal-common.f.f" [style=filled, fillcolor=2];',
+      '  "internal-common.h.h" -> "internal-common.f.f";',
+      '}',
+      targets=[self.target('common/h')],
+      options={'graph': True}
+    )
+
+  def test_graph_show_types(self):
+    self.assert_console_output_ordered(
+      'digraph "common.h.h" {',
+      '  node [shape=rectangle, colorscheme=set312;];',
+      '  rankdir=LR;',
+      '  "internal-common.h.h\\nJvmApp" [style=filled, fillcolor=1];',
+      '  "internal-common.f.f\\nJvmBinary" [style=filled, fillcolor=2];',
+      '  "internal-common.h.h\\nJvmApp" -> "internal-common.f.f\\nJvmBinary";',
+      '}',
+      targets=[self.target('common/h')],
+      options={'graph': True, 'show_types': True}
+    )
+
+  def test_tree(self):
+    self.assert_console_output_ordered(
+      '--internal-overlaps.two',
+      '  |--internal-overlaps.one',
+      '  |  |--internal-common.h.h',
+      '  |  |  |--internal-common.f.f',
+      '  |  |--internal-common.i.i',
+      '  |  |  |--internal-common.g.g',
+      '  |  |  |  |--*internal-common.f.f',
+      targets=[self.target('overlaps:two')],
+      options={'tree': True}
+    )
 
 class ProjectInfoTest(ConsoleTaskTestBase):
   @classmethod

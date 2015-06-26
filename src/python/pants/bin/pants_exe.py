@@ -15,6 +15,10 @@ from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
 
 
+sys.path = filter(lambda p: 'pantsbuild.pants' not in p, sys.path)
+
+
+
 class _Exiter(object):
   def __init__(self):
     # Since we have some exit paths that run via the sys.excepthook,
