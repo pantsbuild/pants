@@ -123,8 +123,6 @@ class Globs(FilesetRelPathWrapper):
     strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
     'foo.py'])`` gives all files in this directory except ``.java``
     files and ``foo.py``.
-  :return: FilesetWithSpec containing matching files in same directory as this BUILD file.
-  :rtype: FilesetWithSpec
 
   Deprecated:
   You might see that old code uses "math" on the return value of
@@ -145,8 +143,6 @@ class RGlobs(FilesetRelPathWrapper):
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
     strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
     'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
-  :return: FilesetWithSpec matching files in this directory and its descendents.
-  :rtype: FilesetWithSpec
 
   Deprecated:
   You might see that old code uses "math" on the return value of ``rglobs()``. E.g.,
