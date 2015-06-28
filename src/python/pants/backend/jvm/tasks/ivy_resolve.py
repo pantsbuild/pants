@@ -29,6 +29,9 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   class Error(TaskError):
     """Error in IvyResolve."""
 
+  class UnresolvedJarError(Error):
+    """A jar dependency couldn't be found in the symlink map"""
+
   @classmethod
   def global_subsystems(cls):
     return super(IvyResolve, cls).global_subsystems() + (IvySubsystem, )
@@ -147,6 +150,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
             key = artifact.path
           else:
             key = os.path.realpath(artifact.path)
+          if key not in symlink_map:
+            raise self.UnresolvedJarError(
+              'Jar {artifact} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
+              spec=target.address.spec, artifact=artifact, conf=conf))
           artifact_paths.append(symlink_map[key])
         compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
 

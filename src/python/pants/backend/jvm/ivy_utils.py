@@ -122,6 +122,8 @@ class IvyInfo(object):
 
     :param jar_library A JarLibrary to collect the transitive artifacts for.
     :param memo see `traverse_dependency_graph`
+    :returns: all the artifacts for all of the jars in this library, including transitive deps
+    :rtype: list of IvyArtifact
     """
     artifacts = OrderedSet()
     def create_collection(dep):
@@ -282,7 +284,7 @@ class IvyUtils(object):
   def _parse_xml_report(cls, path):
     if not os.path.exists(path):
       return None
-
+    logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo()
     etree = xml.etree.ElementTree.parse(path)
     doc = etree.getroot()
