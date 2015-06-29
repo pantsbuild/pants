@@ -91,12 +91,12 @@ class GroupIteratorMultipleTest(GroupIteratorTestBase):
     self.assertEqual({a_blue}, set(targets))
 
     group_member, targets = chunks[2]
-    self.assertEqual(self.green, type(group_member))
-    self.assertEqual({a_green}, set(targets))
-
-    group_member, targets = chunks[3]
     self.assertEqual(self.red, type(group_member))
     self.assertEqual({b_red, c_red}, set(targets))
+
+    group_member, targets = chunks[3]
+    self.assertEqual(self.green, type(group_member))
+    self.assertEqual({a_green}, set(targets))
 
 
 class BaseGroupTaskTest(BaseTest):
