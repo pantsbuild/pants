@@ -121,11 +121,14 @@ class IvyTaskMixin(object):
       # targets up to date... See https://rbcommons.com/s/twitter/r/2015
       report_missing = False
       report_confs = confs or ['default']
+      report_paths = []
       for conf in report_confs:
         report_path = IvyUtils.xml_report_path(global_vts.targets, conf)
         if not os.path.exists(report_path):
           report_missing = True
           break
+        else:
+          report_paths.append(report_path)
 
       target_workdir = os.path.join(ivy_workdir, global_vts.cache_key.hash)
       target_classpath_file = os.path.join(target_workdir, 'classpath')
@@ -160,6 +163,8 @@ class IvyTaskMixin(object):
 
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])
+      else:
+        logger.debug("Using previously resolved reports: {}".format(report_paths))
 
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
