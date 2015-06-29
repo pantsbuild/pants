@@ -392,8 +392,7 @@ class IvyUtils(object):
       # wants to download multiple jar files with different classifiers as binary dependencies.
       # I am trying to work out a better long-term solution in this design doc:
       # https://docs.google.com/document/d/1sEMXUmj7v-YCBZ_wHLpCFjkHOeWjsc1NR1hRIJ9uCZ8
-      target_jars = [jar for jar in target.jar_dependencies]
-      for jar in cls._combine_jars(target_jars):
+      for jar in cls._combine_jars(target.jar_dependencies):
         if jar.rev:
           add_jar(jar)
 
