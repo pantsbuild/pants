@@ -6,9 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.option.options import Options
-from pants.util.strutil import safe_shlex_split
 
 
 class JvmTask(Task):
@@ -18,23 +17,12 @@ class JvmTask(Task):
     return cls.options_scope.replace('.', '_')
 
   @classmethod
+  def task_subsystems(cls):
+    return super(JvmTask, cls).task_subsystems() + (JVM, )
+
+  @classmethod
   def register_options(cls, register):
     super(JvmTask, cls).register_options(register)
-    register('--jvm-options', action='append', metavar='<option>...',
-             help='Run the JVM with these extra jvm options.')
-    register('--args', action='append', metavar='<arg>...',
-             help='Run the JVM with these extra program args.')
-    register('--debug', action='store_true',
-             help='Run the JVM with remote debugging.')
-    register('--debug-port', advanced=True, type=int, default=5005,
-             help='The JVM will listen for a debugger on this port.')
-    register('--debug-args', advanced=True, type=Options.list,
-             default=[
-               '-Xdebug',
-               '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'
-             ],
-             help='The JVM remote-debugging arguments. {debug_port} will be replaced with '
-                  'the value of the --debug-port option.')
     register('--confs', action='append', default=['default'],
              help='Use only these Ivy configurations of external deps.')
 
@@ -44,26 +32,15 @@ class JvmTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(JvmTask, self).__init__(*args, **kwargs)
-
-    self.jvm_options = []
-    for jvm_option in self.get_options().jvm_options:
-      self.jvm_options.extend(safe_shlex_split(jvm_option))
-
-    if self.get_options().debug:
-      debug_port = self.get_options().debug_port
-      self.jvm_options.extend(
-        arg.format(debug_port=debug_port) for arg in self.get_options().debug_args)
-
-    self.args = []
-    for arg in self.get_options().args:
-      self.args.extend(safe_shlex_split(arg))
-
+    self.jvm = JVM.instance_for_task(self)
+    self.jvm_options = self.jvm.get_jvm_options()
+    self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
 
   def classpath(self, targets, cp=None):
     classpath = list(cp) if cp else []
 
-    classpath_for_targets = ClasspathUtil. \
-      classpath_entries(targets, self.context.products.get_data('compile_classpath'), self.confs)
+    classpath_for_targets = ClasspathUtil.classpath_entries(
+      targets, self.context.products.get_data('compile_classpath'), self.confs)
     classpath.extend(classpath_for_targets)
     return classpath
