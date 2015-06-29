@@ -442,7 +442,7 @@ def invert_dependencies(targets):
 def sort_targets(targets):
   """:return: the targets that `targets` depend on sorted from most dependent to least."""
 
-  (roots, inverted_deps) = invert_dependencies(targets)
+  roots, inverted_deps = invert_dependencies(targets)
   ordered = []
   visited = set()
 

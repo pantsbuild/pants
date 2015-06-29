@@ -103,7 +103,7 @@ class GroupIterator(object):
     # The quadratic implementation took on average about 18 seconds. The linear implementation
     # took on average about 1 second.
 
-    (roots, inverted_deps) = invert_dependencies(targets)
+    roots, inverted_deps = invert_dependencies(targets)
 
     queues = defaultdict(deque)
     queues_total_size = 0
