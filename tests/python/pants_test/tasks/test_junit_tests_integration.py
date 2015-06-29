@@ -150,7 +150,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true'])
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
   def test_junit_test_requiring_cwd_passes_with_option_with_value_specified(self):
@@ -159,7 +159,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd=testprojects/src/java/org/pantsbuild/testproject/cwdexample/subdir'])
     self.assert_success(pants_run)
 
@@ -169,7 +169,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd',])
     self.assert_success(pants_run)
 
@@ -180,7 +180,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd',])
     self.assert_failure(pants_run)
 

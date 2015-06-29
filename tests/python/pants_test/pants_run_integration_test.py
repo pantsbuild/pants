@@ -89,7 +89,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
-
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 

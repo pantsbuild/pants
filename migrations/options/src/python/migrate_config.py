@@ -347,8 +347,16 @@ def check_config_file(path):
   for src, dst in migrations.items():
     check_option(cp, src, dst)
 
-  # Special-case handling of artifact cache options, so we can sweep them up in all sections easily.
-  artifact_cache_options = {
+  # Special-case handling of per-task subsystem options, so we can sweep them up in all
+  # sections easily.
+
+  def check_task_subsystem_options(subsystem_sec, options_map):
+    for src_sec in ['DEFAULT'] + cp.sections():
+      dst_sec = subsystem_sec if src_sec == 'DEFAULT' else '{}.{}'.format(subsystem_sec, src_sec)
+      for src_key, dst_key in options_map.items():
+        check_option(cp, (src_sec, src_key), (dst_sec, dst_key))
+
+  artifact_cache_options_map = {
     'read_from_artifact_cache': 'read',
     'write_to_artifact_cache': 'write',
     'overwrite_cache_artifacts': 'overwrite',
@@ -356,10 +364,16 @@ def check_config_file(path):
     'write_artifact_caches': 'write_to',
     'cache_compression': 'compression_level',
   }
-  for src_sec in ['DEFAULT'] + cp.sections():
-    dst_sec = 'cache' if src_sec == 'DEFAULT' else 'cache.{}'.format(src_sec)
-    for src_key, dst_key in artifact_cache_options.items():
-      check_option(cp, (src_sec, src_key), (dst_sec, dst_key))
+  check_task_subsystem_options('cache', artifact_cache_options_map)
+
+  jvm_options_map = {
+    'jvm_options': 'options',
+    'args': 'program_args',
+    'debug': 'debug',
+    'debug_port': 'debug_port',
+    'debug_args': 'debug_args',
+  }
+  check_task_subsystem_options('jvm', jvm_options_map)
 
   # Check that all values are parseable.
   for sec in ['DEFAULT'] + cp.sections():
