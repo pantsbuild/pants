@@ -69,6 +69,8 @@ class Scalastyle(NailgunTask):
              help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
                   'and lines starting with \'#\' are ignored.) A file is skipped if its path '
                   '(relative to the repo root) matches any of these regexes.')
+    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+             help='Run scalastyle with these extra jvm options.')
     cls.register_jvm_tool(register, 'scalastyle')
 
   @classmethod
@@ -138,6 +140,7 @@ class Scalastyle(NailgunTask):
           cp = self.tool_classpath('scalastyle')
           return self.runjava(classpath=cp,
                               main=self._MAIN,
+                              jvm_options=self.get_options().jvm_options,
                               args=['-c', scalastyle_config] + srcs)
 
         result = Xargs(call).execute(scala_sources)
