@@ -281,17 +281,17 @@ python_library(
   sources = ['target.py'],
   dependencies = [
     '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address',
     ':build_environment',
+    ':exceptions',
     ':fingerprint_strategy',
     ':hash_utils',
-    ':lazy_source_mapper',
     ':payload',
     ':payload_field',
     ':source_root',
     ':target_addressable',
     'src/python/pants/backend/core:wrapped_globs',
+    ':validation',
   ],
 )
 

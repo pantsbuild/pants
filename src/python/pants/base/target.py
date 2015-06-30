@@ -395,7 +395,7 @@ class Target(AbstractTarget):
   def id(self):
     """A unique identifier for the Target.
 
-    The generated id is safe for use as a path name on unix systems.
+    The generated id is safe for use as a filename on unix systems.
     """
     return self.address.path_safe_spec
 
@@ -403,7 +403,7 @@ class Target(AbstractTarget):
   def identifier(self):
     """A unique identifier for the Target.
 
-    The generated id is safe for use as a path name on unix systems.
+    The generated id is safe for use as a filename on unix systems.
     """
     return self.id
 
