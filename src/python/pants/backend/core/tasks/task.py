@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import os
 import sys
-import threading
 from abc import abstractmethod
 from contextlib import contextmanager
 
@@ -21,6 +20,7 @@ from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
+from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.meta import AbstractClass
 
@@ -94,13 +94,13 @@ class TaskBase(Optionable, AbstractClass):
     return []
 
   @classmethod
-  def known_scopes(cls):
-    """Yields all known scopes for this task, in no particular order."""
+  def known_scope_infos(cls):
+    """Yields ScopeInfo for all known scopes for this task, in no particular order."""
     # The task's own scope.
-    yield cls.options_scope
+    yield ScopeInfo(cls.options_scope, ScopeInfo.TASK)
     # The scopes of any task-specific subsystems it uses.
     for subsystem in cls.task_subsystems():
-      yield subsystem.subscope(cls.options_scope)
+      yield ScopeInfo(subsystem.subscope(cls.options_scope), ScopeInfo.TASK_SUBSYSTEM)
 
   @classmethod
   def supports_passthru_args(cls):

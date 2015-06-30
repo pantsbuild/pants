@@ -10,6 +10,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_file
 
 
@@ -110,7 +111,11 @@ class BootstrapOptionsTest(unittest.TestCase):
                                          },
                                          configpath=fp.name,
                                          args=['--pants-workdir=/qux'])
-      opts = bootstrapper.get_full_options(known_scopes=['', 'foo', 'fruit'])
+      opts = bootstrapper.get_full_options(known_scope_infos=[
+        ScopeInfo('', ScopeInfo.GLOBAL),
+        ScopeInfo('foo', ScopeInfo.TASK),
+        ScopeInfo('fruit', ScopeInfo.TASK)
+      ])
       opts.register('', '--pants-workdir')  # So we don't choke on it on the cmd line.
       opts.register('foo', '--bar')
       opts.register('fruit', '--apple')

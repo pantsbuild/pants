@@ -6,30 +6,29 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
-from argparse import ArgumentParser
 
-from pants.option.help_formatter import PantsAdvancedHelpFormatter, PantsBasicHelpFormatter
+from pants.option.help_formatter import HelpFormatter
+from pants.option.help_info_extracter import OptionHelpInfo
 
 
 class OptionHelpFormatterTest(unittest.TestCase):
+  def test_format_help(self):
+    ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
+                         scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
+                         type=bool, default='MYDEFAULT', help='help for foo',
+                         deprecated_version=None, deprecated_message=None, deprecated_hint=None)
 
-  def _create_argparser(self, formatter_class):
-    argparser = ArgumentParser(formatter_class=formatter_class)
-    group = argparser.add_argument_group(title='foo')
-    advanced_group = argparser.add_argument_group(title='*foo')
-    group.add_argument('--bar', help='help for argument bar')
-    advanced_group.add_argument('--baz', help='help for argument baz')
-    return argparser
+    lines = HelpFormatter(scope='', show_advanced=False, color=False).format_option(ohi)
+    self.assertEquals(len(lines), 2)
+    self.assertEquals('--foo (default: MYDEFAULT)', lines[0])
+    self.assertIn('help for foo', lines[1])
 
   def test_suppress_advanced(self):
-    argparser = self._create_argparser(PantsBasicHelpFormatter)
-    help_output = argparser.format_help()
-    self.assertIn('--bar', help_output)
-    self.assertNotIn('(ADVANCED)', help_output)
-    self.assertNotIn('--baz', help_output)
-
-    argparser = self._create_argparser(PantsAdvancedHelpFormatter)
-    help_output = argparser.format_help()
-    self.assertIn('--bar', help_output)
-    self.assertIn('(ADVANCED)', help_output)
-    self.assertIn('--baz', help_output)
+    args = ['--foo']
+    kwargs = {'advanced': True}
+    lines = HelpFormatter(scope='', show_advanced=False, color=False).format_options(
+      '', [(args, kwargs)])
+    self.assertEquals(0, len(lines))
+    lines = HelpFormatter(scope='', show_advanced=True, color=False).format_options(
+      '', [(args, kwargs)])
+    self.assertEquals(4, len(lines))

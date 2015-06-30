@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 #
 # Pants Autocompletion Support
@@ -10,7 +10,6 @@
 
 __pants_scopes='{{{scopes_text}}}'
 {{{options_text}}}
-__pants_global_options='{{{global_options}}}'
 
 # Pants autocompletion handler.
 __pants_autocomplete() {
@@ -19,12 +18,12 @@ __pants_autocomplete() {
 
   local pants="${COMP_WORDS[0]}"
 
-  # Determine what the user is trying to autocomplete (goal, option, or target).
+  # Determine what the user is trying to autocomplete (scope, option, or target).
 
-  local saw_goal=0
-  local goal_name=''
+  local saw_scope=0
+  local scope_name=''
   local is_option=0
-  local is_goal=0
+  local is_scope=0
 
   local i=1   # Skip index 0 which is the "./pants" command.
   while [[ $i -le $COMP_CWORD ]]; do
@@ -32,16 +31,16 @@ __pants_autocomplete() {
     case "$arg" in
       -*)
         is_option=1
-        is_goal=0
+        is_scope=0
         ;;
       *)
         is_option=0
-        if [[ $saw_goal = 1 ]]; then
-          is_goal=0
+        if [[ $saw_scope = 1 ]]; then
+          is_scope=0
         else
-          is_goal=1
-          saw_goal=1
-          goal_name="$arg"
+          is_scope=1
+          saw_scope=1
+          scope_name="$arg"
         fi
     esac
 
@@ -49,15 +48,18 @@ __pants_autocomplete() {
   done
 
   # Return a response to bash based on the context.
-  if [[ $is_goal = 1 ]]; then
-    # Autocomplete using the goal names.
-    COMPREPLY=($(compgen -W "$__pants_scopes" "${COMP_WORDS[COMP_CWORD]}" ))
+  if [[ $is_scope = 1 ]]; then
+    # Autocomplete using the scope names.
+    # Note: currently this offers the global options (along with scopes) as completions when
+    # nothing has been typed yet, but if you type '-' it refuses to complete that to options.
+    # TODO(tdyas): Fix this.
+    COMPREPLY=($(compgen -W "${__pants_scopes} ${__pants_global_options}" -- "${COMP_WORDS[COMP_CWORD]}" ))
   elif [[ $is_option = 1 ]]; then
-    # Autocomplete using any relevant options for `goal_name` plus the global options.
+    # Autocomplete using any relevant options for `scope_name`.
     local options=''
-    local goal_name_for_var=`echo "${goal_name}" | tr .- __  `
-    eval "options=\"\${__pants_options_for_${goal_name_for_var}}\""
-    COMPREPLY=($(compgen -W "${options} ${__pants_global_options}" -- "${COMP_WORDS[COMP_CWORD]}" ))
+    local scope_name_for_var=`echo "${scope_name}" | tr .- __  `
+    eval "options=\"\${__pants_options_for_${scope_name_for_var}}\""
+    COMPREPLY=($(compgen -W "${options}" -- "${COMP_WORDS[COMP_CWORD]}" ))
   else
     local arg="${COMP_WORDS[COMP_CWORD]}"
     if [[ "$arg" =~ ":" ]]; then
