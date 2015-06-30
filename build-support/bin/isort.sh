@@ -23,12 +23,15 @@ function usage() {
 isort_args=(
   --check-only
 )
+strict=False
 
 while getopts "hf" opt
 do
   case ${opt} in
     h) usage ;;
-    f) isort_args=() ;;
+    f) isort_args=()
+       strict=True
+       ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -73,7 +76,20 @@ function activate_isort() {
  fi
 }
 
+echo ">>> Running isort from PWD: ${PWD} REPO_ROOT: ${REPO_ROOT}"
+
 activate_isort
 
-isort ${isort_args[@]} --recursive src tests pants-plugins examples contrib
+if [[ -n "${GIT_HOOK}" ]]
+then
+  echo ">>> running isort in hook mode!"
+  python << EOF
+import sys
+from isort.hooks import git_hook
+
+sys.exit(git_hook(strict=${strict}))
+EOF
+else
+  isort ${isort_args[@]} --recursive src tests pants-plugins examples contrib
+fi
 

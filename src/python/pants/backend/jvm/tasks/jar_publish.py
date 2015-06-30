@@ -469,7 +469,11 @@ class JarPublish(ScmPublishMixin, JarTask):
         auth=None
       )
       self.repos = defaultdict(lambda: local_repo)
-      self.commit = False
+
+      #self.commit = False
+      self.commit = self.get_options().commit
+      self.push_postscript = self.get_options().push_postscript or ''
+
       self.local_snapshot = self.get_options().local_snapshot
     else:
       self.repos = self.get_options().repos
