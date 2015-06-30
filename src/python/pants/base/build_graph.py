@@ -409,9 +409,10 @@ class CycleException(Exception):
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 
-def invert_dependencies(targets):
-  """:return: the full graph of dependencies for `targets` and the list of roots."""
-  roots = set()
+
+def sort_targets(targets):
+  """:return: the targets that targets depend on sorted from most dependent to least."""
+  roots = OrderedSet()
   inverted_deps = defaultdict(OrderedSet)  # target -> dependent targets
   visited = set()
   path = OrderedSet()
@@ -425,26 +426,18 @@ def invert_dependencies(targets):
     path.add(target)
     if target not in visited:
       visited.add(target)
-      if target.dependencies:
-        for dependency in target.dependencies:
-          inverted_deps[dependency].add(target)
-          invert(dependency)
+      for dependency in target.dependencies:
+        inverted_deps[dependency].add(target)
+        invert(dependency)
       else:
         roots.add(target)
-
     path.remove(target)
 
   for target in targets:
     invert(target)
 
-  return roots, inverted_deps
-
-def sort_targets(targets):
-  """:return: the targets that `targets` depend on sorted from most dependent to least."""
-
-  roots, inverted_deps = invert_dependencies(targets)
   ordered = []
-  visited = set()
+  visited.clear()
 
   def topological_sort(target):
     if target not in visited:
