@@ -43,12 +43,16 @@ class OptionValueContainerTest(unittest.TestCase):
     o.add_forwardings({'foo': 'bar'})
     o.bar = RankedValue(RankedValue.CONFIG, 11)
     self.assertEqual(11, o.foo)
+    self.assertEqual(RankedValue.CONFIG, o.get_rank('foo'))
     o.bar = RankedValue(RankedValue.HARDCODED, 22)
     self.assertEqual(11, o.foo)
+    self.assertEqual(RankedValue.CONFIG, o.get_rank('foo'))
     o.bar = RankedValue(RankedValue.ENVIRONMENT, 33)
     self.assertEqual(33, o.foo)
+    self.assertEqual(RankedValue.ENVIRONMENT, o.get_rank('foo'))
     o.bar = 44  # No explicit rank is assumed to be a FLAG.
     self.assertEqual(44, o.foo)
+    self.assertEqual(RankedValue.FLAG, o.get_rank('foo'))
 
   def test_indexing(self):
     o = OptionValueContainer()
