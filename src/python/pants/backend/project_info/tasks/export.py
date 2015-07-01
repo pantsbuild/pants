@@ -90,14 +90,24 @@ class Export(ConsoleTask):
              help='Causes output to be a single line of JSON.')
     register('--libraries', default=True, action='store_true',
              help='Causes libraries to be output.')
+    register('--libraries-sources', default=False, action='store_true',
+             help='Causes libraries with sources to be output.')
+    register('--libraries-javadocs', default=False, action='store_true',
+             help='Causes libraries with javadocs to be output.')
     register('--sources', default=False, action='store_true',
              help='Causes sources to be output.')
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
-    if options.libraries:
+    if options.libraries or options.libraries_sources or options.libraries_javadocs:
       round_manager.require_data('ivy_jar_products')
+      round_manager.require('jar_dependencies')
+      round_manager.require('jar_map_default')
+      if options.libraries_sources:
+        round_manager.require('jar_map_sources')
+      if options.libraries_javadocs:
+        round_manager.require('jar_map_javadoc')
 
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)

@@ -15,9 +15,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ExportIntegrationTest(PantsRunIntegrationTest):
   _confs_args = [
-    '--resolve-ivy-confs=default',
-    '--resolve-ivy-confs=sources',
-    '--resolve-ivy-confs=javadoc',
+    '--export-libraries-sources',
+    '--export-libraries-javadocs',
   ]
 
   def run_export(self, test_target, workdir, load_libs = False, extra_args = list()):
