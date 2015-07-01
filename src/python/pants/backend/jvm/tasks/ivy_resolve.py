@@ -115,19 +115,17 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     # After running ivy, we parse the resulting report, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
-    _, relevant_targets = self.ivy_resolve(
+    _, resolve_hash_name = self.ivy_resolve(
       targets,
       executor=executor,
       workunit_name='ivy-resolve',
       confs=self.confs,
       custom_args=self._args,
     )
-    self.context.log.debug("{} of {} targets were relevant for ivy resolve.".format(
-      len(relevant_targets), len(targets)))
 
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
-    ivy_jar_products = self._generate_ivy_jar_products(relevant_targets)
+    ivy_jar_products = self._generate_ivy_jar_products(resolve_hash_name)
     symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
     for conf in self.confs:
       ivy_jar_memo = {}
@@ -139,8 +137,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         'The values in ivy_jar_products should always be length 1,'
         ' since we no longer have exclusives groups.'
       )
+      # Build the symlink_map product
       ivy_info = ivy_info_list[0]
-      for target in relevant_targets:
+      jar_library_targets = [ t  for t in targets if isinstance(t, JarLibrary) ]
+      for target in jar_library_targets:
         if not isinstance(target, JarLibrary):
           continue
         # Add the artifacts from each dependency module.
@@ -158,9 +158,9 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
 
     if self._report:
-      self._generate_ivy_report(relevant_targets)
+      self._generate_ivy_report(resolve_hash_name)
     if self.context.products.is_required_data('ivy_jar_products'):
-      self._populate_ivy_jar_products(relevant_targets, ivy_jar_products)
+      self._populate_ivy_jar_products(ivy_jar_products)
 
     create_jardeps_for = self.context.products.isrequired('jar_dependencies')
     if create_jardeps_for:
@@ -174,23 +174,23 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
     return [global_vts]
 
-  def _generate_ivy_jar_products(self, targets):
+  def _generate_ivy_jar_products(self, resolve_hash_name):
     """Based on the ivy report, compute a map of conf to lists of IvyInfo objects."""
     ivy_products = defaultdict(list)
     for conf in self.confs:
-      ivyinfo = IvyUtils.parse_xml_report(targets, conf)
+      ivyinfo = IvyUtils.parse_xml_report(resolve_hash_name, conf)
       if ivyinfo:
         # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
         ivy_products[conf].append(ivyinfo)
     return ivy_products
 
-  def _populate_ivy_jar_products(self, targets, new_ivy_products):
+  def _populate_ivy_jar_products(self, new_ivy_products):
     """Merge the given info into the ivy_jar_products product."""
     ivy_products = self.context.products.get_data('ivy_jar_products', lambda: defaultdict(list))
     for conf, new_ivyinfos in new_ivy_products.items():
       ivy_products[conf] += new_ivyinfos
 
-  def _generate_ivy_report(self, targets):
+  def _generate_ivy_report(self, resolve_hash_name):
     def make_empty_report(report, organisation, module, conf):
       no_deps_xml_template = dedent("""<?xml version="1.0" encoding="UTF-8"?>
         <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
@@ -215,7 +215,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     tool_classpath = self.tool_classpath('xalan')
 
     report = None
-    org, name = IvyUtils.identify(targets)
+    org = IvyUtils.INTERNAL_ORG_NAME
+    name = resolve_hash_name
     xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
@@ -223,7 +224,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     safe_mkdir(self._outdir, clean=False)
 
     for conf in self.confs:
-      xml_path = IvyUtils.xml_report_path(targets, conf)
+      xml_path = IvyUtils.xml_report_path(resolve_hash_name, conf)
       if not os.path.exists(xml_path):
         # Make it clear that this is not the original report from Ivy by changing its name.
         xml_path = xml_path[:-4] + "-empty.xml"
