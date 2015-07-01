@@ -34,7 +34,7 @@ do
 done
 
 REQUIREMENTS=(
-  "isort==3.9.5"
+  "isort==3.9.6"
 )
 
 VENV_DIR="build-support/isort.venv"
@@ -75,5 +75,22 @@ function activate_isort() {
 
 activate_isort
 
-isort ${isort_args[@]} --recursive src tests pants-plugins examples contrib
+# We run differently when in the context of a git hook because otherwise nested .isort.cfg files
+# are not found, leading to false negatives. See: https://github.com/timothycrosley/isort#git-hook
+# Note that the git_hook only checks tracked files, all of which we wish to isort.  The
+# non-GIT_HOOK command line invocation unfortunately must list top-level directories in order to
+# avoid python files in virtualenvs created under build-support (Using the single . top-level dir
+# finds these files, leading to many false negatives.).
+if [[ -n "${GIT_HOOK}" ]]
+then
+  python << EOF
+import sys
+from isort.hooks import git_hook
+
+
+sys.exit(git_hook(strict=True))
+EOF
+else
+  isort ${isort_args[@]} --recursive src tests pants-plugins contrib examples testprojects
+fi
 
