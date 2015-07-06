@@ -141,8 +141,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       ivy_info = ivy_info_list[0]
       jar_library_targets = [ t  for t in targets if isinstance(t, JarLibrary) ]
       for target in jar_library_targets:
-        if not isinstance(target, JarLibrary):
-          continue
         # Add the artifacts from each dependency module.
         artifact_paths = []
         for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):

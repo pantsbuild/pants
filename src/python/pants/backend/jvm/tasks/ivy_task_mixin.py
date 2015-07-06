@@ -103,10 +103,6 @@ class IvyTaskMixin(object):
     if not targets:
       return ([], None)
 
-    # NOTE: Always pass all the targets to exec_ivy, as they're used to calculate the name of
-    # the generated module, which in turn determines the location of the XML report file
-    # ivy generates. We recompute this name from targets later in order to find that file.
-    # TODO: This is fragile. Refactor so that we're not computing the name twice.
     ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
 
     ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
