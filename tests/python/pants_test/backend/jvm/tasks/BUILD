@@ -118,6 +118,7 @@ python_tests(
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',

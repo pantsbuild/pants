@@ -164,6 +164,8 @@ class IvyUtils(object):
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
 
+  INTERNAL_ORG_NAME = 'internal'
+
   class IvyResolveReportError(Exception):
     """Raised when the ivy report cannot be found."""
     pass
@@ -251,30 +253,33 @@ class IvyUtils(object):
     if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
       return targets[0].provides.org, targets[0].provides.name
     else:
-      return 'internal', Target.maybe_readable_identify(targets)
+      return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
-  def xml_report_path(cls, targets, conf):
-    """The path to the xml report ivy creates after a retrieve."""
-    org, name = cls.identify(targets)
+  def xml_report_path(cls, resolve_hash_name, conf):
+    """The path to the xml report ivy creates after a retrieve.
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
+    used for resolution.
+    :param string conf: the ivy conf name (e.g. "default")
+    """
     cachedir = IvySubsystem.global_instance().get_options().cache_dir
-    return os.path.join(cachedir, '{}-{}-{}.xml'.format(org, name, conf))
+    return os.path.join(cachedir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
+                                                        resolve_hash_name, conf))
 
   @classmethod
-  def parse_xml_report(cls, targets, conf):
-    """Parse the ivy xml report corresponding to the targets and conf passed.
+  def parse_xml_report(cls, resolve_hash_name, conf):
+    """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :param targets: Targets ivy considered during ivy_resolve()
-    :type targets: list of Target
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
+    used for resolution.
     :param string conf: the ivy conf name (e.g. "default")
     :return: The info in the xml report or None if target is empty.
     :rtype: IvyInfo
-    :raises:  IvyResolveReportError if no report exists.
+    :raises: IvyResolveReportError if no report exists.
     """
-    if not targets:
+    if not resolve_hash_name:
       return None
-
-    path = cls.xml_report_path(targets, conf)
+    path = cls.xml_report_path(resolve_hash_name, conf)
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
@@ -282,8 +287,6 @@ class IvyUtils(object):
 
   @classmethod
   def _parse_xml_report(cls, path):
-    if not os.path.exists(path):
-      return None
     logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo()
     etree = xml.etree.ElementTree.parse(path)
@@ -335,8 +338,12 @@ class IvyUtils(object):
     return jar_map.values()
 
   @classmethod
-  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs):
-    org, name = cls.identify(targets)
+  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None):
+    if resolve_hash_name:
+      org = IvyUtils.INTERNAL_ORG_NAME
+      name = resolve_hash_name
+    else:
+      org, name = cls.identify(targets)
 
     # As it turns out force is not transitive - it only works for dependencies pants knows about
     # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
