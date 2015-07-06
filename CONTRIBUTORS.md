@@ -1,6 +1,7 @@
 Created by running `./build-support/bin/contributors.sh`.
 
 + Alexander Johnson
++ Alyssa Pohahau
 + Andy Reitz
 + Antoine Tollenaere
 + Benjy Weinberger
@@ -9,6 +10,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Brian Wickman
 + Chris Aniszczyk
 + Chris Chen
++ Cody Gibb
 + Craig Schertz
 + Dan Davydov
 + Daniel Anderson
@@ -76,7 +78,9 @@ Created by running `./build-support/bin/contributors.sh`.
 + Paul Groudas
 + Peiyu Wang
 + Peter Seibel
++ Qicheng Ma
 + Ryan Williams
++ Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
 + Simeon Franklin
@@ -90,3 +94,4 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Howland
 + Travis Crawford
 + Ugo Di Girolamo
+
