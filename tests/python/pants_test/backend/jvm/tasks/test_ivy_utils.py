@@ -15,6 +15,7 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
 
@@ -248,10 +249,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           },
           result1)
 
-  def parse_ivy_report(self, path):
-    ivy_info = IvyUtils._parse_xml_report(path)
-    self.assertIsNotNone(ivy_info)
-    return ivy_info
 
   def find_single(self, elem, xpath):
     results = list(elem.findall(xpath))
@@ -326,3 +323,17 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                                   output_path, result_map)
           with open(output_path, 'r') as outpath:
             self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
+
+  def test_missing_ivy_report(self):
+    self.set_options_for_scope(IvySubsystem.options_scope, cache_dir='DOES_NOT_EXIST', use_nailgun=False)
+
+    # Hack to initialize Ivy subsystem
+    self.context()
+
+    with self.assertRaises(IvyUtils.IvyResolveReportError):
+      IvyUtils.parse_xml_report('INVALID_REPORT_UNIQUE_NAME', 'default')
+
+  def parse_ivy_report(self, path):
+    ivy_info = IvyUtils._parse_xml_report(path)
+    self.assertIsNotNone(ivy_info)
+    return ivy_info

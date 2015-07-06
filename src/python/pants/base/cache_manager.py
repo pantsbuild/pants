@@ -18,7 +18,6 @@ except ImportError:
   import pickle
 
 
-
 class VersionedTargetSet(object):
   """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the
   list of targets is currently valid.
@@ -230,11 +229,11 @@ class InvalidationCacheManager(object):
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
     """
-    all_vts = self._wrap_targets(targets, topological_order=topological_order)
+    all_vts = self.wrap_targets(targets, topological_order=topological_order)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
-  def _wrap_targets(self, targets, topological_order=False):
+  def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.
 
     If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
