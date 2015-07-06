@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, touch
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
@@ -31,31 +31,35 @@ class CppBinaryCreate(CppTask):
     round_manager.require('lib')
     round_manager.require('objs')
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   def execute(self):
     with self.context.new_workunit(name='cpp-binary', labels=[WorkUnit.TASK]):
       targets = self.context.targets(self.is_binary)
-      for target in targets:
-        target.workdir = self._workdir
-
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
-        invalid_targets = []
         for vt in invalidation_check.invalid_vts:
-          invalid_targets.extend(vt.targets)
-        for target in invalid_targets:
-          binary = self._create_binary(target)
-          self.context.products.get('exe').add(target, self.workdir).append(binary)
+          binary = self._create_binary(vt)
+          self.context.products.get('exe').add(vt.target, vt.results_dir).append(binary)
 
-  def _create_binary(self, binary):
+  def _create_binary(self, vt):
     objects = []
-    for basedir, objs in self.context.products.get('objs').get(binary).items():
+    for basedir, objs in self.context.products.get('objs').get(vt.target).items():
       objects.extend([os.path.join(basedir, obj) for obj in objs])
-    output = self._link_binary(binary, objects)
+    output = self._link_binary(vt, objects)
     self.context.log.info('Built c++ binary: {0}'.format(output))
     return output
 
-  def _link_binary(self, target, objects):
-    output = os.path.join(self.workdir, target.id, target.name)
-    safe_mkdir(os.path.dirname(output))
+  def _libname(self, libpath):
+    """Converts a full library filepath to the library's name.
+    Ex: /path/to/libhello.a --> hello
+    """
+    # Cut off 'lib' at the beginning of filename, and '.a' at end.
+    return os.path.basename(libpath)[3:-2]
+
+  def _link_binary(self, vt, objects):
+    output = os.path.join(vt.results_dir, vt.target.name)
 
     cmd = [self.cpp_toolchain.compiler]
 
@@ -63,16 +67,17 @@ class CppBinaryCreate(CppTask):
     libraries = []
 
     # TODO(dhamon): should this use self.context.products.get('lib').get(binary).items()
-    def add_library(tgt):
-      for dep in tgt.dependencies:
-        if self.is_library(dep):
-          library_dirs.extend([os.path.join(dep.workdir, dep.id)])
-          libraries.extend([dep.name])
+    def add_library(target):
+      product_map = self.context.products.get('lib').get(target)
+      if product_map:
+        for dir, libs in product_map.items():
+          library_dirs.append(dir)
+          libraries.extend((self._libname(l) for l in libs))
 
-    target.walk(add_library)
+    vt.target.walk(add_library)
 
-    if target.libraries != None:
-      libraries.extend(target.libraries)
+    if vt.target.libraries:
+      libraries.extend(vt.target.libraries)
 
     cmd.extend(objects)
     cmd.extend(('-L{0}'.format(L) for L in library_dirs))

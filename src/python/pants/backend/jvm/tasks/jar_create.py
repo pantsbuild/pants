@@ -67,17 +67,20 @@ class JarCreate(JarTask):
     self.compressed = self.get_options().compressed
     self._jars = {}
 
-  def execute(self):
-    safe_mkdir(self.workdir)
+  @property
+  def cache_target_dirs(self):
+    return True
 
-    with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
-      for target in self.context.targets(is_jvm_library):
-        jar_name = jarname(target)
-        jar_path = os.path.join(self.workdir, jar_name)
-        with self.create_jar(target, jar_path) as jarfile:
-          with self.create_jar_builder(jarfile) as jar_builder:
-            if target in jar_builder.add_target(target):
-              self.context.products.get('jars').add(target, self.workdir).append(jar_name)
+  def execute(self):
+    with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
+      with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
+        for vt in invalidation_check.invalid_vts:
+          jar_name = jarname(vt.target)
+          jar_path = os.path.join(vt.results_dir, jar_name)
+          with self.create_jar(vt.target, jar_path) as jarfile:
+            with self.create_jar_builder(jarfile) as jar_builder:
+              if vt.target in jar_builder.add_target(vt.target):
+                self.context.products.get('jars').add(vt.target, vt.results_dir).append(jar_name)
 
   @contextmanager
   def create_jar(self, target, path):

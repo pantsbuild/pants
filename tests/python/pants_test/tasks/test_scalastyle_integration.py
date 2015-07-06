@@ -24,11 +24,13 @@ class ScalastyleIntegrationTest(PantsRunIntegrationTest):
           '-ldebug'
         ]
 
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(scalastyle_args, workdir)
         self.assert_success(pants_run)
         self.assertIn('abc_Scalastyle_compile_scalastyle will write to local artifact cache',
             pants_run.stdout_data)
 
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(scalastyle_args, workdir)
         self.assert_success(pants_run)
         self.assertIn('abc_Scalastyle_compile_scalastyle will read from local artifact cache',

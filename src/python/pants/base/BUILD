@@ -134,6 +134,7 @@ python_library(
     ':build_graph',
     ':build_invalidator',
     ':target',
+    'src/python/pants/util:dirutil',
   ],
 )
 

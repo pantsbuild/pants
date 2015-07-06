@@ -106,6 +106,10 @@ class Scalastyle(NailgunTask):
     touch(result_file)
     return result_file
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   def execute(self):
     if self.get_options().skip:
       self.context.log.info('Skipping scalastyle.')
@@ -117,9 +121,7 @@ class Scalastyle(NailgunTask):
       return
 
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = []
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.extend(vt.targets)
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
       scalastyle_config = self.validate_scalastyle_config()
       scalastyle_excluder = self.create_file_excluder()
@@ -145,10 +147,9 @@ class Scalastyle(NailgunTask):
           raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
             entry=Scalastyle._MAIN, exit_code=result))
 
-        if self.artifact_cache_writes_enabled():
-          result_files = lambda vt: map(lambda t: self._create_result_file(t), vt.targets)
-          pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
-          self.update_artifact_cache(pairs)
+        for vt in invalidation_check.invalid_vts:
+          result_file = os.path.join(vt.results_dir, 'result')
+          touch(result_file)
 
   def validate_scalastyle_config(self):
     scalastyle_config = self.get_options().config

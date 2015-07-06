@@ -10,6 +10,7 @@ import sys
 from pants.base.build_graph import sort_targets
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.target import Target
+from pants.util.dirutil import safe_mkdir
 
 
 try:
@@ -78,7 +79,19 @@ class VersionedTarget(VersionedTargetSet):
     # Must come after the assignments above, as they are used in the parent's __init__.
     VersionedTargetSet.__init__(self, cache_manager, [self])
     self.id = target.id
+    self._results_dir = None
 
+  @property
+  def results_dir(self):
+    return self._results_dir
+
+  @results_dir.setter
+  def results_dir(self, dir):
+    safe_mkdir(dir)
+    self._results_dir = dir
+
+  def __repr__(self):
+    return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
 
 
 class InvalidationCheck(object):

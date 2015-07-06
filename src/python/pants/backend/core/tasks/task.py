@@ -228,6 +228,10 @@ class TaskBase(Optionable, AbstractClass):
                                     invalidate_dependents,
                                     fingerprint_strategy=fingerprint_strategy)
 
+  @property
+  def cache_target_dirs(self):
+    return False
+
   @contextmanager
   def invalidated(self,
                   targets,
@@ -304,6 +308,10 @@ class TaskBase(Optionable, AbstractClass):
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
 
+    if self.cache_target_dirs:
+      for vt in invalidation_check.all_vts:
+        vt.results_dir = os.path.join(self.workdir, vt.cache_key.hash)
+
     if not silent:
       targets = []
       num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
@@ -320,8 +328,18 @@ class TaskBase(Optionable, AbstractClass):
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
+
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
+
+    write_to_cache = (self.cache_target_dirs
+                      and self.artifact_cache_writes_enabled()
+                      and invalidation_check.invalid_vts)
+    if write_to_cache:
+      def result_files(vt):
+        return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
+      pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+      self.update_artifact_cache(pairs)
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
@@ -461,6 +479,24 @@ class TaskBase(Optionable, AbstractClass):
       # language-specific flags that would resolve the ambiguity here
       raise TaskError('Mutually incompatible targets specified: {} vs {} (and {} others)'
                       .format(accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
+
+  def retrieve_sole_product(self, product_type, target):
+    """If there is exactly one product for the given product type and target, returns the
+    full filepath of said product.
+
+    Otherwise, raises an exception.
+
+    Useful for retrieving the filepath for the executable of a binary target.
+    """
+    product_map = self.context.products.get(product_type).get(target)
+    if len(product_map) != 1:
+      raise Exception('More than one directory in product mapping.')
+
+    for _, files in product_map.items():
+      if len(files) != 1:
+        raise Exception('More than one file in target directory.')
+
+      return files[0]
 
 
 class Task(TaskBase):
