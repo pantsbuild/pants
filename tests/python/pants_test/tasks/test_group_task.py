@@ -82,21 +82,20 @@ class GroupIteratorMultipleTest(GroupIteratorTestBase):
     chunks = self.iterate(c_red, a_green)
     self.assertEqual(4, len(chunks))
 
-    group_member, targets = chunks[0]
-    self.assertEqual(self.red, type(group_member))
-    self.assertEqual({a_red}, set(targets))
+    group_members, target_lists = zip(*chunks)
+    group_member_types = [type(group_member) for group_member in group_members]
+    target_sets = [set(target_list) for target_list in target_lists]
 
-    group_member, targets = chunks[1]
-    self.assertEqual(self.blue, type(group_member))
-    self.assertEqual({a_blue}, set(targets))
+    # There are two possible topological orders, both correct.
+    first_possible_group_member_types = [self.red, self.blue, self.red, self.green]
+    first_possible_target_sets = [{a_red}, {a_blue}, {b_red, c_red}, {a_green}]
+    second_possible_group_member_types = [self.red, self.blue, self.green, self.red]
+    second_possible_target_sets = [{a_red}, {a_blue}, {a_green}, {b_red, c_red}]
 
-    group_member, targets = chunks[2]
-    self.assertEqual(self.green, type(group_member))
-    self.assertEqual({a_green}, set(targets))
-
-    group_member, targets = chunks[3]
-    self.assertEqual(self.red, type(group_member))
-    self.assertEqual({b_red, c_red}, set(targets))
+    self.assertIn(
+      (group_member_types, target_sets),
+      [(first_possible_group_member_types, first_possible_target_sets),
+       (second_possible_group_member_types, second_possible_target_sets)])
 
 
 class BaseGroupTaskTest(BaseTest):
