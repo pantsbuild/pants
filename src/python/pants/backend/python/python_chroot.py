@@ -197,7 +197,7 @@ class PythonChroot(object):
         reqs_from_libraries.add(req)
 
     reqs_to_build = OrderedSet()
-    find_links = []
+    find_links = OrderedSet()
 
     for req in reqs_from_libraries | generated_reqs | self._extra_requirements:
       if not req.should_build(self._interpreter.python, Platform.current()):
@@ -206,7 +206,7 @@ class PythonChroot(object):
       reqs_to_build.add(req)
       self._dump_requirement(req.requirement)
       if req.repository:
-        find_links.append(req.repository)
+        find_links.add(req.repository)
 
     distributions = self._resolve_multi(reqs_to_build, find_links)
 
@@ -240,7 +240,7 @@ class PythonChroot(object):
 
     for platform in platforms:
       distributions[platform] = resolve(
-        requirements=requirements,
+        requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
         fetchers=fetchers,
         platform=platform,

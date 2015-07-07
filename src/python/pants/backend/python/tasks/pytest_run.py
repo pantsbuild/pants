@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -549,5 +550,11 @@ class PytestRun(PythonTask):
           return run_and_analyze(resultlog_path)
 
   def _pex_run(self, pex, workunit, args, setsid=False):
-    return pex.run(args=args, setsid=setsid,
-                   stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+    # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
+    # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
+    # task.
+    process = subprocess.Popen(pex.cmdline(args),
+                               preexec_fn=os.setsid if setsid else None,
+                               stdout=workunit.output('stdout'),
+                               stderr=workunit.output('stderr'))
+    return process.wait()
