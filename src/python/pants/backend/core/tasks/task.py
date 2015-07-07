@@ -336,9 +336,11 @@ class TaskBase(Optionable, AbstractClass):
                       and self.artifact_cache_writes_enabled()
                       and invalidation_check.invalid_vts)
     if write_to_cache:
-      def result_files(vt):
-        return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
-      pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+      pairs = []
+      for vt in invalidation_check.invalid_vts:
+        result_files = [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
+        if result_files:
+          pairs.append((vt, result_files))
       self.update_artifact_cache(pairs)
 
   def check_artifact_cache_for(self, invalidation_check):

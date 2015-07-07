@@ -15,6 +15,7 @@ from pants.base.address import BuildFileAddress
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 logger = logging.getLogger(__name__)
@@ -210,6 +211,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     self.assertEquals(1, len(result_sources))
     self.assertEqual('a/scala_1/Source1.scala', result_sources[0])
 
+  @ensure_cached(Scalastyle, expected_num_artifacts=1)
   def test_end_to_end_pass(self):
     # Default scalastyle config (import grouping rule) and no excludes.
 
@@ -235,6 +237,7 @@ class ScalastyleTest(NailgunTaskTestBase):
                                    target_roots=[scala_target])
 
     self.execute(context)
+
 
   def test_fail(self):
     # Default scalastyle config (import grouping rule) and no excludes.

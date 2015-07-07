@@ -19,6 +19,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 class JarCreateTestBase(JarTaskTestBase):
@@ -131,6 +132,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
             with closing(jar.open(content)) as fp:
               self.assertEqual(os.path.basename(content), fp.read())
 
+  @ensure_cached(JarCreate, expected_num_artifacts=4)
   def test_classfile_jar_contents(self):
     context = self.context()
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):

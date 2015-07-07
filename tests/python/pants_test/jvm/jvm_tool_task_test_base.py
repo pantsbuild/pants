@@ -57,11 +57,11 @@ class JvmToolTaskTestBase(TaskTestBase):
     # populate a second cache at the standard location, which is no big deal.
     # TODO: We really need a straightforward way for pants's own tests to get to the enclosing
     # pants instance's options values.
-    artifact_caches = [os.path.join(get_pants_cachedir(), 'artifact_cache')]
+    # self.artifact_cache = os.path.join(get_pants_cachedir(), 'artifact_cache')
     self.set_options_for_scope(bootstrap_scope, jvm_options=['-Xmx128m'])
-    self.set_options_for_scope('cache.{}'.format(bootstrap_scope),
-                               read_from=artifact_caches,
-                               write_to=artifact_caches)
+    # self.set_options_for_scope('cache.{}'.format(bootstrap_scope),
+                               # read_from=[self.artifact_cache],
+                               # write_to=[self.artifact_cache])
 
     # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it
     # into our test workspace.
