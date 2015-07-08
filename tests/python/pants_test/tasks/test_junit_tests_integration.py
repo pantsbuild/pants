@@ -192,3 +192,10 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
     self.assertIn('Hello from test1!', pants_run.stdout_data)
     self.assertIn('Hello from test2!', pants_run.stdout_data)
+
+  def test_junit_test_target_cwd(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/tests/java/org/pantsbuild/testproject/workdirs/onedir',
+    ])
+    self.assert_success(pants_run)

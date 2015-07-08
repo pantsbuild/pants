@@ -19,6 +19,7 @@ from pants import binary_util
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnit
@@ -89,8 +90,10 @@ class _JUnitRunner(object):
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
              help='Redirect test output to files in .pants.d/test/junit.')
+    # TODO(gmalmquist): Use the build root instead of the path of the first target by default.
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
-             help='Set the working directory. If no argument is passed, use the first target path.')
+             help='Set the working directory. If no argument is passed, use the first target path. '
+                  'If cwd is set on a target, it will supersede this argument.')
     register_jvm_tool(register,
                       'junit',
                       main=JUnitRun._MAIN,
@@ -200,7 +203,8 @@ class _JUnitRunner(object):
   def _collect_test_targets(self, targets):
     """Returns a mapping from test names to target objects for all tests that
     are included in targets. If self._tests_to_run is set, return {test: None}
-    for these tests instead."""
+    for these tests instead.
+    """
 
     java_tests_targets = list(self._test_target_candidates(targets))
     tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
@@ -261,32 +265,46 @@ class _JUnitRunner(object):
 
     return failed_targets
 
-  def _run_tests(self, tests_and_targets, classpath, main, extra_jvm_options=None):
+  def _run_tests(self, tests_to_targets, classpath, main, extra_jvm_options=None):
     extra_jvm_options = extra_jvm_options or []
 
     result = 0
-    for batch in self._partition(tests_and_targets.keys()):
-      with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
-        result += abs(execute_java(
-          classpath=classpath,
-          main=main,
-          jvm_options=self._task_exports.jvm_options + extra_jvm_options,
-          args=self._args + batch_tests + [u'-xmlreport'],
-          workunit_factory=self._context.new_workunit,
-          workunit_name='run',
-          workunit_labels=[WorkUnit.TEST],
-          cwd=self._working_dir
-        ))
+    for workdir, tests in self._tests_by_workdir(tests_to_targets).items():
+      for batch in self._partition(tests):
+        with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
+          self._context.log.debug('CWD = {}'.format(workdir))
+          result += abs(execute_java(
+            classpath=classpath,
+            main=main,
+            jvm_options=self._task_exports.jvm_options + extra_jvm_options,
+            args=self._args + batch_tests + [u'-xmlreport'],
+            workunit_factory=self._context.new_workunit,
+            workunit_name='run',
+            workunit_labels=[WorkUnit.TEST],
+            cwd=workdir,
+          ))
 
-        if result != 0 and self._fail_fast:
-          break
+          if result != 0 and self._fail_fast:
+            break
 
     if result != 0:
-      failed_targets = self._get_failed_targets(tests_and_targets)
+      failed_targets = self._get_failed_targets(tests_to_targets)
       raise TestFailedTaskError(
-        'java {0} ... exited non-zero ({1})'.format(main, result),
+        'java {0} ... exited non-zero ({1}); {2} failed targets.'
+        .format(main, result, len(failed_targets)),
         failed_targets=failed_targets
       )
+
+  def _infer_workdir(self, target):
+    if target.cwd is not None:
+      return target.cwd
+    return self._working_dir
+
+  def _tests_by_workdir(self, tests_to_targets):
+    workdirs = defaultdict(OrderedSet)
+    for test, target in tests_to_targets.items():
+      workdirs[self._infer_workdir(target)].add(test)
+    return { workdir: list(tests) for workdir, tests in workdirs.items() }
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
