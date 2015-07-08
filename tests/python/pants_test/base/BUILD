@@ -33,7 +33,6 @@ target(
     ':address',
     ':build_configuration',
     ':build_environment',
-    ':build_file',
     ':build_file_address_mapper',
     ':build_file_aliases',
     ':build_file_parser',
@@ -44,6 +43,7 @@ target(
     ':config',
     ':deprecated',
     ':extension_loader',
+    ':filesystem_build_file',
     ':fingerprint_strategy',
     ':generator',
     ':hash_utils',
@@ -99,14 +99,13 @@ python_library(
   name = 'build_file_test_base',
   sources = ['build_file_test_base.py'],
   dependencies = [
-    'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
   ]
 )
 
 python_tests(
-  name = 'build_file',
-  sources = ['test_build_file.py'],
+  name = 'filesystem_build_file',
+  sources = ['test_filesystem_build_file.py'],
   dependencies = [
     ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
