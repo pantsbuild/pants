@@ -15,10 +15,13 @@ from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
-class BuildFileTest(BuildFileTestBase):
+class FilesystemBuildFileTest(BuildFileTestBase):
   def setUp(self):
-    super(BuildFileTest, self).setUp()
+    super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
+
+  def create_buildfile(self, path):
+    return FilesystemBuildFile(self.root_dir, path)
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
@@ -146,6 +149,7 @@ class BuildFileTest(BuildFileTestBase):
                        self.create_buildfile('grandparent/parent/BUILD'),
                        self.create_buildfile('grandparent/parent/BUILD.twitter'),
                        self.create_buildfile('grandparent/parent/child5/BUILD'),
+                       self.create_buildfile('issue_1742/BUILD.sibling'),
                        ],
                       buildfiles)
 
@@ -161,8 +165,13 @@ class BuildFileTest(BuildFileTestBase):
                        self.create_buildfile('grandparent/parent/BUILD'),
                        self.create_buildfile('grandparent/parent/BUILD.twitter'),
                        self.create_buildfile('grandparent/parent/child5/BUILD'),
+                       self.create_buildfile('issue_1742/BUILD.sibling'),
                        ],
                       buildfiles)
+
+  def test_dir_is_primary(self):
+    buildfile = self.create_buildfile('issue_1742')
+    self.assertEqual([self.create_buildfile('issue_1742/BUILD.sibling')], list(buildfile.family()))
 
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
