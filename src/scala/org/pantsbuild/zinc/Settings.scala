@@ -246,15 +246,7 @@ object Settings {
 
     header("JVM options:"),
     prefix(    "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
-    dummy(     "-J<flag>",                     "Set JVM flag directly for this process"),
-
-    header("Nailgun options:"),
-    dummy(     "-nailed",                      "Run as daemon with nailgun server"),
-    dummy(     "-port",                        "Set nailgun port (if nailed)"),
-    dummy(     "-start",                       "Ensure nailgun server is running (if nailed)"),
-    dummy(     "-status",                      "Report nailgun server status (if nailed)"),
-    dummy(     "-shutdown",                    "Shutdown nailgun server (if nailed)"),
-    dummy(     "-idle-timeout <duration>",     "Set idle timeout (Nh|Nm|Ns) (if nailed)")
+    dummy(     "-J<flag>",                     "Set JVM flag directly for this process")
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
