@@ -4,5 +4,6 @@ jvm_binary(
   main='org.pantsbuild.zinc.Main',
   dependencies=[
     'src/scala/org/pantsbuild/zinc',
-  ]
-).with_description("zinc -- the scala compiler in nailgun")
+  ],
+  description='zinc -- the scala compiler in nailgun',
+)

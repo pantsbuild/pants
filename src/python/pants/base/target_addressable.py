@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from six import string_types
 
 from pants.base.addressable import Addressable
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -15,10 +16,6 @@ class TargetAddressable(Addressable):
   @classmethod
   def get_target_type(cls):
     raise NotImplemented
-
-  @property
-  def addressable_name(self):
-    return self.name
 
   def __init__(self, *args, **kwargs):
     self.target_type = self.get_target_type()
@@ -47,6 +44,13 @@ class TargetAddressable(Addressable):
                .format(target_type=self.target_type, dep_spec=dep_spec))
         raise TargetDefinitionException(target=self, msg=msg)
 
+  @property
+  def addressable_name(self):
+    return self.name
+
+  @deprecated(removal_version='0.0.38',
+              hint_message='Use the target description keyword argument instead of the deprecated '
+                           'with_description target method.')
   def with_description(self, description):
     self.kwargs['description'] = description
 
