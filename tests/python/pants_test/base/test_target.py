@@ -84,3 +84,19 @@ class TargetTest(BaseTest):
                                        deferred_sources_address=SyntheticAddress.parse('//:foo'))
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
+
+  def test_illegal_kwargs(self):
+    with self.assertRaises(Target.UnknownArguments) as cm:
+      context = self.context()
+      build_file = self.add_to_build_file('foo/BUILD', dedent('''
+      java_library(
+        name='bar',
+        sources=[],
+        foobar='barfoo',
+      )
+      '''))
+      address = BuildFileAddress(build_file, 'bar')
+      context.build_graph.inject_address_closure(address)
+      context.build_graph.get_target(address)
+    self.assertTrue('foobar = barfoo' in str(cm.exception))
+    self.assertTrue('foo:bar' in str(cm.exception))
