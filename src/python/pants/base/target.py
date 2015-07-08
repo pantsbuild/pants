@@ -119,7 +119,9 @@ class Target(AbstractTarget):
 
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses"""
-    pass
+
+  class UnknownArguments(TargetDefinitionException):
+    """Unknown keyword arguments supplied to Target."""
 
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
@@ -176,7 +178,8 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None,
+               **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -204,6 +207,13 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+
+    if kwargs:
+      error_message = '{target_type} received unknown arguments: {args}'
+      raise self.UnknownArguments(address.spec, error_message.format(
+        target_type=type(self).__name__,
+        args=''.join('\n  {} = {}'.format(key, value) for key, value in kwargs.items())
+      ))
 
   @property
   def tags(self):
