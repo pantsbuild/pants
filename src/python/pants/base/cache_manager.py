@@ -9,6 +9,7 @@ import sys
 
 from pants.base.build_graph import sort_targets
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.base.exceptions import TaskError
 from pants.base.target import Target
 
 
@@ -183,7 +184,9 @@ class InvalidationCacheManager(object):
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
   """
 
-  class CacheValidationError(Exception):
+  # NOTE: This should extend TaskError so that it doesn't bubble up past the Engine;
+  #       specifically this addresses https://github.com/pantsbuild/pants/issues/465
+  class CacheValidationError(TaskError):
     """Indicates a problem accessing the cache."""
 
   def __init__(self,
