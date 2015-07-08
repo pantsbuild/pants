@@ -33,7 +33,6 @@ target(
     ':jar_create',
     ':jar_publish',
     ':jar_task',
-    ':jvm_run',
     ':jvm_task',
     ':jvmdoc_gen',
     ':list_goals',
@@ -499,17 +498,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/engine:engine',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'jvm_run',
-  sources = ['test_jvm_run.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:jvm_run',
-    'src/python/pants/util:contextutil',
   ]
 )
 
