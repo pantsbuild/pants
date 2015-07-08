@@ -21,6 +21,8 @@ h1, h2, h3, h4, h5, h6 {
  */
 .mainflow {
   margin: 64px 1rem 40em 300px;
+  float:left;
+  max-width: 800px;
 }
 
 a:link, a:visited {
@@ -36,6 +38,7 @@ pre {
   border: 1px solid #ddd;
   padding: 2px;
   color: #006;
+  white-space: pre-wrap;
 }
 
 ul, ol, dl {
@@ -141,6 +144,7 @@ nav.bignav {
   margin: 0px;
   max-width: 272px;
   background-color: #55acee;
+  height: 100%;
 }
 
 .bignav-logo {
@@ -207,21 +211,26 @@ nav.bignav .site-toc {
   padding-left: 0.5em;
 }
 .site-toc ul li.toc-h2 {
-  padding-left: 1.0em;
+  padding-left: 1.5em;
+  font-size: medium;
 }
 .site-toc ul li.toc-h3 {
-  padding-left: 1.5em;
+  padding-left: 2.5em;
+  font-size: smaller;
+  color: #eee;
 }
 .site-toc ul li.toc-h4 {
-  padding-left: 2.0em;
+  padding-left: 3.5em;
+  font-size: smaller;
+  color: #eee;
 }
 
 /* page's table of contents */
 nav.pagetoc {
-  float: right;
-  margin: 0px -1.0rem 0px 1em;
+  float: left;
+  margin: 100px -1.0rem 0px 1em;
   background-color: #55acee;
-  max-width: 24%;
+  width: 300px;
 }
 
 nav.pagetoc ul {
