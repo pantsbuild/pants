@@ -30,6 +30,7 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
+from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
@@ -242,9 +243,14 @@ class GoalRunner(object):
       return False
 
     is_explain = self.global_options.explain
+    if self.reporting.global_instance().get_options().invalidation_report:
+      invalidation_report = InvalidationReport()
+    else:
+      invalidation_report = None
     self.reporting.update_reporting(self.global_options,
                                     is_quiet_task() or is_explain,
-                                    self.run_tracker)
+                                    self.run_tracker,
+                                    invalidation_report=invalidation_report)
 
     context = Context(
       options=self.options,
@@ -254,7 +260,8 @@ class GoalRunner(object):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
-      spec_excludes=self.spec_excludes
+      spec_excludes=self.spec_excludes,
+      invalidation_report=invalidation_report
     )
 
     unknown = []
@@ -267,7 +274,10 @@ class GoalRunner(object):
       return 1
 
     engine = RoundEngine()
-    return engine.execute(context, self.goals)
+    result = engine.execute(context, self.goals)
+    if invalidation_report:
+      invalidation_report.report()
+    return result
 
   def _setup_logging(self, global_options):
     # NB: quiet help says 'Squelches all console output apart from errors'.
