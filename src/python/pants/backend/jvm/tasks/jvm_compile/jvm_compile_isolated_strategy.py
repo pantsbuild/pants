@@ -300,7 +300,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     if resources_by_target is not None:
       for _, paths in resources_by_target[compile_context.target].abs_paths():
         artifacts.extend(paths)
-    target_classes = self.context.products.get_data('classes_by_target').get(target)
+    target_classes = self.context.products.get_data('classes_by_target').get(compile_context.target)
     for _, classfiles in target_classes.abs_paths():
       artifacts.extend(classfiles)
     log_file = self._capture_log_file(compile_context.target)
