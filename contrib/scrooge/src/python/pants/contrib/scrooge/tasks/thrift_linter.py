@@ -39,7 +39,7 @@ class ThriftLinter(NailgunTask):
     register('--linter-args', default=[], advanced=True, type=Options.list,
              help='Additional options passed to the linter.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
-             help='Run checkstyle with these extra jvm options.')
+             help='Run with these extra jvm options.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
