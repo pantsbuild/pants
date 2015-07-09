@@ -24,35 +24,36 @@ class OptionsTest(unittest.TestCase):
   _known_scopes = ['compile', 'compile.java', 'compile.scala', 'stale', 'test', 'test.junit']
 
   def _register(self, options):
-    options.register_global('-v', '--verbose', action='store_true', help='Verbose output.',
-                            recursive=True)
-    options.register_global('-n', '--num', type=int, default=99, recursive=True)
-    options.register_global('-x', '--xlong', action='store_true', recursive=True)
-    options.register_global('--y', action='append', type=int)
-    options.register_global('--pants-foo')
-    options.register_global('--bar-baz')
-    options.register_global('--store-true-flag', action='store_true')
-    options.register_global('--store-false-flag', action='store_false')
-    options.register_global('--store-true-def-true-flag', action='store_true', default=True)
-    options.register_global('--store-true-def-false-flag', action='store_true', default=False)
-    options.register_global('--store-false-def-false-flag', action='store_false', default=False)
-    options.register_global('--store-false-def-true-flag', action='store_false', default=True)
+    def register_global(*args, **kwargs):
+      options.register(Options.GLOBAL_SCOPE, *args, **kwargs)
+
+    register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
+    register_global('-n', '--num', type=int, default=99, recursive=True)
+    register_global('-x', '--xlong', action='store_true', recursive=True)
+    register_global('--y', action='append', type=int)
+    register_global('--pants-foo')
+    register_global('--bar-baz')
+    register_global('--store-true-flag', action='store_true')
+    register_global('--store-false-flag', action='store_false')
+    register_global('--store-true-def-true-flag', action='store_true', default=True)
+    register_global('--store-true-def-false-flag', action='store_true', default=False)
+    register_global('--store-false-def-false-flag', action='store_false', default=False)
+    register_global('--store-false-def-true-flag', action='store_false', default=True)
 
     # Custom types.
-    options.register_global('--dicty', type=Options.dict, default='{"a": "b"}')
-    options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
+    register_global('--dicty', type=Options.dict, default='{"a": "b"}')
+    register_global('--listy', type=Options.list, default='[1, 2, 3]')
 
     # For the design doc example test.
-    options.register_global('--a', type=int, recursive=True)
-    options.register_global('--b', type=int, recursive=True)
+    register_global('--a', type=int, recursive=True)
+    register_global('--b', type=int, recursive=True)
 
     # Deprecated global options
-    options.register_global('--global-crufty',
-                            deprecated_version='999.99.9',
-                            deprecated_hint='use a less crufty global option')
-    options.register_global('--global-crufty-boolean', action='store_true',
-                            deprecated_version='999.99.9',
-                            deprecated_hint='say no to crufty global options')
+    register_global('--global-crufty', deprecated_version='999.99.9',
+                    deprecated_hint='use a less crufty global option')
+    register_global('--global-crufty-boolean', action='store_true', deprecated_version='999.99.9',
+                    deprecated_hint='say no to crufty global options')
+
     # Override --xlong with a different type (but leave -x alone).
     options.register('test', '--xlong', type=int)
 
@@ -354,13 +355,12 @@ class OptionsTest(unittest.TestCase):
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
       options = Options({}, FakeConfig({}), OptionsTest._known_scopes, "./pants")
-      options.register_global('--too-old-option',
-                              deprecated_version='0.0.24',
+      options.register(Options.GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                               deprecated_hint='The semver for this option has already passed.')
 
   def test_is_deprecated(self):
     options = self._parse('./pants')
-    global_parser = options.get_global_parser()
+    global_parser = options.get_parser(Options.GLOBAL_SCOPE)
     self.assertTrue(global_parser.is_deprecated('--global-crufty'))
     self.assertTrue(global_parser.is_deprecated('--global-crufty=foo'))
     self.assertTrue(global_parser.is_deprecated('--global-crufty-boolean'))

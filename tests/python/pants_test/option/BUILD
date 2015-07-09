@@ -6,6 +6,7 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:pytest',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',

@@ -156,14 +156,6 @@ class Options(object):
     """Register an option in the given scope, using argparse params."""
     self.get_parser(scope).register(*args, **kwargs)
 
-  def register_global(self, *args, **kwargs):
-    """Register an option in the global scope, using argparse params."""
-    self.register(GLOBAL_SCOPE, *args, **kwargs)
-
-  def registration_function_for_global_scope(self):
-    """Returns a function for registering argparse args on the global scope."""
-    return self.registration_function_for_scope(GLOBAL_SCOPE)
-
   def registration_function_for_scope(self, scope):
     """Returns a function for registering argparse args on the given scope."""
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
@@ -179,10 +171,6 @@ class Options(object):
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
     return self._parser_hierarchy.get_parser_by_scope(scope)
-
-  def get_global_parser(self):
-    """Returns the parser for the global scope, so code can register on it directly."""
-    return self.get_parser(GLOBAL_SCOPE)
 
   def for_scope(self, scope):
     """Return the option values for the given scope.
@@ -277,7 +265,7 @@ class Options(object):
 
     if show_all_help or not goals:
       print('\nGlobal options:')
-      print(self.get_global_parser().format_help())
+      print(self.get_parser(GLOBAL_SCOPE).format_help())
 
   def _format_help_for_scope(self, scope):
     """Generate a help message for options at the specified scope."""

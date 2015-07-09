@@ -11,16 +11,18 @@ import re
 from collections import OrderedDict
 
 from docutils.core import publish_parts
+from six import string_types
 from six.moves import range
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.option.global_options import register_global_options
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 
 
@@ -417,17 +419,23 @@ def get_syms(build_file_parser):
 
 
 def bootstrap_option_values():
-  return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
+  return OptionsBootstrapper().get_bootstrap_options().for_global_scope()
 
 
 def gen_glopts_reference_data():
+  buildroot = get_buildroot()
   option_parser = Parser(env={}, config={}, scope='', help_request=None, parent_parser=None)
   def register(*args, **kwargs):
+    # Replace the actual buildroot specified in the help args with a placeholder.
+    def sub_buildroot(key):
+      if isinstance(kwargs.get(key), string_types):
+        kwargs[key] = kwargs[key].replace(buildroot, '<buildroot>')
+    sub_buildroot('default')
+    sub_buildroot('key')
     option_parser.register(*args, **kwargs)
   register.bootstrap = bootstrap_option_values()
   register.scope = ''
-  register_bootstrap_options(register, buildroot='<buildroot>')
-  register_global_options(register)
+  GlobalOptionsRegistrar.register_options(register)
   argparser = option_parser._help_argparser
   return oref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
 

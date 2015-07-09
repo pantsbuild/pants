@@ -26,7 +26,7 @@ from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.logging.setup import setup_logging
-from pants.option.global_options import register_global_options
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
@@ -160,7 +160,7 @@ class GoalRunner(object):
 
   def register_options(self, subsystems):
     # Standalone global options.
-    register_global_options(self.options.registration_function_for_global_scope())
+    GlobalOptionsRegistrar.register_options_on_scope(self.options)
 
     # Options for subsystems.
     for subsystem in subsystems:

@@ -28,9 +28,8 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
-from pants.option.global_options import register_global_options
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
-from pants.option.options_bootstrapper import register_bootstrap_options
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
@@ -175,11 +174,11 @@ class BaseTest(unittest.TestCase):
     # TODO: This sequence is a bit repetitive of the real registration sequence.
 
     # Register bootstrap options and grab their default values for use in subsequent registration.
-    register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
+    GlobalOptionsRegistrar.register_bootstrap_options(register_func(Options.GLOBAL_SCOPE))
     bootstrap_option_values = create_option_values(copy.copy(option_values[Options.GLOBAL_SCOPE]))
 
-    # Now register the remaining global scope options.
-    register_global_options(register_func(Options.GLOBAL_SCOPE))
+    # Now register the full global scope options.
+    GlobalOptionsRegistrar.register_options(register_func(Options.GLOBAL_SCOPE))
 
     # Now register task and subsystem options for relevant tasks.
     for task_type in for_task_types:
