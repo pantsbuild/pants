@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from textwrap import dedent
 
+from pants.base.build_environment import get_buildroot
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_file
 
@@ -28,24 +29,29 @@ class BootstrapOptionsTest(unittest.TestCase):
           fp.write('{0}: {1}\n'.format(k, v))
       fp.close()
 
-      vals = OptionsBootstrapper(env=env, configpath=fp.name, args=args,
-                                 buildroot='/buildroot').get_bootstrap_options().for_global_scope()
+      bootstrapper = OptionsBootstrapper(env=env, configpath=fp.name, args=args)
+      vals = bootstrapper.get_bootstrap_options().for_global_scope()
 
       vals_dict = {k: getattr(vals, k) for k in expected_entries}
       self.assertEquals(expected_entries, vals_dict)
 
   def test_bootstrap_option_values(self):
     # Check all defaults.
-    self._do_test(['/buildroot/.pants.d', '/buildroot/build-support', '/buildroot/dist'],
+    buildroot = get_buildroot()
+    def br(path):
+      # Returns the full path of the given path under the buildroot.
+      return '{}/{}'.format(buildroot, path)
+
+    self._do_test([br('.pants.d'), br('build-support'), br('dist')],
                   config=None, env={}, args=[])
 
     # Check getting values from config, env and args.
-    self._do_test(['/from_config/.pants.d', '/buildroot/build-support', '/buildroot/dist'],
+    self._do_test(['/from_config/.pants.d', br('build-support'), br('dist')],
                   config={'pants_workdir': '/from_config/.pants.d'}, env={}, args=[])
-    self._do_test(['/buildroot/.pants.d', '/from_env/build-support', '/buildroot/dist'],
+    self._do_test([br('.pants.d'), '/from_env/build-support', br('dist')],
                   config=None,
                   env={'PANTS_SUPPORTDIR': '/from_env/build-support'}, args=[])
-    self._do_test(['/buildroot/.pants.d', '/buildroot/build-support', '/from_args/dist'],
+    self._do_test([br('.pants.d'), br('build-support'), '/from_args/dist'],
                   config={}, env={}, args=['--pants-distdir=/from_args/dist'])
 
     # Check that args > env > config.
@@ -105,6 +111,7 @@ class BootstrapOptionsTest(unittest.TestCase):
                                          configpath=fp.name,
                                          args=['--pants-workdir=/qux'])
       opts = bootstrapper.get_full_options(known_scopes=['', 'foo', 'fruit'])
+      opts.register('', '--pants-workdir')  # So we don't choke on it on the cmd line.
       opts.register('foo', '--bar')
       opts.register('fruit', '--apple')
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)

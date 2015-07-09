@@ -255,6 +255,7 @@ python_library(
   dependencies = [
     '3rdparty/python:docutils',
     '3rdparty/python:six',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',

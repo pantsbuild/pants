@@ -6,76 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import logging
 import os
 import sys
 
-from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.parser import Parser
 
 
-def register_bootstrap_options(register, buildroot=None):
-  """Register bootstrap options.
-
-  "Bootstrap options" are a small set of options whose values are useful when registering other
-  options. Therefore we must bootstrap them early, before other options are registered, let
-  alone parsed.
-
-  Bootstrap option values can be interpolated into the config file, and can be referenced
-  programatically in registration code, e.g., as register.bootstrap.pants_workdir.
-
-  Note that regular code can also access these options as normal global-scope options. Their
-  status as "bootstrap options" is only pertinent during option registration.
-  """
-  buildroot = buildroot or get_buildroot()
-  register('--plugins', advanced=True, type=Options.list, help='Load these plugins.')
-  register('--backend-packages', advanced=True, type=Options.list,
-           help='Load backends from these packages that are already on the path.')
-
-  register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
-           help='Use this dir for global cache.')
-  register('--pants-configdir', advanced=True, metavar='<dir>', default=get_pants_configdir(),
-         help='Use this dir for global config files.')
-  register('--pants-workdir', metavar='<dir>', default=os.path.join(buildroot, '.pants.d'),
-           help='Write intermediate output files to this dir.')
-  register('--pants-supportdir', metavar='<dir>', default=os.path.join(buildroot, 'build-support'),
-           help='Use support files from this dir.')
-  register('--pants-distdir', metavar='<dir>', default=os.path.join(buildroot, 'dist'),
-           help='Write end-product artifacts to this dir.')
-  register('--config-override', help='A second config file, to override pants.ini.')
-  register('--pantsrc', action='store_true', default=True,
-           help='Use pantsrc files.')
-  register('--pantsrc-files', action='append', metavar='<path>',
-           default=['/etc/pantsrc', '~/.pants.rc'],
-           help='Override config with values from these files. Later files override earlier ones.')
-  register('--pythonpath', action='append',
-           help='Add these directories to PYTHONPATH to search for plugins.')
-  register('--target-spec-file', action='append', dest='target_spec_files',
-           help='Read additional specs from this file, one per line')
-
-  # These logging options are registered in the bootstrap phase so that plugins can log during
-  # registration and not so that their values can be interpolated in configs.
-  register('-d', '--logdir', metavar='<dir>',
-           help='Write logs to files under this directory.')
-
-  # Although logging supports the WARN level, its not documented and could conceivably be yanked.
-  # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
-  # setup a 'WARN' logging level name that maps to 'WARNING'.
-  logging.addLevelName(logging.WARNING, 'WARN')
-  register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
-           help='Set the logging level.')
-
-  register('-q', '--quiet', action='store_true',
-           help='Squelches all console output apart from errors.')
-
-
 class OptionsBootstrapper(object):
   """An object that knows how to create options in two stages: bootstrap, and then full options."""
-  def __init__(self, env=None, configpath=None, args=None, buildroot=None):
-    self._buildroot = buildroot or get_buildroot()
+  def __init__(self, env=None, configpath=None, args=None):
     self._env = env or os.environ.copy()
     self._configpath = configpath
     self._post_bootstrap_config = None  # Will be set later.
@@ -99,7 +42,7 @@ class OptionsBootstrapper(object):
           if flag.inverse_name:
             flags.add(flag.inverse_name)
 
-      register_bootstrap_options(capture_the_flags, buildroot=self._buildroot)
+      GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
 
       def is_bootstrap_option(arg):
         components = arg.split('=', 1)
@@ -116,12 +59,14 @@ class OptionsBootstrapper(object):
       bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
 
       configpaths = [self._configpath] if self._configpath else None
-      pre_bootstrap_config = Config.load(configpaths, seed_values={'buildroot': self._buildroot})
+      pre_bootstrap_config = Config.load(configpaths)
 
       def bootstrap_options_from_config(config):
         bootstrap_options = Options(env=self._env, config=config,
                                     known_scopes=[GLOBAL_SCOPE], args=bargs)
-        register_bootstrap_options(bootstrap_options.register_global, buildroot=self._buildroot)
+        def register_global(*args, **kwargs):
+          bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+        GlobalOptionsRegistrar.register_bootstrap_options(register_global)
         return bootstrap_options
 
       initial_bootstrap_options = bootstrap_options_from_config(pre_bootstrap_config)
@@ -156,9 +101,4 @@ class OptionsBootstrapper(object):
                                    known_scopes,
                                    args=self._args,
                                    bootstrap_option_values=bootstrap_options.for_global_scope())
-
-      # The bootstrap options need to be registered on the post-bootstrap Options instance, so it
-      # won't choke on them on the command line, and also so we can access their values as regular
-      # global-scope options, for convenience.
-      register_bootstrap_options(self._full_options.register_global, buildroot=self._buildroot)
     return self._full_options
