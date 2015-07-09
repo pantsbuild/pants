@@ -38,6 +38,8 @@ class ThriftLinter(NailgunTask):
                   'this value if it is set.')
     register('--linter-args', default=[], advanced=True, type=Options.list,
              help='Additional options passed to the linter.')
+    register('--jvm-options', action='append', metavar='<option>...', advanced=True,
+             help='Run checkstyle with these extra jvm options.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
@@ -94,6 +96,7 @@ class ThriftLinter(NailgunTask):
     returncode = self.runjava(classpath=classpath,
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
+                              jvm_options=self.get_options().jvm_options,
                               workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
