@@ -113,7 +113,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       # Walk the class directory to build a set of unclaimed classfiles.
       unclaimed_classes = set()
       for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
-        unclaimed_classes.update([os.path.join(dirpath, f) for f in filenames])
+        unclaimed_classes.update(os.path.join(dirpath, f) for f in filenames)
 
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
