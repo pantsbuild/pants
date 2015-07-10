@@ -230,6 +230,9 @@ class TaskBase(Optionable, AbstractClass):
 
   @property
   def cache_target_dirs(self):
+    """Subclasses can to override this property to return True to cache files left in
+    each VersionedTarget's results_dir after exiting an invalidated block.
+    """
     return False
 
   @contextmanager
@@ -481,24 +484,6 @@ class TaskBase(Optionable, AbstractClass):
       # language-specific flags that would resolve the ambiguity here
       raise TaskError('Mutually incompatible targets specified: {} vs {} (and {} others)'
                       .format(accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
-
-  def retrieve_sole_product(self, product_type, target):
-    """If there is exactly one product for the given product type and target, returns the
-    full filepath of said product.
-
-    Otherwise, raises an exception.
-
-    Useful for retrieving the filepath for the executable of a binary target.
-    """
-    product_map = self.context.products.get(product_type).get(target)
-    if len(product_map) != 1:
-      raise Exception('More than one directory in product mapping.')
-
-    for _, files in product_map.items():
-      if len(files) != 1:
-        raise Exception('More than one file in target directory.')
-
-      return files[0]
 
 
 class Task(TaskBase):

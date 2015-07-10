@@ -50,7 +50,7 @@ class CppCompile(CppTask):
         for source in vt.target.sources_relative_to_buildroot():
           if is_cc(source):
             self.context.products.get('objs').add(vt.target, vt.results_dir).append(
-                self._objpath(vt, source))
+                self._objpath(vt.target, vt.results_dir, source))
 
       for vt in invalidation_check.invalid_vts:
         with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.MULTITOOL]):
@@ -60,26 +60,26 @@ class CppCompile(CppTask):
               # TODO: Only recompile source files that have changed since the
               #       object file was last written. Also use the output from
               #       gcc -M to track dependencies on headers.
-              self._compile(vt, source)
+              self._compile(vt.target, vt.results_dir, source)
 
-  def _objpath(self, vt, source):
-    abs_source_root = os.path.join(get_buildroot(), vt.target.target_base)
+  def _objpath(self, target, results_dir, source):
+    abs_source_root = os.path.join(get_buildroot(), target.target_base)
     abs_source = os.path.join(get_buildroot(), source)
     rel_source = os.path.relpath(abs_source, abs_source_root)
     root, _ = os.path.splitext(rel_source)
     obj_name = root + '.o'
 
-    return os.path.join(vt.results_dir, obj_name)
+    return os.path.join(results_dir, obj_name)
 
-  def _compile(self, vt, source):
+  def _compile(self, target, results_dir, source):
     """Compile given source to an object file."""
-    obj = self._objpath(vt, source)
+    obj = self._objpath(target, results_dir, source)
 
     abs_source = os.path.join(get_buildroot(), source)
 
     # TODO: include dir should include dependent work dir when headers are copied there.
     include_dirs = []
-    for dep in vt.target.dependencies:
+    for dep in target.dependencies:
       if self.is_library(dep):
         include_dirs.extend([os.path.join(get_buildroot(), dep.target_base)])
 

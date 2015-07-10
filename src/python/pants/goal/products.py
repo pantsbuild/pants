@@ -11,6 +11,9 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 
+class ProductError(Exception): pass
+
+
 class UnionProducts(object):
   """Here, products for a target are the ordered union of the products for its transitive deps."""
   def __init__(self):
@@ -287,3 +290,21 @@ class Products(object):
         return None
       self.data_products[typename] = init_func()
     return self.data_products.get(typename)
+
+  def get_only(self, product_type, target):
+    """If there is exactly one product for the given product type and target, returns the
+    full filepath of said product.
+
+    Otherwise, raises a ProductError.
+
+    Useful for retrieving the filepath for the executable of a binary target.
+    """
+    product_mapping = self.get(product_type).get(target)
+    if len(product_mapping) != 1:
+      raise ProductError('More than one directory in product mapping.')
+
+    for _, files in product_map.items():
+      if len(files) != 1:
+        raise ProductError('More than one file in target directory.')
+
+      return files[0]

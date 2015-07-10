@@ -34,15 +34,6 @@ def is_jvm_library(target):
           or (is_jvm_binary(target) and target.has_resources))
 
 
-def jarname(target, extension='.jar'):
-  # TODO(John Sirois): incorporate version
-  _, id_, _ = target.get_artifact_info()
-  # Cap jar names quite a bit lower than the standard fs limit of 255 characters since these
-  # artifacts will often be used outside pants and those uses may manipulate (expand) the jar
-  # filenames blindly.
-  return safe_filename(id_, extension, max_length=200)
-
-
 class JarCreate(JarTask):
   """Jars jvm libraries and optionally their sources and their docs."""
 
@@ -75,7 +66,7 @@ class JarCreate(JarTask):
     with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
       with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
         for vt in invalidation_check.invalid_vts:
-          jar_name = jarname(vt.target)
+          jar_name = vt.target.name + '.jar'
           jar_path = os.path.join(vt.results_dir, jar_name)
           with self.create_jar(vt.target, jar_path) as jarfile:
             with self.create_jar_builder(jarfile) as jar_builder:

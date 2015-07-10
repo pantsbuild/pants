@@ -40,14 +40,14 @@ class CppBinaryCreate(CppTask):
       targets = self.context.targets(self.is_binary)
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
         for vt in invalidation_check.invalid_vts:
-          binary = self._create_binary(vt)
+          binary = self._create_binary(vt.target, vt.results_dir)
           self.context.products.get('exe').add(vt.target, vt.results_dir).append(binary)
 
-  def _create_binary(self, vt):
+  def _create_binary(self, target, results_dir):
     objects = []
-    for basedir, objs in self.context.products.get('objs').get(vt.target).items():
+    for basedir, objs in self.context.products.get('objs').get(target).items():
       objects.extend([os.path.join(basedir, obj) for obj in objs])
-    output = self._link_binary(vt, objects)
+    output = self._link_binary(target, results_dir, objects)
     self.context.log.info('Built c++ binary: {0}'.format(output))
     return output
 
@@ -58,8 +58,8 @@ class CppBinaryCreate(CppTask):
     # Cut off 'lib' at the beginning of filename, and '.a' at end.
     return os.path.basename(libpath)[3:-2]
 
-  def _link_binary(self, vt, objects):
-    output = os.path.join(vt.results_dir, vt.target.name)
+  def _link_binary(self, target, results_dir, objects):
+    output = os.path.join(results_dir, target.name)
 
     cmd = [self.cpp_toolchain.compiler]
 
@@ -74,10 +74,10 @@ class CppBinaryCreate(CppTask):
           library_dirs.append(dir)
           libraries.extend((self._libname(l) for l in libs))
 
-    vt.target.walk(add_library)
+    target.walk(add_library)
 
-    if vt.target.libraries:
-      libraries.extend(vt.target.libraries)
+    if target.libraries:
+      libraries.extend(target.libraries)
 
     cmd.extend(objects)
     cmd.extend(('-L{0}'.format(L) for L in library_dirs))

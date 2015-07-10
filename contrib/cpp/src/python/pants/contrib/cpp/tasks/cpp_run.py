@@ -37,7 +37,7 @@ class CppRun(CppTask):
     binary_target = self.require_single_root_target()
     if isinstance(binary_target, CppBinary):
       with self.context.new_workunit(name='cpp-run', labels=[WorkUnit.RUN]) as workunit:
-        cmd = [self.retrieve_sole_product('exe', binary_target)]
+        cmd = [self.context.products.get_only('exe', binary_target)]
 
         args = self.get_options().args + self.get_passthru_args()
         if args != None:

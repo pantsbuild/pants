@@ -41,27 +41,10 @@ class JvmToolTaskTestBase(TaskTestBase):
     self.bootstrap_task_type = self.synthesize_task_subtype(BootstrapJvmTools, bootstrap_scope)
     JvmToolMixin.reset_registered_tools()
 
-    # Set some options:
-
-    # 1. Cap BootstrapJvmTools memory usage in tests.  The Xmx was empirically arrived upon using
-    #    -Xloggc and verifying no full gcs for a test using the full gamut of resolving a multi-jar
-    #    tool, constructing a fat jar and then shading that fat jar.
-    #
-    # 2. Allow tests to read/write tool jars from the real artifact cache, so they don't
-    #    each have to resolve and shade them every single time, which is a huge slowdown.
-    #    Note that local artifact cache writes are atomic, so it's fine for multiple concurrent
-    #    tests to write to it.
-    #
-    # Note that we don't have access to the invoking pants instance's options, so we assume that
-    # its artifact cache is in the standard location.  If it isn't, worst case the tests will
-    # populate a second cache at the standard location, which is no big deal.
-    # TODO: We really need a straightforward way for pants's own tests to get to the enclosing
-    # pants instance's options values.
-    # self.artifact_cache = os.path.join(get_pants_cachedir(), 'artifact_cache')
+    # Cap BootstrapJvmTools memory usage in tests.  The Xmx was empirically arrived upon using
+    # -Xloggc and verifying no full gcs for a test using the full gamut of resolving a multi-jar
+    # tool, constructing a fat jar and then shading that fat jar.
     self.set_options_for_scope(bootstrap_scope, jvm_options=['-Xmx128m'])
-    # self.set_options_for_scope('cache.{}'.format(bootstrap_scope),
-                               # read_from=[self.artifact_cache],
-                               # write_to=[self.artifact_cache])
 
     # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it
     # into our test workspace.

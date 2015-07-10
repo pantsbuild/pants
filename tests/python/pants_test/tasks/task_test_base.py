@@ -80,6 +80,9 @@ class TaskTestBase(BaseTest):
                                read_from=[self.artifact_cache],
                                write_to=[self.artifact_cache])
 
+  def disable_artifact_cache(self):
+    self.del_options_for_scope('cache', 'read_from', 'write_to')
+
   @property
   def test_workdir(self):
     return self._test_workdir
