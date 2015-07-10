@@ -301,10 +301,12 @@ class Products(object):
     """
     product_mapping = self.get(product_type).get(target)
     if len(product_mapping) != 1:
-      raise ProductError('More than one directory in product mapping.')
+      raise ProductError('{} directories in product mapping: requires exactly 1.'
+                         .format(len(product_mapping)))
 
     for _, files in product_mapping.items():
       if len(files) != 1:
-        raise ProductError('More than one file in target directory.')
+        raise ProductError('{} files in target directory: requires exactly 1.'
+                           .format(len(files)))
 
       return files[0]

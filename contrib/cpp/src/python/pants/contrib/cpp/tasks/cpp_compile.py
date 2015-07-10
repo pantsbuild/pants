@@ -46,21 +46,29 @@ class CppCompile(CppTask):
 
     # Compile source files to objects.
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
+      obj_mapping = self.context.products.get('objs')
       for vt in invalidation_check.all_vts:
         for source in vt.target.sources_relative_to_buildroot():
           if is_cc(source):
-            self.context.products.get('objs').add(vt.target, vt.results_dir).append(
-                self._objpath(vt.target, vt.results_dir, source))
+            if not vt.valid:
+              with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.MULTITOOL]):
+                # TODO: Parallelise the compilation.
+                # TODO: Only recompile source files that have changed since the
+                #       object file was last written. Also use the output from
+                #       gcc -M to track dependencies on headers.
+                self._compile(vt.target, vt.results_dir, source)
+            objpath = self._objpath(vt.target, vt.results_dir, source)
+            obj_mapping.add(vt.target, vt.results_dir).append(objpath)
 
-      for vt in invalidation_check.invalid_vts:
-        with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.MULTITOOL]):
-          for source in vt.target.sources_relative_to_buildroot():
-            if is_cc(source):
-              # TODO: Parallelise the compilation.
-              # TODO: Only recompile source files that have changed since the
-              #       object file was last written. Also use the output from
-              #       gcc -M to track dependencies on headers.
-              self._compile(vt.target, vt.results_dir, source)
+      # for vt in invalidation_check.invalid_vts:
+      #   with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.MULTITOOL]):
+      #     for source in vt.target.sources_relative_to_buildroot():
+      #       if is_cc(source):
+      #         # TODO: Parallelise the compilation.
+      #         # TODO: Only recompile source files that have changed since the
+      #         #       object file was last written. Also use the output from
+      #         #       gcc -M to track dependencies on headers.
+      #         self._compile(vt.target, vt.results_dir, source)
 
   def _objpath(self, target, results_dir, source):
     abs_source_root = os.path.join(get_buildroot(), target.target_base)

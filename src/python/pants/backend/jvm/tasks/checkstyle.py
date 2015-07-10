@@ -66,9 +66,6 @@ class Checkstyle(NailgunTask):
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
-        for vt in invalidation_check.invalid_vts:
-          result_file = os.path.join(vt.results_dir, 'result')
-          touch(result_file)
 
   def calculate_sources(self, targets):
     sources = set()

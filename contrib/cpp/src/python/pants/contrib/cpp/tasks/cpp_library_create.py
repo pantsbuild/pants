@@ -36,11 +36,11 @@ class CppLibraryCreate(CppTask):
     with self.context.new_workunit(name='cpp-library', labels=[WorkUnit.TASK]):
       targets = self.context.targets(self.is_library)
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
+        lib_mapping = self.context.products.get('lib')
         for vt in invalidation_check.all_vts:
-          libpath = self._libpath(vt.target, vt.results_dir)
-          self.context.products.get('lib').add(vt.target, vt.results_dir).append(libpath)
-        for vt in invalidation_check.invalid_vts:
-          self._create_library(vt.target, vt.results_dir)
+          if not vt.valid:
+            self._create_library(vt.target, vt.results_dir)
+          lib_mapping.add(vt.target, vt.results_dir).append(self._libpath(vt.target, vt.results_dir))
 
   def _create_library(self, target, results_dir):
     objects = []

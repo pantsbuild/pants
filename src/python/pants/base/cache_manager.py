@@ -62,7 +62,7 @@ class VersionedTargetSet(object):
     self._cache_manager.force_invalidate(self)
 
   def __repr__(self):
-    return 'VTS({}, {})'.format(','.join(target.id for target in self.targets),
+    return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
                                 'valid' if self.valid else 'invalid')
 
 
@@ -81,14 +81,13 @@ class VersionedTarget(VersionedTargetSet):
     self.id = target.id
     self._results_dir = None
 
+  def create_results_dir(self, dir):
+    safe_mkdir(dir)
+    self._results_dir = dir
+
   @property
   def results_dir(self):
     return self._results_dir
-
-  @results_dir.setter
-  def results_dir(self, dir):
-    safe_mkdir(dir)
-    self._results_dir = dir
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')

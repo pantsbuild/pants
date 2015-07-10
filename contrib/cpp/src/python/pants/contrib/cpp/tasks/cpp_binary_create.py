@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir, touch
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
@@ -35,21 +34,26 @@ class CppBinaryCreate(CppTask):
   def cache_target_dirs(self):
     return True
 
+  def _binary_name(self, target):
+    return target.name
+
   def execute(self):
     with self.context.new_workunit(name='cpp-binary', labels=[WorkUnit.TASK]):
       targets = self.context.targets(self.is_binary)
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
-        for vt in invalidation_check.invalid_vts:
-          binary = self._create_binary(vt.target, vt.results_dir)
-          self.context.products.get('exe').add(vt.target, vt.results_dir).append(binary)
+        binary_mapping = self.context.products.get('exe')
+        for vt in invalidation_check.all_vts:
+          binary_path = os.path.join(vt.results_dir, vt.target.name)
+          if not vt.valid:
+            self._create_binary(vt.target, binary_path)
+          binary_mapping.add(vt.target, vt.results_dir).append(binary_path)
 
-  def _create_binary(self, target, results_dir):
+  def _create_binary(self, target, binary_path):
     objects = []
     for basedir, objs in self.context.products.get('objs').get(target).items():
       objects.extend([os.path.join(basedir, obj) for obj in objs])
-    output = self._link_binary(target, results_dir, objects)
-    self.context.log.info('Built c++ binary: {0}'.format(output))
-    return output
+    self._link_binary(target, binary_path, objects)
+    self.context.log.info('Built c++ binary: {0}'.format(binary_path))
 
   def _libname(self, libpath):
     """Converts a full library filepath to the library's name.
@@ -58,9 +62,7 @@ class CppBinaryCreate(CppTask):
     # Cut off 'lib' at the beginning of filename, and '.a' at end.
     return os.path.basename(libpath)[3:-2]
 
-  def _link_binary(self, target, results_dir, objects):
-    output = os.path.join(results_dir, target.name)
-
+  def _link_binary(self, target, binary_path, objects):
     cmd = [self.cpp_toolchain.compiler]
 
     library_dirs = []
@@ -82,11 +84,9 @@ class CppBinaryCreate(CppTask):
     cmd.extend(objects)
     cmd.extend(('-L{0}'.format(L) for L in library_dirs))
     cmd.extend(('-l{0}'.format(l) for l in libraries))
-    cmd.extend(['-o' + output])
+    cmd.extend(['-o' + binary_path])
     if self.get_options().ld_options != None:
       cmd.extend(('-Wl,{0}'.format(o) for o in self.get_options().ld_options.split(' ')))
 
     with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]) as workunit:
       self.run_command(cmd, workunit)
-
-    return output

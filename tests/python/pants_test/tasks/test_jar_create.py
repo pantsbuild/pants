@@ -132,7 +132,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
             with closing(jar.open(content)) as fp:
               self.assertEqual(os.path.basename(content), fp.read())
 
-  @ensure_cached(JarCreate, expected_num_artifacts=4)
+  @ensure_cached(JarCreate)
   def test_classfile_jar_contents(self):
     context = self.context()
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):

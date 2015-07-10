@@ -230,8 +230,13 @@ class TaskBase(Optionable, AbstractClass):
 
   @property
   def cache_target_dirs(self):
-    """Subclasses can to override this property to return True to cache files left in
-    each VersionedTarget's results_dir after exiting an invalidated block.
+    """Whether to cache files in VersionedTarget's results_dir after exiting an invalidated block.
+
+    Subclasses may override this method to return True if they wish to use this style
+    of "automated" caching, where each VersionedTarget is given an associated results directory,
+    which will automatically be uploaded to the cache. Tasks should place the output files
+    for each VersionedTarget in said results directory. It is highly suggested to follow this
+    schema for caching, rather than manually making updates to the artifact cache.
     """
     return False
 
@@ -313,7 +318,7 @@ class TaskBase(Optionable, AbstractClass):
 
     if self.cache_target_dirs:
       for vt in invalidation_check.all_vts:
-        vt.results_dir = os.path.join(self.workdir, vt.cache_key.hash)
+        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
 
     if not silent:
       targets = []
@@ -339,11 +344,9 @@ class TaskBase(Optionable, AbstractClass):
                       and self.artifact_cache_writes_enabled()
                       and invalidation_check.invalid_vts)
     if write_to_cache:
-      pairs = []
-      for vt in invalidation_check.invalid_vts:
-        result_files = [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
-        if result_files:
-          pairs.append((vt, result_files))
+      def result_files(vt):
+        return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
+      pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
       self.update_artifact_cache(pairs)
 
   def check_artifact_cache_for(self, invalidation_check):

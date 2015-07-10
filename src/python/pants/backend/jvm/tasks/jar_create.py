@@ -65,13 +65,23 @@ class JarCreate(JarTask):
   def execute(self):
     with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
       with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
-        for vt in invalidation_check.invalid_vts:
+        jar_mapping = self.context.products.get('jars')
+
+        for vt in invalidation_check.all_vts:
           jar_name = vt.target.name + '.jar'
           jar_path = os.path.join(vt.results_dir, jar_name)
-          with self.create_jar(vt.target, jar_path) as jarfile:
-            with self.create_jar_builder(jarfile) as jar_builder:
-              if vt.target in jar_builder.add_target(vt.target):
-                self.context.products.get('jars').add(vt.target, vt.results_dir).append(jar_name)
+
+          def add_jar_to_products():
+            jar_mapping.add(vt.target, vt.results_dir).append(jar_name)
+
+          if vt.valid:
+            if os.path.exists(jar_path):
+              add_jar_to_products()
+          else:
+            with self.create_jar(vt.target, jar_path) as jarfile:
+              with self.create_jar_builder(jarfile) as jar_builder:
+                if vt.target in jar_builder.add_target(vt.target):
+                  add_jar_to_products()
 
   @contextmanager
   def create_jar(self, target, path):

@@ -147,10 +147,6 @@ class Scalastyle(NailgunTask):
           raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
             entry=Scalastyle._MAIN, exit_code=result))
 
-        for vt in invalidation_check.invalid_vts:
-          result_file = os.path.join(vt.results_dir, 'result')
-          touch(result_file)
-
   def validate_scalastyle_config(self):
     scalastyle_config = self.get_options().config
     if not scalastyle_config:
