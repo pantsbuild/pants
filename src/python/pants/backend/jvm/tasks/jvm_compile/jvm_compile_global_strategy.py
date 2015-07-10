@@ -57,9 +57,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
-    super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                   language, sources_predicate)
+  def __init__(self, context, options, workdir, all_compile_contexts, analysis_tools, language, sources_predicate):
+    super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, all_compile_contexts,
+                                                   analysis_tools, language, sources_predicate)
 
     # Various working directories.
     # NB: These are grandfathered in with non-strategy-specific names, but to prevent
@@ -110,7 +110,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def name(self):
     return 'global'
 
-  def compile_context(self, target):
+  def _compute_compile_context(self, target):
     """Returns the default/stable compile context for the given target.
 
     Temporary compile contexts are private to the strategy.
@@ -139,9 +139,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for f in (self._invalid_analysis_file, self._analysis_file):
       self.validate_analysis(f)
 
-  def prepare_compile(self, cache_manager, all_targets, relevant_targets, all_compile_contexts):
-    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets,
-                                                          relevant_targets, all_compile_contexts)
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
+    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
 
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -197,7 +196,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
-                    all_compile_contexts,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,

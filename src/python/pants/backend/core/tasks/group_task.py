@@ -320,7 +320,9 @@ class GroupTask(Task):
 
     self._all_compile_contexts = OrderedDict()
 
-    self._group_members = [member_type(self.context, os.path.join(self.workdir, member_type.name()), self._all_compile_contexts)
+    self._group_members = [member_type(context=self.context,
+                                       workdir=os.path.join(self.workdir, member_type.name()),
+                                       all_compile_contexts=self._all_compile_contexts)
                            for member_type in self._member_types()]
 
   @abstractmethod

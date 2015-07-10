@@ -33,9 +33,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     register('--capture-log', action='store_true', default=False, advanced=True,
             help='Capture compilation output to per-target logs.')
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
-    super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                     language, sources_predicate)
+  def __init__(self, context, options, workdir, all_compile_contexts, analysis_tools, language, sources_predicate):
+    super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, all_compile_contexts,
+                                                     analysis_tools, language, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
@@ -56,7 +56,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def name(self):
     return 'isolated'
 
-  def compile_context(self, target):
+  def _compute_compile_context(self, target):
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)
     classes_dir = os.path.join(self._classes_dir, target.id)
     return self.CompileContext(target,
@@ -70,9 +70,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._logs_dir)
 
-  def prepare_compile(self, cache_manager, all_targets, relevant_targets, all_compile_contexts):
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
-                                                            relevant_targets, all_compile_contexts)
+                                                            relevant_targets)
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -222,7 +222,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
-                    all_compile_contexts,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -239,7 +238,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # Now create compile jobs for each invalid target one by one.
     jobs = self._create_compile_jobs(compile_classpaths,
-                                     all_compile_contexts,
+                                     self._all_compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
                                      invalidation_check.invalid_vts_partitioned,

@@ -175,10 +175,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     return []
 
-  def __init__(self, context, workdir, all_compile_contexts):
-    super(JvmCompile, self).__init__(context, workdir)
-
-    self._all_compile_contexts = all_compile_contexts
+  def __init__(self, all_compile_contexts=None, *args, **kwargs):
+    super(JvmCompile, self).__init__(*args, **kwargs)
 
     # JVM options for running the compiler.
     self._jvm_options = self.get_options().jvm_options
@@ -201,6 +199,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._strategy = strategy_constructor(self.context,
                                           self.get_options(),
                                           self.workdir,
+                                          all_compile_contexts,
                                           self.create_analysis_tools(),
                                           self._language,
                                           lambda s: s.endswith(self._file_suffix))
@@ -240,7 +239,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._jvm_fingerprint_strategy())
-    self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks, self._all_compile_contexts)
+    self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -270,7 +269,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
             if self.artifact_cache_writes_enabled() else None)
         self._strategy.compile_chunk(invalidation_check,
                                      self.context.targets(),
-                                     self._all_compile_contexts,
                                      relevant_targets,
                                      invalid_targets,
                                      self.extra_compile_time_classpath_elements(),
