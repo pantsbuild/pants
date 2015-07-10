@@ -148,8 +148,8 @@ class BaseGroupTaskTest(BaseTest):
       def prepare(cls, options, round_manager):
         self.recorded_actions.append(self.prepare_action(name))
 
-      def __init__(me, *args, **kwargs):
-        super(RecordingGroupMember, me).__init__(*args, **kwargs)
+      def __init__(me, context, workdir, all_compile_contexts):
+        super(RecordingGroupMember, me).__init__(context, workdir)
         self.recorded_actions.append(self.construct_action(name))
 
       def select(me, target):

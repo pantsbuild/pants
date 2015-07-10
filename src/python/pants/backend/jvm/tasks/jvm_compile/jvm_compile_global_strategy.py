@@ -139,8 +139,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for f in (self._invalid_analysis_file, self._analysis_file):
       self.validate_analysis(f)
 
-  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
-    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets, all_compile_contexts):
+    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets,
+                                                          relevant_targets, all_compile_contexts)
 
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -196,6 +197,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
+                    all_compile_contexts,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,

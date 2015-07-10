@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -64,22 +64,15 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                classes_dir,
                                self._sources_for_target(target))
 
-  def _create_compile_contexts_for_targets(self, targets):
-    compile_contexts = OrderedDict()
-    for target in targets:
-      compile_context = self.compile_context(target)
-      compile_contexts[target] = compile_context
-    return compile_contexts
-
   def pre_compile(self):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._logs_dir)
 
-  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets, all_compile_contexts):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
-                                                            relevant_targets)
+                                                            relevant_targets, all_compile_contexts)
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -229,6 +222,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
+                    all_compile_contexts,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -243,11 +237,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     extra_compile_time_classpath = self._compute_extra_classpath(
         extra_compile_time_classpath_elements)
 
-    compile_contexts = self._create_compile_contexts_for_targets(all_targets)
-
     # Now create compile jobs for each invalid target one by one.
     jobs = self._create_compile_jobs(compile_classpaths,
-                                     compile_contexts,
+                                     all_compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
                                      invalidation_check.invalid_vts_partitioned,

@@ -109,6 +109,7 @@ class JvmCompileStrategy(object):
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
+                    all_compile_contexts,
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
@@ -146,7 +147,7 @@ class JvmCompileStrategy(object):
         raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
                         "run `clean-all` if your tools versions changed recently:\n{}".format(e))
 
-  def prepare_compile(self, cache_manager, all_targets, relevant_targets):
+  def prepare_compile(self, cache_manager, all_targets, relevant_targets, all_compile_contexts):
     """Prepares to compile the given set of targets.
 
     Has the side effects of pruning old analysis, and computing deleted sources.
@@ -154,6 +155,10 @@ class JvmCompileStrategy(object):
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
+
+    # Compute compile contexts for targets in the current chunk.
+    for target in relevant_targets:
+      all_compile_contexts[target] = self.compile_context(target)
 
   def class_name_for_class_file(self, compile_context, class_file_name):
     if not class_file_name.endswith(".class"):
