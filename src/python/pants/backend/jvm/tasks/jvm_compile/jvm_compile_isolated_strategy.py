@@ -107,16 +107,26 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def compute_classes_by_source(self, compile_contexts):
     buildroot = get_buildroot()
+    # Build a mapping of srcs to classes for each context.
     classes_by_src_by_context = defaultdict(dict)
     for compile_context in compile_contexts:
-      if not os.path.exists(compile_context.analysis_file):
-        continue
-      products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
-                                                                compile_context.classes_dir)
+      # Walk the class directory to build a set of unclaimed classfiles.
+      unclaimed_classes = set()
+      for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
+        unclaimed_classes.update(os.path.join(dirpath, f) for f in filenames)
+
+      # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
-      for src, classes in products.items():
-        relsrc = os.path.relpath(src, buildroot)
-        classes_by_src[relsrc] = classes
+      if os.path.exists(compile_context.analysis_file):
+        products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
+                                                                  compile_context.classes_dir)
+        for src, classes in products.items():
+          relsrc = os.path.relpath(src, buildroot)
+          classes_by_src[relsrc] = classes
+          unclaimed_classes.difference_update(classes)
+
+      # Any remaining classfiles were unclaimed by sources/analysis.
+      classes_by_src[None] = list(unclaimed_classes)
     return classes_by_src_by_context
 
   def _compute_classpath_entries(self, compile_classpaths,
@@ -290,8 +300,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     if resources_by_target is not None:
       for _, paths in resources_by_target[compile_context.target].abs_paths():
         artifacts.extend(paths)
-    for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
-      artifacts.extend([os.path.join(dirpath, f) for f in filenames])
+    target_classes = self.context.products.get_data('classes_by_target').get(compile_context.target)
+    for _, classfiles in target_classes.abs_paths():
+      artifacts.extend(classfiles)
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
       artifacts.append(log_file)
