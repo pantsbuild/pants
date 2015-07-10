@@ -163,7 +163,7 @@ class JvmCompileStrategy(object):
 
     # Compute compile contexts for targets in the current chunk.
     for target in relevant_targets:
-      self._all_compile_contexts[target] = self.compile_context(target)
+      self._all_compile_contexts[target] = self._compute_compile_context(target)
 
   def class_name_for_class_file(self, compile_context, class_file_name):
     if not class_file_name.endswith(".class"):
