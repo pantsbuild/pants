@@ -13,6 +13,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -28,6 +29,9 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses a global classpath and analysis."""
+
+  class InternalTargetPartitioningError(Exception):
+    """Error partitioning targets by jvm platform settings."""
 
   @classmethod
   def register_options(cls, register, language, supports_concurrent_execution):
@@ -193,6 +197,122 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     return (self._partition_size_hint, locally_changed_targets)
 
+
+  def ordered_compile_settings_and_targets(self, relevant_targets):
+    """Groups the targets into ordered chunks, dependencies before dependees.
+
+    Each chunk is of the form (compile_setting, targets). Attempts to create as few chunks as
+    possible, under the constraint that targets with different compile settings cannot be in the
+    same chunk, and dependencies must be in the same chunk or an earlier chunk than their
+    dependees.
+
+    Detects impossible combinations/dependency relationships with respect to the java target and
+    source level, and raising errors as necessary (see targets_to_compile and
+    infer_and_validate_java_target_levels).
+
+    :return: a list of tuples of the form (compile_settings, list of targets)
+    """
+    relevant_targets = set(relevant_targets)
+
+    def get_platform(target):
+      return getattr(target, 'platform', None)
+
+    # NB(gmalmquist): Short-circuit if we only have one platform. Asymptotically, this only gives us
+    # O(|V|) time instead of O(|V|+|E|) if we have only one platform, which doesn't seem like much,
+    # but in practice we save a lot of time because the runtime for the non-short-circuited code is
+    # multiplied by a higher constant, because we have to iterate over all the targets several
+    # times.
+    platform_counts = defaultdict(int)
+    for target in relevant_targets:
+      platform_counts[target.platform] += 1
+    if len(platform_counts) == 1:
+      settings, = platform_counts
+      return [(settings, relevant_targets)]
+
+    # Map of target -> dependees.
+    outgoing = defaultdict(set)
+    # Map of target -> dependencies.
+    incoming = defaultdict(set)
+
+    transitive_targets = set()
+
+    def add_edges(target):
+      transitive_targets.add(target)
+      if target.dependencies:
+        for dependency in target.dependencies:
+          outgoing[dependency].add(target)
+          incoming[target].add(dependency)
+
+    self.context.build_graph.walk_transitive_dependency_graph([t.address for t in relevant_targets],
+                                                               work=add_edges)
+    # Topological sort.
+    sorted_targets = []
+    frontier = defaultdict(set)
+
+    def add_node(node):
+      frontier[get_platform(node)].add(node)
+
+    def next_node():
+      next_setting = None
+      if sorted_targets:
+        # Prefer targets with the same settings as whatever we just added to the sorted list, to
+        # greedily create chains that are as long as possible.
+        next_setting = get_platform(sorted_targets[-1])
+      if next_setting not in frontier:
+        if None in frontier:
+          # NB(gmalmquist): compile_settings=None indicates a target that is not actually a
+          # jvm_target, which mean's it's an intermediate dependency. We want to expand these
+          # whenever we can, because they give us more options we can use to create longer chains.
+          next_setting = None
+        else:
+          next_setting = max(frontier.keys(), key=lambda setting: len(frontier[setting]))
+      node = frontier[next_setting].pop()
+      if not frontier[next_setting]:
+        frontier.pop(next_setting)
+      return node
+
+    for target in transitive_targets:
+      if not incoming[target]:
+        add_node(target)
+
+    while frontier:
+      node = next_node()
+      sorted_targets.append(node)
+      if node in outgoing:
+        for dependee in tuple(outgoing[node]):
+          outgoing[node].remove(dependee)
+          incoming[dependee].remove(node)
+          if not incoming[dependee]:
+            add_node(dependee)
+
+    sorted_targets = [target for target in sorted_targets if target in relevant_targets]
+
+    if set(sorted_targets) != relevant_targets:
+      added = '\n  '.join(t.address.spec for t in (set(sorted_targets)-relevant_targets))
+      removed = '\n  '.join(t.address.spec for t in (set(relevant_targets)-sorted_targets))
+      raise self.InternalTargetPartitioningError(
+        'Internal partitioning targets:\nSorted targets =/= original targets!\n'
+        'Added:\n  {}\nRemoved:\n  {}'.format(added, removed)
+      )
+
+    unconsumed_edges = any(len(edges) > 0 for edges in outgoing.values())
+    if unconsumed_edges:
+      raise self.InternalTargetPartitioningError(
+        'Cycle detected while ordering jvm_targets for compilation. This should have been detected '
+        'when constructing the build_graph, so the presence of this error means there is probably '
+        'a bug in this method.'
+      )
+
+    chunks = []
+    for target in sorted_targets:
+      if not isinstance(target, JvmTarget):
+        continue
+      if chunks and chunks[-1][0] == get_platform(target):
+        chunks[-1][1].append(target)
+      else:
+        chunks.append((get_platform(target), [target]))
+    return chunks
+
   def compile_chunk(self,
                     invalidation_check,
                     all_targets,
@@ -202,6 +322,28 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                     compile_vts,
                     register_vts,
                     update_artifact_cache_vts_work):
+    assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
+    settings_and_targets = self.ordered_compile_settings_and_targets(invalid_targets)
+    for settings, targets in settings_and_targets:
+      if targets:
+        self.compile_sub_chunk(invalidation_check,
+                               all_targets,
+                               targets,
+                               extra_compile_time_classpath_elements,
+                               compile_vts,
+                               register_vts,
+                               update_artifact_cache_vts_work,
+                               settings)
+
+  def compile_sub_chunk(self,
+                        invalidation_check,
+                        all_targets,
+                        invalid_targets,
+                        extra_compile_time_classpath_elements,
+                        compile_vts,
+                        register_vts,
+                        update_artifact_cache_vts_work,
+                        settings):
     """Executes compilations for the invalid targets contained in a single chunk.
 
     Has the side effects of populating:
@@ -210,8 +352,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # classes_by_target product
     # resources_by_target product
     """
-    assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
-
     extra_classpath_tuples = self._compute_extra_classpath(extra_compile_time_classpath_elements)
 
     # Get the classpath generated by upstream JVM tasks and our own prepare_compile().
@@ -270,7 +410,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                   compile_classpath,
                   self._classes_dir,
                   None,
-                  progress_message)
+                  progress_message,
+                  settings)
 
       # No exception was thrown, therefore the compile succeeded and analysis_file is now valid.
       if os.path.exists(analysis_file):  # The compilation created an analysis.
