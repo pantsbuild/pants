@@ -68,9 +68,6 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', action='append', help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=Options.dict, default={},
-             help='Map from plugin name to list of arguments for that plugin.')
     register('--name-hashing', action='store_true', default=False, help='Use zinc name hashing.')
 
     cls.register_jvm_tool(register,
@@ -87,16 +84,6 @@ class ZincCompile(JvmCompile):
                           ])
     cls.register_jvm_tool(register, 'compiler-interface')
     cls.register_jvm_tool(register, 'sbt-interface')
-
-    cls.register_jvm_tool(register, 'plugin-jars')
-
-  def __init__(self, *args, **kwargs):
-    super(ZincCompile, self).__init__(*args, **kwargs)
-
-    # A directory independent of any other classpath which can contain per-target
-    # plugin resource files.
-    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
-    self._lazy_plugin_args = None
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
@@ -116,6 +103,119 @@ class ZincCompile(JvmCompile):
 
   def compiler_classpath(self):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)
+
+  def extra_compile_time_classpath_elements(self):
+    return []
+
+  def plugin_jars(self):
+    return []
+
+  def plugin_args(self):
+    return []
+
+  # Invalidate caches if the toolchain changes.
+  def _language_platform_version_info(self):
+    ret = []
+
+    # Go through all the bootstrap tools required to compile.
+    targets = (ScalaPlatform.global_instance().tool_targets(self.context, 'scalac') +
+               self.tool_targets(self.context, 'zinc'))
+    for lib in (t for t in targets if isinstance(t, JarLibrary)):
+      for jar in lib.jar_dependencies:
+        ret.append(jar.cache_key())
+
+    # We must invalidate on the set of plugins and their settings.
+    ret.extend(self.plugin_args())
+
+    # Invalidate if any compiler args change.
+    # Note that while some args are obviously important for invalidation (e.g., the jvm target
+    # version), some might not be. However we must invalidated on all the args, because Zinc
+    # ignores analysis files if the compiler args they were created with are different from the
+    # current ones, and does a full recompile. So if we allow cached artifacts with those analysis
+    # files to be used, Zinc will do unnecessary full recompiles on subsequent edits.
+    ret.extend(self._args)
+
+    # Invalidate if use of name hashing changes.
+    ret.append('name-hashing-{0}'.format('on' if self.get_options().name_hashing else 'off'))
+
+    return ret
+
+  def extra_products(self, target):
+    return []
+
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
+    # We add compiler_classpath to ensure the scala-library jar is on the classpath.
+    # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
+    # usually need. Be more selective?
+    # TODO(John Sirois): Do we need to do this at all?  If adding scala-library to the classpath is
+    # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
+    # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
+    # appropriate level and certainly at a more appropriate granularity.
+    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
+
+    zinc_args = []
+
+    zinc_args.extend([
+      '-log-level', self.get_options().level,
+      '-analysis-cache', analysis_file,
+      '-classpath', ':'.join(relativized_classpath),
+      '-d', classes_output_dir
+    ])
+    if not self.get_options().colors:
+      zinc_args.append('-no-color')
+    if not self.get_options().name_hashing:
+      zinc_args.append('-no-name-hashing')
+    if log_file:
+      zinc_args.extend(['-capture-log', log_file])
+
+    zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
+    zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
+    zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
+
+    zinc_args += self.plugin_args()
+    if upstream_analysis:
+      zinc_args.extend(['-analysis-map',
+                        ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
+
+    zinc_args += args
+
+    zinc_args.extend(sources)
+
+    self.log_zinc_file(analysis_file)
+    if self.runjava(classpath=self.zinc_classpath(),
+                    main=self._ZINC_MAIN,
+                    jvm_options=self._jvm_options,
+                    args=zinc_args,
+                    workunit_name='zinc',
+                    workunit_labels=[WorkUnit.COMPILER]):
+      raise TaskError('Zinc compile failed.')
+
+  def log_zinc_file(self, analysis_file):
+    self.context.log.debug('Calling zinc on: {} ({})'
+                           .format(analysis_file,
+                                   hash_file(analysis_file).upper()
+                                   if os.path.exists(analysis_file)
+                                   else 'nonexistent'))
+
+class ScalaZincCompile(ZincCompile):
+  _language = 'scala'
+  _file_suffix = '.scala'
+
+  @classmethod
+  def register_options(cls, register):
+    super(ScalaZincCompile, cls).register_options(register)
+    register('--plugins', action='append', help='Use these scalac plugins.')
+    register('--plugin-args', advanced=True, type=Options.dict, default={},
+             help='Map from plugin name to list of arguments for that plugin.')
+    cls.register_jvm_tool(register, 'plugin-jars')
+
+  def __init__(self, *args, **kwargs):
+    super(ScalaZincCompile, self).__init__(*args, **kwargs)
+
+    # A directory independent of any other classpath which can contain per-target
+    # plugin resource files.
+    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
+    self._lazy_plugin_args = None
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
@@ -176,33 +276,6 @@ class ZincCompile(JvmCompile):
       raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
     return plugins
 
-  # Invalidate caches if the toolchain changes.
-  def _language_platform_version_info(self):
-    ret = []
-
-    # Go through all the bootstrap tools required to compile.
-    targets = (ScalaPlatform.global_instance().tool_targets(self.context, 'scalac') +
-               self.tool_targets(self.context, 'zinc'))
-    for lib in (t for t in targets if isinstance(t, JarLibrary)):
-      for jar in lib.jar_dependencies:
-        ret.append(jar.cache_key())
-
-    # We must invalidate on the set of plugins and their settings.
-    ret.extend(self.plugin_args())
-
-    # Invalidate if any compiler args change.
-    # Note that while some args are obviously important for invalidation (e.g., the jvm target
-    # version), some might not be. However we must invalidated on all the args, because Zinc
-    # ignores analysis files if the compiler args they were created with are different from the
-    # current ones, and does a full recompile. So if we allow cached artifacts with those analysis
-    # files to be used, Zinc will do unnecessary full recompiles on subsequent edits.
-    ret.extend(self._args)
-
-    # Invalidate if use of name hashing changes.
-    ret.append('name-hashing-{0}'.format('on' if self.get_options().name_hashing else 'off'))
-
-    return ret
-
   def extra_products(self, target):
     """Override extra_products to produce a plugin information file."""
     ret = []
@@ -213,64 +286,6 @@ class ZincCompile(JvmCompile):
       root, plugin_info_file = self.write_plugin_info(self._plugin_info_dir, target)
       ret.append((root, [plugin_info_file]))
     return ret
-
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
-    # We add compiler_classpath to ensure the scala-library jar is on the classpath.
-    # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
-    # usually need. Be more selective?
-    # TODO(John Sirois): Do we need to do this at all?  If adding scala-library to the classpath is
-    # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
-    # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
-    # appropriate level and certainly at a more appropriate granularity.
-    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
-
-    zinc_args = []
-
-    zinc_args.extend([
-      '-log-level', self.get_options().level,
-      '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(relativized_classpath),
-      '-d', classes_output_dir
-    ])
-    if not self.get_options().colors:
-      zinc_args.append('-no-color')
-    if not self.get_options().name_hashing:
-      zinc_args.append('-no-name-hashing')
-    if log_file:
-      zinc_args.extend(['-capture-log', log_file])
-
-    zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
-    zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
-    zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
-
-    zinc_args += self.plugin_args()
-    if upstream_analysis:
-      zinc_args.extend(['-analysis-map',
-                        ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
-
-    zinc_args += args
-
-    zinc_args.extend(sources)
-
-    self.log_zinc_file(analysis_file)
-    if self.runjava(classpath=self.zinc_classpath(),
-                    main=self._ZINC_MAIN,
-                    jvm_options=self._jvm_options,
-                    args=zinc_args,
-                    workunit_name='zinc',
-                    workunit_labels=[WorkUnit.COMPILER]):
-      raise TaskError('Zinc compile failed.')
-
-  def log_zinc_file(self, analysis_file):
-    self.context.log.debug('Calling zinc on: {} ({})'
-                           .format(analysis_file,
-                                   hash_file(analysis_file).upper()
-                                   if os.path.exists(analysis_file)
-                                   else 'nonexistent'))
-
-class ScalaZincCompile(ZincCompile):
-  _language = 'scala'
-  _file_suffix = '.scala'
 
 
 class JavaZincCompile(ZincCompile):
