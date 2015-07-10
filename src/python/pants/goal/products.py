@@ -303,7 +303,7 @@ class Products(object):
     if len(product_mapping) != 1:
       raise ProductError('More than one directory in product mapping.')
 
-    for _, files in product_map.items():
+    for _, files in product_mapping.items():
       if len(files) != 1:
         raise ProductError('More than one file in target directory.')
 
