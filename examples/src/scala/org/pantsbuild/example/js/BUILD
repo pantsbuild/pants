@@ -3,5 +3,6 @@ scala_js_library(
   sources=globs('*'),
   dependencies=[
     '3rdparty/jvm/org/scala-js:library',
+    'examples/src/scala/org/pantsbuild/example/hello/welcome',
   ],
 )
