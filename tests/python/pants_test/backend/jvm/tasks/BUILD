@@ -13,6 +13,7 @@ target(
     ':ivy_resolve',
     ':ivy_utils',
     ':junit_run',
+    ':jvm_run',
     ':resources_task',
     ':prepare_resources',
     ':prepare_services',
@@ -140,6 +141,17 @@ python_tests(
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'jvm_run',
+  sources = ['test_jvm_run.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_run',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
