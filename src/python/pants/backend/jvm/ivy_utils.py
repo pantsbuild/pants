@@ -10,7 +10,7 @@ import logging
 import os
 import pkgutil
 import threading
-import xml
+import xml.etree.ElementTree as ET
 from collections import OrderedDict, defaultdict, namedtuple
 from contextlib import contextmanager
 from copy import deepcopy
@@ -289,7 +289,7 @@ class IvyUtils(object):
   def _parse_xml_report(cls, path):
     logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo()
-    etree = xml.etree.ElementTree.parse(path)
+    etree = ET.parse(path)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')
