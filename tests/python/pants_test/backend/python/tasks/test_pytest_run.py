@@ -14,7 +14,7 @@ import coverage
 
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.base.exceptions import TestFailedTaskError
-from pants.util.contextutil import environment_as, pushd
+from pants.util.contextutil import pushd
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
 
@@ -158,7 +158,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
 
-  def assert_expected_junit_xml(self, report_basedir, **kwargs):
+  def test_junit_xml_option(self):
     # We expect xml of the following form:
     # <testsuite errors=[Ne] failures=[Nf] skips=[Ns] tests=[Nt] ...>
     #   <testcase classname="..." name="..." .../>
@@ -166,7 +166,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     #     <failure ...>...</failure>
     #   </testcase>
     # </testsuite>
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red], **kwargs)
+    report_basedir = os.path.join(self.build_root, 'dist', 'junit_option')
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
+                           junit_xml_dir=report_basedir)
 
     files = glob.glob(os.path.join(report_basedir, '*.xml'))
     self.assertEqual(1, len(files), 'Expected 1 file, found: {}'.format(files))
@@ -184,15 +186,6 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.assertEqual(1, len(children_by_test_name['test_two'].childNodes))
     self.assertEqual('failure', children_by_test_name['test_two'].firstChild.nodeName)
 
-  def test_junit_xml_option(self):
-    basedir = os.path.join(self.build_root, 'dist', 'junit_option')
-    self.assert_expected_junit_xml(basedir, junit_xml_dir=basedir)
-
-  def test_junit_xml_env(self):
-    basedir = os.path.join(self.build_root, 'dist', 'junit_env')
-    with environment_as(JUNIT_XML_BASE=basedir):
-      self.assert_expected_junit_xml(basedir)
-
   def coverage_data_file(self):
     return os.path.join(self.build_root, '.coverage')
 
@@ -204,113 +197,83 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     _, all_statements, not_run_statements, _ = coverage_data.analysis(path)
     return all_statements, not_run_statements
 
-  def assert_expected_coverage(self, **kwargs):
+  def test_coverage_simple_option(self):
+    # TODO(John Sirois): Consider eliminating support for "simple" coverage or at least formalizing
+    # the coverage option value that turns this on to "1" or "all" or "simple" = anything formal.
+    simple_coverage_kwargs = {'coverage': '1'}
+
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
 
-    self.run_tests(targets=[self.green], **kwargs)
+    self.run_tests(targets=[self.green], **simple_coverage_kwargs)
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([6], not_run_statements)
 
-    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], **kwargs)
+    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], **simple_coverage_kwargs)
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([2], not_run_statements)
 
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red], **kwargs)
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
+                           **simple_coverage_kwargs)
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
     # The all target has no coverage attribute and the code under test does not follow the
     # auto-discover pattern so we should get no coverage.
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], **kwargs)
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], **simple_coverage_kwargs)
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
 
     self.run_failing_tests(targets=[self.all_with_coverage],
                            failed_targets=[self.all_with_coverage],
-                           **kwargs)
+                           **simple_coverage_kwargs)
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
-  def test_coverage_simple_option(self):
-    # TODO(John Sirois): Consider eliminating support for "simple" coverage or at least formalizing
-    # the coverage option value that turns this on to "1" or "all" or "simple" = anything formal.
-    self.assert_expected_coverage(coverage='1')
-
-  def test_coverage_simple_env(self):
-    with environment_as(PANTS_PY_COVERAGE='1'):
-      self.assert_expected_coverage()
-
-  def assert_modules_dne(self, **kwargs):
+  def test_coverage_modules_dne_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
 
     # modules: should trump .coverage
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red], **kwargs)
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
+                           coverage='modules:does_not_exist,nor_does_this')
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
 
-  def test_coverage_modules_dne_option(self):
-    self.assert_modules_dne(coverage='modules:does_not_exist,nor_does_this')
-
-  def test_coverage_modules_dne_env(self):
-    with environment_as(PANTS_PY_COVERAGE='modules:does_not_exist,nor_does_this'):
-      self.assert_modules_dne()
-
-  def assert_modules(self, **kwargs):
+  def test_coverage_modules_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], **kwargs)
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='modules:core')
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
-  def test_coverage_modules_option(self):
-    self.assert_modules(coverage='modules:core')
-
-  def test_coverage_modules_env(self):
-    with environment_as(PANTS_PY_COVERAGE='modules:core'):
-      self.assert_modules()
-
-  def assert_paths_dne(self, **kwargs):
+  def test_coverage_paths_dne_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
 
     # paths: should trump .coverage
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red], **kwargs)
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
+                           coverage='paths:does_not_exist/,nor_does_this/')
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
 
-  def test_coverage_paths_dne_option(self):
-    self.assert_paths_dne(coverage='paths:does_not_exist/,nor_does_this/')
-
-  def test_coverage_paths_dne_env(self):
-    with environment_as(PANTS_PY_COVERAGE='paths:does_not_exist/,nor_does_this/'):
-      self.assert_paths_dne()
-
-  def assert_paths(self, **kwargs):
+  def test_coverage_paths_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
     covered_file = os.path.join(self.build_root, 'lib', 'core.py')
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], **kwargs)
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='paths:core.py')
     all_statements, not_run_statements = self.load_coverage_data(covered_file)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
-
-  def test_coverage_paths_option(self):
-    self.assert_paths(coverage='paths:core.py')
-
-  def test_coverage_paths_env(self):
-    with environment_as(PANTS_PY_COVERAGE='paths:core.py'):
-      self.assert_paths()
 
   def test_sharding(self):
     self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red], shard='0/2')

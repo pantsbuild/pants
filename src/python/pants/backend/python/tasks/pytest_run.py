@@ -24,7 +24,6 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
@@ -67,43 +66,6 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-def deprecated_env_accessors(removal_version, **replacement_mapping):
-  """Generates accessors for legacy env ver/replacement option pairs.
-
-  The generated accessors issue a deprecation warning when the deprecated env var is present and
-  enjoy the "compile" time removal forcing that normal @deprecated functions and methods do.
-  """
-  def create_accessor(env_name, option_name):
-    @deprecated(removal_version=removal_version,
-                hint_message='Use the {option} option instead of the deprecated {env} environment '
-                             'variable'.format(option=option_name, env=env_name))
-    def deprecated_accessor():
-      return os.environ.get(env_name)
-
-    def accessor(self):
-      value = None
-      if env_name in os.environ:
-        value = deprecated_accessor()
-      sanitized_option_name = option_name.lstrip('-').replace('-', '_')
-      value = self.get_options()[sanitized_option_name] or value
-      return value
-    return accessor
-
-  def decorator(clazz):
-    for env_name, option_name in replacement_mapping.items():
-      setattr(clazz, 'get_DEPRECATED_{}'.format(env_name), create_accessor(env_name, option_name))
-    return clazz
-
-  return decorator
-
-
-# TODO(John Sirois): Replace this helper and use of the accessors it generates with direct options
-# access prior to releasing 0.0.35
-@deprecated_env_accessors(removal_version='0.0.35',
-                          JUNIT_XML_BASE='--junit-xml-dir',
-                          PANTS_PROFILE='--profile',
-                          PANTS_PYTHON_TEST_FAILSOFT='--fail-slow',
-                          PANTS_PY_COVERAGE='--coverage')
 class PytestRun(PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
@@ -175,8 +137,7 @@ class PytestRun(PythonTask):
     else:
       results = {}
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
-      fail_hard = (not self.get_DEPRECATED_PANTS_PYTHON_TEST_FAILSOFT() and
-                   not self.get_DEPRECATED_PANTS_PY_COVERAGE())
+      fail_hard = not self.get_options().fail_slow and not self.get_options().coverage
       for target in targets:
         if isinstance(target, PythonTests):
           rv = self._do_run_tests([target], workunit)
@@ -247,7 +208,7 @@ class PytestRun(PythonTask):
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):
     args = []
-    xml_base = self.get_DEPRECATED_JUNIT_XML_BASE()
+    xml_base = self.get_options().junit_xml_dir
     if xml_base and targets:
       xml_base = os.path.realpath(xml_base)
       xml_path = os.path.join(xml_base, Target.maybe_readable_identify(targets) + '.xml')
@@ -376,7 +337,7 @@ class PytestRun(PythonTask):
 
   @contextmanager
   def _maybe_emit_coverage_data(self, targets, chroot, pex, workunit):
-    coverage = self.get_DEPRECATED_PANTS_PY_COVERAGE()
+    coverage = self.get_options().coverage
     if coverage is None:
       yield []
       return
@@ -468,7 +429,7 @@ class PytestRun(PythonTask):
       env = {
         'PYTHONUNBUFFERED': '1',
       }
-      profile = self.get_DEPRECATED_PANTS_PROFILE()
+      profile = self.get_options().profile
       if profile:
         env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       with environment_as(**env):

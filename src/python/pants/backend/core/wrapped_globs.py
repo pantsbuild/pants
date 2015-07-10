@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from copy import deepcopy
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 
 
 class FilesetWithSpec(object):
@@ -31,33 +29,6 @@ class FilesetWithSpec(object):
   def __getitem__(self, index):
     return self._result[index]
 
-  @deprecated(removal_version='0.0.35',
-              hint_message='Instead of globs(a) + globs(b), use globs(a, b)')
-  def __add__(self, other):
-    filespec = deepcopy(self.filespec)
-    if isinstance(other, FilesetWithSpec):
-      filespec['globs'] += other.filespec['globs']
-      other_result = other._result
-    else:
-      filespec['globs'] += [os.path.join(self._rel_root, other_path) for other_path in other]
-      other_result = other
-    result = list(set(self._result).union(set(other_result)))
-    return FilesetWithSpec(self._rel_root, result, filespec)
-
-  @deprecated(removal_version='0.0.35',
-              hint_message='Instead of glob arithmetic, use glob(..., exclude=[...])')
-  def __sub__(self, other):
-    filespec = deepcopy(self.filespec)
-    exclude = filespec.get('exclude', [])
-    if isinstance(other, FilesetWithSpec):
-      exclude.append(other.filespec)
-      other_result = other._result
-    else:
-      exclude.append({'globs' : [os.path.join(self._rel_root, other_path) for other_path in other]})
-      other_result = other
-    filespec['exclude'] = exclude
-    result = list(set(self._result) - set(other_result))
-    return FilesetWithSpec(self._rel_root, result, filespec)
 
 class FilesetRelPathWrapper(object):
   def __init__(self, parse_context):
