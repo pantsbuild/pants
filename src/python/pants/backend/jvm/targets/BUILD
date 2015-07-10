@@ -60,6 +60,7 @@ python_library(
 python_library(
   name = 'scala',
   sources = [
+    'scala_js_library.py',
     'scala_library.py',
     'scalac_plugin.py',
   ],

@@ -12,6 +12,7 @@ from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.scala_js_library import ScalaJSLibrary
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -197,6 +198,7 @@ class ZincCompile(JvmCompile):
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
 
+
 class ScalaZincCompile(ZincCompile):
   _language = 'scala'
   _file_suffix = '.scala'
@@ -309,3 +311,22 @@ class JavaZincCompile(ZincCompile):
 
   def select(self, target):
     return self.get_options().enabled and super(JavaZincCompile, self).select(target)
+
+class ScalaJSZincCompile(ZincCompile):
+  _language = 'scala-js'
+  _file_suffix = '.scala'
+
+  @classmethod
+  def register_options(cls, register):
+    super(ScalaJSZincCompile, cls).register_options(register)
+    cls.register_jvm_tool(register, 'scala-js-compiler')
+
+  def plugin_jars(self):
+    return self.tool_classpath('scala-js-compiler')
+
+  def plugin_args(self):
+    # filter the tool classpath to select only the compiler jar
+    return ['-S-Xplugin:{}'.format(jar) for jar in self.plugin_jars() if 'scalajs-compiler_' in jar]
+
+  def select(self, target):
+    return isinstance(target, ScalaJSLibrary)

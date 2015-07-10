@@ -122,6 +122,17 @@ jar_library(name = 'scalastyle',
               jar(org='org.scalastyle', name='scalastyle_2.10', rev='0.3.2')
             ])
 
+SCALAJS_REV = '0.6.4'
+jar_library(name = 'scala-js-compiler',
+            jars = [
+              jar(org='org.scala-js', name='scalajs-compiler_2.10', rev=SCALAJS_REV)
+            ])
+
+jar_library(name = 'scala-js-library',
+            jars = [
+              jar(org='org.scala-js', name='scalajs-library_2.10', rev=SCALAJS_REV)
+            ])
+
 jar_library(name = 'checkstyle',
             jars = [
               jar(org = 'com.puppycrawl.tools', name = 'checkstyle', rev = '5.6'),
