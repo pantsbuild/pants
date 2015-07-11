@@ -46,7 +46,7 @@ class BashCompletionTask(ConsoleTask):
     autocomplete options is more confusing than useful. So, as a heuristic:
      1. In global scope we only autocomplete globally-registered options.
      2. In a goal scope we only autocomplete options registered by any task in that goal.
-     3/ In a task scope we only autocomplete options registered by that task.
+     3. In a task scope we only autocomplete options registered by that task.
 
     :return: A map of scope -> options to complete at that scope.
     """
@@ -58,12 +58,13 @@ class BashCompletionTask(ConsoleTask):
       for ohi in option_help_infos:
         autocomplete_options_by_scope[oschi.scope].update(ohi.unscoped_cmd_line_args)
         autocomplete_options_by_scope[oschi.scope].update(ohi.scoped_cmd_line_args)
+        # Autocomplete to this option in the enclosing goal scope, but exclude options registered
+        # on us, but not by us, e.g., recursive options (which are registered by
+        # GlobalOptionsRegisterer).
+        # We exclude those because they are already registered on the goal scope anyway
+        # (via the recursion) and it would be confusing and superfluous to have autocompletion
+        # to both --goal-recursive-opt and --goal-task-recursive-opt in goal scope.
         if issubclass(ohi.registering_class, TaskBase):
-          # Note: Recursive options are registered by GlobalOptionsRegisterer, so they won't be
-          # added to the goal scope here. But they are already in the goal scope anyway, because
-          # they recursed through it. So, e.g., in the compile scope we'll autocomplete to
-          # --compile-colors, but not to --compile-java-colors, --compile-scala-colors etc.
-          # This seems like the preferred behavior.
           goal_scope = oschi.scope.partition('.')[0]
           autocomplete_options_by_scope[goal_scope].update(ohi.scoped_cmd_line_args)
     self.context.options.walk_parsers(get_from_parser)

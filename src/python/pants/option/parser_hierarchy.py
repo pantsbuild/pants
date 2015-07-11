@@ -30,5 +30,5 @@ class ParserHierarchy(object):
     return self._parser_by_scope[scope]
 
   def walk(self, callback):
-    """Invoke callback on each parser, in depth-first order."""
+    """Invoke callback on each parser, in pre-order depth-first order."""
     self._parser_by_scope[GLOBAL_SCOPE].walk(callback)

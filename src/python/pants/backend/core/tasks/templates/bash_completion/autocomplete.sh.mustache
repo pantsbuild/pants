@@ -49,10 +49,8 @@ __pants_autocomplete() {
 
   # Return a response to bash based on the context.
   if [[ $is_scope = 1 ]]; then
-    # Autocomplete using the scope names.
-    # Note: currently this offers the global options (along with scopes) as completions when
-    # nothing has been typed yet, but if you type '-' it refuses to complete that to options.
-    # TODO(tdyas): Fix this.
+    # Autocomplete using the scope names and global flags.
+    # TODO(tdyas): Fix https://github.com/pantsbuild/pants/issues/1793.
     COMPREPLY=($(compgen -W "${__pants_scopes} ${__pants_global_options}" -- "${COMP_WORDS[COMP_CWORD]}" ))
   elif [[ $is_option = 1 ]]; then
     # Autocomplete using any relevant options for `scope_name`.

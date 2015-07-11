@@ -105,7 +105,7 @@ class Parser(object):
     # The keys are external dest names (the ones seen by the user, not by argparse).
     self._deprecated_option_dests = {}
 
-  # A Parser instance, or None for the global scope parser.
+    # A Parser instance, or None for the global scope parser.
     self._parent_parser = parent_parser
 
     # List of Parser instances.

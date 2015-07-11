@@ -17,7 +17,7 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category'])):
   TASK = 'TASK'
   GLOBAL_SUBSYSTEM = 'GLOBAL_SUBSYSTEM'
   TASK_SUBSYSTEM = 'TASK_SUBSYSTEM'
-  INTERMEDIATE = 'INTERMEDIATE'
+  INTERMEDIATE = 'INTERMEDIATE'  # Scoped added automatically to fill out the scope hierarchy.
 
 
   @classmethod
