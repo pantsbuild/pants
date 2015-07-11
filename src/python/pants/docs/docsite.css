@@ -7,7 +7,7 @@
 body {
   background-color: #eee;
   color: #111;
-  font-family: "Luxi Sans", "Lucida Sans", sans-serif;
+  font-family: "Lato","proxima-nova","Helvetica Neue",Arial,sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -21,6 +21,7 @@ h1, h2, h3, h4, h5, h6 {
  */
 .mainflow {
   margin: 64px 1rem 40em 300px;
+  line-height: 24px;
 }
 
 a:link, a:visited {
@@ -36,6 +37,7 @@ pre {
   border: 1px solid #ddd;
   padding: 2px;
   color: #006;
+  white-space: pre-wrap;
 }
 
 ul, ol, dl {
@@ -182,7 +184,7 @@ nav.bignav .site-toc {
   background-color: #777;
 }
 .site-toc ul li {
-  margin: 0.6rem 0px;
+  margin: 0.6rem .8em;
   padding-right: 0.5rem;
 }
 .site-toc ul li a {
@@ -206,22 +208,29 @@ nav.bignav .site-toc {
 .site-toc ul li.toc-h1 {
   padding-left: 0.5em;
 }
+
 .site-toc ul li.toc-h2 {
-  padding-left: 1.0em;
-}
-.site-toc ul li.toc-h3 {
   padding-left: 1.5em;
+  font-size: medium;
+}
+
+.site-toc ul li.toc-h3 {
+  padding-left: 2.5em;
+  font-size: smaller;
+  color: #eee;
 }
 .site-toc ul li.toc-h4 {
-  padding-left: 2.0em;
+  padding-left: 3.5em;
+  font-size: smaller;
+  color: #eee;
 }
 
 /* page's table of contents */
 nav.pagetoc {
   float: right;
-  margin: 0px -1.0rem 0px 1em;
+  margin: 0px 1em 0px 1em;
   background-color: #55acee;
-  max-width: 24%;
+  width: 300px;
 }
 
 nav.pagetoc ul {
@@ -231,7 +240,7 @@ nav.pagetoc ul {
 }
 
 nav.pagetoc ul li {
-  margin: 0.5em 0px;
+  margin: 0.5em 1em;
   padding-right: 2px;
 }
 
