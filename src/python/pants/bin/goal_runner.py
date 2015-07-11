@@ -29,6 +29,7 @@ from pants.logging.setup import setup_logging
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import ScopeInfo
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
@@ -95,19 +96,19 @@ class GoalRunner(object):
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
 
-    known_scopes = ['']
+    known_scope_infos = [ScopeInfo.for_global_scope()]
 
     # Add scopes for all needed subsystems.
     subsystems = (set(self.subsystems) | Goal.subsystems() | build_configuration.subsystems())
     for subsystem in subsystems:
-      known_scopes.append(subsystem.options_scope)
+      known_scope_infos.append(ScopeInfo(subsystem.options_scope, ScopeInfo.GLOBAL_SUBSYSTEM))
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
-      known_scopes.extend(filter(None, goal.known_scopes()))
+      known_scope_infos.extend(filter(None, goal.known_scope_infos()))
 
     # Now that we have the known scopes we can get the full options.
-    self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
+    self.options = options_bootstrapper.get_full_options(known_scope_infos)
     self.register_options(subsystems)
 
     # Make the options values available to all subsystems.

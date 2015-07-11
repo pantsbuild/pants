@@ -17,11 +17,25 @@ from pants.option.errors import ParseError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
+from pants.option.scope import ScopeInfo
 from pants_test.option.fake_config import FakeConfig
 
 
+def goal(scope):
+  return ScopeInfo(scope, ScopeInfo.GOAL)
+
+
+def task(scope):
+  return ScopeInfo(scope, ScopeInfo.TASK)
+
+
+def intermediate(scope):
+  return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
+
+
 class OptionsTest(unittest.TestCase):
-  _known_scopes = ['compile', 'compile.java', 'compile.scala', 'stale', 'test', 'test.junit']
+  _known_scope_infos = [goal('compile'), task('compile.java'), task('compile.scala'),
+                        goal('stale'), goal('test'), task('test.junit')]
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -72,7 +86,7 @@ class OptionsTest(unittest.TestCase):
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args,
+    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scope_infos, args,
                       bootstrap_option_values=bootstrap_option_values)
     self._register(options)
     return options
@@ -249,8 +263,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
-    for scope in self._known_scopes:
-      self.assertTrue(options.is_known_scope(scope))
+    for scope_info in self._known_scope_infos:
+      self.assertTrue(options.is_known_scope(scope_info.scope))
     self.assertFalse(options.is_known_scope('nonexistent_scope'))
 
   def test_designdoc_example(self):
@@ -354,28 +368,9 @@ class OptionsTest(unittest.TestCase):
 
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
-      options = Options({}, FakeConfig({}), OptionsTest._known_scopes, "./pants")
+      options = Options({}, FakeConfig({}), OptionsTest._known_scope_infos, "./pants")
       options.register(Options.GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                               deprecated_hint='The semver for this option has already passed.')
-
-  def test_is_deprecated(self):
-    options = self._parse('./pants')
-    global_parser = options.get_parser(Options.GLOBAL_SCOPE)
-    self.assertTrue(global_parser.is_deprecated('--global-crufty'))
-    self.assertTrue(global_parser.is_deprecated('--global-crufty=foo'))
-    self.assertTrue(global_parser.is_deprecated('--global-crufty-boolean'))
-    self.assertTrue(global_parser.is_deprecated('--no-global-crufty-boolean'))
-    self.assertFalse(global_parser.is_deprecated('--pants-foo'))
-    scope_parser = options.get_parser('stale')
-    self.assertTrue(scope_parser.is_deprecated('--crufty'))
-    self.assertTrue(scope_parser.is_deprecated('--crufty=bar'))
-    self.assertTrue(scope_parser.is_deprecated('--stale-crufty'))
-    self.assertTrue(scope_parser.is_deprecated('--stale-crufty=baz'))
-    self.assertTrue(scope_parser.is_deprecated('--crufty-boolean'))
-    self.assertTrue(scope_parser.is_deprecated('--no-crufty-boolean'))
-    self.assertTrue(scope_parser.is_deprecated('--stale-crufty-boolean'))
-    self.assertTrue(scope_parser.is_deprecated('--no-stale-crufty-boolean'))
-    self.assertFalse(scope_parser.is_deprecated('--still-good'))
 
   @contextmanager
   def warnings_catcher(self):
@@ -394,42 +389,42 @@ class OptionsTest(unittest.TestCase):
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty=crufty1')
       self.assertEquals('crufty1', options.for_global_scope().global_crufty)
-      assertWarning(w, '--global-crufty')
+      assertWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty-boolean')
       self.assertTrue(options.for_global_scope().global_crufty_boolean)
-      assertWarning(w, '--global-crufty-boolean')
+      assertWarning(w, 'global_crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --no-global-crufty-boolean')
       self.assertFalse(options.for_global_scope().global_crufty_boolean)
-      assertWarning(w, '--no-global-crufty-boolean')
+      assertWarning(w, 'global_crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty=stale_and_crufty')
       self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
-      assertWarning(w, '--crufty')
+      assertWarning(w, 'crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --no-crufty-boolean')
       self.assertFalse(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--no-crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --no-stale-crufty-boolean')
       self.assertFalse(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--no-crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --stale-crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     # Make sure the warnings don't come out for regular options
     with self.warnings_catcher() as w:
@@ -523,11 +518,13 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_scope('compile.java').a)
 
   def test_complete_scopes(self):
-    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz'},
-                      Options.complete_scopes({'foo.bar.baz'}))
-    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz'},
-                      Options.complete_scopes({'', 'foo.bar.baz'}))
-    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz'},
-                      Options.complete_scopes({'foo', 'foo.bar.baz'}))
-    self.assertEquals({'', 'foo', 'foo.bar', 'foo.bar.baz', 'qux', 'qux.quux'},
-                      Options.complete_scopes({'foo.bar.baz', 'qux.quux'}))
+    _global = ScopeInfo.for_global_scope()
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({ScopeInfo.for_global_scope(), task('foo.bar.baz')}))
+    self.assertEquals({_global, goal('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({goal('foo'), task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
+                       intermediate('qux'), task('qux.quux')},
+                      Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))

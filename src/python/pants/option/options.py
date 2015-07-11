@@ -14,6 +14,7 @@ from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
+from pants.option.scope import ScopeInfo
 
 
 class Options(object):
@@ -73,33 +74,40 @@ class Options(object):
   list = staticmethod(custom_types.list_type)
 
   @classmethod
-  def complete_scopes(cls, scopes):
+  def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.
 
     E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
     """
-    ret = {''}
-    for scope in scopes:
+    ret = {ScopeInfo.for_global_scope()}
+    for scope_info in scope_infos:
+      ret.add(scope_info)
+
+    original_scopes = {si.scope for si in scope_infos}
+    for scope_info in scope_infos:
+      scope = scope_info.scope
       while scope != '':
-        ret.add(scope)
+        if scope not in original_scopes:
+          ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
         scope = scope.rpartition('.')[0]
     return ret
 
 
-  def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
+  def __init__(self, env, config, known_scope_infos, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
     :param config: data from a config file (must support config.get[list](section, name, default=)).
-    :param known_scopes: a list of all possible scopes that may be encountered.
+    :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
     :param args: a list of cmd-line args.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
     """
     # We need parsers for all the intermediate scopes, so inherited option values
     # can propagate through them.
-    complete_known_scopes = self.complete_scopes(known_scopes)
-    splitter = ArgSplitter(complete_known_scopes)
+    complete_known_scope_infos = self.complete_scopes(known_scope_infos)
+    complete_known_scope_names = [si.scope for si in complete_known_scope_infos]
+    splitter = ArgSplitter(complete_known_scope_names)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
 
@@ -112,10 +120,10 @@ class Options(object):
 
     self._help_request = splitter.help_request
 
-    self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scopes, self._help_request)
+    self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
-    self._known_scopes = set(known_scopes)
+    self._known_scopes = set([s[0] for s in known_scope_infos])
 
   @property
   def target_specs(self):
@@ -156,21 +164,25 @@ class Options(object):
     """Register an option in the given scope, using argparse params."""
     self.get_parser(scope).register(*args, **kwargs)
 
-  def registration_function_for_scope(self, scope):
+  def registration_function_for_optionable(self, optionable_class):
     """Returns a function for registering argparse args on the given scope."""
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
-      self.register(scope, *args, **kwargs)
+      kwargs['registering_class'] = optionable_class
+      self.register(optionable_class.options_scope, *args, **kwargs)
     # Clients can access the bootstrap option values as register.bootstrap.
     register.bootstrap = self.bootstrap_option_values()
     # Clients can access the scope as register.scope.
-    register.scope = scope
+    register.scope = optionable_class.options_scope
     return register
 
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
     return self._parser_hierarchy.get_parser_by_scope(scope)
+
+  def walk_parsers(self, callback):
+    self._parser_hierarchy.walk(callback)
 
   def for_scope(self, scope):
     """Return the option values for the given scope.
@@ -230,14 +242,6 @@ class Options(object):
 
     Note: Ony useful if called after options have been registered.
     """
-    def _maybe_help(scope):
-      s = self._format_help_for_scope(scope)
-      if s != '':  # Avoid printing scope name for scope with empty options.
-        print(scope)
-        for line in s.split('\n'):
-          if line != '':  # Avoid superfluous blank lines for empty strings.
-            print('  {0}'.format(line))
-
     show_all_help = self._help_request and self._help_request.all_scopes
     goals = (Goal.all() if show_all_help else [Goal.by_name(goal_name) for goal_name in self.goals])
     if goals:
@@ -246,8 +250,10 @@ class Options(object):
           print('\nUnknown goal: {}'.format(goal.name))
         else:
           print('\n{0}: {1}\n'.format(goal.name, goal.description))
-          for scope in goal.known_scopes():
-            _maybe_help(scope)
+          for scope_info in goal.known_scope_infos():
+            help_str = self._format_help_for_scope(scope_info.scope)
+            if help_str:
+              print(help_str)
     else:
       print(pants_release())
       print('\nUsage:')
@@ -264,9 +270,8 @@ class Options(object):
       print('\nFriendly docs:\n  http://pantsbuild.github.io/')
 
     if show_all_help or not goals:
-      print('\nGlobal options:')
-      print(self.get_parser(GLOBAL_SCOPE).format_help())
+      print(self.get_parser(GLOBAL_SCOPE).format_help('Global', self._help_request.advanced))
 
   def _format_help_for_scope(self, scope):
     """Generate a help message for options at the specified scope."""
-    return self.get_parser(scope).format_help()
+    return self.get_parser(scope).format_help(scope, self._help_request.advanced)
