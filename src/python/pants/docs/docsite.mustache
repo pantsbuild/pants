@@ -31,6 +31,16 @@
 </ul>
 </nav>
 
+{{#has_page_toc}}
+<nav class="pagetoc">
+<ul>
+{{#page_toc}}
+<li class="toc-h{{depth}}"><a href="#{{link}}">{{text}}</a></li>
+{{/page_toc}}
+</ul>
+</nav>
+{{/has_page_toc}}
+
 <!-- main content start -->
 {{{body_html}}}
 <!-- main content end -->
@@ -41,16 +51,6 @@ from {{generated}}
 </div>
 
 </div> <!-- end of mainflow -->
-
-{{#has_page_toc}}
-<nav class="pagetoc">
-<ul>
-{{#page_toc}}
-<li class="toc-h{{depth}}"><a href="#{{link}}">{{text}}</a></li>
-{{/page_toc}}
-</ul>
-</nav>
-{{/has_page_toc}}
 
 <nav class="bignav">
   <div class="bignav-logo">
