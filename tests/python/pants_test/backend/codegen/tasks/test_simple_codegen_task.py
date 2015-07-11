@@ -120,7 +120,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
       task.execute()
 
   def test_execute_fail(self):
-    task = self._create_dummy_task(strategy='global')
+    # Ensure whichever strategy is selected, it actually call execute_codegen to trigger our
+    # DummyTask `should_fail` logic.  The isolated strategy, for example, short circuits that call
+    # if there are no targets.
+    dummy = self.make_target(spec='dummy', target_type=self.DummyLibrary)
+    task = self._create_dummy_task(target_roots=[dummy])
     task.should_fail = True
     self.assertRaisesRegexp(TaskError, r'Failed to generate target\(s\)', task.execute)
 
