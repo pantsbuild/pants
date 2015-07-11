@@ -6,6 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import os
+import sys
 import warnings
 from argparse import ArgumentParser, _HelpAction
 from collections import defaultdict
@@ -152,8 +154,16 @@ class Parser(object):
     """
     return HelpInfoExtracter(self._scope).get_option_scope_help_info(self._registration_args)
 
-  def format_help(self, header, show_advanced=False, color=True):
-    """Return a help message for the options registered on this object."""
+  def format_help(self, header, show_advanced=False, color=None):
+    """Return a help message for the options registered on this object.
+
+    :param header: text to display at the start of help printing.
+    :param bool show_advanced: Set to true to turn on display of advanced options.
+    :param bool color: Set to True to turn on color help printing. Defaults to True if the output
+      is a terminal. Otherwise defaults to False.
+    """
+    if color is None:
+      color = sys.stdout.isatty()
     help_formatter = HelpFormatter(scope=self._scope, show_advanced=show_advanced, color=color)
     return '\n'.join(help_formatter.format_options(header, self._registration_args))
 
