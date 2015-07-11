@@ -28,5 +28,6 @@ class JarTool(JvmToolMixin, Subsystem):
                    'org.pantsbuild.tools.jar.Main',
                    jvm_options=self.get_options().jvm_options,
                    args=args,
+                   jdk=True,
                    workunit_name='jar-tool',
                    workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])
