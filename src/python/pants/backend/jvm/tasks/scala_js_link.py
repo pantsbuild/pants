@@ -21,6 +21,8 @@ class ScalaJSLink(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ScalaJSLink, cls).register_options(register)
+    # TODO: This option should cause target invalidation but doesn't.
+    #   see https://github.com/pantsbuild/pants/issues/1273
     register('--full-opt', default=False, action='store_true',
              help='Perform all optimizations; this is generally only useful for deployments.')
     register('--check-ir', default=False, action='store_true', advanced=True,
@@ -81,6 +83,10 @@ class ScalaJSLink(NailgunTask):
                           jvm_options=self.get_options().jvm_options,
                           args=args, workunit_name='scala-js-link')
 
+    # TODO: scopt doesn't exit(1) when it receives an invalid option, but in all cases here
+    # that should be caused by a task-implementation error rather than a user error.
     if result != 0:
-      raise TaskError('java {main} ... exited non-zero ({result})'.format(
-        main=self._SCALA_JS_CLI_MAIN, result=result))
+      raise TaskError(
+          'java {main} ... exited non-zero ({result})'.format(
+            main=self._SCALA_JS_CLI_MAIN, result=result),
+          failed_targets=[target])

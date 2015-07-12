@@ -1,4 +1,4 @@
-package org.pantsbuild.example.js
+package org.pantsbuild.example.scalajs
 
 import scala.scalajs.js.annotation.JSExport
 import scala.scalajs.js.JSApp

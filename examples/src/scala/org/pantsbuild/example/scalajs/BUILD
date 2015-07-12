@@ -1,12 +1,12 @@
 scala_js_binary(
-  name='js',
+  name='scalajs',
   dependencies=[
-    ':js-lib',
+    ':scalajs-lib',
   ],
 )
 
 scala_js_library(
-  name='js-lib',
+  name='scalajs-lib',
   sources=globs('*'),
   dependencies=[
     '3rdparty/jvm/org/scala-js:library',
