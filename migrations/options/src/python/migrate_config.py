@@ -314,7 +314,15 @@ def check_option(cp, src, dst):
     # that approach fails for the important case of boolean options.  Since this is a ~short term
     # tool and its highly likely its lifetime will be shorter than the time the private
     # ConfigParser_sections API we use here changes, its worth the risk.
-    return cp.has_section(section) and (key in cp._sections[section])
+    if section == 'DEFAULT':
+      # NB: The 'DEFAULT' section is not tracked via `has_section` or `_sections`, so we use a
+      # different API to check for an explicit default.  The defaults are a combination of both
+      # 'DEFAULT' section values and defaults passed to the ConfigParser constructor, but we
+      # create the `cp` config parser below explicitly with no constructor defaults so this check
+      # works.
+      return key in cp.defaults()
+    else:
+      return cp.has_section(section) and (key in cp._sections[section])
 
   def section(s):
     return cyan('[{0}]'.format(s))
