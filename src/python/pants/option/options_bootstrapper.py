@@ -12,8 +12,9 @@ import sys
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.option_util import is_boolean_flag
 from pants.option.options import Options
-from pants.option.parser import Parser
+from pants.option.scope import ScopeInfo
 
 
 class OptionsBootstrapper(object):
@@ -35,12 +36,12 @@ class OptionsBootstrapper(object):
       short_flags = set()
 
       def capture_the_flags(*args, **kwargs):
-        for flag in Parser.expand_flags(*args, **kwargs):
-          flags.add(flag.name)
-          if len(flag.name) == 2:
-            short_flags.add(flag.name)
-          if flag.inverse_name:
-            flags.add(flag.inverse_name)
+        for arg in args:
+          flags.add(arg)
+          if len(arg) == 2:
+            short_flags.add(arg)
+          elif is_boolean_flag(kwargs):
+            flags.add('--no-{}'.format(arg[2:]))
 
       GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
 
@@ -63,7 +64,7 @@ class OptionsBootstrapper(object):
 
       def bootstrap_options_from_config(config):
         bootstrap_options = Options(env=self._env, config=config,
-                                    known_scopes=[GLOBAL_SCOPE], args=bargs)
+            known_scope_infos=[ScopeInfo.for_global_scope()], args=bargs)
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
         GlobalOptionsRegistrar.register_bootstrap_options(register_global)
@@ -91,14 +92,18 @@ class OptionsBootstrapper(object):
 
     return self._bootstrap_options
 
-  def get_full_options(self, known_scopes):
+  def get_full_options(self, known_scope_infos):
+    """Get the full Options instance bootstrapped by this object.
+
+    :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
+    """
     if not self._full_options:
       # Note: Don't inline this into the Options() call, as this populates
       # self._post_bootstrap_config, which is another argument to that call.
       bootstrap_options = self.get_bootstrap_options()
       self._full_options = Options(self._env,
                                    self._post_bootstrap_config,
-                                   known_scopes,
+                                   known_scope_infos,
                                    args=self._args,
                                    bootstrap_option_values=bootstrap_options.for_global_scope())
     return self._full_options

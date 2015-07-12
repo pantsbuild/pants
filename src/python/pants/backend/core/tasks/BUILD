@@ -48,6 +48,7 @@ python_library(
   resources = globs('templates/bash_completion/*.mustache'),
   dependencies = [
     ':console_task',
+    ':task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
@@ -62,10 +63,10 @@ python_library(
   dependencies = [
     ':common',
     ':reflect',
+    ':task',
     '3rdparty/python:docutils',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/maven_layout',
     'src/python/pants/backend/python:python_requirements',
     'src/python/pants/base:build_environment',
@@ -162,6 +163,7 @@ python_library(
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
+    'src/python/pants/option',
   ],
 )
 
@@ -277,7 +279,7 @@ python_library(
   name = 'run_prep_command',
   sources = ['run_prep_command.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:task',
+    ':task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
   ],

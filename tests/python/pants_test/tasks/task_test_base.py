@@ -11,8 +11,10 @@ from contextlib import closing
 from StringIO import StringIO
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.base.build_environment import get_pants_cachedir
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.util.dirutil import safe_mkdir
 from pants_test.base_test import BaseTest
 
 
@@ -21,6 +23,37 @@ def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
   return result == 0
 
+def ensure_cached(task_cls, expected_num_artifacts=None):
+  """Decorator for a task-executing unit test. Asserts that after running
+  the decorated test function, the cache for task_cls contains expected_num_artifacts.
+  Clears the task's cache before running the test.
+
+  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
+  :param expected_num_artifacts: Expected number of artifacts to be in the task's
+                                 cache after running the test. If unspecified, will
+                                 assert that the number of artifacts in the cache is
+                                 non-zero.
+  """
+  def decorator(test_fn):
+
+    def wrapper(self, *args, **kwargs):
+      task_cache = os.path.join(self.artifact_cache, task_cls.stable_name())
+      safe_mkdir(task_cache, clean=True)
+
+      test_fn(self, *args, **kwargs)
+
+      num_artifacts = 0
+      for (_, _, files) in os.walk(task_cache):
+        num_artifacts += len(files)
+
+      if expected_num_artifacts is None:
+        self.assertNotEqual(num_artifacts, 0)
+      else:
+        self.assertEqual(num_artifacts, expected_num_artifacts)
+
+    return wrapper
+
+  return decorator
 
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""
@@ -42,6 +75,13 @@ class TaskTestBase(BaseTest):
     # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
     # action in this non-JVM-specific, high-level base class.
     Bootstrapper.reset_instance()
+    self.artifact_cache = os.path.join(get_pants_cachedir(), 'artifact_cache')
+    self.set_options_for_scope('cache',
+                               read_from=[self.artifact_cache],
+                               write_to=[self.artifact_cache])
+
+  def disable_artifact_cache(self):
+    self.del_options_for_scope('cache', 'read_from', 'write_to')
 
   @property
   def test_workdir(self):

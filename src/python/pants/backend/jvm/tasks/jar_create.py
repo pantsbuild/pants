@@ -34,15 +34,6 @@ def is_jvm_library(target):
           or (is_jvm_binary(target) and target.has_resources))
 
 
-def jarname(target, extension='.jar'):
-  # TODO(John Sirois): incorporate version
-  _, id_, _ = target.get_artifact_info()
-  # Cap jar names quite a bit lower than the standard fs limit of 255 characters since these
-  # artifacts will often be used outside pants and those uses may manipulate (expand) the jar
-  # filenames blindly.
-  return safe_filename(id_, extension, max_length=200)
-
-
 class JarCreate(JarTask):
   """Jars jvm libraries and optionally their sources and their docs."""
 
@@ -67,17 +58,30 @@ class JarCreate(JarTask):
     self.compressed = self.get_options().compressed
     self._jars = {}
 
-  def execute(self):
-    safe_mkdir(self.workdir)
+  @property
+  def cache_target_dirs(self):
+    return True
 
-    with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
-      for target in self.context.targets(is_jvm_library):
-        jar_name = jarname(target)
-        jar_path = os.path.join(self.workdir, jar_name)
-        with self.create_jar(target, jar_path) as jarfile:
-          with self.create_jar_builder(jarfile) as jar_builder:
-            if target in jar_builder.add_target(target):
-              self.context.products.get('jars').add(target, self.workdir).append(jar_name)
+  def execute(self):
+    with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
+      with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
+        jar_mapping = self.context.products.get('jars')
+
+        for vt in invalidation_check.all_vts:
+          jar_name = vt.target.name + '.jar'
+          jar_path = os.path.join(vt.results_dir, jar_name)
+
+          def add_jar_to_products():
+            jar_mapping.add(vt.target, vt.results_dir).append(jar_name)
+
+          if vt.valid:
+            if os.path.exists(jar_path):
+              add_jar_to_products()
+          else:
+            with self.create_jar(vt.target, jar_path) as jarfile:
+              with self.create_jar_builder(jarfile) as jar_builder:
+                if vt.target in jar_builder.add_target(vt.target):
+                  add_jar_to_products()
 
   @contextmanager
   def create_jar(self, target, path):

@@ -45,40 +45,27 @@ class Checkstyle(NailgunTask):
     super(Checkstyle, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
 
-  def __init__(self, *args, **kwargs):
-    super(Checkstyle, self).__init__(*args, **kwargs)
-
-    self._results_dir = os.path.join(self.workdir, 'results')
-
   def _is_checked(self, target):
     return (isinstance(target, Target) and
             target.has_sources(self._JAVA_SOURCE_EXTENSION) and
             (not target.is_synthetic))
 
-  def _create_result_file(self, target):
-    result_file = os.path.join(self._results_dir, target.id)
-    touch(result_file)
-    return result_file
+  @property
+  def cache_target_dirs(self):
+    return True
 
   def execute(self):
     if self.get_options().skip:
       return
     targets = self.context.targets(self._is_checked)
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = []
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.extend(vt.targets)
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       sources = self.calculate_sources(invalid_targets)
       if sources:
         result = self.checkstyle(targets, sources)
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
-
-        if self.artifact_cache_writes_enabled():
-          result_files = lambda vt: map(lambda t: self._create_result_file(t), vt.targets)
-          pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
-          self.update_artifact_cache(pairs)
 
   def calculate_sources(self, targets):
     sources = set()

@@ -5,38 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import closing
-from StringIO import StringIO
-
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
 from pants_test.base_test import BaseTest
-from pants_test.tasks.task_test_base import TaskTestBase
-
-
-OUTDIR = '/tmp/dist'
-
-class BaseBuildBuildDictionaryTest(TaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return builddictionary.BuildBuildDictionary
-
-  def execute_task(self):
-    self.set_options(pants_distdir=OUTDIR)
-    with closing(StringIO()) as output:
-      task = self.create_task(self.context())
-      task.execute()
-      return output.getvalue()
-
-
-class BuildBuildDictionaryTestEmpty(BaseBuildBuildDictionaryTest):
-  def test_builddict_empty(self):
-    """Execution should be silent."""
-    # We don't care _that_ much that execution be silent. Nice if at least
-    # one test executes the task and doesn't explode, tho.
-    self.assertEqual('', self.execute_task())
 
 
 class ExtractedContentSanityTests(BaseTest):

@@ -1,9 +1,68 @@
 RELEASE HISTORY
 ===============
 
-0.0.34 (7/6/2015)
+0.0.35 (7/10/2015)
 ------------------
 
+Release Notes
+~~~~~~~~~~~~~
+
+With this release, if you use the
+`isolated jvm compile strategy <https://github.com/pantsbuild/pants/blob/0acdf8d8ab49a0a6bdf5084a99e0c1bca0231cf6/pants.ini.isolated>`_,
+java annotation processers that emit java sourcefiles or classfiles will be
+handled correctly and the generated code will be bundled appropriately in jars.
+In particular, this makes libraries like Google's AutoValue useable in a pants
+build. See: `RB #2451 <https://rbcommons.com/s/twitter/r/2451>`_.
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate with_description.
+  `RB #2444 <https://rbcommons.com/s/twitter/r/2444>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup BuildFile must_exist logic.
+  `RB #2441 <https://rbcommons.com/s/twitter/r/2441>`_
+
+* Upgrade to pex 1.0.1.
+  `Issue #1658 <https://github.com/pantsbuild/pants/issues/1658>`_
+  `RB #2438 <https://rbcommons.com/s/twitter/r/2438>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add an option --main to the run.jvm task to override the specification of 'main' on a jvm_binary() target.
+  `RB #2442 <https://rbcommons.com/s/twitter/r/2442>`_
+
+* Add jvm_options for thrift-linter.
+  `RB #2445 <https://rbcommons.com/s/twitter/r/2445>`_
+
+* Added cwd argument to allow JavaTest targets to require particular working directories.
+  `RB #2440 <https://rbcommons.com/s/twitter/r/2440>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Record all output classes for the jvm isolated compile strategy.
+  `RB #2451 <https://rbcommons.com/s/twitter/r/2451>`_
+
+* Robustify the pants ivy configuration.
+  `Issue #1779 <https://github.com/pantsbuild/pants/issues/1779>`_
+  `RB #2450 <https://rbcommons.com/s/twitter/r/2450>`_
+
+* Some refactoring of global options.
+  `RB #2446 <https://rbcommons.com/s/twitter/r/2446>`_
+
+* Improved error messaging for unknown Target kwargs.
+  `RB #2443 <https://rbcommons.com/s/twitter/r/2443>`_
+
+* Remove Nailgun specific classes from zinc, since pants invokes Main directly.
+  `RB #2439 <https://rbcommons.com/s/twitter/r/2439>`_
+
+0.0.34 (7/6/2015)
+-----------------
 
 Release Notes
 ~~~~~~~~~~~~~
@@ -18,7 +77,6 @@ for this new release.  Download the pants source code and run:
 
   ./pants run migrations/options/src/python:migrate_config --  <path
   to your pants.ini>
-
 
 API Changes
 ~~~~~~~~~~~

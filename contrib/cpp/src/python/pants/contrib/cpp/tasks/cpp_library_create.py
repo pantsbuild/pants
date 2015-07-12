@@ -28,36 +28,34 @@ class CppLibraryCreate(CppTask):
   def __init__(self, *args, **kwargs):
     super(CppLibraryCreate, self).__init__(*args, **kwargs)
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   def execute(self):
     with self.context.new_workunit(name='cpp-library', labels=[WorkUnit.TASK]):
       targets = self.context.targets(self.is_library)
-      for target in targets:
-        target.workdir = self._workdir
-        self.context.products.get('lib').add(target, self.workdir).append(self._libpath(target))
-
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
-        invalid_targets = []
-        for vt in invalidation_check.invalid_vts:
-          invalid_targets.extend(vt.targets)
-        for target in invalid_targets:
-          self._create_library(target)
+        lib_mapping = self.context.products.get('lib')
+        for vt in invalidation_check.all_vts:
+          if not vt.valid:
+            self._create_library(vt.target, vt.results_dir)
+          lib_mapping.add(vt.target, vt.results_dir).append(self._libpath(vt.target, vt.results_dir))
 
-  def _create_library(self, library):
+  def _create_library(self, target, results_dir):
     objects = []
-    for basedir, objs in self.context.products.get('objs').get(library).items():
+    for basedir, objs in self.context.products.get('objs').get(target).items():
       objects = [os.path.join(basedir, obj) for obj in objs]
     # TODO: copy public headers to work dir.
-    output = self._link_library(library, objects)
+    output = self._link_library(target, results_dir, objects)
     self.context.log.info('Built c++ library: {0}'.format(output))
     return output
 
-  def _libpath(self, target):
-    output_dir = os.path.join(self.workdir, target.id)
-    return os.path.join(output_dir, 'lib' + target.name + '.a')
+  def _libpath(self, target, results_dir):
+    return os.path.join(results_dir, 'lib' + target.name + '.a')
 
-  def _link_library(self, target, objects):
-    output = self._libpath(target)
-    safe_mkdir(os.path.dirname(output))
+  def _link_library(self, target, results_dir, objects):
+    output = self._libpath(target, results_dir)
 
     cmd = [self.cpp_toolchain.register_tool('ar')]
     cmd.extend(['rcs'])

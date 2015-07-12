@@ -6,4 +6,5 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 
-VERSION = '0.0.35'
+def is_boolean_flag(kwargs):
+  return kwargs.get('action') in ('store_false', 'store_true')

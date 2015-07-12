@@ -13,6 +13,7 @@ target(
     ':ivy_resolve',
     ':ivy_utils',
     ':junit_run',
+    ':jvm_run',
     ':resources_task',
     ':prepare_resources',
     ':prepare_services',
@@ -69,6 +70,7 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
@@ -144,6 +146,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'jvm_run',
+  sources = ['test_jvm_run.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_run',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name = 'jvm_binary_integration',
   sources = ['test_jvm_binary_integration.py'],
   dependencies = [
@@ -204,6 +217,7 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

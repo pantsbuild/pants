@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.goal.error import GoalError
+from pants.option.scope import ScopeInfo
 
 
 class Goal(object):
@@ -153,12 +154,13 @@ class _Goal(object):
     else:
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
 
-  def known_scopes(self):
-    """Yields all known scopes under this goal in no particular order."""
+  def known_scope_infos(self):
+    """Yields ScopeInfos for all known scopes under this goal."""
+    yield ScopeInfo(self.name, ScopeInfo.GOAL)
     # Yield scopes for tasks in this goal.
     for task_type in self.task_types():
-      for scope in task_type.known_scopes():
-        yield scope
+      for scope_info in task_type.known_scope_infos():
+        yield scope_info
 
   def subsystems(self):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""

@@ -29,7 +29,7 @@ class Optionable(AbstractClass):
 
     Subclasses should not generally need to override this method.
     """
-    cls.register_options(options.registration_function_for_scope(cls.options_scope))
+    cls.register_options(options.registration_function_for_optionable(cls))
 
   def __init__(self):
     # Check that the instance's class defines options_scope.
