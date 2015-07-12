@@ -144,6 +144,10 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
+  def del_options_for_scope(self, scope, *args):
+    for option in args:
+      self.options[scope].pop(option, None)
+
   def context(self, for_task_types=None, options=None, target_roots=None,
               console_outstream=None, workspace=None):
     for_task_types = for_task_types or []

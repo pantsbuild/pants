@@ -228,6 +228,18 @@ class TaskBase(Optionable, AbstractClass):
                                     invalidate_dependents,
                                     fingerprint_strategy=fingerprint_strategy)
 
+  @property
+  def cache_target_dirs(self):
+    """Whether to cache files in VersionedTarget's results_dir after exiting an invalidated block.
+
+    Subclasses may override this method to return True if they wish to use this style
+    of "automated" caching, where each VersionedTarget is given an associated results directory,
+    which will automatically be uploaded to the cache. Tasks should place the output files
+    for each VersionedTarget in said results directory. It is highly suggested to follow this
+    schema for caching, rather than manually making updates to the artifact cache.
+    """
+    return False
+
   @contextmanager
   def invalidated(self,
                   targets,
@@ -304,6 +316,10 @@ class TaskBase(Optionable, AbstractClass):
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
 
+    if self.cache_target_dirs:
+      for vt in invalidation_check.all_vts:
+        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
+
     if not silent:
       targets = []
       num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
@@ -320,8 +336,18 @@ class TaskBase(Optionable, AbstractClass):
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
+
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
+
+    write_to_cache = (self.cache_target_dirs
+                      and self.artifact_cache_writes_enabled()
+                      and invalidation_check.invalid_vts)
+    if write_to_cache:
+      def result_files(vt):
+        return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
+      pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+      self.update_artifact_cache(pairs)
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.

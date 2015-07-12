@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import pytest
+from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 from pants.contrib.cpp.toolchain.cpp_toolchain import CppToolchain
@@ -67,10 +68,29 @@ class CppIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('[cpp-run]\nHello, pants!\nGoodbye, pants!\n',
                   pants_run.stdout_data)
 
+  def _run_with_cache(self, task, target):
+    with temporary_dir(root_dir=self.workdir_root()) as cache:
+      args = [
+        'clean-all',
+        task,
+        "--cache-write-to=['{}']".format(cache),
+        "--cache-read-from=['{}']".format(cache),
+        target,
+        '-ldebug',
+      ]
+
+      pants_run = self.run_pants(args)
+      self.assert_success(pants_run)
+      self.assertIn('No cached artifacts', pants_run.stdout_data)
+      self.assertIn('Caching artifacts', pants_run.stdout_data)
+
+      pants_run = self.run_pants(args)
+      self.assert_success(pants_run)
+      self.assertIn('Using cached artifacts', pants_run.stdout_data)
+      self.assertNotIn('No cached artifacts', pants_run.stdout_data)
+
   def _binary_test(self, target):
-    pants_run = self.run_pants(['binary', target])
-    self.assert_success(pants_run)
+    self._run_with_cache('binary', target)
 
   def _compile_test(self, target):
-    pants_run = self.run_pants(['compile', target])
-    self.assert_success(pants_run)
+    self._run_with_cache('compile', target)

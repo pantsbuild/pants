@@ -14,6 +14,7 @@ from pants.base.address import BuildFileAddress
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 class CheckstyleTest(NailgunTaskTestBase):
@@ -113,6 +114,7 @@ class CheckstyleTest(NailgunTaskTestBase):
   #
   # Test section
   #
+  @ensure_cached(Checkstyle, expected_num_artifacts=1)
   def test_single_rule_pass(self):
     no_tab = self._create_target('no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)
     context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER],
@@ -121,6 +123,7 @@ class CheckstyleTest(NailgunTaskTestBase):
     self.populate_compile_classpath(context=context)
     self.execute(context)
 
+  @ensure_cached(Checkstyle, expected_num_artifacts=0)
   def test_single_rule_fail(self):
     with_tab = self._create_target('with_tab', self._TEST_JAVA_SOURCE_WITH_TAB)
     context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER],

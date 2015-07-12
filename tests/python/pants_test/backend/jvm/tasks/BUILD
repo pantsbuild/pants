@@ -70,6 +70,7 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
@@ -216,6 +217,7 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

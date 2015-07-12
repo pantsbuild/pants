@@ -47,6 +47,34 @@ class AntlrGenTest(NailgunTaskTestBase):
 
   def setUp(self):
     super(AntlrGenTest, self).setUp()
+
+    # There are some weird errors happening when caching is enabled on Antlr tests,
+    # which is why the use of the artifact cache is disabled. These bugs do not surface
+    # in Antlr integration tests (tasks/test_antlr_integration.py), which explicitly
+    # test caching, because the issue lies within what the following tests expect
+    # the SyntheticAddress of a target to be -- when caching is enabled, the expected
+    # SyntheticAddress is always incorrect, however, it would seem that everything else
+    # works just fine.
+    #
+    # Here's what happens without caching. In CodeGen->execute, within the self.invalidated
+    # block, self.genlang is called for all of the invalidated targets. In AntlrGen->genlang,
+    # the antlr classpath is computed with a call to self.tool_classpath(antlr_version).
+    # This is where things get weird. This call has the strange side-effect of changing
+    # each target.target_base: the sole test target prior to this call has a
+    # target_base = "testprojects/src/antlr/this/is/a/directory", but _after_ this call,
+    # it has a target_base = "testprojects/src/antlr". Note that self.tool_classpath does
+    # not take the target as an argument, rather, somewhere deep down the callstack it is
+    # muddling around with SourceRoot. Because target.target_base is used to compute a
+    # SyntheticAddress, the tests rely on this seemingly magic change of target_base.
+    #
+    # When caching is enabled, the first test passes and caches the sole test target.
+    # The rest of the tests run Antlr, but each one hits the cache, and thus none of the
+    # targets are invalidated. Recall that self.genlang is called on invalidated targets,
+    # so self.genlang is never called. Thus our sole test target's target_base is never
+    # changed from "testprojects/src/antlr/this/is/a/directory" to "testprojects/src/antlr",
+    # which causes the tests to fail, because the actual and expected SyntheticAddresses differ.
+    self.disable_artifact_cache()
+
     self.add_to_build_file('BUILD', dedent("""
       source_root('{srcroot}', java_antlr_library)
     """.format(**self.PARTS)))
@@ -155,7 +183,6 @@ class AntlrGenTest(NailgunTaskTestBase):
 
     with self.assertRaises(AntlrGen.AmbiguousPackageError):
       self.execute(self.create_context())
-
 
   def test_generated_target_fingerprint_stable_v3(self):
     self._test_generated_target_fingerprint_stable('3')
