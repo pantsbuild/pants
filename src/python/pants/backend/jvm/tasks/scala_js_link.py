@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -24,7 +24,7 @@ class ScalaJSLink(NailgunTask):
     register('--check-ir', default=False, action='store_true', advanced=True,
              help='Perform (relatively costly) validity checks of IR before linking it.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
-             help='Run checkstyle with these extra jvm options.')
+             help='Run with these extra jvm options.')
     cls.register_jvm_tool(register, 'scala-js-cli', main=cls._SCALA_JS_CLI_MAIN)
 
   @classmethod
@@ -39,30 +39,23 @@ class ScalaJSLink(NailgunTask):
     # Outputs are provided as synthetic resource targets to downstream consumers.
     return ['resources_by_target']
 
-  def __init__(self, *args, **kwargs):
-    super(ScalaJSLink, self).__init__(*args, **kwargs)
-
-    self._results_dir = os.path.join(self.workdir, 'results')
+  @property
+  def cache_target_dirs(self):
+    return True
 
   def _is_linked(self, target):
     return isinstance(target, ScalaJSLibrary)
 
-  def _target_dir(self, target):
-    return os.path.join(self._results_dir, target.id)
-
-  def _target_file(self, target):
-    return os.path.join(self._target_dir(target), "out.js")
+  def _target_file(self, vt):
+    return os.path.join(vt.results_dir, "{}.js".format(vt.target.id))
 
   def execute(self):
-    targets = self.context.targets(self._is_linked)
     resources_by_target = self.context.products.get_data('resources_by_target')
-    with self.invalidated(targets) as invalidation_check:
-      for vt in invalidation_check.invalid_vts:
-        safe_mkdir(self._target_dir(vt.target))
-        self._link(vt.target, self._target_file(vt.target))
+    with self.invalidated(self.context.targets(self._is_linked)) as invalidation_check:
       for vt in invalidation_check.all_vts:
-        resources_by_target[vt.target].add_abs_paths(self._results_dir, [self._target_file(vt.target)])
-
+        if not vt.valid:
+          self._link(vt.target, self._target_file(vt))
+        resources_by_target[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
 
   def _link(self, target, output_file):
     args = ['--output', output_file]
