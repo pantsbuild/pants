@@ -6,6 +6,7 @@ target(
   dependencies=[
     ':aapt_gen',
     ':sign_apk',
+    ':unpack_libraries',
     ':zipalign',
   ],
 )
@@ -70,6 +71,25 @@ python_tests(
   ],
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
+  ],
+)
+
+python_tests(
+  name = 'unpack_libraries',
+  sources = [
+    'test_unpack_libraries.py',
+  ],
+  dependencies = [
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/android/tasks:unpack_libraries',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/fs:fs',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/android:android_base',
   ],
 )
 

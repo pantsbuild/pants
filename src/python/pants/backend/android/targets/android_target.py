@@ -15,7 +15,6 @@ from pants.base.exceptions import TargetDefinitionException
 class AndroidTarget(JvmTarget):
   """A base class for all Android targets."""
 
-
   def __init__(self,
                address=None,
                # TODO (mateor) add support for minSDk
@@ -37,14 +36,11 @@ class AndroidTarget(JvmTarget):
 
     self._manifest_path = manifest
     self._manifest = None
-    self._app_name = None
 
   @property
   def manifest(self):
     """Return an AndroidManifest object made from a manifest by AndroidManifestParser."""
 
-    # For both gradle and ant layouts, AndroidManifest is conventionally at top-level.
-    # I would recommend users still explicitly define a 'manifest' in android BUILD files.
     if self._manifest is None:
       # If there was no 'manifest' field in the BUILD file, try to find one with the default value.
       if self._manifest_path is None:
@@ -56,11 +52,3 @@ class AndroidTarget(JvmTarget):
                                               "path.".format(manifest))
       self._manifest = AndroidManifestParser.parse_manifest(manifest)
     return self._manifest
-
-  @property
-  def app_name(self):
-    """Return application name from the target's manifest or target.name if that cannot be found."""
-    if self._app_name is None:
-      app_name = self.manifest.app_name or self.name
-      self._app_name = app_name.split(".")[-1]
-    return self._app_name

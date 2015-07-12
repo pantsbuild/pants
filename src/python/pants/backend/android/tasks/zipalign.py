@@ -47,7 +47,8 @@ class Zipalign(AndroidTask):
     #   :  '4' is the mandated byte-alignment boundaries. If not 4, zipalign doesn't do anything.
     #   :   Final two args are infile, outfile.
 
-    outfile = os.path.join(self.zipalign_out(target), '{0}.signed.apk'.format(target.app_name))
+    outfile = os.path.join(self.zipalign_out(target),
+                           '{0}.signed.apk'.format(target.manifest.package_name))
     args = [self.zipalign_binary(target), '-f', '4', package, outfile]
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
