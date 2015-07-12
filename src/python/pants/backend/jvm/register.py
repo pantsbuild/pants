@@ -21,6 +21,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
+from pants.backend.jvm.targets.scala_js_binary import ScalaJSBinary
 from pants.backend.jvm.targets.scala_js_library import ScalaJSLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -62,16 +63,17 @@ def build_file_aliases():
       'benchmark': Benchmark,
       'credentials': Credentials,
       'jar_library': JarLibrary,
-      'unpacked_jars' : UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'java_tests': JavaTests,
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
+      'scala_js_binary': ScalaJSBinary,
       'scala_js_library': ScalaJSLibrary,
       'scala_library': ScalaLibrary,
       'scalac_plugin': ScalacPlugin,
+      'unpacked_jars' : UnpackedJars,
     },
     objects={
       'artifact': Artifact,
