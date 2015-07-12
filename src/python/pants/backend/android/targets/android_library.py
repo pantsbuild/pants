@@ -48,7 +48,7 @@ class AndroidLibrary(ImportJarsMixin, AndroidTarget):
   @property
   def manifest(self):
     """The manifest of the AndroidLibrary, if one exists."""
-    # Libraries may not have a manifest allow that to be None for android_library targets.
+    # Libraries may not have a manifest, so allow that to be None for android_library targets.
     if self._manifest is None:
       if self._manifest_path is None:
         return None
