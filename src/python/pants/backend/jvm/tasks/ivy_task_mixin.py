@@ -314,8 +314,8 @@ class IvyTaskMixin(object):
   @staticmethod
   def _get_ivy_args(mapdir):
     # At least one task(android.unpack_libraries) relies on mapped jars filenames being unique and
-    # including the version number. This method is being used to create a regression test to protect
-    # that interest.
+    # including the version number. This method is being used to create a regression test to
+    # protect that interest.
     ivy_args = [
       '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
                    '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
