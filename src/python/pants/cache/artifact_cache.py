@@ -61,6 +61,14 @@ class ArtifactCache(object):
     """
     self.artifact_root = artifact_root
 
+  def prune(self):
+    """Prune stale cache files
+
+    Remove old unused cache files
+    :return:
+    """
+    pass
+
   def insert(self, cache_key, paths, overwrite=False):
     """Cache the output of a build.
 

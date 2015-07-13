@@ -51,6 +51,8 @@ class CacheSetup(Subsystem):
                   'caches to choose from.')
     register('--compression-level', advanced=True, type=int, default=5, recursive=True,
              help='The gzip compression level (0-9) for created artifacts.')
+    register('--max-stale', recursive=True, default=2, type=int,
+             help='Maximum number of stale cache files to keep')
 
   @classmethod
   def create_cache_factory_for_task(cls, task):
@@ -140,7 +142,11 @@ class CacheFactory(object):
       path = os.path.join(parent_path, self._stable_name)
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
-      return LocalArtifactCache(artifact_root, path, compression)
+      local_cache = LocalArtifactCache(artifact_root, path, compression)
+      max_stale = getattr(self._options, '_cache_max_stale__', None)
+      if max_stale is not None:
+        local_cache.set_max_stale(max_stale)
+      return local_cache
 
     def create_remote_cache(urls, local_cache):
       best_url = self.select_best_url(urls)
