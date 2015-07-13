@@ -106,8 +106,7 @@ class Options(object):
     # We need parsers for all the intermediate scopes, so inherited option values
     # can propagate through them.
     complete_known_scope_infos = self.complete_scopes(known_scope_infos)
-    complete_known_scope_names = [si.scope for si in complete_known_scope_infos]
-    splitter = ArgSplitter(complete_known_scope_names)
+    splitter = ArgSplitter(complete_known_scope_infos)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
 

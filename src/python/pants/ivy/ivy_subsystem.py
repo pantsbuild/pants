@@ -24,7 +24,6 @@ class IvySubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(IvySubsystem, cls).register_options(register)
-    bootstrap_options = register.bootstrap
     register('--http-proxy', advanced=True,
              help='Specify a proxy URL for http requests.')
     register('--https-proxy', advanced=True,
