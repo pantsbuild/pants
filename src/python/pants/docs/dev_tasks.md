@@ -184,6 +184,24 @@ shows some useful idioms for JVM tasks.
 Enabling Caching For Tasks
 --------------------------
 
+**Auto caching**
+
+If your task follows an isolated strategy where each target produces output into
+an isolated directory, then the task will be able to take advantage of auto
+caching. If your task follows a global strategy, where all targets produce output
+into the same directory, then see the **"Manual caching"** section below.
+
+Auto caching works by assigning a results directory to each VersionedTarget (VT) of
+the InvalidationCheck yielded by `Task->invalidated`. A task operating on a given
+VT should place the resulting files in the VT's `results_dir`. After exiting the
+`invalidated` context block, these files will be automatically uploaded to
+the artifact cache.
+
+Auto caching is disabled by default. To enable, override `Task->cache_target_dirs`
+to return True.
+
+**Manual caching (not recommended)**
+
 Pants will attempt to read task results from the cache automatically, however,
 Pants cannot automatically decide what to write to the cache. In a task's `execute` method,
 you must manually provide each target and its artifacts as an update to the
