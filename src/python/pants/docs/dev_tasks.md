@@ -184,23 +184,27 @@ shows some useful idioms for JVM tasks.
 Enabling Caching For Tasks
 --------------------------
 
-**Auto caching**
-
 If your task follows an isolated strategy where each target produces output into
-an isolated directory, then the task will be able to take advantage of auto
-caching. If your task follows a global strategy, where all targets produce output
-into the same directory, then see the **"Manual caching"** section below.
+its own directory, then the task will be able to take advantage of automatic
+target workdir caching. If your task follows a more complicated design
+(for example, all targets produce output into the same directory), then check
+out the manual caching section below.
 
-Auto caching works by assigning a results directory to each VersionedTarget (VT) of
-the InvalidationCheck yielded by `Task->invalidated`. A task operating on a given
-VT should place the resulting files in the VT's `results_dir`. After exiting the
-`invalidated` context block, these files will be automatically uploaded to
-the artifact cache.
+**Automatic target workdir caching**
 
-Auto caching is disabled by default. To enable, override `Task->cache_target_dirs`
-to return True.
+Automatic target workdir caching works by assigning a results directory to
+each VersionedTarget (VT) of the InvalidationCheck yielded by `Task->invalidated`.
+A task operating on a given VT should place the resulting files in the VT's
+`results_dir`. After exiting the `invalidated` context block, these files
+will be automatically uploaded to the artifact cache.
 
-**Manual caching (not recommended)**
+This interface for caching is disabled by default. To enable, override
+`Task->cache_target_dirs` to return True.
+
+**Manual caching**
+
+Manual caching is much more complicated than automatic target workdir caching,
+and as such should only be used for non-standard usecases.
 
 Pants will attempt to read task results from the cache automatically, however,
 Pants cannot automatically decide what to write to the cache. In a task's `execute` method,
