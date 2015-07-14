@@ -1,6 +1,56 @@
 RELEASE HISTORY
 ===============
 
+0.0.36 (7/14/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a quick release following up on 0.0.35 to make available internal API changes made during options refactoring.
+
+API Changes
+~~~~~~~~~~~
+
+* Improved artifact cache usability by allowing tasks to opt-in to a mode that generates and then caches a directory for each target.
+  `RB #2449 <https://rbcommons.com/s/twitter/r/2449>`_
+  `RB #2471 <https://rbcommons.com/s/twitter/r/2471>`_
+
+* Re-compute the classpath for each batch of junit tests.
+  `RB #2454 <https://rbcommons.com/s/twitter/r/2454>`_
+
+Bugfixes
+~~~~~~~~
+
+* Stops unit tests in test_simple_codegen_task.py in master from failing.
+  `RB #2469 <https://rbcommons.com/s/twitter/r/2469>`_
+
+* Helpful error message when 'sources' is specified for jvm_binary.
+  `Issue #871 <https://github.com/pantsbuild/pants/issues/871>`_
+  `RB #2455 <https://rbcommons.com/s/twitter/r/2455>`_
+
+* Fix failure in test_execute_fail under python>=2.7.10 for test_simple_codegen_task.py.
+  `RB #2461 <https://rbcommons.com/s/twitter/r/2461>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support short-form task subsystem flags.
+  `RB #2466 <https://rbcommons.com/s/twitter/r/2466>`_
+
+* Reimplement help formatting to improve clarity of both the code and output.
+  `RB #2458 <https://rbcommons.com/s/twitter/r/2458>`_
+  `RB #2464 <https://rbcommons.com/s/twitter/r/2464>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Visual docsite changes
+  `RB #2463 <https://rbcommons.com/s/twitter/r/2463>`_
+
+* Fix migrate_config to detect explicit [DEFAULT]s.
+  `RB #2465 <https://rbcommons.com/s/twitter/r/2465>`_
+
 0.0.35 (7/10/2015)
 ------------------
 
