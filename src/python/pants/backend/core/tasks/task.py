@@ -16,6 +16,9 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
@@ -174,6 +177,8 @@ class TaskBase(Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
+    self._payload = None
+
   def get_options(self):
     """Returns the option values for this task's scope."""
     return self.context.options.for_scope(self.options_scope)
@@ -192,6 +197,20 @@ class TaskBase(Optionable, AbstractClass):
     workdir path to use.
     """
     return self._workdir
+
+  @property
+  def payload(self):
+    if not self._payload:
+      self._payload = Payload()
+      registered = self.context.options.registration_args_iter_for_scope(self.options_scope)
+      for (name, args, kwargs) in registered:
+        if not kwargs.get('fingerprint', False):
+          continue
+        val = self.get_options()[name]
+        self._payload.add_field(name, PrimitiveField(val))
+      self._payload.freeze()
+
+    return self._payload
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -277,6 +296,7 @@ class TaskBase(Optionable, AbstractClass):
     # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
+    fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
 
