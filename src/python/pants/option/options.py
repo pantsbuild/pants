@@ -205,6 +205,13 @@ class Options(object):
     self._values_by_scope[scope] = values
     return values
 
+  def registration_args_iter_for_scope(self, scope):
+    """Returns an iterator over the registration arguments of each option in this scope.
+
+    See `Parser.registration_args_iter` for details.
+    """
+    return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
+
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
     # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.

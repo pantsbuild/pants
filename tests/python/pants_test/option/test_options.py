@@ -517,6 +517,30 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
 
+  def test_registration_arg_iter(self):
+    options = self._parse('./pants',
+                          config={
+                            'compile': {'a' : 99},
+                          })
+
+    def get_registration_args(scope, name):
+      return next((x for x in options.registration_args_iter_for_scope(scope) if x[0] == name))
+
+    # The global xlong arg.
+    for_xlong = get_registration_args('', 'xlong')
+    self.assertEquals(for_xlong[1], ['-x', '--xlong'])
+    self.assertEquals(for_xlong[2].get('action'), 'store_true')
+
+    # The new, local xlong arg, which shadows the recursive registration of the global one.
+    for_xlong = get_registration_args('test', 'xlong')
+    self.assertEquals(for_xlong[1], ['--xlong'])
+    self.assertEquals(for_xlong[2].get('type'), int)
+
+    # The recursive registration, without the shadowed --xlong arg.
+    for_x = get_registration_args('test', 'x')
+    self.assertEquals(for_x[1], ['-x'])
+    self.assertEquals(for_x[2].get('action'), 'store_true')
+
   def test_complete_scopes(self):
     _global = ScopeInfo.for_global_scope()
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
