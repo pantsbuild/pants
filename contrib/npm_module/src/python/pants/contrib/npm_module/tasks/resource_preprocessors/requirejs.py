@@ -2,8 +2,6 @@ import os
 import shutil
 
 from twitter.common.util.command_util import CommandUtil
-from pants.contrib.npm_module.targets.gen_resources import GenResources
-from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
 
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir

@@ -2,7 +2,9 @@ python_library(
   name='tasks',
   sources=globs('*.py'),
   dependencies=[
-    '3rdparty/python/twitter/common:collections',
-    '3rdparty/python/twitter/common:lang',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    'contrib/npm_module/src/python/pants/contrib/npm_module/targets',
+    'src/python/pants/backend/core/tasks:task',
   ]
 )

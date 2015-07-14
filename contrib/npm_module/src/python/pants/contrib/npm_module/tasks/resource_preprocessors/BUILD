@@ -1,8 +1,16 @@
 python_library(
-  name='resource-preprocessors',
+  name='resource_preprocessors',
   sources=globs('*.py'),
   dependencies=[
-    '3rdparty/python/twitter/common:collections',
-    '3rdparty/python/twitter/common:lang',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.lang',
+    '3rdparty/python/twitter/commons:twitter.common.util',
+    'contrib/npm_module/src/python/pants/contrib/npm_module/targets',
+    'contrib/npm_module/src/python/pants/contrib/npm_module/tasks',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
