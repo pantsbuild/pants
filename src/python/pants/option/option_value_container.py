@@ -127,3 +127,16 @@ class OptionValueContainer(object):
       return val.value
     else:
       return val
+
+  def __iter__(self):
+    """Returns an iterator over all option names, in lexicographical order.
+
+    In the rare (for us) case of an option with multiple names, we pick the
+    lexicographically smallest one, for consistency.
+    """
+    inverse_forwardings = {}  # internal attribute -> external attribute.
+    for k, v in self._forwardings.items():
+      if v not in inverse_forwardings or inverse_forwardings[v] > k:
+        inverse_forwardings[v] = k
+    for name in sorted(inverse_forwardings.values()):
+      yield name

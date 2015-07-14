@@ -54,12 +54,6 @@ class Parser(object):
   we've already registered an option on one of its inner scopes. This is to ensure that
   re-registering the same option name on an inner scope correctly replaces the identically-named
   option from the outer scope.
-
-  :param env: a dict of environment variables.
-  :param config: data from a config file (must support config.get[list](section, name, default=)).
-  :param scope: the scope this parser acts for.
-  :param parent_parser: the parser for the scope immediately enclosing this one, or
-         None if this is the global scope.
   """
 
   class BooleanConversionError(ParseError):
@@ -83,6 +77,14 @@ class Parser(object):
       raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
 
   def __init__(self, env, config, scope_info, parent_parser):
+    """Create a Parser instance.
+
+    :param env: a dict of environment variables.
+    :param config: data from a config file (must support config.get[list](section, name, default=)).
+    :param scope_info: the scope this parser acts for.
+    :param parent_parser: the parser for the scope immediately enclosing this one, or
+                          None if this is the global scope.
+    """
     self._env = env
     self._config = config
     self._scope_info = scope_info
@@ -99,9 +101,8 @@ class Parser(object):
     # The argparser we use for actually parsing args.
     self._argparser = CustomArgumentParser(scope=self._scope, conflict_handler='resolve')
 
-    # Map of external to internal dest names, and its inverse. See docstring for _set_dest below.
+    # Map of external to internal dest names. See docstring for _set_dest below.
     self._dest_forwardings = {}
-    self._inverse_dest_forwardings = defaultdict(set)
 
     # Map of dest -> (deprecated_version, deprecated_hint), for deprecated options.
     # The keys are external dest names (the ones seen by the user, not by argparse).
@@ -132,10 +133,18 @@ class Parser(object):
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
 
+    # Compute the inverse of the dest forwardings.
+    # We do this here and not when creating the forwardings, because forwardings inherited
+    # from outer scopes can be overridden in inner scopes, so this computation is only
+    # correct after all options have been registered on all scopes.
+    inverse_dest_forwardings = defaultdict(set)
+    for src, dest in self._dest_forwardings.items():
+      inverse_dest_forwardings[dest].add(src)
+
     # Check for deprecated flags.
     all_deprecated_dests = set(self._deprecated_option_dests.keys())
     for internal_dest in new_args.keys():
-      external_dests = self._inverse_dest_forwardings.get(internal_dest, set())
+      external_dests = inverse_dest_forwardings.get(internal_dest, set())
       deprecated_dests = all_deprecated_dests & external_dests
       if deprecated_dests:
         # Check all dests. Typically there is only one, unless the option was registered with
@@ -281,16 +290,12 @@ class Parser(object):
     # Make argparse write to the internal dest.
     kwargs['dest'] = scoped_dest
 
-    def add_forwarding(x, y):
-      self._dest_forwardings[x] = y
-      self._inverse_dest_forwardings[y].add(x)
-
     # Make reads from the external dest forward to the internal one.
-    add_forwarding(dest, scoped_dest)
+    self._dest_forwardings[dest] = scoped_dest
 
     # Also forward all option aliases, so we can reference -x (as options.x) in the example above.
     for arg in args:
-      add_forwarding(arg.lstrip('-').replace('-', '_'), scoped_dest)
+      self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
     return dest
 
   def _select_dest(self, args, kwargs):
