@@ -113,7 +113,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def _compute_compile_context(self, target):
     """Returns the default/stable compile context for the given target.
 
-    Temporary compile contexts are private to the strategy.
+    Compile contexts are computed in prepare_compile and shared between group members.
     """
     return self.CompileContext(target,
                                self._analysis_file,

@@ -191,6 +191,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._confs = self.get_options().confs
 
     # The compile strategy to use for analysis and classfile placement.
+    # Note that using two different strategies at the same time is unsupported and may not work.
     if self.get_options().strategy == 'global':
       strategy_constructor = JvmCompileGlobalStrategy
     else:
