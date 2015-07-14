@@ -75,13 +75,6 @@ class TaskTestBase(BaseTest):
     # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
     # action in this non-JVM-specific, high-level base class.
     Bootstrapper.reset_instance()
-    self.artifact_cache = os.path.join(get_pants_cachedir(), 'artifact_cache')
-    self.set_options_for_scope('cache',
-                               read_from=[self.artifact_cache],
-                               write_to=[self.artifact_cache])
-
-  def disable_artifact_cache(self):
-    self.del_options_for_scope('cache', 'read_from', 'write_to')
 
   @property
   def test_workdir(self):
