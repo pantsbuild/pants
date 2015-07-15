@@ -16,6 +16,7 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:mustache',
     'src/python/pants/base:run_info',
+    'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
     'src/python/pants/subsystem',
