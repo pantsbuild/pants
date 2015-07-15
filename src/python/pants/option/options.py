@@ -9,6 +9,8 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -211,6 +213,15 @@ class Options(object):
     See `Parser.registration_args_iter` for details.
     """
     return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
+
+  def payload_for_scope(self, scope):
+    payload = Payload()
+    for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
+      if kwargs.get('fingerprint', False):
+        val = self.for_scope(scope)[name]
+        payload.add_field(name, PrimitiveField(val))
+    payload.freeze()
+    return payload
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,

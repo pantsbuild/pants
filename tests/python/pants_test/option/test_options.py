@@ -84,6 +84,9 @@ class OptionsTest(unittest.TestCase):
                      deprecated_version='999.99.9',
                      deprecated_hint='say no to crufty, stale scoped options')
 
+    # For task identity test
+    options.register('compile.scala', '--modifycompile', fingerprint=True)
+
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
     options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scope_infos, args,
@@ -552,3 +555,14 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
+
+  def test_payload_for_scope(self):
+    opt = 'modifycompile'
+    val = 'blah blah blah'
+    options = self._parse('./pants compile.scala --{}="{}"'.format(opt, val))
+    payload = options.payload_for_scope('compile.scala')
+
+    self.assertEquals(len(payload.fields), 1)
+    for key, field in payload.fields:
+      self.assertEquals(key, opt)
+      self.assertEquals(field.value, val)

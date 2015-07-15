@@ -17,8 +17,6 @@ from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
-from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
@@ -201,15 +199,7 @@ class TaskBase(Optionable, AbstractClass):
   @property
   def payload(self):
     if not self._payload:
-      self._payload = Payload()
-      registered = self.context.options.registration_args_iter_for_scope(self.options_scope)
-      for (name, args, kwargs) in registered:
-        if not kwargs.get('fingerprint', False):
-          continue
-        val = self.get_options()[name]
-        self._payload.add_field(name, PrimitiveField(val))
-      self._payload.freeze()
-
+      self._payload = self.context.options.payload_for_scope(self.options_scope)
     return self._payload
 
   def artifact_cache_reads_enabled(self):
