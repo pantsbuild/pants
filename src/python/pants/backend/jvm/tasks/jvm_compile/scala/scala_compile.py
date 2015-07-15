@@ -257,6 +257,7 @@ class ZincCompile(JvmCompile):
                     main=self._ZINC_MAIN,
                     jvm_options=self._jvm_options,
                     args=zinc_args,
+                    executor_workdir_name="ZincCompile",
                     workunit_name='zinc',
                     workunit_labels=[WorkUnit.COMPILER]):
       raise TaskError('Zinc compile failed.')

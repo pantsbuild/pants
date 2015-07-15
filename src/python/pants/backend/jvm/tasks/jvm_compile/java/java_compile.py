@@ -76,7 +76,6 @@ class JavaCompile(JvmCompile):
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
-    self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
 
@@ -143,6 +142,7 @@ class JavaCompile(JvmCompile):
                           main=JavaCompile._JMAKE_MAIN,
                           jvm_options=self._jvm_options,
                           args=args,
+                          jdk=True,
                           workunit_name='jmake',
                           workunit_labels=[WorkUnit.COMPILER])
     if result:
