@@ -218,7 +218,7 @@ class TaskBase(Optionable, AbstractClass):
         field = TargetListField(targets)
       else:
         field = PrimitiveField(val)
-      payload.add_field(name, PrimitiveField(val))
+      payload.add_field(name, field)
 
     payload.freeze()
     return payload
