@@ -226,7 +226,9 @@ class TaskBase(Optionable, AbstractClass):
     return InvalidationCacheManager(self._cache_key_generator,
                                     self._build_invalidator_dir,
                                     invalidate_dependents,
-                                    fingerprint_strategy=fingerprint_strategy)
+                                    fingerprint_strategy=fingerprint_strategy,
+                                    invalidation_report=self.context.invalidation_report,
+                                    task_name=type(self).__name__)
 
   @property
   def cache_target_dirs(self):
@@ -279,7 +281,6 @@ class TaskBase(Optionable, AbstractClass):
     # to selectively enable this feature.
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
-
     # We separate locally-modified targets from others by coloring them differently.
     # This can be a performance win, because these targets are more likely to be iterated
     # over, and this preserves "chunk stability" for them.
@@ -334,9 +335,19 @@ class TaskBase(Optionable, AbstractClass):
         msg_elements.append('.')
         self.context.log.info(*msg_elements)
 
+    invalidation_report = self.context.invalidation_report
+    if invalidation_report:
+      for vts in invalidation_check.all_vts:
+        invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
+                                    phase='pre-check')
+
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
 
+    if invalidation_report:
+      for vts in invalidation_check.all_vts:
+        invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
+                                    phase='post-check')
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
 
