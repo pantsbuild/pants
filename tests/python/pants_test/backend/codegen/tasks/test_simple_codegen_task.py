@@ -19,6 +19,14 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class SimpleCodegenTaskTest(TaskTestBase):
+
+  def setUp(self):
+    super(SimpleCodegenTaskTest, self).setUp()
+    # NB(gmalmquist): We always want to re-run codegen rather than just assuming it works and
+    # using cached results. If we could safely assume codegen always worked, we wouldn't need
+    # these tests in the first place.
+    self.disable_artifact_cache()
+
   @classmethod
   def task_type(cls):
     return cls.DummyGen
