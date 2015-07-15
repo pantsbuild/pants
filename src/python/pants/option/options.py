@@ -106,8 +106,7 @@ class Options(object):
     # We need parsers for all the intermediate scopes, so inherited option values
     # can propagate through them.
     complete_known_scope_infos = self.complete_scopes(known_scope_infos)
-    complete_known_scope_names = [si.scope for si in complete_known_scope_infos]
-    splitter = ArgSplitter(complete_known_scope_names)
+    splitter = ArgSplitter(complete_known_scope_infos)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
 
@@ -205,6 +204,13 @@ class Options(object):
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
     self._values_by_scope[scope] = values
     return values
+
+  def registration_args_iter_for_scope(self, scope):
+    """Returns an iterator over the registration arguments of each option in this scope.
+
+    See `Parser.registration_args_iter` for details.
+    """
+    return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,

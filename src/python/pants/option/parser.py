@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import sys
 import warnings
 from argparse import ArgumentParser, _HelpAction
 from collections import defaultdict
@@ -52,12 +53,6 @@ class Parser(object):
   we've already registered an option on one of its inner scopes. This is to ensure that
   re-registering the same option name on an inner scope correctly replaces the identically-named
   option from the outer scope.
-
-  :param env: a dict of environment variables.
-  :param config: data from a config file (must support config.get[list](section, name, default=)).
-  :param scope: the scope this parser acts for.
-  :param parent_parser: the parser for the scope immediately enclosing this one, or
-         None if this is the global scope.
   """
 
   class BooleanConversionError(ParseError):
@@ -81,6 +76,14 @@ class Parser(object):
       raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
 
   def __init__(self, env, config, scope_info, parent_parser):
+    """Create a Parser instance.
+
+    :param env: a dict of environment variables.
+    :param config: data from a config file (must support config.get[list](section, name, default=)).
+    :param scope_info: the scope this parser acts for.
+    :param parent_parser: the parser for the scope immediately enclosing this one, or
+                          None if this is the global scope.
+    """
     self._env = env
     self._config = config
     self._scope_info = scope_info
@@ -89,17 +92,26 @@ class Parser(object):
     # If True, no more registration is allowed on this parser.
     self._frozen = False
 
-    # List of (args, kwargs) registration pairs, captured at registration time.
-    # Note that the kwargs may include our custom, non-argparse arguments
-    # (e.g., 'recursive' and 'advanced').
+    # List of (args, kwargs) registration pairs, more-or-less as captured at registration time.
+    # Note that:
+    # 1. kwargs may include our custom, non-argparse arguments (e.g., 'recursive' and 'advanced').
+    # 2. kwargs will include a value for 'default', computed from env vars, pants.ini and the
+    #    static 'default' in the originally passed-in kwargs (if any).
+    # 3. args will only contain names that have not been shadowed by a subsequent registration.
+    #    For example, if an outer scope registers [-x, --xlong] on an inner scope (via recursion)
+    #    and then the inner scope re-registers [--xlong], the args for the first registration
+    #    here will contain only [-x].
     self._registration_args = []
+
+    # arg -> list that arg appears in, in self_registration_args above.
+    # Used to ensure that shadowed args are removed from their lists.
+    self._arg_lists_by_arg = {}
 
     # The argparser we use for actually parsing args.
     self._argparser = CustomArgumentParser(scope=self._scope, conflict_handler='resolve')
 
-    # Map of external to internal dest names, and its inverse. See docstring for _set_dest below.
+    # Map of external to internal dest names. See docstring for _set_dest below.
     self._dest_forwardings = {}
-    self._inverse_dest_forwardings = defaultdict(set)
 
     # Map of dest -> (deprecated_version, deprecated_hint), for deprecated options.
     # The keys are external dest names (the ones seen by the user, not by argparse).
@@ -130,10 +142,18 @@ class Parser(object):
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
 
+    # Compute the inverse of the dest forwardings.
+    # We do this here and not when creating the forwardings, because forwardings inherited
+    # from outer scopes can be overridden in inner scopes, so this computation is only
+    # correct after all options have been registered on all scopes.
+    inverse_dest_forwardings = defaultdict(set)
+    for src, dest in self._dest_forwardings.items():
+      inverse_dest_forwardings[dest].add(src)
+
     # Check for deprecated flags.
     all_deprecated_dests = set(self._deprecated_option_dests.keys())
     for internal_dest in new_args.keys():
-      external_dests = self._inverse_dest_forwardings.get(internal_dest, set())
+      external_dests = inverse_dest_forwardings.get(internal_dest, set())
       deprecated_dests = all_deprecated_dests & external_dests
       if deprecated_dests:
         # Check all dests. Typically there is only one, unless the option was registered with
@@ -145,6 +165,20 @@ class Parser(object):
                           stacklevel=9999) # Out of range stacklevel to suppress printing src line.
     return namespace
 
+
+  def registration_args_iter(self):
+    """Returns an iterator over the registration arguments of each option in this parser.
+
+    Each yielded item is a (dest, args, kwargs) triple.  `dest` is the canonical name that can be
+    used to retrieve the option value, if the option has multiple names.
+    See comment on self._registration_args above for caveats re (args, kwargs).
+    For consistency, items are iterated over in lexicographical order, not registration order.
+    """
+    for args, kwargs in sorted(self._registration_args):
+      if args:  # Otherwise all args have been shadowed, so ignore.
+        dest = self._select_dest(args)
+        yield dest, args, kwargs
+
   def get_help_info(self):
     """Returns a dict of help information for the options registered on this object.
 
@@ -152,8 +186,15 @@ class Parser(object):
     """
     return HelpInfoExtracter(self._scope).get_option_scope_help_info(self._registration_args)
 
-  def format_help(self, header, show_advanced=False, color=True):
-    """Return a help message for the options registered on this object."""
+  def format_help(self, header, show_advanced=False, color=None):
+    """Return a help message for the options registered on this object.
+
+    :param header: Value to display as a header.
+    :param bool show_advanced: Whether to display advanced options.
+    :param bool color: Whether to use color. If None, use color only if writing to a terminal.
+    """
+    if color is None:
+      color = sys.stdout.isatty()
     help_formatter = HelpFormatter(scope=self._scope, show_advanced=show_advanced, color=color)
     return '\n'.join(help_formatter.format_options(header, self._registration_args))
 
@@ -201,7 +242,14 @@ class Parser(object):
   def _clean_argparse_kwargs(self, dest, args, kwargs):
     ranked_default = self._compute_default(dest, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
-    self._registration_args.append((args, kwargs_with_default))
+
+    args_copy = list(args)
+    for arg in args_copy:
+      shadowed_arg_list = self._arg_lists_by_arg.get(arg)
+      if shadowed_arg_list is not None:
+        shadowed_arg_list.remove(arg)
+      self._arg_lists_by_arg[arg] = args_copy
+    self._registration_args.append((args_copy, kwargs_with_default))
 
     # For argparse registration, remove our custom kwargs.
     argparse_kwargs = dict(kwargs_with_default)
@@ -241,6 +289,8 @@ class Parser(object):
 
   def _validate(self, args, kwargs):
     """Ensure that the caller isn't trying to use unsupported argparse features."""
+    if not args:
+      raise RegistrationError('No args provided for option in scope {}'.format(self.scope))
     for arg in args:
       if not arg.startswith('-'):
         raise RegistrationError('Option {0} in scope {1} must begin '
@@ -266,33 +316,26 @@ class Parser(object):
 
     Note: Modfies kwargs.
     """
-    dest = self._select_dest(args, kwargs)
+    dest = kwargs.get('dest') or self._select_dest(args)
     scoped_dest = '_{0}_{1}__'.format(self._scope or 'DEFAULT', dest)
 
     # Make argparse write to the internal dest.
     kwargs['dest'] = scoped_dest
 
-    def add_forwarding(x, y):
-      self._dest_forwardings[x] = y
-      self._inverse_dest_forwardings[y].add(x)
-
     # Make reads from the external dest forward to the internal one.
-    add_forwarding(dest, scoped_dest)
+    self._dest_forwardings[dest] = scoped_dest
 
     # Also forward all option aliases, so we can reference -x (as options.x) in the example above.
     for arg in args:
-      add_forwarding(arg.lstrip('-').replace('-', '_'), scoped_dest)
+      self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
     return dest
 
-  def _select_dest(self, args, kwargs):
+  def _select_dest(self, args):
     """Select the dest name for the option.
 
     Replicated from the dest inference logic in argparse:
     '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
     """
-    dest = kwargs.get('dest')
-    if dest:
-      return dest
     arg = next((a for a in args if a.startswith('--')), args[0])
     return arg.lstrip('-').replace('-', '_')
 

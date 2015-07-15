@@ -278,6 +278,7 @@ class JvmBinary(JvmTarget):
     this means the jar has a manifest specifying the main class.
   * ``run`` - Executes the main class of this binary locally.
   """
+
   def __init__(self,
                name=None,
                address=None,
@@ -331,6 +332,12 @@ class JvmBinary(JvmTarget):
                                       'manifest_entries must be a dict. got {}'
                                       .format(type(manifest_entries).__name__))
     sources = [source] if source else None
+    if 'sources' in kwargs:
+      raise self.IllegalArgument(address.spec,
+        'jvm_binary only supports a single "source" argument, typically used to specify a main '
+        'class source file. Other sources should instead be placed in a java_library, which '
+        'should be referenced in the jvm_binary\'s dependencies.'
+      )
     payload = payload or Payload()
     payload.add_fields({
       'basename' : PrimitiveField(basename or name),
