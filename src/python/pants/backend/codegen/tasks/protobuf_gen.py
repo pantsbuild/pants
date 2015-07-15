@@ -33,14 +33,13 @@ class ProtobufGen(SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
-    register('--lang', action='append', choices=['python', 'java'], default=['java'],
-             help='Force generation of protobuf code for these languages.')
     register('--version', advanced=True,
              help='Version of protoc.  Used to create the default --javadeps and as part of '
                   'the path to lookup the tool with --pants-support-baseurls and '
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
+    # TODO(Eric Ayers) Mix the value of this option into the fingerprint
     register('--plugins', advanced=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
