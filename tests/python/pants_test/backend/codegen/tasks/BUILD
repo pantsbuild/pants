@@ -22,6 +22,7 @@ python_tests(
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:antlr_gen',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
