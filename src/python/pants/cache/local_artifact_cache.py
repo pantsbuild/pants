@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 from contextlib import contextmanager
+from operator import itemgetter
 
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
@@ -27,6 +28,8 @@ class BaseLocalArtifactCache(ArtifactCache):
     super(BaseLocalArtifactCache, self).__init__(artifact_root)
     self._compression = compression
     self._cache_root = None
+
+
 
   def _artifact(self, path):
     return TarballArtifact(self.artifact_root, path, self._compression)
@@ -69,8 +72,27 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     """
     super(LocalArtifactCache, self).__init__(artifact_root, compression)
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
-
+    self._max_stale = None
     safe_mkdir(self._cache_root)
+
+  def set_max_stale(self, max_stale):
+    self._max_stale = max_stale
+
+  def prune(self, root):
+    """Prune stale cache files
+
+    Keep the n most recent cache files based on the option --cache-max-stale
+    :param str root: The path under which cacheable artifacts will be cleaned
+    """
+    if os.path.isdir(root) and self._max_stale is not None:
+      found_files = []
+      for file in os.listdir(root):
+        full_path = os.path.join(root,file)
+        found_files.append(((full_path), os.path.getmtime(full_path)))
+      found_files = sorted(found_files, key=itemgetter(1))
+
+      for cur_file in found_files[self._max_stale:]:
+        safe_delete(cur_file[0])
 
   def has(self, cache_key):
     return os.path.isfile(self._cache_file_for_key(cache_key))
@@ -78,6 +100,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _store_tarball(self, cache_key, src):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
+    self.prune(os.path.dirname(dest))  # Remove stale cache files
     os.rename(src, dest)
     return dest
 
