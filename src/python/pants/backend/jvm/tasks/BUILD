@@ -380,13 +380,8 @@ python_library(
   name = 'scala_js_link',
   sources = ['scala_js_link.py'],
   dependencies = [
-    ':jvm_task',
-    ':jvm_tool_task_mixin',
+    ':nailgun_task',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:workunit',
-    'src/python/pants/console:stty_utils',
-    'src/python/pants/java:util',
-    'src/python/pants/util:strutil',
   ],
 )
 
