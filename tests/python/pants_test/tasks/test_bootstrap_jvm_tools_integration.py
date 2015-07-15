@@ -29,6 +29,6 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
                                  ['clean-all',
                                   'compile',
                                   'examples/src/java/org/pantsbuild/example/hello/simple',
-                                  '--compile-zinc-java-enabled'])
+                                  '--no-compile-java-enabled'])
       self.assert_success(pants_run)
       self.assertFalse('[shade-zinc]' in pants_run.stdout_data)

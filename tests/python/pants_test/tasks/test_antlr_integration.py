@@ -25,7 +25,7 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
 
   # Test that antlr3 and antlr4 generated java targets are cache-able.
   def test_compile_antlr_cached(self):
-    for enable_zinc_java in ['--compile-zinc-java-enabled', '--no-compile-zinc-java-enabled']:
+    for enable_jmake in ['--compile-java-enabled', '--no-compile-java-enabled']:
       # Use the same temporary workdir because generated target's name includes the workdir.
       # Use the same artifact_cache dir to share artifacts across two runs.
       with temporary_dir(root_dir=self.workdir_root()) as tmp_workdir:
@@ -41,7 +41,7 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
             'compile',
             "--cache-gen-antlr-write-to=['{}']".format(artifact_cache),
             "--cache-gen-antlr-read-from=['{}']".format(artifact_cache),
-            enable_zinc_java,
+            enable_jmake,
             'examples/src/antlr/org/pantsbuild/example/exp::'
           ]
           # First run should generate and cache artifacts.

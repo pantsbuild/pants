@@ -43,7 +43,7 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 
 
 class JavaCompile(JvmCompile):
-  _language = 'java'
+  _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False
 
@@ -71,6 +71,7 @@ class JavaCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
+    register('--enabled', action='store_true', default=True, help='Use jmake to compile Java targets')
     register('--source', advanced=True, fingerprint=True,
              help='Provide source compatibility with this release. Overrides the jvm platform '
                   'source.',
@@ -82,6 +83,9 @@ class JavaCompile(JvmCompile):
              deprecated_version='0.0.43')
     cls.register_jvm_tool(register, 'jmake', fingerprint=True)
     cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
+
+  def select(self, target):
+    return self.get_options().enabled and super(JavaCompile, self).select(target)
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
