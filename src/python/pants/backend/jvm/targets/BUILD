@@ -69,6 +69,7 @@ python_library(
     ':jvm',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/subsystems:scala_js_platform',
     'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',

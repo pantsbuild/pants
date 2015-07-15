@@ -32,12 +32,20 @@ python_library(
   ],
 )
 
-
 python_library(
   name = 'scala_platform',
   sources = ['scala_platform.py'],
   dependencies = [
     ':jvm_tool_mixin',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+  ],
+)
+
+python_library(
+  name = 'scala_js_platform',
+  sources = ['scala_js_platform.py'],
+  dependencies = [
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
