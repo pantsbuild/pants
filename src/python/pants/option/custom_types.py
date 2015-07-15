@@ -35,6 +35,17 @@ def list_type(s):
   return _convert(s, (list, tuple))
 
 
+def target_list_type(s):
+  """Same type as 'list_type', but indicates list contents are targets."""
+  return _convert(s, (list, tuple))
+
+
+def file_type(s):
+  """Same type as 'str', but indicates string represents a filepath."""
+  # TODO(cgibb): Would it make sense to verify that the string is a valid filepath here?
+  return s
+
+
 def _convert(val, acceptable_types):
   """Ensure that val is one of the acceptable types, converting it if needed.
 

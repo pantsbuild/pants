@@ -280,3 +280,28 @@ class PrimitiveField(PayloadField):
 
   def _compute_fingerprint(self):
     return stable_json_sha1(self._underlying)
+
+
+class FileField(PayloadField):
+
+  def __init__(self, filepath):
+    self._filepath = filepath
+
+  def _compute_fingerprint(self):
+    hasher = sha1()
+    hasher.update(self._filepath)
+    with open(self._filepath, 'rb') as f:
+      hasher.update(f.read())
+    return hasher.hexdigest()
+
+
+class TargetListField(PayloadField):
+
+  def __init__(self, targets):
+    self._targets = targets
+
+  def _compute_fingerprint(self):
+    hasher = sha1()
+    for target in sorted(self._targets):
+      hasher.update(target.compute_invalidation_hash())
+    return hasher.hexdigest()

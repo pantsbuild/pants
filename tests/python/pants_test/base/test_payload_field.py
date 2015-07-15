@@ -10,9 +10,10 @@ from hashlib import sha1
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      JarsField, PrimitiveField, PythonRequirementsField,
-                                      SourcesField)
+from pants.base.payload import Payload
+from pants.base.payload_field import (ExcludesField, FileField, FingerprintedField,
+                                      FingerprintedMixin, JarsField, PrimitiveField,
+                                      PythonRequirementsField, SourcesField, TargetListField)
 from pants_test.base_test import BaseTest
 
 
@@ -289,3 +290,28 @@ class PayloadTest(BaseTest):
 
     with self.assertRaises(NotImplementedError):
       FingerprintedField(TestUnimplementedValue()).fingerprint()
+
+  def test_file_field(self):
+    fp1 = FileField(self.create_file('foo/bar.config', contents='blah blah blah')).fingerprint()
+    fp2 = FileField(self.create_file('foo/bar.config', contents='meow meow meow')).fingerprint()
+    fp3 = FileField(self.create_file('spam/egg.config', contents='blah blah blah')).fingerprint()
+
+    self.assertNotEquals(fp1, fp2)
+    self.assertNotEquals(fp1, fp3)
+    self.assertNotEquals(fp2, fp3)
+
+  def test_target_list_field(self):
+    payloads = [Payload() for i in range(3)]
+    for i, p in enumerate(payloads):
+      p.add_field('foo', PrimitiveField(i))
+
+    t1 = self.make_target(':t1', payload=payloads[0])
+    t2 = self.make_target(':t2', payload=payloads[1])
+    t3 = self.make_target(':t3', payload=payloads[2])
+
+    fp1 = TargetListField([t1, t2]).fingerprint()
+    fp2 = TargetListField([t2, t1]).fingerprint()
+    fp3 = TargetListField([t1, t3]).fingerprint()
+
+    self.assertEquals(fp1, fp2)
+    self.assertNotEquals(fp1, fp3)
