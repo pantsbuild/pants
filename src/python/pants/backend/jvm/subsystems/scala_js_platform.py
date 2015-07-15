@@ -20,9 +20,6 @@ class ScalaJSPlatform(Subsystem):
     register('--runtime', advanced=True, type=Options.list, default=['//:scala-js-library'],
              help='Target specs pointing to the scala-js runtime libraries.')
 
-  def compiler_classpath(self, products):
-    return self.tool_classpath_from_products(products, 'scalac', scope=self.options_scope)
-
   @property
   def runtime(self):
     return self.get_options().runtime
