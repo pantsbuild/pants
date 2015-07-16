@@ -51,6 +51,9 @@ def create_options(options):
     def items(self):
       return options.items()
 
+    def registration_args_iter_for_scope(self, scope):
+      return []
+
     def __getitem__(self, key):
       return self.for_scope(key)
   return TestOptions()

@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+from textwrap import dedent
+
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
@@ -36,3 +39,48 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         # implying there was as a cache hit
         self.assertNotIn('abc_Checkstyle_compile_checkstyle will write to local artifact cache',
             pants_run.stdout_data)
+
+  def _create_config_file(self, filepath, rules_xml=''):
+    with open(filepath, 'w') as f:
+      f.write(dedent(
+        """<?xml version="1.0"?>
+           <!DOCTYPE module PUBLIC
+             "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
+             "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
+           <module name="Checker">
+             {rules_xml}
+           </module>""".format(rules_xml=rules_xml)))
+
+  @ensure_cached(expected_num_artifacts=2)
+  def test_config_invalidates_targets(self, cache_args):
+    with temporary_dir(root_dir=self.workdir_root()) as tmp:
+
+      tab_width_checker = os.path.join(tmp, 'tab_width_checker.xml')
+      self._create_config_file(tab_width_checker, dedent("""
+          <module name="TreeWalker">
+            <property name="tabWidth" value="2"/>
+          </module>
+        """))
+
+      line_length_checker = os.path.join(tmp, 'line_length_checker.xml')
+      self._create_config_file(line_length_checker, dedent("""
+          <module name="TreeWalker">
+            <module name="LineLength">
+              <property name="max" value="100"/>
+            </module>
+          </module>
+        """))
+
+      checkstyle_args = [
+        'clean-all',
+        'compile.checkstyle',
+        cache_args,
+        'examples/src/java/org/pantsbuild/example/hello/simple'
+      ]
+
+      with open(tab_width_checker, 'r') as f:
+        print(f.read())
+
+      for config in (tab_width_checker, line_length_checker):
+        pants_run = self.run_pants(checkstyle_args + ['--compile-checkstyle-configuration={}'.format(config)])
+        self.assert_success(pants_run)
