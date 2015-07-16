@@ -196,4 +196,4 @@ class PythonTask(Task):
       fingerprint_components.append(executable_file_content)
 
     fingerprint = hash_utils.hash_all(fingerprint_components)
-    return os.path.join(python_setup.chroot_cache_dir, fingerprint)
+    return os.path.join(self.chroot_cache_dir, fingerprint)

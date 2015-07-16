@@ -46,11 +46,11 @@ class PythonRepl(PythonTask):
 
       pex_info = PexInfo.default()
       pex_info.entry_point = entry_point
-      with self.temporary_chroot(interpreter=interpreter,
-                                 pex_info=pex_info,
-                                 targets=targets,
-                                 platforms=None,
-                                 extra_requirements=extra_requirements) as chroot:
+      with self.cached_chroot(interpreter=interpreter,
+                              pex_info=pex_info,
+                              targets=targets,
+                              platforms=None,
+                              extra_requirements=extra_requirements) as chroot:
         pex = chroot.pex()
         self.context.release_lock()
         with stty_utils.preserve_stty_settings():
