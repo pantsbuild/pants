@@ -22,7 +22,7 @@ class JvmToolMixin(object):
   _tool_keys = []  # List of (scope, key, main, custom_rule) tuples.
 
   @classmethod
-  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None):
+  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None, fingerprint=False):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
     Classpaths can be retrieved in `execute` scope via `tool_classpath`.
@@ -44,9 +44,10 @@ class JvmToolMixin(object):
     """
     register('--{0}'.format(key),
              advanced=True,
-             type=Options.list,
+             type=Options.target_list,
              default=default or ['//:{0}'.format(key)],
-             help='Target specs for bootstrapping the {0} tool.'.format(key))
+             help='Target specs for bootstrapping the {0} tool.'.format(key),
+             fingerprint=fingerprint)
 
     # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
     # These already have a main and are a natural place to house any custom shading rules.  That

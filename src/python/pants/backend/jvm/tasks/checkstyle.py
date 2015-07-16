@@ -39,7 +39,7 @@ class Checkstyle(NailgunTask):
                   'not intended for general use. ')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run checkstyle with these extra jvm options.')
-    cls.register_jvm_tool(register, 'checkstyle')
+    cls.register_jvm_tool(register, 'checkstyle', fingerprint=True)
 
   @classmethod
   def prepare(cls, options, round_manager):

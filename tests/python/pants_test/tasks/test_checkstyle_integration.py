@@ -84,3 +84,15 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
       for config in (tab_width_checker, line_length_checker):
         pants_run = self.run_pants(checkstyle_args + ['--compile-checkstyle-configuration={}'.format(config)])
         self.assert_success(pants_run)
+
+  @ensure_cached(expected_num_artifacts=2)
+  def test_jvm_tool_changes_invalidate_targets(self, cache_args):
+    for checkstyle_jar in ('//:checkstyle', 'testprojects/3rdparty/checkstyle', '//:checkstyle'):
+      args = [
+        'compile.checkstyle',
+        cache_args,
+        '--checkstyle=["{}"]'.format(checkstyle_jar),
+        'examples/src/java/org/pantsbuild/example/hello/simple'
+      ]
+      pants_run = self.run_pants(args)
+      self.assert_success(pants_run)
