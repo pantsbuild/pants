@@ -15,8 +15,9 @@ class LessC(ResourcePreprocessor, NpmModuleBase):
     on the lessc files speficed in the input target.
   """
 
-  MODULE_NAME = 'lessc'
+  # TODO Move this as advanced options so that this is configurable
   MODULE_VERSION = '1.5.1'
+  MODULE_NAME = 'lessc'
   MODULE_EXECUTABLE = os.path.join('bin', 'lessc')
 
   @classmethod

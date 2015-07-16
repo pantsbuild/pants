@@ -17,8 +17,9 @@ class RTL(ResourcePreprocessor, NpmModuleBase):
   """
 
   MODULE_NAME = 'R2'
-  MODULE_VERSION = '1.3.1'
   MODULE_EXECUTABLE = os.path.join('bin', 'r2')
+  # TODO Move this as advanced options so that this is configurable
+  MODULE_VERSION = '1.3.1'
 
   @classmethod
   def product_types(cls):

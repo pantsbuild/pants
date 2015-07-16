@@ -1,9 +1,8 @@
 python_tests(
-  name='resource-preprocessors',
+  name='integration',
   sources=globs('*.py'),
   dependencies=[
-    '3rdparty/python/pantsbuild/pants',
-    '3rdparty/python/twitter/common:collections',
-    '3rdparty/python/twitter/common:lang',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
   ]
 )

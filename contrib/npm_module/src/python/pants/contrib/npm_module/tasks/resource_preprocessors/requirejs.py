@@ -18,6 +18,7 @@ class RequireJS(ResourcePreprocessor, NpmModuleBase):
   """
 
   MODULE_NAME = 'requirejs'
+  # TODO Move this as advanced options so that this is configurable
   MODULE_VERSION = '2.1.9'
   MODULE_EXECUTABLE = os.path.join('bin', 'r.js')
 
