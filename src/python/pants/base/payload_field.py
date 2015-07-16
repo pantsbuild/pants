@@ -56,9 +56,8 @@ class PayloadField(AbstractClass):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
     pass
 
-  @abstractmethod
-  def _compute_fingerprint_with_context(self):
-    pass
+  def _compute_fingerprint_with_context(self, context):
+    return self._compute_fingerprint()
 
   @property
   def value(self):
@@ -308,6 +307,9 @@ class TargetListField(PayloadField):
 
   def __init__(self, target_specs):
     self._target_specs = target_specs
+
+  def _compute_fingerprint(self):
+    raise NotImplementedError
 
   def _compute_fingerprint_with_context(self, context):
     hasher = sha1()
