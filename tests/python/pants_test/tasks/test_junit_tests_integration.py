@@ -172,7 +172,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-  @unittest.skip("junit-runner-0.0.7 is not published yet")
   def test_junit_test_suppress_output_flag(self):
     pants_run = self.run_pants([
         'test.junit',
@@ -185,6 +184,14 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
       'test',
       'testprojects/tests/java/org/pantsbuild/testproject/workdirs/onedir',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_annotation_processor(self):
+    pants_run = self.run_pants([
+      'test',
+      '--compile-java-strategy=isolated',
+      'testprojects/tests/java/org/pantsbuild/testproject/annotation',
     ])
     self.assert_success(pants_run)
 
