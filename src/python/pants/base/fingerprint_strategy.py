@@ -60,7 +60,7 @@ class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStra
 class TaskIdentityFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def __init__(self, task):
-    self._task_fingerprint = task.payload.fingerprint() or ""
+    self._task_fingerprint = task.payload.fingerprint(context=task.context) or ""
 
   def compute_fingerprint(self, target):
     hasher = hashlib.sha1()

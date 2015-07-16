@@ -46,9 +46,18 @@ class PayloadField(AbstractClass):
       self._fingerprint_memo = self._compute_fingerprint()
     return self._fingerprint_memo
 
+  def fingerprint_with_context(self, context):
+    if self._fingerprint_memo is None:
+      self._fingerprint_memo = self._compute_fingerprint_with_context(context)
+    return self._fingerprint_memo
+
   @abstractmethod
   def _compute_fingerprint(self):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
+    pass
+
+  @abstractmethod
+  def _compute_fingerprint_with_context(self):
     pass
 
   @property
@@ -297,11 +306,12 @@ class FileField(PayloadField):
 
 class TargetListField(PayloadField):
 
-  def __init__(self, targets):
-    self._targets = targets
+  def __init__(self, target_specs):
+    self._target_specs = target_specs
 
-  def _compute_fingerprint(self):
+  def _compute_fingerprint_with_context(self, context):
     hasher = sha1()
-    for target in sorted(self._targets):
-      hasher.update(target.compute_invalidation_hash())
+    for spec in sorted(self._target_specs):
+      for target in sorted(context.resolve(spec)):
+        hasher.update(target.compute_invalidation_hash())
     return hasher.hexdigest()

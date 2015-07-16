@@ -17,8 +17,6 @@ from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
-from pants.base.payload import Payload
-from pants.base.payload_field import FileField, PrimitiveField, TargetListField
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
@@ -199,34 +197,10 @@ class TaskBase(Optionable, AbstractClass):
     """
     return self._workdir
 
-  def _create_payload(self):
-    payload = Payload()
-
-    options_iter = self.context.options.registration_args_iter_for_scope(self.options_scope)
-    for (name, _, kwargs) in options_iter:
-      if not kwargs.get('fingerprint', False):
-        continue
-
-      val = self.get_options()[name]
-      val_type = kwargs.get('type', '')
-      if val_type == Options.file:
-        field = FileField(val)
-      elif val_type == Options.target_list:
-        targets = []
-        for spec in val:
-          targets.extend(self.context.resolve(spec))
-        field = TargetListField(targets)
-      else:
-        field = PrimitiveField(val)
-      payload.add_field(name, field)
-
-    payload.freeze()
-    return payload
-
   @property
   def payload(self):
     if not self._payload:
-      self._payload = self._create_payload()
+      self._payload = self.context.options.payload_for_scope(self.options_scope)
     return self._payload
 
   def artifact_cache_reads_enabled(self):

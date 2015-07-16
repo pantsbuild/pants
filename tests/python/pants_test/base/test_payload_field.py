@@ -301,17 +301,19 @@ class PayloadTest(BaseTest):
     self.assertNotEquals(fp2, fp3)
 
   def test_target_list_field(self):
+    specs = [':t1', ':t2', ':t3']
     payloads = [Payload() for i in range(3)]
-    for i, p in enumerate(payloads):
+    for i, (s, p) in enumerate(zip(specs, payloads)):
       p.add_field('foo', PrimitiveField(i))
+      self.make_target(s, payload=p)
 
-    t1 = self.make_target(':t1', payload=payloads[0])
-    t2 = self.make_target(':t2', payload=payloads[1])
-    t3 = self.make_target(':t3', payload=payloads[2])
+    s1, s2, s3 = specs
 
-    fp1 = TargetListField([t1, t2]).fingerprint()
-    fp2 = TargetListField([t2, t1]).fingerprint()
-    fp3 = TargetListField([t1, t3]).fingerprint()
+    context = self.context()
+
+    fp1 = TargetListField([s1, s2]).fingerprint_with_context(context)
+    fp2 = TargetListField([s2, s1]).fingerprint_with_context(context)
+    fp3 = TargetListField([s1, s3]).fingerprint_with_context(context)
 
     self.assertEquals(fp1, fp2)
     self.assertNotEquals(fp1, fp3)

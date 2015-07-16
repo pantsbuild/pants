@@ -9,6 +9,8 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.base.payload import Payload
+from pants.base.payload_field import FileField, PrimitiveField, TargetListField
 from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -214,6 +216,26 @@ class Options(object):
     See `Parser.registration_args_iter` for details.
     """
     return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
+
+  def payload_for_scope(self, scope):
+    payload = Payload()
+
+    for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
+      if not kwargs.get('fingerprint', False):
+        continue
+
+      val = self.for_scope(scope)[name]
+      val_type = kwargs.get('type', '')
+      if val_type == Options.file:
+        field = FileField(val)
+      elif val_type == Options.target_list:
+        field = TargetListField(val)
+      else:
+        field = PrimitiveField(val)
+      payload.add_field(name, field)
+
+    payload.freeze()
+    return payload
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
