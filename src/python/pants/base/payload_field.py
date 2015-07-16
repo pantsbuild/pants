@@ -57,6 +57,10 @@ class PayloadField(AbstractClass):
     pass
 
   def _compute_fingerprint_with_context(self, context):
+    """Subclasses can override this method if they required a context when fingerprinting.
+
+    By default, the context is ignored.
+    """
     return self._compute_fingerprint()
 
   @property
