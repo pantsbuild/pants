@@ -25,6 +25,7 @@ from six.moves import range
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
+from pants.pantsd.process_manager import ProcessManager
 from pants.util.dirutil import safe_delete, safe_mkdir
 
 
@@ -323,20 +324,22 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def log_message(self, fmt, *args):
     """Silence BaseHTTPRequestHandler's logging."""
-    pass
 
 
 class ReportingServer(object):
-  # Reporting server settings.
-  #   info_dir: path to dir containing RunInfo files.
-  #   template_dir: location of mustache template files. If None, the templates
-  #                 embedded in our package are used.
-  #   assets_dir: location of assets (js, css etc.) If None, the assets
-  #               embedded in our package are used.
-  #   root: build root.
-  #   allowed_clients: list of ips or ['ALL'].
+  """Reporting server settings.
+
+     info_dir: path to dir containing RunInfo files.
+     template_dir: location of mustache template files. If None, the templates
+                   embedded in our package are used.
+     assets_dir: location of assets (js, css etc.) If None, the assets
+                 embedded in our package are used.
+     root: build root.
+     allowed_clients: list of ips or ['ALL'].
+  """
+
   Settings = namedtuple('Settings',
-    ['info_dir', 'template_dir', 'assets_dir', 'root', 'allowed_clients'])
+                        ['info_dir', 'template_dir', 'assets_dir', 'root', 'allowed_clients'])
 
   def __init__(self, port, settings):
     renderer = MustacheRenderer(settings.template_dir, __name__)
@@ -354,62 +357,28 @@ class ReportingServer(object):
   def start(self):
     self._httpd.serve_forever()
 
-# TODO(Eric Ayers) We should probably look into unifying this and the nailgun mechanism into
-# some sort of "run a daemon" lib, at some point.
-class ReportingServerManager(object):
-  @staticmethod
-  def _get_pidfile_dir():
-    return os.path.join(get_buildroot(), '.pids', 'daemon')
 
-  @staticmethod
-  def save_current_server_port(port):
-    """Save the port of the currently-running server, so we can find it across pants runs."""
-    # We don't put the pidfile in .pants.d, because we want to find it even after a clean.
-    # NOTE: If changing this dir/file name, also change get_current_server_info
-    # appropriately.
-    # TODO: Generalize the pidfile idiom into some central library.
-    pidfile_dir = ReportingServerManager._get_pidfile_dir()
-    safe_mkdir(pidfile_dir)
-    pidfile = os.path.join(pidfile_dir, 'port_{0}.pid'.format(port))
-    with open(pidfile, 'w') as outfile:
-      outfile.write(str(os.getpid()))
+class ReportingServerManager(ProcessManager):
+  def __init__(self, context=None, options=None):
+    ProcessManager.__init__(self, name='reporting_server')
+    self.context = context
+    self.options = options
 
-  @staticmethod
-  def get_current_server_pid_and_port():
-    """Returns the (pid, port) of the currently-running server, or (None, None) if no server is detected."""
-    info = ReportingServerManager.get_current_server_info()
-    # There should only be one pidfile, but in case there are many due to error,
-    # pick the first one.
-    return (info[0][1], info[0][2]) if info else (None, None)
+  def post_fork_child(self):
+    """Post-fork() child callback for ProcessManager.daemonize()."""
+    # The server finds run-specific info dirs by looking at the subdirectories of info_dir,
+    # which is conveniently and obviously the parent dir of the current run's info dir.
+    info_dir = os.path.dirname(self.context.run_tracker.run_info_dir)
 
-  @staticmethod
-  def get_current_server_info():
-    """Returns a list of tuples (pidfile, pid, port) of all found pidfiles."""
+    settings = ReportingServer.Settings(info_dir=info_dir,
+                                        root=get_buildroot(),
+                                        template_dir=self.options.template_dir,
+                                        assets_dir=self.options.assets_dir,
+                                        allowed_clients=self.options.allowed_clients)
 
-    def pid_from_pidfile(pid_filename):
-      with open(pid_filename) as pidfile:
-        pid = pidfile.readline().strip()
-        return int(pid)
+    server = ReportingServer(self.options.port, settings)
 
-    def is_active_pidfile(pid_filename):
-      pid = pid_from_pidfile(pid_filename)
-      if not psutil.pid_exists(pid):
-        logger.info("Pid {pid} not active. Deleting stale pidfile: {pid_filename}"
-                    .format(pid=pid, pid_filename=pid_filename))
-        safe_delete(pid_filename)
-        return False
-      return True
+    self.write_socket(server.server_port())
 
-    pidfile_dir = ReportingServerManager._get_pidfile_dir()
-    # There should only be one pidfile, but there may be errors/race conditions where
-    # there are multiple of them.
-    pidfile_names = os.listdir(pidfile_dir) if os.path.exists(pidfile_dir) else []
-    ret = []
-    for pidfile_name in pidfile_names:
-      m = re.match(r'port_(\d+)\.pid', pidfile_name)
-      if m is not None:
-        pid_filename = os.path.join(pidfile_dir, pidfile_name)
-        port = int(m.group(1))
-        if is_active_pidfile(pid_filename):
-          ret.append((pid_filename, pid_from_pidfile(pid_filename), port))
-    return ret
+    # Block forever.
+    server.start()

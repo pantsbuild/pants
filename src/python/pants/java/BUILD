@@ -30,6 +30,7 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/pantsd:process_manager',
     'src/python/pants/util:dirutil',
   ],
 )

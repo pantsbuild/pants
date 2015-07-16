@@ -71,7 +71,7 @@ class Reporting(Subsystem):
 
     # Add some useful RunInfo.
     run_tracker.run_info.add_info('default_report', html_reporter.report_path())
-    (_, port) = ReportingServerManager.get_current_server_pid_and_port()
+    port = ReportingServerManager().socket
     if port:
       run_tracker.run_info.add_info('report_url', 'http://localhost:{}/run/{}'.format(port, run_id))
 
