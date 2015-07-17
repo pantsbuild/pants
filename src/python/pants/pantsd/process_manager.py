@@ -131,12 +131,12 @@ class ProcessManager(object):
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
     self._wait_for_file(self.get_pid_path(), timeout)
-    return self._read_file(self.get_pid_path())
+    return self.get_pid()
 
   def await_socket(self, timeout):
     """Wait up to a given timeout for a process to write socket info."""
     self._wait_for_file(self.get_socket_path(), timeout)
-    return self._read_file(self.get_socket_path())
+    return self.get_socket()
 
   def get_metadata_dir(self):
     """Return a deterministic, relative metadata path for the process.
@@ -144,9 +144,6 @@ class ProcessManager(object):
        This should always live outside of the .pants.d dir to survive a clean-all.
     """
     return os.path.join(self._buildroot, '.pids', self._name)
-
-  def _maybe_init_metadata_dir(self):
-    safe_mkdir(self.get_metadata_dir())
 
   def _purge_metadata(self):
     assert not self.is_alive(), 'aborting attempt to purge metadata for a running process!'
@@ -166,6 +163,9 @@ class ProcessManager(object):
   def get_socket_path(self):
     """Return the path to the file containing the processes socket."""
     return os.path.join(self.get_metadata_dir(), 'socket')
+
+  def _maybe_init_metadata_dir(self):
+    safe_mkdir(self.get_metadata_dir())
 
   def write_pid(self, pid):
     """Write the current processes PID to the pidfile location"""
@@ -200,18 +200,19 @@ class ProcessManager(object):
     """Send a signal to the current process."""
     os.kill(self.pid, kill_sig)
 
-  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT):
+  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
-    for signal_type in signal_chain:
-      if not self.is_alive():
-        self._purge_metadata()
-        return
-
-      self.kill(signal_type)
-      time.sleep(kill_wait)
-
     if self.is_alive():
-      raise self.NonResponsiveProcess('failed to kill pid {pid} with signal chain {chain}'
+      for signal_type in signal_chain:
+        self.kill(signal_type)
+        time.sleep(kill_wait)
+        if not self.is_alive():
+          break
+
+    if not self.is_alive():
+      if purge: self._purge_metadata()
+    else:
+      raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
   def monitor(self):
@@ -221,7 +222,7 @@ class ProcessManager(object):
   def _open_process(self, *args, **kwargs):
     return subprocess.Popen(*args, **kwargs)
 
-  def run(self, *args, **kwargs):
+  def run_subprocess(self, *args, **kwargs):
     """Synchronously run a subprocess."""
     return self._open_process(*args, **kwargs)
 
