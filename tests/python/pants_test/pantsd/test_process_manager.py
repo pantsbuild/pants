@@ -14,6 +14,7 @@ from pants.pantsd.process_manager import ProcessGroup, ProcessManager
 from pants.util.contextutil import temporary_dir
 
 import mock
+import psutil
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -27,14 +28,8 @@ class TestProcessGroup(unittest.TestCase):
     self.pg = ProcessGroup('test')
 
   def test_psutil_safe_access(self):
-    target_exc = self.pg.PSUTIL_STD_EXCEPTIONS[0]
-
     with self.pg._psutil_safe_access():
-      raise target_exc()            # Should swallow this.
-
-    with self.assertRaises(target_exc):
-      with self.pg._psutil_safe_access(mask_exc=False):
-        raise target_exc()
+      raise psutil.NoSuchProcess('test')
 
   def test_iter_processes(self):
     with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
@@ -93,7 +88,7 @@ class TestProcessManager(unittest.TestCase):
   def test_wait_for_file_timeout(self):
     with temporary_dir() as td:
       with self.assertRaises(self.pm.Timeout):
-        self.pm._wait_for_file('non_existent_file', timeout=.1)
+        self.pm._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
 
   def test_await_pid(self):
     with temporary_dir() as td:
@@ -181,7 +176,7 @@ class TestProcessManager(unittest.TestCase):
 
   def test_terminate(self):
     with mock.patch('psutil.pid_exists', **PATCH_OPTS) as mock_exists:
-      with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
+      with mock.patch('os.kill', **PATCH_OPTS):
         mock_exists.return_value = True
         with self.assertRaises(self.pm.NonResponsiveProcess):
           self.pm.terminate(kill_wait=.1, purge=False)

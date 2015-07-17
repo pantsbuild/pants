@@ -25,26 +25,24 @@ logger = logging.getLogger(__name__)
 class ProcessGroup(object):
   """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
 
-  PSUTIL_STD_EXCEPTIONS = (psutil.AccessDenied, psutil.NoSuchProcess)
-
   def __init__(self, name):
     self._name = name
 
   @contextmanager
-  def _psutil_safe_access(self, exceptions=PSUTIL_STD_EXCEPTIONS, mask_exc=True):
+  def _psutil_safe_access(self):
     """A contextmanager that traps standard psutil access exceptions."""
     try:
       yield
-    except exceptions:
-      if not mask_exc: raise
+    except (psutil.AccessDenied, psutil.NoSuchProcess):
+      pass
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
     return ProcessManager(name=process.cmdline[0], pid=process.pid, process_name=process.cmdline[0])
 
-  def iter_processes(self, proc_filter=None, mask_exc=True):
+  def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
-    with self._psutil_safe_access(mask_exc=mask_exc):
+    with self._psutil_safe_access():
       for proc in (x for x in psutil.process_iter() if proc_filter(x)):
         yield proc
 
@@ -286,10 +284,13 @@ class ProcessManager(object):
         logging.critical(traceback.format_exc())
 
   def pre_fork(self):
-    """Pre-fork callback for subclasses. No-op otherwise."""
+    """Pre-fork callback for subclasses."""
+    pass
 
   def post_fork_child(self):
-    """Pre-fork child callback for subclasses. No-op otherwise."""
+    """Pre-fork child callback for subclasses."""
+    pass
 
   def post_fork_parent(self):
-    """Post-fork parent callback for subclasses. No-op otherwise."""
+    """Post-fork parent callback for subclasses."""
+    pass

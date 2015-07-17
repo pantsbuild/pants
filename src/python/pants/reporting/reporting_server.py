@@ -327,19 +327,20 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 class ReportingServer(object):
-  """Reporting server settings.
+  """Reporting Server HTTP server."""
 
-     info_dir: path to dir containing RunInfo files.
-     template_dir: location of mustache template files. If None, the templates
+  class Settings(namedtuple('Settings', ['info_dir', 'template_dir', 'assets_dir', 'root',
+                                         'allowed_clients'])):
+    """Reporting server settings.
+
+       info_dir: path to dir containing RunInfo files.
+       template_dir: location of mustache template files. If None, the templates
+                     embedded in our package are used.
+       assets_dir: location of assets (js, css etc.) If None, the assets
                    embedded in our package are used.
-     assets_dir: location of assets (js, css etc.) If None, the assets
-                 embedded in our package are used.
-     root: build root.
-     allowed_clients: list of ips or ['ALL'].
-  """
-
-  Settings = namedtuple('Settings',
-                        ['info_dir', 'template_dir', 'assets_dir', 'root', 'allowed_clients'])
+       root: build root.
+       allowed_clients: list of ips or ['ALL'].
+    """
 
   def __init__(self, port, settings):
     renderer = MustacheRenderer(settings.template_dir, __name__)

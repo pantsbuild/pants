@@ -20,7 +20,6 @@ from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import ProcessGroup, ProcessManager
 from pants.util.dirutil import safe_open
 
-import psutil
 from six import string_types
 from twitter.common.collections import maybe_list
 
