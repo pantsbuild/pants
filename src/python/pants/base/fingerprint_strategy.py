@@ -65,6 +65,6 @@ class TaskIdentityFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
 
   def compute_fingerprint(self, target):
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint())
-    hasher.update(self._task.identity or "")
+    hasher.update(target.payload.fingerprint() or '')
+    hasher.update(self._task.identity or '')
     return hasher.hexdigest()

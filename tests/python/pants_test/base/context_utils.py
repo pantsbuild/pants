@@ -11,6 +11,7 @@ from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
 
+from pants.base.payload import Payload
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.goal.context import Context
@@ -53,6 +54,9 @@ def create_options(options):
 
     def registration_args_iter_for_scope(self, scope):
       return []
+
+    def payload_for_scope(self, scope):
+      return Payload()
 
     def __getitem__(self, key):
       return self.for_scope(key)
