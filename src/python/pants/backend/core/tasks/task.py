@@ -176,7 +176,7 @@ class TaskBase(Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
-    self._payload = None
+    self._fingerprint = None
 
   def get_options(self):
     """Returns the option values for this task's scope."""
@@ -198,10 +198,17 @@ class TaskBase(Optionable, AbstractClass):
     return self._workdir
 
   @property
-  def payload(self):
-    if not self._payload:
-      self._payload = self.context.options.payload_for_scope(self.options_scope)
-    return self._payload
+  def identity(self):
+    """Returns a fingerprint for the identity of the task.
+
+    A task identity is composed of the options the task is currently running under.
+    Useful for invalidating unchanging targets being executed beneath changing task
+    options that affect outputted artifacts.
+    """
+    if not self._fingerprint:
+      payload = self.context.options.payload_for_scope(self.options_scope)
+      self._fingerprint = payload.fingerprint(context=self.context)
+    return self._fingerprint
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()

@@ -295,6 +295,7 @@ class PrimitiveField(PayloadField):
 
 
 class FileField(PayloadField):
+  """A field that represents the contents of an individual file."""
 
   def __init__(self, filepath):
     self._filepath = filepath
@@ -308,7 +309,11 @@ class FileField(PayloadField):
 
 
 class TargetListField(PayloadField):
+  """A field that represents a list of targets.
 
+  The fingerprint of a TargetListField is the combined fingerprints of the
+  resolved target specs.
+  """
   def __init__(self, target_specs):
     self._target_specs = target_specs
 

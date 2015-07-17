@@ -218,12 +218,11 @@ class Options(object):
     return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
 
   def payload_for_scope(self, scope):
+    """Returns a payload representing the options for the given scope."""
     payload = Payload()
-
     for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
       if not kwargs.get('fingerprint', False):
         continue
-
       val = self.for_scope(scope)[name]
       val_type = kwargs.get('type', '')
       if val_type == Options.file:
@@ -233,7 +232,6 @@ class Options(object):
       else:
         field = PrimitiveField(val)
       payload.add_field(name, field)
-
     payload.freeze()
     return payload
 

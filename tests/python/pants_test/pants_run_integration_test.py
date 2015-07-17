@@ -22,6 +22,14 @@ PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data',
 
 
 def ensure_cached(expected_num_artifacts=None):
+  """Decorator for asserting cache writes in an integration test.
+
+  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
+  :param expected_num_artifacts: Expected number of artifacts to be in the task's
+                                 cache after running the test. If unspecified, will
+                                 assert that the number of artifacts in the cache is
+                                 non-zero.
+  """
   def decorator(test_fn):
     def wrapper(self, *args, **kwargs):
       with temporary_dir() as artifact_cache:
