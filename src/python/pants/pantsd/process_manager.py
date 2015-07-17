@@ -139,7 +139,7 @@ class ProcessManager(object):
     return self.get_socket()
 
   def get_metadata_dir(self):
-    """Return a deterministic, relative metadata path for the process.
+    """Return a metadata path for the process.
 
        This should always live outside of the .pants.d dir to survive a clean-all.
     """

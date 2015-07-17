@@ -15,9 +15,7 @@ python_tests(
   dependencies = [
     'src/python/pants/pantsd:process_manager',
     'tests/python/pants_test:base_test',
-    # 'src/python/pants/util:contextutil',
-    # 'src/python/pants/util:fileutil',
     '3rdparty/python:mock',
-    '3rdparty/python:pytest',
+    '3rdparty/python:pytest'
   ]
 )
