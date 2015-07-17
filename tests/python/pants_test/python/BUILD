@@ -86,8 +86,11 @@ python_tests(
   sources = ['test_interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:mock',
+    '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
+    'src/python/pants/backend/python:python_setup',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/base:context_utils',
   ],
 )
 
