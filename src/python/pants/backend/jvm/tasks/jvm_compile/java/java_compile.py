@@ -60,6 +60,10 @@ class JavaCompile(JvmCompile):
             '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*')
 
   @classmethod
+  def fingerprint_args(cls):
+    return False
+
+  @classmethod
   def get_warning_args_default(cls):
     return ('-C-Xlint:all',   '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
 
