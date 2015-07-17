@@ -70,9 +70,10 @@ class JavaCompile(JvmCompile):
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
     register('--source', help='Provide source compatibility with this release.', advanced=True)
-    register('--target', help='Generate class files for this JVM version.', advanced=True)
+    register('--target', help='Generate class files for this JVM version.',
+             advanced=True, fingerprint=True)
     cls.register_jvm_tool(register, 'jmake')
-    cls.register_jvm_tool(register, 'java-compiler')
+    cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
@@ -93,11 +94,6 @@ class JavaCompile(JvmCompile):
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
-
-  # Make the java target language version part of the cache key hash,
-  # this ensures we invalidate if someone builds against a different version.
-  def _language_platform_version_info(self):
-    return [self.get_options().target] if self.get_options().target else []
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)

@@ -28,6 +28,7 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
         workdir, 'examples/src/java/org/pantsbuild/example/hello/main', strategy,
         extra_args=['--compile-zinc-java-enabled', '-ldebug'], clean_all=True
       )
+      print(pants_run.stdout_data)
       self.assertIn('Attempting to call com.sun.tools.javac.api.JavacTool', pants_run.stdout_data)
       self.assertNotIn('Forking javac', pants_run.stdout_data)
 

@@ -45,7 +45,7 @@ class JvmToolMixin(object):
     register('--{0}'.format(key),
              advanced=True,
              type=Options.target_list,
-             default=default or ['//:{0}'.format(key)],
+             default=['//:{0}'.format(key)] if default is None else default,
              help='Target specs for bootstrapping the {0} tool.'.format(key),
              fingerprint=fingerprint)
 
