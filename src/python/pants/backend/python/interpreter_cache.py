@@ -9,7 +9,7 @@ import os
 import shutil
 
 from pex.interpreter import PythonIdentity, PythonInterpreter
-from pex.package import Package
+from pex.package import EggPackage, Package, SourcePackage, WheelPackage
 from pex.resolver import resolve
 
 from pants.util.dirutil import safe_concurrent_create, safe_mkdir
@@ -170,13 +170,31 @@ class PythonInterpreterCache(object):
       if bdist.satisfies(requirement):
         return bdist
 
-    # We accept the default `precedence` of WheelPackage, EggPackage, SourcePackage here.
-    distributions = resolve(requirements=[requirement],
-                            fetchers=self._python_repos.get_fetchers(),
-                            interpreter=interpreter,
-                            context=self._python_repos.get_network_context(),
-                            cache=self._python_setup.resolver_cache_dir,
-                            cache_ttl=self._python_setup.resolver_cache_ttl)
+    def do_resolve(*precedence):
+      return resolve(requirements=[requirement],
+                     fetchers=self._python_repos.get_fetchers(),
+                     interpreter=interpreter,
+                     context=self._python_repos.get_network_context(),
+                     precedence=precedence,
+                     cache=self._python_setup.resolver_cache_dir,
+                     cache_ttl=self._python_setup.resolver_cache_ttl)
+
+    # TODO(John Sirois): This resolve setup achieves the following logic:
+    #   When resolving, prefer wheels to eggs to sdists, and if an sdist is all that's available,
+    #   then build it as an egg.
+    #
+    # Currently resolve uses the precedence both for precedence purposes and to determine the bdist
+    # translator to pick for sdists.  It's the latter part of the overload that's getting in the
+    # way here and forcing and odd `do_resolve or do_resolve`.  With a single call and precedence
+    # of `WheelPackage, EggPackage, SourcePackage`, sdists get built by the most-preferred
+    # packager; ie: WheelPackage.  This fails systemically when wheel itself is not setup for the
+    # interpreter, and half of this method's job is to setup wheel for the interpreter!
+    #
+    # The TODO is to come up with a better API proposal for pex here that we can consume that
+    # allows for a more sane single resolve call that uses a fetch precedence order seperate from a
+    # translator precedence order, or else tries all available translators in precedence order
+    # before giving up.
+    distributions = do_resolve(WheelPackage, EggPackage) or do_resolve(EggPackage, SourcePackage)
     if not distributions:
       return None
 
