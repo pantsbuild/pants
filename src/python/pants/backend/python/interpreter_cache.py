@@ -9,7 +9,7 @@ import os
 import shutil
 
 from pex.interpreter import PythonIdentity, PythonInterpreter
-from pex.package import EggPackage, Package, SourcePackage, WheelPackage
+from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 
 from pants.util.dirutil import safe_concurrent_create, safe_mkdir
