@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 class NailgunProcessGroup(ProcessGroup):
+  _NAILGUN_KILL_LOCK = threading.Lock()
+
   def __init__(self):
     ProcessGroup.__init__(self, name='nailgun')
     # TODO: this should enumerate the .pids dir first, then fallback to ps enumeration (& warn).
@@ -38,8 +40,7 @@ class NailgunProcessGroup(ProcessGroup):
         if not everywhere:
           return NailgunExecutor._PANTS_NG_ARG in proc.cmdline
         else:
-          return any(filter(lambda arg: arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX),
-                            proc.cmdline))
+          return any(arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX) for arg in proc.cmdline)
 
     return self.iter_instances(predicate)
 
@@ -50,9 +51,10 @@ class NailgunProcessGroup(ProcessGroup):
                                otherwise restricts the nailguns killed to those started for the
                                current build root.
     """
-    for proc in self._iter_nailgun_instances(everywhere):
-      logger.info('killing nailgun server pid={pid}'.format(pid=proc.pid))
-      proc.terminate()
+    with self._NAILGUN_KILL_LOCK:
+      for proc in self._iter_nailgun_instances(everywhere):
+        logger.info('killing nailgun server pid={pid}'.format(pid=proc.pid))
+        proc.terminate()
 
 
 # TODO: Once we integrate standard logging into our reporting framework, we can consider making
@@ -74,6 +76,7 @@ class NailgunExecutor(Executor, ProcessManager):
   _PANTS_NG_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
+  _SELECT_WAIT = 1
 
   def __init__(self, identity, workdir, nailgun_classpath, distribution=None, ins=None,
                connect_timeout=10, connect_attempts=5):
@@ -170,7 +173,7 @@ class NailgunExecutor(Executor, ProcessManager):
       running, updated = self._check_nailgun_state(new_fingerprint)
 
       if running and updated:
-        logger.debug('Killing ng server {server}'.format(server=repr(self)))
+        logger.debug('Killing ng server {server!r}'.format(server=self))
         self.terminate()
 
       if (not running) or (running and updated):
@@ -183,7 +186,7 @@ class NailgunExecutor(Executor, ProcessManager):
     with safe_open(self._ng_stdout, 'r') as ng_stdout:
       start_time = time.time()
       while 1:
-        readable, _, _ = select.select([ng_stdout], [], [], 1)
+        readable, _, _ = select.select([ng_stdout], [], [], self._SELECT_WAIT)
         if readable:
           line = ng_stdout.readline()                          # TODO: address deadlock risk here.
           try:
@@ -210,7 +213,7 @@ class NailgunExecutor(Executor, ProcessManager):
       try:
         sock = nailgun.try_connect()
         if sock:
-          logger.debug('Connected to ng server {server}'.format(server=repr(self)))
+          logger.debug('Connected to ng server {server!r}'.format(server=self))
           return
       finally:
         sock.close()

@@ -27,8 +27,8 @@ class TestProcessGroup(unittest.TestCase):
   def setUp(self):
     self.pg = ProcessGroup('test')
 
-  def test_psutil_safe_access(self):
-    with self.pg._psutil_safe_access():
+  def test_swallow_psutil_exceptions(self):
+    with self.pg._swallow_psutil_exceptions():
       raise psutil.NoSuchProcess('test')
 
   def test_iter_processes(self):

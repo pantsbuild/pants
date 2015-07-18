@@ -29,11 +29,13 @@ class ProcessGroup(object):
     self._name = name
 
   @contextmanager
-  def _psutil_safe_access(self):
-    """A contextmanager that traps standard psutil access exceptions."""
+  def _swallow_psutil_exceptions(self):
+    """A contextmanager that swallows standard psutil access exceptions."""
     try:
       yield
     except (psutil.AccessDenied, psutil.NoSuchProcess):
+      # This masks common, but usually benign psutil process access exceptions that might be seen
+      # when accessing attributes/methods on psutil.Process objects.
       pass
 
   def _instance_from_process(self, process):
@@ -42,7 +44,7 @@ class ProcessGroup(object):
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
-    with self._psutil_safe_access():
+    with self._swallow_psutil_exceptions():
       for proc in (x for x in psutil.process_iter() if proc_filter(x)):
         yield proc
 
@@ -52,7 +54,7 @@ class ProcessGroup(object):
 
 
 class ProcessManager(object):
-  """Subprocess/daemon management mixin/superclass."""
+  """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
@@ -202,7 +204,11 @@ class ProcessManager(object):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
     if self.is_alive():
       for signal_type in signal_chain:
-        self.kill(signal_type)
+        try:
+          self.kill(signal_type)
+        except OSError as e:
+          logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
+                         .format(e=e, signal=signal_type, pid=self.pid))
         time.sleep(kill_wait)
         if not self.is_alive():
           break
