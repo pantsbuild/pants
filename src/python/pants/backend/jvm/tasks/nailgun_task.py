@@ -13,23 +13,11 @@ from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.distribution.distribution import Distribution
 from pants.java.executor import SubprocessExecutor
-from pants.java.nailgun_executor import NailgunExecutor
+from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
-
-  @staticmethod
-  def killall(everywhere=False):
-    """Kills all nailgun servers launched by pants in the current repo.
-
-    Returns ``True`` if all nailguns were successfully killed, ``False`` otherwise.
-
-    :param bool everywhere: ``True`` to kill all nailguns servers launched by pants on this machine
-    """
-    if not NailgunExecutor.killall:
-      return False
-    else:
-      return NailgunExecutor.killall(everywhere=everywhere)
+  ID_PREFIX = 'ng'
 
   @classmethod
   def register_options(cls, register):
@@ -37,12 +25,18 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     cls.register_jvm_tool(register, 'nailgun-server')
     register('--use-nailgun', action='store_true', default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
+    register('--nailgun-timeout-seconds', default=10, help='Timeout (secs) for nailgun startup.')
+    register('--nailgun-connect-attempts', default=5, help='Max attempts for nailgun connects.')
 
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
+
+    id_tuple = (self.ID_PREFIX, self.__class__.__name__)
+
+    self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
-                                          'ng', self.__class__.__name__)
-    self.set_distribution()  # Use default until told otherwise.
+                                          *id_tuple)
+    self.set_distribution()    # Use default until told otherwise.
     # TODO: Choose default distribution based on options.
 
   def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
@@ -52,21 +46,21 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     except Distribution.Error as e:
       raise TaskError(e)
 
-  @property
-  def nailgun_is_enabled(self):
-    return self.get_options().use_nailgun
-
   def create_java_executor(self):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
-    if self.nailgun_is_enabled:
+    if self.get_options().use_nailgun:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
-      client = NailgunExecutor(self._executor_workdir, classpath, distribution=self._dist)
+      return NailgunExecutor(self._identity,
+                             self._executor_workdir,
+                             classpath,
+                             self._dist,
+                             connect_timeout=self.get_options().nailgun_timeout_seconds,
+                             connect_attempts=self.get_options().nailgun_connect_attempts)
     else:
-      client = SubprocessExecutor(self._dist)
-    return client
+      return SubprocessExecutor(self._dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
               workunit_labels=None):
@@ -90,9 +84,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
       raise TaskError(e)
 
 
-class NailgunTask(NailgunTaskBase, Task):
-  # TODO(John Sirois): This just prevents ripple - maybe inline
-  pass
+# TODO(John Sirois): This just prevents ripple - maybe inline
+class NailgunTask(NailgunTaskBase, Task): pass
 
 
 class NailgunKillall(Task):
@@ -104,4 +97,4 @@ class NailgunKillall(Task):
              help='Kill all nailguns servers launched by pants for all workspaces on the system.')
 
   def execute(self):
-    NailgunTaskBase.killall(everywhere=self.get_options().everywhere)
+    NailgunProcessGroup().killall(everywhere=self.get_options().everywhere)
