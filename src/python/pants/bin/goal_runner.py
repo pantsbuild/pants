@@ -11,7 +11,6 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -25,6 +24,7 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
@@ -231,7 +231,7 @@ class GoalRunner(object):
         # TODO: This is JVM-specific and really doesn't belong here.
         # TODO: Make this more selective? Only kill nailguns that affect state?
         # E.g., checkstyle may not need to be killed.
-        NailgunTask.killall()
+        NailgunProcessGroup().killall()
     return result
 
   def _do_run(self):

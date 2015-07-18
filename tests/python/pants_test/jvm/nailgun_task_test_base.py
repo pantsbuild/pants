@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunProcessGroup
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -17,5 +17,5 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
 
   @classmethod
   def tearDownClass(cls):
-    # Kill any nailguns launched in our ephemeral build root
-    NailgunTask.killall()
+    # Kill any nailguns launched in our ephemeral build root.
+    NailgunProcessGroup().killall()
