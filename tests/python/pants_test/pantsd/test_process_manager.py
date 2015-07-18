@@ -221,7 +221,7 @@ class TestProcessManager(unittest.TestCase):
   @mock.patch('os.setsid', **PATCH_OPTS)
   def test_daemon_spawn_parent(self, *args):
     with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
-      mock_fork.return_value = 1    # Simulate the parent.
+      mock_fork.return_value = 1     # Simulate the parent.
       self.pm.daemon_spawn()
 
   @mock.patch('os.umask', **PATCH_OPTS)
@@ -230,5 +230,5 @@ class TestProcessManager(unittest.TestCase):
   @mock.patch('os.setsid', **PATCH_OPTS)
   def test_daemon_spawn_child(self, *args):
     with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
-      mock_fork.return_value = 0    # Simulate the child.
+      mock_fork.return_value = 0     # Simulate the child.
       self.pm.daemon_spawn()
