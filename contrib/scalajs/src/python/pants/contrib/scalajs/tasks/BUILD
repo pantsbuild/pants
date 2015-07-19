@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'scala_js_link',
-  sources = ['scala_js_link.py'],
+  name = 'tasks',
   dependencies = [
-    ':nailgun_task',
+    'contrib/scalajs/src/python/pants/contrib/scalajs/targets',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/tasks/jvm_compile:scala',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
   ],
+  sources = globs('*'),
 )
