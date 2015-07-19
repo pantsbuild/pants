@@ -41,12 +41,3 @@ python_library(
     'src/python/pants/subsystem',
   ],
 )
-
-python_library(
-  name = 'scala_js_platform',
-  sources = ['scala_js_platform.py'],
-  dependencies = [
-    'src/python/pants/option',
-    'src/python/pants/subsystem',
-  ],
-)

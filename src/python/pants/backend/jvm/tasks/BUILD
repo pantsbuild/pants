@@ -377,15 +377,6 @@ python_library(
 )
 
 python_library(
-  name = 'scala_js_link',
-  sources = ['scala_js_link.py'],
-  dependencies = [
-    ':nailgun_task',
-    'src/python/pants/backend/core/tasks:task',
-  ],
-)
-
-python_library(
   name = 'scala_repl',
   sources = ['scala_repl.py'],
   dependencies = [

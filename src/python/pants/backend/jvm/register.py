@@ -21,8 +21,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
-from pants.backend.jvm.targets.scala_js_binary import ScalaJSBinary
-from pants.backend.jvm.targets.scala_js_library import ScalaJSLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
@@ -41,13 +39,11 @@ from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCompile,
-                                                                     ScalaJSZincCompile,
                                                                      ScalaZincCompile)
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
-from pants.backend.jvm.tasks.scala_js_link import ScalaJSLink
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
@@ -69,8 +65,6 @@ def build_file_aliases():
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
-      'scala_js_binary': ScalaJSBinary,
-      'scala_js_library': ScalaJSLibrary,
       'scala_library': ScalaLibrary,
       'scalac_plugin': ScalacPlugin,
       'unpacked_jars' : UnpackedJars,
@@ -134,7 +128,6 @@ def register_goals():
   # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
   # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
   # systemic compile errors.
-  jvm_compile.add_member(ScalaJSZincCompile)
   jvm_compile.add_member(ScalaZincCompile)
 
   # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
@@ -145,9 +138,6 @@ def register_goals():
   jvm_compile.add_member(JavaCompile)
 
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
-
-  # Link ScalaJS IR into Javascript.
-  task(name='scala-js', action=ScalaJSLink).install('link').with_description('Link intermediate outputs.')
 
   # Generate documentation.
   task(name='javadoc', action=JavadocGen).install('doc').with_description('Create documentation.')
