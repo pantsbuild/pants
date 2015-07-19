@@ -405,11 +405,11 @@ class PytestRun(PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
-    with self.temporary_chroot(interpreter=interpreter,
-                               pex_info=pex_info,
-                               targets=targets,
-                               platforms=('current',),
-                               extra_requirements=self._TESTING_TARGETS) as chroot:
+    with self.cached_chroot(interpreter=interpreter,
+                            pex_info=pex_info,
+                            targets=targets,
+                            platforms=('current',),
+                            extra_requirements=self._TESTING_TARGETS) as chroot:
       pex = chroot.pex()
       with self._maybe_shard() as shard_args:
         with self._maybe_emit_junit_xml(targets) as junit_args:

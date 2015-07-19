@@ -343,13 +343,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       target = compile_context.target
       classes_dir = compile_context.classes_dir
 
-      def add_products_by_target(classes):
-        classes_by_target[target].add_abs_paths(classes_dir, classes)
-        for cls in classes:
-          clsname = self._strategy.class_name_for_class_file(compile_context, cls)
+      def add_products_by_target(files):
+        for f in files:
+          clsname = self._strategy.class_name_for_class_file(compile_context, f)
           if clsname:
+            # Is a class.
+            classes_by_target[target].add_abs_paths(classes_dir, [f])
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
+          else:
+            # Is a resource.
+            resources_by_target[target].add_abs_paths(classes_dir, [f])
 
       # Collect classfiles (absolute) that were claimed by sources (relative)
       for source in compile_context.sources:

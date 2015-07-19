@@ -14,7 +14,6 @@ from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir
 from pants_test.base_test import BaseTest
 
 
@@ -41,7 +40,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
         self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                    write_to=artifact_cache)
         task_cache = os.path.join(artifact_cache, task_cls.stable_name())
-        safe_mkdir(task_cache, clean=True)
+        os.mkdir(task_cache)
 
         test_fn(self, *args, **kwargs)
 

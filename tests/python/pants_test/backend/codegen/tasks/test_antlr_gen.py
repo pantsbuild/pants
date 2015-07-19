@@ -60,7 +60,7 @@ class AntlrGenTest(NailgunTaskTestBase):
       """.format(**self.PARTS)))
 
   def create_context(self):
-    # generate a context to contain the build graph for the input target, then execute
+    # generate a context to contain the build graph for the input target.
     antlr_target = self.target('{srcroot}/{dir}:{name}'.format(**self.PARTS))
     return self.context(target_roots=[antlr_target])
 
