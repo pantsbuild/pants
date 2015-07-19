@@ -5,8 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.targets.scala_js_library import ScalaJSLibrary
-from pants.backend.jvm.tasks.jvm_compile.scala_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ZincCompile
+
+from pants.contrib.scalajs.targets.scala_js_library import ScalaJSLibrary
 
 
 class ScalaJSZincCompile(ZincCompile):

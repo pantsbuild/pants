@@ -7,11 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.targets.scala_js_binary import ScalaJSBinary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
+
+from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSLink(NailgunTask):
@@ -25,7 +26,7 @@ class ScalaJSLink(NailgunTask):
     #   see https://github.com/pantsbuild/pants/issues/1273
     register('--full-opt', default=False, action='store_true',
              help='Perform all optimizations; this is generally only useful for deployments.')
-    register('--check-ir', default=False, action='store_true', advanced=True,
+    register('--check-ir', default=False, action='store_true',
              help='Perform (relatively costly) validity checks of IR before linking it.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')

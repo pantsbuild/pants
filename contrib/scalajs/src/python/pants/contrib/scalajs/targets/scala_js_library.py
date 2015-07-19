@@ -5,8 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.subsystems.scala_js_platform import ScalaJSPlatform
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+
+from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 
 
 class ScalaJSLibrary(ScalaLibrary):
