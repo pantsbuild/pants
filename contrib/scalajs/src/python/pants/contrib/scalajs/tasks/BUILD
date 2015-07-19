@@ -9,5 +9,5 @@ python_library(
     'src/python/pants/backend/jvm/tasks/jvm_compile:scala',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
   ],
-  sources = globs('*'),
+  sources = globs('*.py'),
 )

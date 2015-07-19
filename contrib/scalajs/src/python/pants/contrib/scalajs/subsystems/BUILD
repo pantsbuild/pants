@@ -7,5 +7,5 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
-  sources = globs('*'),
+  sources = globs('*.py'),
 )

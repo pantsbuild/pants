@@ -4,10 +4,10 @@
 python_library(
   name = 'targets',
   dependencies = [
+    'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/subsystems:scala_js_platform',
     'src/python/pants/base:target',
   ],
-  sources = globs('*'),
+  sources = globs('*.py'),
 )
