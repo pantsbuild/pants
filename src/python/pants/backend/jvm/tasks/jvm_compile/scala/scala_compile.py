@@ -68,11 +68,12 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', action='append', help='Use these scalac plugins.', fingerprint=True)
-    register('--plugin-args', advanced=True, type=Options.dict, default={},
-             help='Map from plugin name to list of arguments for that plugin.', fingerprint=True)
-    register('--name-hashing', action='store_true', default=False, help='Use zinc name hashing.',
-             fingerprint=True)
+    register('--plugins', action='append', fingerprint=True,
+             help='Use these scalac plugins.')
+    register('--plugin-args', advanced=True, type=Options.dict, default={}, fingerprint=True,
+             help='Map from plugin name to list of arguments for that plugin.')
+    register('--name-hashing', action='store_true', default=False, fingerprint=True,
+             help='Use zinc name hashing.')
 
     cls.register_jvm_tool(register,
                           'zinc',

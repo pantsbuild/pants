@@ -40,7 +40,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
-             help='Pass these args to the compiler.', fingerprint=True)
+             fingerprint=True,
+             help='Pass these args to the compiler.')
 
     register('--confs', type=Options.list, default=['default'],
              help='Compile for these Ivy confs.')
@@ -63,10 +64,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              advanced=True,
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--strategy', choices=['global', 'isolated'], default='global',
+    register('--strategy', choices=['global', 'isolated'], default='global', fingerprint=True,
              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
-                  'per-target classpaths.', fingerprint=True)
+                  'per-target classpaths.')
 
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
