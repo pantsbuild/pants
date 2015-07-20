@@ -21,10 +21,6 @@ from pants.option.scope import ScopeInfo
 from pants_test.option.fake_config import FakeConfig
 
 
-def goal(scope):
-  return ScopeInfo(scope, ScopeInfo.GOAL)
-
-
 def task(scope):
   return ScopeInfo(scope, ScopeInfo.TASK)
 
@@ -34,8 +30,8 @@ def intermediate(scope):
 
 
 class OptionsTest(unittest.TestCase):
-  _known_scope_infos = [goal('compile'), task('compile.java'), task('compile.scala'),
-                        goal('stale'), goal('test'), task('test.junit')]
+  _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
+                        intermediate('stale'), intermediate('test'), task('test.junit')]
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -547,8 +543,8 @@ class OptionsTest(unittest.TestCase):
                       Options.complete_scopes({task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({ScopeInfo.for_global_scope(), task('foo.bar.baz')}))
-    self.assertEquals({_global, goal('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
-                      Options.complete_scopes({goal('foo'), task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({intermediate('foo'), task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
