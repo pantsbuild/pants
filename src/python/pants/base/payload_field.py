@@ -309,7 +309,7 @@ class FileField(PayloadField):
 
 
 class TargetListField(PayloadField):
-  """A field that represents a list of targets.
+  """A field that represents a list of target specs.
 
   The fingerprint of a TargetListField is the combined fingerprints of the
   resolved target specs.

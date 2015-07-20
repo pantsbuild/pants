@@ -29,11 +29,12 @@ class Checkstyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
-    register('--skip', action='store_true', help='Skip checkstyle.')
-    register('--configuration', help='Path to the checkstyle configuration file.',
-             fingerprint=True)
+    register('--skip', action='store_true', help='Skip checkstyle.', fingerprint=True)
+    register('--configuration', type=Options.file,
+             help='Path to the checkstyle configuration file.', fingerprint=True)
     register('--properties', type=Options.dict, default={},
-             help='Dictionary of property mappings to use for checkstyle.properties.')
+             help='Dictionary of property mappings to use for checkstyle.properties.',
+             fingerprint=True)
     register('--confs', default=['default'],
              help='One or more ivy configurations to resolve for this target. This parameter is '
                   'not intended for general use. ')

@@ -51,17 +51,14 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
-    workdir_gen = os.path.relpath(os.path.join(bootstrap_option_values.pants_workdir, 'gen'), get_buildroot())
+    workdir_gen = os.path.relpath(os.path.join(bootstrap_option_values.pants_workdir, 'gen'),
+                                  get_buildroot())
     return ('-C-encoding', '-CUTF-8', '-C-g', '-C-Tcolor',
             # Don't warn for generated code.
             '-C-Tnowarnprefixes',
             '-C{0}'.format(workdir_gen),
             # Suppress warning for annotations with no processor - we know there are many of these!
             '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*')
-
-  @classmethod
-  def fingerprint_args(cls):
-    return False
 
   @classmethod
   def get_warning_args_default(cls):
@@ -77,7 +74,7 @@ class JavaCompile(JvmCompile):
     register('--source', help='Provide source compatibility with this release.', advanced=True)
     register('--target', help='Generate class files for this JVM version.',
              advanced=True, fingerprint=True)
-    cls.register_jvm_tool(register, 'jmake')
+    cls.register_jvm_tool(register, 'jmake', fingerprint=True)
     cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
 
   def __init__(self, *args, **kwargs):

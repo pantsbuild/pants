@@ -198,12 +198,14 @@ class TaskBase(Optionable, AbstractClass):
     return self._workdir
 
   @property
-  def identity(self):
+  def fingerprint(self):
     """Returns a fingerprint for the identity of the task.
 
-    A task identity is composed of the options the task is currently running under.
+    A task fingerprint is composed of the options the task is currently running under.
     Useful for invalidating unchanging targets being executed beneath changing task
     options that affect outputted artifacts.
+
+    A task's fingerprint is only valid afer the task has been fully initialized.
     """
     if not self._fingerprint:
       payload = self.context.options.payload_for_scope(self.options_scope)

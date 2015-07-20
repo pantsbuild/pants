@@ -40,7 +40,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
-             help='Pass these args to the compiler.', fingerprint=cls.fingerprint_args())
+             help='Pass these args to the compiler.', fingerprint=True)
 
     register('--confs', type=Options.list, default=['default'],
              help='Compile for these Ivy confs.')
@@ -119,11 +119,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                     details.
     """
     return ()
-
-  @classmethod
-  def fingerprint_args(cls):
-    """Override to not include --args option in task identity fingerprint."""
-    return True
 
   @classmethod
   def get_warning_args_default(cls):

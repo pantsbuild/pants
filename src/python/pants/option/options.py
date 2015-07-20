@@ -75,8 +75,10 @@ class Options(object):
   # will replace the default with the cmd-line value.
   list = staticmethod(custom_types.list_type)
 
+  # A list-typed option that indicates the list elements are target specs.
   target_list = staticmethod(custom_types.target_list_type)
 
+  # A string-typed option that indicates the string is a filepath.
   file = staticmethod(custom_types.file_type)
 
   @classmethod

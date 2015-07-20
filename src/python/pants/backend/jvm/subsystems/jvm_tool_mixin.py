@@ -41,6 +41,7 @@ class JvmToolMixin(object):
                               runner tools from user code. In this sort of case the shared code must
                               have a uniform name between the tool and the user code and so the
                               shared code must be excluded from shading.
+    :param bool fingerprint: Indicates whether to include the jvm tool in the task's fingerprint.
     """
     register('--{0}'.format(key),
              advanced=True,

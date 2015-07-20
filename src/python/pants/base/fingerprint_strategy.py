@@ -58,7 +58,7 @@ class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStra
 
 
 class TaskIdentityFingerprintStrategy(FingerprintStrategy):
-  """Fingerprint strategy which includes the current task identity when fingerprinting target."""
+  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target."""
 
   def __init__(self, task):
     self._task = task
@@ -66,11 +66,11 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
   def compute_fingerprint(self, target):
     hasher = hashlib.sha1()
     hasher.update(target.payload.fingerprint() or '')
-    hasher.update(self._task.identity or '')
+    hasher.update(self._task.fingerprint or '')
     return hasher.hexdigest()
 
   def __hash__(self):
-    return hash(self._task.identity)
+    return hash(self._task.fingerprint)
 
   def __eq__(self, other):
-    return self._task.identity == other._task.identity
+    return self._task.fingerprint == other._task.fingerprint

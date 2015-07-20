@@ -21,6 +21,8 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
   @classmethod
   def register_options(cls, register):
     super(ScalaPlatform, cls).register_options(register)
+    # No need to fingerprint --runtime, because it is automatically inserted as a
+    # dependency for the scala_library target.
     register('--runtime', advanced=True, type=Options.list, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.')
     cls.register_jvm_tool(register, 'scalac', default=['//:scala-compiler'], fingerprint=True)

@@ -87,8 +87,8 @@ class ZincCompile(JvmCompile):
                             Shader.exclude_package('xsbti', recursive=True),
                           ],
                           fingerprint=True)
-    cls.register_jvm_tool(register, 'compiler-interface')
-    cls.register_jvm_tool(register, 'sbt-interface')
+    cls.register_jvm_tool(register, 'compiler-interface', fingerprint=True)
+    cls.register_jvm_tool(register, 'sbt-interface', fingerprint=True)
 
     cls.register_jvm_tool(register, 'plugin-jars', default=[], fingerprint=True)
 
