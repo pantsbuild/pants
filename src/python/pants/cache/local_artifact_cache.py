@@ -103,7 +103,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _store_tarball(self, cache_key, src):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
-    self.prune(os.path.dirname(dest))  # Remove stale cache files
+    self.prune(os.path.dirname(dest))  # Remove old cache files
     os.rename(src, dest)
     return dest
 
@@ -139,14 +139,12 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
   This implementation does not have a backing _cache_root, and never
   actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
-  def __init__(self, artifact_root, compression, max_old):
+  def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int max_old_cache: The maximum number of old cache files to leave behind on a cache miss
     """
-    super(TempLocalArtifactCache, self).__init__(
-      artifact_root, compression=compression, max_old=max_old
-    )
+    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=compression)
 
   def _store_tarball(self, cache_key, src):
     return src
