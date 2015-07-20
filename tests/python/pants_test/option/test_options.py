@@ -18,6 +18,7 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.scope import ScopeInfo
+from pants.util.contextutil import temporary_file_path
 from pants_test.option.fake_config import FakeConfig
 
 
@@ -151,8 +152,9 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
 
     # Test file-typed option.
-    options = self._parse('./pants --filey="my/config/file.txt"')
-    self.assertEqual('my/config/file.txt', options.for_global_scope().filey)
+    with temporary_file_path() as fp:
+      options = self._parse('./pants --filey="{}"'.format(fp))
+      self.assertEqual(fp, options.for_global_scope().filey)
 
   def test_boolean_defaults(self):
     options = self._parse('./pants')
