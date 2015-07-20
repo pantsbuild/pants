@@ -71,7 +71,7 @@ class JavaCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
-    register('--source', advanced=True,
+    register('--source', advanced=True, fingerprint=True,
              help='Provide source compatibility with this release.')
     register('--target', advanced=True, fingerprint=True,
              help='Generate class files for this JVM version.')
