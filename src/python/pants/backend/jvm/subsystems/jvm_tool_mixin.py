@@ -42,6 +42,8 @@ class JvmToolMixin(object):
                               have a uniform name between the tool and the user code and so the
                               shared code must be excluded from shading.
     """
+    register('--options', action='append', recursive=True, metavar='<option>...',
+             help='Run with these extra JVM options.')
     register('--{0}'.format(key),
              advanced=True,
              type=Options.list,
