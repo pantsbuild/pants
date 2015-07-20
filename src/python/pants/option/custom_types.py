@@ -44,7 +44,7 @@ def target_list_type(s):
 
 def file_type(s):
   """Same type as 'str', but indicates string represents a filepath."""
-  if not os.path.exists(s):
+  if not os.path.isfile(s):
     raise ParseError('Options file "{filepath}" does not exist.'.format(filepath=s))
   return s
 
