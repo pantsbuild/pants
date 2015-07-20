@@ -51,7 +51,7 @@ class CacheSetup(Subsystem):
                   'caches to choose from.')
     register('--compression-level', advanced=True, type=int, default=5, recursive=True,
              help='The gzip compression level (0-9) for created artifacts.')
-    register('--max-old', recursive=True, default=2, type=int,
+    register('--max-old', recursive=True, type=int, default=None,
              help='Maximum number of old cache files to keep per task/target')
 
   @classmethod

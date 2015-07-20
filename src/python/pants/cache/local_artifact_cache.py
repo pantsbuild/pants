@@ -87,8 +87,12 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     :param str root: The path under which cacheable artifacts will be cleaned
     """
 
-    # We check explicitly for none to allow zero values in max_old
-    if os.path.isdir(root) and self._max_old is not None:
+    if not isinstance(self._max_old, int):  # Handle Ranked Value, when option not specified by user
+      max_old = None  #RankedValue(NONE, None)
+    else:
+      max_old = self._max_old
+
+    if os.path.isdir(root) and max_old is not None:
       found_files = []
       for old_file in os.listdir(root):
         full_path = os.path.join(root, old_file)
