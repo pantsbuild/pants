@@ -32,7 +32,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       pants_run = self.run_pants(['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-                                  '--cache-target-entry-max=1',],
+                                  '--cache-max-entries-per-target=1',],
                                  config=config)
       self.assert_success(pants_run)
 
@@ -44,7 +44,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(['compile.java',
                                   '--target=1.7',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-                                  '--cache-target-entry-max=1'],
+                                  '--cache-max-entries-per-target=1'],
                                  config)
       self.assert_success(pants_run)
 
@@ -72,7 +72,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       pants_run = self.run_pants(['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-                                  '--cache-target-entry-max=0',],
+                                  '--cache-max-entries-per-target=0',],
                                  config=config)
       self.assert_success(pants_run)
 
@@ -84,7 +84,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(['compile.java',
                                   '--target=1.7',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-                                  '--cache-target-entry-max=0'],
+                                  '--cache-max-entries-per-target=0'],
                                  config)
       self.assert_success(pants_run)
 

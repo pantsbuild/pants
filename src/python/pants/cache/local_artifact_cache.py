@@ -66,7 +66,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
-    :param int target_entry_max: The maximum number of old cache files to leave behind on a cache miss
+    :param int target_entry_max: The maximum number of old cache files to leave behind on a cache miss.
     """
     super(LocalArtifactCache, self).__init__(artifact_root, compression)
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
@@ -101,7 +101,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _store_tarball(self, cache_key, src):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
-    self.prune(os.path.dirname(dest))  # Remove old cache files
+    self.prune(os.path.dirname(dest))  # Remove old cache files.
     os.rename(src, dest)
     return dest
 
