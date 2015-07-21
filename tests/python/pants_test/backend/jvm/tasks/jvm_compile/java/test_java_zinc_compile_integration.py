@@ -24,19 +24,22 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
   @provide_compile_strategies
   def test_in_process(self, strategy):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      pants_run = self.run_test_compile(
-        workdir, 'examples/src/java/org/pantsbuild/example/hello/main', strategy,
-        extra_args=['--compile-zinc-java-enabled', '-ldebug'], clean_all=True
-      )
-      self.assertIn('Attempting to call com.sun.tools.javac.api.JavacTool', pants_run.stdout_data)
-      self.assertNotIn('Forking javac', pants_run.stdout_data)
+      with temporary_dir(root_dir=self.workdir_root()) as cachedir:
+        pants_run = self.run_test_compile(
+          workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/main', strategy,
+          extra_args=['--compile-zinc-java-enabled', '-ldebug'], clean_all=True
+        )
+        self.assertIn('Attempting to call com.sun.tools.javac.api.JavacTool', pants_run.stdout_data)
+        self.assertNotIn('Forking javac', pants_run.stdout_data)
 
   @provide_compile_strategies
   def test_log_level(self, strategy):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
-      pants_run = self.run_test_compile(
-        workdir, target, strategy, extra_args=['--compile-zinc-java-enabled', '--no-color'], clean_all=True
-      )
-      self.assertIn('[warn] sun.security.x509.X500Name', pants_run.stdout_data)
-      self.assertIn('[error] System2.out', pants_run.stdout_data)
+      with temporary_dir(root_dir=self.workdir_root()) as cachedir:
+        target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
+        pants_run = self.run_test_compile(
+          workdir, cachedir, target, strategy,
+          extra_args=['--compile-zinc-java-enabled', '--no-color'], clean_all=True
+        )
+        self.assertIn('[warn] sun.security.x509.X500Name', pants_run.stdout_data)
+        self.assertIn('[error] System2.out', pants_run.stdout_data)

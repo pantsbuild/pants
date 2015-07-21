@@ -22,26 +22,33 @@ class BaseCompileIT(PantsRunIntegrationTest):
     By default, runs twice to shake out errors related to noops.
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      for i in xrange(0, iterations):
-        pants_run = self.run_test_compile(workdir, target, strategy, clean_all=(i == 0), extra_args=extra_args)
-        if expect_failure:
-          self.assert_failure(pants_run)
-        else:
-          self.assert_success(pants_run)
-      if expected_files:
-        to_find = set(expected_files)
+      with temporary_dir(root_dir=self.workdir_root()) as cachedir:
+        for i in xrange(0, iterations):
+          pants_run = self.run_test_compile(workdir, cachedir, target,
+                                            strategy, clean_all=(i == 0),
+                                            extra_args=extra_args)
+          if expect_failure:
+            self.assert_failure(pants_run)
+          else:
+            self.assert_success(pants_run)
         found = defaultdict(set)
-        for root, _, files in os.walk(workdir):
-          for file in files:
-            if file in to_find:
-              found[file].add(os.path.join(root, file))
-        to_find.difference_update(found)
-        if not expect_failure:
-          self.assertEqual(set(), to_find,
-                          'Failed to find the following compiled files: {}'.format(to_find))
+        if expected_files:
+          to_find = set(expected_files)
+          for root, _, files in os.walk(workdir):
+            for file in files:
+              if file in to_find:
+                found[file].add(os.path.join(root, file))
+          to_find.difference_update(found)
+          if not expect_failure:
+            self.assertEqual(set(), to_find,
+                            'Failed to find the following compiled files: {}'.format(to_find))
         yield found
 
-  def run_test_compile(self, workdir, target, strategy, clean_all=False, extra_args=None):
+  def run_test_compile(self, workdir, cachedir, target, strategy, clean_all=False, extra_args=None):
+    global_args = [
+        '--cache-write',
+        '--cache-write-to=[\'{}\']'.format(cachedir),
+    ]
     args = [
         'compile',
         '--compile-apt-strategy={}'.format(strategy),
@@ -53,7 +60,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')
-    return self.run_pants_with_workdir(args, workdir)
+    return self.run_pants_with_workdir(global_args + args, workdir)
 
   def get_only(self, found, name):
     files = found[name]
