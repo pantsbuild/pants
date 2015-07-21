@@ -61,16 +61,16 @@ class BaseLocalArtifactCache(ArtifactCache):
 
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
-  def __init__(self, artifact_root, cache_root, compression, target_entry_max=None):
+  def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
-    :param int target_entry_max: The maximum number of old cache files to leave behind on a cache miss.
+    :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
     """
     super(LocalArtifactCache, self).__init__(artifact_root, compression)
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
-    self._target_entry_max = target_entry_max
+    self._max_entries_per_target = max_entries_per_target
     safe_mkdir(self._cache_root)
 
   def prune(self, root):
@@ -85,14 +85,14 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     :param str root: The path under which cacheable artifacts will be cleaned
     """
 
-    target_entry_max = self._target_entry_max
-    if os.path.isdir(root) and target_entry_max is not None:
+    max_entries_per_target = self._max_entries_per_target
+    if os.path.isdir(root) and max_entries_per_target is not None:
       found_files = []
       for old_file in os.listdir(root):
         full_path = os.path.join(root, old_file)
         found_files.append((full_path, os.path.getmtime(full_path)))
       found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
-      for cur_file in found_files[self._target_entry_max:]:
+      for cur_file in found_files[self._max_entries_per_target:]:
         safe_delete(cur_file[0])
 
   def has(self, cache_key):
