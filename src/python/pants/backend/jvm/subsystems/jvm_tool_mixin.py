@@ -22,7 +22,7 @@ class JvmToolMixin(object):
   _tool_keys = []  # List of (scope, key, main, custom_rule) tuples.
 
   @classmethod
-  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None):
+  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None, fingerprint=False):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
     Classpaths can be retrieved in `execute` scope via `tool_classpath`.
@@ -41,12 +41,14 @@ class JvmToolMixin(object):
                               runner tools from user code. In this sort of case the shared code must
                               have a uniform name between the tool and the user code and so the
                               shared code must be excluded from shading.
+    :param bool fingerprint: Indicates whether to include the jvm tool in the task's fingerprint.
     """
     register('--{0}'.format(key),
              advanced=True,
-             type=Options.list,
-             default=default or ['//:{0}'.format(key)],
-             help='Target specs for bootstrapping the {0} tool.'.format(key))
+             type=Options.target_list,
+             default=['//:{0}'.format(key)] if default is None else default,
+             help='Target specs for bootstrapping the {0} tool.'.format(key),
+             fingerprint=fingerprint)
 
     # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
     # These already have a main and are a natural place to house any custom shading rules.  That
