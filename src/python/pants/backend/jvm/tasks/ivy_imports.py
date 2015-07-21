@@ -23,12 +23,14 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   containing .proto files.
   """
 
+  # TODO https://github.com/pantsbuild/pants/issues/604 product_types start
   @classmethod
   def product_types(cls):
     # TODO(mateor) Create a more robust ivy_import product, that exposes the path to the jar
     # and a slot for the metadata from the IvyModuleRef:
     # https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/ivy_utils.py#L38-38
     return ['ivy_imports']  # Guaranteed to populate target => { builddir: [jar_filenames]}
+  # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
   @classmethod
   def prepare(cls, options, round_manager):
