@@ -57,12 +57,12 @@ class TestAndroidManifestParser(TestXmlBase):
   def test_no_uses_sdk_element(self):
     with self.xml_file(uses_sdk_element='something-random') as xml:
       manifest = AndroidManifestParser.parse_manifest(xml)
-      self.assertEqual(manifest.target_sdk, None)
+      self.assertIsNone(manifest.target_sdk)
 
   def test_no_target_sdk_value(self):
     with self.xml_file(android_attribute='android:bad_value') as xml:
       parsed = AndroidManifestParser.parse_manifest(xml)
-      self.assertEqual(parsed.target_sdk, None)
+      self.assertIsNone(parsed.target_sdk)
 
   def test_no_android_part(self):
     with self.xml_file(android_attribute='unrelated:targetSdkVersion') as xml:
@@ -72,7 +72,7 @@ class TestAndroidManifestParser(TestXmlBase):
   def test_missing_whole_targetsdk(self):
     with self.xml_file(android_attribute='unrelated:cola') as xml:
       manifest = AndroidManifestParser.parse_manifest(xml)
-      self.assertEqual(manifest.target_sdk, None)
+      self.assertIsNone(manifest.target_sdk)
 
   # Test AndroidManifest().
   def test_android_manifest(self):

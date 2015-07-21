@@ -23,6 +23,6 @@ class AndroidBinary(AndroidTarget):
     if self._target_sdk is None:
       self._target_sdk = self.manifest.target_sdk
       if not self._target_sdk:
-        raise TargetDefinitionException(self, "AndroidBinary targets must declare targetSdkVersion "
-                                              "in the AndroidManifest.xml.")
+        raise TargetDefinitionException(self, "AndroidBinary targets must declare targetSdkVersion"
+                                              " in the AndroidManifest.xml.")
     return self._target_sdk
