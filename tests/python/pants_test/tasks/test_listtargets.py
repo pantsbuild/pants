@@ -119,8 +119,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/c:c3',
         'a/b/d:d',
         'a/b/e:e1',
-        'f:alias',
-        'g:g')
+        'f:alias')
 
     self.assert_entries(', ',
         'a:a',
@@ -131,7 +130,6 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
-        'g:g',
         options={ 'sep': ', ' })
 
     self.assert_console_output(
@@ -142,8 +140,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/c:c3',
         'a/b/d:d',
         'a/b/e:e1',
-        'f:alias',
-        'g:g')
+        'f:alias')
 
   def test_list_provides(self):
     self.assert_console_output(
@@ -182,10 +179,6 @@ class ListTargetsTest(BaseListTargetsTest):
       f:alias
         Exercises alias resolution.
         Further description.
-      """).strip(),
-      dedent("""
-      g:g
-        the description
       """).strip(),
       options={ 'documented': True }
     )
