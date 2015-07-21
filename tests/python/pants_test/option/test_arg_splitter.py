@@ -12,11 +12,11 @@ from pants.option.arg_splitter import ArgSplitter
 from pants.option.scope import ScopeInfo
 
 
-def goal(scope):
-  return ScopeInfo(scope, ScopeInfo.GOAL)
-
 def task(scope):
   return ScopeInfo(scope, ScopeInfo.TASK)
+
+def intermediate(scope):
+  return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 def global_subsys(scope):
   return ScopeInfo(scope, ScopeInfo.GLOBAL_SUBSYSTEM)
@@ -26,9 +26,9 @@ def task_subsys(scope):
 
 
 class ArgSplitterTest(unittest.TestCase):
-  _known_scope_infos = [goal('compile'), task('compile.java'), task('compile.scala'),
+  _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
                         global_subsys('jvm'), task_subsys('jvm.test.junit'),
-                        global_subsys('reporting'), goal('test'), task('test.junit')]
+                        global_subsys('reporting'), intermediate('test'), task('test.junit')]
 
   def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
              expected_passthru=None, expected_passthru_owner=None,

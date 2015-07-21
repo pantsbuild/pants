@@ -9,32 +9,35 @@ import logging
 import os
 import re
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
-from pants.backend.codegen.tasks.code_gen import CodeGen
+from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import SyntheticAddress
-from pants.base.address_lookup_error import AddressLookupError
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_mkdir
+from pants.java import util
 
 
 logger = logging.getLogger(__name__)
+_DEFAULT_ANTLR_DEPS = {
+  'antlr3': '//:antlr-3.4',
+  'antlr4': '//:antlr-4'
+}
 
-
-class AntlrGen(CodeGen, NailgunTask):
+class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
+  class AntlrIsolatedCodegenStrategy(SimpleCodegenTask.IsolatedCodegenStrategy):
+    def find_sources(self, target):
+      sources = super(AntlrGen.AntlrIsolatedCodegenStrategy, self).find_sources(target)
+      return [source for source in sources if source.endswith('.java')]
+
   @classmethod
   def register_options(cls, register):
     super(AntlrGen, cls).register_options(register)
-    cls.register_jvm_tool(register, 'antlr3', ['//:antlr-3.4'])
-    cls.register_jvm_tool(register, 'antlr4', ['//:antlr-4'])
+    for key, value in _DEFAULT_ANTLR_DEPS.items():
+      cls.register_jvm_tool(register, key, [value])
 
   @property
   def config_section(self):
@@ -43,32 +46,23 @@ class AntlrGen(CodeGen, NailgunTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)
 
-  def is_forced(self, lang):
-    return lang == 'java'
+  @property
+  def synthetic_target_type(self):
+    return JavaLibrary
 
-  def genlangs(self):
-    return dict(java=lambda t: t.is_jvm)
+  @classmethod
+  def supported_strategy_types(cls):
+    return [cls.AntlrIsolatedCodegenStrategy]
 
-  def genlang(self, lang, targets):
-    if lang != 'java':
-      raise TaskError('Unrecognized antlr gen lang: {}'.format(lang))
-
-    # TODO: Instead of running the compiler for each target, collect the targets
-    # by type and invoke it twice, once for antlr3 and once for antlr4.
-
+  def execute_codegen(self, targets):
     for target in targets:
-      java_out = self._java_out(target)
-      safe_mkdir(java_out)
-
-      args = ['-o', java_out]
-
-      if target.compiler == 'antlr3':
-        antlr_classpath = self.tool_classpath('antlr3')
+      args = ['-o', self.codegen_workdir(target)]
+      compiler = target.compiler
+      if compiler == 'antlr3':
         if target.package is not None:
           logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
         java_main = 'org.antlr.Tool'
-      elif target.compiler == 'antlr4':
-        antlr_classpath = self.tool_classpath('antlr4')
+      elif compiler == 'antlr4':
         args.append('-visitor')  # Generate Parse Tree Visitor As Well
         # Note that this assumes that there is no package set in the antlr file itself,
         # which is considered an ANTLR best practice.
@@ -78,16 +72,22 @@ class AntlrGen(CodeGen, NailgunTask):
         else:
           args.append(target.package)
         java_main = 'org.antlr.v4.Tool'
-      else:
-        raise TaskError('Unknown ANTLR compiler: {}'.format(target.compiler))
 
+      antlr_classpath = self.tool_classpath(compiler)
       sources = self._calculate_sources([target])
       args.extend(sources)
-
-      result = self.runjava(classpath=antlr_classpath, main=java_main,
-                            args=args, workunit_name='antlr')
+      result = util.execute_java(classpath=antlr_classpath, main=java_main,
+                                 args=args, workunit_name='antlr')
       if result != 0:
         raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
+
+      if compiler == 'antlr3':
+        for source in list(self.codegen_strategy.find_sources(target)):
+          self._scrub_generated_timestamp(source)
+
+  def synthetic_target_extra_dependencies(self, target):
+    # Fetch the right java dependency from the target's compiler option
+    return self.resolve_deps(self.get_options()[target.compiler])
 
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the
@@ -109,50 +109,8 @@ class AntlrGen(CodeGen, NailgunTask):
       target.walk(collect_sources)
     return sources
 
-  def createtarget(self, lang, gentarget, dependees):
-    if lang != 'java':
-      raise TaskError('Unrecognized antlr gen lang: {}'.format(lang))
-    return self._create_java_target(gentarget, dependees)
-
-  def _create_java_target(self, target, dependees):
-    antlr_files_suffix = ["Lexer.java", "Parser.java"]
-    if target.compiler == 'antlr4':
-      antlr_files_suffix = ["BaseListener.java", "BaseVisitor.java",
-                            "Listener.java", "Visitor.java"] + antlr_files_suffix
-
-    generated_sources = []
-    for source in target.sources_relative_to_source_root():
-      # Antlr enforces that generated sources are relative to the base filename, and that
-      # each grammar filename must match the resulting grammar Lexer and Parser classes.
-      source_base, source_ext = os.path.splitext(source)
-      for suffix in antlr_files_suffix:
-        generated_sources.append(source_base + suffix)
-
-    syn_target_sourceroot = os.path.join(self._java_out(target), target.target_base)
-
-    if (target.compiler == 'antlr3'):
-      # Removes timestamps in generated source to get stable fingerprint for buildcache.
-      for source in generated_sources:
-        self._scrub_generated_timestamp(os.path.join(syn_target_sourceroot, source))
-
-    # The runtime deps are the same JAR files as those of the tool used to compile.
-    # TODO: In antlr4 there is a separate runtime-only JAR, so use that.
-    deps = self._resolve_java_deps(target)
-
-    spec_path = os.path.relpath(syn_target_sourceroot, get_buildroot())
-    address = SyntheticAddress(spec_path=spec_path, target_name=target.id)
-    tgt = self.context.add_new_target(address,
-                                      JavaLibrary,
-                                      dependencies=deps,
-                                      derived_from=target,
-                                      sources=generated_sources,
-                                      provides=target.provides,
-                                      excludes=target.excludes)
-    for dependee in dependees:
-      dependee.inject_dependency(tgt.address)
-    return tgt
-
   _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
+
   def _scrub_generated_timestamp(self, source):
     # Removes the first line of comment if it contains a timestamp.
     with open(source) as f:
@@ -164,20 +122,3 @@ class AntlrGen(CodeGen, NailgunTask):
         f.write(lines[0])
       for line in lines[1:]:
         f.write(line)
-
-  def _resolve_java_deps(self, target):
-    dep_specs = self.get_options()[target.compiler]
-
-    deps = OrderedSet()
-    try:
-      for dep in dep_specs:
-        deps.update(self.context.resolve(dep))
-      return deps
-    except AddressLookupError as e:
-      raise self.DepLookupError('{message}\n'
-                                '  referenced from option {option} in scope {scope}'
-                                .format(message=e, option=target.compiler,
-                                        scope=self.options_scope))
-
-  def _java_out(self, target):
-    return os.path.join(self.workdir, target.compiler, 'gen-java')

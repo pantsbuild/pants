@@ -68,10 +68,12 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', action='append', help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=Options.dict, default={},
+    register('--plugins', action='append', fingerprint=True,
+             help='Use these scalac plugins.')
+    register('--plugin-args', advanced=True, type=Options.dict, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
-    register('--name-hashing', action='store_true', default=False, help='Use zinc name hashing.')
+    register('--name-hashing', action='store_true', default=False, fingerprint=True,
+             help='Use zinc name hashing.')
 
     cls.register_jvm_tool(register,
                           'zinc',
@@ -84,11 +86,12 @@ class ZincCompile(JvmCompile):
                             Shader.exclude_package('scala', recursive=True),
                             Shader.exclude_package('xsbt', recursive=True),
                             Shader.exclude_package('xsbti', recursive=True),
-                          ])
-    cls.register_jvm_tool(register, 'compiler-interface')
-    cls.register_jvm_tool(register, 'sbt-interface')
+                          ],
+                          fingerprint=True)
+    cls.register_jvm_tool(register, 'compiler-interface', fingerprint=True)
+    cls.register_jvm_tool(register, 'sbt-interface', fingerprint=True)
 
-    cls.register_jvm_tool(register, 'plugin-jars')
+    cls.register_jvm_tool(register, 'plugin-jars', default=[], fingerprint=True)
 
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
@@ -175,33 +178,6 @@ class ZincCompile(JvmCompile):
     if unresolved_plugins:
       raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
     return plugins
-
-  # Invalidate caches if the toolchain changes.
-  def _language_platform_version_info(self):
-    ret = []
-
-    # Go through all the bootstrap tools required to compile.
-    targets = (ScalaPlatform.global_instance().tool_targets(self.context, 'scalac') +
-               self.tool_targets(self.context, 'zinc'))
-    for lib in (t for t in targets if isinstance(t, JarLibrary)):
-      for jar in lib.jar_dependencies:
-        ret.append(jar.cache_key())
-
-    # We must invalidate on the set of plugins and their settings.
-    ret.extend(self.plugin_args())
-
-    # Invalidate if any compiler args change.
-    # Note that while some args are obviously important for invalidation (e.g., the jvm target
-    # version), some might not be. However we must invalidated on all the args, because Zinc
-    # ignores analysis files if the compiler args they were created with are different from the
-    # current ones, and does a full recompile. So if we allow cached artifacts with those analysis
-    # files to be used, Zinc will do unnecessary full recompiles on subsequent edits.
-    ret.extend(self._args)
-
-    # Invalidate if use of name hashing changes.
-    ret.append('name-hashing-{0}'.format('on' if self.get_options().name_hashing else 'off'))
-
-    return ret
 
   def extra_products(self, target):
     """Override extra_products to produce a plugin information file."""

@@ -63,13 +63,13 @@ python_library(
     ':jvm_compile_global_strategy',
     ':jvm_compile_isolated_strategy',
     ':jvm_dependency_analyzer',
-    ':jvm_fingerprint_strategy',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:dirutil',
+    'src/python/pants/base:fingerprint_strategy',
   ],
 )
 
@@ -130,16 +130,6 @@ python_library(
 python_library(
   name = 'resource_mapping',
   sources = ['resource_mapping.py'],
-)
-
-python_library(
-  name = 'jvm_fingerprint_strategy',
-  sources = ['jvm_fingerprint_strategy.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:fingerprint_strategy',
-    'src/python/pants/base:hash_utils',
-  ],
 )
 
 python_library(
