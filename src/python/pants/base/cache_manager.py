@@ -53,6 +53,9 @@ class VersionedTargetSet(object):
                                                            for vt in versioned_targets])
     self.num_chunking_units = self.cache_key.num_chunking_units
     self.valid = not cache_manager.needs_update(self.cache_key)
+    if cache_manager.invalidation_report:
+      cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
+                                                self.valid, phase='init')
 
   def update(self):
     self._cache_manager.update(self)
@@ -202,11 +205,15 @@ class InvalidationCacheManager(object):
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
-               fingerprint_strategy=None):
+               fingerprint_strategy=None,
+               invalidation_report=None,
+               task_name=None):
     self._cache_key_generator = cache_key_generator
+    self._task_name = task_name or 'UNKNOWN'
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy
+    self.invalidation_report = invalidation_report
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
@@ -244,6 +251,10 @@ class InvalidationCacheManager(object):
     all_vts = self.wrap_targets(targets, topological_order=topological_order)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
+
+  @property
+  def task_name(self):
+    return self._task_name
 
   def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.

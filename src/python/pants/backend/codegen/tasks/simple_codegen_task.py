@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
@@ -262,6 +263,15 @@ class SimpleCodegenTask(Task):
 
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache(vts_artifactfiles_pairs)
+
+  def resolve_deps(self, unresolved_deps):
+    deps = OrderedSet()
+    for dep in unresolved_deps:
+      try:
+        deps.update(self.context.resolve(dep))
+      except AddressLookupError as e:
+        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+    return deps
 
 
   class CodegenStrategy(AbstractClass):

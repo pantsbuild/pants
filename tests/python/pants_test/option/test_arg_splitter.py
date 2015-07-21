@@ -9,16 +9,32 @@ import shlex
 import unittest
 
 from pants.option.arg_splitter import ArgSplitter
+from pants.option.scope import ScopeInfo
+
+
+def task(scope):
+  return ScopeInfo(scope, ScopeInfo.TASK)
+
+def intermediate(scope):
+  return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
+
+def global_subsys(scope):
+  return ScopeInfo(scope, ScopeInfo.GLOBAL_SUBSYSTEM)
+
+def task_subsys(scope):
+  return ScopeInfo(scope, ScopeInfo.TASK_SUBSYSTEM)
 
 
 class ArgSplitterTest(unittest.TestCase):
-  _known_scopes = ['compile', 'compile.java', 'compile.scala', 'test', 'test.junit']
+  _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
+                        global_subsys('jvm'), task_subsys('jvm.test.junit'),
+                        global_subsys('reporting'), intermediate('test'), task('test.junit')]
 
   def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
              expected_passthru=None, expected_passthru_owner=None,
              expected_is_help=False, expected_help_advanced=False, expected_help_all=False):
     expected_passthru = expected_passthru or []
-    splitter = ArgSplitter(ArgSplitterTest._known_scopes)
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     args = shlex.split(args_str)
     goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
     self.assertEquals(expected_goals, goals)
@@ -42,12 +58,12 @@ class ArgSplitterTest(unittest.TestCase):
                 expected_help_all=expected_help_all)
 
   def _split_version(self, args_str):
-    splitter = ArgSplitter(ArgSplitterTest._known_scopes)
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     args = shlex.split(args_str)
     splitter.split_args(args)
     self.assertTrue(splitter.help_request is not None and splitter.help_request.version)
 
-  def test_arg_splitting(self):
+  def test_basic_arg_splitting(self):
     # Various flag combos.
     self._split('./pants --compile-java-long-flag -f compile -g compile.java -x test.junit -i '
                 'src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz',
@@ -70,7 +86,7 @@ class ArgSplitterTest(unittest.TestCase):
                 },
                 ['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'])
 
-    # Distinguishing goals and target specs.
+  def test_distinguish_goals_from_target_specs(self):
     self._split('./pants compile test foo::', ['compile', 'test'],
                 {'': [], 'compile': [], 'test': []}, ['foo::'])
     self._split('./pants compile test foo::', ['compile', 'test'],
@@ -80,18 +96,18 @@ class ArgSplitterTest(unittest.TestCase):
     self._split('./pants test ./test', ['test'], {'': [], 'test': []}, ['./test'])
     self._split('./pants test //test', ['test'], {'': [], 'test': []}, ['//test'])
 
-    # De-scoping old-style flags correctly.
+  def test_descoping_qualified_flags(self):
     self._split('./pants compile test --compile-java-bar --no-test-junit-baz foo',
                 ['compile', 'test'],
                 {'': [], 'compile': [], 'compile.java': ['--bar'], 'test': [],
                  'test.junit': ['--no-baz']}, ['foo'])
 
-    # Old-style flags don't count as explicit goals.
+    # Qualified flags don't count as explicit goals.
     self._split('./pants compile --test-junit-bar foo',
                 ['compile'],
                 {'': [], 'compile': [], 'test.junit': ['--bar']}, ['foo'])
 
-    # Passthru args.
+  def test_passthru_args(self):
     self._split('./pants test foo -- -t arg',
                 ['test'],
                 {'': [], 'test': []},
@@ -111,6 +127,24 @@ class ArgSplitterTest(unittest.TestCase):
                 ['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
                 expected_passthru=['passthru1', 'passthru2'],
                 expected_passthru_owner='test.junit')
+
+  def test_subsystem_flags(self):
+    # Global subsystem flag in global scope.
+    self._split('./pants --jvm-options=-Dbar=baz test foo',
+                ['test'],
+                {'': [], 'jvm': ['--options=-Dbar=baz'], 'test': []}, ['foo'])
+    # Qualified task subsystem flag in global scope.
+    self._split('./pants --jvm-test-junit-options=-Dbar=baz test foo',
+                ['test'],
+                {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test': []}, ['foo'])
+    # Unqualified task subsystem flag in task scope.
+    self._split('./pants test.junit --jvm-options=-Dbar=baz foo',
+                ['test'],
+                {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test.junit': []}, ['foo'])
+    # Global-only flag in task scope.
+    self._split('./pants test.junit --reporting-template-dir=path foo',
+                ['test'],
+                {'': [], 'reporting': ['--template-dir=path'], 'test.junit': []}, ['foo'])
 
   def test_help_detection(self):
     self._split_help('./pants', [], {'': []}, [])

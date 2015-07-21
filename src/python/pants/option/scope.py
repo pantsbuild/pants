@@ -13,7 +13,6 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category'])):
 
   # Symbolic constants for different categories of scope.
   GLOBAL = 'GLOBAL'
-  GOAL = 'GOAL'
   TASK = 'TASK'
   GLOBAL_SUBSYSTEM = 'GLOBAL_SUBSYSTEM'
   TASK_SUBSYSTEM = 'TASK_SUBSYSTEM'

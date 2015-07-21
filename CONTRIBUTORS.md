@@ -94,4 +94,3 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Howland
 + Travis Crawford
 + Ugo Di Girolamo
-

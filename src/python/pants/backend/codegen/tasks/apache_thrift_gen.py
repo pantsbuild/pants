@@ -67,7 +67,7 @@ class ApacheThriftGen(CodeGen):
     register('--supportdir', advanced=True, default='bin/thrift',
              help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants-bootstrapdir')
-    register('--version', advanced=True, default='0.5.0-finagle',
+    register('--version', advanced=True, default='0.9.2',
              help='Thrift compiler version.   Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants-bootstrapdir')
     register('--java', advanced=True, type=Options.dict, help='GenInfo for Java.')

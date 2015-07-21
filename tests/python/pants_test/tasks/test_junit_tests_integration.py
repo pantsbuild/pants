@@ -163,28 +163,15 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--test-junit-cwd=testprojects/src/java/org/pantsbuild/testproject/cwdexample/subdir'])
     self.assert_success(pants_run)
 
-  def test_junit_test_requiring_cwd_passes_with_option_with_no_value_specified(self):
+  def test_junit_test_requiring_cwd_fails_with_option_with_no_value_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--jvm-test-junit-options=-Dcwd.test.enabled=true',
-        '--test-junit-cwd',])
-    self.assert_success(pants_run)
-
-  def test_junit_test_requiring_cwd_fails_when_target_not_first(self):
-    pants_run = self.run_pants([
-        'test',
-        'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-        'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
-        '--interpreter=CPython>=2.6,<3',
-        '--interpreter=CPython>=3.3',
-        '--jvm-test-junit-options=-Dcwd.test.enabled=true',
-        '--test-junit-cwd',])
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-  @unittest.skip("junit-runner-0.0.7 is not published yet")
   def test_junit_test_suppress_output_flag(self):
     pants_run = self.run_pants([
         'test.junit',
@@ -197,5 +184,28 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
       'test',
       'testprojects/tests/java/org/pantsbuild/testproject/workdirs/onedir',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_annotation_processor(self):
+    pants_run = self.run_pants([
+      'test',
+      '--compile-java-strategy=isolated',
+      'testprojects/tests/java/org/pantsbuild/testproject/annotation',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_duplicate_resources(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/maven_layout/junit_resource_collision',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_target_cwd_overrides_option(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/tests/java/org/pantsbuild/testproject/workdirs/onedir',
+      '--test-junit-cwd=testprojects/tests/java/org/pantsbuild/testproject/dummies'
     ])
     self.assert_success(pants_run)

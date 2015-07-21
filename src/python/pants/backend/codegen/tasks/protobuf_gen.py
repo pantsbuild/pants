@@ -19,7 +19,6 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -33,14 +32,13 @@ class ProtobufGen(SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
-    register('--lang', action='append', choices=['python', 'java'], default=['java'],
-             help='Force generation of protobuf code for these languages.')
     register('--version', advanced=True,
              help='Version of protoc.  Used to create the default --javadeps and as part of '
                   'the path to lookup the tool with --pants-support-baseurls and '
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
+    # TODO(Eric Ayers) Mix the value of this option into the fingerprint
     register('--plugins', advanced=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
@@ -73,22 +71,12 @@ class ProtobufGen(SimpleCodegenTask):
     self._extra_paths = self.get_options().extra_path
     self.protobuf_binary = BinaryUtil.from_options(self.get_options()).select_binary('protoc')
 
-  def resolve_deps(self, deps_list, key):
-    deps = OrderedSet()
-    for dep in deps_list:
-      try:
-        deps.update(self.context.resolve(dep))
-      except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  referenced from --{key} option."
-                                  .format(message=e, key=key))
-    return deps
-
   def invalidate_for_files(self):
     return [self.protobuf_binary]
 
   @property
   def javadeps(self):
-    return self.resolve_deps(self.get_options().javadeps, 'javadeps')
+    return self.resolve_deps(self.get_options().javadeps)
 
   @property
   def synthetic_target_type(self):

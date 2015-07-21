@@ -76,7 +76,6 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
       # TODO(John Sirois): We should not have to pass `--no-colors` since the pants subprocess
       # has no terminal attached - ie: colors should be turned off by default in this case.
       pants_run = self.run_pants(['gen.protoc',
-                                  '--lang=java',
                                   'testprojects/src/java/org/pantsbuild/testproject/proto-ordering',
                                   '--level=debug',
                                   '--no-colors',

@@ -18,11 +18,8 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.scope import ScopeInfo
+from pants.util.contextutil import temporary_file_path
 from pants_test.option.fake_config import FakeConfig
-
-
-def goal(scope):
-  return ScopeInfo(scope, ScopeInfo.GOAL)
 
 
 def task(scope):
@@ -34,8 +31,8 @@ def intermediate(scope):
 
 
 class OptionsTest(unittest.TestCase):
-  _known_scope_infos = [goal('compile'), task('compile.java'), task('compile.scala'),
-                        goal('stale'), goal('test'), task('test.junit')]
+  _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
+                        intermediate('stale'), intermediate('test'), task('test.junit')]
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -57,6 +54,8 @@ class OptionsTest(unittest.TestCase):
     # Custom types.
     register_global('--dicty', type=Options.dict, default='{"a": "b"}')
     register_global('--listy', type=Options.list, default='[1, 2, 3]')
+    register_global('--target_listy', type=Options.target_list, default=[':a', ':b'])
+    register_global('--filey', type=Options.file, default='default.txt')
 
     # For the design doc example test.
     register_global('--a', type=int, recursive=True)
@@ -83,6 +82,10 @@ class OptionsTest(unittest.TestCase):
     options.register('stale', '--crufty-boolean', action='store_true',
                      deprecated_version='999.99.9',
                      deprecated_hint='say no to crufty, stale scoped options')
+
+    # For task identity test
+    options.register('compile.scala', '--modifycompile', fingerprint=True)
+    options.register('compile.scala', '--modifylogs')
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
@@ -139,6 +142,15 @@ class OptionsTest(unittest.TestCase):
     # Test dict-typed option.
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
+
+    # Test target_list-typed option.
+    options = self._parse('./pants --target_listy=\'["//:foo", "//:bar"]\'')
+    self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
+
+    # Test file-typed option.
+    with temporary_file_path() as fp:
+      options = self._parse('./pants --filey="{}"'.format(fp))
+      self.assertEqual(fp, options.for_global_scope().filey)
 
   def test_boolean_defaults(self):
     options = self._parse('./pants')
@@ -517,14 +529,49 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
 
+  def test_registration_arg_iter(self):
+    options = self._parse('./pants',
+                          config={
+                            'compile': {'a' : 99},
+                          })
+
+    def get_registration_args(scope, name):
+      return next((x for x in options.registration_args_iter_for_scope(scope) if x[0] == name))
+
+    # The global xlong arg.
+    for_xlong = get_registration_args('', 'xlong')
+    self.assertEquals(for_xlong[1], ['-x', '--xlong'])
+    self.assertEquals(for_xlong[2].get('action'), 'store_true')
+
+    # The new, local xlong arg, which shadows the recursive registration of the global one.
+    for_xlong = get_registration_args('test', 'xlong')
+    self.assertEquals(for_xlong[1], ['--xlong'])
+    self.assertEquals(for_xlong[2].get('type'), int)
+
+    # The recursive registration, without the shadowed --xlong arg.
+    for_x = get_registration_args('test', 'x')
+    self.assertEquals(for_x[1], ['-x'])
+    self.assertEquals(for_x[2].get('action'), 'store_true')
+
   def test_complete_scopes(self):
     _global = ScopeInfo.for_global_scope()
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({ScopeInfo.for_global_scope(), task('foo.bar.baz')}))
-    self.assertEquals({_global, goal('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
-                      Options.complete_scopes({goal('foo'), task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({intermediate('foo'), task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
+
+  def test_payload_for_scope(self):
+    val = 'blah blah blah'
+    options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
+
+    payload = options.payload_for_scope('compile.scala')
+
+    self.assertEquals(len(payload.fields), 1)
+    for key, field in payload.fields:
+      self.assertEquals(key, 'modifycompile')
+      self.assertEquals(field.value, val)

@@ -181,20 +181,40 @@ shows some useful idioms for JVM tasks.
 -   Let organizations/users override the jar in `pants.ini`; it makes it
     easy to use/test a new version.
 
-Enabling Caching For Tasks
+Enabling Artifact Caching For Tasks
 --------------------------
 
-Pants will attempt to read task results from the cache automatically, however,
-Pants cannot automatically decide what to write to the cache. In a task's `execute` method,
-you must manually provide each target and its artifacts as an update to the
-cache.
+An artifact is the output file produced by a task processing some target.
+For example, the artifacts of a `JavaCompile` task on a target
+`java_library` would be the `.class` files produced by compiling the library.
+In this scenario, the `java_library` (i.e. the target) would have its sources
+used to compute a cache key, and the `.class` files would be used as the cached value.
 
-A target's artifacts are the output files produced as a result of
-processing the target via some job. For example, the output files of a `JavaCompile`
-task on a target `java_library` would be the `.class` files produced by compiling
-the library. In this scenario, the `java_library` (i.e. the target) would have its
-sources used to compute a cache key, and the `.class` files would be used as the cached value.
-Here is a template for how this process works in the `execute` method:
+If your task follows an isolated strategy where each target produces artifacts into
+its own directory, then the task will be able to take advantage of automatic
+target workdir caching. If your task has more complicated behavior
+(for example, all targets produce artifacts into the same directory), then check
+out the manual caching section below.
+
+**Automatic target workdir caching**
+
+Automatic target workdir caching works by assigning a results directory to
+each VersionedTarget (VT) of the InvalidationCheck yielded by `Task->invalidated`.
+A task operating on a given VT should place the resulting artifacts in the VT's
+`results_dir`. After exiting the `invalidated` context block, these artifacts
+will be automatically uploaded to the artifact cache.
+
+This interface for caching is disabled by default. To enable, override
+`Task->cache_target_dirs` to return True.
+
+**Manual caching**
+
+Manual caching is much more complicated than automatic target workdir caching,
+and as such should only be used for non-standard usecases. Instead of placing
+artifacts in known target directories, artifacts may be placed anywhere -- although
+it is now the responsibility of the task developer to manually upload
+VT / artifact pairs to the cache. Here is a template for how manual caching
+would be implemented in the `execute` method:
 
     def execute(self):
       targets = self.context.targets()

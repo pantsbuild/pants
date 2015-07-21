@@ -133,9 +133,9 @@ class PythonEval(PythonTask):
                             chroot_parent=self.chroot_cache_dir, modules=modules)
       executable_file_content = generator.render()
 
-      with self.temporary_chroot(interpreter=interpreter, pex_info=pexinfo,
-                                 targets=[target], platforms=platforms,
-                                 executable_file_content=executable_file_content) as chroot:
+      with self.cached_chroot(interpreter=interpreter, pex_info=pexinfo,
+                              targets=[target], platforms=platforms,
+                              executable_file_content=executable_file_content) as chroot:
         pex = chroot.pex()
         with self.context.new_workunit(name='eval',
                                        labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],

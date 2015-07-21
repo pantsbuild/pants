@@ -48,12 +48,6 @@ class TargetAddressable(Addressable):
   def addressable_name(self):
     return self.name
 
-  @deprecated(removal_version='0.0.38',
-              hint_message='Use the target description keyword argument instead of the deprecated '
-                           'with_description target method.')
-  def with_description(self, description):
-    self.kwargs['description'] = description
-
   def __str__(self):
     format_str = 'TargetAddressable(target_type={target_type}, name={name}, **kwargs=...)'
     return format_str.format(target_type=self.target_type, name=self.name)

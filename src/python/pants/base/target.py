@@ -123,6 +123,9 @@ class Target(AbstractTarget):
   class UnknownArguments(TargetDefinitionException):
     """Unknown keyword arguments supplied to Target."""
 
+  class IllegalArgument(TargetDefinitionException):
+    """Argument that isn't allowed supplied to Target."""
+
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
