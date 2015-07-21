@@ -12,7 +12,8 @@ A quick hotfix release to pick up a fix related to incorrectly specified scala t
 API Changes
 ~~~~~~~~~~~
 
-None.
+* Remove the with_description method from target.
+  `RB #2507 <https://rbcommons.com/s/twitter/r/2507>`_
 
 Bugfixes
 ~~~~~~~~
