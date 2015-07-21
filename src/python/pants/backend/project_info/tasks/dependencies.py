@@ -30,8 +30,8 @@ class Dependencies(ConsoleTask):
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
     register('--transitive', default=True, action='store_true',
-             help='List transitive dependencies. Prepend with "--no-" to exclusively output '
-                  'the dependencies listed in the BUILD file of each target.')
+             help='List transitive dependencies. Disable to only list dependencies defined '
+                  'in target BUILD file(s).')
 
   def __init__(self, *args, **kwargs):
     super(Dependencies, self).__init__(*args, **kwargs)
@@ -45,10 +45,10 @@ class Dependencies(ConsoleTask):
   def console_output(self, unused_method_argument):
     for target in self.context.target_roots:
       ordered_closure = OrderedSet()
-      if not self._transitive:
-        ordered_closure.update(dep for dep in target.dependencies)
-      else:
+      if self._transitive:
         target.walk(ordered_closure.add)
+      else:
+        ordered_closure.update(target.dependencies)
       for tgt in ordered_closure:
         if not self.is_external_only:
           yield tgt.address.spec
