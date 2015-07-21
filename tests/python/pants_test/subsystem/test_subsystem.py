@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
+from pants.option.optionable import Optionable
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -19,7 +20,7 @@ class DummyOptions(object):
     return object()
 
 
-class DummyTask(object):
+class DummyOptionable(Optionable):
   options_scope = 'foo'
 
 
@@ -32,11 +33,11 @@ class SubsystemTest(unittest.TestCase):
     global_instance = DummySubsystem.global_instance()
     self.assertIs(global_instance, DummySubsystem.global_instance())
 
-  def test_instance_for_task(self):
+  def test_scoped_instance(self):
     # Verify that we get the same instance back every time.
-    task = DummyTask()
-    task_instance = DummySubsystem.instance_for_task(task)
-    self.assertIs(task_instance, DummySubsystem.instance_for_task(task))
+    task = DummyOptionable()
+    task_instance = DummySubsystem.scoped_instance(task)
+    self.assertIs(task_instance, DummySubsystem.scoped_instance(task))
 
   def test_invalid_subsystem_class(self):
     class NoScopeSubsystem(Subsystem):
@@ -44,3 +45,72 @@ class SubsystemTest(unittest.TestCase):
     NoScopeSubsystem._options = DummyOptions()
     with self.assertRaises(NotImplementedError):
       NoScopeSubsystem.global_instance()
+
+  def test_closure_simple(self):
+    self.assertEqual({DummySubsystem}, Subsystem.closure((DummySubsystem,)))
+
+  def test_closure_tree(self):
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+    class SubsystemA(Subsystem):
+      options_scope = 'a'
+
+      @classmethod
+      def dependencies(cls):
+        return (DummySubsystem, SubsystemB)
+
+    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB}, Subsystem.closure((SubsystemA,)))
+    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
+                     Subsystem.closure((SubsystemA, SubsystemB)))
+    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
+                     Subsystem.closure((DummySubsystem, SubsystemA, SubsystemB)))
+
+  def test_closure_graph(self):
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+      @classmethod
+      def dependencies(cls):
+        return (DummySubsystem,)
+
+    class SubsystemA(Subsystem):
+      options_scope = 'a'
+
+      @classmethod
+      def dependencies(cls):
+        return (DummySubsystem, SubsystemB)
+
+    self.assertEqual({DummySubsystem, SubsystemB}, Subsystem.closure((SubsystemB,)))
+
+    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB}, Subsystem.closure((SubsystemA,)))
+    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
+                     Subsystem.closure((SubsystemA, SubsystemB)))
+    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
+                     Subsystem.closure((DummySubsystem, SubsystemA, SubsystemB)))
+
+  def test_closure_cycle(self):
+    class SubsystemC(Subsystem):
+      options_scope = 'c'
+
+      @classmethod
+      def dependencies(cls):
+        return (SubsystemA,)
+
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+      @classmethod
+      def dependencies(cls):
+        return (SubsystemC,)
+
+    class SubsystemA(Subsystem):
+      options_scope = 'a'
+
+      @classmethod
+      def dependencies(cls):
+        return (SubsystemB,)
+
+    self.assertEqual({SubsystemA, SubsystemB, SubsystemC}, Subsystem.closure((SubsystemA,)))
+    self.assertEqual({SubsystemA, SubsystemB, SubsystemC}, Subsystem.closure((SubsystemB,)))
+    self.assertEqual({SubsystemA, SubsystemB, SubsystemC}, Subsystem.closure((SubsystemC,)))
