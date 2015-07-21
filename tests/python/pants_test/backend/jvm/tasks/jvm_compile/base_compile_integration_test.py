@@ -22,27 +22,31 @@ class BaseCompileIT(PantsRunIntegrationTest):
     By default, runs twice to shake out errors related to noops.
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      for i in xrange(0, iterations):
-        pants_run = self.run_test_compile(workdir, target, strategy, clean_all=(i == 0), extra_args=extra_args)
-        if expect_failure:
-          self.assert_failure(pants_run)
-        else:
-          self.assert_success(pants_run)
-      found = defaultdict(set)
-      if expected_files:
-        to_find = set(expected_files)
-        for root, _, files in os.walk(workdir):
-          for file in files:
-            if file in to_find:
-              found[file].add(os.path.join(root, file))
-        to_find.difference_update(found)
-        if not expect_failure:
-          self.assertEqual(set(), to_find,
-                          'Failed to find the following compiled files: {}'.format(to_find))
-      yield found
+      with temporary_dir(root_dir=self.workdir_root()) as cachedir:
+        for i in xrange(0, iterations):
+          pants_run = self.run_test_compile(workdir, cachedir, target,
+                                            strategy, clean_all=(i == 0),
+                                            extra_args=extra_args)
+          if expect_failure:
+            self.assert_failure(pants_run)
+          else:
+            self.assert_success(pants_run)
+        found = defaultdict(set)
+        if expected_files:
+          to_find = set(expected_files)
+          for root, _, files in os.walk(workdir):
+            for file in files:
+              if file in to_find:
+                found[file].add(os.path.join(root, file))
+          to_find.difference_update(found)
+          if not expect_failure:
+            self.assertEqual(set(), to_find,
+                            'Failed to find the following compiled files: {}'.format(to_find))
+        yield found
 
-  def run_test_compile(self, workdir, target, strategy, clean_all=False, extra_args=None):
+  def run_test_compile(self, workdir, cachedir, target, strategy, clean_all=False, extra_args=None):
     args = [
+        '--cache-write-to=[\'{}\']'.format(cachedir),
         'compile',
         '--compile-apt-strategy={}'.format(strategy),
         '--compile-java-strategy={}'.format(strategy),
