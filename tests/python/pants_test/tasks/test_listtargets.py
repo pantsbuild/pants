@@ -88,16 +88,6 @@ class ListTargetsTest(BaseListTargetsTest):
         )
         '''))
 
-    # TODO: Remove this once with_description has been removed
-    self.add_to_build_file('g', dedent('''
-        target(
-          name='g',
-          dependencies=[
-            'a',
-          ],
-        ).with_description("""the description"""),
-        '''))
-
 
   def test_list_path(self):
     self.assert_console_output('a/b:b', targets=[self.target('a/b')])
