@@ -29,16 +29,18 @@ class Checkstyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
-    register('--skip', action='store_true', help='Skip checkstyle.')
-    register('--configuration', help='Path to the checkstyle configuration file.')
-    register('--properties', type=Options.dict, default={},
+    register('--skip', action='store_true', fingerprint=True,
+             help='Skip checkstyle.')
+    register('--configuration', type=Options.file, fingerprint=True,
+             help='Path to the checkstyle configuration file.')
+    register('--properties', type=Options.dict, default={}, fingerprint=True,
              help='Dictionary of property mappings to use for checkstyle.properties.')
     register('--confs', default=['default'],
              help='One or more ivy configurations to resolve for this target. This parameter is '
                   'not intended for general use. ')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run checkstyle with these extra jvm options.')
-    cls.register_jvm_tool(register, 'checkstyle')
+    cls.register_jvm_tool(register, 'checkstyle', fingerprint=True)
 
   @classmethod
   def prepare(cls, options, round_manager):

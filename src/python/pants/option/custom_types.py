@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.base.config import Config
 from pants.option.errors import ParseError
 
@@ -33,6 +35,18 @@ def list_type(s):
   list or tuple.
   """
   return _convert(s, (list, tuple))
+
+
+def target_list_type(s):
+  """Same type as 'list_type', but indicates list contents are target specs."""
+  return _convert(s, (list, tuple))
+
+
+def file_type(s):
+  """Same type as 'str', but indicates string represents a filepath."""
+  if not os.path.isfile(s):
+    raise ParseError('Options file "{filepath}" does not exist.'.format(filepath=s))
+  return s
 
 
 def _convert(val, acceptable_types):

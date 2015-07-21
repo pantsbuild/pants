@@ -18,6 +18,7 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.scope import ScopeInfo
+from pants.util.contextutil import temporary_file_path
 from pants_test.option.fake_config import FakeConfig
 
 
@@ -53,6 +54,8 @@ class OptionsTest(unittest.TestCase):
     # Custom types.
     register_global('--dicty', type=Options.dict, default='{"a": "b"}')
     register_global('--listy', type=Options.list, default='[1, 2, 3]')
+    register_global('--target_listy', type=Options.target_list, default=[':a', ':b'])
+    register_global('--filey', type=Options.file, default='default.txt')
 
     # For the design doc example test.
     register_global('--a', type=int, recursive=True)
@@ -79,6 +82,10 @@ class OptionsTest(unittest.TestCase):
     options.register('stale', '--crufty-boolean', action='store_true',
                      deprecated_version='999.99.9',
                      deprecated_hint='say no to crufty, stale scoped options')
+
+    # For task identity test
+    options.register('compile.scala', '--modifycompile', fingerprint=True)
+    options.register('compile.scala', '--modifylogs')
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
@@ -135,6 +142,15 @@ class OptionsTest(unittest.TestCase):
     # Test dict-typed option.
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
+
+    # Test target_list-typed option.
+    options = self._parse('./pants --target_listy=\'["//:foo", "//:bar"]\'')
+    self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
+
+    # Test file-typed option.
+    with temporary_file_path() as fp:
+      options = self._parse('./pants --filey="{}"'.format(fp))
+      self.assertEqual(fp, options.for_global_scope().filey)
 
   def test_boolean_defaults(self):
     options = self._parse('./pants')
@@ -548,3 +564,14 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
+
+  def test_payload_for_scope(self):
+    val = 'blah blah blah'
+    options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
+
+    payload = options.payload_for_scope('compile.scala')
+
+    self.assertEquals(len(payload.fields), 1)
+    for key, field in payload.fields:
+      self.assertEquals(key, 'modifycompile')
+      self.assertEquals(field.value, val)

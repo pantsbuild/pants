@@ -51,10 +51,12 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
+    workdir_gen = os.path.relpath(os.path.join(bootstrap_option_values.pants_workdir, 'gen'),
+                                  get_buildroot())
     return ('-C-encoding', '-CUTF-8', '-C-g', '-C-Tcolor',
             # Don't warn for generated code.
             '-C-Tnowarnprefixes',
-            '-C{0}'.format(os.path.join(bootstrap_option_values.pants_workdir, 'gen')),
+            '-C{0}'.format(workdir_gen),
             # Suppress warning for annotations with no processor - we know there are many of these!
             '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*')
 
@@ -69,10 +71,12 @@ class JavaCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JavaCompile, cls).register_options(register)
-    register('--source', help='Provide source compatibility with this release.', advanced=True)
-    register('--target', help='Generate class files for this JVM version.', advanced=True)
-    cls.register_jvm_tool(register, 'jmake')
-    cls.register_jvm_tool(register, 'java-compiler')
+    register('--source', advanced=True, fingerprint=True,
+             help='Provide source compatibility with this release.')
+    register('--target', advanced=True, fingerprint=True,
+             help='Generate class files for this JVM version.')
+    cls.register_jvm_tool(register, 'jmake', fingerprint=True)
+    cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
 
   def __init__(self, *args, **kwargs):
     super(JavaCompile, self).__init__(*args, **kwargs)
@@ -93,11 +97,6 @@ class JavaCompile(JvmCompile):
 
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
-
-  # Make the java target language version part of the cache key hash,
-  # this ensures we invalidate if someone builds against a different version.
-  def _language_platform_version_info(self):
-    return [self.get_options().target] if self.get_options().target else []
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
     relative_classpath = relativize_paths(classpath, self._buildroot)

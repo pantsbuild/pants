@@ -9,6 +9,8 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.base.payload import Payload
+from pants.base.payload_field import FileField, PrimitiveField, TargetListField
 from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -73,6 +75,12 @@ class Options(object):
   # will replace the default with the cmd-line value.
   list = staticmethod(custom_types.list_type)
 
+  # A list-typed option that indicates the list elements are target specs.
+  target_list = staticmethod(custom_types.target_list_type)
+
+  # A string-typed option that indicates the string is a filepath.
+  file = staticmethod(custom_types.file_type)
+
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.
@@ -91,7 +99,6 @@ class Options(object):
           ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
         scope = scope.rpartition('.')[0]
     return ret
-
 
   def __init__(self, env, config, known_scope_infos, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
@@ -211,6 +218,24 @@ class Options(object):
     See `Parser.registration_args_iter` for details.
     """
     return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
+
+  def payload_for_scope(self, scope):
+    """Returns a payload representing the options for the given scope."""
+    payload = Payload()
+    for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
+      if not kwargs.get('fingerprint', False):
+        continue
+      val = self.for_scope(scope)[name]
+      val_type = kwargs.get('type', '')
+      if val_type == Options.file:
+        field = FileField(val)
+      elif val_type == Options.target_list:
+        field = TargetListField(val)
+      else:
+        field = PrimitiveField(val)
+      payload.add_field(name, field)
+    payload.freeze()
+    return payload
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,

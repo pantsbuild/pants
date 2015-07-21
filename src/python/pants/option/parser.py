@@ -257,6 +257,7 @@ class Parser(object):
     recursive = argparse_kwargs.pop('recursive', False)
     argparse_kwargs.pop('recursive_root', False)
     argparse_kwargs.pop('registering_class', None)
+    argparse_kwargs.pop('fingerprint', False)
     deprecated_version = argparse_kwargs.pop('deprecated_version', None)
     deprecated_hint = argparse_kwargs.pop('deprecated_hint', '')
 

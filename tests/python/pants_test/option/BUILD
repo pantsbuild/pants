@@ -8,6 +8,7 @@ python_tests(
     '3rdparty/python:pytest',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
+    'src/python/pants/base:payload',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
   ],

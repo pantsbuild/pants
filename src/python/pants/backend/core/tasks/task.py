@@ -16,10 +16,12 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
+from pants.option.options import Options
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.meta import AbstractClass
@@ -174,6 +176,8 @@ class TaskBase(Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
+    self._fingerprint = None
+
   def get_options(self):
     """Returns the option values for this task's scope."""
     return self.context.options.for_scope(self.options_scope)
@@ -192,6 +196,21 @@ class TaskBase(Optionable, AbstractClass):
     workdir path to use.
     """
     return self._workdir
+
+  @property
+  def fingerprint(self):
+    """Returns a fingerprint for the identity of the task.
+
+    A task fingerprint is composed of the options the task is currently running under.
+    Useful for invalidating unchanging targets being executed beneath changing task
+    options that affect outputted artifacts.
+
+    A task's fingerprint is only valid afer the task has been fully initialized.
+    """
+    if not self._fingerprint:
+      payload = self.context.options.payload_for_scope(self.options_scope)
+      self._fingerprint = payload.fingerprint(context=self.context)
+    return self._fingerprint
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -279,6 +298,7 @@ class TaskBase(Optionable, AbstractClass):
     # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
+    fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
     # We separate locally-modified targets from others by coloring them differently.
