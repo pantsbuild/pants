@@ -5,16 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import namedtuple
 import os
 import subprocess
 import unittest
-
-from pants.pantsd.process_manager import ProcessGroup, ProcessManager
-from pants.util.contextutil import temporary_dir
+from collections import namedtuple
 
 import mock
 import psutil
+
+from pants.pantsd.process_manager import ProcessGroup, ProcessManager
+from pants.util.contextutil import temporary_dir
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
