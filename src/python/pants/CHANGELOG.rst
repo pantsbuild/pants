@@ -1,6 +1,36 @@
 RELEASE HISTORY
 ===============
 
+0.0.38 (7/21/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+A quick hotfix release to pick up a fix related to incorrectly specified scala targets.
+
+API Changes
+~~~~~~~~~~~
+
+None.
+
+Bugfixes
+~~~~~~~~
+
+* Handle the case where there are no classes for a target.
+  `RB #2489 <https://rbcommons.com/s/twitter/r/2489>`_
+
+New Features
+~~~~~~~~~~~~
+
+None.
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor AntlrGen to use SimpleCodeGen.
+  `RB #2487 <https://rbcommons.com/s/twitter/r/2487>`_
+
 0.0.37 (7/20/2015)
 ------------------
 
