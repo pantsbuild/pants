@@ -1,61 +1,35 @@
 RELEASE HISTORY
 ===============
 
-0.0.37 (7/20/2015)
+0.0.38 (7/21/2015)
 ------------------
 
 Release Notes
 ~~~~~~~~~~~~~
 
-This is the regularly scheduled release for 7/17/2015 (slightly behind schedule!)
+A quick hotfix release to pick up a fix related to incorrectly specified scala targets.
 
 API Changes
 ~~~~~~~~~~~
 
-* Unified support for process management, to prepare for a new daemon.
-  `RB #2490 <https://rbcommons.com/s/twitter/r/2490>`_
-
-* An iterator over Option registration args.
-  `RB #2478 <https://rbcommons.com/s/twitter/r/2478>`_
-
-* An iterator over OptionValueContainer keys.
-  `RB #2472 <https://rbcommons.com/s/twitter/r/2472>`_
+None.
 
 Bugfixes
 ~~~~~~~~
 
-* Correctly classify files as resources or classes
-  `RB #2488 <https://rbcommons.com/s/twitter/r/2488>`_
-
-* Fix test bugs introduced during the target cache refactor.
-  `RB #2483 <https://rbcommons.com/s/twitter/r/2483>`_
-
-* Don't explicitly enumerate goal scopes: makes life easier for the IntelliJ pants plugin.
-  `RB #2500 <https://rbcommons.com/s/twitter/r/2500>`_
+* Handle the case where there are no classes for a target.
+  `RB #2489 <https://rbcommons.com/s/twitter/r/2489>`_
 
 New Features
 ~~~~~~~~~~~~
 
-* Switch almost all python tasks over to use cached chroots.
-  `RB #2486 <https://rbcommons.com/s/twitter/r/2486>`_
-
-* Add invalidation report flag to reporting subsystem.
-  `RB #2448 <https://rbcommons.com/s/twitter/r/2448>`_
+None.
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Add a note about the pantsbuild slack team.
-  `RB #2491 <https://rbcommons.com/s/twitter/r/2491>`_
-
-* Upgrade pantsbuild/pants to apache thrift 0.9.2.
-  `RB #2484 <https://rbcommons.com/s/twitter/r/2484>`_
-
-* Remove unused --lang option from protobuf_gen.py
-  `RB #2485 <https://rbcommons.com/s/twitter/r/2485>`_
-
-* Update release docs to recommend both server-login and pypi sections.
-  `RB #2481 <https://rbcommons.com/s/twitter/r/2481>`_
+* Refactor AntlrGen to use SimpleCodeGen.
+  `RB #2487 <https://rbcommons.com/s/twitter/r/2487>`_
 
 0.0.36 (7/14/2015)
 ------------------
