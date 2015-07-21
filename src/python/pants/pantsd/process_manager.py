@@ -5,18 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import contextmanager
 import logging
 import os
 import signal
 import subprocess
 import time
 import traceback
+from contextlib import contextmanager
+
+import psutil
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
-
-import psutil
 
 
 logger = logging.getLogger(__name__)
