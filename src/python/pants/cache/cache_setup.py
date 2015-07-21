@@ -51,6 +51,8 @@ class CacheSetup(Subsystem):
                   'caches to choose from.')
     register('--compression-level', advanced=True, type=int, default=5, recursive=True,
              help='The gzip compression level (0-9) for created artifacts.')
+    register('--target-entry-max', advanced=True, recursive=True, type=int, default=None,
+             help='Maximum number of old cache files to keep per task target pair')
 
   @classmethod
   def create_cache_factory_for_task(cls, task):
@@ -140,7 +142,8 @@ class CacheFactory(object):
       path = os.path.join(parent_path, self._stable_name)
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
-      return LocalArtifactCache(artifact_root, path, compression)
+      target_entry_max = self._options.target_entry_max
+      return LocalArtifactCache(artifact_root, path, compression, target_entry_max)
 
     def create_remote_cache(urls, local_cache):
       best_url = self.select_best_url(urls)

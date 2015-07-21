@@ -61,16 +61,39 @@ class BaseLocalArtifactCache(ArtifactCache):
 
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
-  def __init__(self, artifact_root, cache_root, compression):
+  def __init__(self, artifact_root, cache_root, compression, target_entry_max=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
+    :param int target_entry_max: The maximum number of old cache files to leave behind on a cache miss
     """
     super(LocalArtifactCache, self).__init__(artifact_root, compression)
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
-
+    self._target_entry_max = target_entry_max
     safe_mkdir(self._cache_root)
+
+  def prune(self, root):
+    """Prune stale cache files
+
+    If the user specifies the option --cache-target-max-entry then prune will remove all but n old
+    cache files for each target/task.
+
+    If the user has not specified the option --cache-target-max-entry then behavior is unchanged and
+    files will remain in cache indefinitely.
+
+    :param str root: The path under which cacheable artifacts will be cleaned
+    """
+
+    target_entry_max = self._target_entry_max
+    if os.path.isdir(root) and target_entry_max is not None:
+      found_files = []
+      for old_file in os.listdir(root):
+        full_path = os.path.join(root, old_file)
+        found_files.append((full_path, os.path.getmtime(full_path)))
+      found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
+      for cur_file in found_files[self._target_entry_max:]:
+        safe_delete(cur_file[0])
 
   def has(self, cache_key):
     return os.path.isfile(self._cache_file_for_key(cache_key))
@@ -78,6 +101,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _store_tarball(self, cache_key, src):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
+    self.prune(os.path.dirname(dest))  # Remove old cache files
     os.rename(src, dest)
     return dest
 
