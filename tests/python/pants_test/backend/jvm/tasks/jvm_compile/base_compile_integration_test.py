@@ -45,8 +45,11 @@ class BaseCompileIT(PantsRunIntegrationTest):
         yield found
 
   def run_test_compile(self, workdir, cachedir, target, strategy, clean_all=False, extra_args=None):
-    args = [
+    global_args = [
+        '--cache-write',
         '--cache-write-to=[\'{}\']'.format(cachedir),
+    ]
+    args = [
         'compile',
         '--compile-apt-strategy={}'.format(strategy),
         '--compile-java-strategy={}'.format(strategy),
@@ -57,7 +60,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')
-    return self.run_pants_with_workdir(args, workdir)
+    return self.run_pants_with_workdir(global_args + args, workdir)
 
   def get_only(self, found, name):
     files = found[name]
