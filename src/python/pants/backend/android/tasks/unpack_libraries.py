@@ -34,7 +34,21 @@ class AndroidLibraryFingerprintStrategy(DefaultFingerprintStrategy):
     return None
 
 class UnpackLibraries(Task):
-  """Unpack AndroidDependency artifacts, including .jar and .aar libraries."""
+  """Unpack AndroidDependency artifacts, including .jar and .aar libraries.
+
+  The UnpackLibraries task unpacks artifacts imported by AndroidLibraries, as .aar or .jar files,
+  through a 'libraries' attribute. The .aar files may contain components which require creation
+  of some synthetic targets, as well as a classes.jar. The classes.jar is packaged into a
+  JarDependency target and sent to javac compilation. All jar files are then unpacked-
+  android_binaries repack the class files of all the android_libraries in their transitive
+  dependencies into a dex file.
+
+  All archives are unpacked only once, regardless of differing include/exclude patterns or how many
+  targets depend upon it. All targets that depend on a particular artifact will be passed the
+  unpack_libraries product, which is a directory containing the entire source of the unpacked jars.
+  These sources are filtered against the AndroidLibrary's include/exclude patterns during the
+  creation of the dex file.
+  """
 
   class MissingElementException(Exception):
     """Raised if an unpacked file or directory unexpectedly does not exist."""

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.android.targets.android_target import AndroidTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.util.memo import memoized_property
 
 
 class AndroidBinary(AndroidTarget):
@@ -14,15 +15,11 @@ class AndroidBinary(AndroidTarget):
 
   def __init__(self, *args, **kwargs):
     super(AndroidBinary, self).__init__(*args, **kwargs)
-    self._target_sdk = None
 
-  @property
+  @memoized_property
   def target_sdk(self):
     """Return the SDK version to use when compiling this target."""
-    # This is an optional attribute for AndroidLibrary but required for AndroidBinary.
-    if self._target_sdk is None:
-      self._target_sdk = self.manifest.target_sdk
-      if not self._target_sdk:
-        raise TargetDefinitionException(self, "AndroidBinary targets must declare targetSdkVersion"
-                                              " in the AndroidManifest.xml.")
-    return self._target_sdk
+    if not self.manifest.target_sdk:
+      raise TargetDefinitionException(self, "AndroidBinary targets must declare targetSdkVersion "
+                                            "in the AndroidManifest.xml.")
+    return self.manifest.target_sdk

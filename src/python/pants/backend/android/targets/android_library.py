@@ -12,6 +12,7 @@ from pants.backend.android.targets.android_target import AndroidTarget
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.util.memo import memoized_property
 
 
 class AndroidLibrary(ImportJarsMixin, AndroidTarget):
@@ -45,14 +46,12 @@ class AndroidLibrary(ImportJarsMixin, AndroidTarget):
     """
     return self.payload.library_specs
 
-  @property
+  @memoized_property
   def manifest(self):
     """The manifest of the AndroidLibrary, if one exists."""
-    # Libraries may not have a manifest, so allow that to be None for android_library targets.
-    if self._manifest is None:
-      if self._manifest_path is None:
-        return None
-      else:
-        manifest = os.path.join(self._spec_path, self._manifest_path)
-        self._manifest = AndroidManifestParser.parse_manifest(manifest)
-    return self._manifest
+    # Libraries may not have a manifest, so self.manifest can be None for android_libraries.
+    if self._manifest_file is None:
+      return None
+    else:
+      manifest_path = os.path.join(self._spec_path, self._manifest_file)
+    return AndroidManifestParser.parse_manifest(manifest_path)

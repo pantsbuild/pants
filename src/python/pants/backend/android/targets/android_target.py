@@ -10,6 +10,7 @@ import os
 from pants.backend.android.android_manifest_parser import AndroidManifestParser
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.util.memo import memoized_property
 
 
 class AndroidTarget(JvmTarget):
@@ -34,21 +35,18 @@ class AndroidTarget(JvmTarget):
     self.build_tools_version = build_tools_version
     self._spec_path = address.spec_path
 
-    self._manifest_path = manifest
-    self._manifest = None
+    self._manifest_file = manifest
 
-  @property
+  @memoized_property
   def manifest(self):
     """Return an AndroidManifest object made from a manifest by AndroidManifestParser."""
 
-    if self._manifest is None:
-      # If there was no 'manifest' field in the BUILD file, try to find one with the default value.
-      if self._manifest_path is None:
-        self._manifest_path = 'AndroidManifest.xml'
-      manifest = os.path.join(self._spec_path, self._manifest_path)
-      if not os.path.isfile(manifest):
-        raise TargetDefinitionException(self, "There is no AndroidManifest.xml at path {0}. Please "
-                                              "declare a 'manifest' field with its relative "
-                                              "path.".format(manifest))
-      self._manifest = AndroidManifestParser.parse_manifest(manifest)
-    return self._manifest
+    # If there was no 'manifest' field in the BUILD file, try to find one with the default value.
+    if self._manifest_file is None:
+      self._manifest_file = 'AndroidManifest.xml'
+    manifest_path = os.path.join(self._spec_path, self._manifest_file)
+    if not os.path.isfile(manifest_path):
+      raise TargetDefinitionException(self, "There is no AndroidManifest.xml at path {0}. Please "
+                                            "declare a 'manifest' field with its relative "
+                                            "path.".format(manifest_path))
+    return AndroidManifestParser.parse_manifest(manifest_path)
