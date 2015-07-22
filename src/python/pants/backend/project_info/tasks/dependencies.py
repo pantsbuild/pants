@@ -29,20 +29,26 @@ class Dependencies(ConsoleTask):
     register('--external-only', default=False, action='store_true',
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
+    register('--transitive', default=True, action='store_true',
+             help='List transitive dependencies. Disable to only list dependencies defined '
+                  'in target BUILD file(s).')
 
   def __init__(self, *args, **kwargs):
     super(Dependencies, self).__init__(*args, **kwargs)
 
     self.is_internal_only = self.get_options().internal_only
     self.is_external_only = self.get_options().external_only
+    self._transitive = self.get_options().transitive
     if self.is_internal_only and self.is_external_only:
       raise TaskError('At most one of --internal-only or --external-only can be selected.')
-
 
   def console_output(self, unused_method_argument):
     for target in self.context.target_roots:
       ordered_closure = OrderedSet()
-      target.walk(ordered_closure.add)
+      if self._transitive:
+        target.walk(ordered_closure.add)
+      else:
+        ordered_closure.update(target.dependencies)
       for tgt in ordered_closure:
         if not self.is_external_only:
           yield tgt.address.spec
