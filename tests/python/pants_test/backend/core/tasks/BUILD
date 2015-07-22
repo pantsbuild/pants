@@ -58,3 +58,15 @@ python_tests(
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
+
+python_tests(
+  name='cache_cleanup',
+  sources=['test_cache_cleanup.py'],
+  coverage=['pants.backend.core.tasks.bash_completion'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile:java',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+    'src/python/pants/util:contextutil',
+  ]
+)

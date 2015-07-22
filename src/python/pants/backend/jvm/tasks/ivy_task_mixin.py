@@ -309,4 +309,3 @@ class IvyTaskMixin(object):
       '-symlink',
       ]
     return ivy_args
-
