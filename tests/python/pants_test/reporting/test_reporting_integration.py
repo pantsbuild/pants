@@ -44,3 +44,18 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
           elif _POST.match(line):
             post = True
         self.assertTrue(init and pre and post)
+
+  def test_ouput_no_suppression(self):
+    command = ['clean-all', 'compile', '--compile-java-strategy=isolated',
+               'testprojects/src/java/org/pantsbuild/testproject/reporting_example:main']
+    pants_run = self.run_pants(command)
+    self.assert_failure(pants_run, msg='error: unreported exception')
+    self.assertTrue('mandatory_warning: unchecked cast' in pants_run.stdout_data)
+
+  def test_output_with_suppression(self):
+    command = ['clean-all', 'compile', '--compile-java-strategy=isolated',
+               'testprojects/src/java/org/pantsbuild/testproject/reporting_example:main',
+               '--compile-java-level=warn']
+    pants_run = self.run_pants(command)
+    self.assert_failure(pants_run, msg='error: unreported exception')
+    self.assertFalse('mandatory_warning: unchecked cast' in pants_run.stdout_data)

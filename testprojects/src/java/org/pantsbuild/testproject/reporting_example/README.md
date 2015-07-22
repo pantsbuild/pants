@@ -1,0 +1,1 @@
+This tests the reporting system by providing three targets: one that compiles, one with a warning, and one with an error.

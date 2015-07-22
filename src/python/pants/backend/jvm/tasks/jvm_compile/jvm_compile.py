@@ -19,6 +19,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDepen
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.workunit import WorkUnit
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
@@ -357,7 +358,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         ' (',
         progress_message,
         ').')
-      with self.context.new_workunit('compile'):
+      log_config = WorkUnit.LogConfig(level=self.get_options().level, colors=self.get_options().colors)
+      with self.context.new_workunit('compile', log_config=log_config):
         # The compiler may delete classfiles, then later exit on a compilation error. Then if the
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.

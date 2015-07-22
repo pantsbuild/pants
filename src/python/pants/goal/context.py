@@ -199,9 +199,9 @@ class Context(object):
       raise
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """Create a new workunit under the calling thread's current workunit."""
-    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd) as workunit:
+    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd, log_config=log_config) as workunit:
       yield workunit
 
   def acquire_lock(self):
