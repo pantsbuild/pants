@@ -9,6 +9,7 @@ import os
 import re
 import time
 import uuid
+from collections import namedtuple
 
 from six.moves import range
 
@@ -34,6 +35,11 @@ class WorkUnit(object):
   WARNING = 2
   SUCCESS = 3
   UNKNOWN = 4
+
+  # Generic workunit log config.
+  #   log_level: Display log messages up to this level.
+  #   color: log color settings.
+  LogConfig = namedtuple('LogConfig', ['level', 'colors'])
 
   @staticmethod
   def outcome_string(outcome):
@@ -63,7 +69,7 @@ class WorkUnit(object):
 
   PREP = 13      # Running a prep command
 
-  def __init__(self, run_info_dir, parent, name, labels=None, cmd=''):
+  def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
     """
     - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
@@ -73,6 +79,7 @@ class WorkUnit(object):
               display information about this work.
     - cmd: An optional longer string representing this work.
             E.g., the cmd line of a compiler invocation.
+    - log_config: An optional tuple of registered options affecting reporting output.
     """
     self._outcome = WorkUnit.UNKNOWN
 
@@ -84,6 +91,7 @@ class WorkUnit(object):
     self.labels = set(labels or ())
     self.cmd = cmd
     self.id = uuid.uuid4()
+    self.log_config = log_config
 
     # In seconds since the epoch. Doubles, to account for fractional seconds.
     self.start_time = 0
@@ -97,7 +105,10 @@ class WorkUnit(object):
     # Do this last, as the parent's _self_time() might get called before we're
     # done initializing ourselves.
     # TODO: Ensure that a parent can't be ended before all its children are.
+
     if self.parent:
+      if not log_config:
+        self.log_config = self.parent.log_config
       self.parent.children.append(self)
 
   def has_label(self, label):

@@ -37,12 +37,13 @@ class GoalExecutor(object):
                                 self._goal.name)
     with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.GOAL]):
       for name, task_type in reversed(self._tasktypes_by_name.items()):
-        with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
+        task_workdir = os.path.join(goal_workdir, name)
+        task = task_type(self._context, task_workdir)
+        log_config = WorkUnit.LogConfig(level=task.get_options().level, colors=task.get_options().colors)
+        with self._context.new_workunit(name=name, labels=[WorkUnit.TASK], log_config=log_config):
           if explain:
             self._context.log.debug('Skipping execution of {} in explain mode'.format(name))
           else:
-            task_workdir = os.path.join(goal_workdir, name)
-            task = task_type(self._context, task_workdir)
             task.execute()
 
       if explain:
@@ -53,7 +54,6 @@ class GoalExecutor(object):
 
 
 class RoundEngine(Engine):
-
   class DependencyError(ValueError):
     """Indicates a Task has an unsatisfiable data dependency."""
 

@@ -53,7 +53,7 @@ class TestContext(Context):
     artifact_cache_stats = DummyArtifactCacheStats()
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', log_config=None):
     sys.stderr.write('\nStarting workunit {}\n'.format(name))
     yield TestContext.DummyWorkUnit()
 
