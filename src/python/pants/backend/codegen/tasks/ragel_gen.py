@@ -18,13 +18,13 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binary_util import BinaryUtil
+from pants.util.memo import memoized_property
 
 
 class RagelGen(CodeGen):
-  def __init__(self, *args, **kwargs):
-    super(RagelGen, self).__init__(*args, **kwargs)
-    self._java_out = os.path.join(self.workdir, 'gen-java')
-    self._ragel_binary = None
+  @classmethod
+  def global_subsystems(cls):
+    return super(RagelGen, cls).global_subsystems() + (BinaryUtil.Factory,)
 
   @classmethod
   def register_options(cls, register):
@@ -36,11 +36,16 @@ class RagelGen(CodeGen):
              help='The version of ragel to use.  Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants-bootstrapdir')
 
-  @property
+  def __init__(self, *args, **kwargs):
+    super(RagelGen, self).__init__(*args, **kwargs)
+    self._java_out = os.path.join(self.workdir, 'gen-java')
+
+  @memoized_property
   def ragel_binary(self):
-    if self._ragel_binary is None:
-      self._ragel_binary = BinaryUtil.from_options(self.get_options()).select_binary('ragel')
-    return self._ragel_binary
+    binary_util = BinaryUtil.Factory.create()
+    return binary_util.select_binary(self.get_options().supportdir,
+                                     self.get_options().version,
+                                     'ragel')
 
   @property
   def javadeps(self):

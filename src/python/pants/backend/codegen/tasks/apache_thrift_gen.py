@@ -24,7 +24,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.option.options import Options
-from pants.thrift_util import calculate_compile_roots, select_thrift_binary
+from pants.thrift_util import ThriftBinary, calculate_compile_roots
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
 
@@ -64,18 +64,16 @@ class ApacheThriftGen(CodeGen):
              help='Force generation of thrift code for these languages.')
     register('--strict', action='store_true',
              help='Run thrift compiler with strict warnings.')
-    register('--supportdir', advanced=True, default='bin/thrift',
-             help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
-    register('--version', advanced=True, default='0.9.2',
-             help='Thrift compiler version.   Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
     register('--java', advanced=True, type=Options.dict, help='GenInfo for Java.')
     register('--python', advanced=True, type=Options.dict, help='GenInfo for Python.')
 
   @classmethod
   def global_subsystems(cls):
-    return (ThriftDefaults,)
+    return super(ApacheThriftGen, cls).global_subsystems() + (ThriftDefaults,)
+
+  @classmethod
+  def task_subsystems(cls):
+    return super(ApacheThriftGen, cls).task_subsystems() + (ThriftBinary.Factory,)
 
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
@@ -91,7 +89,8 @@ class ApacheThriftGen(CodeGen):
 
   @memoized_property
   def thrift_binary(self):
-    return select_thrift_binary(self.get_options())
+    thrift_binary = ThriftBinary.Factory.scoped_instance(self).create()
+    return thrift_binary.path
 
   def create_geninfo(self, key):
     gen_info = self.get_options()[key]
@@ -115,6 +114,8 @@ class ApacheThriftGen(CodeGen):
   def invalidate_for_files(self):
     # TODO: This will prevent artifact caching across platforms.
     # Find some cross-platform way to assert the thrift binary version.
+    # NB: We have access to the version via the ThriftBinary instance's `version`, we just need
+    # support for invalidation based on non-files.
     return [self.thrift_binary]
 
   def is_gentarget(self, target):
