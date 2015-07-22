@@ -32,7 +32,7 @@ class RagelGen(CodeGen):
     register('--supportdir', default='bin/ragel', advanced=True,
              help='The path to find the ragel binary.  Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants_bootstrapdir.')
-    register('--version', default='6.8', advanced=True,
+    register('--version', default='6.9', advanced=True,
              help='The version of ragel to use.  Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants-bootstrapdir')
 
@@ -75,14 +75,14 @@ class RagelGen(CodeGen):
       output_file = os.path.join(output_dir, calculate_genfile(source))
       safe_mkdir_for(output_file)
 
-      args = [self.ragel_binary, lang_flag, '-o', output_file]
+      args = [self.ragel_binary, lang_flag, '-o', output_file, source]
 
-      args.append(source)
       self.context.log.debug('Executing: {args}'.format(args=' '.join(args)))
       process = subprocess.Popen(args)
       result = process.wait()
       if result != 0:
-        raise TaskError('{binary} ... exited non-zero ({result})'.format(binary=self.ragel_binary, result=result))
+        raise TaskError('{binary} ... exited non-zero ({result})'.format(binary=self.ragel_binary,
+                                                                         result=result))
 
   def _calculate_sources(self, targets):
     sources = set()
