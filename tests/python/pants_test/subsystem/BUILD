@@ -6,6 +6,7 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:pytest',
+    'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
 )

@@ -56,7 +56,7 @@ class CacheSetup(Subsystem):
 
   @classmethod
   def create_cache_factory_for_task(cls, task):
-    return CacheFactory(cls.instance_for_task(task).get_options(),
+    return CacheFactory(cls.scoped_instance(task).get_options(),
                         task.context.log, task.stable_name())
 
 
