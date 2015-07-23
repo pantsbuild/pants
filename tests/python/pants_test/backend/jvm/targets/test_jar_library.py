@@ -16,6 +16,9 @@ from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
 
+jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
+jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
+
 class JarLibraryTest(BaseTest):
 
   @property
@@ -31,8 +34,6 @@ class JarLibraryTest(BaseTest):
       JarLibrary(name="test", jars=[target])
 
   def test_jar_dependencies(self):
-    jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
-    jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
     lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
                      build_graph=self.build_graph,
                      jars=[jar1, jar2])
@@ -48,7 +49,7 @@ class JarLibraryTest(BaseTest):
   def test_excludes(self):
     # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
     lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
-                     build_graph=self.build_graph)
+                     build_graph=self.build_graph, jars=[jar1])
     self.assertEquals([], lib.excludes)
 
   def test_to_jar_dependencies(self):
@@ -82,9 +83,7 @@ class JarLibraryTest(BaseTest):
     assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
     assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')
 
-    jvm_target = JarLibrary(name='dummy', address=SyntheticAddress.parse("//:dummy"),
-                           build_graph=self.build_graph)
-    deps = jvm_target.to_jar_dependencies(jvm_target.address,
+    deps = JarLibrary.to_jar_dependencies(lib1.address,
                                           [':lib1', ':lib2'],
                                           self.build_graph)
     self.assertEquals(3, len(deps))

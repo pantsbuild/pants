@@ -26,6 +26,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'jar_library',
+  sources = ['test_jar_library.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:target',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
   name = 'jvm_app',
   sources = ['test_jvm_app.py'],
   dependencies = [
