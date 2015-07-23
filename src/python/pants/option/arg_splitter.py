@@ -10,6 +10,8 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
+from pants.option.scope import ScopeInfo
+
 
 GLOBAL_SCOPE = ''
 
@@ -64,18 +66,23 @@ class ArgSplitter(object):
 
   _VERSION_ARGS = ('-V', '--version')
 
-  def __init__(self, known_scopes):
-    self._known_scopes = set(known_scopes) | {'help', 'help-advanced', 'help-all'}
+  def __init__(self, known_scope_infos):
+    self._known_scope_infos = known_scope_infos
+    self._known_scopes = (set([si.scope for si in known_scope_infos]) |
+                          {'help', 'help-advanced', 'help-all'})
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._help_request = None  # Will be set if we encounter any help flags.
 
-    # For historical reasons we allow --scope-flag-name anywhere on the cmd line,
-    # as an alternative to ... scope --flag-name. This makes the transition to
-    # the new options system easier, as old-style flags will still work.
+    # For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
+    # cmd line, as an alternative to ... scope --flag-name.
 
-    # Check for prefixes in reverse order, so we match the longest prefix first.
-    self._known_scoping_prefixes = [('{0}-'.format(scope.replace('.', '-')), scope)
-        for scope in filter(None, sorted(self._known_scopes, reverse=True))]
+    # We check for prefixes in reverse order, so we match the longest prefix first.
+    sorted_scope_infos = sorted(filter(lambda si: si.scope, self._known_scope_infos),
+                                key=lambda si: si.scope, reverse=True)
+
+    # List of pairs (prefix, ScopeInfo).
+    self._known_scoping_prefixes = [('{0}-'.format(si.scope.replace('.', '-')), si)
+                                    for si in sorted_scope_infos]
 
   @property
   def help_request(self):
@@ -202,10 +209,17 @@ class ArgSplitter(object):
 
     returns a pair (scope, flag).
     """
-    for scope_prefix, scope in self._known_scoping_prefixes:
+    for scope_prefix, scope_info in self._known_scoping_prefixes:
       for flag_prefix in ['--', '--no-']:
         prefix = flag_prefix + scope_prefix
         if flag.startswith(prefix):
+          scope = scope_info.scope
+          if scope_info.category == ScopeInfo.GLOBAL_SUBSYSTEM and default_scope != GLOBAL_SCOPE:
+            # We allow goal.task --subsystem-foo to refer to the task-level subsystem instance,
+            # i.e., as if qualified by --subsystem-goal-task-foo.
+            task_subsystem_scope = '{}.{}'.format(scope_info.scope, default_scope)
+            if task_subsystem_scope in self._known_scopes:  # Such a task subsystem actually exists.
+              scope = task_subsystem_scope
           return scope, flag_prefix + flag[len(prefix):]
     return default_scope, flag
 

@@ -18,7 +18,6 @@ from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -61,15 +60,6 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
         source,
         target.payload.service_writer))
     return genfiles
-
-  def resolve_deps(self, unresolved_deps):
-    deps = OrderedSet()
-    for dep in unresolved_deps:
-      try:
-        deps.update(self.context.resolve(dep))
-      except AddressLookupError as e:
-        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
-    return deps
 
   def synthetic_target_extra_dependencies(self, target):
     return self.resolve_deps(self.get_options().javadeps)

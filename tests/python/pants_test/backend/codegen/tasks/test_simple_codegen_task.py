@@ -95,7 +95,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                          'Codegen workdir suffix should be stable given the same target!\n'
                          '  target: {}'.format(target.address.spec))
 
-  def test_execute(self):
+  def _test_execute_strategy(self, strategy, expected_execution_count):
     dummy_suffixes = ['a', 'b', 'c',]
 
     self.add_to_build_file('gen-lib', '\n'.join(dedent('''
@@ -109,15 +109,23 @@ class SimpleCodegenTaskTest(TaskTestBase):
                        'org.pantsbuild.example Foo{0}'.format(suffix))
 
     targets = [self.target('gen-lib:{suffix}'.format(suffix=suffix)) for suffix in dummy_suffixes]
-    for strategy in ('global', 'isolated',):
-      task = self._create_dummy_task(target_roots=targets, strategy=strategy)
-      expected_targets = set(targets)
-      found_targets = set(task.codegen_targets())
-      self.assertEqual(expected_targets, found_targets,
-                       'TestGen failed to find codegen target {expected}! Found: [{found}].'
-                       .format(expected=', '.join(t.id for t in expected_targets),
-                               found=', '.join(t.id for t in found_targets)))
-      task.execute()
+    task = self._create_dummy_task(target_roots=targets, strategy=strategy)
+    expected_targets = set(targets)
+    found_targets = set(task.codegen_targets())
+    self.assertEqual(expected_targets, found_targets,
+                     'TestGen failed to find codegen target {expected}! Found: [{found}].'
+                     .format(expected=', '.join(t.id for t in expected_targets),
+                             found=', '.join(t.id for t in found_targets)))
+    task.execute()
+    self.assertEqual(expected_execution_count, task.execution_counts,
+                     '{} strategy had the wrong number of executions!\n  expected: {}\n  got: {}'
+                     .format(strategy, expected_execution_count, task.execution_counts))
+
+  def test_execute_global(self):
+    self._test_execute_strategy('global', 1)
+
+  def test_execute_isolated(self):
+    self._test_execute_strategy('isolated', 3)
 
   def test_execute_fail(self):
     # Ensure whichever strategy is selected, it actually call execute_codegen to trigger our
@@ -230,6 +238,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
       self._all_targets = None
       self.setup_for_testing(None, None)
       self.should_fail = False
+      self.execution_counts = 0
 
     def setup_for_testing(self, test_case, all_targets, forced_codegen_strategy=None,
                           hard_strategy_force=False):
@@ -271,6 +280,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
       return isinstance(target, SimpleCodegenTaskTest.DummyLibrary)
 
     def execute_codegen(self, invalid_targets):
+      self.execution_counts += 1
       if self.should_fail: raise TaskError('Failed to generate target(s)')
       if self.codegen_strategy.name() == 'isolated':
         self._test_case.assertEqual(1, len(invalid_targets),

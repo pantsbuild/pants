@@ -50,5 +50,17 @@ Created by running \`$0\`.
 
 HEADER
 
-  contributors | sort -u | sed -E -e "s|^|+ |" >> CONTRIBUTORS.md
+  (cat - - <(contributors) << FIXED_LIST
+# You can add contributors that don't show up as an author in the git log
+# manually here.  Just add a line for their full name.  Comments and blank
+# lines are ignored.
+
+# Contributor from Square shepherded by Eric.
+Alyssa Pohahau
+
+FIXED_LIST
+) | grep -v -E "^[[:space:]]*#" | \
+    grep -v -E "^[[:space:]]*$" | \
+    sort -u | \
+    sed -E -e "s|^|+ |" >> CONTRIBUTORS.md
 fi

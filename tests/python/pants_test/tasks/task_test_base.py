@@ -11,10 +11,9 @@ from contextlib import closing
 from StringIO import StringIO
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.base.build_environment import get_pants_cachedir
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.util.dirutil import safe_mkdir
+from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 
 
@@ -37,19 +36,22 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
   def decorator(test_fn):
 
     def wrapper(self, *args, **kwargs):
-      task_cache = os.path.join(self.artifact_cache, task_cls.stable_name())
-      safe_mkdir(task_cache, clean=True)
+      with temporary_dir() as artifact_cache:
+        self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                                   write_to=artifact_cache)
+        task_cache = os.path.join(artifact_cache, task_cls.stable_name())
+        os.mkdir(task_cache)
 
-      test_fn(self, *args, **kwargs)
+        test_fn(self, *args, **kwargs)
 
-      num_artifacts = 0
-      for (_, _, files) in os.walk(task_cache):
-        num_artifacts += len(files)
+        num_artifacts = 0
+        for (_, _, files) in os.walk(task_cache):
+          num_artifacts += len(files)
 
-      if expected_num_artifacts is None:
-        self.assertNotEqual(num_artifacts, 0)
-      else:
-        self.assertEqual(num_artifacts, expected_num_artifacts)
+        if expected_num_artifacts is None:
+          self.assertNotEqual(num_artifacts, 0)
+        else:
+          self.assertEqual(num_artifacts, expected_num_artifacts)
 
     return wrapper
 
@@ -75,13 +77,6 @@ class TaskTestBase(BaseTest):
     # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
     # action in this non-JVM-specific, high-level base class.
     Bootstrapper.reset_instance()
-    self.artifact_cache = os.path.join(get_pants_cachedir(), 'artifact_cache')
-    self.set_options_for_scope('cache',
-                               read_from=[self.artifact_cache],
-                               write_to=[self.artifact_cache])
-
-  def disable_artifact_cache(self):
-    self.del_options_for_scope('cache', 'read_from', 'write_to')
 
   @property
   def test_workdir(self):

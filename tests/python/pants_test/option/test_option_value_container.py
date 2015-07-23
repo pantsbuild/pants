@@ -69,6 +69,15 @@ class OptionValueContainerTest(unittest.TestCase):
     with self.assertRaises(AttributeError):
       o['baz']
 
+  def test_iterator(self):
+    o = OptionValueContainer()
+    o.add_forwardings({'a': '_a'})
+    o.add_forwardings({'b': '_b'})
+    o.add_forwardings({'b_prime': '_b'})  # Should be elided in favor of b.
+    o.add_forwardings({'c': '_c'})
+    names = list(iter(o))
+    self.assertListEqual(['a', 'b', 'c'], names)
+
   def test_copy(self):
     # copy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
     o = OptionValueContainer()

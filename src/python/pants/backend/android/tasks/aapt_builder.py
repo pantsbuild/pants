@@ -61,7 +61,7 @@ class AaptBuilder(AaptTask):
     args.extend(['-I', self.android_jar_tool(target.manifest.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
     args.extend(['-F', os.path.join(self.workdir,
-                                    '{0}.unsigned.apk'.format(target.app_name))])
+                                    '{0}.unsigned.apk'.format(target.manifest.package_name))])
     args.extend(inputs)
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
@@ -95,5 +95,5 @@ class AaptBuilder(AaptTask):
           if returncode:
             raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
     for target in targets:
-      apk_name = '{0}.unsigned.apk'.format(target.app_name)
+      apk_name = '{0}.unsigned.apk'.format(target.manifest.package_name)
       self.context.products.get('apk').add(target, self.workdir).append(apk_name)

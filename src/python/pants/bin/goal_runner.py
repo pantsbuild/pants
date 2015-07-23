@@ -11,7 +11,6 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -25,11 +24,13 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
+from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
@@ -99,7 +100,9 @@ class GoalRunner(object):
     known_scope_infos = [ScopeInfo.for_global_scope()]
 
     # Add scopes for all needed subsystems.
-    subsystems = (set(self.subsystems) | Goal.subsystems() | build_configuration.subsystems())
+    subsystems = Subsystem.closure(set(self.subsystems) |
+                                   Goal.subsystems() |
+                                   build_configuration.subsystems())
     for subsystem in subsystems:
       known_scope_infos.append(ScopeInfo(subsystem.options_scope, ScopeInfo.GLOBAL_SUBSYSTEM))
 
@@ -230,7 +233,7 @@ class GoalRunner(object):
         # TODO: This is JVM-specific and really doesn't belong here.
         # TODO: Make this more selective? Only kill nailguns that affect state?
         # E.g., checkstyle may not need to be killed.
-        NailgunTask.killall()
+        NailgunProcessGroup().killall()
     return result
 
   def _do_run(self):
@@ -242,9 +245,14 @@ class GoalRunner(object):
       return False
 
     is_explain = self.global_options.explain
+    if self.reporting.global_instance().get_options().invalidation_report:
+      invalidation_report = InvalidationReport()
+    else:
+      invalidation_report = None
     self.reporting.update_reporting(self.global_options,
                                     is_quiet_task() or is_explain,
-                                    self.run_tracker)
+                                    self.run_tracker,
+                                    invalidation_report=invalidation_report)
 
     context = Context(
       options=self.options,
@@ -254,7 +262,8 @@ class GoalRunner(object):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
-      spec_excludes=self.spec_excludes
+      spec_excludes=self.spec_excludes,
+      invalidation_report=invalidation_report
     )
 
     unknown = []
@@ -267,7 +276,10 @@ class GoalRunner(object):
       return 1
 
     engine = RoundEngine()
-    return engine.execute(context, self.goals)
+    result = engine.execute(context, self.goals)
+    if invalidation_report:
+      invalidation_report.report()
+    return result
 
   def _setup_logging(self, global_options):
     # NB: quiet help says 'Squelches all console output apart from errors'.

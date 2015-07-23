@@ -116,17 +116,9 @@ class GlobalOptionsRegistrar(Optionable):
     register('--fail-fast', action='store_true',
              help='When parsing specs, will stop on the first erronous BUILD file encountered. '
                   'Otherwise, will parse all builds in a spec and then throw an Exception.')
-    register('--pants-support-baseurls', type=Options.list, advanced=True, recursive=True,
-             default = [ 'https://dl.bintray.com/pantsbuild/bin/build-support' ],
-             help='List of urls from which binary tools are downloaded.  Urls are searched in order'
-             'until the requested path is found.')
     register('--max-subprocess-args', type=int, default=100,  advanced=True, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking'
              'the command up into multiple invocations')
-    register('--pants-support-fetch-timeout-secs', type=int, default=30, advanced=True,
-             recursive=True,
-             help='Timeout in seconds for url reads when fetching binary tools from the '
-                  'repos specified by --pants-support-baseurls')
     register('--build-file-rev',
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')

@@ -24,7 +24,7 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
 
   JAVA_MIN = '1.6.0_00'
   JAVA_MAX = '1.7.0_99'
-  TEST_TARGET = 'examples/src/android/example:hello'
+  TEST_TARGET = 'examples/src/android/hello'
 
   @classmethod
   def requirements(cls, tools):
@@ -38,6 +38,6 @@ class AndroidIntegrationTest(PantsRunIntegrationTest):
       return False
     try:
       Distribution.cached(minimum_version=cls.JAVA_MIN, maximum_version=cls.JAVA_MAX)
-    except:
+    except Distribution.Error:
       return False
     return True

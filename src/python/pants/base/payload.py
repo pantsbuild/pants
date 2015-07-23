@@ -78,27 +78,33 @@ class Payload(object):
       self._fields[key] = field
       self._fingerprint_memo = None
 
-  def fingerprint(self, field_keys=None):
+  def fingerprint(self, field_keys=None, context=None):
     """A memoizing fingerprint that rolls together the fingerprints of underlying PayloadFields.
 
     If no fields were hashed (or all fields opted out of being hashed by returning `None`), then
     `fingerprint()` also returns `None`.
 
     :param iterable<string> field_keys: A subset of fields to use for the fingerprint.  Defaults
-      to all fields.
+                                        to all fields.
+    :param Context context: Optional context in which to fingerprint certain fields under.
+                            Required for payloads with TargetListFields, which need a context to
+                            resolve target specs into Targets.
     """
     field_keys = frozenset(field_keys or self._fields.keys())
     if field_keys not in self._fingerprint_memo_map:
-      self._fingerprint_memo_map[field_keys] = self._compute_fingerprint(field_keys)
+      self._fingerprint_memo_map[field_keys] = self._compute_fingerprint(field_keys, context)
     return self._fingerprint_memo_map[field_keys]
 
-  def _compute_fingerprint(self, field_keys):
+  def _compute_fingerprint(self, field_keys, context):
     hasher = sha1()
     empty_hash = True
     for key in sorted(field_keys):
       field = self._fields[key]
       if field is not None:
-        fp = field.fingerprint()
+        if context:
+          fp = field.fingerprint_with_context(context)
+        else:
+          fp = field.fingerprint()
         if fp is not None:
           empty_hash = False
           hasher.update(sha1(key).hexdigest())

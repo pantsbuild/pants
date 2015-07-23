@@ -51,10 +51,15 @@ script fail:
 
   - Configure your pypi credentials locally in `~/.pypirc`
 
-    This will do it:
+    For some versions of python it's necessary to use both a `server-login` and
+    `pypi` section containing the same info. This will do it:
 
         :::bash
         cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
+        [pypi]
+        username: <fill me in>
+        password: <fill me in>
+
         [server-login]
         username: <fill me in>
         password: <fill me in>

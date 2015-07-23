@@ -10,10 +10,12 @@ from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, ManifestEntries, Skip
+from pants.backend.jvm.targets.jvm_binary import (Duplicate, JarRules, JvmBinary, ManifestEntries,
+                                                  Skip)
 from pants.base.address import BuildFileAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
+from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
 
@@ -124,6 +126,11 @@ class JvmBinaryTest(BaseTest):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*foo.*source must be a single'):
       self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
+
+  def test_bad_sources_declaration(self):
+    with self.assertRaisesRegexp(Target.IllegalArgument,
+                                 r'jvm_binary only supports a single "source" argument'):
+      self.make_target('foo:foo', target_type=JvmBinary, main='com.example.Foo', sources=['foo.py'])
 
   def test_bad_main_declaration(self):
     build_file = self.add_to_build_file('BUILD', dedent('''

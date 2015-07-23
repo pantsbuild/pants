@@ -15,8 +15,8 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmC
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
-from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
@@ -40,6 +40,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
+             fingerprint=True,
              help='Pass these args to the compiler.')
 
     register('--confs', type=Options.list, default=['default'],
@@ -63,7 +64,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              advanced=True,
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--strategy', choices=['global', 'isolated'], default='global',
+    register('--strategy', choices=['global', 'isolated'], default='global', fingerprint=True,
              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
@@ -203,23 +204,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self._language,
                                           lambda s: s.endswith(self._file_suffix))
 
-  def _jvm_fingerprint_strategy(self):
-    # Use a fingerprint strategy that allows us to also include java/scala versions.
-    return JvmFingerprintStrategy(self._platform_version_info())
-
-  def _platform_version_info(self):
-    return [self._strategy.name()] + self._language_platform_version_info()
-
-  @abstractmethod
-  def _language_platform_version_info(self):
-    """
-    Provides extra platform information such as java version that will be used
-    in the fingerprinter. This in turn ensures different platform versions create different
-    cache artifacts.
-
-    Subclasses must override this and return a list of version info.
-    """
-    pass
+  def _fingerprint_strategy(self):
+    return TaskIdentityFingerprintStrategy(self)
 
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
@@ -237,7 +223,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
-                                              fingerprint_strategy=self._jvm_fingerprint_strategy())
+                                              fingerprint_strategy=self._fingerprint_strategy())
     self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
 
   def execute_chunk(self, relevant_targets):
@@ -251,8 +237,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=self._jvm_fingerprint_strategy(),
-                          topological_order=True) as invalidation_check:
+                          topological_order=True,
+                          fingerprint_strategy=self._fingerprint_strategy()) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid targets for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
@@ -343,13 +329,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       target = compile_context.target
       classes_dir = compile_context.classes_dir
 
-      def add_products_by_target(classes):
-        classes_by_target[target].add_abs_paths(classes_dir, classes)
-        for cls in classes:
-          clsname = self._strategy.class_name_for_class_file(compile_context, cls)
+      def add_products_by_target(files):
+        for f in files:
+          clsname = self._strategy.class_name_for_class_file(compile_context, f)
           if clsname:
+            # Is a class.
+            classes_by_target[target].add_abs_paths(classes_dir, [f])
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
+          else:
+            # Is a resource.
+            resources_by_target[target].add_abs_paths(classes_dir, [f])
 
       # Collect classfiles (absolute) that were claimed by sources (relative)
       for source in compile_context.sources:

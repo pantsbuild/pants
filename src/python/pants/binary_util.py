@@ -16,6 +16,8 @@ import six.moves.urllib.request as urllib_request
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.option.options import Options
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
 
@@ -42,8 +44,28 @@ _PATH_BY_ID = {
 logger = logging.getLogger(__name__)
 
 
+# TODO(John Sirois): Extract this subsystem to its own file.
 class BinaryUtil(object):
   """Wraps utility methods for finding binary executables."""
+
+  class Factory(Subsystem):
+    options_scope = 'binaries'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--baseurls', type=Options.list, advanced=True,
+               default=['https://dl.bintray.com/pantsbuild/bin/build-support'],
+               help='List of urls from which binary tools are downloaded.  Urls are searched in '
+                    'order until the requested path is found.')
+      register('--fetch-timeout-secs', type=int, default=30, advanced=True,
+               help='Timeout in seconds for url reads when fetching binary tools from the '
+                    'repos specified by --baseurls')
+
+    @classmethod
+    def create(cls):
+      # NB: create is a class method to ~force binary fetch location to be global.
+      options = cls.global_instance().get_options()
+      return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -64,12 +86,7 @@ class BinaryUtil(object):
     pass
 
   @classmethod
-  def from_options(cls, options):
-    return BinaryUtil(options.supportdir, options.version, options.pants_support_baseurls,
-                      options.pants_support_fetch_timeout_secs, options.pants_bootstrapdir)
-
-  @classmethod
-  def select_binary_base_path(cls, supportdir, version, name):
+  def _select_binary_base_path(cls, supportdir, version, name):
     """Calculate the base path.
 
     Exposed for associated unit tests.
@@ -84,46 +101,43 @@ class BinaryUtil(object):
       middle_path = _PATH_BY_ID[os_id(release, machine)]
       if middle_path:
         return os.path.join(supportdir, *(middle_path + [version, name]))
-    raise BinaryUtil.MissingMachineInfo('No {binary} binary found for: {machine_info}'
-        .format(binary=name, machine_info=(sysname, release, machine)))
+    raise cls.MissingMachineInfo('No {binary} binary found for: {machine_info}'
+                                 .format(binary=name, machine_info=(sysname, release, machine)))
 
-
-  def __init__(self, supportdir, version, baseurls, timeout_secs, bootstrapdir):
+  def __init__(self, baseurls, timeout_secs, bootstrapdir):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
-    an instance using the  BinaryUtil.from_options() factory method.
+    an instance using the BinaryUtil.Factory.create() method.
 
-    :param string supportdir: directory to append to the bootstrapdir for caching this binary.
-    :param string version: version number to append to supportdir for caching this binary.
     :param baseurls: URL prefixes which represent repositories of binaries.
     :type baseurls: list of string
     :param int timeout_secs: Timeout in seconds for url reads.
     :param string bootstrapdir: Directory to use for caching binaries.  Uses this directory to
       search for binaries in, or download binaries to if needed.
     """
-    self._supportdir = supportdir
-    self._version = version
     self._baseurls = baseurls
     self._timeout_secs = timeout_secs
     self._pants_bootstrapdir = bootstrapdir
 
   @contextmanager
-  def select_binary_stream(self, name, url_opener=None):
+  def _select_binary_stream(self, supportdir, version, name, url_opener=None):
     """Select a binary matching the current os and architecture.
 
-    :param name: the name of the binary to fetch.
+    :param string supportdir: The path the `name` binaries are stored under.
+    :param string version: The version number of the binary to select.
+    :param string name: The name of the binary to fetch.
     :param url_opener: Optional argument used only for testing, to 'pretend' to open urls.
     :returns: a 'stream' to download it from a support directory. The returned 'stream' is actually
       a lambda function which returns the files binary contents.
     :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
-      and name could not be found.
+      and name could be found for the current platform.
     """
 
     if not self._baseurls:
-      raise BinaryUtil.NoBaseUrlsError(
+      raise self.NoBaseUrlsError(
           'No urls are defined for the --pants-support-baseurls option.')
-    binary_path = BinaryUtil.select_binary_base_path(self._supportdir, self._version, name)
+    binary_path = self._select_binary_base_path(supportdir, version, name)
     if url_opener is None:
       url_opener = lambda u: closing(urllib_request.urlopen(u, timeout=self._timeout_secs))
 
@@ -142,24 +156,26 @@ class BinaryUtil(object):
         accumulated_errors.append('Failed to fetch binary from {url}: {error}'
                                   .format(url=url, error=e))
     if not downloaded_successfully:
-      raise BinaryUtil.BinaryNotFound((self._supportdir, self._version, name), accumulated_errors)
+      raise self.BinaryNotFound((supportdir, version, name), accumulated_errors)
 
-  def select_binary(self, name):
+  def select_binary(self, supportdir, version, name):
     """Selects a binary matching the current os and architecture.
 
-    :param name: the name of the binary to fetch.
+    :param string supportdir: The path the `name` binaries are stored under.
+    :param string version: The version number of the binary to select.
+    :param string name: The name of the binary to fetch.
     :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
-      and name could be found.
+      and name could be found for the current platform.
     """
     # TODO(John Sirois): finish doc of the path structure expected under base_path
-    binary_path = BinaryUtil.select_binary_base_path(self._supportdir, self._version, name)
+    binary_path = self._select_binary_base_path(supportdir, version, name)
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
     print(bootstrapped_binary_path)
     if not os.path.exists(bootstrapped_binary_path):
       downloadpath = bootstrapped_binary_path + '~'
       try:
-        with self.select_binary_stream(name) as stream:
+        with self._select_binary_stream(supportdir, version, name) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
           os.rename(downloadpath, bootstrapped_binary_path)

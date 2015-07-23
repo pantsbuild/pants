@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
@@ -54,3 +55,22 @@ class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStra
 
   def compute_fingerprint(self, target):
     return target.payload.fingerprint()
+
+
+class TaskIdentityFingerprintStrategy(FingerprintStrategy):
+  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target."""
+
+  def __init__(self, task):
+    self._task = task
+
+  def compute_fingerprint(self, target):
+    hasher = hashlib.sha1()
+    hasher.update(target.payload.fingerprint() or '')
+    hasher.update(self._task.fingerprint or '')
+    return hasher.hexdigest()
+
+  def __hash__(self):
+    return hash(self._task.fingerprint)
+
+  def __eq__(self, other):
+    return self._task.fingerprint == other._task.fingerprint

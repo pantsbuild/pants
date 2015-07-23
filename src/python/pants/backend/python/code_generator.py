@@ -7,25 +7,24 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import tempfile
 import textwrap
 
 from twitter.common.dirutil.chroot import RelativeChroot
 
 from pants.backend.python.sdist_builder import SdistBuilder
+from pants.util.dirutil import safe_mkdtemp
 
 
 class CodeGenerator(object):
   class Error(Exception): pass
   class CodeGenerationException(Error): pass
 
-  def __init__(self, target, root_dir, options, target_suffix=None):
+  def __init__(self, workdir, target, root_dir, target_suffix=None):
     self.target = target
-    self.options = options
     self.suffix = target_suffix or ''
     self.root = root_dir
-    self.chroot = RelativeChroot(root_dir, options.for_global_scope().pants_distdir, target.name)
-    codegen_root = tempfile.mkdtemp(dir=self.chroot.path(), prefix='codegen.')
+    self.chroot = RelativeChroot(root_dir, os.path.join(workdir, 'codegen'), target.name)
+    codegen_root = safe_mkdtemp(dir=self.chroot.path(), prefix='codegen.')
     self.codegen_root = os.path.relpath(codegen_root, self.chroot.path())
     self.created_packages = set()
     self.created_namespace_packages = set()

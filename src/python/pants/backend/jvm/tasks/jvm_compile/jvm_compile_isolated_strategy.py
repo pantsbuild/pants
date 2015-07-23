@@ -296,13 +296,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # Collect the artifacts for this target.
     artifacts = []
+    def add_abs_products(p):
+      if p:
+        for _, paths in p.abs_paths():
+          artifacts.extend(paths)
+    # Resources.
     resources_by_target = self.context.products.get_data('resources_by_target')
-    if resources_by_target is not None:
-      for _, paths in resources_by_target[compile_context.target].abs_paths():
-        artifacts.extend(paths)
-    target_classes = self.context.products.get_data('classes_by_target').get(compile_context.target)
-    for _, classfiles in target_classes.abs_paths():
-      artifacts.extend(classfiles)
+    add_abs_products(resources_by_target.get(compile_context.target))
+    # Classes.
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    add_abs_products(classes_by_target.get(compile_context.target))
+    # Log file.
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
       artifacts.append(log_file)
