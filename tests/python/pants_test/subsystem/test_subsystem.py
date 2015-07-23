@@ -111,6 +111,6 @@ class SubsystemTest(unittest.TestCase):
       def dependencies(cls):
         return (SubsystemB,)
 
-    self.assertEqual({SubsystemA, SubsystemB, SubsystemC}, Subsystem.closure((SubsystemA,)))
-    self.assertEqual({SubsystemA, SubsystemB, SubsystemC}, Subsystem.closure((SubsystemB,)))
-    self.assertEqual({SubsystemA, SubsystemB, SubsystemC}, Subsystem.closure((SubsystemC,)))
+    for root in SubsystemA, SubsystemB, SubsystemC:
+      with self.assertRaises(Subsystem.CycleException):
+        Subsystem.closure((root,))
