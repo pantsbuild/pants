@@ -74,7 +74,7 @@ class Export(ConsoleTask):
     :param Exclude jar: key for an excluded jar
     :returns: String representing the key as a maven coordinate
     """
-    return '{0}:{1}'.format(jar.org, jar.name)
+    return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
   @staticmethod
   def _address(address):

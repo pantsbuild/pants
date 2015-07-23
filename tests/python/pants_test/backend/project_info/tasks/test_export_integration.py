@@ -63,8 +63,10 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
       json_data = self.run_export(test_target, workdir, load_libs=True, extra_args=['--resolve-ivy-soft-excludes'])
       self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
+      self.assertIsNotNone(json_data.get('libraries').get('org.pantsbuild:jmake:1.3.8-10'))
       foo_target = json_data.get('targets').get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo')
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
+      self.assertTrue('org.pantsbuild' in foo_target.get('excludes'))
 
   def test_export_jar_path(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
