@@ -104,7 +104,7 @@ class SourceRootTest(unittest.TestCase):
   def check_here_buildroot(self, buildroot_path):
     target = TestTarget("//mock/foo/bar:baz")
     self.assertEqual("mock/foo/bar", SourceRoot.find(target))
-    SourceRoot(".").here()
+    SourceRoot(buildroot_path).here()
     self.assertEqual("", SourceRoot.find(target))
 
   def test_here_buildroot_dot(self):
