@@ -109,6 +109,7 @@ python_library(
     'src/python/pants/base:source_root',
     'src/python/pants:binary_util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

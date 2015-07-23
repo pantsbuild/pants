@@ -25,6 +25,7 @@ from pants.base.source_root import SourceRoot
 from pants.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
+from pants.util.memo import memoized_property
 
 
 class ProtobufGen(SimpleCodegenTask):
@@ -36,17 +37,23 @@ class ProtobufGen(SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
-    register('--version', advanced=True,
+
+    # The protoc version and the plugin names are used as proxies for the identity of the protoc
+    # executable environment here.  Although version is an obvious proxy for the protoc binary
+    # itself, plugin names are less so and plugin authors must include a version in the name for
+    # proper invalidation of protobuf products in the face of plugin modification that affects
+    # plugin outputs.
+    register('--version', advanced=True, fingerprint=True,
              help='Version of protoc.  Used to create the default --javadeps and as part of '
                   'the path to lookup the tool with --pants-support-baseurls and '
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    # TODO(Eric Ayers) Mix the value of this option into the fingerprint
-    register('--plugins', advanced=True, action='append',
+    register('--plugins', advanced=True, fingerprint=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
              default=[])
+
     register('--extra_path', advanced=True, action='append',
              help='Prepend this path onto PATH in the environment before executing protoc. '
                   'Intended to help protoc find its plugins.',
@@ -74,13 +81,12 @@ class ProtobufGen(SimpleCodegenTask):
     self.plugins = self.get_options().plugins
     self._extra_paths = self.get_options().extra_path
 
+  @memoized_property
+  def protobuf_binary(self):
     binary_util = BinaryUtil.Factory.create()
-    self.protobuf_binary = binary_util.select_binary(self.get_options().supportdir,
-                                                     self.get_options().version,
-                                                     'protoc')
-
-  def invalidate_for_files(self):
-    return [self.protobuf_binary]
+    return binary_util.select_binary(self.get_options().supportdir,
+                                     self.get_options().version,
+                                     'protoc')
 
   @property
   def javadeps(self):

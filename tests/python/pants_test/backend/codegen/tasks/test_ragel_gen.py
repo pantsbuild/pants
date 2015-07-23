@@ -94,7 +94,6 @@ class RagelGenTest(TaskTestBase):
     task = self.create_task(self.context(target_roots=[target]))
 
     task._ragel_binary = 'ragel'
-    task.invalidate_for_files = lambda: []
     task._java_out = self.task_outdir
 
     sources = [os.path.join(self.task_outdir, 'com/example/atoi/Parser.java')]
