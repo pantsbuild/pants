@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+import time
+import threading
 import zipfile
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
@@ -232,6 +234,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       return work
 
     jobs = []
+    job_sizes = []
     invalid_target_set = set(invalid_targets)
     for vts in invalid_vts_partitioned:
       assert len(vts.targets) == 1, ("Requested one target per partition, got {}".format(vts))
@@ -251,7 +254,15 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                       # Otherwise, fail it.
                       on_success=vts.update,
                       on_failure=vts.force_invalidate))
-    return jobs
+
+      def file_line_count(fname):
+        with open(fname) as f:
+          x = len(f.readlines())
+        return x
+
+      # job_sizes.append(sum([file_line_count(filepath) for filepath in compile_context.sources]))
+      job_sizes.append(len(compile_context.sources))
+    return jobs, job_sizes
 
   def compile_chunk(self,
                     invalidation_check,
@@ -273,7 +284,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     compile_contexts = self._create_compile_contexts_for_targets(all_targets)
 
     # Now create compile jobs for each invalid target one by one.
-    jobs = self._create_compile_jobs(compile_classpaths,
+    jobs, job_sizes = self._create_compile_jobs(compile_classpaths,
                                      compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
@@ -282,7 +293,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                      register_vts,
                                      update_artifact_cache_vts_work)
 
-    exec_graph = ExecutionGraph(jobs)
+    exec_graph = ExecutionGraph(jobs, job_sizes)
     try:
       exec_graph.execute(self._worker_pool, self.context.log)
     except ExecutionFailure as e:

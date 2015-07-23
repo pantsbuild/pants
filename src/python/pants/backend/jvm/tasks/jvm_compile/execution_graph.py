@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import Queue as queue
+import time
 import traceback
 from collections import defaultdict
+from heapq import heappop, heappush
 
 from pants.base.worker_pool import Work
 
@@ -125,7 +127,7 @@ class ExecutionGraph(object):
   global execution graph.
   """
 
-  def __init__(self, job_list):
+  def __init__(self, job_list, job_sizes):
     """
 
     :param job_list Job: list of Jobs to schedule and run.
@@ -144,6 +146,16 @@ class ExecutionGraph(object):
 
     if len(self._job_keys_with_no_dependencies) == 0:
       raise NoRootJobError()
+
+    self._job_sizes = {}
+    jobs_with_sizes = zip(job_list, job_sizes)
+    for (job, job_size) in jobs_with_sizes:
+      self._job_sizes[job.key] = job_size
+
+    print("COMPUTING WEIGHTS")
+    self._job_weights = dict()
+    self._compute_weights()
+    print("COMPUTED WEIGHTS")
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -164,6 +176,21 @@ class ExecutionGraph(object):
 
     for dep_name in dependency_keys:
       self._dependees[dep_name].append(key)
+
+  def _compute_weights(self):
+    def subgraph_size(v):
+      if self._job_weights.get(v) is not None:
+        return self._job_weights[v]
+
+      max_for_subgraph = 0
+      for dependee_key in self._dependees[v]:
+        max_for_subgraph = max(max_for_subgraph, subgraph_size(dependee_key))
+
+      self._job_weights[v] = self._job_sizes[v] + max_for_subgraph
+      return self._job_weights[v]
+
+    for job_key in self._job_keys_with_no_dependencies:
+      subgraph_size(job_key)
 
   def execute(self, pool, log):
     """Runs scheduled work, ensuring all dependencies for each element are done before execution.
@@ -190,6 +217,10 @@ class ExecutionGraph(object):
 
     status_table = StatusTable(self._job_keys_as_scheduled)
     finished_queue = queue.Queue()
+    in_flight = []
+    heap = queue.PriorityQueue()
+    finish_time = {}
+    completed_dependencies = defaultdict(int)
 
     def submit_jobs(job_keys):
       def worker(worker_key, work):
@@ -198,9 +229,20 @@ class ExecutionGraph(object):
           result = (worker_key, SUCCESSFUL, None)
         except Exception as e:
           result = (worker_key, FAILED, e)
+        finish_time[worker_key] = time.time()
         finished_queue.put(result)
+        print("pushed to queue: {}".format(time.time() - finish_time[worker_key]))
+        in_flight.pop()
 
       for job_key in job_keys:
+        heap.put((-self._job_weights[job_key], job_key))
+
+      while heap.qsize() > 0 and len(in_flight) < pool._pool._processes:
+        priority, job_key = heap.get()
+        in_flight.append(1)
+
+        print("Submitting job {} with priority {}".format(job_key, -priority))
+        print("Currently in heap: " + str(heap))
         status_table.mark_as(QUEUED, job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
@@ -210,6 +252,7 @@ class ExecutionGraph(object):
       while not status_table.are_all_done():
         try:
           finished_key, result_status, value = finished_queue.get(timeout=10)
+          print("popped from queue: {}".format(time.time() - finish_time[finished_key]))
         except queue.Empty:
           log.debug("Waiting on \n  {}\n".format("\n  ".join(
             "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
@@ -220,6 +263,7 @@ class ExecutionGraph(object):
         status_table.mark_as(result_status, finished_key)
 
         # Queue downstream tasks.
+        print("before if succ: {}".format(time.time() - finish_time[finished_key]))
         if result_status is SUCCESSFUL:
           try:
             finished_job.run_success_callback()
@@ -227,10 +271,17 @@ class ExecutionGraph(object):
             log.debug(traceback.format_exc())
             raise ExecutionFailure("Error in on_success for {}".format(finished_key), e)
 
-          ready_dependees = [dependee for dependee in direct_dependees
-                             if status_table.are_all_successful(self._jobs[dependee].dependencies)]
+          print("before computing ready_deps: {}".format(time.time() - finish_time[finished_key]))
+          for dependee in direct_dependees:
+            completed_dependencies[dependee] += 1
 
+          ready_dependees = [dependee for dependee in direct_dependees
+                             # if status_table.are_all_successful(self._jobs[dependee].dependencies)]
+                             if completed_dependencies[dependee] == len(self._jobs[dependee].dependencies)]
+
+          print("before submit: {}".format(time.time() - finish_time[finished_key]))
           submit_jobs(ready_dependees)
+          print("after submit: {}".format(time.time() - finish_time[finished_key]))
         else:  # Failed or canceled.
           try:
             finished_job.run_failure_callback()
