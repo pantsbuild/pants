@@ -19,7 +19,6 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='lessc', action=LessC).install('gen').with_description('Runs Lessc Pre-processor')
-  task(name='requirejs', action=RequireJS
-  ).install('gen').with_description('Runs RequireJS Pre-processor')
-  task(name='rtl', action=RTL).install('gen').with_description('Runs RTL Pre-processor')
+  task(name='lessc', action=LessC).install('gen')
+  task(name='requirejs', action=RequireJS).install('gen')
+  task(name='rtl', action=RTL).install('gen')

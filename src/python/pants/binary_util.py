@@ -155,6 +155,7 @@ class BinaryUtil(object):
     binary_path = BinaryUtil.select_binary_base_path(self._supportdir, self._version, name)
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
+    print(bootstrapped_binary_path)
     if not os.path.exists(bootstrapped_binary_path):
       downloadpath = bootstrapped_binary_path + '~'
       try:

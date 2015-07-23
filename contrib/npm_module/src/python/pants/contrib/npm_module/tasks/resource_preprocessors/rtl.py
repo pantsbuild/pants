@@ -8,8 +8,6 @@ from pants.contrib.npm_module.targets.gen_resources import GenResources
 from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
 
 
-
-
 class RTL(ResourcePreprocessor, NpmModuleBase):
   """
     This Task downloads the RTL module and performs the RTL transformations in the .css files

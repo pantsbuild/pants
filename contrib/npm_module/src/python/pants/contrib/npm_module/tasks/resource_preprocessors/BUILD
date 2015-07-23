@@ -7,9 +7,11 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.util',
     'contrib/npm_module/src/python/pants/contrib/npm_module/targets',
     'contrib/npm_module/src/python/pants/contrib/npm_module/tasks',
+    'src/python/pants:binary_util',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
     'src/python/pants/fs',
+    'src/python/pants/subsytem:subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
