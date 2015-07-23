@@ -109,7 +109,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       """))
 
     self.add_to_build_file('src/thrift/example', dedent("""
-      jar_library(
+      target(
         name='compiled_scala',
         dependencies=[
           ':mybird',
