@@ -59,6 +59,24 @@ class SourceRootTest(unittest.TestCase):
     self.assertEquals(OrderedSet([TestTarget]), SourceRoot.types("tests"))
     self.assertEquals(OrderedSet(["tests"]), SourceRoot.roots(TestTarget))
 
+  def check_buildroot(self, buildroot_path):
+    self._assert_source_root_empty()
+
+    SourceRoot.register(buildroot_path, TestTarget)
+
+    self.assertEquals({".": OrderedSet([TestTarget])}, SourceRoot.all_roots())
+    self.assertEquals(OrderedSet([TestTarget]), SourceRoot.types("."))
+    self.assertEquals(OrderedSet(["."]), SourceRoot.roots(TestTarget))
+
+    target = TestTarget("//mock/foo/bar:baz")
+    self.assertEqual("", SourceRoot.find(target))
+
+  def test_register_buildroot_dot(self):
+    self.check_buildroot(".")
+
+  def test_register_buildroot_empty(self):
+    self.check_buildroot("")
+
   def test_register_none(self):
     self._assert_source_root_empty()
 
@@ -79,12 +97,21 @@ class SourceRootTest(unittest.TestCase):
 
   def test_here(self):
     target = TestTarget("//mock/foo/bar:baz")
-    proxy = AddressableCallProxy(addressable_type=target.get_addressable_type(),
-                                 build_file=None,
-                                 registration_callback=None)
     self.assertEqual("mock/foo/bar", SourceRoot.find(target))
-    SourceRoot("mock/foo").here(proxy)
+    SourceRoot("mock/foo").here()
     self.assertEqual("mock/foo", SourceRoot.find(target))
+
+  def check_here_buildroot(self, buildroot_path):
+    target = TestTarget("//mock/foo/bar:baz")
+    self.assertEqual("mock/foo/bar", SourceRoot.find(target))
+    SourceRoot(".").here()
+    self.assertEqual("", SourceRoot.find(target))
+
+  def test_here_buildroot_dot(self):
+    self.check_buildroot(".")
+
+  def test_here_buildroot_empty(self):
+    self.check_buildroot("")
 
   def test_find(self):
     # When no source_root is registered, it should just return the path from the address

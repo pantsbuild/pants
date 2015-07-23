@@ -26,7 +26,6 @@ class SourceRootTree(object):
   class NestedSourceRootError(Exception):
     pass
 
-
   class Node(object):
     """Node in the tree that represents a directory"""
 
@@ -54,6 +53,10 @@ class SourceRootTree(object):
     def __eq__(self, other):
       return self.key == other.key
 
+  @staticmethod
+  def _dir_list(path):
+    normpath = os.path.normpath(path)
+    return [] if normpath == '.' else normpath.split(os.path.sep)
 
   def __init__(self):
     self._root = self.Node(key="ROOT")
@@ -66,8 +69,7 @@ class SourceRootTree(object):
     :type types: set of classes derived from Target
     """
     curr_node = self._root
-    dir_list = os.path.normpath(source_root).split(os.path.sep)
-    for subdir in dir_list:
+    for subdir in self._dir_list(source_root):
       curr_node = curr_node.get_or_add(subdir)
 
     if curr_node.is_leaf and types != curr_node.types:
@@ -92,8 +94,7 @@ class SourceRootTree(object):
     """
     found = curr_node = self._root
     found_path = []
-    dir_list = os.path.normpath(path).split(os.path.sep)
-    for subdir in dir_list:
+    for subdir in self._dir_list(path):
       curr_node = curr_node.get(subdir)
       if not curr_node:
         break
@@ -215,7 +216,7 @@ class SourceRoot(object):
     """
     target_path = target.address.spec_path
     found_source_root, allowed_types = cls._SOURCE_ROOT_TREE.get_root_and_types(target_path)
-    if not found_source_root:
+    if found_source_root is None:  # NB: '' represents the buildroot, so we explicitly check None.
       # If the source root is not registered, use the path from the spec.
       found_source_root = target_path
 
