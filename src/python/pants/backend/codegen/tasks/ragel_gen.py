@@ -32,7 +32,10 @@ class RagelGen(CodeGen):
     register('--supportdir', default='bin/ragel', advanced=True,
              help='The path to find the ragel binary.  Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants_bootstrapdir.')
-    register('--version', default='6.9', advanced=True,
+
+    # We take the cautious approach here and assume a version bump will always correspond to
+    # changes in ragel codegen products.
+    register('--version', default='6.9', advanced=True, fingerprint=True,
              help='The version of ragel to use.  Used as part of the path to lookup the'
                   'tool with --pants-support-baseurls and --pants-bootstrapdir')
 
@@ -50,9 +53,6 @@ class RagelGen(CodeGen):
   @property
   def javadeps(self):
     return OrderedSet()
-
-  def invalidate_for_files(self):
-    return [self.ragel_binary]
 
   def is_gentarget(self, target):
     return isinstance(target, JavaRagelLibrary)
