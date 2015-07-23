@@ -30,6 +30,10 @@ from pants.util.dirutil import safe_mkdir
 class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
+  def global_subsystems(cls):
+    return super(ProtobufGen, cls).global_subsystems() + (BinaryUtil.Factory,)
+
+  @classmethod
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
     register('--version', advanced=True,
@@ -69,7 +73,11 @@ class ProtobufGen(SimpleCodegenTask):
     super(ProtobufGen, self).__init__(*args, **kwargs)
     self.plugins = self.get_options().plugins
     self._extra_paths = self.get_options().extra_path
-    self.protobuf_binary = BinaryUtil.from_options(self.get_options()).select_binary('protoc')
+
+    binary_util = BinaryUtil.Factory.create()
+    self.protobuf_binary = binary_util.select_binary(self.get_options().supportdir,
+                                                     self.get_options().version,
+                                                     'protoc')
 
   def invalidate_for_files(self):
     return [self.protobuf_binary]

@@ -35,6 +35,7 @@ class DummyTask(Task):
 class MockPinger(object):
   def __init__(self, hosts_to_times):
     self._hosts_to_times = hosts_to_times
+
   # Returns a fake ping time such that the last host is always the 'fastest'.
   def pings(self, hosts):
     return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)

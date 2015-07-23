@@ -32,6 +32,8 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:exceptions',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
@@ -42,6 +44,8 @@ python_library(
   sources=['thrift_util.py'],
   dependencies=[
     ':binary_util',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
   ],
 )
 

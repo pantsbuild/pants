@@ -68,6 +68,7 @@ python_library(
   dependencies = [
     ':sdist_builder',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/util:dirutil'
   ]
 )
 
