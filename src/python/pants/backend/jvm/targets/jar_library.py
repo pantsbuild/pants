@@ -31,14 +31,15 @@ class JarLibrary(Target):
     :param jars: List of `jar <#jar>`_\s to depend upon.
     """
     jars = self.assert_list(jars, expected_type=JarDependency, key_arg='jars')
-    if not jars:
-      TargetDefinitionException(self, 'Must have a non-empty list of jars.')
     payload = payload or Payload()
     payload.add_fields({
       'jars': JarsField(jars),
       'excludes': ExcludesField([]),
     })
     super(JarLibrary, self).__init__(payload=payload, **kwargs)
+    # NB: Waiting to validate until superclasses are initialized.
+    if not jars:
+      raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')
     self.add_labels('jars', 'jvm')
 
   @property
