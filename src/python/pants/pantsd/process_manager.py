@@ -200,9 +200,9 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
-  def is_alive(self, pid=None):
+  def is_alive(self):
     """Return a boolean indicating whether the process is running."""
-    if psutil.pid_exists(pid or self.pid):
+    if self.as_process():
       try:
         if (self.as_process().status == psutil.STATUS_ZOMBIE or           # Check for walkers.
             (self.process_name and self.process_name != self.exe_name)):  # Check for stale pids.
