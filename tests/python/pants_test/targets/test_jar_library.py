@@ -38,6 +38,13 @@ class JarLibraryTest(BaseTest):
                      jars=[jar1, jar2])
     self.assertEquals((jar1, jar2), lib.jar_dependencies)
 
+  def test_empty_jar_dependencies(self):
+    def example():
+      return JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
+                        build_graph=self.build_graph,
+                        jars=[])
+    self.assertRaises(TargetDefinitionException, example)
+
   def test_excludes(self):
     # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
     lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
