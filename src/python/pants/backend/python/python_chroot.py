@@ -166,7 +166,14 @@ class PythonChroot(object):
 
   def resolve(self, targets):
     children = defaultdict(OrderedSet)
+
     def add_dep(trg):
+      # Currently we handle all of our code generation, so we don't want to operate over any
+      # synthetic targets injected upstream.
+      # TODO(John Sirois): Revisit this when building a proper python product pipeline.
+      if trg.is_synthetic:
+        return
+
       for target_type, target_key in self._VALID_DEPENDENCIES.items():
         if isinstance(trg, target_type):
           children[target_key].add(trg)
