@@ -381,7 +381,7 @@ class IvyUtils(object):
   def calculate_classpath(cls, targets, gather_excludes=True):
     jars = OrderedDict()
     global_excludes = set()
-    provide_excludes = list()
+    provide_excludes = set()
     targets_processed = set()
 
     # Support the ivy force concept when we sanely can for internal dep conflicts.
@@ -416,7 +416,7 @@ class IvyUtils(object):
         return
       logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
         target.provides.org, target.provides.name, target))
-      provide_excludes.append(Exclude(org=target.provides.org, name=target.provides.name))
+      provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     def collect_elements(target):
       targets_processed.add(target)
