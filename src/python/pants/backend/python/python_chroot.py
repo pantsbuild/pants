@@ -60,6 +60,7 @@ class PythonChroot(object):
   def __init__(self,
                python_setup,
                python_repos,
+               ivy_bootstrapper,
                thrift_binary_factory,
                interpreter,
                builder,
@@ -68,6 +69,7 @@ class PythonChroot(object):
                extra_requirements=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
+    self._ivy_bootstrapper = ivy_bootstrapper
     self._thrift_binary_factory = thrift_binary_factory
 
     self._interpreter = interpreter
@@ -161,6 +163,7 @@ class PythonChroot(object):
 
   def _generate_antlr_requirement(self, library):
     antlr_builder = functools.partial(PythonAntlrBuilder,
+                                      ivy_bootstrapper=self._ivy_bootstrapper,
                                       workdir=safe_mkdtemp(dir=self.path(), prefix='antlr.'))
     return self._generate_requirement(library, antlr_builder)
 
