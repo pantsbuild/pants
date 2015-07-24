@@ -145,15 +145,14 @@ def register_goals():
 
   # Bundling.
   task(name='jar', action=JarCreate).install('jar')
-  detect_duplicates = task(name='dup', action=DuplicateDetector)
 
   task(name='binary', action=BinaryCreate).install().with_description('Create a runnable binary.')
-  detect_duplicates.install('binary')
 
   task(name='bundle', action=BundleCreate).install().with_description(
       'Create an application bundle from binary targets.')
-  detect_duplicates.install('bundle')
 
+  # Install the duplicate detector as an independent goal, and under the binary goal.
+  task(name='dup', action=DuplicateDetector).install('binary')
   task(name='detect-duplicates', action=DuplicateDetector).install().with_description(
       'Detect duplicate classes and resources on the classpath.')
 
