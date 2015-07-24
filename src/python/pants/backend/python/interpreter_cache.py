@@ -182,9 +182,7 @@ class PythonInterpreterCache(object):
                             fetchers=self._python_repos.get_fetchers(),
                             interpreter=interpreter,
                             context=self._python_repos.get_network_context(),
-                            precedence=precedence,
-                            cache=self._python_setup.resolver_cache_dir,
-                            cache_ttl=self._python_setup.resolver_cache_ttl)
+                            precedence=precedence)
     if not distributions:
       return None
 
