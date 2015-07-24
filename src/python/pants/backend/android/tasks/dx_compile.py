@@ -17,7 +17,16 @@ from pants.util.dirutil import safe_mkdir
 
 class DxCompile(AndroidTask, NailgunTask):
   """
-  Compile java classes into dex files, Dalvik executables.
+  Compile java classes into dex files, Dalvik executables, for AndroidBinary targets.
+
+  Gather the class files of the AndroidBinary and all of its dependencies. This includes the
+  AndroidLibrary targets that the AndroidBinary depends on. AndroidLibrary artifacts (.jars and
+  .aars) were unpacked during the UnpackLibraries task. The DxCompile task will gather all
+  those classes and compile them into a dex file. When gathering the classes, the DxCompile
+  task will filter unpacked AndroidLibraries in order to honor any include/exclude patterns.
+
+  This task will silently skip any duplicate class files but will raise a
+  DuplicateClassFileException if it detects a version conflict in any AndroidLibrary artifacts.
   """
 
   class DuplicateClassFileException(TaskError):

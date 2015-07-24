@@ -27,20 +27,28 @@ logger = logging.getLogger(__name__)
 
 class AaptGen(AaptTask):
   """
-  Handle the processing of resources for Android targets with the
-  Android Asset Packaging Tool (aapt).
-
-  The aapt tool supports 6 major commands: [dump, list, add, remove, crunch, package]
+  Handle the processing of resources for Android targets with the Android Asset Packaging Tool
+  (aapt). The aapt tool supports 6 major commands: [dump, list, add, remove, crunch, package]
   For right now, pants supports 'package'.
 
   Commands and flags for aapt can be seen here:
   https://android.googlesource.com/platform/frameworks/base/+/master/tools/aapt/Command.cpp
+
+  The resources are processed against a set of APIs found in the android.jar that corresponds to
+  the target's target_sdk. AndroidBinary files must declare a target_sdk in their manifest.
+  AndroidLibrary targets _may_ declare a target_sdk but will otherwise use the target_sdk of the
+  dependee AndroidBinary. An AndroidLibrary will need to be processed once for every target_sdk that
+  it supports.
+
+  Each AndroidLibrary is processed individually. AndroidBinary targets are processed along with
+  all of the AndroidLibrary targets in its transitive closure. The output of an AaptGen invocation
+  is an R.java file that allows programmatic access to resources, one each for every AndroidBinary
+  and AndroidLibrary target.
   """
 
   @classmethod
   def _calculate_genfile(cls, package):
     """Name of the file produced by aapt."""
-    # The aapt tool determines this information by parsing the manifest of the target.
     return os.path.join(cls.package_path(package), 'R.java')
 
   @classmethod
@@ -105,12 +113,12 @@ class AaptGen(AaptTask):
   def execute(self):
     # Every android_binary and each android_library dependency must have its resources processed
     # into separate R.java files.
-    # The number of R.java files produced from each library is <= |sdks in play|.
+    # The number of R.java files produced from each library is == |sdks in play|.
     targets = self.context.targets(self.is_aapt_target)
     self.create_sdk_jar_deps(targets)
     for target in targets:
-      sdk = target.target_sdk
-      outdir = self.aapt_out(sdk)
+      dependee_sdk = target.target_sdk
+      outdir = self.aapt_out(dependee_sdk)
 
       gentargets = [target]
       def gather_gentargets(tgt):
@@ -122,12 +130,12 @@ class AaptGen(AaptTask):
       # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
       for gen in gentargets:
-        # AndroidLibraries are not currently required to have a manifest. No manifest = no work.
+        # AndroidLibraries are not currently required to have a manifest. No manifest == no work.
         if gen.manifest:
           # If a library does not specify a target_sdk, use the sdk of its dependee binary.
-          used_sdk = gen.manifest.target_sdk if gen.manifest.target_sdk else sdk
+          used_sdk = gen.manifest.target_sdk if gen.manifest.target_sdk else dependee_sdk
 
-          # Get resource_dir of all AndroidResources targets in the transitive dependencies.
+          # Get resource_dir of all AndroidResources targets in the transitive closure.
           resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
           resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
@@ -141,7 +149,7 @@ class AaptGen(AaptTask):
 
               aapt_gen_file = self._calculate_genfile(gen.manifest.package_name)
               if aapt_gen_file not in self._created_library_targets:
-                new_target = self.create_target(gen, sdk, aapt_gen_file)
+                new_target = self.create_target(gen, used_sdk, aapt_gen_file)
                 self._created_library_targets[aapt_gen_file] = new_target
               gen.inject_dependency(self._created_library_targets[aapt_gen_file].address)
 
