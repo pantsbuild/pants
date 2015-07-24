@@ -60,6 +60,7 @@ class PythonChroot(object):
   def __init__(self,
                python_setup,
                python_repos,
+               ivy_bootstrapper,
                thrift_binary_factory,
                interpreter,
                builder,
@@ -68,6 +69,7 @@ class PythonChroot(object):
                extra_requirements=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
+    self._ivy_bootstrapper = ivy_bootstrapper
     self._thrift_binary_factory = thrift_binary_factory
 
     self._interpreter = interpreter
@@ -161,12 +163,20 @@ class PythonChroot(object):
 
   def _generate_antlr_requirement(self, library):
     antlr_builder = functools.partial(PythonAntlrBuilder,
+                                      ivy_bootstrapper=self._ivy_bootstrapper,
                                       workdir=safe_mkdtemp(dir=self.path(), prefix='antlr.'))
     return self._generate_requirement(library, antlr_builder)
 
   def resolve(self, targets):
     children = defaultdict(OrderedSet)
+
     def add_dep(trg):
+      # Currently we handle all of our code generation, so we don't want to operate over any
+      # synthetic targets injected upstream.
+      # TODO(John Sirois): Revisit this when building a proper python product pipeline.
+      if trg.is_synthetic:
+        return
+
       for target_type, target_key in self._VALID_DEPENDENCIES.items():
         if isinstance(trg, target_type):
           children[target_key].add(trg)

@@ -15,7 +15,20 @@ python_tests(
   sources=['test_python_chroot.py'],
   dependencies=[
     '3rdparty/python:pex',
+    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_chroot',
+    'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/backend/python:python_setup',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:source_root',
+    'src/python/pants/ivy',
+    'src/python/pants/util:contextutil',
+    'src/python/pants:binary_util',
+    'src/python/pants:thrift_util',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:base_test',
   ]
 )
 
