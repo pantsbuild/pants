@@ -36,6 +36,7 @@ install:
 
 env:
   global:
+    - PEX_VERBOSE=5
     - CXX=g++
     - PANTS_CONFIG_OVERRIDE=pants.travis-ci.ini
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
