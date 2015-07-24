@@ -24,25 +24,26 @@ class TestAndroidBase(TaskTestBase):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @staticmethod
-  def android_manifest(package_name=None):
+  def android_manifest(package_name=None, target_sdk=None):
     package_name = package_name or 'org.pantsbuild.example.hello'
+    sdk = target_sdk or 19
     manifest = textwrap.dedent(
       """<?xml version="1.0" encoding="utf-8"?>
       <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="{}" >
           <uses-sdk
               android:minSdkVersion="8"
-              android:targetSdkVersion="19" />
+              android:targetSdkVersion="{}" />
       </manifest>
-      """.format(package_name))
+      """.format(package_name, sdk))
     return manifest
 
   @contextmanager
-  def android_target(self, name=None, package_name=None, dependencies=None,
+  def android_target(self, name=None, package_name=None, target_sdk=None, dependencies=None,
                      target_type=AndroidTarget, **kwargs):
     """Represent an Android target."""
     with temporary_file() as manifest:
-      manifest.write(self.android_manifest(package_name=package_name))
+      manifest.write(self.android_manifest(package_name=package_name, target_sdk=target_sdk))
       manifest.close()
       name = name or 'target'
       deps = dependencies or []
@@ -54,11 +55,12 @@ class TestAndroidBase(TaskTestBase):
       yield target
 
   @contextmanager
-  def android_binary(self, name=None, dependencies=None, package_name=None):
+  def android_binary(self, name=None, dependencies=None, package_name=None, target_sdk=None):
     """Represent an android_binary target."""
     with self.android_target(name=name or 'binary',
                              dependencies=dependencies,
                              package_name=package_name,
+                             target_sdk=target_sdk,
                              target_type=AndroidBinary) as binary:
       yield binary
 

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.android.tasks.aapt_gen import AaptGen
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants_test.android.test_android_base import TestAndroidBase, distribution
 
 
@@ -18,9 +19,6 @@ class TestAaptGen(TestAndroidBase):
   def task_type(cls):
     return AaptGen
 
-  def test_android_library_target(self):
-    pass
-
   def test_aapt_gen_smoke(self):
     task = self.create_task(self.context())
     task.execute()
@@ -28,6 +26,26 @@ class TestAaptGen(TestAndroidBase):
   def test_calculate_genfile(self):
     self.assertEqual(AaptGen._calculate_genfile('com.pants.examples.hello'),
                      os.path.join('com', 'pants', 'examples', 'hello', 'R.java'))
+
+  def test_is_aapt_target(self):
+    with self.android_binary() as android_binary:
+      self.assertTrue(AaptGen.is_aapt_target(android_binary))
+
+  def test_create_sdk_jar_deps(self):
+    with distribution() as dist:
+      with self.android_binary(name='binary1', target_sdk='18') as binary1:
+        with self.android_binary(name='binary2', target_sdk='19') as binary2:
+          self.set_options(sdk_path=dist)
+          task = self.create_task(self.context())
+          targets = [binary1, binary2]
+          task.create_sdk_jar_deps(targets)
+          self.assertEqual(len(task._jar_library_by_sdk), 2)
+          self.assertTrue(isinstance(task._jar_library_by_sdk['18'], JarLibrary))
+          self.assertTrue(isinstance(task._jar_library_by_sdk['19'], JarLibrary))
+
+  def test_not_aapt_target(self):
+    with self.android_library() as android_library:
+      self.assertFalse(AaptGen.is_aapt_target(android_library))
 
   def test_aapt_out(self):
     task = self.create_task(self.context())
@@ -82,8 +100,8 @@ class TestAaptGen(TestAndroidBase):
             with self.android_binary(dependencies=[resources1, library]) as binary:
               self.set_options(sdk_path=dist)
               task = self.create_task(self.context())
-              # Show that all dependent lib and resources are processed with the binary's target sdk
-              # and that the resource dirs are scanned in reverse order of collection.
+              # Show that all dependent lib and resources are processed with the binary's target
+              # sdk and that the resource dirs are scanned in reverse order of collection.
               expected_args = [task.aapt_tool(binary.build_tools_version),
                                'package', '-m', '-J', task.workdir,
                                '-M', resources1.manifest.path,

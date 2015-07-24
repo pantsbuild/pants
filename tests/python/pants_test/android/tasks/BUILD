@@ -56,6 +56,7 @@ python_tests(
   ],
   dependencies = [
     'src/python/pants/backend/android/tasks:all',
+    'src/python/pants/backend/jvm/targets:jvm',
     'tests/python/pants_test/android:android_base',
   ],
 )
