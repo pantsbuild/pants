@@ -414,8 +414,6 @@ class IvyUtils(object):
     def collect_provide_excludes(target):
       if not target.is_exported:
         return
-      # if a source dep is exported, it should always override remote/binary versions
-      # of itself, ie "round trip" dependencies
       logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
         target.provides.org, target.provides.name, target))
       provide_excludes.append(Exclude(org=target.provides.org, name=target.provides.name))
@@ -430,8 +428,8 @@ class IvyUtils(object):
     for target in targets:
       target.walk(collect_elements, predicate=lambda target: target not in targets_processed)
 
-    # When `exclude_provided` is enabled, if a source dep is exported (ie, has a provides clause),
-    # it should always override remote/binary versions of itself, ie "round trip" dependencies.
+    # If a source dep is exported (ie, has a provides clause), it should always override
+    # remote/binary versions of itself, ie "round trip" dependencies.
     # TODO: Move back to applying provides excludes as target-level excludes when they are no
     # longer global.
     if provide_excludes:
