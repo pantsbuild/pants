@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -33,9 +33,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     register('--capture-log', action='store_true', default=False, advanced=True,
             help='Capture compilation output to per-target logs.')
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
-    super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                     language, sources_predicate)
+  def __init__(self, context, options, workdir, all_compile_contexts, analysis_tools, language, sources_predicate):
+    super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, all_compile_contexts,
+                                                     analysis_tools, language, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
@@ -56,20 +56,13 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def name(self):
     return 'isolated'
 
-  def compile_context(self, target):
+  def _compute_compile_context(self, target):
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)
     classes_dir = os.path.join(self._classes_dir, target.id)
     return self.CompileContext(target,
                                analysis_file,
                                classes_dir,
                                self._sources_for_target(target))
-
-  def _create_compile_contexts_for_targets(self, targets):
-    compile_contexts = OrderedDict()
-    for target in targets:
-      compile_context = self.compile_context(target)
-      compile_contexts[target] = compile_context
-    return compile_contexts
 
   def pre_compile(self):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
@@ -243,11 +236,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     extra_compile_time_classpath = self._compute_extra_classpath(
         extra_compile_time_classpath_elements)
 
-    compile_contexts = self._create_compile_contexts_for_targets(all_targets)
-
     # Now create compile jobs for each invalid target one by one.
     jobs = self._create_compile_jobs(compile_classpaths,
-                                     compile_contexts,
+                                     self._all_compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
                                      invalidation_check.invalid_vts_partitioned,

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import abstractmethod, abstractproperty
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 
 from pants.backend.core.tasks.task import Task, TaskBase
 from pants.base.build_graph import invert_dependencies
@@ -318,7 +318,11 @@ class GroupTask(Task):
   def __init__(self, *args, **kwargs):
     super(GroupTask, self).__init__(*args, **kwargs)
 
-    self._group_members = [member_type(self.context, os.path.join(self.workdir, member_type.name()))
+    self._all_compile_contexts = OrderedDict()
+
+    self._group_members = [member_type(context=self.context,
+                                       workdir=os.path.join(self.workdir, member_type.name()),
+                                       all_compile_contexts=self._all_compile_contexts)
                            for member_type in self._member_types()]
 
   @abstractmethod

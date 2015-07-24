@@ -61,7 +61,7 @@ class JvmCompileStrategy(object):
     The abstract base class does not register any options itself: those are left to JvmCompile.
     """
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
+  def __init__(self, context, options, workdir, all_compile_contexts, analysis_tools, language, sources_predicate):
     self._language = language
     self.context = context
     self._analysis_tools = analysis_tools
@@ -72,6 +72,8 @@ class JvmCompileStrategy(object):
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
     self._sources_predicate = sources_predicate
+
+    self._all_compile_contexts = all_compile_contexts
 
     # The ivy confs for which we're building.
     self._confs = options.confs
@@ -86,11 +88,15 @@ class JvmCompileStrategy(object):
     """A tuple of partition_size_hint and locally_changed targets for the given inputs."""
 
   @abstractmethod
-  def compile_context(self, target):
-    """Returns the default/stable compile context for the given target.
+  def _compute_compile_context(self, target):
+    """Computes the default/stable compile context for the given target.
 
-    Temporary compile contexts are private to the strategy.
+    Compile contexts are computed in prepare_compile and shared between group members.
     """
+
+  def compile_context(self, target):
+    """Returns the default/stable compile context for the given target."""
+    return self._all_compile_contexts[target]
 
   @abstractmethod
   def compute_classes_by_source(self, compile_contexts):
@@ -149,11 +155,15 @@ class JvmCompileStrategy(object):
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     """Prepares to compile the given set of targets.
 
-    Has the side effects of pruning old analysis, and computing deleted sources.
+    Has the side effects of pruning old analysis, computing deleted sources, and computing compile contexts.
     """
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
+
+    # Compute compile contexts for targets in the current chunk.
+    for target in relevant_targets:
+      self._all_compile_contexts[target] = self._compute_compile_context(target)
 
   def class_name_for_class_file(self, compile_context, class_file_name):
     if not class_file_name.endswith(".class"):

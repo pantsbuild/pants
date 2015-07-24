@@ -57,9 +57,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
-    super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                   language, sources_predicate)
+  def __init__(self, context, options, workdir, all_compile_contexts, analysis_tools, language, sources_predicate):
+    super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, all_compile_contexts,
+                                                   analysis_tools, language, sources_predicate)
 
     # Various working directories.
     # NB: These are grandfathered in with non-strategy-specific names, but to prevent
@@ -110,10 +110,10 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   def name(self):
     return 'global'
 
-  def compile_context(self, target):
+  def _compute_compile_context(self, target):
     """Returns the default/stable compile context for the given target.
 
-    Temporary compile contexts are private to the strategy.
+    Compile contexts are computed in prepare_compile and shared between group members.
     """
     return self.CompileContext(target,
                                self._analysis_file,
