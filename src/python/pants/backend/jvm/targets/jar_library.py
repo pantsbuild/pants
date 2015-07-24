@@ -9,6 +9,7 @@ import six
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.address import SyntheticAddress
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, JarsField
 from pants.base.target import Target
@@ -29,12 +30,16 @@ class JarLibrary(Target):
     """
     :param jars: List of `jar <#jar>`_\s to depend upon.
     """
+    jars = self.assert_list(jars, expected_type=JarDependency, key_arg='jars')
     payload = payload or Payload()
     payload.add_fields({
-      'jars': JarsField(self.assert_list(jars, expected_type=JarDependency, key_arg='jars')),
+      'jars': JarsField(jars),
       'excludes': ExcludesField([]),
     })
     super(JarLibrary, self).__init__(payload=payload, **kwargs)
+    # NB: Waiting to validate until superclasses are initialized.
+    if not jars:
+      raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')
     self.add_labels('jars', 'jvm')
 
   @property

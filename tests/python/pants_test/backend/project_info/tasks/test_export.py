@@ -43,7 +43,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
 
     self.make_target(
       'project_info:first',
-      target_type=JarLibrary,
+      target_type=Dependencies,
     )
 
     jar_lib = self.make_target(
