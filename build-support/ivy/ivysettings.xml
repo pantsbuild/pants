@@ -1,10 +1,12 @@
 <?xml version="1.0"?>
-<!--
-Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
-Licensed under the Apache License, Version 2.0 (see LICENSE).
--->
 
 <ivysettings>
+
+  <include url="${ivy.default.settings.dir}/ivysettings.xml"/>
+  <properties environment="env" />
+  <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
+  <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
+  <property name="google.repo.dir" value="${env.ANDROID_HOME}/extras/google/m2repository"/>
   <settings defaultResolver="pants-chain-repos"/>
 
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
@@ -26,6 +28,20 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
         <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
       </filesystem>
+
+      <!-- Android SDK Support Library, found in reference to the ANDROID_HOME variable. -->
+      <ibiblio name="local.android"
+               m2compatible="true"
+               usepoms="true"
+               root="file://${android.repo.dir}/"/>
+      <!-- Google Libraries for the Android SDK, found in reference to ANDROID_HOME. -->
+      <ibiblio name="local.google"
+               m2compatible="true"
+               usepoms="true"
+               root="file://${google.repo.dir}/"/>
     </chain>
   </resolvers>
+  <caches default="default" lockStrategy="no-lock" useOrigin="true">
+    <cache name="default" basedir="${ivy.cache.dir}"/>
+  </caches>
 </ivysettings>
