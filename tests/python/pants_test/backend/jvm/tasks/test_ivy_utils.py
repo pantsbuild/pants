@@ -108,12 +108,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.e = self.target('src/java/targets:e')
 
   def test_exclude_exported(self):
-    _, excludes = IvyUtils.calculate_classpath([self.b])
-    self.assertEqual(excludes, {Exclude(org=self.b_org, name=self.b_name)})
-
-  def test_exclude_exported_disabled(self):
-    _, excludes = IvyUtils.calculate_classpath([self.b], automatic_excludes=False)
-    self.assertSetEqual(excludes, set())
+    jars, excludes = IvyUtils.calculate_classpath([self.b])
+    for jar in jars:
+      self.assertEqual(jar.excludes, (Exclude(self.b_org, self.b_name),))
+    self.assertEqual(excludes, set())
 
   def test_exclude_exported_disabled_when_no_excludes_gathered(self):
     _, excludes = IvyUtils.calculate_classpath([self.b], gather_excludes=False)

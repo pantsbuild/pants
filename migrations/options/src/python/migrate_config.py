@@ -316,7 +316,10 @@ notes = {
                              'java and python using the [thrift-binary] scope or else you can '
                              'configure the languages separately using the '
                              '[thrift-binary.gen.thrift] scope to control the version used for '
-                             'java.'
+                             'java.',
+
+  ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
+  ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
 }
 
 
