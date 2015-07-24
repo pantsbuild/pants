@@ -123,7 +123,7 @@ class PythonEval(PythonTask):
         return 0
 
       print('>>> attempting to eval: {}'.format(target))
-      
+
       interpreter = self.select_interpreter_for_targets([target])
 
       if isinstance(target, PythonBinary):

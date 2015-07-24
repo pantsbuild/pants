@@ -90,6 +90,9 @@ class PythonInterpreterCache(object):
   def _setup_paths(self, paths, filters):
     """Find interpreters under paths, and cache them."""
     for interpreter in self._matching(PythonInterpreter.all(paths), filters):
+
+      print('>>> setting up interpreter {}'.format(interpreter))
+
       identity_str = str(interpreter.identity)
       cache_path = os.path.join(self._cache_dir, identity_str)
       pi = self._interpreter_from_path(cache_path, filters)
