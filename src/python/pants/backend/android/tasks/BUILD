@@ -70,7 +70,6 @@ python_library(
     'src/python/pants/backend/jvm/tasks:unpack_jars',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
-    'src/python/pants/util:dirutil',
   ],
 )
 
