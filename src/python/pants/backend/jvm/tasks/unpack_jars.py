@@ -93,8 +93,8 @@ class UnpackJars(Task):
   def calculate_unpack_filter(cls, includes=[], excludes=[], spec=None):
     """Take regex patterns and return a filter function.
 
-    :param list includes: List of include patterns to pass to _unpack_filter.
-    :param list excludes: List of exclude patterns to pass to _unpack_filter.
+    :param list includes: List of include patterns to pass to _file_filter.
+    :param list excludes: List of exclude patterns to pass to _file_filter.
 
     """
     include_patterns = cls._compile_patterns(includes,
