@@ -41,9 +41,7 @@ class JarLibraryTest(BaseTest):
 
   def test_empty_jar_dependencies(self):
     def example():
-      return JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
-                        build_graph=self.build_graph,
-                        jars=[])
+      return self.make_target('//:foo', JarLibrary)
     self.assertRaises(TargetDefinitionException, example)
 
   def test_excludes(self):
