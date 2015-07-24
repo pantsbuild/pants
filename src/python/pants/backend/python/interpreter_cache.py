@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pex.installer import WheelInstaller
 from pex.interpreter import PythonIdentity, PythonInterpreter
-from pex.package import Package
+from pex.package import EggPackage, Package, SourcePackage, WheelPackage
 from pex.resolver import resolve
 
 from pants.util.dirutil import safe_concurrent_create, safe_mkdir
@@ -170,11 +171,15 @@ class PythonInterpreterCache(object):
       if bdist.satisfies(requirement):
         return bdist
 
-    # We accept the default `precedence` of WheelPackage, EggPackage, SourcePackage here.
+    # Since we're resolving to bootstrap a bare interpreter, we won't have wheel available.
+    # Explicitly set the precedence to avoid resolution of wheels or distillation of sdists into
+    # wheels.
+    precedence = (EggPackage, SourcePackage)
     distributions = resolve(requirements=[requirement],
                             fetchers=self._python_repos.get_fetchers(),
                             interpreter=interpreter,
                             context=self._python_repos.get_network_context(),
+                            precedence=precedence,
                             cache=self._python_setup.resolver_cache_dir,
                             cache_ttl=self._python_setup.resolver_cache_ttl)
     if not distributions:
