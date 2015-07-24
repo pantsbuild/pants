@@ -72,7 +72,6 @@ class TestAaptGen(TestAndroidBase):
                                   'android-{}'.format(target.manifest.target_sdk), 'android.jar')
         self.assertEqual(task.android_jar_tool(target.manifest.target_sdk), jar_folder)
 
-
   def test_render_args(self):
     with distribution() as dist:
       with self.android_resources() as android_resources:
@@ -90,7 +89,6 @@ class TestAaptGen(TestAndroidBase):
           self.assertEqual(expected_args, task._render_args(target, target.target_sdk,
                                                             [android_resources.resource_dir],
                                                             task.workdir))
-
 
   def test_render_args_with_android_library(self):
     with distribution() as dist:

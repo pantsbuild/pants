@@ -239,7 +239,7 @@ class DxCompileTest(TestAndroidBase):
         # Should be just one copy of each class gathered.
         self.assertEqual(len(gathered_classes), 3)
 
-  def test_duplicate_library_version_deps(self):
+  def test_dependency_version_conflict(self):
     with self.assertRaises(DxCompile.DuplicateClassFileException):
       with self.android_library() as android_library:
         with self.android_binary(dependencies=[android_library]) as binary:
