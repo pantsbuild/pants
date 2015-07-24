@@ -59,12 +59,14 @@ Created by running `./build-support/bin/contributors.sh`.
 + Larry Hosken
 + Lei Wang
 + Leo Kim
++ Luc Cary
 + Marc Abramowitz
 + Marius Eriksen
 + Mark Chu-Carroll
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
++ Matt Olsen
 + Matthew Jeffryes
 + Maxim Khutornenko
 + Michael Doherty

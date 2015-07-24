@@ -4,16 +4,15 @@ RELEASE HISTORY
 0.0.39 (7/23/2015)
 ------------------
 
-Release Notes
-~~~~~~~~~~~~~
-
 API Changes
 ~~~~~~~~~~~
+
 * Disallow jar_library targets without jars
   `RB #2519 <https://rbcommons.com/s/twitter/r/2519>`_
 
 Bugfixes
 ~~~~~~~~
+
 * Fixup PythonChroot to ignore synthetic targets.
   `RB #2523 <https://rbcommons.com/s/twitter/r/2523>`_
 
@@ -31,6 +30,7 @@ Bugfixes
 
 New Features
 ~~~~~~~~~~~~
+
 * Invalidate tasks based on BinaryUtil.version.
   `RB #2516 <https://rbcommons.com/s/twitter/r/2516>`_
 
@@ -38,7 +38,7 @@ New Features
   `Issue #1762 <https://github.com/pantsbuild/pants/issues/1762>`_
   `RB #2506 <https://rbcommons.com/s/twitter/r/2506>`_
 
-* Option to expose intransitive target dependencies
+* Option to expose intransitive target dependencies for the dependencies goal
   `RB #2503 <https://rbcommons.com/s/twitter/r/2503>`_
 
 * Introduce Subsystem dependencies.
@@ -47,12 +47,12 @@ New Features
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 * Increase robustness of ProcessManager.terminate() in the face of zombies.
   `RB #2513 <https://rbcommons.com/s/twitter/r/2513>`_
 
 * A global isort fix.
   `RB #2510 <https://rbcommons.com/s/twitter/r/2510>`_
-
 
 0.0.38 (7/21/2015)
 ------------------
