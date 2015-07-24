@@ -122,8 +122,6 @@ class PythonEval(PythonTask):
         # Nothing to eval, so a trivial compile success.
         return 0
 
-      print('>>> attempting to eval: {}'.format(target))
-
       interpreter = self.select_interpreter_for_targets([target])
 
       if isinstance(target, PythonBinary):
