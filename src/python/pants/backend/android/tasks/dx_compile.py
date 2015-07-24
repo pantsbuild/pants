@@ -57,7 +57,9 @@ class DxCompile(AndroidTask, NailgunTask):
     self._forced_build_tools = self.get_options().build_tools_version
     self._forced_jvm_options = self.get_options().jvm_options
 
-    #self.setup_artifact_cache()
+  @property
+  def cache_target_dirs(self):
+    return True
 
   def _render_args(self, outdir, classes):
     dex_file = os.path.join(outdir, self.DEX_NAME)
@@ -69,8 +71,6 @@ class DxCompile(AndroidTask, NailgunTask):
     #   : '--output' tells the dx.jar where to put and what to name the created file.
     #            See comment on self.classes_dex for restrictions.
     args.extend(['--dex', '--no-strict', '--output={0}'.format(dex_file)])
-
-    # classes is a set of class files to be included in the created dex file.
     args.extend(classes)
     return args
 
@@ -145,20 +145,15 @@ class DxCompile(AndroidTask, NailgunTask):
     targets = self.context.targets(self.is_dextarget)
 
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = []
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.extend(vt.targets)
-      for target in invalid_targets:
-        outdir = self.dx_out(target)
-        safe_mkdir(outdir)
-        classes = self._gather_classes(target)
-        if not classes:
-          raise self.EmptyDexError("No classes were found for {}.".format(target))
+      for vt in invalidation_check.all_vts:
+        if not vt.valid:
+          classes = self._gather_classes(vt.target)
+          if not classes:
+            raise self.EmptyDexError("No classes were found for {}.".format(vt.target))
 
-        args = self._render_args(outdir, classes)
-        self._compile_dex(args, target.build_tools_version)
-    for target in targets:
-      self.context.products.get('dex').add(target, self.dx_out(target)).append(self.DEX_NAME)
+          args = self._render_args(vt.results_dir, classes)
+          self._compile_dex(args, vt.target.build_tools_version)
+        self.context.products.get('dex').add(vt.target, vt.results_dir).append(self.DEX_NAME)
 
   def dx_jar_tool(self, build_tools_version):
     """Return the appropriate dx.jar.
@@ -168,7 +163,3 @@ class DxCompile(AndroidTask, NailgunTask):
     build_tools = self._forced_build_tools if self._forced_build_tools else build_tools_version
     dx_jar = os.path.join('build-tools', build_tools, 'lib', 'dx.jar')
     return self.android_sdk.register_android_tool(dx_jar)
-
-  def dx_out(self, target):
-    """Return the outdir for the DxCompile task."""
-    return os.path.join(self.workdir, target.id)

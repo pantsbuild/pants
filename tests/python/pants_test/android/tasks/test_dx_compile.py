@@ -283,11 +283,6 @@ class DxCompileTest(TestAndroidBase):
         dx_jar = os.path.join(dist, 'build-tools', '20.0.0', 'lib/dx.jar')
         self.assertEqual(task.dx_jar_tool(android_binary.build_tools_version),dx_jar)
 
-  def test_dx_out(self):
-    with self.android_binary() as binary:
-      task = self.create_task(self.context())
-      self.assertEqual(task.dx_out(binary), os.path.join(task.workdir, binary.id))
-
   def test_is_dex_target(self):
     with self.android_library() as library:
       with self.android_binary() as binary:
