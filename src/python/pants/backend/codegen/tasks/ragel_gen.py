@@ -9,15 +9,13 @@ import os
 import re
 import subprocess
 
-from twitter.common.dirutil import safe_mkdir, safe_mkdir_for
-
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binary_util import BinaryUtil
-from pants.util.contextutil import pushd
+from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 
 
@@ -60,22 +58,20 @@ class RagelGen(SimpleCodegenTask):
   def execute_codegen(self, invalid_targets):
     for target in invalid_targets:
       output_dir = self.codegen_workdir(target)
-      safe_mkdir(output_dir)
-      with pushd(output_dir):
-        for source in target.sources_relative_to_buildroot():
-          abs_source = os.path.join(get_buildroot(), source)
+      for source in target.sources_relative_to_buildroot():
+        abs_source = os.path.join(get_buildroot(), source)
 
-          output_file = calculate_genfile(abs_source)
-          safe_mkdir_for(output_file)
+        output_file = os.path.join(output_dir, calculate_genfile(abs_source))
+        safe_mkdir_for(output_file)
 
-          args = [self.ragel_binary, '-J', '-o', output_file, abs_source]
+        args = [self.ragel_binary, '-J', '-o', output_file, abs_source]
 
-          self.context.log.debug('Executing: {args}'.format(args=' '.join(args)))
-          process = subprocess.Popen(args)
-          result = process.wait()
-          if result != 0:
-            raise TaskError('{binary} ... exited non-zero ({result})'
-                            .format(binary=self.ragel_binary, result=result))
+        self.context.log.debug('Executing: {args}'.format(args=' '.join(args)))
+        process = subprocess.Popen(args)
+        result = process.wait()
+        if result != 0:
+          raise TaskError('{binary} ... exited non-zero ({result})'
+                          .format(binary=self.ragel_binary, result=result))
 
 
 def calculate_class_and_package(path):
@@ -102,7 +98,7 @@ def calculate_class_and_package(path):
 
 
 def get_filename(package, classname):
-  return "{package}/{cls}.java".format (package=package.replace(".", os.path.sep), cls=classname)
+  return "{package}/{cls}.java".format(package=package.replace(".", os.path.sep), cls=classname)
 
 
 def calculate_genfile(path):
