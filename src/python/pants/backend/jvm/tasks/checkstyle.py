@@ -45,12 +45,12 @@ class Checkstyle(NailgunTask):
                           main=cls._CHECKSTYLE_MAIN,
                           custom_rules=[
                               # Checkstyle uses reflection to load checks and has an affordance that
-                              # allows leaving off a check classes package name.  This affordance
+                              # allows leaving off a check classes' package name.  This affordance
                               # breaks for built-in checkstyle checks under shading so we ensure all
                               # checkstyle packages are excluded from shading such that just its
-                              # thrift party transitive deps (guava and the like), are shaded.
-                              # See the module configuration rules here
-                              # http://checkstyle.sourceforge.net/config.html#Modules
+                              # third party transitive deps (guava and the like), are shaded.
+                              # See the module configuration rules here which describe this:
+                              #   http://checkstyle.sourceforge.net/config.html#Modules
                               Shader.exclude_package('com.puppycrawl.tools.checkstyle',
                                                      recursive=True),
                           ])
