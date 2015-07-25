@@ -142,7 +142,7 @@ class JavaCompile(JvmCompile):
                           main=JavaCompile._JMAKE_MAIN,
                           jvm_options=self._jvm_options,
                           args=args,
-                          workunit_name='jmake',
+                          workunit_name=self.name(),
                           workunit_labels=[WorkUnit.COMPILER])
     if result:
       default_message = 'Unexpected error - JMake returned {}'.format(result)
