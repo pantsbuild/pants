@@ -13,7 +13,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
-class PythonRequirementListTest(BaseTest):
+class PythonRequirementLibraryTest(BaseTest):
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
