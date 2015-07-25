@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
 
 
@@ -32,6 +33,11 @@ class AaptTask(AndroidTask):
   def package_path(cls, package):
     """Return the package name translated into a path."""
     return package.replace('.', os.sep)
+
+  @staticmethod
+  def is_android_binary(target):
+    """Return True for AndroidBinary targets."""
+    return isinstance(target, AndroidBinary)
 
   def __init__(self, *args, **kwargs):
     super(AaptTask, self).__init__(*args, **kwargs)

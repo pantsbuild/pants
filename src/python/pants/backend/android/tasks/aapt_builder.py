@@ -28,7 +28,7 @@ class AaptBuilder(AaptTask):
   """
 
   @staticmethod
-  def is_app(target):
+  def is_binary(target):
     """Return True if the target is an AndroidBinary."""
     return isinstance(target, AndroidBinary)
 
@@ -71,7 +71,7 @@ class AaptBuilder(AaptTask):
 
   def execute(self):
     safe_mkdir(self.workdir)
-    targets = self.context.targets(self.is_app)
+    targets = self.context.targets(self.is_binary)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:

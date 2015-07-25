@@ -38,7 +38,7 @@ class DxCompile(AndroidTask, NailgunTask):
   DEX_NAME = 'classes.dex'
 
   @staticmethod
-  def is_dextarget(target):
+  def is_android_binary(target):
     """Return True if target has class files to be compiled into dex."""
     return isinstance(target, AndroidBinary)
 
@@ -84,6 +84,8 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def _compile_dex(self, args, build_tools_version):
     classpath = [self.dx_jar_tool(build_tools_version)]
+
+    # TODO(mateor) Declare a task_subsystems dependency on JVM and use that to get options.
     jvm_options = self._forced_jvm_options if self._forced_jvm_options else None
     java_main = 'com.android.dx.command.Main'
     return self.runjava(classpath=classpath, jvm_options=jvm_options, main=java_main,
@@ -92,7 +94,7 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def _filter_unpacked_dir(self, target, unpacked_dir, class_files):
     # The Dx tool returns failure if more than one copy of a class is packed into the dex file and
-    #  it is easy to fetch duplicate libraries (as well as conflicting versions) from the SDK repos.
+    # it is easy to fetch duplicate libraries (as well as conflicting versions) from the SDK repos.
     # This filters the contents of the unpacked_dir against the include/exclude patterns of the
     # target, then compares the filtered files against previously gathered class_files to
     # dedupe and detect version conflicts.
@@ -150,7 +152,7 @@ class DxCompile(AndroidTask, NailgunTask):
     return gathered_classes
 
   def execute(self):
-    targets = self.context.targets(self.is_dextarget)
+    targets = self.context.targets(self.is_android_binary)
 
     with self.invalidated(targets) as invalidation_check:
       for vt in invalidation_check.all_vts:

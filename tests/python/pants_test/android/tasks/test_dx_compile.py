@@ -286,5 +286,5 @@ class DxCompileTest(TestAndroidBase):
   def test_is_dex_target(self):
     with self.android_library() as library:
       with self.android_binary() as binary:
-        self.assertTrue(DxCompile.is_dextarget(binary))
-        self.assertFalse(DxCompile.is_dextarget(library))
+        self.assertTrue(DxCompile.is_android_binary(binary))
+        self.assertFalse(DxCompile.is_android_binary(library))

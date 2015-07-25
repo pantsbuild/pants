@@ -56,6 +56,7 @@ python_library(
   name = 'aapt_task',
   sources = ['aapt_task.py'],
   dependencies = [
+    'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:android_task',
   ],
 )

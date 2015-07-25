@@ -27,10 +27,6 @@ class TestAaptGen(TestAndroidBase):
     self.assertEqual(AaptGen._calculate_genfile('com.pants.examples.hello'),
                      os.path.join('com', 'pants', 'examples', 'hello', 'R.java'))
 
-  def test_is_aapt_target(self):
-    with self.android_binary() as android_binary:
-      self.assertTrue(AaptGen.is_aapt_target(android_binary))
-
   def test_create_sdk_jar_deps(self):
     with distribution() as dist:
       with self.android_binary(name='binary1', target_sdk='18') as binary1:
@@ -42,10 +38,6 @@ class TestAaptGen(TestAndroidBase):
           self.assertEqual(len(task._jar_library_by_sdk), 2)
           self.assertTrue(isinstance(task._jar_library_by_sdk['18'], JarLibrary))
           self.assertTrue(isinstance(task._jar_library_by_sdk['19'], JarLibrary))
-
-  def test_not_aapt_target(self):
-    with self.android_library() as android_library:
-      self.assertFalse(AaptGen.is_aapt_target(android_library))
 
   def test_aapt_out(self):
     task = self.create_task(self.context())
