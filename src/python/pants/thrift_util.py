@@ -82,20 +82,6 @@ def calculate_compile_sources(targets, is_thrift_target):
   return basedirs, sources
 
 
-def calculate_compile_roots(targets, is_thrift_target):
-  """Calculates the minimal set of thrift source files that need to be compiled.
-
-  A tuple of (include basedirs, root thrift sources) is returned.
-
-  :targets: The targets to examine.
-  :is_thrift_target: A predicate to pick out thrift targets for consideration in the analysis.
-  """
-
-  basedirs, sources = calculate_compile_sources(targets, is_thrift_target)
-  sources = find_root_thrifts(basedirs, sources)
-  return basedirs, sources
-
-
 # TODO(John Sirois): Extract this subsystem to its own file.
 class ThriftBinary(object):
   """Encapsulates access to pre-built thrift static binaries."""
