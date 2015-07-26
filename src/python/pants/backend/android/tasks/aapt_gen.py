@@ -112,30 +112,21 @@ class AaptGen(AaptTask):
     targets = self.context.targets(self.is_android_binary)
     self.create_sdk_jar_deps(targets)
     for target in targets:
-      dependee_sdk = target.target_sdk
-      outdir = self.aapt_out(dependee_sdk)
+      outdir = self.aapt_out(target.target_sdk)
+      libraries = self.context.build_graph.transitive_subgraph_of_addresses([target.address])
 
-      gentargets = [target]
-      def gather_gentargets(tgt):
-        """Gather targets that have an AndroidResources dependency."""
-        if isinstance(tgt, AndroidLibrary):
-          # AndroidLibraries are not currently required to have a manifest. No manifest == no work.
-          if tgt.manifest:
-            gentargets.append(tgt)
-      target.walk(gather_gentargets)
+      # AndroidLibraries are not required to have a manifest. No manifest == no work.
+      library_deps = [t for t in libraries if isinstance(t, AndroidLibrary) and t.manifest]
 
       # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
-      for gen in gentargets:
-        # If a library does not specify a target_sdk, use the sdk of its dependee binary.
-        used_sdk = gen.manifest.target_sdk if gen.manifest.target_sdk else dependee_sdk
-
+      for gen in library_deps:
         # Get resource_dir of all AndroidResources targets in the transitive closure.
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
         if resource_dirs:
-          args = self._render_args(gen, used_sdk, resource_dirs, outdir)
+          args = self._render_args(gen, target.target_sdk, resource_dirs, outdir)
           with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
             returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                          stderr=workunit.output('stderr'))
@@ -144,7 +135,7 @@ class AaptGen(AaptTask):
 
             aapt_gen_file = self._calculate_genfile(gen.manifest.package_name)
             if aapt_gen_file not in self._created_library_targets:
-              new_target = self.create_target(gen, used_sdk, aapt_gen_file)
+              new_target = self.create_target(gen, target.target_sdk, aapt_gen_file)
               self._created_library_targets[aapt_gen_file] = new_target
             gen.inject_dependency(self._created_library_targets[aapt_gen_file].address)
 
