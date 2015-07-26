@@ -77,12 +77,8 @@ class AaptBuilder(AaptTask):
         for basedir in mapping.get(target):
           input_dirs.append(basedir)
 
-        resource_dirs = []
-        def gather_resources(target):
-          """Gather the 'resource_dir's of the target's AndroidResources dependencies."""
-          if isinstance(target, AndroidResources):
-            resource_dirs.append(target.resource_dir)
-        target.walk(gather_resources)
+        resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([target.address])
+        resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
         # Priority for resources is left to right, so reverse the collection order of DFS preorder.
         resource_dirs.reverse()
