@@ -12,7 +12,6 @@ from pants_test.base_test import BaseTest
 class BinaryUtilTest(BaseTest):
   """Tests binary_util's pants_support_baseurls handling."""
 
-
   class LambdaReader(object):
     """Class which pretends to be an input stream, but is actually a lambda function."""
     def __init__(self, func):
@@ -60,33 +59,34 @@ class BinaryUtilTest(BaseTest):
   @classmethod
   def _fake_url(cls, binaries, base, binary_key):
     supportdir, version, name = binaries[binary_key]
-    return '{base}/{binary}'.format(base=base,
-                                    binary=BinaryUtil.select_binary_base_path(
-                                      supportdir, version, binary_key))
+    binary = BinaryUtil._select_binary_base_path(supportdir, version, binary_key)
+    return '{base}/{binary}'.format(base=base, binary=binary)
 
   def test_nobases(self):
     """Tests exception handling if build support urls are improperly specified."""
-    try:
-      with BinaryUtil('bin/protobuf', '2.4.1', [], 30, '/tmp').select_binary_stream('protoc') as stream:
-        self.fail('We should have gotten a "NoBaseUrlsError".')
-    except BinaryUtil.NoBaseUrlsError as e:
-      pass # expected
+    binary_util = BinaryUtil(baseurls=[], timeout_secs=30, bootstrapdir='/tmp')
+    with self.assertRaises(binary_util.NoBaseUrlsError):
+      with binary_util._select_binary_stream(supportdir='bin/protobuf',
+                                             version='2.4.1',
+                                             name='protoc'):
+        self.fail('Expected acquisition of the stream to raise.')
 
   def test_support_url_multi(self):
     """Tests to make sure existing base urls function as expected."""
     count = 0
-    with BinaryUtil(
-      supportdir='bin/protobuf',
-      version='2.4.1',
+    binary_util = BinaryUtil(
       baseurls=[
-      'BLATANTLY INVALID URL',
-      'https://dl.bintray.com/pantsbuild/bin/reasonably-invalid-url',
-      'https://dl.bintray.com/pantsbuild/bin/build-support',
-      'https://dl.bintray.com/pantsbuild/bin/build-support', # Test duplicate entry handling.
-      'https://dl.bintray.com/pantsbuild/bin/another-invalid-url',
-    ],
+        'BLATANTLY INVALID URL',
+        'https://dl.bintray.com/pantsbuild/bin/reasonably-invalid-url',
+        'https://dl.bintray.com/pantsbuild/bin/build-support',
+        'https://dl.bintray.com/pantsbuild/bin/build-support',  # Test duplicate entry handling.
+        'https://dl.bintray.com/pantsbuild/bin/another-invalid-url',
+      ],
       timeout_secs=30,
-      bootstrapdir='/tmp').select_binary_stream('protoc') as stream:
+      bootstrapdir='/tmp')
+    with binary_util._select_binary_stream(supportdir='bin/protobuf',
+                                           version='2.4.1',
+                                           name='protoc') as stream:
       stream()
       count += 1
     self.assertEqual(count, 1)
@@ -98,12 +98,12 @@ class BinaryUtilTest(BaseTest):
     and others are not.
     """
     fake_base, fake_url = self._fake_base, self._fake_url
-    binaries = {
-      'protoc': ('bin/protobuf', '2.4.1', 'protoc',),
-      'ivy': ('bin/ivy', '4.3.7', 'ivy',),
-      'bash': ('bin/bash', '4.4.3', 'bash',),
-    }
     bases = [fake_base('apple'), fake_base('orange'), fake_base('banana'),]
+    binary_util = BinaryUtil(bases, 30, '/tmp')
+
+    binaries = {t[2]: t for t in (('bin/protobuf', '2.4.1', 'protoc'),
+                                  ('bin/ivy', '4.3.7', 'ivy'),
+                                  ('bin/bash', '4.4.3', 'bash'))}
     reader = self.MapReader({
       fake_url(binaries, bases[0], 'protoc'): 'SEEN PROTOC',
       fake_url(binaries, bases[0], 'ivy'): 'SEEN IVY',
@@ -114,11 +114,11 @@ class BinaryUtilTest(BaseTest):
     })
 
     unseen = [item for item in reader.values() if item.startswith('SEEN ')]
-    for key in binaries:
-      supportdir, version, name = binaries[key]
-      with BinaryUtil(supportdir, version, bases, 30, '/tmp').select_binary_stream(
-          key,
-          url_opener=reader) as stream:
-        self.assertEqual(stream(), 'SEEN ' + key.upper())
+    for supportdir, version, name in binaries.values():
+      with binary_util._select_binary_stream(supportdir=supportdir,
+                                             version=version,
+                                             name=name,
+                                             url_opener=reader) as stream:
+        self.assertEqual(stream(), 'SEEN ' + name.upper())
         unseen.remove(stream())
-    self.assertEqual(0, len(unseen)) # Make sure we've seen all the SEENs.
+    self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.

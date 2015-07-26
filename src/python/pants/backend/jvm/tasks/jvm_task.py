@@ -32,7 +32,7 @@ class JvmTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(JvmTask, self).__init__(*args, **kwargs)
-    self.jvm = JVM.instance_for_task(self)
+    self.jvm = JVM.scoped_instance(self)
     self.jvm_options = self.jvm.get_jvm_options()
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs

@@ -100,7 +100,9 @@ class GoalRunner(object):
     known_scope_infos = [ScopeInfo.for_global_scope()]
 
     # Add scopes for all needed subsystems.
-    subsystems = (set(self.subsystems) | Goal.subsystems() | build_configuration.subsystems())
+    subsystems = Subsystem.closure(set(self.subsystems) |
+                                   Goal.subsystems() |
+                                   build_configuration.subsystems())
     for subsystem in subsystems:
       known_scope_infos.append(ScopeInfo(subsystem.options_scope, ScopeInfo.GLOBAL_SUBSYSTEM))
 

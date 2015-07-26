@@ -116,6 +116,21 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
       targets=[self.target('project:dep-bag')]
     )
 
+  def test_intransitive_internal_dependencies(self):
+    self.assert_console_output_ordered(
+      'dependencies:first',
+      'dependencies:second',
+      targets=[self.target('project:project')],
+      options={'transitive': False, 'internal_only': True}
+    )
+
+  def test_intransitive_external_dependencies(self):
+    self.assert_console_output_ordered(
+      'org.apache:apache-jar:12.12.2012',
+      targets=[self.target('project:project')],
+      options={'transitive': False, 'external_only': True}
+    )
+
 
 class PythonDependenciesTests(ConsoleTaskTestBase):
   @classmethod
@@ -180,4 +195,19 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
       'antlr-python-runtime==3.1.3',
       targets=[self.target('dependencies:python_root')],
       options={'external_only': True}
+    )
+
+  def test_intransitive_internal_dependencies(self):
+    self.assert_console_output_ordered(
+      'dependencies:python_inner',
+      'dependencies:python_inner_with_external',
+      targets=[self.target('dependencies:python_root')],
+      options={'transitive': False, 'internal_only': True}
+    )
+
+  def test_intransitive_external_dependencies(self):
+    self.assert_console_output_ordered(
+      'antlr-python-runtime==3.1.3',
+      targets=[self.target('dependencies:python_root')],
+      options={'transitive': False, 'external_only': True}
     )

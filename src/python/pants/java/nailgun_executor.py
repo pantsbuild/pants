@@ -14,14 +14,14 @@ import threading
 import time
 from collections import namedtuple
 
+from six import string_types
+from twitter.common.collections import maybe_list
+
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import ProcessGroup, ProcessManager
 from pants.util.dirutil import safe_open
-
-from six import string_types
-from twitter.common.collections import maybe_list
 
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class NailgunProcessGroup(ProcessGroup):
 
   def _iter_nailgun_instances(self, everywhere=False):
     def predicate(proc):
-      if proc.name == b'java':
+      if proc.name == NailgunExecutor._PROCESS_NAME:
         if not everywhere:
           return NailgunExecutor._PANTS_NG_ARG in proc.cmdline
         else:
@@ -77,11 +77,12 @@ class NailgunExecutor(Executor, ProcessManager):
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _SELECT_WAIT = 1
+  _PROCESS_NAME = b'java'
 
   def __init__(self, identity, workdir, nailgun_classpath, distribution=None, ins=None,
                connect_timeout=10, connect_attempts=5):
     Executor.__init__(self, distribution=distribution)
-    ProcessManager.__init__(self, name=identity)
+    ProcessManager.__init__(self, name=identity, process_name=self._PROCESS_NAME)
 
     if not isinstance(workdir, string_types):
       raise ValueError('Workdir must be a path string, not: {workdir}'.format(workdir=workdir))

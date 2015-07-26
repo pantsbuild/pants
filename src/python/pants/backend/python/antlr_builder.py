@@ -19,6 +19,11 @@ class PythonAntlrBuilder(CodeGenerator):
   """
     Antlr builder.
   """
+
+  def __init__(self, ivy_bootstrapper, *args, **kwargs):
+    super(PythonAntlrBuilder, self).__init__(*args, **kwargs)
+    self._ivy_bootstrapper = ivy_bootstrapper
+
   def run_antlrs(self, output_dir):
     # TODO(John Sirois): graduate to a JvmToolTask and/or merge with the java code gen AntlrGen
     # task.
@@ -33,7 +38,7 @@ class PythonAntlrBuilder(CodeGenerator):
       args.append(abs_path)
 
     try:
-      ivy = Bootstrapper.default_ivy()
+      ivy = self._ivy_bootstrapper.ivy()
       ivy.execute(args=args)  # TODO: Needs a workunit, when we have a context here.
     except (Bootstrapper.Error, Ivy.Error) as e:
       raise TaskError('ANTLR generation failed! {0}'.format(e))

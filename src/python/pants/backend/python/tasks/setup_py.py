@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import ast
+import functools
 import itertools
 import os
 import pprint
@@ -31,6 +32,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
@@ -276,10 +278,6 @@ class ExportedTargetDependencyCalculator(AbstractClass):
 class SetupPy(PythonTask):
   """Generate setup.py-based Python projects from python_library targets."""
 
-  GENERATED_TARGETS = {
-    PythonAntlrLibrary: PythonAntlrBuilder,
-    PythonThriftLibrary: PythonThriftBuilder,
-  }
   SOURCE_ROOT = b'src'
 
   @staticmethod
@@ -391,9 +389,10 @@ class SetupPy(PythonTask):
     for module, filename, real_filename in iter_files():
       if filename.endswith('.py'):
         if module not in packages:
-          # TODO(wickman) Consider changing this to a full-on error as it
-          # could indicate bad BUILD hygiene.
-          # raise cls.UndefinedSource('{} is source but does not belong to a package!'.format(filename))
+          # TODO(wickman) Consider changing this to a full-on error as it could indicate bad BUILD
+          # hygiene.
+          # raise cls.UndefinedSource('{} is source but does not belong to a package!'
+          #                           .format(filename))
           if log:
             log.warn('{} is source but does not belong to a package.'.format(real_filename))
         else:
@@ -426,9 +425,20 @@ class SetupPy(PythonTask):
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive
 
+  @memoized_property
+  def generated_targets(self):
+    return {
+      PythonAntlrLibrary: functools.partial(PythonAntlrBuilder,
+                                            ivy_bootstrapper=self.ivy_bootstrapper,
+                                            workdir=os.path.join(self.workdir, 'antlr')),
+      PythonThriftLibrary: functools.partial(PythonThriftBuilder,
+                                             thrift_binary_factory=self.thrift_binary_factory,
+                                             workdir=os.path.join(self.workdir, 'thrift')),
+    }
+
   def iter_generated_sources(self, target):
     # This is sort of facepalmy -- python.new will make this much better.
-    for target_type, target_builder in self.GENERATED_TARGETS.items():
+    for target_type, target_builder in self.generated_targets.items():
       if isinstance(target, target_type):
         builder_cls = target_builder
         break
@@ -436,7 +446,7 @@ class SetupPy(PythonTask):
       raise TypeError(
         'iter_generated_sources could not find suitable code generator for {}'.format(type(target)))
 
-    builder = builder_cls(target, self._root, self.context.options)
+    builder = builder_cls(target=target, root_dir=self._root)
     builder.generate()
     for root, _, files in safe_walk(builder.package_root):
       for fn in files:
@@ -462,7 +472,7 @@ class SetupPy(PythonTask):
       chroot.link(abspath, os.path.join(self.SOURCE_ROOT, relpath))
 
     def write_target(target):
-      if isinstance(target, tuple(self.GENERATED_TARGETS.keys())):
+      if isinstance(target, tuple(self.generated_targets.keys())):
         for relpath, abspath in self.iter_generated_sources(target):
           write_codegen_source(relpath, abspath)
       else:

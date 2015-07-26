@@ -20,6 +20,9 @@ from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.base import hash_utils
 from pants.base.exceptions import TaskError
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.thrift_util import ThriftBinary
 
 
 class PythonTask(Task):
@@ -28,7 +31,11 @@ class PythonTask(Task):
 
   @classmethod
   def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + (PythonSetup, PythonRepos)
+    return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
+
+  @classmethod
+  def task_subsystems(cls):
+    return super(PythonTask, cls).task_subsystems() + (ThriftBinary.Factory,)
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
@@ -98,6 +105,25 @@ class PythonTask(Task):
   def chroot_cache_dir(self):
     return PythonSetup.global_instance().chroot_cache_dir
 
+  @property
+  def ivy_bootstrapper(self):
+    return Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
+
+  @property
+  def thrift_binary_factory(self):
+    return ThriftBinary.Factory.scoped_instance(self).create
+
+  def create_chroot(self, interpreter, builder, targets, platforms, extra_requirements):
+    return PythonChroot(python_setup=PythonSetup.global_instance(),
+                        python_repos=PythonRepos.global_instance(),
+                        ivy_bootstrapper=self.ivy_bootstrapper,
+                        thrift_binary_factory=self.thrift_binary_factory,
+                        interpreter=interpreter,
+                        builder=builder,
+                        targets=targets,
+                        platforms=platforms,
+                        extra_requirements=extra_requirements)
+
   @contextmanager
   def cached_chroot(self, interpreter, pex_info, targets, platforms,
                     extra_requirements=None, executable_file_content=None):
@@ -127,10 +153,7 @@ class PythonTask(Task):
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
-    chroot = PythonChroot(
-      context=self.context,
-      python_setup=PythonSetup.global_instance(),
-      python_repos=PythonRepos.global_instance(),
+    chroot = self.create_chroot(
       interpreter=interpreter,
       builder=builder,
       targets=targets,
@@ -156,10 +179,7 @@ class PythonTask(Task):
     """Create a PythonChroot with the specified args."""
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
     with self.context.new_workunit('chroot'):
-      chroot = PythonChroot(
-        context=self.context,
-        python_setup=PythonSetup.global_instance(),
-        python_repos=PythonRepos.global_instance(),
+      chroot = self.create_chroot(
         interpreter=interpreter,
         builder=builder,
         targets=targets,

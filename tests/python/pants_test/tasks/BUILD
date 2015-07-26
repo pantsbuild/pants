@@ -51,7 +51,6 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':checkstyle_integration',
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
@@ -108,15 +107,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
-)
-
-python_tests(
-  name = 'checkstyle_integration',
-  sources = ['test_checkstyle_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-    'src/python/pants/util:contextutil',
-  ]
 )
 
 python_tests(

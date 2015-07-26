@@ -5,22 +5,22 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import namedtuple
 import os
 import subprocess
 import unittest
-
-from pants.pantsd.process_manager import ProcessGroup, ProcessManager
-from pants.util.contextutil import temporary_dir
+from collections import namedtuple
 
 import mock
 import psutil
+
+from pants.pantsd.process_manager import ProcessGroup, ProcessManager
+from pants.util.contextutil import temporary_dir
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-FakeProcess = namedtuple('Process', 'cmdline pid')
+FakeProcess = namedtuple('Process', 'pid name status')
 
 
 class TestProcessGroup(unittest.TestCase):
@@ -45,8 +45,10 @@ class TestProcessGroup(unittest.TestCase):
 
   def test_iter_instances(self):
     with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
-      mock_process_iter.return_value = [FakeProcess(cmdline=['a_test'], pid=3),
-                                        FakeProcess(cmdline=['b_test'], pid=4)]
+      mock_process_iter.return_value = [
+        FakeProcess(name='a_test', pid=3, status=psutil.STATUS_IDLE),
+        FakeProcess(name='b_test', pid=4, status=psutil.STATUS_IDLE)
+      ]
 
       items = [item for item in self.pg.iter_instances()]
       self.assertEqual(len(items), 2)
@@ -74,10 +76,13 @@ class TestProcessManager(unittest.TestCase):
 
   def test_as_process(self):
     sentinel = 3333
-    with mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS):
-      with mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
-        mock_proc.return_value = sentinel
-        self.assertEqual(self.pm.as_process(), sentinel)
+    with mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
+      mock_proc.return_value = sentinel
+      self.pm._pid = sentinel
+      self.assertEqual(self.pm.as_process(), sentinel)
+
+  def test_as_process_none(self):
+    self.assertEqual(self.pm.as_process(), None)
 
   def test_wait_for_file(self):
     with temporary_dir() as td:
@@ -163,11 +168,40 @@ class TestProcessManager(unittest.TestCase):
       patched_pm.return_value = '3333'
       self.assertEqual(self.pm.get_socket(), 3333)
 
-  def test_is_alive(self):
-    with mock.patch('psutil.pid_exists', **PATCH_OPTS) as mock_psutil:
-      mock_psutil.return_value = False
+  def test_is_alive_neg(self):
+    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = None
       self.assertFalse(self.pm.is_alive())
-      mock_psutil.assert_called_once_with(None)
+      mock_as_process.assert_called_once_with(self.pm)
+
+  def test_is_alive(self):
+    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = FakeProcess(name='test', pid=3, status=psutil.STATUS_IDLE)
+      self.pm._process = mock.Mock(status=psutil.STATUS_IDLE)
+      self.assertTrue(self.pm.is_alive())
+      mock_as_process.assert_called_with(self.pm)
+
+  def test_is_alive_zombie(self):
+    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = FakeProcess(name='test', pid=3, status=psutil.STATUS_ZOMBIE)
+      self.assertFalse(self.pm.is_alive())
+      mock_as_process.assert_called_with(self.pm)
+
+  def test_is_alive_zombie_exception(self):
+    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.side_effect = iter([
+        FakeProcess(name='test', pid=3, status=psutil.STATUS_IDLE),
+        psutil.NoSuchProcess(0)
+      ])
+      self.assertFalse(self.pm.is_alive())
+      mock_as_process.assert_called_with(self.pm)
+
+  def test_is_alive_stale_pid(self):
+    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = FakeProcess(name='not_test', pid=3, status=psutil.STATUS_IDLE)
+      self.pm._process_name = 'test'
+      self.assertFalse(self.pm.is_alive())
+      mock_as_process.assert_called_with(self.pm)
 
   def test_kill(self):
     with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
@@ -175,9 +209,9 @@ class TestProcessManager(unittest.TestCase):
       mock_kill.assert_called_once_with(None, 0)
 
   def test_terminate(self):
-    with mock.patch('psutil.pid_exists', **PATCH_OPTS) as mock_exists:
+    with mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:
       with mock.patch('os.kill', **PATCH_OPTS):
-        mock_exists.return_value = True
+        mock_alive.return_value = True
         with self.assertRaises(self.pm.NonResponsiveProcess):
           self.pm.terminate(kill_wait=.1, purge=False)
 

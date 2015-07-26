@@ -77,9 +77,6 @@ class IvyTaskMixin(object):
     register('--soft-excludes', action='store_true', default=False, advanced=True,
              help='If a target depends on a jar that is excluded by another target '
                   'resolve this jar anyway')
-    register('--automatic-excludes', action='store_true', default=True, advanced=True,
-             help='If a target in the graph provides an artifact, said artifact will automatically '
-                  'be excluded from Ivy resolution.')
 
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
@@ -273,10 +270,8 @@ class IvyTaskMixin(object):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
 
     if not jars:
-      automatic_excludes = self.get_options().automatic_excludes
       jars, excludes = IvyUtils.calculate_classpath(targets,
-                                                    gather_excludes=not use_soft_excludes,
-                                                    automatic_excludes=automatic_excludes)
+                                                    gather_excludes=not use_soft_excludes)
     else:
       excludes = set()
 
@@ -309,4 +304,3 @@ class IvyTaskMixin(object):
       '-symlink',
       ]
     return ivy_args
-

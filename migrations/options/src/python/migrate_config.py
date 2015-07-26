@@ -242,6 +242,12 @@ migrations = {
 
   ('python-setup', 'egg_cache_dir'): ('python_setup', 'resolver_cache_dir'),
   ('DEFAULT', 'python_chroot_requirements_ttl'): ('python-setup', 'resolver_cache_ttl'),
+
+  ('DEFAULT', 'pants_support_baseurls'): ('binaries', 'baseurls'),
+  ('DEFAULT', 'pants_support_fetch_timeout_secs'): ('binaries', 'fetch_timeout_secs'),
+
+  ('gen.thrift', 'supportdir'): ('thrift-binary', 'supportdir'),
+  ('gen.thrift', 'version'): ('thrift-binary', 'version'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -305,6 +311,15 @@ notes = {
   ('resolve', 'ng_daemons'): ng_daemons_note,
   ('scrooge-gen', 'scala'): scrooge_gen_deps_note,
   ('scrooge-gen', 'java'): scrooge_gen_deps_note,
+
+  ('gen.thrift', 'version'): 'You can either set the apache thrift compiler version globally for '
+                             'java and python using the [thrift-binary] scope or else you can '
+                             'configure the languages separately using the '
+                             '[thrift-binary.gen.thrift] scope to control the version used for '
+                             'java.',
+
+  ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
+  ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
 }
 
 

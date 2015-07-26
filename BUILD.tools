@@ -124,7 +124,11 @@ jar_library(name = 'scalastyle',
 
 jar_library(name = 'checkstyle',
             jars = [
-              jar(org = 'com.puppycrawl.tools', name = 'checkstyle', rev = '5.6'),
+              # Pants still officially supports java 6 as a tool; the supported development
+              # environment for a pants hacker is based on that.  As such, we use 6.1.1 here since
+              # its the last checkstyle version compiled to java 6.  See the release notes here:
+              # http://checkstyle.sourceforge.net/releasenotes.html
+              jar(org = 'com.puppycrawl.tools', name = 'checkstyle', rev = '6.1.1'),
             ])
 
 jar_library(name = 'junit',

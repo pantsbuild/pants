@@ -21,6 +21,7 @@ class PythonTaskTest(TaskTestBase):
     # but unfortunately real subsystems aren't available here (for example, we have no access
     # to the enclosing pants instance's options), so we have to hard-code it.
     self.set_options_for_scope('python-setup',
+        interpreter_requirement='CPython>=2.7,<3',
         interpreter_cache_dir=os.path.join(self.real_build_root, '.pants.d',
                                            'python-setup', 'interpreters'),
         chroot_cache_dir=os.path.join(self.real_build_root, '.pants.d',
@@ -82,12 +83,3 @@ class PythonTaskTest(TaskTestBase):
     )
     """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
     return self.target(SyntheticAddress(relpath, name).spec)
-
-  def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None):
-    # Our python tests don't pass on Python 3 yet.
-    # TODO: Clean up this hard-coded interpreter constraint once we have subsystems
-    # and can simplify InterpreterCache and PythonSetup.
-    self.set_options(interpreter=['CPython>=2.7,<3'])
-    return super(PythonTaskTest, self).context(for_task_types=for_task_types, options=options,
-        target_roots=target_roots, console_outstream=console_outstream, workspace=workspace)
