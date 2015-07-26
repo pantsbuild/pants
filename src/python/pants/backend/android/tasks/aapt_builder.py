@@ -9,7 +9,6 @@ import logging
 import os
 import subprocess
 
-from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.base.exceptions import TaskError
@@ -26,11 +25,6 @@ class AaptBuilder(AaptTask):
   This class gathers compiled classes (an Android dex archive) and packages it with the
   target's resource files. The output is an unsigned .apk, an Android application package file.
   """
-
-  @staticmethod
-  def is_binary(target):
-    """Return True if the target is an AndroidBinary."""
-    return isinstance(target, AndroidBinary)
 
   @classmethod
   def product_types(cls):
@@ -58,8 +52,7 @@ class AaptBuilder(AaptTask):
     args.extend(['package', '-f'])
     args.extend(['-M', target.manifest.path])
     args.append('--auto-add-overlay')
-    # Priority for resources is left to right, so reverse the collection order of DFS preorder.
-    for resource_dir in reversed(resource_dirs):
+    for resource_dir in resource_dirs:
       args.extend(['-S', resource_dir])
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
@@ -71,7 +64,7 @@ class AaptBuilder(AaptTask):
 
   def execute(self):
     safe_mkdir(self.workdir)
-    targets = self.context.targets(self.is_binary)
+    targets = self.context.targets(self.is_android_binary)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
@@ -84,14 +77,16 @@ class AaptBuilder(AaptTask):
         for basedir in mapping.get(target):
           input_dirs.append(basedir)
 
-        gen_out = []
+        resource_dirs = []
         def gather_resources(target):
           """Gather the 'resource_dir's of the target's AndroidResources dependencies."""
           if isinstance(target, AndroidResources):
-            gen_out.append(target.resource_dir)
+            resource_dirs.append(target.resource_dir)
         target.walk(gather_resources)
 
-        args = self._render_args(target, gen_out, input_dirs)
+        # Priority for resources is left to right, so reverse the collection order of DFS preorder.
+        resource_dirs.reverse()
+        args = self._render_args(target, resource_dirs, input_dirs)
         with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]) as workunit:
           returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                        stderr=workunit.output('stderr'))

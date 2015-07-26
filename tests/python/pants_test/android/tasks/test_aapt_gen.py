@@ -102,7 +102,7 @@ class TestAaptGen(TestAndroidBase):
                                '--ignore-assets', task.ignored_assets]
               self.assertEqual(expected_args,
                                task._render_args(resources1, binary.target_sdk,
-                                                 [resources2.resource_dir, resources1.resource_dir],
+                                                 [resources1.resource_dir, resources2.resource_dir],
                                                  task.workdir))
 
   def test_render_args_force_args(self):

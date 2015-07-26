@@ -128,7 +128,7 @@ class DxCompile(AndroidTask, NailgunTask):
     class_files = {}
 
     def get_classes(tgt):
-      # Gather compiled classes.
+      # Classes allowed to be None for testing ease - TODO(mateor) update tests to not require this.
       target_classes = classes_by_target.get(tgt) if classes_by_target else None
       if target_classes:
         for _, products in target_classes.abs_paths():
