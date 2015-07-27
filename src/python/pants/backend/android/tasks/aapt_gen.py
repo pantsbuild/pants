@@ -73,7 +73,7 @@ class AaptGen(AaptTask):
       address = SyntheticAddress(self.workdir, 'android-{0}.jar'.format(sdk))
       self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
-  def _render_args(self, target, sdk, resource_dirs, output_dir):
+  def _render_args(self, target, manifest, resource_dirs):
     """Compute the args that will be passed to the aapt tool.
 
     :param AndroidResources target: Target resources to be processed.
@@ -93,12 +93,12 @@ class AaptGen(AaptTask):
     #   : '-I' packages to add to base 'include' set, here it is the android.jar of the target sdk.
     #   : '--ignore-assets' the aapt tool will disregard any files matching that pattern.
     args = [self.aapt_tool(target.build_tools_version)]
-    args.extend(['package', '-m', '-J', output_dir])
-    args.extend(['-M', target.manifest.path])
+    args.extend(['package', '-m', '-J', self.aapt_out(target)])
+    args.extend(['-M', manifest.path])
     args.append('--auto-add-overlay')
     for resource_dir in resource_dirs:
       args.extend(['-S', resource_dir])
-    args.extend(['-I', self.android_jar_tool(sdk)])
+    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
@@ -106,20 +106,18 @@ class AaptGen(AaptTask):
   def execute(self):
     # Every android_binary and each of its android_library dependencies must have their resources
     # processed into separate R.java files.
-    # The number of R.java files produced from each library is == |sdks in play|.
+    # The number of R.java files produced from each library is == |sdks in play for its dependees|.
     # The number of R.java files produced for each android_binary == |android_library deps| + 1
     targets = self.context.targets(self.is_android_binary)
     self.create_sdk_jar_deps(targets)
     for target in targets:
-      outdir = self.aapt_out(target.target_sdk)
 
       gentargets = [target]
       def gather_gentargets(tgt):
         """Gather targets that have an AndroidResources dependency."""
-        if isinstance(tgt, AndroidLibrary):
+        if isinstance(tgt, AndroidLibrary) and tgt.manifest:
           # AndroidLibraries are not currently required to have a manifest. No manifest == no work.
-          if tgt.manifest:
-            gentargets.append(tgt)
+          gentargets.append(tgt)
       target.walk(gather_gentargets)
 
       # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
@@ -131,7 +129,7 @@ class AaptGen(AaptTask):
         if resource_dirs:
           # Priority for resources is left->right, so reverse the collection order (DFS preorder).
           resource_dirs.reverse()
-          args = self._render_args(gen, target.target_sdk, resource_dirs, outdir)
+          args = self._render_args(target, gen.manifest, resource_dirs)
           with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
             returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                          stderr=workunit.output('stderr'))
@@ -140,20 +138,20 @@ class AaptGen(AaptTask):
 
             aapt_gen_file = self._calculate_genfile(gen.manifest.package_name)
             if aapt_gen_file not in self._created_library_targets:
-              new_target = self.create_target(gen, target.target_sdk, aapt_gen_file)
+              new_target = self.create_target(target, gen, aapt_gen_file)
               self._created_library_targets[aapt_gen_file] = new_target
             gen.inject_dependency(self._created_library_targets[aapt_gen_file].address)
 
-  def create_target(self, gentarget, sdk, aapt_output):
+  def create_target(self, target, gentarget, aapt_output):
     """Create a JavaLibrary target for the R.java files created by the aapt tool.
 
     :param AndroidTarget gentarget: An android_binary or android_library that owns resources.
     :param string sdk: The Android SDK version of the android.jar that the created target will
       depend on.
     """
-    spec_path = os.path.join(os.path.relpath(self.aapt_out(sdk), get_buildroot()))
+    spec_path = os.path.join(os.path.relpath(self.aapt_out(target), get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
-    deps = [self._jar_library_by_sdk[sdk]]
+    deps = [self._jar_library_by_sdk[target.target_sdk]]
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
@@ -161,11 +159,11 @@ class AaptGen(AaptTask):
                                       dependencies=deps)
     return tgt
 
-  def aapt_out(self, sdk):
+  def aapt_out(self, target):
     """Location for the output of the aapt invocation.
 
     :param string sdk: The Android SDK version to be used when processing the resources.
     """
-    outdir = os.path.join(self.workdir, sdk)
+    outdir = os.path.join(self.workdir, target.target_sdk)
     safe_mkdir(outdir)
     return outdir
