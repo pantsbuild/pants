@@ -44,7 +44,6 @@ _PATH_BY_ID = {
 logger = logging.getLogger(__name__)
 
 
-# TODO(John Sirois): Extract this subsystem to its own file.
 class BinaryUtil(object):
   """Wraps utility methods for finding binary executables."""
 
