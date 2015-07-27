@@ -19,11 +19,11 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     '--export-libraries-javadocs',
   ]
 
-  def run_export(self, test_target, workdir, load_libs = False, extra_args = list()):
+  def run_export(self, test_target, workdir, load_libs=False, extra_args=None):
     export_out_file = os.path.join(workdir, 'export_out.txt')
     args = ['export', '--output-file={out_file}'.format(out_file=export_out_file), test_target]
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
-    pants_run = self.run_pants_with_workdir(args + libs_args + extra_args, workdir)
+    pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
     self.assertTrue(os.path.exists(export_out_file),
                     msg='Could not find export output file in {out_file}'

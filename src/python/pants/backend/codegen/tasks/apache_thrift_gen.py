@@ -30,14 +30,20 @@ class ApacheThriftGen(SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(ApacheThriftGen, cls).register_options(register)
-    register('--strict', action='store_true', help='Run thrift compiler with strict warnings.')
+
+    # NB: As of thrift 0.9.2 there is 1 warning that -strict promotes to an error - missing a
+    # struct field id.  If an artifact was cached with strict off, we must re-gen with strict on
+    # since this case may be present and need to generate a thrift compile error.
+    register('--strict', default=True, fingerprint=True, action='store_true',
+             help='Run thrift compiler with strict warnings.')
+
     register('--gen-options', advanced=True, fingerprint=True,
              help='Use these apache thrift java gen options.')
     register('--deps', advanced=True, type=Options.list,
              help='A list of specs pointing to dependencies of thrift generated java code.')
     register('--service-deps', advanced=True, type=Options.list,
              help='A list of specs pointing to dependencies of thrift generated java service '
-                  'code.  If not supplied, then --deps will be use for service deps.')
+                  'code.  If not supplied, then --deps will be used for service deps.')
 
   @classmethod
   def global_subsystems(cls):

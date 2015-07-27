@@ -1,6 +1,22 @@
 RELEASE HISTORY
 ===============
 
+0.0.40 (unreleased)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+The apache thrift gen for java code now runs in `-strict` mode by default, requiring
+all struct fields declare a field id.  You can use the following configuration in
+pants.ini to retain the old default behavior and turn strict checking off:
+
+.. code::
+
+  [gen.thrift]
+  strict: False
+
+
 0.0.39 (7/23/2015)
 ------------------
 
