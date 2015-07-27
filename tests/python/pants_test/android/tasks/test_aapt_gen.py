@@ -13,7 +13,6 @@ from pants_test.android.test_android_base import TestAndroidBase, distribution
 
 
 class TestAaptGen(TestAndroidBase):
-  """Test the methods in pants.backend.android.tasks.aapt_gen."""
 
   @classmethod
   def task_type(cls):
@@ -29,8 +28,8 @@ class TestAaptGen(TestAndroidBase):
 
   def test_create_sdk_jar_deps(self):
     with distribution() as dist:
-      with self.android_binary(name='binary1', target_sdk='18') as binary1:
-        with self.android_binary(name='binary2', target_sdk='19') as binary2:
+      with self.android_binary(target_name='binary1', target_sdk='18') as binary1:
+        with self.android_binary(target_name='binary2', target_sdk='19') as binary2:
           self.set_options(sdk_path=dist)
           task = self.create_task(self.context())
           targets = [binary1, binary2]
@@ -84,8 +83,8 @@ class TestAaptGen(TestAndroidBase):
 
   def test_render_args_with_android_library(self):
     with distribution() as dist:
-      with self.android_resources(name='binary_resources') as resources1:
-        with self.android_resources(name='library_resources') as resources2:
+      with self.android_resources(target_name='binary_resources') as resources1:
+        with self.android_resources(target_name='library_resources') as resources2:
           with self.android_library(dependencies=[resources2]) as library:
             with self.android_binary(dependencies=[resources1, library]) as binary:
               self.set_options(sdk_path=dist)

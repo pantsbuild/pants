@@ -31,11 +31,15 @@ class AaptBuilder(AaptTask):
     return ['apk']
 
   @classmethod
+  def package_name(cls, target):
+    return '{0}.unsigned.apk'.format(target.manifest.package_name)
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(AaptBuilder, cls).prepare(options, round_manager)
     round_manager.require_data('dex')
 
-  def _render_args(self, target, resource_dirs, inputs):
+  def _render_args(self, target, resource_dirs, dex_file):
     # Glossary of used aapt flags.
     #   : 'package' is the main aapt operation (see class docstring for more info).
     #   : '-f' to 'force' overwrites if the package already exists.
@@ -56,9 +60,8 @@ class AaptBuilder(AaptTask):
       args.extend(['-S', resource_dir])
     args.extend(['-I', self.android_jar_tool(target.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    args.extend(['-F', os.path.join(self.workdir,
-                                    '{0}.unsigned.apk'.format(target.manifest.package_name))])
-    args.extend(inputs)
+    args.extend(['-F', os.path.join(self.workdir, self.package_name(target))])
+    args.append(dex_file)
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
@@ -66,28 +69,22 @@ class AaptBuilder(AaptTask):
     safe_mkdir(self.workdir)
     targets = self.context.targets(self.is_android_binary)
     with self.invalidated(targets) as invalidation_check:
-      invalid_targets = []
-      for vt in invalidation_check.invalid_vts:
-        invalid_targets.extend(vt.targets)
-      for target in invalid_targets:
+      for tgt in invalidation_check.all_vts:
+        if not tgt.valid:
+          mapping = self.context.products.get('dex')
+          dex_file = mapping.get(tgt)
 
-        # 'input_dirs' is the folder containing the Android dex file.
-        input_dirs = []
-        mapping = self.context.products.get('dex')
-        for basedir in mapping.get(target):
-          input_dirs.append(basedir)
+          resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([tgt.address])
+          resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
-        resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([target.address])
-        resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
-
-        # Priority for resources is left to right, so reverse the collection order of DFS preorder.
-        resource_dirs.reverse()
-        args = self._render_args(target, resource_dirs, input_dirs)
-        with self.context.new_workunit(name='apk-bundle', labels=[WorkUnit.MULTITOOL]) as workunit:
-          returncode = subprocess.call(args, stdout=workunit.output('stdout'),
-                                       stderr=workunit.output('stderr'))
-          if returncode:
-            raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
-    for target in targets:
-      apk_name = '{0}.unsigned.apk'.format(target.manifest.package_name)
-      self.context.products.get('apk').add(target, self.workdir).append(apk_name)
+          # Priority for resources is left to right, so reverse the collection order(DFS preorder).
+          resource_dirs.reverse()
+          args = self._render_args(tgt, resource_dirs, dex_file)
+          with self.context.new_workunit(name='apk-bundle',
+                                         labels=[WorkUnit.MULTITOOL]) as workunit:
+            returncode = subprocess.call(args, stdout=workunit.output('stdout'),
+                                         stderr=workunit.output('stderr'))
+            if returncode:
+              raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
+        apk_name = '{0}.unsigned.apk'.format(tgt.manifest.package_name)
+        self.context.products.get('apk').add(tgt, self.workdir).append(apk_name)
