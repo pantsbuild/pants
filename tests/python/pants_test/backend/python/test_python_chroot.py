@@ -24,10 +24,10 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.source_root import SourceRoot
-from pants.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.thrift_util import ThriftBinary
 from pants.util.contextutil import temporary_dir
 from pants_test.base.context_utils import create_option_values
 from pants_test.base_test import BaseTest

@@ -6,12 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import signal
-import sys
 
-from pants import binary_util
 from pants.backend.core.tasks.task import QuietTaskMixin, Task
-from pants.base.build_environment import get_buildroot
+from pants.binaries import binary_util
 from pants.reporting.reporting_server import ReportingServerManager
 
 

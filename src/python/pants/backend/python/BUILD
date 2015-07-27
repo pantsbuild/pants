@@ -133,7 +133,7 @@ python_library(
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
-    'src/python/pants:thrift_util',
+    'src/python/pants/binaries:thrift_util',
     'src/python/pants/util:dirutil',
   ]
 )

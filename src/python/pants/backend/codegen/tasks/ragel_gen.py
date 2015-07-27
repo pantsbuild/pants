@@ -14,7 +14,7 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtil
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 

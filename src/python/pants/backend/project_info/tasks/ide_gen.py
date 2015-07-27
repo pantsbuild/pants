@@ -12,7 +12,6 @@ from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants import binary_util
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -21,6 +20,7 @@ from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
