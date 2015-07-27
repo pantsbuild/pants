@@ -55,7 +55,7 @@ def create_options(options):
     def registration_args_iter_for_scope(self, scope):
       return []
 
-    def payload_for_scope(self, scope):
+    def payload_for_scope(self, scope, context):
       return Payload()
 
     def __getitem__(self, key):
