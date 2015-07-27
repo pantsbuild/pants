@@ -569,7 +569,7 @@ class OptionsTest(unittest.TestCase):
     val = 'blah blah blah'
     options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
 
-    payload = options.payload_for_scope('compile.scala')
+    payload = options.payload_for_scope('compile.scala', None)
 
     self.assertEquals(len(payload.fields), 1)
     for key, field in payload.fields:

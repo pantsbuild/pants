@@ -311,9 +311,15 @@ class PayloadTest(BaseTest):
 
     context = self.context()
 
-    fp1 = TargetListField([s1, s2]).fingerprint_with_context(context)
-    fp2 = TargetListField([s2, s1]).fingerprint_with_context(context)
-    fp3 = TargetListField([s1, s3]).fingerprint_with_context(context)
+    def resolve(specs):
+      targets = []
+      for spec in specs:
+        targets.extend(context.resolve(spec))
+      return targets
+
+    fp1 = TargetListField(resolve([s1, s2])).fingerprint()
+    fp2 = TargetListField(resolve([s2, s1])).fingerprint()
+    fp3 = TargetListField(resolve([s1, s3])).fingerprint()
 
     self.assertEquals(fp1, fp2)
     self.assertNotEquals(fp1, fp3)

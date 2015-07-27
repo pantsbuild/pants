@@ -46,22 +46,10 @@ class PayloadField(AbstractClass):
       self._fingerprint_memo = self._compute_fingerprint()
     return self._fingerprint_memo
 
-  def fingerprint_with_context(self, context):
-    if self._fingerprint_memo is None:
-      self._fingerprint_memo = self._compute_fingerprint_with_context(context)
-    return self._fingerprint_memo
-
   @abstractmethod
   def _compute_fingerprint(self):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
     pass
-
-  def _compute_fingerprint_with_context(self, context):
-    """Subclasses can override this method if they required a context when fingerprinting.
-
-    By default, the context is ignored.
-    """
-    return self._compute_fingerprint()
 
   @property
   def value(self):
@@ -309,20 +297,16 @@ class FileField(PayloadField):
 
 
 class TargetListField(PayloadField):
-  """A field that represents a list of target specs.
+  """A field that represents a list of targets.
 
   The fingerprint of a TargetListField is the combined fingerprints of the
-  resolved target specs.
+  targets.
   """
-  def __init__(self, target_specs):
-    self._target_specs = target_specs
+  def __init__(self, targets):
+    self._targets = targets
 
   def _compute_fingerprint(self):
-    raise NotImplementedError
-
-  def _compute_fingerprint_with_context(self, context):
     hasher = sha1()
-    for spec in sorted(self._target_specs):
-      for target in sorted(context.resolve(spec)):
-        hasher.update(target.compute_invalidation_hash())
+    for target in sorted(self._targets):
+      hasher.update(target.compute_invalidation_hash())
     return hasher.hexdigest()

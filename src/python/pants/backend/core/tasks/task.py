@@ -208,8 +208,8 @@ class TaskBase(Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     if not self._fingerprint:
-      payload = self.context.options.payload_for_scope(self.options_scope)
-      self._fingerprint = payload.fingerprint(context=self.context)
+      payload = self.context.options.payload_for_scope(self.options_scope, self.context)
+      self._fingerprint = payload.fingerprint()
     return self._fingerprint
 
   def artifact_cache_reads_enabled(self):

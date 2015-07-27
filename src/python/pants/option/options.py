@@ -219,18 +219,21 @@ class Options(object):
     """
     return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
 
-  def payload_for_scope(self, scope):
-    """Returns a payload representing the options for the given scope."""
+  def payload_for_scope(self, scope, context):
+    """Returns a payload representing the options for the given scope and context."""
     payload = Payload()
     for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
-      if not kwargs.get('fingerprint', False):
+      if kwargs.get('fingerprint', None) is not True:
         continue
       val = self.for_scope(scope)[name]
       val_type = kwargs.get('type', '')
       if val_type == Options.file:
         field = FileField(val)
       elif val_type == Options.target_list:
-        field = TargetListField(val)
+        targets = []
+        for spec in val:
+          targets.extend(context.resolve(spec))
+        field = TargetListField(targets)
       else:
         field = PrimitiveField(val)
       payload.add_field(name, field)
