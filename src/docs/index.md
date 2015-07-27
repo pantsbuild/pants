@@ -52,6 +52,11 @@ News
 + [[2014-09-16 Announcement|pants('src/docs:announce_201409')]]
   "Hello Pants Build"
 
+Powered by Pants
+----------------
+
++ [[Find out why some organizations are using Pants|pants('src/docs:powered_by')]]
+
 Advanced Documentation
 ----------------------
 
