@@ -10,6 +10,7 @@ import os
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
+from hashlib import sha1
 
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -21,7 +22,6 @@ from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
-from pants.option.options import Options
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.meta import AbstractClass
@@ -197,6 +197,9 @@ class TaskBase(Optionable, AbstractClass):
     """
     return self._workdir
 
+  def _options_fingerprint(self, scope):
+    return str(self.context.options.payload_for_scope(scope).fingerprint(context=self.context))
+
   @property
   def fingerprint(self):
     """Returns a fingerprint for the identity of the task.
@@ -208,8 +211,12 @@ class TaskBase(Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     if not self._fingerprint:
-      payload = self.context.options.payload_for_scope(self.options_scope)
-      self._fingerprint = payload.fingerprint(context=self.context)
+      hasher = sha1()
+      hasher.update(self._options_fingerprint(self.options_scope))
+      for subsystem in self.task_subsystems():
+        hasher.update(self._options_fingerprint(subsystem.subscope(self.options_scope)))
+        hasher.update(self._options_fingerprint(subsystem.options_scope))
+      self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 
   def artifact_cache_reads_enabled(self):

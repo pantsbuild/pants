@@ -190,7 +190,8 @@ class ZincCompile(JvmCompile):
       ret.append((root, [plugin_info_file]))
     return ret
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -224,14 +225,23 @@ class ZincCompile(JvmCompile):
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
 
+
     zinc_args += args
+
+    zinc_args.extend([
+      '-C-source', '-C{}'.format(settings.source_level),
+      '-C-target', '-C{}'.format(settings.target_level),
+    ])
+    zinc_args.extend(settings.args)
+
+    jvm_options = list(self._jvm_options)
 
     zinc_args.extend(sources)
 
     self.log_zinc_file(analysis_file)
     if self.runjava(classpath=self.zinc_classpath(),
                     main=self._ZINC_MAIN,
-                    jvm_options=self._jvm_options,
+                    jvm_options=jvm_options,
                     args=zinc_args,
                     workunit_name='zinc',
                     workunit_labels=[WorkUnit.COMPILER]):

@@ -19,8 +19,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
+from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.options import Options
-from pants.thrift_util import ThriftBinary
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 

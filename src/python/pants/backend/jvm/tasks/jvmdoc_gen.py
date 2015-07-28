@@ -11,9 +11,9 @@ import multiprocessing
 import os
 import subprocess
 
-from pants import binary_util
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 

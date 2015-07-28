@@ -20,9 +20,9 @@ from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.base import hash_utils
 from pants.base.exceptions import TaskError
+from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.thrift_util import ThriftBinary
 
 
 class PythonTask(Task):

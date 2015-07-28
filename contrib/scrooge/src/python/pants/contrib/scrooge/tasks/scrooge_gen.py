@@ -15,19 +15,18 @@ from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.option.options import Options
-from pants.thrift_util import calculate_compile_sources
 from pants.util.dirutil import safe_mkdir, safe_open
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
   JavaThriftLibraryFingerprintStrategy
+from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
 _CONFIG_SECTION = 'scrooge-gen'
@@ -247,17 +246,23 @@ class ScroogeGen(NailgunTask):
                                gen_files_for_source,
                                create_target)
 
+  SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
+
+  def _declares_service(self, source):
+    with open(source) as thrift:
+      return any(line for line in thrift if self.SERVICE_PARSER.search(line))
+
   def _inject_target(self, target, dependees, gen_files_for_source, create_target):
     files = []
     has_service = False
     for source in target.sources_relative_to_buildroot():
-      services = calculate_services(source)
+      has_service = has_service or self._declares_service(source)
       genfiles = gen_files_for_source[source]
-      has_service = has_service or services
       files.extend(genfiles)
     language = self._thrift_defaults.language(target)
     target_type = _TARGET_TYPE_FOR_LANG[language]
-    deps = OrderedSet(self._depinfo.service[language] if has_service else self._depinfo.structs[language])
+    deps = OrderedSet(self._depinfo.service[language] if has_service
+                      else self._depinfo.structs[language])
     deps.update(target.dependencies)
     tgt = create_target(files, deps, target_type)
     tgt.add_labels('codegen')
@@ -351,32 +356,3 @@ class ScroogeGen(NailgunTask):
     for target in targets:
       if isinstance(target, JavaThriftLibrary) and not target.payload.sources.source_paths:
         raise TargetDefinitionException(target, 'no thrift files found')
-
-
-NAMESPACE_PARSER = re.compile(r'^\s*namespace\s+([^\s]+)\s+([^\s]+)\s*$')
-TYPE_PARSER = re.compile(r'^\s*(const|enum|exception|service|struct|union)\s+([^\s{]+).*')
-
-
-# TODO(John Sirois): consolidate thrift parsing to 1 pass instead of 2
-def calculate_services(source):
-  """Calculates the services generated for the given thrift IDL source.
-  Returns an interable of services
-  """
-
-  with open(source, 'r') as thrift:
-    namespaces = dict()
-    types = defaultdict(set)
-    for line in thrift:
-      match = NAMESPACE_PARSER.match(line)
-      if match:
-        lang = match.group(1)
-        namespace = match.group(2)
-        namespaces[lang] = namespace
-      else:
-        match = TYPE_PARSER.match(line)
-        if match:
-          typename = match.group(1)
-          name = match.group(2)
-          types[typename].add(name)
-
-    return types['service']
