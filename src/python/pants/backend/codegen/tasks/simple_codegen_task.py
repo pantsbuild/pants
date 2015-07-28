@@ -29,6 +29,14 @@ class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language."""
 
   @classmethod
+  def product_types(cls):
+    # NB(gmalmquist): This is a hack copied from the old CodeGen base class to get the round manager
+    # to properly run codegen before resolve and compile. It would be more correct to just have each
+    # individual codegen class declare what languages it generates, but would cause problems with
+    # scala. See https://rbcommons.com/s/twitter/r/2540/.
+    return ['java', 'scala', 'python']
+
+  @classmethod
   def register_options(cls, register):
     super(SimpleCodegenTask, cls).register_options(register)
     register('--allow-empty', action='store_true', default=True,
