@@ -35,7 +35,8 @@ class ClasspathUtilTest(BaseTest):
     path = os.path.join(self.build_root, 'jar/path')
     classpath_product.add_for_target(a, [('default', path)])
 
-    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [], ['not-default', 'default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [],
+                                                ['not-default', 'default'])
 
     self.assertEqual([path], classpath)
 
@@ -49,7 +50,8 @@ class ClasspathUtilTest(BaseTest):
     classpath_product.add_for_target(a, [('default', path)])
 
     extra_path = 'new-path'
-    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [('default', extra_path)], ['default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product,
+                                                [('default', extra_path)], ['default'])
 
     self.assertEqual([path, extra_path], classpath)
 
