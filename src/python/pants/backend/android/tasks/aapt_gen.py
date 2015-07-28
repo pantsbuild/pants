@@ -35,20 +35,19 @@ class AaptGen(AaptTask):
 
   The resources are processed against a set of APIs found in the android.jar that corresponds to
   the target's target_sdk. AndroidBinary files must declare a target_sdk in their manifest.
-  AndroidLibrary targets _may_ declare a target_sdk but will otherwise use the target_sdk of the
-  dependee AndroidBinary. An AndroidLibrary will need to be processed once for every target_sdk that
-  it supports.
+  AndroidLibrary targets are processed with the target_sdk of the dependee AndroidBinary.
+  An AndroidLibrary will need to be processed once for every target_sdk that it supports.
 
   Each AndroidLibrary is processed individually. AndroidBinary targets are processed along with
   all of the AndroidLibrary targets in its transitive closure. The output of an AaptGen invocation
-  is an R.java file that allows programmatic access to resources, one each for every AndroidBinary
-  and AndroidLibrary target.
+  is an R.java file that allows programmatic access to resources, one each for all AndroidBinary
+  and AndroidLibrary targets.
   """
 
   @classmethod
-  def _calculate_genfile(cls, package):
+  def _calculate_genfile(cls, target):
     """Name of the file produced by aapt."""
-    return os.path.join(cls.package_path(package), 'R.java')
+    return os.path.join(cls.package_path(target.manifest.package_name), 'R.java')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -73,13 +72,12 @@ class AaptGen(AaptTask):
       address = SyntheticAddress(self.workdir, 'android-{0}.jar'.format(sdk))
       self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
-  def _render_args(self, target, manifest, resource_dirs):
+  def _render_args(self, binary, gentarget, resource_dirs):
     """Compute the args that will be passed to the aapt tool.
 
-    :param AndroidResources target: Target resources to be processed.
-    :param string sdk: The SDK version of the android.jar included with the processing.
+    :param AndroidBinary binary: AndroidBinary target that depends on the gentarget.
+    :param AndroidTarget gentarget: Either an AndroidBinary or AndroidLibrary target.
     :param list resource_dirs: List of resource_dirs to include in this invocation of the aapt tool.
-    :param string output_dir: Output location for the directories and R.java created by aapt.
     """
 
     # Glossary of used aapt flags.
@@ -92,78 +90,77 @@ class AaptGen(AaptTask):
     #            collecting resources (resource priority is left -> right).
     #   : '-I' packages to add to base 'include' set, here it is the android.jar of the target sdk.
     #   : '--ignore-assets' the aapt tool will disregard any files matching that pattern.
-    args = [self.aapt_tool(target.build_tools_version)]
-    args.extend(['package', '-m', '-J', self.aapt_out(target)])
-    args.extend(['-M', manifest.path])
+    args = [self.aapt_tool(binary.build_tools_version)]
+    args.extend(['package', '-m', '-J', self.aapt_out(binary)])
+    args.extend(['-M', gentarget.manifest.path])
     args.append('--auto-add-overlay')
     for resource_dir in resource_dirs:
       args.extend(['-S', resource_dir])
-    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
+    args.extend(['-I', self.android_jar_tool(binary.target_sdk)])
     args.extend(['--ignore-assets', self.ignored_assets])
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def execute(self):
-    # Every android_binary and each of its android_library dependencies must have their resources
-    # processed into separate R.java files.
     # The number of R.java files produced from each library is == |sdks in play for its dependees|.
     # The number of R.java files produced for each android_binary == |android_library deps| + 1
     targets = self.context.targets(self.is_android_binary)
     self.create_sdk_jar_deps(targets)
     for target in targets:
+      # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
+      # framework can't differentiate between one library that has to be compiled by multiple sdks.
 
       gentargets = [target]
       def gather_gentargets(tgt):
-        """Gather targets that have an AndroidResources dependency."""
+        """Gather all AndroidLibrary targets that have a manifest."""
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:
-          # AndroidLibraries are not currently required to have a manifest. No manifest == no work.
           gentargets.append(tgt)
       target.walk(gather_gentargets)
 
-      # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
-      # framework can't differentiate between one library that has to be compiled by multiple sdks.
       for gen in gentargets:
+        aapt_output = self._calculate_genfile(gen)
+        aapt_file = os.path.join(self.aapt_out(target), aapt_output)
+
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
         if resource_dirs:
-          # Priority for resources is left->right, so reverse the collection order (DFS preorder).
-          resource_dirs.reverse()
-          args = self._render_args(target, gen.manifest, resource_dirs)
-          with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
-            returncode = subprocess.call(args, stdout=workunit.output('stdout'),
-                                         stderr=workunit.output('stderr'))
-            if returncode:
-              raise TaskError('The AaptGen process exited non-zero: {}'.format(returncode))
+          if aapt_file not in self._created_library_targets:
 
-            aapt_gen_file = self._calculate_genfile(gen.manifest.package_name)
-            if aapt_gen_file not in self._created_library_targets:
-              new_target = self.create_target(target, gen, aapt_gen_file)
-              self._created_library_targets[aapt_gen_file] = new_target
-            gen.inject_dependency(self._created_library_targets[aapt_gen_file].address)
+            # Priority for resources is left->right, so reverse collection order (DFS preorder).
+            resource_dirs.reverse()
+            args = self._render_args(target, gen, resource_dirs)
+            with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
+              returncode = subprocess.call(args,
+                                           stdout=workunit.output('stdout'),
+                                           stderr=workunit.output('stderr'))
+              if returncode:
+                raise TaskError('The AaptGen process exited non-zero: {}'.format(returncode))
+            new_target = self.create_target(target, gen)
+            self._created_library_targets[aapt_file] = new_target
+          gen.inject_dependency(self._created_library_targets[aapt_file].address)
 
-  def create_target(self, target, gentarget, aapt_output):
+  def create_target(self, binary, gentarget):
     """Create a JavaLibrary target for the R.java files created by the aapt tool.
 
+    :param AndroidBinary binary: AndroidBinary target whose target_sdk is used.
     :param AndroidTarget gentarget: An android_binary or android_library that owns resources.
-    :param string sdk: The Android SDK version of the android.jar that the created target will
-      depend on.
     """
-    spec_path = os.path.join(os.path.relpath(self.aapt_out(target), get_buildroot()))
+    spec_path = os.path.join(os.path.relpath(self.aapt_out(binary), get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
-    deps = [self._jar_library_by_sdk[target.target_sdk]]
+    deps = [self._jar_library_by_sdk[binary.target_sdk]]
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
-                                      sources=[aapt_output],
+                                      sources=[self._calculate_genfile(gentarget)],
                                       dependencies=deps)
     return tgt
 
-  def aapt_out(self, target):
-    """Location for the output of the aapt invocation.
+  def aapt_out(self, binary):
+    """Location for the output of an aapt invocation.
 
-    :param string sdk: The Android SDK version to be used when processing the resources.
+    :param AndroidBinary binary: AndroidBinary target that depends upon the aapt output.
     """
-    outdir = os.path.join(self.workdir, target.target_sdk)
+    outdir = os.path.join(self.workdir, binary.target_sdk)
     safe_mkdir(outdir)
     return outdir
