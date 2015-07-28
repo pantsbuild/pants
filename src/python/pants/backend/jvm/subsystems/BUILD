@@ -32,6 +32,17 @@ python_library(
   ],
 )
 
+python_library(
+  name = 'jvm_platform',
+  sources = ['jvm_platform.py'],
+  dependencies = [
+    'src/python/pants/base:revision',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
+    'src/python/pants/java/distribution',
+  ],
+)
 
 python_library(
   name = 'scala_platform',
