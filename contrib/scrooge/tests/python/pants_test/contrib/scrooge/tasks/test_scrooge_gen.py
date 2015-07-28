@@ -102,27 +102,27 @@ class ScroogeGenTest(TaskTestBase):
     context = self.context(target_roots=[target])
     task = self.create_task(context)
 
-    with patch('pants.contrib.scrooge.tasks.scrooge_gen.calculate_services'):
-      task._outdir = MagicMock()
-      task._outdir.return_value = self.task_outdir
+    task._declares_service = lambda source: False
+    task._outdir = MagicMock()
+    task._outdir.return_value = self.task_outdir
 
-      task.gen = MagicMock()
-      sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
-      task.gen.return_value = {'test_smoke/a.thrift': sources}
+    task.gen = MagicMock()
+    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
+    task.gen.return_value = {'test_smoke/a.thrift': sources}
 
-      saved_add_new_target = Context.add_new_target
-      try:
-        Context.add_new_target = MagicMock()
-        task.execute()
-        relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
-        spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
-        address = SyntheticAddress.parse(spec=spec)
-        Context.add_new_target.assert_called_once_with(address,
-                                                       ScalaLibrary,
-                                                       sources=sources,
-                                                       excludes=OrderedSet(),
-                                                       dependencies=OrderedSet(),
-                                                       provides=None,
-                                                       derived_from=target)
-      finally:
-        Context.add_new_target = saved_add_new_target
+    saved_add_new_target = Context.add_new_target
+    try:
+      Context.add_new_target = MagicMock()
+      task.execute()
+      relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
+      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
+      address = SyntheticAddress.parse(spec=spec)
+      Context.add_new_target.assert_called_once_with(address,
+                                                     ScalaLibrary,
+                                                     sources=sources,
+                                                     excludes=OrderedSet(),
+                                                     dependencies=OrderedSet(),
+                                                     provides=None,
+                                                     derived_from=target)
+    finally:
+      Context.add_new_target = saved_add_new_target

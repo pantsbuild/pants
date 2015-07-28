@@ -15,13 +15,13 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
-from pants import binary_util
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnit
+from pants.binaries import binary_util
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
