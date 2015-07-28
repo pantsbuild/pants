@@ -53,7 +53,7 @@ class ClasspathUtilTest(BaseTest):
 
     self.assertEqual([path, extra_path], classpath)
 
-  def test_is_fine_with_paths_outside_buildroot(self):
+  def test_complains_about_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
 
     classpath_product = UnionProducts()
