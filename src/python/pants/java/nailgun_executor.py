@@ -100,15 +100,16 @@ class NailgunExecutor(Executor, ProcessManager):
     return 'NailgunExecutor({identity}, dist={dist}, pid={pid} socket={socket})'.format(
       identity=self._identity, dist=self._distribution, pid=self.pid, socket=self.socket)
 
-  def _parse_fingerprint(self, cmdline):
-    fingerprints = [cmd.split('=')[1] for cmd in cmdline if cmd.startswith(
-      self._PANTS_FINGERPRINT_ARG_PREFIX + '=')]
-    return fingerprints[0] if fingerprints else None
+  def _maybe_parse_fingerprint(self, cmdline):
+    if cmdline:
+      fingerprints = [cmd.split('=')[1] for cmd in cmdline if cmd.startswith(
+        self._PANTS_FINGERPRINT_ARG_PREFIX + '=')]
+      return fingerprints[0] if fingerprints else None
 
   @property
   def fingerprint(self):
     """This provides the nailgun fingerprint of the running process otherwise None."""
-    return self._parse_fingerprint(self.as_process().cmdline)
+    return self._maybe_parse_fingerprint(getattr(self.as_process(), 'cmdline', None))
 
   def _create_owner_arg(self, workdir):
     # Currently the owner is identified via the full path to the workdir.
@@ -161,7 +162,12 @@ class NailgunExecutor(Executor, ProcessManager):
   def _check_nailgun_state(self, new_fingerprint):
     running = self.is_alive()
     updated = running and (self.fingerprint != new_fingerprint or
-                           self.exe != self._distribution.java)
+                           self.cmd != self._distribution.java)
+    logging.debug('Nailgun {nailgun} state: updated={up!s} running={run!s} fingerprint={old_fp} '
+                  'new_fingerprint={new_fp} distribution={old_dist} new_distribution={new_dist}'
+                  .format(nailgun=self._identity, up=updated, run=running,
+                          old_fp=self.fingerprint, new_fp=new_fingerprint,
+                          old_dist=self.exe, new_dist=self._distribution.java))
     return running, updated
 
   def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
@@ -174,7 +180,8 @@ class NailgunExecutor(Executor, ProcessManager):
       running, updated = self._check_nailgun_state(new_fingerprint)
 
       if running and updated:
-        logger.debug('Killing ng server {server!r}'.format(server=self))
+        logger.debug('Found running nailgun server that needs updating, killing {server}'
+                     .format(server=self._identity))
         self.terminate()
 
       if (not running) or (running and updated):
@@ -224,8 +231,6 @@ class NailgunExecutor(Executor, ProcessManager):
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Synchronously spawn a new nailgun server."""
-    logger.debug('No nailgun server found with fingerprint {f}, spawning...'.format(f=fingerprint))
-
     # Truncate the nailguns stdout & stderr.
     self._write_file(self._ng_stdout, '')
     self._write_file(self._ng_stderr, '')
