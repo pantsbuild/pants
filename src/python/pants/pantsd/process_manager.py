@@ -83,13 +83,6 @@ class ProcessManager(object):
     return self._process_name
 
   @property
-  def exe(self):
-    """The full path of the process executable e.g. '/opt/java/jdk1.7.0/bin/java'.
-       Beware, this can be different than the original command line as it will resolve symlinks.
-    """
-    return getattr(self.as_process(), 'exe', None)
-
-  @property
   def exe_name(self):
     """The basename of the process executable e.g. 'java'."""
     return getattr(self.as_process(), 'name', None)

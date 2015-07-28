@@ -100,16 +100,16 @@ class NailgunExecutor(Executor, ProcessManager):
     return 'NailgunExecutor({identity}, dist={dist}, pid={pid} socket={socket})'.format(
       identity=self._identity, dist=self._distribution, pid=self.pid, socket=self.socket)
 
-  def _maybe_parse_fingerprint(self, cmdline):
-    if cmdline:
-      fingerprints = [cmd.split('=')[1] for cmd in cmdline if cmd.startswith(
-        self._PANTS_FINGERPRINT_ARG_PREFIX + '=')]
-      return fingerprints[0] if fingerprints else None
+  def _parse_fingerprint(self, cmdline):
+    fingerprints = [cmd.split('=')[1] for cmd in cmdline if cmd.startswith(
+      self._PANTS_FINGERPRINT_ARG_PREFIX + '=')]
+    return fingerprints[0] if fingerprints else None
 
   @property
   def fingerprint(self):
     """This provides the nailgun fingerprint of the running process otherwise None."""
-    return self._maybe_parse_fingerprint(getattr(self.as_process(), 'cmdline', None))
+    if self.cmdline:
+      return self._parse_fingerprint(self.cmdline)
 
   def _create_owner_arg(self, workdir):
     # Currently the owner is identified via the full path to the workdir.
@@ -167,7 +167,7 @@ class NailgunExecutor(Executor, ProcessManager):
                   'new_fingerprint={new_fp} distribution={old_dist} new_distribution={new_dist}'
                   .format(nailgun=self._identity, up=updated, run=running,
                           old_fp=self.fingerprint, new_fp=new_fingerprint,
-                          old_dist=self.exe, new_dist=self._distribution.java))
+                          old_dist=self.cmd, new_dist=self._distribution.java))
     return running, updated
 
   def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
