@@ -58,6 +58,19 @@ class OptionValueContainer(object):
     """
     self._forwardings.update(forwardings)
 
+  def get_rank(self, key):
+    """Returns the rank of the value at the specified key.
+
+    Returns one of the constants in RankedValue.
+    """
+    if key not in self._forwardings:
+      raise AttributeError('No such forwarded attribute: {}'.format(key))
+    val = getattr(self, self._forwardings[key])
+    if isinstance(val, RankedValue):
+      return val.rank
+    else:  # Values without rank are assumed to be flag values set by argparse.
+      return RankedValue.FLAG
+
   def update(self, attrs):
     """Set attr values on this object from the data in the attrs dict."""
     for k, v in attrs.items():
@@ -114,3 +127,16 @@ class OptionValueContainer(object):
       return val.value
     else:
       return val
+
+  def __iter__(self):
+    """Returns an iterator over all option names, in lexicographical order.
+
+    In the rare (for us) case of an option with multiple names, we pick the
+    lexicographically smallest one, for consistency.
+    """
+    inverse_forwardings = {}  # internal attribute -> external attribute.
+    for k, v in self._forwardings.items():
+      if v not in inverse_forwardings or inverse_forwardings[v] > k:
+        inverse_forwardings[v] = k
+    for name in sorted(inverse_forwardings.values()):
+      yield name

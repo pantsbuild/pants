@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!--
+Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<ivysettings>
+  <settings defaultResolver="pants-chain-repos"/>
+
+  <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
+  <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
+  <property name="m2.repo.artifact"
+            value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
+  <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
+
+  <resolvers>
+    <chain name="pants-chain-repos" returnFirst="true">
+      <!-- By default ivy does not require metadata (or successful metadata downloads).
+           This can lead to jars downloading without their transitive deps which leads
+           to confusing failures later when classpaths are constructed and used.
+           We setup the maven central resolver to require successful pom downloads here. -->
+      <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
+
+      <!-- The mvn standard local filesystem repo/cache -->
+      <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
+        <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
+        <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
+      </filesystem>
+    </chain>
+  </resolvers>
+</ivysettings>

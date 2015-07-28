@@ -8,8 +8,8 @@ python_library(
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
-    ],
-  )
+  ],
+)
 
 python_library(
   name = 'jar_tool',
@@ -19,8 +19,19 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/option',
     'src/python/pants/subsystem',
-    ],
-  )
+  ],
+)
+
+python_library(
+  name = 'jvm',
+  sources = ['jvm.py'],
+  dependencies = [
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:strutil',
+  ],
+)
+
 
 python_library(
   name = 'scala_platform',
@@ -29,5 +40,5 @@ python_library(
     ':jvm_tool_mixin',
     'src/python/pants/option',
     'src/python/pants/subsystem',
-    ],
-  )
+  ],
+)

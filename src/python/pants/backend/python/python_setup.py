@@ -17,10 +17,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class PythonSetup(Subsystem):
   """A python environment."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'python-setup'
+  options_scope = 'python-setup'
 
   @classmethod
   def register_options(cls, register):
@@ -29,12 +26,15 @@ class PythonSetup(Subsystem):
              help='The interpreter requirement string for this python environment.')
     register('--setuptools-version', advanced=True, default='5.4.1',
              help='The setuptools version for this python environment.')
-    register('--wheel-version', advanced=True, default='0.23.0',
+    register('--wheel-version', advanced=True, default='0.24.0',
              help='The wheel version for this python environment.')
     register('--platforms', advanced=True, type=Options.list, default=['current'],
              help='The wheel version for this python environment.')
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the interpreter cache. '
+                  'If unspecified, a standard path under the workdir is used.')
+    register('--chroot-cache-dir', advanced=True, default=None, metavar='<dir>',
+             help='The parent directory for the chroot cache. '
                   'If unspecified, a standard path under the workdir is used.')
     register('--resolver-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the requirement resolver cache. '
@@ -44,7 +44,8 @@ class PythonSetup(Subsystem):
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
-             help='The parent directory for the python artifact cache. ')
+             help='The parent directory for the python artifact cache. '
+                  'If unspecified, a standard path under the workdir is used.')
 
   @property
   def interpreter_requirement(self):
@@ -66,6 +67,11 @@ class PythonSetup(Subsystem):
   def interpreter_cache_dir(self):
     return (self.get_options().interpreter_cache_dir or
             os.path.join(self.scratch_dir, 'interpreters'))
+
+  @property
+  def chroot_cache_dir(self):
+    return (self.get_options().chroot_cache_dir or
+            os.path.join(self.scratch_dir, 'chroots'))
 
   @property
   def resolver_cache_dir(self):
@@ -107,17 +113,15 @@ class PythonSetup(Subsystem):
 
 class PythonRepos(Subsystem):
   """A python code repository."""
-
-  @classmethod
-  def scope_qualifier(cls):
-    return 'python-repos'
+  options_scope = 'python-repos'
 
   @classmethod
   def register_options(cls, register):
     super(PythonRepos, cls).register_options(register)
     register('--repos', advanced=True, type=Options.list, default=[],
              help='URLs of code repositories.')
-    register('--indexes', advanced=True, type=Options.list, default=[],
+    register('--indexes', advanced=True, type=Options.list,
+             default=['https://pypi.python.org/simple/'],
              help='URLs of code repository indexes.')
 
   @property

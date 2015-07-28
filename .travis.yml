@@ -14,6 +14,10 @@ before_cache:
   # operation).
   - find $HOME/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
   - rm -fv $HOME/.ivy2/pants/*.{css,properties,xml,xsl}
+  # We have several tests that do local file:// url resolves for
+  # com.example artifacts, these disrupt the cache but are fast since
+  # they're resolved from local files when omitted from the cache.
+  - rm -rf $HOME/.ivy2/pants/com.example
 
 cache:
   directories:

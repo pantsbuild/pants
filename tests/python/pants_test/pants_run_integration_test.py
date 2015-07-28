@@ -21,6 +21,35 @@ from pants.util.dirutil import safe_mkdir, safe_open
 PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data', 'stderr_data'])
 
 
+def ensure_cached(expected_num_artifacts=None):
+  """Decorator for asserting cache writes in an integration test.
+
+  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
+  :param expected_num_artifacts: Expected number of artifacts to be in the task's
+                                 cache after running the test. If unspecified, will
+                                 assert that the number of artifacts in the cache is
+                                 non-zero.
+  """
+  def decorator(test_fn):
+    def wrapper(self, *args, **kwargs):
+      with temporary_dir() as artifact_cache:
+        cache_args = '--cache-write-to=["{}"]'.format(artifact_cache)
+
+        test_fn(self, *args + (cache_args,), **kwargs)
+
+        num_artifacts = 0
+        for (root, _, files) in os.walk(artifact_cache):
+          print(root, files)
+          num_artifacts += len(files)
+
+        if expected_num_artifacts is None:
+          self.assertNotEqual(num_artifacts, 0)
+        else:
+          self.assertEqual(num_artifacts, expected_num_artifacts)
+    return wrapper
+  return decorator
+
+
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
@@ -89,7 +118,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
-
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 

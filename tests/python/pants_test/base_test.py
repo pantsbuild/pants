@@ -28,9 +28,8 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
-from pants.option.global_options import register_global_options
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
-from pants.option.options_bootstrapper import register_bootstrap_options
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
@@ -151,7 +150,7 @@ class BaseTest(unittest.TestCase):
     options = options or {}
 
     option_values = defaultdict(dict)
-    registered_global_subsystems = set()
+    registered_subsystems = set()
     bootstrap_option_values = None  # We fill these in after registering bootstrap options.
 
     # We provide our own test-only registration implementation, bypassing argparse.
@@ -175,11 +174,11 @@ class BaseTest(unittest.TestCase):
     # TODO: This sequence is a bit repetitive of the real registration sequence.
 
     # Register bootstrap options and grab their default values for use in subsequent registration.
-    register_bootstrap_options(register_func(Options.GLOBAL_SCOPE), self.build_root)
+    GlobalOptionsRegistrar.register_bootstrap_options(register_func(Options.GLOBAL_SCOPE))
     bootstrap_option_values = create_option_values(copy.copy(option_values[Options.GLOBAL_SCOPE]))
 
-    # Now register the remaining global scope options.
-    register_global_options(register_func(Options.GLOBAL_SCOPE))
+    # Now register the full global scope options.
+    GlobalOptionsRegistrar.register_options(register_func(Options.GLOBAL_SCOPE))
 
     # Now register task and subsystem options for relevant tasks.
     for task_type in for_task_types:
@@ -188,12 +187,11 @@ class BaseTest(unittest.TestCase):
         raise TaskError('You must set a scope on your task type before using it in tests.')
       task_type.register_options(register_func(scope))
       for subsystem in (set(task_type.global_subsystems()) |
-                        self._build_configuration.subsystem_types()):
-        if subsystem not in registered_global_subsystems:
-          subsystem.register_options(register_func(subsystem.qualify_scope(Options.GLOBAL_SCOPE)))
-          registered_global_subsystems.add(subsystem)
-      for subsystem in task_type.task_subsystems():
-        subsystem.register_options(register_func(subsystem.qualify_scope(scope)))
+                        set(task_type.task_subsystems()) |
+                        self._build_configuration.subsystems()):
+        if subsystem not in registered_subsystems:
+          subsystem.register_options(register_func(subsystem.options_scope))
+          registered_subsystems.add(subsystem)
 
     # Now default option values override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
@@ -207,9 +205,12 @@ class BaseTest(unittest.TestCase):
         option_values[scope][key] = val
 
     # Make inner scopes inherit option values from their enclosing scopes.
+    all_scopes = set(option_values.keys())
+    for task_type in for_task_types:  # Make sure we know about pre-task subsystem scopes.
+      all_scopes.update([si.scope for si in task_type.known_scope_infos()])
     # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
     # and therefore only have to inherit from our immediately enclosing scope.
-    for scope in sorted(option_values.keys()):
+    for scope in sorted(all_scopes):
       if scope != Options.GLOBAL_SCOPE:
         enclosing_scope = scope.rpartition('.')[0]
         opts = option_values[scope]

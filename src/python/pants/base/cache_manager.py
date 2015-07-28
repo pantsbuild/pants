@@ -10,13 +10,13 @@ import sys
 from pants.base.build_graph import sort_targets
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.target import Target
+from pants.util.dirutil import safe_mkdir
 
 
 try:
   import cPickle as pickle
 except ImportError:
   import pickle
-
 
 
 class VersionedTargetSet(object):
@@ -53,6 +53,9 @@ class VersionedTargetSet(object):
                                                            for vt in versioned_targets])
     self.num_chunking_units = self.cache_key.num_chunking_units
     self.valid = not cache_manager.needs_update(self.cache_key)
+    if cache_manager.invalidation_report:
+      cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
+                                                self.valid, phase='init')
 
   def update(self):
     self._cache_manager.update(self)
@@ -61,7 +64,7 @@ class VersionedTargetSet(object):
     self._cache_manager.force_invalidate(self)
 
   def __repr__(self):
-    return 'VTS({}, {})'.format(','.join(target.id for target in self.targets),
+    return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
                                 'valid' if self.valid else 'invalid')
 
 
@@ -78,7 +81,18 @@ class VersionedTarget(VersionedTargetSet):
     # Must come after the assignments above, as they are used in the parent's __init__.
     VersionedTargetSet.__init__(self, cache_manager, [self])
     self.id = target.id
+    self._results_dir = None
 
+  def create_results_dir(self, dir):
+    safe_mkdir(dir)
+    self._results_dir = dir
+
+  @property
+  def results_dir(self):
+    return self._results_dir
+
+  def __repr__(self):
+    return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
 
 
 class InvalidationCheck(object):
@@ -191,11 +205,15 @@ class InvalidationCacheManager(object):
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
-               fingerprint_strategy=None):
+               fingerprint_strategy=None,
+               invalidation_report=None,
+               task_name=None):
     self._cache_key_generator = cache_key_generator
+    self._task_name = task_name or 'UNKNOWN'
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy
+    self.invalidation_report = invalidation_report
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
@@ -230,11 +248,15 @@ class InvalidationCacheManager(object):
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
     """
-    all_vts = self._wrap_targets(targets, topological_order=topological_order)
+    all_vts = self.wrap_targets(targets, topological_order=topological_order)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     return InvalidationCheck(all_vts, invalid_vts, partition_size_hint, target_colors)
 
-  def _wrap_targets(self, targets, topological_order=False):
+  @property
+  def task_name(self):
+    return self._task_name
+
+  def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.
 
     If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not

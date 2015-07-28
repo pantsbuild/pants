@@ -15,8 +15,8 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmC
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
-from pants.backend.jvm.tasks.jvm_compile.jvm_fingerprint_strategy import JvmFingerprintStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.reporting.reporting_utils import items_to_report_element
@@ -40,6 +40,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
+             fingerprint=True,
              help='Pass these args to the compiler.')
 
     register('--confs', type=Options.list, default=['default'],
@@ -63,7 +64,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              advanced=True,
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--strategy', choices=['global', 'isolated'], default='global',
+    register('--strategy', choices=['global', 'isolated'], default='global', fingerprint=True,
              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
@@ -144,7 +145,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     raise NotImplementedError()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -187,8 +188,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     else:
       self._args.extend(self.get_options().no_warning_args)
 
-    self.setup_artifact_cache()
-
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
 
@@ -205,23 +204,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self._language,
                                           lambda s: s.endswith(self._file_suffix))
 
-  def _jvm_fingerprint_strategy(self):
-    # Use a fingerprint strategy that allows us to also include java/scala versions.
-    return JvmFingerprintStrategy(self._platform_version_info())
-
-  def _platform_version_info(self):
-    return [self._strategy.name()] + self._language_platform_version_info()
-
-  @abstractmethod
-  def _language_platform_version_info(self):
-    """
-    Provides extra platform information such as java version that will be used
-    in the fingerprinter. This in turn ensures different platform versions create different
-    cache artifacts.
-
-    Subclasses must override this and return a list of version info.
-    """
-    pass
+  def _fingerprint_strategy(self):
+    return TaskIdentityFingerprintStrategy(self)
 
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
@@ -239,7 +223,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
-                                              fingerprint_strategy=self._jvm_fingerprint_strategy())
+                                              fingerprint_strategy=self._fingerprint_strategy())
     self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
 
   def execute_chunk(self, relevant_targets):
@@ -253,8 +237,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=self._jvm_fingerprint_strategy(),
-                          topological_order=True) as invalidation_check:
+                          topological_order=True,
+                          fingerprint_strategy=self._fingerprint_strategy()) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid targets for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
@@ -280,7 +264,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
-  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, progress_message):
+  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, log_file, progress_message):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -312,7 +296,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
-        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file)
+        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file, log_file)
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
@@ -336,27 +320,43 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     compile_classpath = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
 
-    # Register class products.
-    if classes_by_source is not None or classes_by_target is not None:
-      computed_classes_by_source_by_context = self._strategy.compute_classes_by_source(
-          compile_contexts)
-      resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
-      for compile_context in compile_contexts:
-        computed_classes_by_source = computed_classes_by_source_by_context[compile_context]
-        target = compile_context.target
-        classes_dir = compile_context.classes_dir
-        target_products = classes_by_target[target] if classes_by_target is not None else None
-        for source in compile_context.sources:  # Sources are relative to buildroot.
-          classes = computed_classes_by_source.get(source, [])  # Classes are absolute paths.
-          for cls in classes:
-            clsname = self._strategy.class_name_for_class_file(compile_context, cls)
+    # Register class products (and resources generated by annotation processors.)
+    computed_classes_by_source_by_context = self._strategy.compute_classes_by_source(
+        compile_contexts)
+    resource_mapping = self._strategy.compute_resource_mapping(compile_contexts)
+    for compile_context in compile_contexts:
+      computed_classes_by_source = computed_classes_by_source_by_context[compile_context]
+      target = compile_context.target
+      classes_dir = compile_context.classes_dir
+
+      def add_products_by_target(files):
+        for f in files:
+          clsname = self._strategy.class_name_for_class_file(compile_context, f)
+          if clsname:
+            # Is a class.
+            classes_by_target[target].add_abs_paths(classes_dir, [f])
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
+          else:
+            # Is a resource.
+            resources_by_target[target].add_abs_paths(classes_dir, [f])
 
-          if classes_by_target is not None:
-            target_products.add_abs_paths(classes_dir, classes)
-          if classes_by_source is not None:
-            classes_by_source[source].add_abs_paths(classes_dir, classes)
+      # Collect classfiles (absolute) that were claimed by sources (relative)
+      for source in compile_context.sources:
+        classes = computed_classes_by_source.get(source, [])
+        add_products_by_target(classes)
+        if classes_by_source is not None:
+          classes_by_source[source].add_abs_paths(classes_dir, classes)
+
+      # And any that were not claimed by sources (NB: `None` map key.)
+      unclaimed_classes = computed_classes_by_source.get(None, [])
+      if unclaimed_classes:
+        self.context.log.debug(
+          items_to_report_element(unclaimed_classes, 'class'),
+          ' not claimed by analysis for ',
+          str(compile_context.target)
+        )
+        add_products_by_target(unclaimed_classes)
 
     # Register resource products.
     for compile_context in compile_contexts:

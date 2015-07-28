@@ -22,10 +22,10 @@ class JarLibraryWithOverrides(unittest.TestCase):
       nay = JarDependency(org, name, "0.0.1")
       yea = JarDependency(org, name, "0.0.8")
       # define targets depend on different 'org:c's
-      JarLibrary("c", [nay])
-      JarLibrary("b", [yea])
+      JarLibrary("c", jars=[nay])
+      JarLibrary("b", jars=[yea])
       # then depend on those targets transitively, and override to the correct version
-      l = JarLibrary(
+      l = Target(
         "a",
         dependencies=[Pants(":c")],
         overrides=[":b"])

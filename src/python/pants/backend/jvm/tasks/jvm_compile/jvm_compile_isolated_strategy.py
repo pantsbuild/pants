@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 from collections import OrderedDict, defaultdict
-from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -18,7 +17,7 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy
 
 
@@ -30,7 +29,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     if supports_concurrent_execution:
       register('--worker-count', type=int, default=1, advanced=True,
                help='The number of concurrent workers to use compiling {lang} sources with the isolated'
-                    ' strategy. This is a beta feature.'.format(lang=language))
+                    ' strategy.'.format(lang=language))
+    register('--capture-log', action='store_true', default=False, advanced=True,
+            help='Capture compilation output to per-target logs.')
 
   def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
@@ -39,14 +40,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
+    self._logs_dir = os.path.join(workdir, 'isolated-logs')
+
+    self._capture_log = options.capture_log
 
     try:
       worker_count = options.worker_count
     except AttributeError:
       # tasks that don't support concurrent execution have no worker_count registered
       worker_count = 1
-
     self._worker_count = worker_count
+
     self._worker_pool = None
 
   def name(self):
@@ -71,12 +75,11 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     super(JvmCompileIsolatedStrategy, self).pre_compile()
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
+    safe_mkdir(self._logs_dir)
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
                                                             relevant_targets)
-
-    # TODO(jessrosenfield): Should we for invalid analysis files like in the global pre_compile?
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -104,16 +107,26 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def compute_classes_by_source(self, compile_contexts):
     buildroot = get_buildroot()
+    # Build a mapping of srcs to classes for each context.
     classes_by_src_by_context = defaultdict(dict)
     for compile_context in compile_contexts:
-      if not os.path.exists(compile_context.analysis_file):
-        continue
-      products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
-                                                                compile_context.classes_dir)
+      # Walk the class directory to build a set of unclaimed classfiles.
+      unclaimed_classes = set()
+      for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
+        unclaimed_classes.update(os.path.join(dirpath, f) for f in filenames)
+
+      # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
-      for src, classes in products.items():
-        relsrc = os.path.relpath(src, buildroot)
-        classes_by_src[relsrc] = classes
+      if os.path.exists(compile_context.analysis_file):
+        products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
+                                                                  compile_context.classes_dir)
+        for src, classes in products.items():
+          relsrc = os.path.relpath(src, buildroot)
+          classes_by_src[relsrc] = classes
+          unclaimed_classes.difference_update(classes)
+
+      # Any remaining classfiles were unclaimed by sources/analysis.
+      classes_by_src[None] = list(unclaimed_classes)
     return classes_by_src_by_context
 
   def _compute_classpath_entries(self, compile_classpaths,
@@ -140,52 +153,47 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         else:
           yield compile_context.classes_dir, compile_context.analysis_file
 
+  def _capture_log_file(self, target):
+    if self._capture_log:
+      return os.path.join(self._logs_dir, "{}.log".format(target.id))
+    return None
+
   def exec_graph_key_for_target(self, compile_target):
-    return "compile-{}".format(compile_target.address.spec)
-
-  @contextmanager
-  def _empty_analysis_cleanup(self, compile_context):
-    """Addresses cases where failed compilations leave behind invalid analysis.
-
-    If compilation was creating analysis for the first time, and it fails, then the analysis
-    will be empty/invalid.
-    """
-    preexisting_analysis = os.path.exists(compile_context.analysis_file)
-    try:
-      yield
-    except:
-      if not preexisting_analysis:
-        safe_delete(compile_context.analysis_file)
-      raise
+    return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                            invalid_targets, invalid_vts_partitioned, compile_vts, register_vts,
                            update_artifact_cache_vts_work):
     def create_work_for_vts(vts, compile_context, target_closure):
       def work():
-        progress_message = vts.targets[0].address.spec
+        progress_message = compile_context.target.address.spec
         cp_entries = self._compute_classpath_entries(compile_classpaths,
                                                      target_closure,
                                                      compile_context,
                                                      extra_compile_time_classpath)
 
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
-        tmpdir = os.path.join(self.analysis_tmpdir, vts.targets[0].id)
-        safe_mkdir(tmpdir)
 
-        with self._empty_analysis_cleanup(compile_context):
-          tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
-              tmpdir, compile_context.target)
-          if os.path.exists(compile_context.analysis_file):
-             shutil.copy(compile_context.analysis_file, tmp_analysis_file)
-          compile_vts(vts,
-                      compile_context.sources,
-                      tmp_analysis_file,
-                      upstream_analysis,
-                      cp_entries,
-                      compile_context.classes_dir,
-                      progress_message)
-          atomic_copy(tmp_analysis_file, compile_context.analysis_file)
+        # Capture a compilation log if requested.
+        log_file = self._capture_log_file(compile_context.target)
+
+        # Mutate analysis within a temporary directory, and move it to the final location
+        # on success.
+        tmpdir = os.path.join(self.analysis_tmpdir, compile_context.target.id)
+        safe_mkdir(tmpdir)
+        tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
+            tmpdir, compile_context.target)
+        if os.path.exists(compile_context.analysis_file):
+           shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+        compile_vts(vts,
+                    compile_context.sources,
+                    tmp_analysis_file,
+                    upstream_analysis,
+                    cp_entries,
+                    compile_context.classes_dir,
+                    log_file,
+                    progress_message)
+        atomic_copy(tmp_analysis_file, compile_context.analysis_file)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
@@ -282,19 +290,26 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     vt = vts.versioned_targets[0]
 
     # Set up args to relativize analysis in the background.
-    # TODO: GlobalStrategy puts portable analysis in a tmp directory... shall we?
     portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
         self._analysis_dir, compile_context.target)
     relativize_args_tuple = (compile_context.analysis_file, portable_analysis_file)
 
-    # Compute the classes and resources for this target.
+    # Collect the artifacts for this target.
     artifacts = []
+    def add_abs_products(p):
+      if p:
+        for _, paths in p.abs_paths():
+          artifacts.extend(paths)
+    # Resources.
     resources_by_target = self.context.products.get_data('resources_by_target')
-    if resources_by_target is not None:
-      for _, paths in resources_by_target[compile_context.target].abs_paths():
-        artifacts.extend(paths)
-    for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
-      artifacts.extend([os.path.join(dirpath, f) for f in filenames])
+    add_abs_products(resources_by_target.get(compile_context.target))
+    # Classes.
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    add_abs_products(classes_by_target.get(compile_context.target))
+    # Log file.
+    log_file = self._capture_log_file(compile_context.target)
+    if log_file and os.path.exists(log_file):
+      artifacts.append(log_file)
 
     # Get the 'work' that will publish these artifacts to the cache.
     # NB: the portable analysis_file won't exist until we finish.

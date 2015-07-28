@@ -10,7 +10,7 @@ import logging
 import os
 import pkgutil
 import threading
-import xml
+import xml.etree.ElementTree as ET
 from collections import OrderedDict, defaultdict, namedtuple
 from contextlib import contextmanager
 from copy import deepcopy
@@ -122,6 +122,8 @@ class IvyInfo(object):
 
     :param jar_library A JarLibrary to collect the transitive artifacts for.
     :param memo see `traverse_dependency_graph`
+    :returns: all the artifacts for all of the jars in this library, including transitive deps
+    :rtype: list of IvyArtifact
     """
     artifacts = OrderedSet()
     def create_collection(dep):
@@ -161,6 +163,8 @@ class IvyUtils(object):
 
   IVY_TEMPLATE_PACKAGE_NAME = __name__
   IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
+
+  INTERNAL_ORG_NAME = 'internal'
 
   class IvyResolveReportError(Exception):
     """Raised when the ivy report cannot be found."""
@@ -249,30 +253,33 @@ class IvyUtils(object):
     if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
       return targets[0].provides.org, targets[0].provides.name
     else:
-      return 'internal', Target.maybe_readable_identify(targets)
+      return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
-  def xml_report_path(cls, targets, conf):
-    """The path to the xml report ivy creates after a retrieve."""
-    org, name = cls.identify(targets)
+  def xml_report_path(cls, resolve_hash_name, conf):
+    """The path to the xml report ivy creates after a retrieve.
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
+    used for resolution.
+    :param string conf: the ivy conf name (e.g. "default")
+    """
     cachedir = IvySubsystem.global_instance().get_options().cache_dir
-    return os.path.join(cachedir, '{}-{}-{}.xml'.format(org, name, conf))
+    return os.path.join(cachedir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
+                                                        resolve_hash_name, conf))
 
   @classmethod
-  def parse_xml_report(cls, targets, conf):
-    """Parse the ivy xml report corresponding to the targets and conf passed.
+  def parse_xml_report(cls, resolve_hash_name, conf):
+    """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :param targets: Targets ivy considered during ivy_resolve()
-    :type targets: list of Target
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
+    used for resolution.
     :param string conf: the ivy conf name (e.g. "default")
     :return: The info in the xml report or None if target is empty.
     :rtype: IvyInfo
-    :raises:  IvyResolveReportError if no report exists.
+    :raises: IvyResolveReportError if no report exists.
     """
-    if not targets:
+    if not resolve_hash_name:
       return None
-
-    path = cls.xml_report_path(targets, conf)
+    path = cls.xml_report_path(resolve_hash_name, conf)
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
@@ -280,11 +287,9 @@ class IvyUtils(object):
 
   @classmethod
   def _parse_xml_report(cls, path):
-    if not os.path.exists(path):
-      return None
-
+    logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo()
-    etree = xml.etree.ElementTree.parse(path)
+    etree = ET.parse(path)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')
@@ -333,8 +338,12 @@ class IvyUtils(object):
     return jar_map.values()
 
   @classmethod
-  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs):
-    org, name = cls.identify(targets)
+  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None):
+    if resolve_hash_name:
+      org = IvyUtils.INTERNAL_ORG_NAME
+      name = resolve_hash_name
+    else:
+      org, name = cls.identify(targets)
 
     # As it turns out force is not transitive - it only works for dependencies pants knows about
     # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
@@ -369,9 +378,10 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def calculate_classpath(cls, targets, automatic_excludes=True):
+  def calculate_classpath(cls, targets, gather_excludes=True):
     jars = OrderedDict()
-    excludes = set()
+    global_excludes = set()
+    provide_excludes = set()
     targets_processed = set()
 
     # Support the ivy force concept when we sanely can for internal dep conflicts.
@@ -385,34 +395,49 @@ class IvyUtils(object):
       )
 
     def collect_jars(target):
-      targets_processed.add(target)
-      if isinstance(target, JarLibrary):
-        # Combine together requests for jars with different classifiers from the same jar_library
-        # TODO(Eric Ayers) This is a short-term fix for dealing with the same ivy module that
-        # wants to download multiple jar files with different classifiers as binary dependencies.
-        # I am trying to work out a better long-term solution in this design doc:
-        # https://docs.google.com/document/d/1sEMXUmj7v-YCBZ_wHLpCFjkHOeWjsc1NR1hRIJ9uCZ8
-        target_jars = []
-        for jar in target.jar_dependencies:
-          target_jars.append(jar)
-        for jar in cls._combine_jars(target_jars):
-          if jar.rev:
-            add_jar(jar)
+      if not isinstance(target, JarLibrary):
+        return
+      # Combine together requests for jars with different classifiers from the same jar_library
+      # TODO(Eric Ayers) This is a short-term fix for dealing with the same ivy module that
+      # wants to download multiple jar files with different classifiers as binary dependencies.
+      # I am trying to work out a better long-term solution in this design doc:
+      # https://docs.google.com/document/d/1sEMXUmj7v-YCBZ_wHLpCFjkHOeWjsc1NR1hRIJ9uCZ8
+      for jar in cls._combine_jars(target.jar_dependencies):
+        if jar.rev:
+          add_jar(jar)
 
+    def collect_excludes(target):
       target_excludes = target.payload.get_field_value('excludes')
       if target_excludes:
-        excludes.update(target_excludes)
-      if target.is_exported and automatic_excludes:
-        # if a source dep is exported, it should always override remote/binary versions
-        # of itself, ie "round trip" dependencies
-        logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
-          target.provides.org, target.provides.name, target))
-        excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
+        global_excludes.update(target_excludes)
+
+    def collect_provide_excludes(target):
+      if not target.is_exported:
+        return
+      logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
+        target.provides.org, target.provides.name, target))
+      provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
+
+    def collect_elements(target):
+      targets_processed.add(target)
+      collect_jars(target)
+      if gather_excludes:
+        collect_excludes(target)
+      collect_provide_excludes(target)
 
     for target in targets:
-      target.walk(collect_jars, predicate=lambda target: target not in targets_processed)
+      target.walk(collect_elements, predicate=lambda target: target not in targets_processed)
 
-    return jars.values(), excludes
+    # If a source dep is exported (ie, has a provides clause), it should always override
+    # remote/binary versions of itself, ie "round trip" dependencies.
+    # TODO: Move back to applying provides excludes as target-level excludes when they are no
+    # longer global.
+    if provide_excludes:
+      additional_excludes = tuple(provide_excludes)
+      for coordinate, jar in jars.items():
+        jar.excludes += additional_excludes
+
+    return jars.values(), global_excludes
 
   @staticmethod
   def _resolve_conflict(existing, proposed):

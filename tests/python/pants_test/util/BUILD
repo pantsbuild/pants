@@ -34,6 +34,23 @@ python_tests(
 )
 
 python_tests(
+  name = 'fileutil',
+  sources = ['test_fileutil.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
+  ]
+)
+
+python_tests(
+  name = 'filtering',
+  sources = ['test_filtering.py'],
+  dependencies = [
+    'src/python/pants/util:filtering',
+  ]
+)
+
+python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
@@ -46,15 +63,6 @@ python_tests(
   sources = ['test_meta.py'],
   dependencies = [
     'src/python/pants/util:meta',
-  ]
-)
-
-python_tests(
-  name = 'fileutil',
-  sources = ['test_fileutil.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:fileutil',
   ]
 )
 

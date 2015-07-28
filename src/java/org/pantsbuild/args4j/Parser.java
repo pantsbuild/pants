@@ -49,10 +49,13 @@ public class Parser {
     }
 
     /**
+     * <p>
      * Prints command line usage.
-     * <p/>
+     * </p>
+     * <p>
      * The usage will include failure details if the command line parse was a failure according to
      * {@link #isFailure()}.
+     * </p>
      *
      * @param out The stream to print command line usage to.
      */

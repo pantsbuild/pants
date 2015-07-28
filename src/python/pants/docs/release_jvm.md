@@ -35,8 +35,10 @@ satisfy in order to be able publish to Maven Central:
     Sonatype does provide
     [some instructions](http://central.sonatype.org/pages/working-with-pgp-signatures.html)
     you might follow.
+
   - [Create a sonatype.org JIRA account](https://issues.sonatype.org/secure/Signup!default.jspa)
     if you don't already have one.
+
   - Ask an existing Pants Maven Central [releaser](#releasers) to
     create a sonatype.org JIRA ticket to get you added to the
     org.pantsbuild maintainers.  You'll need to give them your
@@ -45,9 +47,16 @@ satisfy in order to be able publish to Maven Central:
     they can use as a template.  Once this is done and you've performed
     your 1st release, add yourself to the [Releasers](#releasers)
     section below.
+
   - Create a `~/.config/pants/release/jvm/pgp.properties` file to store the
     credentials Pants needs to sign artifacts uploaded to sonatype.org.
     This process is [described below](#pgp-credentials).
+
+  - Create an entry in your `~/.netrc` file to enable authentication to Sonatype.
+
+        machine oss.sonatype.org
+          login jsirois
+          password XYX
 
 ### PGP Credentials ###
 
@@ -112,13 +121,13 @@ this, you can test out the publish in 2 ways:
   1. A dry run to get a preview of what will be published and why:
 
         :::bash
-        $ PANTS_DEV=1 ./pants clean-all publish.jar src/{java,scala}::
+        $ ./pants clean-all publish.jar src/{java,scala}::
 
   2. A local publish to get a preview of both what will be published
      and why as well as the changelogs:
 
         :::bash
-        $ PANTS_DEV=1 ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
+        $ ./pants clean-all publish.jar --no-dryrun --local=/tmp/m2 src/{java,scala}::
 
      Note that this "dry-run" technique somewhat confusingly passes
      `--no-dryrun` but only because the publish is local and to a
@@ -142,7 +151,7 @@ to use the following command, which will publish everything that's
 changed and only those things that have changed since the last publish:
 
     :::bash
-    $ PANTS_DEV=1 ./pants publish.jar --no-dryrun src/{java,scala}::
+    $ ./pants publish.jar --no-dryrun src/{java,scala}::
 
 ## Promoting to Maven Central ##
 
@@ -158,7 +167,7 @@ but the process is also described below:
      You should use the the same user id and password you use to login
      to the Sonatype JIRA server.
 
-  2. Find the staging repostitory auto-created when you
+  2. Find the staging repository auto-created when you
      [staged the release](#staging-to-ossrh) above.
 
      As shown below, in the 'Staging Repositories' tab enter
@@ -173,7 +182,8 @@ but the process is also described below:
   3. Close the selected staging repository.
 
      As shown below, with the staging repository selected, there will
-     be a 'Close' button available.  Click it.
+     be a 'Close' button available.  Look for in in the menu bar across
+     the top of the repository list.  Click it.
 
     ![image](images/ossrh-publish-close-staging-repo.png)
 
@@ -212,4 +222,6 @@ The following folks are set up to publish to Maven Central for
 org.pantsbuild:
 
 - David Turner <dturner@twopensource.com>
+- Eric Ayers <ericzundel@gmail.com>
 - John Sirois <john.sirois@gmail.com>
+- Stu Hood <stuhood@gmail.com>

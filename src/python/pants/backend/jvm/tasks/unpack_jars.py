@@ -64,18 +64,17 @@ class UnpackJars(Task):
   @classmethod
   def _unpack_filter(cls, filename, include_patterns, exclude_patterns):
     """:return: True if the file should be allowed through the filter"""
-    found = False
+    for exclude_pattern in exclude_patterns:
+      if exclude_pattern.match(filename):
+        return False
     if include_patterns:
+      found = False
       for include_pattern in include_patterns:
         if include_pattern.match(filename):
           found = True
           break
       if not found:
         return False
-    if exclude_patterns:
-      for exclude_pattern in exclude_patterns:
-        if exclude_pattern.match(filename):
-          return False
     return True
 
   @classmethod

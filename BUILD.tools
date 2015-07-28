@@ -59,9 +59,9 @@ jar_library(name = 'cobertura-report',
 
 jar_library(name = 'benchmark-caliper-0.5',
             jars = [
-              # TODO(Eric Ayers) Caliper is old and breaks with guava 16. Add jmh support?
-              jar(org = 'com.google.caliper', name = 'caliper', rev = '0.5-rc1')
-                .exclude(org='com.google.guava', name='guava')
+              # TODO (Eric Ayers) Caliper is old. Add jmh support?
+              # The caliper tool is shaded, and so shouldn't interfere with Guava 16.
+              jar(org = 'com.google.caliper', name = 'caliper', rev = '0.5-rc1'),
             ])
 
 jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
@@ -75,7 +75,7 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.5')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.7')
             ])
 
 SBT_REV = '0.13.8'
@@ -124,13 +124,17 @@ jar_library(name = 'scalastyle',
 
 jar_library(name = 'checkstyle',
             jars = [
-              jar(org = 'com.puppycrawl.tools', name = 'checkstyle', rev = '5.6'),
+              # Pants still officially supports java 6 as a tool; the supported development
+              # environment for a pants hacker is based on that.  As such, we use 6.1.1 here since
+              # its the last checkstyle version compiled to java 6.  See the release notes here:
+              # http://checkstyle.sourceforge.net/releasenotes.html
+              jar(org = 'com.puppycrawl.tools', name = 'checkstyle', rev = '6.1.1'),
             ])
 
 jar_library(name = 'junit',
             jars = [
               jar(org = 'junit', name = 'junit', rev = '4.12'),
-              jar(org = 'org.pantsbuild', name = 'junit-runner', rev = '0.0.5'),
+              jar(org = 'org.pantsbuild', name = 'junit-runner', rev = '0.0.8'),
             ])
 
 jar_library(name = 'scrooge-gen',

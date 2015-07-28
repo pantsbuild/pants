@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from xml.etree import ElementTree
 
 from pants.util.contextutil import temporary_dir
@@ -149,7 +150,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true'])
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
   def test_junit_test_requiring_cwd_passes_with_option_with_value_specified(self):
@@ -158,29 +159,17 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd=testprojects/src/java/org/pantsbuild/testproject/cwdexample/subdir'])
     self.assert_success(pants_run)
 
-  def test_junit_test_requiring_cwd_passes_with_option_with_no_value_specified(self):
+  def test_junit_test_requiring_cwd_fails_with_option_with_no_value_specified(self):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
         '--interpreter=CPython>=2.6,<3',
         '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
-        '--test-junit-cwd',])
-    self.assert_success(pants_run)
-
-  def test_junit_test_requiring_cwd_fails_when_target_not_first(self):
-    pants_run = self.run_pants([
-        'test',
-        'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-        'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
-        '--interpreter=CPython>=2.6,<3',
-        '--interpreter=CPython>=3.3',
-        '--test-junit-jvm-options=-Dcwd.test.enabled=true',
-        '--test-junit-cwd',])
+        '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
   def test_junit_test_suppress_output_flag(self):
@@ -188,4 +177,35 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'test.junit',
         '--no-suppress-output',
         'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
-    self.assertTrue('Hello from test!' in pants_run.stdout_data)
+    self.assertIn('Hello from test1!', pants_run.stdout_data)
+    self.assertIn('Hello from test2!', pants_run.stdout_data)
+
+  def test_junit_test_target_cwd(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/tests/java/org/pantsbuild/testproject/workdirs/onedir',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_annotation_processor(self):
+    pants_run = self.run_pants([
+      'test',
+      '--compile-java-strategy=isolated',
+      'testprojects/tests/java/org/pantsbuild/testproject/annotation',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_duplicate_resources(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/maven_layout/junit_resource_collision',
+    ])
+    self.assert_success(pants_run)
+
+  def test_junit_test_target_cwd_overrides_option(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/tests/java/org/pantsbuild/testproject/workdirs/onedir',
+      '--test-junit-cwd=testprojects/tests/java/org/pantsbuild/testproject/dummies'
+    ])
+    self.assert_success(pants_run)

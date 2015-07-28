@@ -14,7 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_open
 
 
-class ConsoleTask(Task, QuietTaskMixin):
+class ConsoleTask(QuietTaskMixin, Task):
   """A task whose only job is to print information to the console.
 
   ConsoleTasks are not intended to modify build state.

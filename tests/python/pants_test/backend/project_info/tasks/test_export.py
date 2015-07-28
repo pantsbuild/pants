@@ -43,7 +43,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
 
     self.make_target(
       'project_info:first',
-      target_type=JarLibrary,
+      target_type=Dependencies,
     )
 
     jar_lib = self.make_target(
@@ -340,7 +340,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/**/*.py',]},
+      {'globs' : ['src/y/**/*.py','src/y/*.py',]},
       result['targets']['src/y:y']['globs']
     )
 
@@ -351,7 +351,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/subdir/**/*.py',]},
+      {'globs' : ['src/y/subdir/**/*.py', 'src/y/subdir/*.py',]},
       result['targets']['src/y:y2']['globs']
     )
 

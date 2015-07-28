@@ -42,7 +42,7 @@ def print_vt(vt):
 class InvalidationCacheManagerTest(BaseTest):
   class TestInvalidationCacheManager(InvalidationCacheManager):
     def __init__(self, tmpdir):
-      InvalidationCacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True, None)
+      InvalidationCacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True)
 
   def setUp(self):
     super(InvalidationCacheManagerTest, self).setUp()
@@ -74,7 +74,7 @@ class InvalidationCacheManagerTest(BaseTest):
       print('[%s]' % ' '.join(strs))
 
     # Verify basic data structure soundness.
-    all_vts = self.cache_manager._wrap_targets(targets)
+    all_vts = self.cache_manager.wrap_targets(targets)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
     self.assertEquals(5, len(invalid_vts))
     self.assertEquals(5, len(all_vts))

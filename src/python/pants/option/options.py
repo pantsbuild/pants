@@ -9,11 +9,14 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.base.payload import Payload
+from pants.base.payload_field import FileField, PrimitiveField, TargetListField
 from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
+from pants.option.scope import ScopeInfo
 
 
 class Options(object):
@@ -72,18 +75,45 @@ class Options(object):
   # will replace the default with the cmd-line value.
   list = staticmethod(custom_types.list_type)
 
+  # A list-typed option that indicates the list elements are target specs.
+  target_list = staticmethod(custom_types.target_list_type)
 
-  def __init__(self, env, config, known_scopes, args=sys.argv, bootstrap_option_values=None):
+  # A string-typed option that indicates the string is a filepath.
+  file = staticmethod(custom_types.file_type)
+
+  @classmethod
+  def complete_scopes(cls, scope_infos):
+    """Expand a set of scopes to include all enclosing scopes.
+
+    E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
+    """
+    ret = {ScopeInfo.for_global_scope()}
+    for scope_info in scope_infos:
+      ret.add(scope_info)
+
+    original_scopes = {si.scope for si in scope_infos}
+    for scope_info in scope_infos:
+      scope = scope_info.scope
+      while scope != '':
+        if scope not in original_scopes:
+          ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
+        scope = scope.rpartition('.')[0]
+    return ret
+
+  def __init__(self, env, config, known_scope_infos, args=sys.argv, bootstrap_option_values=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
     :param config: data from a config file (must support config.get[list](section, name, default=)).
-    :param known_scopes: a list of all possible scopes that may be encountered.
+    :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
     :param args: a list of cmd-line args.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
     """
-    splitter = ArgSplitter(known_scopes)
+    # We need parsers for all the intermediate scopes, so inherited option values
+    # can propagate through them.
+    complete_known_scope_infos = self.complete_scopes(known_scope_infos)
+    splitter = ArgSplitter(complete_known_scope_infos)
     self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
       splitter.split_args(args)
 
@@ -95,10 +125,11 @@ class Options(object):
             self._target_specs.extend(filter(None, [line.strip() for line in f]))
 
     self._help_request = splitter.help_request
-    self._parser_hierarchy = ParserHierarchy(env, config, known_scopes, self._help_request)
+
+    self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
-    self._known_scopes = set(known_scopes)
+    self._known_scopes = set([s[0] for s in known_scope_infos])
 
   @property
   def target_specs(self):
@@ -139,33 +170,25 @@ class Options(object):
     """Register an option in the given scope, using argparse params."""
     self.get_parser(scope).register(*args, **kwargs)
 
-  def register_global(self, *args, **kwargs):
-    """Register an option in the global scope, using argparse params."""
-    self.register(GLOBAL_SCOPE, *args, **kwargs)
-
-  def registration_function_for_global_scope(self):
-    """Returns a function for registering argparse args on the global scope."""
-    return self.registration_function_for_scope(GLOBAL_SCOPE)
-
-  def registration_function_for_scope(self, scope):
+  def registration_function_for_optionable(self, optionable_class):
     """Returns a function for registering argparse args on the given scope."""
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
-      self.register(scope, *args, **kwargs)
+      kwargs['registering_class'] = optionable_class
+      self.register(optionable_class.options_scope, *args, **kwargs)
     # Clients can access the bootstrap option values as register.bootstrap.
     register.bootstrap = self.bootstrap_option_values()
     # Clients can access the scope as register.scope.
-    register.scope = scope
+    register.scope = optionable_class.options_scope
     return register
 
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
     return self._parser_hierarchy.get_parser_by_scope(scope)
 
-  def get_global_parser(self):
-    """Returns the parser for the global scope, so code can register on it directly."""
-    return self.get_parser(GLOBAL_SCOPE)
+  def walk_parsers(self, callback):
+    self._parser_hierarchy.walk(callback)
 
   def for_scope(self, scope):
     """Return the option values for the given scope.
@@ -188,6 +211,31 @@ class Options(object):
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
     self._values_by_scope[scope] = values
     return values
+
+  def registration_args_iter_for_scope(self, scope):
+    """Returns an iterator over the registration arguments of each option in this scope.
+
+    See `Parser.registration_args_iter` for details.
+    """
+    return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
+
+  def payload_for_scope(self, scope):
+    """Returns a payload representing the options for the given scope."""
+    payload = Payload()
+    for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
+      if not kwargs.get('fingerprint', False):
+        continue
+      val = self.for_scope(scope)[name]
+      val_type = kwargs.get('type', '')
+      if val_type == Options.file:
+        field = FileField(val)
+      elif val_type == Options.target_list:
+        field = TargetListField(val)
+      else:
+        field = PrimitiveField(val)
+      payload.add_field(name, field)
+    payload.freeze()
+    return payload
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
@@ -225,14 +273,6 @@ class Options(object):
 
     Note: Ony useful if called after options have been registered.
     """
-    def _maybe_help(scope):
-      s = self._format_help_for_scope(scope)
-      if s != '':  # Avoid printing scope name for scope with empty options.
-        print(scope)
-        for line in s.split('\n'):
-          if line != '':  # Avoid superfluous blank lines for empty strings.
-            print('  {0}'.format(line))
-
     show_all_help = self._help_request and self._help_request.all_scopes
     goals = (Goal.all() if show_all_help else [Goal.by_name(goal_name) for goal_name in self.goals])
     if goals:
@@ -241,8 +281,10 @@ class Options(object):
           print('\nUnknown goal: {}'.format(goal.name))
         else:
           print('\n{0}: {1}\n'.format(goal.name, goal.description))
-          for scope in goal.known_scopes():
-            _maybe_help(scope)
+          for scope_info in goal.known_scope_infos():
+            help_str = self._format_help_for_scope(scope_info.scope)
+            if help_str:
+              print(help_str)
     else:
       print(pants_release())
       print('\nUsage:')
@@ -259,9 +301,8 @@ class Options(object):
       print('\nFriendly docs:\n  http://pantsbuild.github.io/')
 
     if show_all_help or not goals:
-      print('\nGlobal options:')
-      print(self.get_global_parser().format_help())
+      print(self.get_parser(GLOBAL_SCOPE).format_help('Global', self._help_request.advanced))
 
   def _format_help_for_scope(self, scope):
     """Generate a help message for options at the specified scope."""
-    return self.get_parser(scope).format_help()
+    return self.get_parser(scope).format_help(scope, self._help_request.advanced)

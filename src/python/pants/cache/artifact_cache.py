@@ -61,6 +61,14 @@ class ArtifactCache(object):
     """
     self.artifact_root = artifact_root
 
+  def prune(self):
+    """Prune stale cache files
+
+    Remove old unused cache files
+    :return:
+    """
+    pass
+
   def insert(self, cache_key, paths, overwrite=False):
     """Cache the output of a build.
 
@@ -79,14 +87,14 @@ class ArtifactCache(object):
 
     if not overwrite:
       if self.has(cache_key):
-        logger.debug('Skipping insert of existing artifact: ', cache_key)
+        logger.debug('Skipping insert of existing artifact: {0}'.format(cache_key))
         return False
 
     try:
       self.try_insert(cache_key, paths)
       return True
     except NonfatalArtifactCacheError as e:
-      logger.error('Error while writing to artifact cache: {0}. '.format(e))
+      logger.error('Error while writing to artifact cache: {0}'.format(e))
       return False
 
   def try_insert(self, cache_key, paths):

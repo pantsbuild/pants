@@ -14,8 +14,12 @@ from mock import Mock
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
+from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
+from pants.base.source_root import SourceRoot
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
@@ -68,8 +72,8 @@ class TestSetupPy(PythonTaskTest):
 
   @contextmanager
   def run_execute(self, target, recursive=False):
-    self.set_options(recursive=recursive, interpreter=[])
-    context = self.context(target_roots=[target])
+    self.set_options(recursive=recursive)
+    context = self.context(target_roots=[target], options=self.options)
     setup_py = self.create_task(context)
     yield setup_py.execute()
 
@@ -289,7 +293,6 @@ class TestSetupPy(PythonTaskTest):
     with self.assertRaises(self.dependency_calculator.NoOwnerError):
       self.dependency_calculator.reduced_dependencies(exported)
 
-
   def test_ambiguous_owner(self):
     self.create_python_library(relpath='foo/bar', name='bar')
     self.create_file(relpath=self.build_path('foo'), contents=dedent("""
@@ -320,6 +323,53 @@ class TestSetupPy(PythonTaskTest):
 
     with self.assertRaises(self.dependency_calculator.AmbiguousOwnerError):
       self.dependency_calculator.reduced_dependencies(self.target('foo:foo2'))
+
+  def test_exported_antlr(self):
+    SourceRoot.register('src/antlr', PythonThriftLibrary)
+    self.create_file(relpath='src/antlr/exported/exported.g', contents=dedent("""
+      grammar exported;
+
+      options {
+        language = Python;
+      }
+
+      WORD: ('a'..'z'|'A'..'Z'|'0'..'9'|'-'|'_')+;
+
+      static: WORD;
+    """))
+    target = self.make_target(spec='src/antlr/exported',
+                              target_type=PythonAntlrLibrary,
+                              antlr_version='3.1.3',
+                              sources=['exported.g'],
+                              module='exported',
+                              provides=PythonArtifact(name='test.exported', version='0.0.0.'))
+    # TODO(John Sirois): Find a way to get easy access to pants option defaults.
+    self.set_options_for_scope('ivy',
+                               ivy_profile='2.4.0',
+                               ivy_settings=None,
+                               cache_dir=os.path.expanduser('~/.ivy2/pants'),
+                               http_proxy=None,
+                               https_proxy=None)
+    with self.run_execute(target) as created:
+      self.assertEqual([target], created)
+
+  def test_exported_thrift(self):
+    SourceRoot.register('src/thrift', PythonThriftLibrary)
+    self.create_file(relpath='src/thrift/exported/exported.thrift', contents=dedent("""
+      namespace py pants.constants_only
+
+      const set<string> VALID_IDENTIFIERS = ["Hello", "World", "!"]
+    """))
+    target = self.make_target(spec='src/thrift/exported',
+                              target_type=PythonThriftLibrary,
+                              sources=['exported.thrift'],
+                              provides=PythonArtifact(name='test.exported', version='0.0.0.'))
+    # TODO(John Sirois): Find a way to get easy access to pants option defaults.
+    self.set_options_for_scope('binaries',
+                               baseurls=['https://dl.bintray.com/pantsbuild/bin/build-support'],
+                               fetch_timeout_secs=30)
+    with self.run_execute(target) as created:
+      self.assertEqual([target], created)
 
 
 def test_detect_namespace_packages():

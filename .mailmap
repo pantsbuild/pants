@@ -1,0 +1,31 @@
+# We use the mailmap to map email addresses to canonical full names.
+# Some folks submit changes under several different email addresses
+# and sometimes the full names associated with those email addresses
+# varies.  The entries below correct the full names for alternate
+# email addresses such that all email addresses used by a single
+# person are associated with the same full name.
+#
+# See `git help shortlog` which has a section describing
+# 'MAPPING AUTHORS', which can also be found here:
+# ftp://www.kernel.org/pub/software/scm/git/docs/git-shortlog.html
+
+Benjy Weinberger <benjy@foursquare.com>
+Benjy Weinberger <benjyw@gmail.com>
+Brian Wickman <wickman@apache.org>
+Craig Schertz <cschertz@CraigLinuxMint.(none)>
+John Chee <cheecheeo+rbcommons@gmail.com>
+John Ioannidis <rbcommons@tla.org>
+Nick Howard <nhoward@twitter.com>
+Nick Howard <nhoward@twopensource.com>
+Ugo Di Girolamo <ugodiggi@gmail.com>
+Dan Davydov <ddavydov@twitter.com>
+Fedor Korotkov <fkorotkov@twitter.com>
+Jon Boulle <jon@twitter.com>
+John Sirois <jsirois@twitter.com>
+Kris Wilson <kwilson@twopensource.com>
+Larry Hosken <mister@lahosken.san-francisco.ca.us>
+Leo Kim <leo@foursquare.com>
+Marius Eriksen <marius@monkey.org>
+Mark Chu-Carroll <markcc@foursquare.com>
+Mark McBride <mmcbride@twitter.com>
+Stu Hood <stuhood@gmail.com>

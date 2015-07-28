@@ -31,8 +31,6 @@ from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
-_CWD_NOT_PRESENT='CWD NOT PRESENT'
-
 # TODO(ji): Add unit tests.
 # TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
 
@@ -89,8 +87,8 @@ class _JUnitRunner(object):
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
              help='Redirect test output to files in .pants.d/test/junit.')
-    register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
-             help='Set the working directory. If no argument is passed, use the first target path.')
+    register('--cwd', help='Set the working directory. If no argument is passed, use the build '
+                           'root. If cwd is set on a target, it will supersede this argument.')
     register_jvm_tool(register,
                       'junit',
                       main=JUnitRun._MAIN,
@@ -110,7 +108,7 @@ class _JUnitRunner(object):
     self._tests_to_run = options.test
     self._batch_size = options.batch_size
     self._fail_fast = options.fail_fast
-    self._working_dir = self._pick_working_dir(options.cwd, context)
+    self._working_dir = options.cwd or get_buildroot()
     self._args = copy.copy(task_exports.args)
     if options.suppress_output:
       self._args.append('-suppress-output')
@@ -152,7 +150,7 @@ class _JUnitRunner(object):
     def _do_report(exception=None):
       self.report(targets, tests_and_targets.keys(), tests_failed_exception=exception)
     try:
-      self.run(tests_and_targets, junit_classpath)
+      self.run(tests_and_targets)
       _do_report(exception=None)
     except TaskError as e:
       _do_report(exception=e)
@@ -170,18 +168,16 @@ class _JUnitRunner(object):
     """
     pass
 
-  def run(self, tests_and_targets, junit_classpath):
+  def run(self, tests_and_targets):
     """Run the tests in the appropriate environment.
 
     Subclasses should override this if they need more work done.
 
     :param tests_and_targets: a dict that contains all the test class names
       mapped to their targets extracted from the testing targets.
-    :param junit_classpath: the collective classpath value under which
-      the junit tests will be executed.
     """
 
-    self._run_tests(tests_and_targets, junit_classpath, JUnitRun._MAIN)
+    self._run_tests(tests_and_targets, JUnitRun._MAIN)
 
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
@@ -200,7 +196,8 @@ class _JUnitRunner(object):
   def _collect_test_targets(self, targets):
     """Returns a mapping from test names to target objects for all tests that
     are included in targets. If self._tests_to_run is set, return {test: None}
-    for these tests instead."""
+    for these tests instead.
+    """
 
     java_tests_targets = list(self._test_target_candidates(targets))
     tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
@@ -217,17 +214,6 @@ class _JUnitRunner(object):
       return tests_with_targets
     else:
       return tests_from_targets
-
-  def _pick_working_dir(self, cwd_opt, context):
-    if not cwd_opt and context.target_roots:
-      # If the --cwd flag is present with no value and there are target roots,
-      # set the working dir to the first target root's BUILD file path
-      return context.target_roots[0].address.spec_path
-    elif cwd_opt != _CWD_NOT_PRESENT and cwd_opt:
-      # If the --cwd is present and has a value other than _CWD_NOT_PRESENT, use the value
-      return cwd_opt
-    else:
-      return get_buildroot()
 
   def _get_failed_targets(self, tests_and_targets):
     """Return a list of failed targets.
@@ -261,32 +247,53 @@ class _JUnitRunner(object):
 
     return failed_targets
 
-  def _run_tests(self, tests_and_targets, classpath, main, extra_jvm_options=None):
+  def _run_tests(self, tests_to_targets, main, extra_jvm_options=None, classpath_prepend=(),
+                 classpath_append=()):
     extra_jvm_options = extra_jvm_options or []
 
     result = 0
-    for batch in self._partition(tests_and_targets.keys()):
-      with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
-        result += abs(execute_java(
-          classpath=classpath,
-          main=main,
-          jvm_options=self._task_exports.jvm_options + extra_jvm_options,
-          args=self._args + batch_tests + [u'-xmlreport'],
-          workunit_factory=self._context.new_workunit,
-          workunit_name='run',
-          workunit_labels=[WorkUnit.TEST],
-          cwd=self._working_dir
-        ))
+    for workdir, tests in self._tests_by_workdir(tests_to_targets).items():
+      for batch in self._partition(tests):
+        classpath = self._task_exports.classpath(map(tests_to_targets.get, batch),
+                                                 cp=self._task_exports.tool_classpath('junit'))
+        complete_classpath = OrderedSet()
+        complete_classpath.update(classpath_prepend)
+        complete_classpath.update(classpath)
+        complete_classpath.update(classpath_append)
+        with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
+          self._context.log.debug('CWD = {}'.format(workdir))
+          result += abs(execute_java(
+            classpath=complete_classpath,
+            main=main,
+            jvm_options=self._task_exports.jvm_options + extra_jvm_options,
+            args=self._args + batch_tests + [u'-xmlreport'],
+            workunit_factory=self._context.new_workunit,
+            workunit_name='run',
+            workunit_labels=[WorkUnit.TEST],
+            cwd=workdir,
+          ))
 
-        if result != 0 and self._fail_fast:
-          break
+          if result != 0 and self._fail_fast:
+            break
 
     if result != 0:
-      failed_targets = self._get_failed_targets(tests_and_targets)
+      failed_targets = self._get_failed_targets(tests_to_targets)
       raise TestFailedTaskError(
-        'java {0} ... exited non-zero ({1})'.format(main, result),
+        'java {0} ... exited non-zero ({1}); {2} failed targets.'
+        .format(main, result, len(failed_targets)),
         failed_targets=failed_targets
       )
+
+  def _infer_workdir(self, target):
+    if target.cwd is not None:
+      return target.cwd
+    return self._working_dir
+
+  def _tests_by_workdir(self, tests_to_targets):
+    workdirs = defaultdict(OrderedSet)
+    for test, target in tests_to_targets.items():
+      workdirs[self._infer_workdir(target)].add(test)
+    return { workdir: list(tests) for workdir, tests in workdirs.items() }
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
@@ -402,7 +409,7 @@ class _Coverage(_JUnitRunner):
     pass
 
   @abstractmethod
-  def run(self, tests_and_targets, junit_classpath):
+  def run(self, tests_and_targets):
     pass
 
   @abstractmethod
@@ -465,10 +472,11 @@ class Emma(_Coverage):
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to instrument'".format(main, result))
 
-  def run(self, tests_and_targets, junit_classpath):
+  def run(self, tests_and_targets):
     self._run_tests(tests_and_targets,
-                    [self._coverage_instrument_dir] + junit_classpath + self._emma_classpath,
                     JUnitRun._MAIN,
+                    classpath_prepend=[self._coverage_instrument_dir],
+                    classpath_append=self._emma_classpath,
                     extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)])
 
   def report(self, targets, tests, tests_failed_exception=None):
@@ -604,14 +612,14 @@ class Cobertura(_Coverage):
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to instrument'".format(main, result))
 
-  def run(self, tests_and_targets, junit_classpath):
+  def run(self, tests_and_targets):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
     cobertura_cp = self._task_exports.tool_classpath('cobertura-run')
     self._run_tests(tests_and_targets,
-                    cobertura_cp + junit_classpath,
                     JUnitRun._MAIN,
+                    classpath_prepend=cobertura_cp,
                     extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
 
   def _build_sources_by_class(self):
@@ -711,7 +719,7 @@ class Cobertura(_Coverage):
                         " 'failed to report'".format(main, result))
 
 
-class JUnitRun(JvmTask, JvmToolTaskMixin):
+class JUnitRun(JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod

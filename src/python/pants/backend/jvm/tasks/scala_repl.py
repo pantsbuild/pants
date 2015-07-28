@@ -12,7 +12,7 @@ from pants.console.stty_utils import preserve_stty_settings
 from pants.java.util import execute_java
 
 
-class ScalaRepl(JvmTask, JvmToolTaskMixin):
+class ScalaRepl(JvmToolTaskMixin, JvmTask):
   @classmethod
   def register_options(cls, register):
     super(ScalaRepl, cls).register_options(register)

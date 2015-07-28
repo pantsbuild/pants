@@ -11,7 +11,6 @@ python_library(
 target(
   name = 'targets',
   dependencies = [
-    ':jar_library',
     ':java_agent',
     ':python_binary',
     ':python_target',
@@ -36,16 +35,6 @@ python_tests(
     'src/python/pants/base:build_graph',
     'src/python/pants/backend/core/targets:common',
   ]
-)
-
-python_tests(
-  name = 'jar_library',
-  sources = ['test_jar_library.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/jvm/targets:jvm',
-    ]
 )
 
 python_tests(

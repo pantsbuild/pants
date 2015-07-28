@@ -5,53 +5,83 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.option.options import Options
+from twitter.common.collections import OrderedSet
+
+from pants.option.optionable import Optionable
 
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-class Subsystem(object):
+class Subsystem(Optionable):
   """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
   Python interpreters, SCMs and so on.
 
-  Subsystem instances are tied to option scopes. For example, a singleton subsystem that all tasks
-  share is tied to the global scope, while a private instance used by just one task is tied to
-  that task's scope.
+  Subsystem instances can be global or per-optionable. Global instances are useful for representing
+  global concepts, such as the SCM used in the workspace. Per-optionable instances allow individual
+  Optionable objects (notably, tasks) to have their own configuration for things such as artifact
+  caches.
 
-  A Subsystem instance initializes itself from options in a subscope (the 'qualified scope') of
-  the scope it's tied to. For example, a global SubsystemFoo instance gets its options from
-  scope 'foo', while a SubsystemFoo instance for use just in task bar.baz gets its options from
-  scope 'bar.baz.foo'.
+  Each subsystem type has an option scope. The global instance of that subsystem initializes
+  itself from options in that scope. An optionable-specific instance initializes itself from options
+  in an appropriate subscope, which defaults back to the global scope.
 
-  TODO(benjy): Model dependencies between subsystems? Registration of subsystems?
+  For example, the global artifact cache options would be in scope `cache`, but the
+  compile.java task can override those options in scope `cache.compile.java`.
   """
-  @classmethod
-  def scope_qualifier(cls):
-    """Qualifies the options scope of this Subsystem type.
 
-    E.g., for SubsystemFoo this should return 'foo'.
+  class CycleException(Exception):
+    """Thrown when a circular dependency is detected."""
+    def __init__(self, cycle):
+      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
+          '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
+      super(Subsystem.CycleException, self).__init__(message)
+
+  @classmethod
+  def closure(cls, subsystem_types):
+    """Gathers the closure of the `subsystem_types` and their transitive `dependencies`.
+
+    :param subsystem_types: An iterable of subsystem types.
+    :returns: A set containing the closure of subsystem types reachable from the given
+              `subsystem_types` roots.
+    :raises: :class:`pants.subsystem.subsystem.Subsystem.CycleException` if a dependency cycle is
+             detected.
     """
-    raise NotImplementedError()
+    known_subsystem_types = set()
+    path = OrderedSet()
+
+    def collect_subsystems(subsystem):
+      if subsystem in path:
+        cycle = list(path) + [subsystem]
+        raise cls.CycleException(cycle)
+
+      path.add(subsystem)
+      if subsystem not in known_subsystem_types:
+        known_subsystem_types.add(subsystem)
+        for dependency in subsystem.dependencies():
+          collect_subsystems(dependency)
+      path.remove(subsystem)
+
+    for subsystem_type in subsystem_types:
+      collect_subsystems(subsystem_type)
+
+    return known_subsystem_types
 
   @classmethod
-  def register_options(cls, register):
-    """Register options for this subsystem.
+  def dependencies(cls):
+    """The subsystems this subsystem uses.
 
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
+    A tuple of subsystem types.
     """
+    return tuple()
 
   @classmethod
-  def register_options_on_scope(cls, options, scope):
-    """Trigger registration of this subsystem's options under a given scope."""
-    cls.register_options(options.registration_function_for_scope(cls.qualify_scope(scope)))
-
-  @classmethod
-  def qualify_scope(cls, scope):
-    return '{0}.{1}'.format(scope, cls.scope_qualifier()) if scope else cls.scope_qualifier()
+  def subscope(cls, scope):
+    """Create a subscope under this Subsystem's scope."""
+    return '{0}.{1}'.format(cls.options_scope, scope)
 
   # The full Options object for this pants run.  Will be set after options are parsed.
   # TODO: A less clunky way to make option values available?
@@ -62,7 +92,40 @@ class Subsystem(object):
 
   @classmethod
   def global_instance(cls):
-    return cls._instance_for_scope(Options.GLOBAL_SCOPE)
+    """Returns the global instance of this subsystem.
+
+    The global instance is the subsystem singleton instance for the main subsystem `options_scope`.
+
+    :returns: The global subsystem instance.
+    :rtype: :class:`pants.subsystem.subsystem.Subsystem`
+    """
+    return cls._instance_for_scope(cls.options_scope)
+
+  @classmethod
+  def scoped_instance(cls, optionable):
+    """Returns an instance of this subsystem scoped by the given `optionable`.
+
+    The scoped instance is the subsystem singleton instance for the main subsystem `options_scope`
+    qualified by `optionable`'s scope.
+
+    :param optionable: An optionable type or instance to scope this subsystem under.
+    :type: :class:`pants.option.optionable.Optionable`
+    :returns: The scoped subsystem instance.
+    :rtype: :class:`pants.subsystem.subsystem.Subsystem`
+    """
+    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
+      raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
+                      .format(optionable, type(optionable)))
+    return cls._instance_for_scope(cls.subscope(optionable.options_scope))
+
+  @classmethod
+  def _instance_for_scope(cls, scope):
+    if cls._options is None:
+      raise SubsystemError('Subsystem not initialized yet.')
+    key = (cls, scope)
+    if key not in cls._scoped_instances:
+      cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))
+    return cls._scoped_instances[key]
 
   @classmethod
   def reset(cls):
@@ -73,28 +136,15 @@ class Subsystem(object):
     cls._options = None
     cls._scoped_instances = {}
 
-  @classmethod
-  def instance_for_task(cls, task):
-    return cls._instance_for_scope(task.options_scope)
-
-  @classmethod
-  def _instance_for_scope(cls, scope):
-    if cls._options is None:
-      raise SubsystemError('Subsystem not initialized yet.')
-    key = (cls, scope)
-    if key not in cls._scoped_instances:
-      qscope = cls.qualify_scope(scope)
-      cls._scoped_instances[key] = cls(qscope, cls._options.for_scope(qscope))
-    return cls._scoped_instances[key]
-
   def __init__(self, scope, scoped_options):
     """Note: A subsystem has no access to options in scopes other than its own.
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
 
-    Task code should call instance_for_scope() or global_instance() to get a subsystem instance.
+    Task code should call scoped_instance() or global_instance() to get a subsystem instance.
     Tests can call this constructor directly though.
     """
+    super(Subsystem, self).__init__()
     self._scope = scope
     self._scoped_options = scoped_options
 

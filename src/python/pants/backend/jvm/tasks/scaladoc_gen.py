@@ -19,7 +19,7 @@ class ScaladocGen(JvmdocGen):
 
   @classmethod
   def task_subsystems(cls):
-    return (ScalaPlatform,)
+    return super(ScaladocGen, cls).task_subsystems() + (ScalaPlatform,)
 
   def execute(self):
     def is_scala(target):

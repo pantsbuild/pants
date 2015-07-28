@@ -7,14 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import abstractmethod, abstractproperty
-from collections import defaultdict
-
-from six.moves import range
+from collections import defaultdict, deque
 
 from pants.backend.core.tasks.task import Task, TaskBase
-from pants.base.build_graph import sort_targets
+from pants.base.build_graph import invert_dependencies
 from pants.base.workunit import WorkUnit
 from pants.goal.goal import Goal
+from pants.option.scope import ScopeInfo
 
 
 class GroupMember(TaskBase):
@@ -77,7 +76,7 @@ class GroupIterator(object):
 
   @staticmethod
   def coalesce_targets(targets, discriminator):
-    """Returns a list of Targets that `targets` depend on sorted from most dependent to least.
+    """Returns a list of Targets that `targets` depend on sorted from least dependent to most.
 
     The targets are grouped where possible by target type as categorized by the given discriminator.
 
@@ -85,50 +84,65 @@ class GroupIterator(object):
     optionally enabled by appending a '!' (bang) to the command line target.
     """
 
-    sorted_targets = filter(discriminator, sort_targets(targets))
+    # We want to sort targets topologically, grouping targets of the same type if possible.
+    # Algorithm: BFS on the dependency graph with a separate queue per each type.
+    # First, enqueue the least dependent targets (roots). Choose a type with a non-empty queue,
+    # and process nodes from this queue until it's exhausted, then move on to the next non-empty
+    # queue. "To process" means to add the node to the resulting list, and to increment
+    # the number of "satisfied" dependencies for all its direct dependees. For every dependee
+    # that has all its dependencies satisfied, enqueue it in the corresponding queue.
+    # Since it's a directed acyclic graph, eventually all targets will be processed and added
+    # to the resulting list.
+    #
+    # This linear-complexity algorithm replaces the worst-case-quadratic-complexity algorithm
+    # that used DFS for topological sort, then trying to rearrange the targets in the resulting
+    # list without breaking the sorting order, repeatedly computing full dependency closure
+    # for the targets in the list.
+    #
+    # For benchmarking, "./pants compile" command was executed on a large target with about 1K nodes
+    # in the dependency graph. The machine was 2013 MPB with SSD.
+    # The quadratic implementation took on average about 18 seconds. The linear implementation
+    # took on average about 1 second.
 
-    # can do no better for any of these:
-    # []
-    # [a]
-    # [a,b]
-    if len(sorted_targets) <= 2:
-      return sorted_targets
+    roots, inverted_deps = invert_dependencies(targets)
 
-    # For these, we'd like to coalesce if possible, like:
-    # [a,b,a,c,a,c] -> [a,a,a,b,c,c]
-    # adopt a quadratic worst case solution, when we find a type change edge, scan forward for
-    # the opposite edge and then try to swap dependency pairs to move the type back left to its
-    # grouping.  If the leftwards migration fails due to a dependency constraint, we just stop
-    # and move on leaving "type islands".
+    queues = defaultdict(deque)
+    queues_total_size = 0
+
+    # Enqueue roots.
+    for root in roots:
+      root_type = discriminator(root)
+      queues[root_type].append(root)
+      queues_total_size += 1
+
+    sorted_targets = []
+    satisfied_deps = defaultdict(int)
     current_type = None
+    # Is there anything left to process?
+    while queues_total_size > 0:
+      # Choose a type with a non-empty queue.
+      for potential_type in queues.keys():
+        if queues[potential_type]:
+          current_type = potential_type
+          break
+      # Process targets of this type while possible - they will form a single chunk.
+      while queues[current_type]:
+        target = queues[current_type].popleft()
+        queues_total_size -= 1
+        sorted_targets.append(target)
 
-    # main scan left to right no backtracking
-    for i in range(len(sorted_targets) - 1):
-      current_target = sorted_targets[i]
-      if current_type != discriminator(current_target):
-        scanned_back = False
+        # Let the dependees know that one more dependency is satisfied.
+        if target in inverted_deps:
+          for dependee in inverted_deps[target]:
+            satisfied_deps[dependee] += 1
+            # Does the dependee have all its dependencies satisfied now?
+            if satisfied_deps[dependee] == len(dependee.dependencies):
+              dependee_type = discriminator(dependee)
+              queues[dependee_type].append(dependee)
+              queues_total_size += 1
 
-        # scan ahead for next type match
-        for j in range(i + 1, len(sorted_targets)):
-          look_ahead_target = sorted_targets[j]
-          if current_type == discriminator(look_ahead_target):
-            scanned_back = True
-
-            # swap this guy as far back as we can
-            for k in range(j, i, -1):
-              previous_target = sorted_targets[k - 1]
-              mismatching_types = current_type != discriminator(previous_target)
-              not_a_dependency = look_ahead_target not in previous_target.closure()
-              if mismatching_types and not_a_dependency:
-                sorted_targets[k] = sorted_targets[k - 1]
-                sorted_targets[k - 1] = look_ahead_target
-              else:
-                break  # out of k
-
-            break  # out of j
-
-        if not scanned_back:  # done with coalescing the current type, move on to next
-          current_type = discriminator(current_target)
+    # Remove targets that are not claimed by any member.
+    sorted_targets = filter(discriminator, sorted_targets)
 
     return sorted_targets
 
@@ -149,13 +163,20 @@ class GroupIterator(object):
       yield group_member, chunk
 
   def _create_chunks(self):
+    # memoized mapping from target to its type (i.e. member)
+    target_to_member = dict()
+
     def discriminator(tgt):
+      if tgt in target_to_member:
+        return target_to_member[tgt]
       for member in self._group_members:
         if member.select(tgt):
+          target_to_member[tgt] = member
           return member
+      target_to_member[tgt] = None
       return None
 
-    coalesced = list(reversed(self.coalesce_targets(self._targets, discriminator)))
+    coalesced = self.coalesce_targets(self._targets, discriminator)
 
     chunks = []
 
@@ -223,15 +244,23 @@ class GroupTask(Task):
         def product_types(cls):
           return product_type
 
-        # We'd prefer to get the parent_options_scope from cls.options_scope,
+        # We'd prefer to get the options_scope from cls.options_scope,
         # but unfortunately that hasn't been set yet.
-        parent_options_scope = '.'.join(flag_namespace)
+        options_scope = '.'.join(flag_namespace)
 
         @classmethod
-        def known_scopes(cls):
-          """Yields all known scopes under this task (i.e., those of its member types.)"""
+        def known_scope_infos(cls):
+          """Yields ScopeInfos for all known scopes for this task, in no particular order."""
+          # We need this because task.py initializes a cache factory for every task type,
+          # even if it's never used. This is slightly icky, but is better than forcing tasks
+          # to explicitly call a cache setup method. And we want to kill GroupTask anyway.
+          yield ScopeInfo(cls.options_scope, ScopeInfo.TASK)
+          for subsystem in cls.task_subsystems():
+            yield ScopeInfo(subsystem.subscope(cls.options_scope), ScopeInfo.TASK_SUBSYSTEM)
+
           for member_type in cls._member_types():
-            yield member_type.options_scope
+            for scope in member_type.known_scope_infos():
+              yield scope
 
         @classmethod
         def register_options_on_scope(cls, options):
@@ -283,7 +312,7 @@ class GroupTask(Task):
       raise ValueError('Only GroupMember subclasses can join a GroupTask, '
                        'given {} of type {}'.format(group_member, type(group_member)))
 
-    group_member.options_scope = Goal.scope(cls.parent_options_scope, group_member.name())
+    group_member.options_scope = Goal.scope(cls.options_scope, group_member.name())
     cls._member_types().append(group_member)
 
   def __init__(self, *args, **kwargs):

@@ -14,6 +14,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class IvySubsystem(Subsystem):
   """Common configuration items for ivy tasks."""
+  options_scope = 'ivy'
 
   _DEFAULT_VERSION = '2.3.0'
   _DEFAULT_URL = ('https://repo1.maven.org/maven2/'
@@ -21,13 +22,8 @@ class IvySubsystem(Subsystem):
                   '{version}/ivy-{version}.jar'.format(version=_DEFAULT_VERSION))
 
   @classmethod
-  def scope_qualifier(cls):
-    return 'ivy'
-
-  @classmethod
   def register_options(cls, register):
     super(IvySubsystem, cls).register_options(register)
-    bootstrap_options = register.bootstrap
     register('--http-proxy', advanced=True,
              help='Specify a proxy URL for http requests.')
     register('--https-proxy', advanced=True,

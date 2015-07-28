@@ -134,6 +134,7 @@ python_library(
     ':build_graph',
     ':build_invalidator',
     ':target',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -301,6 +302,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':addressable',
+    ':deprecated',
     ':exceptions',
   ],
 )

@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from copy import deepcopy
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 
 
 class FilesetWithSpec(object):
@@ -31,33 +29,6 @@ class FilesetWithSpec(object):
   def __getitem__(self, index):
     return self._result[index]
 
-  @deprecated(removal_version='0.0.35',
-              hint_message='Instead of globs(a) + globs(b), use globs(a, b)')
-  def __add__(self, other):
-    filespec = deepcopy(self.filespec)
-    if isinstance(other, FilesetWithSpec):
-      filespec['globs'] += other.filespec['globs']
-      other_result = other._result
-    else:
-      filespec['globs'] += [os.path.join(self._rel_root, other_path) for other_path in other]
-      other_result = other
-    result = list(set(self._result).union(set(other_result)))
-    return FilesetWithSpec(self._rel_root, result, filespec)
-
-  @deprecated(removal_version='0.0.35',
-              hint_message='Instead of glob arithmetic, use glob(..., exclude=[...])')
-  def __sub__(self, other):
-    filespec = deepcopy(self.filespec)
-    exclude = filespec.get('exclude', [])
-    if isinstance(other, FilesetWithSpec):
-      exclude.append(other.filespec)
-      other_result = other._result
-    else:
-      exclude.append({'globs' : [os.path.join(self._rel_root, other_path) for other_path in other]})
-      other_result = other
-    filespec['exclude'] = exclude
-    result = list(set(self._result) - set(other_result))
-    return FilesetWithSpec(self._rel_root, result, filespec)
 
 class FilesetRelPathWrapper(object):
   def __init__(self, parse_context):
@@ -120,9 +91,9 @@ class Globs(FilesetRelPathWrapper):
   E.g., ``sources = globs('*java'),`` to get .java files in this directory.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
-  strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
-  'foo.py'])`` gives all files in this directory except ``.java``
-  files and ``foo.py``.
+    strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
+    'foo.py'])`` gives all files in this directory except ``.java``
+    files and ``foo.py``.
 
   Deprecated:
   You might see that old code uses "math" on the return value of
@@ -130,10 +101,6 @@ class Globs(FilesetRelPathWrapper):
   in this directory *except* ``.java`` files.  Please use exclude
   instead, since pants is moving to make BUILD files easier to parse,
   and the new grammar will not support arithmetic.
-
-  :returns FilesetWithSpec containing matching files in same directory as this BUILD file.
-  :rtype FilesetWithSpec
-
   """
   wrapped_fn = Fileset.globs
 
@@ -145,16 +112,14 @@ class RGlobs(FilesetRelPathWrapper):
   the config, config/foo, config/foo/bar directories.
 
   :param exclude: a list of {,r,z}globs objects, strings, or lists of
-  strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
-  'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
+    strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
+    'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
 
   Deprecated:
   You might see that old code uses "math" on the return value of ``rglobs()``. E.g.,
   ``rglobs('config/*') - rglobs('config/foo/*')`` gives all files under `config` *except*
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
-  :returns FilesetWithSpec matching files in this directory and its descendents.
-  :rtype FilesetWithSpec
   """
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
@@ -165,21 +130,54 @@ class RGlobs(FilesetRelPathWrapper):
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
   def to_filespec(self, args, root='', excludes=None):
-    # In rglobs, * at the beginning of a path component means
-    # **/*.  * anywhere else just means *.
+    # In rglobs, * at the beginning of a path component means "any
+    # number of directories, including 0".  Unfortunately, "**" in
+    # some other systems, e.g. git means "one or more directories".
+    # So every time we see ^* or **, we need to output both
+    # "**/whatever" and "whatever".
     rglobs = []
     for arg in args:
       components = arg.split(os.path.sep)
       out = []
       for component in components:
         if component == '**':
+          if out and out[-1].startswith("**"):
+            continue
           out.append(component)
         elif component[0] == '*':
-          out.append('**/' + component)
+          if out and out[-1].startswith("**"):
+            # We want to translate **/*.py to **/*.py, not **/**/*.py
+            out.append(component)
+          else:
+            out.append('**/' + component)
         else:
           out.append(component)
 
-      rglobs.append(os.path.join(*out))
+      def rglob_path(beginning, rest):
+        if not rest:
+          return [beginning]
+        endings = []
+        for i, item in enumerate(rest):
+          if beginning and not beginning.endswith(os.path.sep):
+            beginning += os.path.sep
+          if item.startswith('**'):
+            # .../**/*.java
+            for ending in rglob_path(beginning + item, rest[i+1:]):
+              endings.append(ending)
+            # .../*.java
+            for ending in rglob_path(beginning + item[3:], rest[i+1:]):
+              endings.append(ending)
+            return endings
+          else:
+            if beginning and not beginning.endswith(os.path.sep):
+              beginning += os.path.sep + item
+            else:
+              beginning += item
+
+        return [beginning]
+
+      rglobs.extend(rglob_path('', out))
+
     return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
 
 class ZGlobs(FilesetRelPathWrapper):

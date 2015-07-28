@@ -11,6 +11,7 @@ python_library(
     ':aapt_task',
     ':dx_compile',
     ':sign_apk',
+    ':unpack_libraries',
     ':zipalign',
   ],
 )
@@ -89,6 +90,20 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'unpack_libraries',
+  sources = ['unpack_libraries.py'],
+  dependencies = [
+    'src/python/pants/backend/android/targets:android',
+    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/fs',
   ],
 )
 

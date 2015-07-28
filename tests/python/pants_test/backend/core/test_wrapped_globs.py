@@ -42,27 +42,61 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("?"))')
     self.context().scan(self.build_root)
 
-  def test_glob_to_spec(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java"))')
+  def _spec_test(self, spec, expected):
+    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources={})'.format(spec))
     graph = self.context().scan(self.build_root)
     globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/*.java']},
-                      globs)
+    self.assertEquals(expected, globs)
+
+  def test_glob_to_spec(self):
+    self._spec_test('globs("*.java")',
+                    {'globs': ['y/*.java']})
 
   def test_glob_to_spec_exclude(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude=["fleem.java"]))')
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/*.java'],
-                       'exclude': [{'globs': ['y/fleem.java']}]},
-                      globs)
+    self._spec_test('globs("*.java", exclude=["fleem.java"])',
+                    {'globs': ['y/*.java'],
+                     'exclude': [{'globs': ['y/fleem.java']}]})
 
   def test_glob_to_spec_list(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=["fleem.java", "morx.java"])')
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/fleem.java', 'y/morx.java']},
-                      globs)
+    self._spec_test('["fleem.java", "morx.java"]',
+                    {'globs': ['y/fleem.java', 'y/morx.java']})
+
+  def test_rglob_to_spec_one(self):
+    self._spec_test('rglobs("fleem.java")',
+                    {'globs': ['y/fleem.java']})
+
+  def test_rglob_to_spec_simple(self):
+    self._spec_test('rglobs("*.java")',
+                    {'globs': ['y/**/*.java', 'y/*.java']})
+
+  def test_rglob_to_spec_multi(self):
+    self._spec_test('rglobs("a/**/b/*.java")',
+                    {'globs': ['y/a/**/b/**/*.java',
+                               'y/a/**/b/*.java',
+                               'y/a/b/**/*.java',
+                               'y/a/b/*.java']})
+
+  def test_rglob_to_spec_multi_more(self):
+    self._spec_test('rglobs("a/**/b/**/c/*.java")',
+                    {'globs': ['y/a/**/b/**/c/**/*.java',
+                               'y/a/**/b/**/c/*.java',
+                               'y/a/**/b/c/**/*.java',
+                               'y/a/**/b/c/*.java',
+
+                               'y/a/b/**/c/**/*.java',
+                               'y/a/b/**/c/*.java',
+                               'y/a/b/c/**/*.java',
+                               'y/a/b/c/*.java']})
+
+  def test_rglob_to_spec_mid(self):
+    self._spec_test('rglobs("a/**/b/Fleem.java")',
+                    {'globs': ['y/a/**/b/Fleem.java',
+                               'y/a/b/Fleem.java']})
+
+  def test_rglob_to_spec_explicit(self):
+    self._spec_test('rglobs("a/**/*.java")',
+                    {'globs': ['y/a/**/*.java',
+                               'y/a/*.java']})
 
   def test_glob_exclude(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", exclude=[["fleem.java"]]))')
@@ -136,88 +170,3 @@ class FilesetRelPathWrapperTest(BaseTest):
                            'java_library(name="w", sources=rglobs("*.java", follow_links=False))')
     graph = self.context().scan(self.build_root)
     assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
-
-  # Remove the following tests when operator support is dropped from globs
-  def test_globs_add_globs_added_to_spec(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y",'
-                                      '             sources=globs("morx.java") + globs("fleem.java"))')
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/morx.java', 'y/fleem.java']},
-                      globs)
-
-  def test_globs_add_list_added_to_spec(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y",'
-                                      '             sources=globs("morx.java") + ["fleem.java"])')
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/morx.java', 'y/fleem.java']},
-                      globs)
-
-  def test_rglob_add_operator_with_other_rglob(self):
-    self.add_to_build_file('y/BUILD',
-                           'java_library(name="y",'
-                           '             sources=rglobs("fleem.java") + rglobs("morx.java"))'
-    )
-    graph = self.context().scan(self.build_root)
-    self.assertEqual(['fleem.java','morx.java'],
-                     list(graph.get_target_from_spec('y').sources_relative_to_source_root()))
-
-  def test_rglob_add_operator_with_list(self):
-    self.add_to_build_file('y/BUILD',
-                           'java_library(name="y",'
-                           '             sources=rglobs("fleem.java") + ["morx.java"])'
-    )
-    graph = self.context().scan(self.build_root)
-    self.assertEqual(['fleem.java', 'morx.java'],
-                     list(graph.get_target_from_spec('y').sources_relative_to_source_root()))
-
-  def test_rglob_add_operator_with_overlapping_rglob_has_distinct_list(self):
-    self.add_to_build_file('y/BUILD',
-                           'java_library(name="y",'
-                           '             sources=rglobs("*.java") + rglobs("*.java"))')
-    graph = self.context().scan(self.build_root)
-    self.assertEqual(['fleem.java', 'morx.java'],
-                     list(graph.get_target_from_spec('y').sources_relative_to_source_root()))
-
-  def test_globs_sub_globs_added_to_spec_exclude(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y",'
-                                      '             sources=globs("*.java") - globs("fleem.java"))')
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/*.java'],
-                       'exclude': [{'globs': ['y/fleem.java']}]},
-                      globs)
-
-  def test_glob_sub_list_added_to_spec_exclude(self):
-    self.add_to_build_file('y/BUILD', 'java_library(name="y",'
-                                      '             sources=globs("*.java") - ["fleem.java"])')
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals({'globs': ['y/*.java'],
-                       'exclude': [{'globs': ['y/fleem.java']}]},
-                      globs)
-
-  def test_rglob_sub_operator_with_other_rglob(self):
-    self.add_to_build_file('y/BUILD',
-                           'java_library(name="y",'
-                           '             sources=rglobs("*.java") - rglobs("morx.java"))')
-    graph = self.context().scan(self.build_root)
-    self.assertEqual(['fleem.java'],
-                     list(graph.get_target_from_spec('y').sources_relative_to_source_root()))
-
-  def test_rglob_sub_operator_with_list(self):
-    self.add_to_build_file('y/BUILD',
-                           'java_library(name="y",'
-                           '             sources=rglobs("*.java") - ["morx.java"])')
-    graph = self.context().scan(self.build_root)
-    self.assertEqual(['fleem.java'],
-                     list(graph.get_target_from_spec('y').sources_relative_to_source_root()))
-
-  def test_rglob_sub_operator_with_non_overlapping_rglob(self):
-    self.add_to_build_file('y/BUILD',
-                           'java_library(name="y",'
-                           '             sources=rglobs("*.java") - rglobs("*.scala"))')
-    graph = self.context().scan(self.build_root)
-    self.assertEqual(['fleem.java', 'morx.java'],
-                     list(graph.get_target_from_spec('y').sources_relative_to_source_root()))

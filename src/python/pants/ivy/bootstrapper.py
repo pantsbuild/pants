@@ -59,9 +59,9 @@ class Bootstrapper(object):
     """
     return cls.instance().ivy(bootstrap_workunit_factory=bootstrap_workunit_factory)
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, ivy_subsystem=None):
     """Creates an ivy bootstrapper."""
-    self._ivy_subsystem = IvySubsystem.global_instance()
+    self._ivy_subsystem = ivy_subsystem or IvySubsystem.global_instance()
     self._version_or_ivyxml = self._ivy_subsystem.get_options().ivy_profile
     self._classpath = None
 

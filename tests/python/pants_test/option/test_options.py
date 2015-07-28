@@ -17,42 +17,56 @@ from pants.option.errors import ParseError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
+from pants.option.scope import ScopeInfo
+from pants.util.contextutil import temporary_file_path
 from pants_test.option.fake_config import FakeConfig
 
 
+def task(scope):
+  return ScopeInfo(scope, ScopeInfo.TASK)
+
+
+def intermediate(scope):
+  return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
+
+
 class OptionsTest(unittest.TestCase):
-  _known_scopes = ['compile', 'compile.java', 'compile.scala', 'stale', 'test', 'test.junit']
+  _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
+                        intermediate('stale'), intermediate('test'), task('test.junit')]
 
   def _register(self, options):
-    options.register_global('-v', '--verbose', action='store_true', help='Verbose output.',
-                            recursive=True)
-    options.register_global('-n', '--num', type=int, default=99, recursive=True)
-    options.register_global('-x', '--xlong', action='store_true', recursive=True)
-    options.register_global('--y', action='append', type=int)
-    options.register_global('--pants-foo')
-    options.register_global('--bar-baz')
-    options.register_global('--store-true-flag', action='store_true')
-    options.register_global('--store-false-flag', action='store_false')
-    options.register_global('--store-true-def-true-flag', action='store_true', default=True)
-    options.register_global('--store-true-def-false-flag', action='store_true', default=False)
-    options.register_global('--store-false-def-false-flag', action='store_false', default=False)
-    options.register_global('--store-false-def-true-flag', action='store_false', default=True)
+    def register_global(*args, **kwargs):
+      options.register(Options.GLOBAL_SCOPE, *args, **kwargs)
+
+    register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
+    register_global('-n', '--num', type=int, default=99, recursive=True)
+    register_global('-x', '--xlong', action='store_true', recursive=True)
+    register_global('--y', action='append', type=int)
+    register_global('--pants-foo')
+    register_global('--bar-baz')
+    register_global('--store-true-flag', action='store_true')
+    register_global('--store-false-flag', action='store_false')
+    register_global('--store-true-def-true-flag', action='store_true', default=True)
+    register_global('--store-true-def-false-flag', action='store_true', default=False)
+    register_global('--store-false-def-false-flag', action='store_false', default=False)
+    register_global('--store-false-def-true-flag', action='store_false', default=True)
 
     # Custom types.
-    options.register_global('--dicty', type=Options.dict, default='{"a": "b"}')
-    options.register_global('--listy', type=Options.list, default='[1, 2, 3]')
+    register_global('--dicty', type=Options.dict, default='{"a": "b"}')
+    register_global('--listy', type=Options.list, default='[1, 2, 3]')
+    register_global('--target_listy', type=Options.target_list, default=[':a', ':b'])
+    register_global('--filey', type=Options.file, default='default.txt')
 
     # For the design doc example test.
-    options.register_global('--a', type=int, recursive=True)
-    options.register_global('--b', type=int, recursive=True)
+    register_global('--a', type=int, recursive=True)
+    register_global('--b', type=int, recursive=True)
 
     # Deprecated global options
-    options.register_global('--global-crufty',
-                            deprecated_version='999.99.9',
-                            deprecated_hint='use a less crufty global option')
-    options.register_global('--global-crufty-boolean', action='store_true',
-                            deprecated_version='999.99.9',
-                            deprecated_hint='say no to crufty global options')
+    register_global('--global-crufty', deprecated_version='999.99.9',
+                    deprecated_hint='use a less crufty global option')
+    register_global('--global-crufty-boolean', action='store_true', deprecated_version='999.99.9',
+                    deprecated_hint='say no to crufty global options')
+
     # Override --xlong with a different type (but leave -x alone).
     options.register('test', '--xlong', type=int)
 
@@ -69,9 +83,13 @@ class OptionsTest(unittest.TestCase):
                      deprecated_version='999.99.9',
                      deprecated_hint='say no to crufty, stale scoped options')
 
+    # For task identity test
+    options.register('compile.scala', '--modifycompile', fingerprint=True)
+    options.register('compile.scala', '--modifylogs')
+
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scopes, args,
+    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scope_infos, args,
                       bootstrap_option_values=bootstrap_option_values)
     self._register(options)
     return options
@@ -124,6 +142,15 @@ class OptionsTest(unittest.TestCase):
     # Test dict-typed option.
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
+
+    # Test target_list-typed option.
+    options = self._parse('./pants --target_listy=\'["//:foo", "//:bar"]\'')
+    self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
+
+    # Test file-typed option.
+    with temporary_file_path() as fp:
+      options = self._parse('./pants --filey="{}"'.format(fp))
+      self.assertEqual(fp, options.for_global_scope().filey)
 
   def test_boolean_defaults(self):
     options = self._parse('./pants')
@@ -248,8 +275,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
-    for scope in self._known_scopes:
-      self.assertTrue(options.is_known_scope(scope))
+    for scope_info in self._known_scope_infos:
+      self.assertTrue(options.is_known_scope(scope_info.scope))
     self.assertFalse(options.is_known_scope('nonexistent_scope'))
 
   def test_designdoc_example(self):
@@ -353,29 +380,9 @@ class OptionsTest(unittest.TestCase):
 
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
-      options = Options({}, FakeConfig({}), OptionsTest._known_scopes, "./pants")
-      options.register_global('--too-old-option',
-                              deprecated_version='0.0.24',
+      options = Options({}, FakeConfig({}), OptionsTest._known_scope_infos, "./pants")
+      options.register(Options.GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                               deprecated_hint='The semver for this option has already passed.')
-
-  def test_is_deprecated(self):
-    options = self._parse('./pants')
-    global_parser = options.get_global_parser()
-    self.assertTrue(global_parser.is_deprecated('--global-crufty'))
-    self.assertTrue(global_parser.is_deprecated('--global-crufty=foo'))
-    self.assertTrue(global_parser.is_deprecated('--global-crufty-boolean'))
-    self.assertTrue(global_parser.is_deprecated('--no-global-crufty-boolean'))
-    self.assertFalse(global_parser.is_deprecated('--pants-foo'))
-    scope_parser = options.get_parser('stale')
-    self.assertTrue(scope_parser.is_deprecated('--crufty'))
-    self.assertTrue(scope_parser.is_deprecated('--crufty=bar'))
-    self.assertTrue(scope_parser.is_deprecated('--stale-crufty'))
-    self.assertTrue(scope_parser.is_deprecated('--stale-crufty=baz'))
-    self.assertTrue(scope_parser.is_deprecated('--crufty-boolean'))
-    self.assertTrue(scope_parser.is_deprecated('--no-crufty-boolean'))
-    self.assertTrue(scope_parser.is_deprecated('--stale-crufty-boolean'))
-    self.assertTrue(scope_parser.is_deprecated('--no-stale-crufty-boolean'))
-    self.assertFalse(scope_parser.is_deprecated('--still-good'))
 
   @contextmanager
   def warnings_catcher(self):
@@ -394,42 +401,42 @@ class OptionsTest(unittest.TestCase):
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty=crufty1')
       self.assertEquals('crufty1', options.for_global_scope().global_crufty)
-      assertWarning(w, '--global-crufty')
+      assertWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty-boolean')
       self.assertTrue(options.for_global_scope().global_crufty_boolean)
-      assertWarning(w, '--global-crufty-boolean')
+      assertWarning(w, 'global_crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --no-global-crufty-boolean')
       self.assertFalse(options.for_global_scope().global_crufty_boolean)
-      assertWarning(w, '--no-global-crufty-boolean')
+      assertWarning(w, 'global_crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty=stale_and_crufty')
       self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
-      assertWarning(w, '--crufty')
+      assertWarning(w, 'crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --no-crufty-boolean')
       self.assertFalse(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--no-crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --no-stale-crufty-boolean')
       self.assertFalse(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--no-crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --stale-crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
-      assertWarning(w, '--crufty-boolean')
+      assertWarning(w, 'crufty_boolean')
 
     # Make sure the warnings don't come out for regular options
     with self.warnings_catcher() as w:
@@ -521,3 +528,50 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
+
+  def test_registration_arg_iter(self):
+    options = self._parse('./pants',
+                          config={
+                            'compile': {'a' : 99},
+                          })
+
+    def get_registration_args(scope, name):
+      return next((x for x in options.registration_args_iter_for_scope(scope) if x[0] == name))
+
+    # The global xlong arg.
+    for_xlong = get_registration_args('', 'xlong')
+    self.assertEquals(for_xlong[1], ['-x', '--xlong'])
+    self.assertEquals(for_xlong[2].get('action'), 'store_true')
+
+    # The new, local xlong arg, which shadows the recursive registration of the global one.
+    for_xlong = get_registration_args('test', 'xlong')
+    self.assertEquals(for_xlong[1], ['--xlong'])
+    self.assertEquals(for_xlong[2].get('type'), int)
+
+    # The recursive registration, without the shadowed --xlong arg.
+    for_x = get_registration_args('test', 'x')
+    self.assertEquals(for_x[1], ['-x'])
+    self.assertEquals(for_x[2].get('action'), 'store_true')
+
+  def test_complete_scopes(self):
+    _global = ScopeInfo.for_global_scope()
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({ScopeInfo.for_global_scope(), task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+                      Options.complete_scopes({intermediate('foo'), task('foo.bar.baz')}))
+    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
+                       intermediate('qux'), task('qux.quux')},
+                      Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
+
+  def test_payload_for_scope(self):
+    val = 'blah blah blah'
+    options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
+
+    payload = options.payload_for_scope('compile.scala')
+
+    self.assertEquals(len(payload.fields), 1)
+    for key, field in payload.fields:
+      self.assertEquals(key, 'modifycompile')
+      self.assertEquals(field.value, val)

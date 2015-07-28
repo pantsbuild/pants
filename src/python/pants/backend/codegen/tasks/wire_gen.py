@@ -18,7 +18,6 @@ from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -62,15 +61,6 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
         target.payload.service_writer))
     return genfiles
 
-  def resolve_deps(self, unresolved_deps):
-    deps = OrderedSet()
-    for dep in unresolved_deps:
-      try:
-        deps.update(self.context.resolve(dep))
-      except AddressLookupError as e:
-        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
-    return deps
-
   def synthetic_target_extra_dependencies(self, target):
     return self.resolve_deps(self.get_options().javadeps)
 
@@ -110,11 +100,11 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
       if registry_class:
         args.append('--registry_class={0}'.format(registry_class))
 
-      for root in target.payload.roots:
-        args.append('--roots={0}'.format(root))
+      if target.payload.roots:
+        args.append('--roots={0}'.format(','.join(target.payload.roots)))
 
-      for enum_option in target.payload.enum_options:
-        args.append('--enum_options={0}'.format(enum_option))
+      if target.payload.enum_options:
+        args.append('--enum_options={0}'.format(','.join(target.payload.enum_options)))
 
       args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
                                                          SourceRoot.find(target))))

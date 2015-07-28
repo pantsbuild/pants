@@ -56,30 +56,6 @@ jar_library(name='cucumber-java',
               jar(org='info.cukes', name='cucumber-java', rev='1.1.7'),
             ])
 
-# common rev for all com.twitter%finagle* artifacts
-FINAGLE_REV = '6.24.0'
-
-jar_library(name='finagle-core',
-            jars = [
-              jar(org='com.twitter', name='finagle-core_2.10', rev=FINAGLE_REV),
-            ],
-            dependencies = [
-              ':util-core'
-            ])
-
-# The finagle-thrift lib has a dep on org.apache.thrift#libthrift;0.5.0 which is
-# hosted at maven.twttr.com.  Since finagle-thrift is only used by test code we
-# exclude and then use org.apache.hadoop#libthrift;0.5.0.o instead to avoid the
-# need to setup a custom ivy resolver.
-jar_library(name='finagle-thrift',
-            jars = [
-              jar(org='com.twitter', name='finagle-thrift_2.10', rev=FINAGLE_REV)
-                .exclude(org='org.apache.thrift', name='libthrift'),
-            ],
-            dependencies=[
-              ':libthrift-0.5.0',
-            ])
-
 jar_library(name='log4j',
             jars = [
               jar(org='log4j', name='log4j', rev='1.2.15')
@@ -94,10 +70,7 @@ jar_library(name='protobuf-2.4.1',
               jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1'),
             ])
 
-jar_library(name='protobuf-java',
-            dependencies = [
-              ':protobuf-2.4.1'
-            ])
+target(name='protobuf-java', dependencies = [':protobuf-2.4.1'])
 
 jar_library(name='protobuf-test-import',
             jars = [
@@ -125,43 +98,19 @@ jar_library(name = 'spindle-runtime',
               jar(org = 'com.foursquare', name = 'spindle-runtime_2.10', rev = '3.0.0-M7'),
             ])
 
-jar_library(name='libthrift-0.5.0',
+jar_library(name='libthrift-0.9.2',
             jars = [
-              jar(org='org.apache.hadoop', name='libthrift', rev='0.5.0.0')
-                # These are un-needed and un-available log4j appender deps pulled in via a
-                # libthrift dep on slf4j-log4j.
-                .exclude(org='javax.jms', name='jms')
-                .exclude(org='com.sun.jdmk', name='jmxtools')
-                .exclude(org='com.sun.jmx', name='jmxri')
+              jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
             ])
 
-jar_library(name='thrift-0.5.0',
-            dependencies = [
-              ':commons-lang',
-              ':libthrift-0.5.0',
-              ':slf4j-api',
-            ])
+target(name='thrift-0.9.2',
+       dependencies = [
+         ':commons-lang',
+         ':libthrift-0.9.2',
+         ':slf4j-api',
+       ])
 
-jar_library(name='thrift-0.5.0-finagle',
-            dependencies = [
-              ':thrift-0.5.0',
-
-              # finagle thrift extra deps
-              ':finagle-core',
-              ':finagle-thrift',
-              ':util-core',
-            ])
-
-jar_library(name='thrift',
-            dependencies = [ ':thrift-0.5.0' ])
-
-# common rev for all com.twitter%util* artifacts
-UTIL_REV = '6.23.0'
-
-jar_library(name='util-core',
-            jars = [
-              jar(org='com.twitter', name='util-core_2.10', rev=UTIL_REV),
-            ])
+target(name='thrift', dependencies = [ ':thrift-0.9.2' ])
 
 
 ###############
@@ -183,7 +132,7 @@ jar_library(name='junit',
               jar('junit', 'junit', '4.12')
             ])
 
-jar_library(name='specs',
+jar_library(name='scalatest',
             jars=[
-              jar('org.scala-tools.testing', 'specs_2.10', '1.6.9')
+              jar('org.scalatest', 'scalatest_2.10', '2.2.4')
             ])

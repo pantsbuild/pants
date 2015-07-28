@@ -13,9 +13,11 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.base.address import SyntheticAddress
+from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -32,21 +34,21 @@ class SimpleCodegenTask(Task):
     register('--allow-empty', action='store_true', default=True,
              help='Skip targets with no sources defined.',
              advanced=True)
+    strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
     if cls.forced_codegen_strategy() is None:
-      strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
       register('--strategy', choices=strategy_names,
                default=strategy_names[0],
                help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                     'global directory for all generated code, and the "isolated" strategy uses '
                     'per-target codegen directories.',
                advanced=True)
-      if 'isolated' in strategy_names:
-        register('--allow-dups', action='store_true', default=False,
-                 help='Allow multiple targets specifying the same sources when using the isolated '
-                      'strategy. If duplicates are allowed, the logic of find_sources in '
-                      'IsolatedCodegenStrategy will associate generated sources with '
-                      'least-dependent targets that generate them.',
-                 advanced=True)
+    if 'isolated' in strategy_names:
+      register('--allow-dups', action='store_true', default=False,
+               help='Allow multiple targets specifying the same sources when using the isolated '
+                    'strategy. If duplicates are allowed, the logic of find_sources in '
+                    'IsolatedCodegenStrategy will associate generated sources with '
+                    'least-dependent targets that generate them.',
+               advanced=True)
 
   @classmethod
   def get_fingerprint_strategy(cls):
@@ -262,6 +264,15 @@ class SimpleCodegenTask(Task):
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache(vts_artifactfiles_pairs)
 
+  def resolve_deps(self, unresolved_deps):
+    deps = OrderedSet()
+    for dep in unresolved_deps:
+      try:
+        deps.update(self.context.resolve(dep))
+      except AddressLookupError as e:
+        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+    return deps
+
 
   class CodegenStrategy(AbstractClass):
     """Abstract strategies for running codegen.
@@ -277,9 +288,18 @@ class SimpleCodegenTask(Task):
       """
       raise NotImplementedError
 
+    def _do_execute_codegen(self, targets):
+      """Invokes the task's execute_codegen on the targets """
+      try:
+        self._task.execute_codegen(targets)
+      except Exception as ex:
+        for target in targets:
+          self._task.context.log.error('Failed to generate target: {}'.format(target.address.spec))
+        raise TaskError(ex)
+
     @abstractmethod
     def execute_codegen(self, targets):
-      """Invokes the task's execute_codegen on the targets.
+      """Invokes _do_execute_codegen on the targets.
 
       Subclasses decide how the targets are partitioned before being sent to the task's
       execute_codegen method.
@@ -309,7 +329,8 @@ class SimpleCodegenTask(Task):
       return 'global'
 
     def execute_codegen(self, targets):
-      self._task.execute_codegen(targets)
+      with self._task.context.new_workunit(name='execute', labels=[WorkUnit.MULTITOOL]):
+        self._do_execute_codegen(targets)
 
     @abstractmethod
     def find_sources(self, target):
@@ -341,11 +362,13 @@ class SimpleCodegenTask(Task):
       return 'isolated'
 
     def execute_codegen(self, targets):
-      ordered = [target for target in reversed(sort_targets(targets)) if target in targets]
-      for target in ordered:
-        # TODO(gm): add a test-case to ensure this is correctly eliminating stale generated code.
-        safe_rmtree(self._task.codegen_workdir(target))
-        self._task.execute_codegen([target])
+      with self._task.context.new_workunit(name='execute', labels=[WorkUnit.MULTITOOL]):
+        ordered = [target for target in reversed(sort_targets(targets)) if target in targets]
+        for target in ordered:
+          with self._task.context.new_workunit(name=target.address.spec):
+            # TODO(gm): add a test-case to ensure this is correctly eliminating stale generated code.
+            safe_rmtree(self._task.codegen_workdir(target))
+            self._do_execute_codegen([target])
 
     def find_sources(self, target):
       """Determines what sources were generated by the target after the fact.
@@ -420,7 +443,6 @@ class SimpleCodegenTask(Task):
           messages.append('\t{} also generated:'.format(dependency.address.spec))
           messages.extend(['\t\t{}'.format(source) for source in duplicates_by_targets[dependency]])
         message = '\n'.join(messages)
-        # TODO(gm): Add a test to ensure duplicate detection and reporting are working correctly.
         if self._task.get_options().allow_dups:
           logger.warn(message)
         else:
@@ -437,5 +459,5 @@ class SimpleCodegenTask(Task):
       """
 
 
-    class UnsupportedStrategyError(TaskError):
-      """Generated when there is no strategy for a given name."""
+  class UnsupportedStrategyError(TaskError):
+    """Generated when there is no strategy for a given name."""

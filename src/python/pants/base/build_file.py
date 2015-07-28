@@ -61,7 +61,7 @@ class BuildFile(AbstractClass):
     """Returns all the BUILD files on a path"""
     results = []
     for build in self._glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build):
+      if self._is_buildfile_name(build) and self._isfile(os.path.join(path, build)):
         results.append(build)
     return sorted(results)
 
@@ -137,14 +137,15 @@ class BuildFile(AbstractClass):
     """Returns True if path exists"""
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    """Creates a BuildFile object representing the BUILD file set at the specified path.
+    """Creates a BuildFile object representing the BUILD file family at the specified path.
 
-    :param string root_dir: The base directory of the project
-    :param string relpath: The path relative to root_dir where the BUILD file is found - this can either point
-        directly at the BUILD file or else to a directory which contains BUILD files
-    :param bool must_exist: If True, the specified BUILD file must exist or else an IOError is thrown
-    :raises IOError: if the root_dir path is not absolute
-    :raises MissingBuildFileError: if the path does not house a BUILD file and must_exist is True
+    :param string root_dir: The base directory of the project.
+    :param string relpath: The path relative to root_dir where the BUILD file is found - this can
+        either point directly at the BUILD file or else to a directory which contains BUILD files.
+    :param bool must_exist: If True, at least one BUILD file must exist at the given location or
+        else an` `MissingBuildFileError` is thrown
+    :raises IOError: if the root_dir path is not absolute.
+    :raises MissingBuildFileError: if the path does not house a BUILD file and must_exist is `True`.
     """
 
     if not os.path.isabs(root_dir):
@@ -157,19 +158,6 @@ class BuildFile(AbstractClass):
     self._build_basename = self._BUILD_FILE_PREFIX
     buildfile = os.path.join(path, self._build_basename) if self._isdir(path) else path
 
-    if must_exist:
-      # If the build file must exist then we want to make sure it's not a dir.
-      # In other cases we are ok with it being a dir, for example someone might have
-      # repo/scripts/build/doit.sh.
-      if self._isdir(buildfile):
-        raise self.MissingBuildFileError(
-          'Path to buildfile ({buildfile}) is a directory, but it must be a file.'
-          .format(buildfile=buildfile))
-
-      if not self._exists(os.path.dirname(buildfile)):
-        raise self.MissingBuildFileError('Path to BUILD file does not exist at: {path}'
-                                         .format(path=os.path.dirname(buildfile)))
-
     # There is no BUILD file without a prefix so select any viable sibling
     if not self._exists(buildfile) or self._isdir(buildfile):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
@@ -177,15 +165,23 @@ class BuildFile(AbstractClass):
         buildfile = os.path.join(path, self._build_basename)
         break
 
-    self.full_path = os.path.realpath(buildfile)
     if must_exist:
       if not self._exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
+      # If a build file must exist then we want to make sure it's not a dir.
+      # In other cases we are ok with it being a dir, for example someone might have
+      # repo/scripts/build/doit.sh.
+      if self._isdir(buildfile):
+        raise self.MissingBuildFileError('Path to buildfile ({buildfile}) is a directory, '
+                                         'but it must be a file.'.format(buildfile=buildfile))
+
       if not self._is_buildfile_name(os.path.basename(buildfile)):
         raise self.MissingBuildFileError('{path} is not a BUILD file'
                                          .format(path=buildfile))
+
+    self.full_path = os.path.realpath(buildfile)
 
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
@@ -200,8 +196,7 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_buildfiles(self.root_dir, self.parent_path,
-                                            spec_excludes=spec_excludes)
+    descendants = self.scan_buildfiles(self.root_dir, self.parent_path, spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
@@ -213,9 +208,7 @@ class BuildFile(AbstractClass):
       parent = os.path.dirname(dir)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        if self._isfile(buildfile):
-          return parent, self.from_cache(self.root_dir,
-                                              os.path.relpath(buildfile, self.root_dir))
+        return parent, self.from_cache(self.root_dir, os.path.relpath(buildfile, self.root_dir))
       return parent, None
 
     parent_buildfiles = OrderedSet()
@@ -240,8 +233,7 @@ class BuildFile(AbstractClass):
     for build in self._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        if not self._isdir(os.path.join(self.root_dir, siblingpath)):
-          yield self.from_cache(self.root_dir, siblingpath)
+        yield self.from_cache(self.root_dir, siblingpath)
 
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this

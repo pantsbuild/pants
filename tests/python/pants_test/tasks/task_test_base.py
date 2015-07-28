@@ -13,6 +13,7 @@ from StringIO import StringIO
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 
 
@@ -21,6 +22,40 @@ def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
   return result == 0
 
+def ensure_cached(task_cls, expected_num_artifacts=None):
+  """Decorator for a task-executing unit test. Asserts that after running
+  the decorated test function, the cache for task_cls contains expected_num_artifacts.
+  Clears the task's cache before running the test.
+
+  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
+  :param expected_num_artifacts: Expected number of artifacts to be in the task's
+                                 cache after running the test. If unspecified, will
+                                 assert that the number of artifacts in the cache is
+                                 non-zero.
+  """
+  def decorator(test_fn):
+
+    def wrapper(self, *args, **kwargs):
+      with temporary_dir() as artifact_cache:
+        self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                                   write_to=artifact_cache)
+        task_cache = os.path.join(artifact_cache, task_cls.stable_name())
+        os.mkdir(task_cache)
+
+        test_fn(self, *args, **kwargs)
+
+        num_artifacts = 0
+        for (_, _, files) in os.walk(task_cache):
+          num_artifacts += len(files)
+
+        if expected_num_artifacts is None:
+          self.assertNotEqual(num_artifacts, 0)
+        else:
+          self.assertEqual(num_artifacts, expected_num_artifacts)
+
+    return wrapper
+
+  return decorator
 
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""
@@ -148,6 +183,14 @@ class ConsoleTaskTestBase(TaskTestBase):
     **kwargs: additional kwargs passed to execute_console_task.
     """
     self.assertEqual(sorted(output), sorted(self.execute_console_task(**kwargs)))
+
+  def assert_console_output_contains(self, output, **kwargs):
+    """Verifies the expected output string is emitted by the console task under test.
+
+    output:  the expected output entry(ies)
+    **kwargs: additional kwargs passed to execute_console_task.
+    """
+    self.assertIn(output, self.execute_console_task(**kwargs))
 
   def assert_console_output_ordered(self, *output, **kwargs):
     """Verifies the expected output entries are emitted by the console task under test.

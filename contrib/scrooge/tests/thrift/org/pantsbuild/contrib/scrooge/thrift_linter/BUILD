@@ -3,19 +3,19 @@
 
 java_thrift_library(
   name = 'bad-thrift-default',
-  sources = ['bad.thrift'],
+  sources = ['bad-default.thrift'],
   # thrift_linter_strict not defined
 )
 
 java_thrift_library(
   name = 'bad-thrift-strict',
-  sources = ['bad.thrift'],
+  sources = ['bad-strict.thrift'],
   thrift_linter_strict=True,
 )
 
 java_thrift_library(
   name = 'bad-thrift-non-strict',
-  sources = ['bad.thrift'],
+  sources = ['bad-non-strict.thrift'],
   thrift_linter_strict=False,
 )
 

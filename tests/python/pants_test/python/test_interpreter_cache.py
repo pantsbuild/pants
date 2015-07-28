@@ -5,12 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import unittest
 
 import mock
+from pex.package import EggPackage, Package, SourcePackage
+from pex.resolver import resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
+from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.util.contextutil import temporary_dir
+from pants_test.base.context_utils import create_option_values
 
 
 class TestInterpreterCache(unittest.TestCase):
@@ -53,3 +58,52 @@ class TestInterpreterCache(unittest.TestCase):
     self._do_test(self._make_bad_requirement(self._interpreter.identity.requirement),
                   (str(self._interpreter.identity.requirement), ),
                   [self._interpreter])
+
+  def test_setup_using_eggs(self):
+    def options(**kwargs):
+      return create_option_values(kwargs)
+
+    def link_egg(repo_root, requirement):
+      existing_dist_location = self._interpreter.get_location(requirement)
+      if existing_dist_location is not None:
+        existing_dist = Package.from_href(existing_dist_location)
+        requirement = '{}=={}'.format(existing_dist.name, existing_dist.raw_version)
+
+      distributions = resolve([requirement],
+                              interpreter=self._interpreter,
+                              precedence=(EggPackage, SourcePackage))
+      self.assertEqual(1, len(distributions))
+      dist_location = distributions[0].location
+
+      self.assertRegexpMatches(dist_location, r'\.egg$')
+      os.symlink(dist_location, os.path.join(repo_root, os.path.basename(dist_location)))
+
+      return Package.from_href(dist_location).raw_version
+
+    with temporary_dir() as root:
+      egg_dir = os.path.join(root, 'eggs')
+      os.makedirs(egg_dir)
+      setuptools_version = link_egg(egg_dir, 'setuptools')
+      wheel_version = link_egg(egg_dir, 'wheel')
+
+      python_setup_options = options(interpreter_cache_dir=None,
+                                     pants_workdir=os.path.join(root, 'workdir'),
+                                     interpreter_requirement=self._interpreter.identity.requirement,
+                                     setuptools_version=setuptools_version,
+                                     wheel_version=wheel_version)
+      python_setup = PythonSetup('test-scope', python_setup_options)
+      python_repos = PythonRepos('test-scope', options(indexes=[], repos=[egg_dir]))
+      cache = PythonInterpreterCache(python_setup, python_repos)
+
+      interpereters = cache.setup(paths=[os.path.dirname(self._interpreter.binary)],
+                                  filters=[str(self._interpreter.identity.requirement)])
+      self.assertGreater(len(interpereters), 0)
+
+      def assert_egg_extra(interpreter, name, version):
+        location = interpreter.get_location('{}=={}'.format(name, version))
+        self.assertIsNotNone(location)
+        self.assertIsInstance(Package.from_href(location), EggPackage)
+
+      for interpreter in interpereters:
+        assert_egg_extra(interpreter, 'setuptools', setuptools_version)
+        assert_egg_extra(interpreter, 'wheel', wheel_version)

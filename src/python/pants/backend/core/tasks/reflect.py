@@ -5,23 +5,32 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import argparse
 import inspect
 import re
 from collections import OrderedDict
 
 from docutils.core import publish_parts
+from six import string_types
 from six.moves import range
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
-from pants.option.global_options import register_global_options
-from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper, register_bootstrap_options
-from pants.option.parser import Parser
+from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.options_bootstrapper import OptionsBootstrapper
+
+
+# TODO(benjy): Rewrite this to handle subsystem options, and recursive/advanced options.
+# Ideally the latter would be expandable or linked or something, so there's not a ton of clutter.
+# Also make this code better (at least wrap it in a class and give the methods comprehensible
+# names), and make its output prettier and more dynamic.
+# This might make a good documentation hack week project for someone.
+
+
+buildroot = get_buildroot()
 
 
 # Our CLI help and doc-website-gen use this to get useful help text.
@@ -417,49 +426,41 @@ def get_syms(build_file_parser):
 
 
 def bootstrap_option_values():
-  return OptionsBootstrapper(buildroot='<buildroot>').get_bootstrap_options().for_global_scope()
+  return OptionsBootstrapper().get_bootstrap_options().for_global_scope()
 
 
-def gen_glopts_reference_data():
-  option_parser = Parser(env={}, config={}, scope='', help_request=None, parent_parser=None)
-  def register(*args, **kwargs):
-    option_parser.register(*args, **kwargs)
-  register.bootstrap = bootstrap_option_values()
-  register.scope = ''
-  register_bootstrap_options(register, buildroot='<buildroot>')
-  register_global_options(register)
-  argparser = option_parser._help_argparser
-  return oref_template_data_from_options(Options.GLOBAL_SCOPE, argparser)
+def gen_glopts_reference_data(options):
+  return oref_template_data_from_help_info(options.get_parser(GLOBAL_SCOPE).get_help_info())
 
 
-def oref_template_data_from_options(scope, argparser):
-  """Get data for the Options Reference from a CustomArgumentParser instance."""
-  if not argparser: return None
-  title = scope or ''
+def oref_template_data_from_help_info(oschi):
+  """Get data for the Options Reference from an OptionScopeHelpInfo instance."""
+  def sub_buildroot(s):
+    if isinstance(s, string_types):
+      return s.replace(buildroot, '<buildroot>')
+    else:
+      return s
+
+  title = oschi.scope
   pantsref = ''.join([c for c in title if c.isalnum()])
   option_l = []
-  for o in argparser.walk_actions():
-    st = '/'.join(o.option_strings)
-    # Argparse elides the type in various circumstances, so we have to reverse that logic here.
-    typ = o.type or (type(o.const) if isinstance(o, argparse._StoreConstAction) else str)
-    default = None
-    if o.default and not str(o.default).startswith("('NO',"):
-      default = o.default
+  for ohi in oschi.basic:
+    st = '/'.join(ohi.display_args)
     hlp = None
-    if o.help:
-      hlp = indent_docstring_by_n(o.help, 6)
+    if ohi.help:
+      hlp = indent_docstring_by_n(sub_buildroot(ohi.help), 6)
     option_l.append(TemplateData(
-        st=st,
-        default=default,
-        hlp=hlp,
-        typ=typ.__name__))
+      st=st,
+      default=sub_buildroot(ohi.default),
+      hlp=hlp,
+      typ=ohi.type.__name__))
   return TemplateData(
     title=title,
     options=option_l,
     pantsref=pantsref)
 
 
-def gen_tasks_options_reference_data():
+def gen_tasks_options_reference_data(options):
   """Generate the template data for the options reference rst doc."""
   goal_dict = {}
   goal_names = []
@@ -467,28 +468,21 @@ def gen_tasks_options_reference_data():
     tasks = []
     for task_name in goal.ordered_task_names():
       task_type = goal.task_type_by_name(task_name)
-      doc_rst = indent_docstring_by_n(task_type.__doc__ or '', 2)
-      doc_html = rst_to_html(dedent_docstring(task_type.__doc__))
-      option_parser = Parser(env={}, config={}, scope='', help_request=None, parent_parser=None)
-      def register(*args, **kwargs):
-        option_parser.register(*args, **kwargs)
-      register.bootstrap = bootstrap_option_values()
-      register.scope = ''
-      task_type.register_options(register)
-      argparser = option_parser._help_argparser
-      scope = Goal.scope(goal.name, task_name)
       # task_type may actually be a synthetic subclass of the authored class from the source code.
-      # We want to display the authored class's name in the docs (but note that we must use the
-      # subclass for registering options above)
+      # We want to display the authored class's name in the docs.
       for authored_task_type in task_type.mro():
         if authored_task_type.__module__ != 'abc':
           break
+
+      doc_rst = indent_docstring_by_n(authored_task_type.__doc__ or '', 2)
+      doc_html = rst_to_html(dedent_docstring(authored_task_type.__doc__))
+      oschi = options.get_parser(task_type.options_scope).get_help_info()
       impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
       tasks.append(TemplateData(
           impl=impl,
           doc_html=doc_html,
           doc_rst=doc_rst,
-          ogroup=oref_template_data_from_options(scope, argparser)))
+          ogroup=oref_template_data_from_help_info(oschi)))
     goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
     goal_names.append(goal.name)
 

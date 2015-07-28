@@ -14,6 +14,8 @@ from pants.base.payload_field import PayloadField, stable_json_sha1
 from pants.base.validation import assert_list
 
 
+# TODO(Eric Ayers) There are two classes named IvyArtifact, the one and one in ivy_utils.py
+# This one needs to go when we refactor Ivy datastructures out of the rest of pants.
 class IvyArtifact(PayloadField):
   """
   Specification for an Ivy Artifact for this jar dependency.
@@ -103,7 +105,7 @@ class JarDependency(object):
     self.transitive = not intransitive
     self.apidocs = apidocs
     self.mutable = mutable
-    self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact))
+    self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact, key_arg='artifacts'))
 
     if ext or url or type_ or classifier:
       self.append_artifact(name,

@@ -9,13 +9,12 @@ import sys
 
 from colors import cyan, green, red, yellow
 
-from pants.base.config import Config, SingleFileConfig
+from pants.base.config import Config
 from pants.option import custom_types
 from pants.option.errors import ParseError
 
 
 migrations = {
-
   ('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
   ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
@@ -162,8 +161,6 @@ migrations = {
   ('ide', 'extra_jvm_test_paths'): ('idea', 'extra_jvm_test_paths'),
   ('ide', 'debug_port'): ('idea', 'debug_port'),
 
-  ('cache', 'compression'): ('DEFAULT', 'cache_compression'),
-
   ('reporting', 'reports_template_dir'): ('reporting', 'template_dir'),
 
   ('DEFAULT', 'stats_upload_url'): ('run-tracker', 'stats_upload_url'),
@@ -245,6 +242,15 @@ migrations = {
 
   ('python-setup', 'egg_cache_dir'): ('python_setup', 'resolver_cache_dir'),
   ('DEFAULT', 'python_chroot_requirements_ttl'): ('python-setup', 'resolver_cache_ttl'),
+
+  ('DEFAULT', 'pants_support_baseurls'): ('binaries', 'baseurls'),
+  ('DEFAULT', 'pants_support_fetch_timeout_secs'): ('binaries', 'fetch_timeout_secs'),
+
+  ('gen.thrift', 'supportdir'): ('thrift-binary', 'supportdir'),
+  ('gen.thrift', 'version'): ('thrift-binary', 'version'),
+
+  ('gen.thrift', 'java'): None,  # Notes only one to many migration: see notes below.
+  ('gen.thrift', 'python'): None,  # Notes only pure deletion migration: see notes below.
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -308,41 +314,111 @@ notes = {
   ('resolve', 'ng_daemons'): ng_daemons_note,
   ('scrooge-gen', 'scala'): scrooge_gen_deps_note,
   ('scrooge-gen', 'java'): scrooge_gen_deps_note,
+
+  ('gen.thrift', 'version'): 'You can either set the apache thrift compiler version globally for '
+                             'java and python using the [thrift-binary] scope or else you can '
+                             'configure the languages separately using the '
+                             '[thrift-binary.gen.thrift] scope to control the version used for '
+                             'java.',
+
+  ('gen.thrift', 'java'): 'The java configuration has migrated from a single dict with 3 keys to '
+                          '3 options.\n'
+                          'The "gen" key has migrated to the `gen_options` option and the value '
+                          'should just be the option portion of the thrift --gen argument.  For '
+                          'example, if you had `"gen": "java:hashcode"` as your java dict entry '
+                          'you\'d now use the top-level option `gen_options: hashcode`.\n'
+                          'The "deps.structs" nested key has migrated to the `deps` option and the '
+                          'value remains the same.\n'
+                          'The "deps.service" nested key as migrated to the `service_deps` option '
+                          'and the value remains the same, but is now optional if service deps are '
+                          'the same as non-service deps.',
+
+  ('gen.thrift', 'python'): 'The python configuration for gen.thrift has never been used and '
+                            'should be removed.',
+
+  ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
+  ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
 }
 
+
+def check_option(cp, src, dst):
+  def has_explicit_option(section, key):
+    # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
+    # that approach fails for the important case of boolean options.  Since this is a ~short term
+    # tool and its highly likely its lifetime will be shorter than the time the private
+    # ConfigParser_sections API we use here changes, its worth the risk.
+    if section == 'DEFAULT':
+      # NB: The 'DEFAULT' section is not tracked via `has_section` or `_sections`, so we use a
+      # different API to check for an explicit default.  The defaults are a combination of both
+      # 'DEFAULT' section values and defaults passed to the ConfigParser constructor, but we
+      # create the `cp` config parser below explicitly with no constructor defaults so this check
+      # works.
+      return key in cp.defaults()
+    else:
+      return cp.has_section(section) and (key in cp._sections[section])
+
+  def section(s):
+    return cyan('[{0}]'.format(s))
+
+  src_section, src_key = src
+  if has_explicit_option(src_section, src_key):
+    if dst is not None:
+      dst_section, dst_key = dst
+      print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
+            '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
+                                    dst_key=green(dst_key), dst_section=section(dst_section)),
+            file=sys.stderr)
+    elif src not in notes:
+      print('Found {src_key} in section {src_section} and there is no automated migration path'
+            'for this option.  Please consult the '
+            'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
+
+    if (src_section, src_key) in notes:
+      print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
 
 def check_config_file(path):
   cp = Config.create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
-  config = SingleFileConfig(path, cp)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
   def section(s):
     return cyan('[{0}]'.format(s))
 
-  for (src_section, src_key), dst in migrations.items():
-    def has_explicit_option(section, key):
-      # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
-      # that approach fails for the important case of boolean options.  Since this is a ~short term
-      # tool and its highly likely its lifetime will be shorter than the time the private
-      # ConfigParser_sections API we use here changes, its worth the risk.
-      return cp.has_section(section) and (key in cp._sections[section])
+  for src, dst in migrations.items():
+    check_option(cp, src, dst)
 
-    if has_explicit_option(src_section, src_key):
-      if dst is not None:
-        dst_section, dst_key = dst
-        print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
-              '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
-                                      dst_key=green(dst_key), dst_section=section(dst_section)),
-                                      file=sys.stderr)
-      elif (src_section, src_key) not in notes:
-        print('Found {src_key} in section {src_section} and there is no automated migration path'
-              'for this option.  Please consult the '
-              'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
+  # Special-case handling of per-task subsystem options, so we can sweep them up in all
+  # sections easily.
 
-      if (src_section, src_key) in notes:
-        print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
+  def check_task_subsystem_options(subsystem_sec, options_map, sections=None):
+    sections = sections or cp.sections()
+    for src_sec in ['DEFAULT'] + sections:
+      dst_sec = subsystem_sec if src_sec == 'DEFAULT' else '{}.{}'.format(subsystem_sec, src_sec)
+      for src_key, dst_key in options_map.items():
+        check_option(cp, (src_sec, src_key), (dst_sec, dst_key))
+
+  artifact_cache_options_map = {
+    'read_from_artifact_cache': 'read',
+    'write_to_artifact_cache': 'write',
+    'overwrite_cache_artifacts': 'overwrite',
+    'read_artifact_caches': 'read_from',
+    'write_artifact_caches': 'write_to',
+    'cache_compression': 'compression_level',
+  }
+  check_task_subsystem_options('cache', artifact_cache_options_map)
+
+  jvm_options_map = {
+    'jvm_options': 'options',
+    'args': 'program_args',
+    'debug': 'debug',
+    'debug_port': 'debug_port',
+    'debug_args': 'debug_args',
+  }
+  jvm_options_sections = [
+    'repl.scala', 'test.junit', 'run.jvm', 'bench', 'doc.javadoc', 'doc.scaladoc'
+  ]
+  check_task_subsystem_options('jvm', jvm_options_map, sections=jvm_options_sections)
 
   # Check that all values are parseable.
   for sec in ['DEFAULT'] + cp.sections():

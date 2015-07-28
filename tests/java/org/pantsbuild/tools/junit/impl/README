@@ -1,0 +1,45 @@
+Testing ConsoleRunner and other classes in src/java/org/pantsbuild/junit
+is non-trivial because of bootstrapping issues. It should become somewhat easier
+in the future, but in the mean time, here are the steps one needs to perform
+if they change anything under src/java/org/pantsbuild/junit:
+
+I.) On the dev branch:
+1) Create a self-contained binary
+$ ./pants binary src/java/org/pantsbuild/tools/junit:main
+
+2) Edit BUILD.tools to pick up the self-contained binary you created in 1,
+so that the end result looks like (modulo the exact path to the binary jar you created in 1):
+
+$$ git diff
+ diff --git a/BUILD.tools b/BUILD.tools
+ index fc53e75..da0a936 100644
+ --- a/BUILD.tools
+ +++ b/BUILD.tools
+ @@ -123,7 +123,8 @@ jar_library(name = 'junit',
+              jars = [
+                jar(org = 'junit', name = 'junit-dep', rev = '4.10'),
+                jar(org = 'org.hamcrest', name = 'hamcrest-core', rev = '1.2'),
+ -              jar(org = 'com.twitter.common', name = 'junit-runner', rev = '0.0.41'),
+ +              jar(org = 'org.pantsbuild', name = 'junit-runner', rev = 'none', mutable = True,
+ +                  url = 'file:///home/jsirois/dev/3rdparty/jsirois-pants4/dist/junit-runner.jar'),
+
+As you edit the source files, just repeat step 1 and the change will be picked up.
+
+II.) Revert the change made in I-2 above, mark with @Ignore the tests that rely on
+code changes in the runner (or the entire test class), and submit changes from I
+to master
+
+# TODO(John Sirois): Fix the publishing advice once publishing is sussed.
+# See: https://github.com/pantsbuild/pants/issues/1361
+III.) The operation below should be done on MASTER. Publish a jar with:
+
+1) git checkout master; git pull
+
+2) dry run:
+./pants clean-all publish src/java/org/pantsbuild/tools/junit
+
+3) looks ok? do it:
+yes | ./pants publish.jar --no-dryrun src/java/org/pantsbuild/tools/junit
+
+IV.) Switch back to a dev branch. Make a change that bumps the revision number in BUILD.tools and
+un-@Ignores any tests temporarily ignored in step I.

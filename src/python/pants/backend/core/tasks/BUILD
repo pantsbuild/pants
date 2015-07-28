@@ -45,8 +45,10 @@ target(
 python_library(
   name = 'bash_completion',
   sources = ['bash_completion.py'],
+  resources = globs('templates/bash_completion/*.mustache'),
   dependencies = [
     ':console_task',
+    ':task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
@@ -61,10 +63,10 @@ python_library(
   dependencies = [
     ':common',
     ':reflect',
+    ':task',
     '3rdparty/python:docutils',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/maven_layout',
     'src/python/pants/backend/python:python_requirements',
     'src/python/pants/base:build_environment',
@@ -148,6 +150,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:target',
+    'src/python/pants/util:filtering',
   ],
 )
 
@@ -160,6 +163,7 @@ python_library(
     'src/python/pants/base:build_graph',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
+    'src/python/pants/option',
   ],
 )
 
@@ -190,12 +194,13 @@ python_library(
     '3rdparty/python:Pygments',
     '3rdparty/python:docutils',
     '3rdparty/python:six',
-    ':common',
+    ':task',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
-    'src/python/pants/base:target',
+    'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
     'src/python/pants:binary_util',
   ],
@@ -252,6 +257,7 @@ python_library(
   dependencies = [
     '3rdparty/python:docutils',
     '3rdparty/python:six',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
@@ -273,7 +279,7 @@ python_library(
   name = 'run_prep_command',
   sources = ['run_prep_command.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:task',
+    ':task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
   ],
@@ -326,6 +332,7 @@ python_library(
     'src/python/pants/cache',
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
+    'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/util:meta',
   ],

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
 import sys
 
@@ -21,13 +20,13 @@ from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
 
 
 class Reporting(Subsystem):
-  @classmethod
-  def scope_qualifier(cls):
-    return 'reporting'
+  options_scope = 'reporting'
 
   @classmethod
   def register_options(cls, register):
     super(Reporting, cls).register_options(register)
+    register('--invalidation-report', default=False, action='store_true',
+             help='Write a formatted report on the invalid objects to the specified path.')
     register('--reports-dir', advanced=True, metavar='<dir>',
              default=os.path.join(register.bootstrap.pants_workdir, 'reports'),
              help='Write reports to this dir.')
@@ -72,13 +71,13 @@ class Reporting(Subsystem):
 
     # Add some useful RunInfo.
     run_tracker.run_info.add_info('default_report', html_reporter.report_path())
-    (_, port) = ReportingServerManager.get_current_server_pid_and_port()
+    port = ReportingServerManager().socket
     if port:
       run_tracker.run_info.add_info('report_url', 'http://localhost:{}/run/{}'.format(port, run_id))
 
     return report
 
-  def update_reporting(self, global_options, is_quiet_task, run_tracker):
+  def update_reporting(self, global_options, is_quiet_task, run_tracker, invalidation_report=None):
     """Updates reporting config once we've parsed cmd-line flags."""
 
     # Get any output silently buffered in the old console reporter, and remove it.
@@ -117,3 +116,8 @@ class Reporting(Subsystem):
       logfile_reporter.emit(buffered_output)
       logfile_reporter.flush()
       run_tracker.report.add_reporter('logfile', logfile_reporter)
+
+    if invalidation_report:
+      run_id = run_tracker.run_info.get_info('id')
+      outfile = os.path.join(self.get_options().reports_dir, run_id, 'invalidation-report.csv')
+      invalidation_report.set_filename(outfile)

@@ -119,7 +119,12 @@ class Target(AbstractTarget):
 
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses"""
-    pass
+
+  class UnknownArguments(TargetDefinitionException):
+    """Unknown keyword arguments supplied to Target."""
+
+  class IllegalArgument(TargetDefinitionException):
+    """Argument that isn't allowed supplied to Target."""
 
   LANG_DISCRIMINATORS = {
     'java':   lambda t: t.is_jvm,
@@ -176,7 +181,8 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None):
+  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None,
+               **kwargs):
     """
     :param string name: The name of this target, which combined with this
       build file defines the target address.
@@ -205,6 +211,13 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
 
+    if kwargs:
+      error_message = '{target_type} received unknown arguments: {args}'
+      raise self.UnknownArguments(address.spec, error_message.format(
+        target_type=type(self).__name__,
+        args=''.join('\n  {} = {}'.format(key, value) for key, value in kwargs.items())
+      ))
+
   @property
   def tags(self):
     return self._tags
@@ -213,8 +226,8 @@ class Target(AbstractTarget):
   def num_chunking_units(self):
     return max(1, len(self.sources_relative_to_buildroot()))
 
-  def assert_list(self, maybe_list, expected_type=string_types):
-    return assert_list(maybe_list, expected_type,
+  def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
+    return assert_list(maybe_list, expected_type, key_arg=key_arg,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
@@ -464,7 +477,7 @@ class Target(AbstractTarget):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
     return "{}({})".format(type(self).__name__, addr)
 
-  def create_sources_field(self, sources, sources_rel_path, address=None):
+  def create_sources_field(self, sources, sources_rel_path, address=None, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
     Note that this method is called before the call to Target.__init__ so don't expect fields to
@@ -486,7 +499,7 @@ class Target(AbstractTarget):
       filespec = sources.filespec
     else:
       sources = sources or []
-      assert_list(sources)
+      assert_list(sources, key_arg=key_arg)
       filespec = {'globs' : [os.path.join(sources_rel_path, src) for src in (sources or [])]}
 
     return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)

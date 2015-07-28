@@ -68,6 +68,7 @@ python_library(
   dependencies = [
     ':sdist_builder',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/util:dirutil'
   ]
 )
 
@@ -77,7 +78,6 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
     'src/python/pants/util:dirutil',
   ]
 )

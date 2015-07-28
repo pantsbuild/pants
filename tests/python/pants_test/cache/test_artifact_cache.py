@@ -14,24 +14,11 @@ from threading import Thread
 
 from pants.base.build_invalidator import CacheKey
 from pants.cache.artifact_cache import call_insert, call_use_cached_files
-from pants.cache.cache_setup import (CacheSpecFormatError, EmptyCacheSpecError,
-                                     InvalidCacheSpecError, LocalCacheSpecRequiredError,
-                                     RemoteCacheSpecRequiredError, create_artifact_cache,
-                                     select_best_url)
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.base.context_utils import create_context
-from pants_test.testutils.mock_logger import MockLogger
-
-
-class MockPinger(object):
-  def __init__(self, hosts_to_times):
-    self._hosts_to_times = hosts_to_times
-  # Returns a fake ping time such that the last host is always the 'fastest'.
-  def pings(self, hosts):
-    return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)
 
 
 # A very trivial server that serves files under the cwd.
@@ -107,54 +94,6 @@ class TestArtifactCache(unittest.TestCase):
       path = f.name
       f.close()
       yield path
-
-  def test_select_best_url(self):
-    spec = 'http://host1|https://host2:666/path/to|http://host3/path/'
-    best = select_best_url(spec, MockPinger({'host1':  5, 'host2:666': 3, 'host3': 7}), MockLogger())
-    self.assertEquals('https://host2:666/path/to', best)
-
-  def test_cache_spec_parsing(self):
-    artifact_root = '/bogus/artifact/root'
-
-    def mk_cache(spec):
-      return create_artifact_cache(MockLogger(), artifact_root, spec,
-                                  'TestTask', compression=1, action='testing')
-
-    def check(expected_type, spec):
-      cache = mk_cache(spec)
-      self.assertTrue(isinstance(cache, expected_type))
-      self.assertEquals(cache.artifact_root, artifact_root)
-
-    with temporary_dir() as tmpdir:
-      cachedir = os.path.join(tmpdir, 'cachedir')  # Must be a real path, so we can safe_mkdir it.
-      check(LocalArtifactCache, cachedir)
-      check(RESTfulArtifactCache, 'http://localhost/bar')
-      check(RESTfulArtifactCache, 'https://localhost/bar')
-      check(RESTfulArtifactCache, [cachedir, 'http://localhost/bar'])
-
-      with self.assertRaises(EmptyCacheSpecError):
-        mk_cache(None)
-
-      with self.assertRaises(EmptyCacheSpecError):
-        mk_cache('')
-
-      with self.assertRaises(CacheSpecFormatError):
-        mk_cache('foo')
-
-      with self.assertRaises(CacheSpecFormatError):
-        mk_cache('../foo')
-
-      with self.assertRaises(LocalCacheSpecRequiredError):
-        mk_cache(['https://localhost/foo', 'http://localhost/bar'])
-
-      with self.assertRaises(RemoteCacheSpecRequiredError):
-        mk_cache([tmpdir, '/bar'])
-
-      with self.assertRaises(InvalidCacheSpecError):
-        mk_cache(4)
-
-      with self.assertRaises(InvalidCacheSpecError):
-        mk_cache([4])
 
   def test_local_cache(self):
     with self.setup_local_cache() as artifact_cache:

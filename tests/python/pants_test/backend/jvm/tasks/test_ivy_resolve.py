@@ -11,7 +11,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyArtifact as IvyUtilArtifact
-from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
+from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyUtils
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -19,6 +19,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
+from pants.base.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
@@ -32,10 +33,10 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(IvyResolveTest, self).setUp()
-    self.set_options(
-        read_artifact_caches=None,
-        write_artifact_caches=None,
-        use_nailgun=False)
+    self.set_options(use_nailgun=False)
+    self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                               read_from=None,
+                               write_to=None)
 
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
@@ -73,13 +74,21 @@ class IvyResolveTest(JvmToolTaskTestBase):
     symlink_map = dict(bogus0='bogus0', bogus1='bogus1', unused='unused')
     context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
-    task.ivy_resolve = lambda targets, *args, **kw: (None, targets)
 
-    def mock_generate_ivy_jar_products(targets):
+    def mock_ivy_resolve(targets, *args, **kw):
+      if targets:
+        cache_manager = task.create_cache_manager(False)
+        vts = VersionedTargetSet(cache_manager, cache_manager.wrap_targets(targets))
+        cache_key = vts.cache_key.hash
+      else:
+        cache_key = None
+      return ([], cache_key)
+
+    task.ivy_resolve = mock_ivy_resolve
+
+    def mock_generate_ivy_jar_products(cache_key_ignored):
       ivy_products = defaultdict(list)
       ivy_info = IvyInfo()
-      artifacts = []
-      callers = []
 
       # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
       # resolve, it's possible that before it was evicted, it would
@@ -167,7 +176,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
     excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
-
     compile_classpath = self.resolve([junit_jar_lib, excluding_target])
 
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)

@@ -17,26 +17,19 @@ Build
 
 Zinc is built using pants:
 
-    ./pants test zinc/
+    ./pants test zinc:
 
 To build a jar use:
 
-    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:bin
+    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:
 
-To consume a jar change zinc target in BUILD.tools:
+To consume a jar, change the zinc target in BUILD.tools. To force pants to re-resolve
+and re-shade the artifact, use a new `rev` whenever the artifact has changed.
 
     jar_library(name = 'zinc',
                 jars = [
-                  jar(org = 'org.pantsbuild', name = 'zinc', rev = 'none', mutable = True,
-                      url = 'file:///Users/fkorotkov/workspace/fkorotkov/pants/dist/zinc.jar'),
-                ],
-                dependencies=[
-                  ':nailgun-server',
-                  '3rdparty/jvm/com/typesafe/sbt:compiler-interface',
-                  '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
-                  '3rdparty/jvm/com/typesafe/sbt:sbt-interface',
-                  '3rdparty:guava',
-                  '3rdparty:jsr305',
+                  jar(org = 'org.pantsbuild', name = 'zinc', rev = ???,
+                      url = 'file:///Users/user/pants/dist/zinc.jar'),
                 ])
 
 
@@ -45,7 +38,7 @@ Options
 
 To get information about options
 
-    ./pants run zinc:bin -- -help
+    ./pants run zinc: -- -help
 
 ### Compile
 
@@ -92,18 +85,9 @@ added to avoid the Scala library jar being automatically added to the classpath.
 
 ### Nailed
 
-Zinc comes with built-in [Nailgun] integration. Running with Nailgun provides
+Zinc assumes that it will be run in Nailgun. Running with Nailgun provides
 zinc as a server, communicating commands via a client, keeping cached compilers
 in a warm running JVM and avoiding startup and load times.
-
-To run zinc as a build daemon add the `-nailed` option to all commands, or
-`alias zinc="zinc -nailed"`.
-
-Nailgun client binaries for common platforms are bundled with zinc. If an `ng`
-client is on the current path then this will be used instead.
-
-To shutdown the zinc server run `zinc -shutdown`. To list currently cached zinc
-compilers use `zinc -status`.
 
 [Nailgun]: http://www.martiansoftware.com/nailgun
 

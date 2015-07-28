@@ -1,4 +1,4 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
@@ -13,8 +13,8 @@ python_library(
     'src/python/pants/goal:context',
     'src/python/pants/goal',
     'src/python/pants/ivy',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/base:context_utils',
   ]
 )
 
@@ -33,12 +33,10 @@ target(
     ':jar_create',
     ':jar_publish',
     ':jar_task',
-    ':jvm_run',
     ':jvm_task',
     ':jvmdoc_gen',
     ':list_goals',
     ':listtargets',
-    ':markdown_to_html',
     ':minimal_cover',
     ':reflect',
     ':roots',
@@ -53,7 +51,6 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':depmap_integration',
     ':eclipse_integration',
     ':ensime_integration',
     ':idea_integration',
@@ -62,11 +59,19 @@ target(
     ':junit_tests_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
-    ':markdown_to_html_integration',
     ':protobuf_integration',
     ':scala_repl_integration',
     ':wire_integration',
   ],
+)
+
+python_tests(
+  name = 'scalastyle_integration',
+  sources = ['test_scalastyle_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+    'src/python/pants/util:contextutil',
+  ]
 )
 
 python_tests(
@@ -148,8 +153,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:reflect',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
     'tests/python/pants_test:base_test',
   ]
 )
@@ -211,17 +214,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
   ]
-)
-
-python_tests(
-  name = 'depmap_integration',
-  sources = ['test_depmap_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/ivy',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
 )
 
 python_tests(
@@ -386,29 +378,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'markdown_to_html',
-  sources = ['test_markdown_to_html.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/tasks:markdown_to_html',
-  ]
-)
-
-python_tests(
-  name='markdown_to_html_integration',
-  sources=['test_markdown_to_html_integration.py'],
-  dependencies=[
-    'src/python/pants/backend/core/tasks:markdown_to_html',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-  ],
-  coverage=[
-    'pants.backend.core.tasks.markdown_to_html',
-  ]
-)
-
-python_tests(
   name = 'minimal_cover',
   sources = ['test_minimal_cover.py'],
   dependencies = [
@@ -517,17 +486,6 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/engine:engine',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'jvm_run',
-  sources = ['test_jvm_run.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:jvm_run',
-    'src/python/pants/util:contextutil',
   ]
 )
 

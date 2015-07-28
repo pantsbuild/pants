@@ -98,6 +98,11 @@ class JvmCompileStrategy(object):
 
     It's possible (although unfortunate) for multiple targets to own the same sources, hence
     the top level division. Srcs are relative to buildroot. Classes are absolute paths.
+
+    Strategies may also return classes with 'None' as their src, to indicate that compiler
+    analysis indicated that they were un-owned. This case is triggered when annotation
+    processors generate classes (or due to bugs in classfile tracking in zinc/jmake.)
+
     """
 
   @abstractmethod
@@ -151,7 +156,8 @@ class JvmCompileStrategy(object):
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
 
   def class_name_for_class_file(self, compile_context, class_file_name):
-    assert class_file_name.endswith(".class")
+    if not class_file_name.endswith(".class"):
+      return None
     assert class_file_name.startswith(compile_context.classes_dir)
     class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
     return class_file_name.replace("/", ".")

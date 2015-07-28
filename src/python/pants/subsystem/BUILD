@@ -5,6 +5,7 @@ python_library(
   name = 'subsystem',
   sources = globs('*.py'),
   dependencies = [
-    'src/python/pants/option',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/option'
   ],
 )

@@ -11,7 +11,6 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask  # XXX(pl)
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -25,24 +24,25 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
-from pants.option.global_options import register_global_options
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import ScopeInfo
+from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
+from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
 
 
 class SourceRootBootstrapper(Subsystem):
-  @classmethod
-  def scope_qualifier(cls):
-    # This is an odd name, but we maintain the legacy scope until we can kill this subsystem
-    # outright.
-    return 'goals'
+  # This is an odd name, but we maintain the legacy scope until we kill this subsystem outright.
+  options_scope = 'goals'
 
   @classmethod
   def register_options(cls, register):
@@ -97,23 +97,22 @@ class GoalRunner(object):
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
 
-    known_scopes = ['']
+    known_scope_infos = [ScopeInfo.for_global_scope()]
 
-    # Add scopes for global subsystem instances.
-    global_subsystems = (set(self.subsystems) |
-                         Goal.global_subsystem_types() |
-                         build_configuration.subsystem_types())
-    for subsystem_type in global_subsystems:
-      known_scopes.append(subsystem_type.qualify_scope(Options.GLOBAL_SCOPE))
+    # Add scopes for all needed subsystems.
+    subsystems = Subsystem.closure(set(self.subsystems) |
+                                   Goal.subsystems() |
+                                   build_configuration.subsystems())
+    for subsystem in subsystems:
+      known_scope_infos.append(ScopeInfo(subsystem.options_scope, ScopeInfo.GLOBAL_SUBSYSTEM))
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
-      # Note that enclosing scopes will appear before scopes they enclose.
-      known_scopes.extend(filter(None, goal.known_scopes()))
+      known_scope_infos.extend(filter(None, goal.known_scope_infos()))
 
     # Now that we have the known scopes we can get the full options.
-    self.options = options_bootstrapper.get_full_options(known_scopes=known_scopes)
-    self.register_subsystem_options(global_subsystems)
+    self.options = options_bootstrapper.get_full_options(known_scope_infos)
+    self.register_options(subsystems)
 
     # Make the options values available to all subsystems.
     Subsystem._options = self.options
@@ -163,18 +162,18 @@ class GoalRunner(object):
   def global_options(self):
     return self.options.for_global_scope()
 
-  def register_subsystem_options(self, global_subsystems):
+  def register_options(self, subsystems):
     # Standalone global options.
-    register_global_options(self.options.registration_function_for_global_scope())
+    GlobalOptionsRegistrar.register_options_on_scope(self.options)
 
-    # Options for global-level subsystems.
-    for subsystem_type in global_subsystems:
-      subsystem_type.register_options_on_scope(self.options, Options.GLOBAL_SCOPE)
+    # Options for subsystems.
+    for subsystem in subsystems:
+      subsystem.register_options_on_scope(self.options)
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
     # be a subsystem?
     for goal in Goal.all():
-      # Register task options (including per-task subsystem options).
+      # Register task options.
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):
@@ -197,10 +196,15 @@ class GoalRunner(object):
                                       spec_excludes=self.spec_excludes,
                                       exclude_target_regexps=self.global_options.exclude_target_regexp)
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+        def filter_for_tag(tag):
+          return lambda target: tag in map(str, target.tags)
+        tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
             self.build_graph.inject_address_closure(address)
-            self.targets.append(self.build_graph.get_target(address))
+            tgt = self.build_graph.get_target(address)
+            if tag_filter(tgt):
+              self.targets.append(tgt)
     self.goals = [Goal.by_name(goal) for goal in goals]
 
   def run(self):
@@ -229,7 +233,7 @@ class GoalRunner(object):
         # TODO: This is JVM-specific and really doesn't belong here.
         # TODO: Make this more selective? Only kill nailguns that affect state?
         # E.g., checkstyle may not need to be killed.
-        NailgunTask.killall()
+        NailgunProcessGroup().killall()
     return result
 
   def _do_run(self):
@@ -241,9 +245,14 @@ class GoalRunner(object):
       return False
 
     is_explain = self.global_options.explain
+    if self.reporting.global_instance().get_options().invalidation_report:
+      invalidation_report = InvalidationReport()
+    else:
+      invalidation_report = None
     self.reporting.update_reporting(self.global_options,
                                     is_quiet_task() or is_explain,
-                                    self.run_tracker)
+                                    self.run_tracker,
+                                    invalidation_report=invalidation_report)
 
     context = Context(
       options=self.options,
@@ -253,7 +262,8 @@ class GoalRunner(object):
       build_graph=self.build_graph,
       build_file_parser=self.build_file_parser,
       address_mapper=self.address_mapper,
-      spec_excludes=self.spec_excludes
+      spec_excludes=self.spec_excludes,
+      invalidation_report=invalidation_report
     )
 
     unknown = []
@@ -266,7 +276,10 @@ class GoalRunner(object):
       return 1
 
     engine = RoundEngine()
-    return engine.execute(context, self.goals)
+    result = engine.execute(context, self.goals)
+    if invalidation_report:
+      invalidation_report.report()
+    return result
 
   def _setup_logging(self, global_options):
     # NB: quiet help says 'Squelches all console output apart from errors'.

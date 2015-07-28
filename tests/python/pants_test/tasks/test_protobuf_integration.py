@@ -76,7 +76,6 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
       # TODO(John Sirois): We should not have to pass `--no-colors` since the pants subprocess
       # has no terminal attached - ie: colors should be turned off by default in this case.
       pants_run = self.run_pants(['gen.protoc',
-                                  '--lang=java',
                                   'testprojects/src/java/org/pantsbuild/testproject/proto-ordering',
                                   '--level=debug',
                                   '--no-colors',
@@ -117,7 +116,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                              'Local protoc bases must be ordered before imported bases!')
           continue
         # Check to make sure, eg, testproto4.proto never precedes testproto2.proto.
-        match = re.search(r'(?P<sequence>\d+)\.proto\\?$', line)
+        match = re.search(r'(?P<sequence>\d+)\.proto[\\.]?$', line)
         if match:
           number = int(match.group('sequence'))
           self.assertTrue(number > last_proto, '{proto} succeeded proto #{number}!\n{blocks}'

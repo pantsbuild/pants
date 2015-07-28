@@ -46,10 +46,22 @@ class PayloadField(AbstractClass):
       self._fingerprint_memo = self._compute_fingerprint()
     return self._fingerprint_memo
 
+  def fingerprint_with_context(self, context):
+    if self._fingerprint_memo is None:
+      self._fingerprint_memo = self._compute_fingerprint_with_context(context)
+    return self._fingerprint_memo
+
   @abstractmethod
   def _compute_fingerprint(self):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
     pass
+
+  def _compute_fingerprint_with_context(self, context):
+    """Subclasses can override this method if they required a context when fingerprinting.
+
+    By default, the context is ignored.
+    """
+    return self._compute_fingerprint()
 
   @property
   def value(self):
@@ -93,7 +105,7 @@ class SourcesField(PayloadField):
     :param filespec: glob and exclude data that generated this set of sources
     """
     self._rel_path = sources_rel_path
-    self._source_paths = assert_list(sources)
+    self._source_paths = assert_list(sources, key_arg='sources')
     self._ref_address = ref_address
     self._filespec = filespec
 
@@ -180,7 +192,7 @@ class DeferredSourcesField(SourcesField):
       raise self.AlreadyPopulatedError("Called with rel_path={rel_path} sources={sources}"
       .format(rel_path=rel_path, sources=sources))
     self._rel_path = rel_path
-    self._source_paths = assert_list(sources)
+    self._source_paths = assert_list(sources, key_arg='sources')
     self._populated = True
 
   @property
@@ -280,3 +292,37 @@ class PrimitiveField(PayloadField):
 
   def _compute_fingerprint(self):
     return stable_json_sha1(self._underlying)
+
+
+class FileField(PayloadField):
+  """A field that represents the contents of an individual file."""
+
+  def __init__(self, filepath):
+    self._filepath = filepath
+
+  def _compute_fingerprint(self):
+    hasher = sha1()
+    hasher.update(self._filepath)
+    with open(self._filepath, 'rb') as f:
+      hasher.update(f.read())
+    return hasher.hexdigest()
+
+
+class TargetListField(PayloadField):
+  """A field that represents a list of target specs.
+
+  The fingerprint of a TargetListField is the combined fingerprints of the
+  resolved target specs.
+  """
+  def __init__(self, target_specs):
+    self._target_specs = target_specs
+
+  def _compute_fingerprint(self):
+    raise NotImplementedError
+
+  def _compute_fingerprint_with_context(self, context):
+    hasher = sha1()
+    for spec in sorted(self._target_specs):
+      for target in sorted(context.resolve(spec)):
+        hasher.update(target.compute_invalidation_hash())
+    return hasher.hexdigest()

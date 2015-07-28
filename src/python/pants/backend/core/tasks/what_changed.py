@@ -146,7 +146,7 @@ class ChangedFileTaskMixin(object):
                             spec_excludes=spec_excludes)
 
 
-class WhatChanged(ConsoleTask, ChangedFileTaskMixin):
+class WhatChanged(ChangedFileTaskMixin, ConsoleTask):
   """Emits the targets that have been modified since a given commit."""
   @classmethod
   def register_options(cls, register):

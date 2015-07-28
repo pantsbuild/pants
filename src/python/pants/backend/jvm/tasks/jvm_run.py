@@ -39,6 +39,8 @@ class JvmRun(JvmTask):
     # No explicit --cwd at all (defaults to the value of 'default')
     register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
              help='Set the working directory. If no argument is passed, use the target path.')
+    register('--main', metavar='<main class>',
+             help='Invoke this class (overrides "main"" attribute in jvm_binary targets)')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -94,7 +96,7 @@ class JvmRun(JvmTask):
       self.context.release_lock()
       result = execute_java(
         classpath=(self.classpath([target])),
-        main=binary.main,
+        main=self.get_options().main or binary.main,
         executor=executor,
         jvm_options=self.jvm_options,
         args=self.args,

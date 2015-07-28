@@ -25,6 +25,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
+    'src/python/pants/util:filtering',
   ],
 )
 
@@ -32,18 +33,9 @@ python_library(
 # pip installers, ie: it is why this works to get `pants` on your PATH:
 # $ pip install pantsbuild.pants
 # $ pants
-# NB: The platforms below are _only_ used when building a pex from this target.  They are
-# not used in the sdist generation.
 python_binary(
   name = 'pants',
   entry_point = 'pants.bin.pants_exe:main',
-  # TODO(John Sirois): Nuke this - we don't publish pexes so we need not build cross-platform pexes.
-  platforms=[
-    'current',
-    'linux-x86_64',
-    'macosx-10.4-x86_64',
-  ],
-  compatibility='CPython>=2.7,<3',
   dependencies = [
     ':bin',
   ],

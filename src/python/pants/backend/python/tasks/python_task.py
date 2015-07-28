@@ -5,23 +5,37 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import shutil
 import tempfile
 from contextlib import contextmanager
 
 from pex.pex_builder import PEXBuilder
+from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.base import hash_utils
 from pants.base.exceptions import TaskError
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.thrift_util import ThriftBinary
 
 
 class PythonTask(Task):
+  # If needed, we set this as the executable entry point of any chroots we create.
+  CHROOT_EXECUTABLE_NAME = '__pants_executable__'
+
   @classmethod
   def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + (PythonSetup, PythonRepos)
+    return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
+
+  @classmethod
+  def task_subsystems(cls):
+    return super(PythonTask, cls).task_subsystems() + (ThriftBinary.Factory,)
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
@@ -87,29 +101,119 @@ class PythonTask(Task):
     self.context.log.debug('Selected {}'.format(interpreter))
     return interpreter
 
+  @property
+  def chroot_cache_dir(self):
+    return PythonSetup.global_instance().chroot_cache_dir
+
+  @property
+  def ivy_bootstrapper(self):
+    return Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
+
+  @property
+  def thrift_binary_factory(self):
+    return ThriftBinary.Factory.scoped_instance(self).create
+
+  def create_chroot(self, interpreter, builder, targets, platforms, extra_requirements):
+    return PythonChroot(python_setup=PythonSetup.global_instance(),
+                        python_repos=PythonRepos.global_instance(),
+                        ivy_bootstrapper=self.ivy_bootstrapper,
+                        thrift_binary_factory=self.thrift_binary_factory,
+                        interpreter=interpreter,
+                        builder=builder,
+                        targets=targets,
+                        platforms=platforms,
+                        extra_requirements=extra_requirements)
+
+  @contextmanager
+  def cached_chroot(self, interpreter, pex_info, targets, platforms,
+                    extra_requirements=None, executable_file_content=None):
+    """Returns a cached PythonChroot created with the specified args.
+
+    The returned chroot will be cached for future use.
+
+    TODO: Garbage-collect old chroots, so they don't pile up?
+    TODO: Ideally chroots would just be products produced by some other task. But that's
+          a bit too complicated to implement right now, as we'd need a way to request
+          chroots for a variety of sets of targets.
+    """
+    # This PexInfo contains any customizations specified by the caller.
+    # The process of building a pex modifies it further.
+    pex_info = pex_info or PexInfo.default()
+
+    path = self._chroot_path(PythonSetup.global_instance(), interpreter, pex_info, targets,
+                             platforms, extra_requirements, executable_file_content)
+    if not os.path.exists(path):
+      path_tmp = path + '.tmp'
+      self._build_chroot(path_tmp, interpreter, pex_info, targets, platforms,
+                         extra_requirements, executable_file_content)
+      shutil.move(path_tmp, path)
+
+    # We must read the PexInfo that was frozen into the pex, so we get the modifications
+    # created when that pex was built.
+    pex_info = PexInfo.from_pex(path)
+    # Now create a PythonChroot wrapper without dumping it.
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
+    chroot = self.create_chroot(
+      interpreter=interpreter,
+      builder=builder,
+      targets=targets,
+      platforms=platforms,
+      extra_requirements=extra_requirements)
+    # TODO: Doesn't really need to be a contextmanager, but it's convenient to make it so
+    # while transitioning calls to temporary_chroot to calls to cached_chroot.
+    # We can revisit after that transition is complete.
+    yield chroot
+
   @contextmanager
   def temporary_chroot(self, interpreter, pex_info, targets, platforms,
-                       extra_requirements=None, pre_freeze=None):
-    """Yields a temporary PythonChroot created with the specified args.
+                       extra_requirements=None, executable_file_content=None):
+    path = tempfile.mkdtemp()  # Not a contextmanager: chroot.delete() will clean this up anyway.
+    pex_info = pex_info or PexInfo.default()
+    chroot = self._build_chroot(path, interpreter, pex_info, targets, platforms,
+                                extra_requirements, executable_file_content)
+    yield chroot
+    chroot.delete()
 
-    pre_freeze is an optional function run on the chroot just before freezing its builder,
-    to allow for any extra modification.
-    """
-    path = tempfile.mkdtemp()
+  def _build_chroot(self, path, interpreter, pex_info, targets, platforms,
+                     extra_requirements=None, executable_file_content=None):
+    """Create a PythonChroot with the specified args."""
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
     with self.context.new_workunit('chroot'):
-      chroot = PythonChroot(
-        context=self.context,
-        python_setup=PythonSetup.global_instance(),
-        python_repos=PythonRepos.global_instance(),
+      chroot = self.create_chroot(
         interpreter=interpreter,
         builder=builder,
         targets=targets,
         platforms=platforms,
         extra_requirements=extra_requirements)
       chroot.dump()
-      if pre_freeze:
-        pre_freeze(chroot)
+      if executable_file_content is not None:
+        with open(os.path.join(path, '{}.py'.format(self.CHROOT_EXECUTABLE_NAME)), 'w') as outfile:
+          outfile.write(executable_file_content)
+        # Override any user-specified entry point, under the assumption that the
+        # executable_file_content does what the user intends (including, probably, calling that
+        # underlying entry point).
+        pex_info.entry_point = self.CHROOT_EXECUTABLE_NAME
       builder.freeze()
-    yield chroot
-    chroot.delete()
+    return chroot
+
+  def _chroot_path(self, python_setup, interpreter, pex_info, targets, platforms,
+                   extra_requirements, executable_file_content):
+    """Pick a unique, well-known directory name for the chroot with the specified parameters.
+
+    TODO: How many of these do we expect to have? Currently they are all under a single
+    directory, and some filesystems (E.g., HFS+) don't handle directories with thousands of
+    entries well. GC'ing old chroots may be enough of a solution, assuming this is even a problem.
+    """
+    fingerprint_components = [str(interpreter.identity)]
+    if pex_info:
+      fingerprint_components.append(pex_info.dump())
+    fingerprint_components.extend(filter(None, [t.payload.fingerprint() for t in targets]))
+    if platforms:
+      fingerprint_components.extend(platforms)
+    if extra_requirements:
+      fingerprint_components.extend([r.cache_key() for r in extra_requirements])
+    if executable_file_content is not None:
+      fingerprint_components.append(executable_file_content)
+
+    fingerprint = hash_utils.hash_all(fingerprint_components)
+    return os.path.join(self.chroot_cache_dir, fingerprint)

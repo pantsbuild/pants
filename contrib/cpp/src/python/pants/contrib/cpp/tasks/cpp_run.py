@@ -34,10 +34,11 @@ class CppRun(CppTask):
     round_manager.require_data('exe')
 
   def execute(self):
-    binary = self.require_single_root_target()
-    if isinstance(binary, CppBinary):
+    binary_target = self.require_single_root_target()
+    if isinstance(binary_target, CppBinary):
       with self.context.new_workunit(name='cpp-run', labels=[WorkUnit.RUN]) as workunit:
-        cmd = [os.path.join(binary.workdir, binary.id, binary.name)]
+        cmd = [self.context.products.get_only('exe', binary_target)]
+
         args = self.get_options().args + self.get_passthru_args()
         if args != None:
           cmd.extend(args)

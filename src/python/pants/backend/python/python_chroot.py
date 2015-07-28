@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import os
 import shutil
@@ -30,7 +31,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -56,19 +57,20 @@ class PythonChroot(object):
   def get_platforms(platform_list):
     return tuple({Platform.current() if p == 'current' else p for p in platform_list})
 
-  # TODO: A little extra push and we can get rid of the 'context' argument.
   def __init__(self,
-               context,
                python_setup,
                python_repos,
+               ivy_bootstrapper,
+               thrift_binary_factory,
                interpreter,
                builder,
                targets,
                platforms,
                extra_requirements=None):
-    self.context = context
     self._python_setup = python_setup
     self._python_repos = python_repos
+    self._ivy_bootstrapper = ivy_bootstrapper
+    self._thrift_binary_factory = thrift_binary_factory
 
     self._interpreter = interpreter
     self._builder = builder
@@ -86,12 +88,6 @@ class PythonChroot(object):
     """Deletes this chroot from disk if it has been dumped."""
     safe_rmtree(self.path())
 
-  def __del__(self):
-    if os.getenv('PANTS_LEAVE_CHROOT') is None:
-      self.delete()
-    else:
-      self.debug('Left chroot at {}'.format(self.path()))
-
   def debug(self, msg, indent=0):
     if os.getenv('PANTS_VERBOSE') is not None:
       print('{}{}'.format(' ' * indent, msg))
@@ -99,11 +95,8 @@ class PythonChroot(object):
   def path(self):
     return os.path.realpath(self._builder.path())
 
-  def set_executable(self, filename, env_filename=None):
-    self._builder.set_executable(filename, env_filename)
-
   def pex(self):
-    return PEX(os.path.realpath(self._builder.path()), interpreter=self._interpreter)
+    return PEX(self.path(), interpreter=self._interpreter)
 
   def package_pex(self, filename):
     """Package into a PEX zipfile.
@@ -121,7 +114,7 @@ class PythonChroot(object):
     for relpath in library.sources_relative_to_source_root():
       try:
         copy_to_chroot(library.target_base, relpath, self._builder.add_source)
-      except OSError as e:
+      except OSError:
         logger.error("Failed to copy {path} for library {library}"
                      .format(path=os.path.join(library.target_base, relpath),
                              library=library))
@@ -149,8 +142,9 @@ class PythonChroot(object):
 
   def _generate_requirement(self, library, builder_cls):
     library_key = self._key_generator.key_for_target(library)
-    builder = builder_cls(library, get_buildroot(),
-                          self.context.options, '-' + library_key.hash[:8])
+    builder = builder_cls(target=library,
+                          root_dir=get_buildroot(),
+                          target_suffix='-' + library_key.hash[:8])
 
     cache_dir = os.path.join(self._artifact_cache_root, library_key.id)
     if self._build_invalidator.needs_update(library_key):
@@ -162,14 +156,27 @@ class PythonChroot(object):
     return PythonRequirement(builder.requirement_string(), repository=cache_dir, use_2to3=True)
 
   def _generate_thrift_requirement(self, library):
-    return self._generate_requirement(library, PythonThriftBuilder)
+    thrift_builder = functools.partial(PythonThriftBuilder,
+                                       thrift_binary_factory=self._thrift_binary_factory,
+                                       workdir=safe_mkdtemp(dir=self.path(), prefix='thrift.'))
+    return self._generate_requirement(library, thrift_builder)
 
   def _generate_antlr_requirement(self, library):
-    return self._generate_requirement(library, PythonAntlrBuilder)
+    antlr_builder = functools.partial(PythonAntlrBuilder,
+                                      ivy_bootstrapper=self._ivy_bootstrapper,
+                                      workdir=safe_mkdtemp(dir=self.path(), prefix='antlr.'))
+    return self._generate_requirement(library, antlr_builder)
 
   def resolve(self, targets):
     children = defaultdict(OrderedSet)
+
     def add_dep(trg):
+      # Currently we handle all of our code generation, so we don't want to operate over any
+      # synthetic targets injected upstream.
+      # TODO(John Sirois): Revisit this when building a proper python product pipeline.
+      if trg.is_synthetic:
+        return
+
       for target_type, target_key in self._VALID_DEPENDENCIES.items():
         if isinstance(trg, target_type):
           children[target_key].add(trg)
@@ -206,7 +213,7 @@ class PythonChroot(object):
         reqs_from_libraries.add(req)
 
     reqs_to_build = OrderedSet()
-    find_links = []
+    find_links = OrderedSet()
 
     for req in reqs_from_libraries | generated_reqs | self._extra_requirements:
       if not req.should_build(self._interpreter.python, Platform.current()):
@@ -215,7 +222,7 @@ class PythonChroot(object):
       reqs_to_build.add(req)
       self._dump_requirement(req.requirement)
       if req.repository:
-        find_links.append(req.repository)
+        find_links.add(req.repository)
 
     distributions = self._resolve_multi(reqs_to_build, find_links)
 
@@ -249,7 +256,7 @@ class PythonChroot(object):
 
     for platform in platforms:
       distributions[platform] = resolve(
-        requirements=requirements,
+        requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
         fetchers=fetchers,
         platform=platform,

@@ -14,9 +14,13 @@ See [[How To Ask|pants('src/python/pants/docs:howto_ask')]]
 Join the Conversation
 ---------------------
 
-Join the [pants-devel Google
-Group](https://groups.google.com/forum/#!forum/pants-devel) to keep in
-touch with other pants developers.
+Join the [pants-devel Google Group][pants-devel] to keep in touch with other
+pants developers.
+
+Join the [pantsbuild Slack team](https://pantsbuild.slack.com) and hop on the
+`#general` channel for higher bandwidth questions and answers about hacking on
+or using pants. You can [send yourself an invite](https://pantsslack.herokuapp.com/) or ask for one on the
+[pants-devel Google group][pants-devel].
 
 Join the [pants-reviews Google
 Group](https://groups.google.com/forum/#!forum/pants-reviews) to see
@@ -31,6 +35,8 @@ occasional announcements.
 
 Find out when the CI tests go red/green by adding your email address to
 [.travis.yml](https://github.com/pantsbuild/pants/blob/master/.travis.yml).
+
+[pants-devel]: https://groups.google.com/forum/#!forum/pants-devel "pants-devel Google Group"
 
 Life of a Change
 ----------------
