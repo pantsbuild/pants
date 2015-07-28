@@ -200,6 +200,15 @@ class TaskBase(Optionable, AbstractClass):
     """
     return self._workdir
 
+  def _options_fingerprint(self, scope):
+    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+    hasher = sha1()
+    for (option_type, option_val) in pairs:
+      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
+      if fp is not None:
+        hasher.update(fp)
+    return hasher.hexdigest()
+
   @property
   def fingerprint(self):
     """Returns a fingerprint for the identity of the task.
@@ -211,13 +220,12 @@ class TaskBase(Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     if not self._fingerprint:
-      pairs = self.context.options.get_fingerprintable_for_scope(self.options_scope)
       hasher = sha1()
-      for (option_type, option_val) in pairs:
-        fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-        if fp is not None:
-          hasher.update(fp)
-      self._fingerprint = hasher.hexdigest()
+      hasher.update(self._options_fingerprint(self.options_scope))
+      for subsystem in self.task_subsystems():
+        hasher.update(self._options_fingerprint(subsystem.subscope(self.options_scope)))
+        hasher.update(self._options_fingerprint(subsystem.options_scope))
+      self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 
   def artifact_cache_reads_enabled(self):

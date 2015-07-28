@@ -272,9 +272,14 @@ notes = {
                          'move to a subsystem, which will fix this requirement.',
   ('jvm', 'debug_args'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
                          'move to a subsystem, which will fix this requirement.',
-  ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
-                                  'target: options. Other args should be placed in args: and '
-                                  'prefixed with -C.',
+  ('java-compile', 'javac_args'): 'Source, target, and bootclasspath args should be specified in '
+                                  'the jvm-platform subsystem. Other args can be placed in args: '
+                                  'and prefixed with -C, or also be included in the jvm-platform '
+                                  'args.',
+  ('java-compile', 'source'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
+  ('java-compile', 'target'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
   ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '

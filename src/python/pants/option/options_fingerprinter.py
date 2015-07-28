@@ -5,10 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 from hashlib import sha1
 
 from pants.option.options import Options
+
+
+def stable_json_dumps(obj):
+  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
+
+
+def stable_json_sha1(obj):
+  return sha1(stable_json_dumps(obj)).hexdigest()
 
 
 class OptionsFingerprinter(object):
@@ -25,22 +34,12 @@ class OptionsFingerprinter(object):
     if option_val is None:
       return None
 
-    if option_type == Options.dict:
-      return self._fingerprint_dict(option_val)
-    elif option_type == Options.list:
-      return self._fingerprint_list(option_val)
-    elif option_type == Options.target_list:
+    if option_type == Options.target_list:
       return self._fingerprint_target_specs(option_val)
     elif option_type == Options.file:
       return self._fingerprint_file(option_val)
     else:
       return self._fingerprint_primitive(option_val)
-
-  def _fingerprint_dict(self, d):
-    return self._hash(frozenset(d.items()))
-
-  def _fingerprint_list(self, l):
-    return self._hash(frozenset(l))
 
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
@@ -59,7 +58,4 @@ class OptionsFingerprinter(object):
     return hasher.hexdigest()
 
   def _fingerprint_primitive(self, val):
-    return self._hash(val)
-
-  def _hash(self, val):
-    return sha1(str(hash(val))).hexdigest()
+    return stable_json_sha1(val)

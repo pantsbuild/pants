@@ -31,12 +31,10 @@ class OptionsFingerprinterTest(BaseTest):
 
   def test_fingerprint_list(self):
     l1 = [1, 2, 3]
-    l2 = [2, 3, 1]
-    l3 = [1, 2, 3, 4]
-    fp1, fp2, fp3 = (self.options_fingerprinter.fingerprint(Options.list, l)
-                     for l in (l1, l2, l3))
-    self.assertEquals(fp1, fp2)
-    self.assertNotEquals(fp1, fp3)
+    l2 = [1, 3, 2]
+    fp1, fp2 = (self.options_fingerprinter.fingerprint(Options.list, l)
+                     for l in (l1, l2))
+    self.assertNotEquals(fp1, fp2)
 
   def test_fingerprint_target_specs(self):
     specs = [':t1', ':t2', ':t3']

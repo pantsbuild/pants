@@ -224,13 +224,11 @@ class Options(object):
     """
     pairs = []
     # This iterator will have already sorted the options, so their order is deterministic.
-    print('===')
     for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
       if kwargs.get('fingerprint') is not True:
         continue
       val = self.for_scope(scope)[name]
       val_type = kwargs.get('type', '')
-      print(name, val, val_type)
       pairs.append((val_type, val))
     return pairs
 

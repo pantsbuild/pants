@@ -50,6 +50,7 @@ page(
     ':first_tutorial',
     ':install',
     ':invoking',
+    ':powered_by',
     ':publish',
     ':setup_repo',
     ':target_addresses',
@@ -78,6 +79,11 @@ page(
   links=[
     ':setup_repo',
   ]
+)
+
+page(
+  name='powered_by',
+  source='powered_by.md',
 )
 
 page(

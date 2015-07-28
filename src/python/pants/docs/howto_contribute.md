@@ -19,7 +19,7 @@ pants developers.
 
 Join the [pantsbuild Slack team](https://pantsbuild.slack.com) and hop on the
 `#general` channel for higher bandwidth questions and answers about hacking on
-or using pants.  If you need an invite, ask for one on the
+or using pants. You can [send yourself an invite](https://pantsslack.herokuapp.com/) or ask for one on the
 [pants-devel Google group][pants-devel].
 
 Join the [pants-reviews Google
