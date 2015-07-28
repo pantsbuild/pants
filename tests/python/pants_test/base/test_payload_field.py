@@ -12,7 +12,8 @@ from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      JarsField, PrimitiveField, PythonRequirementsField)
+                                      JarsField, PrimitiveField, PythonRequirementsField,
+                                      SourcesField)
 from pants_test.base_test import BaseTest
 
 
