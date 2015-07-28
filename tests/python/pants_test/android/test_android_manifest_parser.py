@@ -32,7 +32,7 @@ class TestAndroidManifestParser(TestXmlBase):
   def test_missing_manifest_element(self):
     with self.xml_file(manifest_element='some_other_element') as xml:
       manifest = AndroidManifestParser.parse_manifest(xml)
-      
+
       with self.assertRaises(AndroidManifestParser.BadManifestError):
         self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 

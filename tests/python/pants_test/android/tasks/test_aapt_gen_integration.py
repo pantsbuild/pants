@@ -7,8 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-
-import pytest
+import unittest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.android.android_integration_test import AndroidIntegrationTest
@@ -34,15 +33,15 @@ class AaptGenIntegrationTest(AndroidIntegrationTest):
     pants_run = self.run_pants(['gen', target])
     self.assert_success(pants_run)
 
-  @pytest.mark.skipif('not AaptGenIntegrationTest.tools',
-                      reason='Android integration test requires tools {0!r} '
-                             'and ANDROID_HOME set in path.'.format(TOOLS))
+  @unittest.skipIf('not AaptGenIntegrationTest.tools',
+                   reason='Android integration test requires tools {0!r} '
+                          'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_aapt_gen(self):
     self.aapt_gen_test(AndroidIntegrationTest.TEST_TARGET)
 
-  @pytest.mark.skipif('not AaptGenIntegrationTest.tools',
-                     reason='Android integration test requires tools {0!r} '
-                            'and ANDROID_HOME set in path.'.format(TOOLS))
+  @unittest.skipIf('not AaptGenIntegrationTest.tools',
+                   reason='Android integration test requires tools {0!r} '
+                          'and ANDROID_HOME set in path.'.format(TOOLS))
 
   # TODO(mateor) Write a testproject instead of using hello_with_library which may change.
   def test_android_library_dep(self):
