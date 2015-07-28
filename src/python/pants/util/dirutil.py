@@ -225,3 +225,7 @@ def touch(path, times=None):
 
   with safe_open(path, 'a'):
     os.utime(path, times)
+
+
+def get_basedir(path):
+  return path[:path.index(os.sep)] if os.sep in path else path
