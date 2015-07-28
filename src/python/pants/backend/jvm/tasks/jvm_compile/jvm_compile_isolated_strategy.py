@@ -185,6 +185,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
             tmpdir, compile_context.target)
         if os.path.exists(compile_context.analysis_file):
            shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+        target, = vts.targets
         compile_vts(vts,
                     compile_context.sources,
                     tmp_analysis_file,
@@ -192,7 +193,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                     cp_entries,
                     compile_context.classes_dir,
                     log_file,
-                    progress_message)
+                    progress_message,
+                    target.platform)
         atomic_copy(tmp_analysis_file, compile_context.analysis_file)
 
         # Update the products with the latest classes.
