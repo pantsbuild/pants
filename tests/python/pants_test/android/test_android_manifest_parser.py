@@ -31,17 +31,13 @@ class TestAndroidManifestParser(TestXmlBase):
 
   def test_missing_manifest_element(self):
     with self.xml_file(manifest_element='some_other_element') as xml:
-      manifest = AndroidManifestParser.parse_manifest(xml)
-
       with self.assertRaises(AndroidManifestParser.BadManifestError):
-        self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
+        AndroidManifestParser.parse_manifest(xml)
 
   def test_missing_package_attribute(self):
     with self.xml_file(package_attribute='bad_value') as xml:
-      manifest = AndroidManifestParser.parse_manifest(xml)
-
       with self.assertRaises(AndroidManifestParser.BadManifestError):
-        self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
+        AndroidManifestParser.parse_manifest(xml)
 
   def test_weird_package_name(self):
     # Should accept unexpected package names, the info gets verified in classes that consume it.

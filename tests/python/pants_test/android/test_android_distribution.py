@@ -59,10 +59,8 @@ class TestAndroidDistribution(BaseTest):
   def test_locate_no_sdk_on_path(self):
     with distribution() as sdk:
       with self.env(ANDROooooD_HOME=sdk):
-        dist = AndroidDistribution.locate_sdk_path()
-
         with self.assertRaises(AndroidDistribution.DistributionError):
-          self.assertEquals(dist._sdk_path, None)
+          AndroidDistribution.locate_sdk_path()
 
   def test_locate_sdk_path(self):
     with distribution() as sdk:
@@ -164,10 +162,8 @@ class TestAndroidDistribution(BaseTest):
       with temporary_dir() as workdir:
         android_sdk = AndroidDistribution.cached(sdk)
         android_jar = os.path.join('platforms', 'android-19', 'no.jar')
-        android_sdk.register_android_tool(android_jar, workdir=workdir)
         with self.assertRaises(AndroidDistribution.DistributionError):
-          self.assertEquals(android_sdk._validated_tools[android_jar],
-                            os.path.join(workdir, 'android.jar'))
+          android_sdk.register_android_tool(android_jar, workdir=workdir)
 
   def test_register_copy_file_exists(self):
     with distribution() as sdk:
@@ -200,6 +196,5 @@ class TestAndroidDistribution(BaseTest):
     with distribution() as sdk:
       android_sdk = AndroidDistribution.cached(sdk)
       android_jar = os.path.join('platforms', 'android-19', 'no.jar')
-      tool_path = android_sdk._get_tool_path(android_jar)
       with self.assertRaises(AndroidDistribution.DistributionError):
-        self.assertEquals(tool_path, os.path.join(sdk, android_jar))
+        android_sdk._get_tool_path(android_jar)

@@ -30,7 +30,7 @@ class ZipalignIntegrationTest(AndroidIntegrationTest):
 
   requirements = AndroidIntegrationTest.requirements(TOOLS)
 
-  @pytest.mark.skipif('not ZipalignIntegrationTest.requirements',
+  @pytest.mark.skipif(not requirements,
                       reason='Zipalign integration test requires the JDK, Android tools {0!r} '
                              'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_zipalign(self):
