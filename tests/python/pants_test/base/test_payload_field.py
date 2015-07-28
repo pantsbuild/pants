@@ -13,7 +13,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload
 from pants.base.payload_field import (ExcludesField, FileField, FingerprintedField,
                                       FingerprintedMixin, JarsField, PrimitiveField,
-                                      PythonRequirementsField, SourcesField, TargetListField)
+                                      PythonRequirementsField)
 from pants_test.base_test import BaseTest
 
 
@@ -290,36 +290,3 @@ class PayloadTest(BaseTest):
 
     with self.assertRaises(NotImplementedError):
       FingerprintedField(TestUnimplementedValue()).fingerprint()
-
-  def test_file_field(self):
-    fp1 = FileField(self.create_file('foo/bar.config', contents='blah blah blah')).fingerprint()
-    fp2 = FileField(self.create_file('foo/bar.config', contents='meow meow meow')).fingerprint()
-    fp3 = FileField(self.create_file('spam/egg.config', contents='blah blah blah')).fingerprint()
-
-    self.assertNotEquals(fp1, fp2)
-    self.assertNotEquals(fp1, fp3)
-    self.assertNotEquals(fp2, fp3)
-
-  def test_target_list_field(self):
-    specs = [':t1', ':t2', ':t3']
-    payloads = [Payload() for i in range(3)]
-    for i, (s, p) in enumerate(zip(specs, payloads)):
-      p.add_field('foo', PrimitiveField(i))
-      self.make_target(s, payload=p)
-
-    s1, s2, s3 = specs
-
-    context = self.context()
-
-    def resolve(specs):
-      targets = []
-      for spec in specs:
-        targets.extend(context.resolve(spec))
-      return targets
-
-    fp1 = TargetListField(resolve([s1, s2])).fingerprint()
-    fp2 = TargetListField(resolve([s2, s1])).fingerprint()
-    fp3 = TargetListField(resolve([s1, s3])).fingerprint()
-
-    self.assertEquals(fp1, fp2)
-    self.assertNotEquals(fp1, fp3)

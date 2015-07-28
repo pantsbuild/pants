@@ -280,33 +280,3 @@ class PrimitiveField(PayloadField):
 
   def _compute_fingerprint(self):
     return stable_json_sha1(self._underlying)
-
-
-class FileField(PayloadField):
-  """A field that represents the contents of an individual file."""
-
-  def __init__(self, filepath):
-    self._filepath = filepath
-
-  def _compute_fingerprint(self):
-    hasher = sha1()
-    hasher.update(self._filepath)
-    with open(self._filepath, 'rb') as f:
-      hasher.update(f.read())
-    return hasher.hexdigest()
-
-
-class TargetListField(PayloadField):
-  """A field that represents a list of targets.
-
-  The fingerprint of a TargetListField is the combined fingerprints of the
-  targets.
-  """
-  def __init__(self, targets):
-    self._targets = targets
-
-  def _compute_fingerprint(self):
-    hasher = sha1()
-    for target in sorted(self._targets):
-      hasher.update(target.compute_invalidation_hash())
-    return hasher.hexdigest()

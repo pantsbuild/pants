@@ -68,7 +68,7 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', action='append', fingerprint=True,
+    register('--plugins', action='append', type=Options.list, fingerprint=True,
              help='Use these scalac plugins.')
     register('--plugin-args', advanced=True, type=Options.dict, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')

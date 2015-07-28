@@ -9,8 +9,6 @@ import copy
 import sys
 
 from pants.base.build_environment import pants_release, pants_version
-from pants.base.payload import Payload
-from pants.base.payload_field import FileField, PrimitiveField, TargetListField
 from pants.goal.goal import Goal
 from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -219,26 +217,22 @@ class Options(object):
     """
     return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
 
-  def payload_for_scope(self, scope, context):
-    """Returns a payload representing the options for the given scope and context."""
-    payload = Payload()
+  def get_fingerprintable_for_scope(self, scope):
+    """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
+
+    Fingerprintable options are options registered via a "fingerprint=True" kwarg.
+    """
+    pairs = []
+    # This iterator will have already sorted the options, so their order is deterministic.
+    print('===')
     for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
-      if kwargs.get('fingerprint', None) is not True:
+      if kwargs.get('fingerprint') is not True:
         continue
       val = self.for_scope(scope)[name]
       val_type = kwargs.get('type', '')
-      if val_type == Options.file:
-        field = FileField(val)
-      elif val_type == Options.target_list:
-        targets = []
-        for spec in val:
-          targets.extend(context.resolve(spec))
-        field = TargetListField(targets)
-      else:
-        field = PrimitiveField(val)
-      payload.add_field(name, field)
-    payload.freeze()
-    return payload
+      print(name, val, val_type)
+      pairs.append((val_type, val))
+    return pairs
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
