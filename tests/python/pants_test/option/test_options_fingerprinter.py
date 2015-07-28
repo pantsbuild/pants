@@ -18,7 +18,7 @@ class OptionsFingerprinterTest(BaseTest):
 
   def setUp(self):
     super(OptionsFingerprinterTest, self).setUp()
-    self.options_fingerprinter = OptionsFingerprinter(self.context())
+    self.options_fingerprinter = OptionsFingerprinter(self.context().build_graph)
 
   def test_fingerprint_dict(self):
     d1 = {'b': 1, 'a': 2}

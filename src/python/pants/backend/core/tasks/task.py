@@ -178,7 +178,7 @@ class TaskBase(Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
-    self._options_fingerprinter = OptionsFingerprinter(self.context)
+    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
     self._fingerprint = None
 
   def get_options(self):
