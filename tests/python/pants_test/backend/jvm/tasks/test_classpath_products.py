@@ -59,7 +59,7 @@ class ClasspathProductsTest(BaseTest):
 
     self.assertEqual([], classpath)
 
-  def test_transitive_dependencys_excluded_classpath_element_something(self):
+  def test_parent_exclude_excludes_dependency_jar(self):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, dependencies=[b], excludes=[Exclude('com.example', 'lib')])
 
@@ -71,7 +71,6 @@ class ClasspathProductsTest(BaseTest):
     classpath = classpath_product.get_for_target(a)
 
     self.assertEqual([], classpath)
-
 
   def test_exclude_leaves_other_jars_unaffected(self):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
