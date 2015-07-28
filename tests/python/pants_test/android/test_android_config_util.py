@@ -45,7 +45,7 @@ class TestAndroidConfigUtil(unittest.TestCase):
       self.assertEquals(config.read(), self.contents())
 
   def test_no_permission_keystore_config(self):
-    with self.assertRaises(AndroidConfigUtil.AndroidConfigError):
-      with temporary_file() as temp:
-        os.chmod(temp.name, 0o400)
+    with temporary_file() as temp:
+      os.chmod(temp.name, 0o400)
+      with self.assertRaises(AndroidConfigUtil.AndroidConfigError):
         AndroidConfigUtil.setup_keystore_config(temp.name)

@@ -19,8 +19,8 @@ class TestAndroidManifestParser(TestXmlBase):
       self.assertEqual(manifest.path, xml)
 
   def test_bad_parse_manifest(self):
+    xml = '/no/file/here'
     with self.assertRaises(AndroidManifestParser.BadManifestError):
-      xml = '/no/file/here'
       AndroidManifestParser.parse_manifest(xml)
 
   # Test AndroidManifest.package_name.
@@ -30,15 +30,17 @@ class TestAndroidManifestParser(TestXmlBase):
       self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 
   def test_missing_manifest_element(self):
-    with self.assertRaises(AndroidManifestParser.BadManifestError):
-      with self.xml_file(manifest_element='some_other_element') as xml:
-        manifest = AndroidManifestParser.parse_manifest(xml)
+    with self.xml_file(manifest_element='some_other_element') as xml:
+      manifest = AndroidManifestParser.parse_manifest(xml)
+      
+      with self.assertRaises(AndroidManifestParser.BadManifestError):
         self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 
   def test_missing_package_attribute(self):
-    with self.assertRaises(AndroidManifestParser.BadManifestError):
-      with self.xml_file(package_attribute='bad_value') as xml:
-        manifest = AndroidManifestParser.parse_manifest(xml)
+    with self.xml_file(package_attribute='bad_value') as xml:
+      manifest = AndroidManifestParser.parse_manifest(xml)
+
+      with self.assertRaises(AndroidManifestParser.BadManifestError):
         self.assertEqual(manifest.package_name, 'org.pantsbuild.example.hello')
 
   def test_weird_package_name(self):

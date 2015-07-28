@@ -12,7 +12,6 @@ from pants_test.android.test_android_base import TestAndroidBase
 
 
 class TestAaptTask(TestAndroidBase):
-  """Test the AaptTask base class."""
 
   @classmethod
   def task_type(cls):

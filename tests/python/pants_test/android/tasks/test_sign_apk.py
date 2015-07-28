@@ -47,8 +47,8 @@ class SignApkTest(TestAndroidBase):
     task.execute()
 
   def test_no_location_defined(self):
+    task = self.create_task(self._get_context(location=''))
     with self.assertRaises(TaskError):
-      task = self.create_task(self._get_context(location=''))
       task.config_file
 
   def test_setting_location(self):
@@ -70,9 +70,9 @@ class SignApkTest(TestAndroidBase):
       self.assertTrue(os.path.isfile(default_config))
 
   def test_setup_default_config_no_permission(self):
-    with self.assertRaises(TaskError):
-      with temporary_file() as temp:
-        os.chmod(temp.name, 0o400)
+    with temporary_file() as temp:
+      os.chmod(temp.name, 0o400)
+      with self.assertRaises(TaskError):
         SignApkTask.setup_default_config(temp.name)
 
   def test_render_args(self):

@@ -11,13 +11,11 @@ from collections import defaultdict
 from pants.backend.android.tasks.dx_compile import DxCompile
 from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
-from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree, touch
 from pants_test.android.test_android_base import TestAndroidBase, distribution
 
 
 class DxCompileTest(TestAndroidBase):
-  """Test dex creation methods of pants.backend.android.tasks.DxCompile."""
 
   JAVA_CLASSES_LOC = os.path.join(get_buildroot(), '.pants.d/compile/java/classes')
   UNPACKED_LIBS_LOC = os.path.join(get_buildroot(),'.pants.d/unpack-jars/unpack-libs/explode-jars')
@@ -44,8 +42,7 @@ class DxCompileTest(TestAndroidBase):
   @staticmethod
   def base_class_files(package, app):
     javac_classes = []
-    class_files = ['Foo.class', 'Bar.class', 'Baz.class']
-    for filename in class_files:
+    for filename in ['Foo.class', 'Bar.class', 'Baz.class']:
       javac_classes.append('{}/{}/a/b/c/{}'.format(package, app, filename))
     return javac_classes
 
@@ -195,15 +192,15 @@ class DxCompileTest(TestAndroidBase):
           self.assertNotIn(excluded_file, gathered_classes)
 
   def test_no_matching_classes(self):
-    with self.assertRaises(DxCompile.EmptyDexError):
-      # No classes_by_target and no classes that pass the file filter.
-      with self.android_library(include_patterns=['**/a/**/*.NONE']) as android_library:
-        with self.android_binary(dependencies=[android_library]) as binary:
-          context = self.context(target_roots=binary)
-          classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-          task_context = self._mock_unpacked_libraries(context, android_library, classes)
-          dx_task = self.create_task(task_context)
+    # No classes_by_target and no classes that pass the file filter.
+    with self.android_library(include_patterns=['**/a/**/*.NONE']) as android_library:
+      with self.android_binary(dependencies=[android_library]) as binary:
+        context = self.context(target_roots=binary)
+        classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
+        task_context = self._mock_unpacked_libraries(context, android_library, classes)
+        dx_task = self.create_task(task_context)
 
+        with self.assertRaises(DxCompile.EmptyDexError):
           dx_task.execute()
 
   # Test deduping and version conflicts within android_dependencies. The Dx tool returns failure if
@@ -240,17 +237,17 @@ class DxCompileTest(TestAndroidBase):
         self.assertEqual(len(gathered_classes), 3)
 
   def test_dependency_version_conflict(self):
-    with self.assertRaises(DxCompile.DuplicateClassFileException):
-      with self.android_library() as android_library:
-        with self.android_binary(dependencies=[android_library]) as binary:
-          context = self.context(target_roots=binary)
-          first_unpacked = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-          conflicting = self.base_unpacked_files('org.pantsbuild.android', 'example', '2.0')
-          task_context = self._mock_unpacked_libraries(context, android_library, first_unpacked)
-          both_context = self._mock_unpacked_libraries(task_context, android_library, conflicting)
-          dx_task = self.create_task(both_context)
+    with self.android_library() as android_library:
+      with self.android_binary(dependencies=[android_library]) as binary:
+        context = self.context(target_roots=binary)
+        first_unpacked = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
+        conflicting = self.base_unpacked_files('org.pantsbuild.android', 'example', '2.0')
+        task_context = self._mock_unpacked_libraries(context, android_library, first_unpacked)
+        both_context = self._mock_unpacked_libraries(task_context, android_library, conflicting)
+        dx_task = self.create_task(both_context)
 
-          # Raises an exception when gathering classes with conflicting version numbers.
+        # Raises an exception when gathering classes with conflicting version numbers.
+        with self.assertRaises(DxCompile.DuplicateClassFileException):
           dx_task._gather_classes(binary)
 
   # Test misc. methods
