@@ -45,23 +45,22 @@ class AaptTask(AndroidTask):
     self.ignored_assets = self.get_options().ignored_assets
     self._forced_target_sdk = self.get_options().target_sdk
 
-  def aapt_tool(self, build_tools_version):
+  def aapt_tool(self, binary):
     """Return the appropriate aapt tool.
 
-    :param string build_tools_version: The Android build-tools version number (e.g. '19.1.0').
+    :param AndroidBinary binary: AndroidBinary that requires the output of the aapt invocation.
     """
-    if self._forced_build_tools_version:
-      build_tools_version = self._forced_build_tools_version
+    build_tools_version = self._forced_build_tools_version or binary.build_tools_version
     aapt = os.path.join('build-tools', build_tools_version, 'aapt')
     return self.android_sdk.register_android_tool(aapt)
 
-  def android_jar_tool(self, target_sdk):
+  def android_jar(self, binary):
     """Return the appropriate android.jar.
 
-    :param string target_sdk: The Android SDK version number of the target (e.g. '18').
+    :param AndroidBinary binary: AndroidBinary that requires the output of the aapt invocation.
     """
-    if self._forced_target_sdk:
-      target_sdk = self._forced_target_sdk
+    target_sdk = self._forced_target_sdk or binary.target_sdk
     android_jar = os.path.join('platforms', 'android-' + target_sdk, 'android.jar')
+
     # The android.jar is bound for the classpath and so must be under the buildroot.
     return self.android_sdk.register_android_tool(android_jar, workdir=self.workdir)

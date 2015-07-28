@@ -45,7 +45,7 @@ class AaptGen(AaptTask):
   """
 
   @classmethod
-  def _calculate_genfile(cls, target):
+  def _relative_genfile(cls, target):
     """Name of the file produced by aapt."""
     return os.path.join(cls.package_path(target.manifest.package_name), 'R.java')
 
@@ -65,18 +65,21 @@ class AaptGen(AaptTask):
     :param list binaries: A list of AndroidBinary targets.
     """
     # Prepare exactly N android jar targets where N is the number of SDKs in-play.
-    sdks = set(ar.target_sdk for ar in binaries)
-    for sdk in sdks:
-      jar_url = 'file://{0}'.format(self.android_jar_tool(sdk))
-      jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
-      address = SyntheticAddress(self.workdir, 'android-{0}.jar'.format(sdk))
-      self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
+    # sdks = set(ar.target_sdk for ar in binaries)
+    # for sdk in sdks:
+    for binary in binaries:
+      sdk = binary.target_sdk
+      if sdk not in self._jar_library_by_sdk:
+        jar_url = 'file://{0}'.format(self.android_jar(binary))
+        jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
+        address = SyntheticAddress(self.workdir, 'android-{0}.jar'.format(sdk))
+        self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
-  def _render_args(self, binary, gentarget, resource_dirs):
+  def _render_args(self, binary, manifest, resource_dirs):
     """Compute the args that will be passed to the aapt tool.
 
-    :param AndroidBinary binary: AndroidBinary target that depends on the gentarget.
-    :param AndroidTarget gentarget: Either an AndroidBinary or AndroidLibrary target.
+    :param AndroidBinary binary: The target that depends on the processed resources.
+    :param AndroidManifest manifest: Manifest of the target that owns the resources.
     :param list resource_dirs: List of resource_dirs to include in this invocation of the aapt tool.
     """
 
@@ -90,13 +93,13 @@ class AaptGen(AaptTask):
     #            collecting resources (resource priority is left -> right).
     #   : '-I' packages to add to base 'include' set, here it is the android.jar of the target sdk.
     #   : '--ignore-assets' the aapt tool will disregard any files matching that pattern.
-    args = [self.aapt_tool(binary.build_tools_version)]
+    args = [self.aapt_tool(binary)]
     args.extend(['package', '-m', '-J', self.aapt_out(binary)])
-    args.extend(['-M', gentarget.manifest.path])
+    args.extend(['-M', manifest.path])
     args.append('--auto-add-overlay')
     for resource_dir in resource_dirs:
       args.extend(['-S', resource_dir])
-    args.extend(['-I', self.android_jar_tool(binary.target_sdk)])
+    args.extend(['-I', self.android_jar(binary)])
     args.extend(['--ignore-assets', self.ignored_assets])
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
@@ -118,7 +121,7 @@ class AaptGen(AaptTask):
       target.walk(gather_gentargets)
 
       for gen in gentargets:
-        aapt_output = self._calculate_genfile(gen)
+        aapt_output = self._relative_genfile(gen)
         aapt_file = os.path.join(self.aapt_out(target), aapt_output)
 
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
@@ -129,7 +132,7 @@ class AaptGen(AaptTask):
 
             # Priority for resources is left->right, so reverse collection order (DFS preorder).
             resource_dirs.reverse()
-            args = self._render_args(target, gen, resource_dirs)
+            args = self._render_args(target, gen.manifest, resource_dirs)
             with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
               returncode = subprocess.call(args,
                                            stdout=workunit.output('stdout'),
@@ -144,7 +147,10 @@ class AaptGen(AaptTask):
     """Create a JavaLibrary target for the R.java files created by the aapt tool.
 
     :param AndroidBinary binary: AndroidBinary target whose target_sdk is used.
-    :param AndroidTarget gentarget: An android_binary or android_library that owns resources.
+    :param AndroidTarget gentarget: AndroidBinary or Library that owns the processed resources.
+
+    :returns tgt: Synthetic target for the R.java output of the aapt tool.
+    :rtype JavaLibrary
     """
     spec_path = os.path.join(os.path.relpath(self.aapt_out(binary), get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
@@ -152,7 +158,7 @@ class AaptGen(AaptTask):
     tgt = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
-                                      sources=[self._calculate_genfile(gentarget)],
+                                      sources=[self._relative_genfile(gentarget)],
                                       dependencies=deps)
     return tgt
 
@@ -160,6 +166,8 @@ class AaptGen(AaptTask):
     """Location for the output of an aapt invocation.
 
     :param AndroidBinary binary: AndroidBinary target that depends upon the aapt output.
+    :returns outdir: full path of output directory
+    :rtype string
     """
     outdir = os.path.join(self.workdir, binary.target_sdk)
     safe_mkdir(outdir)

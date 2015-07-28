@@ -31,15 +31,15 @@ class AaptBuilder(AaptTask):
     return ['apk']
 
   @classmethod
-  def package_name(cls, target):
-    return '{0}.unsigned.apk'.format(target.manifest.package_name)
+  def package_name(cls, binary):
+    return '{0}.unsigned.apk'.format(binary.manifest.package_name)
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(AaptBuilder, cls).prepare(options, round_manager)
     round_manager.require_data('dex')
 
-  def _render_args(self, target, resource_dirs, dex_file):
+  def _render_args(self, binary, resource_dirs, dex_file):
     # Glossary of used aapt flags.
     #   : 'package' is the main aapt operation (see class docstring for more info).
     #   : '-f' to 'force' overwrites if the package already exists.
@@ -52,17 +52,16 @@ class AaptBuilder(AaptTask):
     #   : '-F' The name and location of the .apk file to output.
     #   : additional positional arguments are treated as input directories to gather files from.
     args = []
-    args.extend([self.aapt_tool(target.build_tools_version)])
+    args.extend([self.aapt_tool(binary)])
     args.extend(['package', '-f'])
-    args.extend(['-M', target.manifest.path])
+    args.extend(['-M', binary.manifest.path])
     args.append('--auto-add-overlay')
     for resource_dir in resource_dirs:
       args.extend(['-S', resource_dir])
-    args.extend(['-I', self.android_jar_tool(target.target_sdk)])
+    args.extend(['-I', self.android_jar(binary)])
     args.extend(['--ignore-assets', self.ignored_assets])
-    args.extend(['-F', os.path.join(self.workdir, self.package_name(target))])
+    args.extend(['-F', os.path.join(self.workdir, self.package_name(binary))])
     args.extend(dex_file)
-    print(args)
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
@@ -93,5 +92,5 @@ class AaptBuilder(AaptTask):
           if returncode:
             raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
     for target in targets:
-      apk_name = '{0}.unsigned.apk'.format(target.manifest.package_name)
+      apk_name = self.package_name(target)
       self.context.products.get('apk').add(target, self.workdir).append(apk_name)

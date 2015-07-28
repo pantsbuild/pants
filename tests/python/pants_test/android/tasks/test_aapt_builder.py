@@ -20,8 +20,9 @@ class TestAaptBuilder(TestAndroidBase):
     task.execute()
 
   def test_creates_apk(self):
-    with self.android_binary(target_name='example', package_name='org.pantsbuild.example') as bin1:
-      self.assertTrue(AaptBuilder.package_name(bin1).endswith(".apk"))
+    with self.android_binary(target_name='example',
+                             package_name='org.pantsbuild.example') as binary:
+      self.assertTrue(AaptBuilder.package_name(binary).endswith(".apk"))
 
   def test_unique_package_name(self):
     with self.android_binary(target_name='example', package_name='org.pantsbuild.example') as bin1:
@@ -33,23 +34,23 @@ class TestAaptBuilder(TestAndroidBase):
       with self.android_binary() as android_binary:
         self.set_options(sdk_path=dist)
         task = self.create_task(self.context())
-        rendered_args = task._render_args(android_binary, 'res', 'classes.dex')
+        rendered_args = task._render_args(android_binary, 'res', ['classes.dex'])
         self.assertTrue(rendered_args[0].endswith('aapt'))
         self.assertEquals(rendered_args[-1], 'classes.dex')
 
   def test_resource_order_in_args(self):
     with distribution() as dist:
-        with self.android_resources(target_name='binary_resources') as res1:
-          with self.android_resources(target_name='library_resources') as res2:
-            with self.android_library(dependencies=[res2]) as library:
-              with self.android_binary(dependencies=[res1, library]) as target:
-                self.set_options(sdk_path=dist)
-                task = self.create_task(self.context())
+      with self.android_resources(target_name='binary_resources') as res1:
+        with self.android_resources(target_name='library_resources') as res2:
+          with self.android_library(dependencies=[res2]) as library:
+            with self.android_binary(dependencies=[res1, library]) as target:
+              self.set_options(sdk_path=dist)
+              task = self.create_task(self.context())
 
-                res_dirs = [res1.resource_dir, res2.resource_dir]
-                rendered_args = task._render_args(target, res_dirs, 'classes.dex')
-                self.assertTrue(rendered_args[0].endswith('/aapt'))
+              res_dirs = [res1.resource_dir, res2.resource_dir]
+              rendered_args = task._render_args(target, res_dirs, 'classes.dex')
+              self.assertTrue(rendered_args[0].endswith('/aapt'))
 
-                args_string = ' '.join(rendered_args)
-                self.assertIn('--auto-add-overlay -S {} -S '
-                              '{}'.format(res1.resource_dir, res2.resource_dir), args_string)
+              args_string = ' '.join(rendered_args)
+              self.assertIn('--auto-add-overlay -S {} -S '
+                            '{}'.format(res1.resource_dir, res2.resource_dir), args_string)
