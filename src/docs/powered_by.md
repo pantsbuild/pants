@@ -15,6 +15,7 @@ Organizations
 - [Football Radar](http://www.footballradar.com/)
 - [Oscar](https://www.hioscar.com/)
 - [Whisk](https://whisk.com)
+- [Clover Health](http://www.cloverhealth.com/)
 
 Open Source Projects
 --------------------
