@@ -26,7 +26,7 @@ class ClasspathProductsTest(BaseTest):
 
     self.assertEqual([('default', path)], classpath_product.get_for_target(a))
 
-  def test_is_fine_with_paths_outside_buildroot(self):
+  def test_does_not_fail_if_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
 
     classpath_product = ClasspathProducts()

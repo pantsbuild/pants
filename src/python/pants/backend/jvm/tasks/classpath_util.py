@@ -89,12 +89,12 @@ class ClasspathUtil(object):
   def _validate_classpath_tuples(cls, classpath, classpath_products):
     """Validates that all files are located within the working copy, to simplify relativization."""
     buildroot = get_buildroot()
-    for tuple in classpath:
-      cls._validate_path_in_buildroot(buildroot, tuple, classpath_products)
+    for classpath_tuple in classpath:
+      cls._validate_path_in_buildroot(buildroot, classpath_tuple, classpath_products)
 
   @classmethod
-  def _validate_path_in_buildroot(cls, buildroot, tuple, classpath_products):
-    conf, path = tuple
+  def _validate_path_in_buildroot(cls, buildroot, classpath_tuple, classpath_products):
+    conf, path = classpath_tuple
     if os.path.relpath(path, buildroot).startswith('..'):
       target = classpath_products.target_for_product((conf, path))
       raise TaskError(

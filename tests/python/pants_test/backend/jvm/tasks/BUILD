@@ -89,8 +89,9 @@ python_tests(
   sources = ['test_classpath_products.py'],
   dependencies = [
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/goal:products',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:repository',
     'tests/python/pants_test:base_test',
   ]
 )
