@@ -14,9 +14,9 @@ from pants.base.target import Target
 
 class GoTarget(Target):
 
-  def __init__(self, address=None, **kwargs):
+  def __init__(self, address=None, payload=None, **kwargs):
     sources = glob(os.path.join(address.spec_path, '*.go'))
-    payload = Payload()
+    payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources=sources,
                                            sources_rel_path=address.spec_path,

@@ -11,6 +11,7 @@ from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 from pants.process.xargs import Xargs
 
+from pants.contrib.go.subsystems.go_platform import GoPlatform
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_package import GoPackage
 from pants.contrib.go.targets.go_remote_package import GoRemotePackage
@@ -18,13 +19,25 @@ from pants.contrib.go.targets.go_remote_package import GoRemotePackage
 
 class GoTask(Task):
 
+  @classmethod
+  def global_subsystems(cls):
+    return super(GoTask, cls).global_subsystems() + (GoPlatform, )
+
   @staticmethod
   def is_binary(target):
     return isinstance(target, GoBinary)
 
   @staticmethod
+  def is_go_remote_pkg(target):
+    return isinstance(target, GoRemotePackage)
+
+  @staticmethod
   def is_go_source(target):
     return isinstance(target, (GoPackage, GoRemotePackage, GoBinary))
+
+  def global_import_id(self, go_remote_pkg):
+    return os.path.relpath(go_remote_pkg.target_base,
+                           GoPlatform.global_instance().remote_pkg_root)
 
   def run_go_cmd(self, cmd, gopath, target):
     os.environ['GOPATH'] = gopath

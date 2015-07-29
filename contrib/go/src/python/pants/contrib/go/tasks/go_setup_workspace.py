@@ -20,6 +20,11 @@ from pants.contrib.go.tasks.go_task import GoTask
 class GoSetupWorkspace(GoTask):
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(GoSetupWorkspace, cls).prepare(options, round_manager)
+    round_manager.require_data('go_remote_pkg_source')
+
+  @classmethod
   def product_types(cls):
     return ['gopath']
 
@@ -31,16 +36,29 @@ class GoSetupWorkspace(GoTask):
       safe_mkdir(os.path.join(self._gopath, dir))
 
   def execute(self):
-    targets = self.context.targets(self.is_go_source)
-    self._symlink(targets)
     self.context.products.safe_create_data('gopath', lambda: defaultdict(str))
-    for target in targets:
+    for target in self.context.targets(self.is_go_source):
+      if self.is_go_remote_pkg(target):
+        self._symlink_remote_pkg(target)
+      else:
+        self._symlink_local_pkg(target)
       self.context.products.get_data('gopath')[target] = self._gopath
 
-  def _symlink(self, targets):
-    for target in targets:
-      basedir = get_basedir(target.target_base)
-      basedir_link = os.path.join(self._gopath, 'src', basedir)
-      if not os.path.islink(basedir_link):
-        basedir_abs = os.path.join(get_buildroot(), basedir)
-        os.symlink(basedir_abs, basedir_link)
+  def _symlink_local_pkg(self, go_pkg):
+    basedir = get_basedir(go_pkg.target_base)
+    basedir_link = os.path.join(self._gopath, 'src', basedir)
+    if not os.path.islink(basedir_link):
+      basedir_abs = os.path.join(get_buildroot(), basedir)
+      os.symlink(basedir_abs, basedir_link)
+
+  def _symlink_remote_pkg(self, go_remote_pkg):
+    # Transforms github.com/user/lib --> $GOPATH/src/github.com/user
+    remote_pkg_dir = os.path.join(self._gopath,
+                                  'src',
+                                  os.path.dirname(self.global_import_id(go_remote_pkg)))
+    safe_mkdir(remote_pkg_dir)
+    remote_pkg_source_dir = self.context.products.get_data('go_remote_pkg_source')[go_remote_pkg]
+    remote_pkg_link = os.path.join(remote_pkg_dir,
+                                   os.path.basename(remote_pkg_source_dir))
+    if not os.path.islink(remote_pkg_link):
+      os.symlink(remote_pkg_source_dir, remote_pkg_link)

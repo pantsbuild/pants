@@ -2,6 +2,8 @@ package libA
 
 import (
   "fmt"
+
+  "github.com/fatih/set"
 )
 
 func Foo() {
@@ -10,4 +12,8 @@ func Foo() {
 
 func Add(a int, b int) int {
   return a + b
+}
+
+func SetSize(s *set.Set) int {
+  return s.Size()
 }

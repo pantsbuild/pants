@@ -18,7 +18,6 @@ class GoTest(GoTask):
     round_manager.require_data('gopath')
 
   def execute(self):
-    targets = self.context.targets(self.is_go_source)
-    for target in targets:
+    for target in filter(self.is_go_source, self.context.target_roots):
       gopath = self.context.products.get_data('gopath')[target]
       self.run_go_cmd('test', gopath, target)

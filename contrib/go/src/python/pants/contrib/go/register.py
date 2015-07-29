@@ -29,8 +29,7 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='go', action=GoFetch).install('fetch').with_description(
-    "Fetch a go_remote_package and its transitive dependencies.")
+  task(name='go', action=GoFetch).install('resolve')
   task(name='go-setup-workspace', action=GoSetupWorkspace).install()
   task(name='go', action=GoCompile).install('compile')
   task(name='go', action=GoRun).install('run')
