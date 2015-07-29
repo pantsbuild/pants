@@ -21,12 +21,12 @@ class RTL(ResourcePreprocessor, NpmModuleBase):
 
   @classmethod
   def product_types(cls):
-    return ['resources']
+    return ['rtl_css']
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(RTL, cls).prepare(options, round_manager)
-    round_manager.require_data('rtl')
+    round_manager.require_data('less_css')
 
   def __init__(self, *args, **kwargs):
     super(RTL, self).__init__(*args, **kwargs)

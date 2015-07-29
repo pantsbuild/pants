@@ -21,7 +21,7 @@ class LessC(ResourcePreprocessor, NpmModuleBase):
 
   @classmethod
   def product_types(cls):
-    return ['rtl']
+    return ['less_css']
 
   def __init__(self, *args, **kwargs):
     super(LessC, self).__init__(*args, **kwargs)

@@ -25,7 +25,7 @@ class RequireJS(ResourcePreprocessor, NpmModuleBase):
 
   @classmethod
   def product_types(cls):
-    return ['resources']
+    return ['min_js']
 
   def execute_cmd(self, target, node_environ):
     if len(target.sources_relative_to_buildroot()) > 1:
