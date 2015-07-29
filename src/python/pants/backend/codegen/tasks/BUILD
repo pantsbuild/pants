@@ -37,10 +37,10 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/binaries:thrift_util',
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants:thrift_util',
   ],
 )
 
@@ -102,7 +102,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants:binary_util',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
@@ -125,10 +125,10 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants:binary_util',
   ],
 )
 

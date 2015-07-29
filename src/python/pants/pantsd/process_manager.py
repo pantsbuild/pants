@@ -103,6 +103,16 @@ class ProcessManager(object):
     return (self.cmdline or [None])[0]
 
   @property
+  def cmdline(self):
+    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex']."""
+    return getattr(self.as_process(), 'cmdline', None)
+
+  @property
+  def cmd(self):
+    """The first element of the process commandline e.g. '/usr/bin/python2.7'."""
+    return (self.cmdline or [None])[0]
+
+  @property
   def pid(self):
     """The running processes pid (or None)."""
     return self._pid or self.get_pid()

@@ -20,7 +20,6 @@ from pygments.styles import get_all_styles
 from pygments.util import ClassNotFound
 from six.moves import range
 
-from pants import binary_util
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.task import Task
 from pants.base.address import SyntheticAddress
@@ -28,6 +27,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.base.workunit import WorkUnit
+from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
