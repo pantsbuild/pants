@@ -20,7 +20,9 @@ from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.base import hash_utils
 from pants.base.exceptions import TaskError
-from pants.thrift_util import ThriftBinary
+from pants.binaries.thrift_binary import ThriftBinary
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 
 
 class PythonTask(Task):
@@ -29,7 +31,7 @@ class PythonTask(Task):
 
   @classmethod
   def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + (PythonSetup, PythonRepos)
+    return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
 
   @classmethod
   def task_subsystems(cls):
@@ -104,12 +106,17 @@ class PythonTask(Task):
     return PythonSetup.global_instance().chroot_cache_dir
 
   @property
+  def ivy_bootstrapper(self):
+    return Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
+
+  @property
   def thrift_binary_factory(self):
-    return ThriftBinary.Factory.scoped_instance(self)
+    return ThriftBinary.Factory.scoped_instance(self).create
 
   def create_chroot(self, interpreter, builder, targets, platforms, extra_requirements):
     return PythonChroot(python_setup=PythonSetup.global_instance(),
                         python_repos=PythonRepos.global_instance(),
+                        ivy_bootstrapper=self.ivy_bootstrapper,
                         thrift_binary_factory=self.thrift_binary_factory,
                         interpreter=interpreter,
                         builder=builder,

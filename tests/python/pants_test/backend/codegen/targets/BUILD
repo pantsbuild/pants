@@ -3,6 +3,7 @@
 
 target(name='targets',
   dependencies=[
+    ':java_antlr_library',
     ':java_protobuf_library',
     ':java_wire_library'
   ]
@@ -21,6 +22,16 @@ python_tests(
 python_tests(
   name = 'java_wire_library',
   sources = ['test_java_wire_library.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/base:build_file_aliases',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name = 'java_antlr_library',
+  sources = ['test_java_antlr_library.py'],
   dependencies = [
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/base:build_file_aliases',

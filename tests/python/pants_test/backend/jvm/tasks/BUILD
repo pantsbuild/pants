@@ -74,6 +74,14 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'checkstyle_integration',
+  sources = ['test_checkstyle_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
+)
 
 python_tests(
   name = 'classpath_util',

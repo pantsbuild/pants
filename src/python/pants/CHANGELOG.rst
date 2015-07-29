@@ -1,6 +1,75 @@
 RELEASE HISTORY
 ===============
 
+0.0.40 (unreleased)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+The apache thrift gen for java code now runs in `-strict` mode by default, requiring
+all struct fields declare a field id.  You can use the following configuration in
+pants.ini to retain the old default behavior and turn strict checking off:
+
+.. code::
+
+  [gen.thrift]
+  strict: False
+
+
+0.0.39 (7/23/2015)
+------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Disallow jar_library targets without jars
+  `RB #2519 <https://rbcommons.com/s/twitter/r/2519>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup PythonChroot to ignore synthetic targets.
+  `RB #2523 <https://rbcommons.com/s/twitter/r/2523>`_
+
+* Exclude provides clauses regardless of soft_excludes
+  `RB #2524 <https://rbcommons.com/s/twitter/r/2524>`_
+
+* Fixed exclude id when name is None + added a test for excludes by just an org #1857
+  `RB #2518 <https://rbcommons.com/s/twitter/r/2518>`_
+
+* Fixup SourceRoot to handle the buildroot.
+  `RB #2514 <https://rbcommons.com/s/twitter/r/2514>`_
+
+* Fixup SetupPy handling of exported thrift.
+  `RB #2511 <https://rbcommons.com/s/twitter/r/2511>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Invalidate tasks based on BinaryUtil.version.
+  `RB #2516 <https://rbcommons.com/s/twitter/r/2516>`_
+
+* Remove local cache files
+  `Issue #1762 <https://github.com/pantsbuild/pants/issues/1762>`_
+  `RB #2506 <https://rbcommons.com/s/twitter/r/2506>`_
+
+* Option to expose intransitive target dependencies for the dependencies goal
+  `RB #2503 <https://rbcommons.com/s/twitter/r/2503>`_
+
+* Introduce Subsystem dependencies.
+  `RB #2509 <https://rbcommons.com/s/twitter/r/2509>`_
+  `RB #2515 <https://rbcommons.com/s/twitter/r/2515>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Increase robustness of ProcessManager.terminate() in the face of zombies.
+  `RB #2513 <https://rbcommons.com/s/twitter/r/2513>`_
+
+* A global isort fix.
+  `RB #2510 <https://rbcommons.com/s/twitter/r/2510>`_
+
 0.0.38 (7/21/2015)
 ------------------
 

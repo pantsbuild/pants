@@ -429,6 +429,7 @@ class SetupPy(PythonTask):
   def generated_targets(self):
     return {
       PythonAntlrLibrary: functools.partial(PythonAntlrBuilder,
+                                            ivy_bootstrapper=self.ivy_bootstrapper,
                                             workdir=os.path.join(self.workdir, 'antlr')),
       PythonThriftLibrary: functools.partial(PythonThriftBuilder,
                                              thrift_binary_factory=self.thrift_binary_factory,

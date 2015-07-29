@@ -37,7 +37,7 @@ class PythonThriftBuilder(CodeGenerator):
 
   @memoized_property
   def _thrift_binary(self):
-    return self._thrift_binary_factory.create().path
+    return self._thrift_binary_factory().path
 
   def run_thrifts(self):
     """Generate Python thrift code.

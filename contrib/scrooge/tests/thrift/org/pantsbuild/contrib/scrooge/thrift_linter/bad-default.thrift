@@ -1,5 +1,5 @@
 // No scala/java namespaces
 
-struct Duck {
+struct DuckDefaultStrictness {
   1: optional string quack,
 }

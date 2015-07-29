@@ -22,7 +22,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
@@ -97,15 +97,17 @@ class ProtobufGen(SimpleCodegenTask):
     return JavaLibrary
 
   def synthetic_target_extra_dependencies(self, target):
-    # We need to add in the proto imports jars.
-    jars_address = SyntheticAddress(
-        os.path.relpath(self.codegen_workdir(target), get_buildroot()),
-        target.id + '-rjars')
-    jars_target = self.context.add_new_target(jars_address,
-                                              JarLibrary,
-                                              jars=target.imported_jars,
-                                              derived_from=target)
-    deps = OrderedSet([jars_target])
+    deps = OrderedSet()
+    if target.imported_jars:
+      # We need to add in the proto imports jars.
+      jars_address = SyntheticAddress(
+          os.path.relpath(self.codegen_workdir(target), get_buildroot()),
+          target.id + '-rjars')
+      jars_target = self.context.add_new_target(jars_address,
+                                                JarLibrary,
+                                                jars=target.imported_jars,
+                                                derived_from=target)
+      deps.update([jars_target])
     deps.update(self.javadeps)
     return deps
 

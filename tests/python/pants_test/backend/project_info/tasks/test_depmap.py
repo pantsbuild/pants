@@ -81,7 +81,7 @@ class DepmapTest(BaseDepmapTest):
       ))
 
     add_to_build_file('common/a', 'a', 'target')
-    add_to_build_file('common/b', 'b', 'jar_library')
+    add_to_build_file('common/b', 'b', 'target')
     self.add_to_build_file('common/c', dedent("""
       java_library(name='c',
         sources=[],
@@ -172,7 +172,6 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('common/a')]
     )
 
-  def test_jar_library(self):
     self.assert_console_output_ordered(
       'internal-common.b.b',
       targets=[self.target('common/b')],

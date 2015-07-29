@@ -114,7 +114,8 @@ class JvmCompileStrategy(object):
                     extra_compile_time_classpath_elements,
                     compile_vts,
                     register_vts,
-                    update_artifact_cache_vts_work):
+                    update_artifact_cache_vts_work,
+                    settings):
     """Executes compilations for that invalid targets contained in a single language chunk."""
 
   @abstractmethod

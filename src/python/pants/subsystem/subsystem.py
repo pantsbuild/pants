@@ -147,6 +147,7 @@ class Subsystem(Optionable):
     super(Subsystem, self).__init__()
     self._scope = scope
     self._scoped_options = scoped_options
+    self._fingerprint = None
 
   @property
   def options_scope(self):

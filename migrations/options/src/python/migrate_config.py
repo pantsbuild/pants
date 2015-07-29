@@ -248,6 +248,9 @@ migrations = {
 
   ('gen.thrift', 'supportdir'): ('thrift-binary', 'supportdir'),
   ('gen.thrift', 'version'): ('thrift-binary', 'version'),
+
+  ('gen.thrift', 'java'): None,  # Notes only one to many migration: see notes below.
+  ('gen.thrift', 'python'): None,  # Notes only pure deletion migration: see notes below.
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -269,9 +272,14 @@ notes = {
                          'move to a subsystem, which will fix this requirement.',
   ('jvm', 'debug_args'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
                          'move to a subsystem, which will fix this requirement.',
-  ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
-                                  'target: options. Other args should be placed in args: and '
-                                  'prefixed with -C.',
+  ('java-compile', 'javac_args'): 'Source, target, and bootclasspath args should be specified in '
+                                  'the jvm-platform subsystem. Other args can be placed in args: '
+                                  'and prefixed with -C, or also be included in the jvm-platform '
+                                  'args.',
+  ('java-compile', 'source'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
+  ('java-compile', 'target'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
   ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
@@ -316,7 +324,25 @@ notes = {
                              'java and python using the [thrift-binary] scope or else you can '
                              'configure the languages separately using the '
                              '[thrift-binary.gen.thrift] scope to control the version used for '
-                             'java.'
+                             'java.',
+
+  ('gen.thrift', 'java'): 'The java configuration has migrated from a single dict with 3 keys to '
+                          '3 options.\n'
+                          'The "gen" key has migrated to the `gen_options` option and the value '
+                          'should just be the option portion of the thrift --gen argument.  For '
+                          'example, if you had `"gen": "java:hashcode"` as your java dict entry '
+                          'you\'d now use the top-level option `gen_options: hashcode`.\n'
+                          'The "deps.structs" nested key has migrated to the `deps` option and the '
+                          'value remains the same.\n'
+                          'The "deps.service" nested key as migrated to the `service_deps` option '
+                          'and the value remains the same, but is now optional if service deps are '
+                          'the same as non-service deps.',
+
+  ('gen.thrift', 'python'): 'The python configuration for gen.thrift has never been used and '
+                            'should be removed.',
+
+  ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
+  ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
 }
 
 

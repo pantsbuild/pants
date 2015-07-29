@@ -378,9 +378,10 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def calculate_classpath(cls, targets, gather_excludes=True, automatic_excludes=True):
+  def calculate_classpath(cls, targets, gather_excludes=True):
     jars = OrderedDict()
-    excludes = set()
+    global_excludes = set()
+    provide_excludes = set()
     targets_processed = set()
 
     # Support the ivy force concept when we sanely can for internal dep conflicts.
@@ -408,29 +409,35 @@ class IvyUtils(object):
     def collect_excludes(target):
       target_excludes = target.payload.get_field_value('excludes')
       if target_excludes:
-        excludes.update(target_excludes)
+        global_excludes.update(target_excludes)
 
-    def collect_automatic_excludes(target):
+    def collect_provide_excludes(target):
       if not target.is_exported:
         return
-      # if a source dep is exported, it should always override remote/binary versions
-      # of itself, ie "round trip" dependencies
       logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
         target.provides.org, target.provides.name, target))
-      excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
+      provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     def collect_elements(target):
       targets_processed.add(target)
       collect_jars(target)
       if gather_excludes:
         collect_excludes(target)
-        if automatic_excludes:
-          collect_automatic_excludes(target)
+      collect_provide_excludes(target)
 
     for target in targets:
       target.walk(collect_elements, predicate=lambda target: target not in targets_processed)
 
-    return jars.values(), excludes
+    # If a source dep is exported (ie, has a provides clause), it should always override
+    # remote/binary versions of itself, ie "round trip" dependencies.
+    # TODO: Move back to applying provides excludes as target-level excludes when they are no
+    # longer global.
+    if provide_excludes:
+      additional_excludes = tuple(provide_excludes)
+      for coordinate, jar in jars.items():
+        jar.excludes += additional_excludes
+
+    return jars.values(), global_excludes
 
   @staticmethod
   def _resolve_conflict(existing, proposed):

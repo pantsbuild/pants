@@ -1,8 +1,8 @@
 python_library(
-  name = 'python',
-  sources = globs('*.py'),
-  resources = globs('templates/python_eval/*.mustache'),
-  dependencies = [
+  name='python',
+  sources=globs('*.py'),
+  resources=globs('templates/python_eval/*.mustache'),
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:coverage',
@@ -28,7 +28,9 @@ python_library(
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
+    'src/python/pants/binaries:thrift_util',
     'src/python/pants/console:stty_utils',
+    'src/python/pants/ivy',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -36,6 +38,5 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:strutil',
     'src/python/pants/util:xml_parser',
-    'src/python/pants:thrift_util',
   ]
 )

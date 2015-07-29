@@ -10,12 +10,11 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
+from pants.java.jar.shader import Shader
 from pants.option.options import Options
 from pants.process.xargs import Xargs
-from pants.util.dirutil import safe_open, touch
+from pants.util.dirutil import safe_open
 
 
 class Checkstyle(NailgunTask):
@@ -40,7 +39,21 @@ class Checkstyle(NailgunTask):
                   'not intended for general use. ')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run checkstyle with these extra jvm options.')
-    cls.register_jvm_tool(register, 'checkstyle', fingerprint=True)
+    cls.register_jvm_tool(register,
+                          'checkstyle',
+                          fingerprint=True,
+                          main=cls._CHECKSTYLE_MAIN,
+                          custom_rules=[
+                              # Checkstyle uses reflection to load checks and has an affordance that
+                              # allows leaving off a check classes' package name.  This affordance
+                              # breaks for built-in checkstyle checks under shading so we ensure all
+                              # checkstyle packages are excluded from shading such that just its
+                              # third party transitive deps (guava and the like), are shaded.
+                              # See the module configuration rules here which describe this:
+                              #   http://checkstyle.sourceforge.net/config.html#Modules
+                              Shader.exclude_package('com.puppycrawl.tools.checkstyle',
+                                                     recursive=True),
+                          ])
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -48,9 +61,7 @@ class Checkstyle(NailgunTask):
     round_manager.require_data('compile_classpath')
 
   def _is_checked(self, target):
-    return (isinstance(target, Target) and
-            target.has_sources(self._JAVA_SOURCE_EXTENSION) and
-            (not target.is_synthetic))
+    return target.has_sources(self._JAVA_SOURCE_EXTENSION) and not target.is_synthetic
 
   @property
   def cache_target_dirs(self):
