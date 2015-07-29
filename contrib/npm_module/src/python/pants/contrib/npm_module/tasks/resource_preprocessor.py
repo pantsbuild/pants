@@ -14,6 +14,11 @@ class ResourcePreprocessor(Task):
   """ Processes GenResource targets
   """
 
+  class ResourcePreprocessorError(Exception):
+     """Indicates a ResourceProcessor Error"""
+     def __init__(self, *args, **kwargs):
+       super(ResourcePreprocessor.ResourcePreprocessorError, self).__init__(*args, **kwargs)
+
   def is_processable_target(self, target):
     return (isinstance(target, GenResources) and
             self.processor_name in target.preprocessors and
@@ -30,7 +35,7 @@ class ResourcePreprocessor(Task):
         target.processed.add(self.processor_name)
         if files:
           self._create_target(target, files)
-      except Exception as e:
+      except ResourcePreprocessor.ResourcePreprocessorError as e:
         raise TaskError('Preprocessor {processor_name} on target {target} failed due to '
                         'exception {exp}'.format(processor_name=self.processor_name,
                                                  target=target,

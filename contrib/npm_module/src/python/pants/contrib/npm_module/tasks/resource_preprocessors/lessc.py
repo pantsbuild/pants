@@ -1,8 +1,8 @@
 import os
+import subprocess
 
 from pants.contrib.npm_module.tasks.resource_preprocessors.npm_module_base import NpmModuleBase
 
-from twitter.common.util.command_util import CommandUtil
 from pants.contrib.npm_module.targets.gen_resources import GenResources
 from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
 
@@ -15,10 +15,9 @@ class LessC(ResourcePreprocessor, NpmModuleBase):
     on the lessc files speficed in the input target.
   """
 
-  # TODO Move this as advanced options so that this is configurable
   MODULE_VERSION = '1.5.1'
-  MODULE_NAME = 'lessc'
   MODULE_EXECUTABLE = os.path.join('bin', 'lessc')
+  MODULE_NAME = 'less'
 
   @classmethod
   def product_types(cls):
@@ -27,7 +26,7 @@ class LessC(ResourcePreprocessor, NpmModuleBase):
   def __init__(self, *args, **kwargs):
     super(LessC, self).__init__(*args, **kwargs)
 
-  def execute_cmd(self, target):
+  def execute_cmd(self, target, node_environ):
     files = set()
     safe_mkdir(os.path.join(self.workdir, target.gen_resource_path))
     for file in target.sources_relative_to_buildroot():
@@ -35,9 +34,14 @@ class LessC(ResourcePreprocessor, NpmModuleBase):
       (file_name, ext) = os.path.splitext(os.path.basename(file))
       if ext == '.less':
         dest_file = os.path.join(target.gen_resource_path, '%s.css' % file_name)
-        cmd = [self.bin_path, source_file, '-x', os.path.join(self.workdir,
+        cmd = [self.MODULE_EXECUTABLE, source_file, '-x', os.path.join(self.workdir,
                                                               dest_file)]
-        CommandUtil.execute_suppress_stdout(cmd)
+        self.context.log.debug('Executing: {0}\n'.format(' '.join(cmd)))
+        process = subprocess.Popen(cmd, env=node_environ)
+        result = process.wait()
+        if result != 0:
+          raise ResourcePreprocessor.ResourcePreprocessorError('{0} ... exited non-zero ({1})'
+                                                               .format(self.module_name, result))
         files.add(dest_file)
     return files
 

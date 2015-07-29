@@ -1,7 +1,6 @@
 import os
 import shutil
-
-from twitter.common.util.command_util import CommandUtil
+import subprocess
 
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir
@@ -18,20 +17,27 @@ class RequireJS(ResourcePreprocessor, NpmModuleBase):
   """
 
   MODULE_NAME = 'requirejs'
-  # TODO Move this as advanced options so that this is configurable
   MODULE_VERSION = '2.1.9'
-  MODULE_EXECUTABLE = 'bin'
+  MODULE_EXECUTABLE = os.path.join('bin', 'r.js')
+
+  def __init__(self, *args, **kwargs):
+    super(RequireJS, self).__init__(*args, **kwargs)
 
   @classmethod
   def product_types(cls):
     return ['resources']
 
-  def execute_cmd(self, target):
+  def execute_cmd(self, target, node_environ):
     if len(target.sources_relative_to_buildroot()) > 1:
       raise TaskError('RequireJs processor takes one build profile file per target.')
     build_profile = os.path.join(self.buildroot, target.sources_relative_to_buildroot()[0])
-    cmd = [self.bin_path, '-o', '%s' % build_profile]
-    CommandUtil.execute_suppress_stdout(cmd)
+    cmd = [self.MODULE_EXECUTABLE, '-o', '%s' % build_profile]
+    self.context.log.debug('Executing: {0}\n'.format(' '.join(cmd)))
+    process = subprocess.Popen(cmd, env=node_environ)
+    result = process.wait()
+    if result != 0:
+      raise ResourcePreprocessor.ResourcePreprocessorError('{0} ... exited non-zero ({1})'
+                                                           .format(self.module_name, result))
 
     files = set()
     generated_js_dir = os.path.join(os.path.dirname(build_profile), target.gen_resource_path)

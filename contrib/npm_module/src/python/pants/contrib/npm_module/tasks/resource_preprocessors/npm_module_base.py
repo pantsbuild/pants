@@ -3,9 +3,6 @@ import shutil
 import subprocess
 
 from abc import abstractmethod
-from contextlib import closing
-
-from twitter.common.lang import Compatibility
 
 from pants.backend.core.tasks.task import Task
 from pants.binary_util import BinaryUtil
@@ -13,43 +10,38 @@ from pants.fs.archive import TGZ
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 
-from pants.contrib.npm_module.tasks.resource_preprocessors.npm_module_subsystem import NpmModuleSubsystem
-
-if Compatibility.PY3:
-  from urllib.request import urlopen
-else:
-  from urllib2 import urlopen
-
+from twitter.common.util.command_util import CommandUtil
 
 class NpmModuleBase(Task):
   """
-    Class to downloads the module tar.gz from science-binaries and runs the
+    Class to downloads the module tar.gz from hosted binaries and runs the
     binary specified in bin_file
   """
+
+  NODE_VERSION = '0.12.7'
+  NODE_WORKDIR = 'node'
+  NODE_EXECUTABLE = 'bin'
 
   class NpmModuleError(Exception):
     """Indicates a NpmModule download has failed."""
 
     def __init__(self, *args, **kwargs):
-      super(NpmModule.NpmModuleError, self).__init__(*args, **kwargs)
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(NpmModuleBase, cls).global_subsystems() + (NpmModuleSubsystem, )
+      super(NpmModuleBase.NpmModuleError, self).__init__(*args, **kwargs)
 
   @classmethod
   def register_options(cls, register):
     super(NpmModuleBase, cls).register_options(register)
-    register('--supportdir', default='bin', help='Look for binaries in this directory')
-    register('--version', default=cls.MODULE_VERSION, help='Look for binaries in this directory')
+    register('--supportdir', default=os.path.join('bin', 'node'),
+             help='Look for binaries in this directory')
+    register('--version', default=cls.NODE_VERSION, help='Version')
 
   def __init__(self, *args, **kwargs):
     super(NpmModuleBase, self).__init__(*args, **kwargs)
-    self._cachedir = None
+    self._module_name = self.MODULE_NAME
+    self._module_version = self.MODULE_VERSION
     self._chdir = None
-    self._skip_bootstrap = NpmModuleSubsystem.global_instance().get_options().skip_bootstrap
-    self._force_get = NpmModuleSubsystem.global_instance().get_options().force_get
-    self.task_name = (self.__class__.__name__).lower()
+    self._cachedir = None
+    self._node_cachedir = None
 
   @property
   def skip_bootstrap(self):
@@ -62,39 +54,72 @@ class NpmModuleBase(Task):
   @property
   def module_name(self):
     """Name of the NPM Module"""
-    return self.MODULE_NAME
+    return self._module_name
 
   @property
   def module_version(self):
-    """Version of the NPM Module"""
-    return self.MODULE_VERSION
+    """Name of the NPM Module"""
+    return self._module_version
 
   @property
-  def bin_path(self):
-    """Executable file for the Module"""
-    return os.path.join(self.binary, self.MODULE_EXECUTABLE)
+  def node_cachedir(self):
+    """Directory where module is cached"""
+    if not self._node_cachedir:
+      self._node_cachedir = os.path.join(self.context.options.for_global_scope().pants_workdir,
+                                         NpmModuleBase.NODE_WORKDIR, NpmModuleBase.NODE_VERSION)
+    return self._node_cachedir
 
   @property
   def cachedir(self):
     """Directory where module is cached"""
     if not self._cachedir:
-      self._cachedir = os.path.join(self.workdir, self.module_name, self.module_version)
+      self._cachedir = os.path.join(self.node_cachedir, NpmModuleBase.NODE_EXECUTABLE,
+                                    'node_modules', self.module_name)
     return self._cachedir
 
   @property
   def chdir(self):
     """This property specifies the directory for the executing the command."""
     if not self._chdir:
-      self._chdir = self.binary
+      self._chdir = self.cachedir
     return self._chdir
 
   def _get_npm_module(self):
     safe_mkdir(self.binary)
 
+  def _bootstrap_node(self):
+    try:
+      binary_util = BinaryUtil.Factory.create()
+      node_path = binary_util.select_binary(self.get_options().supportdir,
+                                            self.get_options().version,
+                                            'node-v{0}.tar.gz'.format(NpmModuleBase.NODE_VERSION),
+                                            write_mode='w')
+      with temporary_dir(cleanup=False) as staging_dir:
+        stage_root = os.path.join(staging_dir, 'stage')
+        TGZ.extract(node_path, stage_root, 'r:gz')
+        safe_rmtree(self.node_cachedir)
+        self.context.log.debug("Moving %s to %s" %(stage_root, self.node_cachedir))
+        shutil.move(stage_root, self.node_cachedir)
+    except IOError as e:
+      NpmModuleBase.NpmModuleError('Failed to install fetch node due to {0}'.format(e))
+
+  def _install_module(self):
+    self.context.log.debug('Installing npm module {0}'.format(self._module_name))
+    CommandUtil.execute_suppress_stdout(['./npm', 'install', self.module_name])
+
   def execute_npm_module(self, target):
-    self.binary = BinaryUtil.from_options(self.get_options()).select_binary(self.module_name)
+    if not os.path.exists(self.node_cachedir):
+      self._bootstrap_node()
+    if not os.path.exists(self.cachedir):
+      safe_mkdir(self.cachedir)
+      with pushd(os.path.join(self.node_cachedir, NpmModuleBase.NODE_EXECUTABLE)):
+        self._install_module()
     with pushd(self.chdir):
-      files = self.execute_cmd(target)
+      node_environ = os.environ.copy()
+      node_environ['PATH'] = os.pathsep.join([os.path.join(self.node_cachedir,
+                                                           NpmModuleBase.NODE_EXECUTABLE),
+                                              node_environ['PATH']])
+      files = self.execute_cmd(target, node_environ)
       return files
 
   @abstractmethod

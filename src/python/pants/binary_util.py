@@ -158,7 +158,7 @@ class BinaryUtil(object):
     if not downloaded_successfully:
       raise self.BinaryNotFound((supportdir, version, name), accumulated_errors)
 
-  def select_binary(self, supportdir, version, name):
+  def select_binary(self, supportdir, version, name, write_mode='wb'):
     """Selects a binary matching the current os and architecture.
 
     :param string supportdir: The path the `name` binaries are stored under.
@@ -171,12 +171,11 @@ class BinaryUtil(object):
     binary_path = self._select_binary_base_path(supportdir, version, name)
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
-    print(bootstrapped_binary_path)
     if not os.path.exists(bootstrapped_binary_path):
       downloadpath = bootstrapped_binary_path + '~'
       try:
         with self._select_binary_stream(supportdir, version, name) as stream:
-          with safe_open(downloadpath, 'wb') as bootstrapped_binary:
+          with safe_open(downloadpath, write_mode) as bootstrapped_binary:
             bootstrapped_binary.write(stream())
           os.rename(downloadpath, bootstrapped_binary_path)
           chmod_plus_x(bootstrapped_binary_path)
