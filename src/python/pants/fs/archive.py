@@ -21,7 +21,7 @@ from pants.util.strutil import ensure_text
 
 class Archiver(AbstractClass):
   @classmethod
-  def extract(cls, path, outdir, mode):
+  def extract(cls, path, outdir):
     """Extracts an archive's contents to the specified outdir."""
     raise NotImplementedError()
 
@@ -37,7 +37,7 @@ class TarArchiver(Archiver):
   """An archiver that stores files in a tar file with optional compression."""
 
   @classmethod
-  def extract(cls, path, outdir, mode):
+  def extract(cls, path, outdir, mode='r'):
     with open_tar(path, mode, errorlevel=1) as tar:
       tar.extractall(outdir)
 
