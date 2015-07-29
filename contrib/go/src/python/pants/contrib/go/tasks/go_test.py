@@ -5,10 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoTest(GoTask):
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(GoTest, cls).prepare(options, round_manager)
+    round_manager.require_data('gopath')
+
   def execute(self):
-    pass
+    targets = self.context.targets(self.is_go_source)
+    for target in targets:
+      gopath = self.context.products.get_data('gopath')[target]
+      self.run_go_cmd('test', gopath, target)

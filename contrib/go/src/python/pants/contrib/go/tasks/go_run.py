@@ -10,7 +10,6 @@ import os
 from pants.base.exceptions import TaskError
 from pants.process.xargs import Xargs
 
-from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.tasks.go_task import GoTask
 
 
@@ -21,13 +20,8 @@ class GoRun(GoTask):
     super(GoRun, cls).prepare(options, round_manager)
     round_manager.require_data('go_binary')
 
-  @staticmethod
-  def is_binary(target):
-    return isinstance(target, GoBinary)
-
   def execute(self):
-    targets = self.context.targets(self.is_binary)
-    for target in targets:
+    for target in filter(self.is_binary, self.context.target_roots):
       binary_path = self.context.products.get_data('go_binary')[target]
       res = Xargs.subprocess([binary_path]).execute([])
       if res != 0:
