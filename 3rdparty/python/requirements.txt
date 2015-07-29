@@ -10,7 +10,7 @@ mox==0.5.3
 # do pex<1.1.0.
 pex>=1.0.1,<1.0.999999
 
-psutil==1.1.3
+psutil==3.1.1
 lockfile==0.10.2
 Pygments==1.4
 pystache==0.5.3
