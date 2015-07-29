@@ -16,4 +16,5 @@ class NpmModuleIntegrationTest(PantsRunIntegrationTest):
       command = ['bundle', '--archive=zip','examples/src/java/org/pantsbuild/example/hello/main']
       self.run_pants_with_workdir(command, workdir)
       with open_zip('dist/hello-example-bundle/hello-example.jar') as jar:
-        self.assertIn('examples/src/resources/example_less.css', jar.namelist())
+        self.assertIn('examples/src/resources/example_less.rtl.css', jar.namelist())
+        self.assertIn('min/main.js', jar.namelist())
