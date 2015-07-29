@@ -40,7 +40,7 @@ class ProcessGroup(object):
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name, pid=process.pid, process_name=process.name)
+    return ProcessManager(name=process.name(), pid=process.pid(), process_name=process.name())
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
@@ -85,7 +85,22 @@ class ProcessManager(object):
   @property
   def exe_name(self):
     """The basename of the process executable e.g. 'java'."""
-    return getattr(self.as_process(), 'name', None)
+    return self._get_process_property('name')
+
+  @property
+  def cmdline(self):
+    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex']."""
+    return self._get_process_property('cmdline')
+
+  @property
+  def status(self):
+    """The process status as reported by psutil. e.g. psutil.PROCESS_IDLE, psutil.PROCESS_ZOMBIE."""
+    return self._get_process_property('status')
+
+  @property
+  def cmd(self):
+    """The first element of the process commandline e.g. '/usr/bin/python2.7'."""
+    return (self.cmdline or [None])[0]
 
   @property
   def cmdline(self):
@@ -113,6 +128,10 @@ class ProcessManager(object):
       return caster(x)
     except (TypeError, ValueError):
       return x
+
+  def _get_process_property(self, attr):
+    if self.as_process():
+      return getattr(self.as_process(), attr)()
 
   def as_process(self):
     if self._process is None and self.pid:
@@ -209,7 +228,7 @@ class ProcessManager(object):
     """Return a boolean indicating whether the process is running."""
     if self.as_process():
       try:
-        if (self.as_process().status == psutil.STATUS_ZOMBIE or           # Check for walkers.
+        if (self.status == psutil.STATUS_ZOMBIE or                        # Check for walkers.
             (self.process_name and self.process_name != self.exe_name)):  # Check for stale pids.
           return False
       except psutil.NoSuchProcess:
@@ -272,7 +291,6 @@ class ProcessManager(object):
       if second_pid == 0:
         try:
           os.chdir(self._buildroot)
-          os.umask(0)
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logging.critical(traceback.format_exc())
@@ -301,7 +319,6 @@ class ProcessManager(object):
       try:
         os.setsid()
         os.chdir(self._buildroot)
-        os.umask(0)
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logging.critical(traceback.format_exc())
