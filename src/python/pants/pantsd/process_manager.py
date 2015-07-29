@@ -83,14 +83,19 @@ class ProcessManager(object):
     return self._process_name
 
   @property
-  def exe(self):
-    """The full path of the process executable e.g. '/opt/java/jdk1.7.0/Contents/Home/bin/java'."""
-    return getattr(self.as_process(), 'exe', None)
-
-  @property
   def exe_name(self):
     """The basename of the process executable e.g. 'java'."""
     return getattr(self.as_process(), 'name', None)
+
+  @property
+  def cmdline(self):
+    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex']."""
+    return getattr(self.as_process(), 'cmdline', None)
+
+  @property
+  def cmd(self):
+    """The first element of the process commandline e.g. '/usr/bin/python2.7'."""
+    return (self.cmdline or [None])[0]
 
   @property
   def pid(self):
