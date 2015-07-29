@@ -1,11 +1,10 @@
 import os
 import shutil
-import subprocess
 
 from abc import abstractmethod
 
 from pants.backend.core.tasks.task import Task
-from pants.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
