@@ -401,6 +401,13 @@ class BuildGraph(object):
                                address=address))
       raise
 
+  def resolve(self, spec):
+    """Returns an iterator over the target(s) the given address points to."""
+    address = SyntheticAddress.parse(spec)
+    # NB: This is an idempotent, short-circuiting call.
+    self.inject_address_closure(address)
+    return self.transitive_subgraph_of_addresses([address])
+
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected."""

@@ -94,4 +94,5 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'examples/src/java/org/pantsbuild/example/hello/simple'
           ]
         pants_run = self.run_pants_with_workdir(args, workdir)
+        print(pants_run.stdout_data)
         self.assert_success(pants_run)

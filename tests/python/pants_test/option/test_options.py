@@ -565,13 +565,11 @@ class OptionsTest(unittest.TestCase):
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
 
-  def test_payload_for_scope(self):
+  def test_get_fingerprintable_for_scope(self):
     val = 'blah blah blah'
     options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
 
-    payload = options.payload_for_scope('compile.scala')
-
-    self.assertEquals(len(payload.fields), 1)
-    for key, field in payload.fields:
-      self.assertEquals(key, 'modifycompile')
-      self.assertEquals(field.value, val)
+    pairs = options.get_fingerprintable_for_scope('compile.scala')
+    self.assertEquals(len(pairs), 1)
+    _, v = pairs[0]
+    self.assertEquals(v, val)

@@ -22,6 +22,8 @@ from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
+from pants.option.options import Options
+from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.meta import AbstractClass
@@ -176,6 +178,7 @@ class TaskBase(Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
+    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
     self._fingerprint = None
 
   def get_options(self):
@@ -198,7 +201,13 @@ class TaskBase(Optionable, AbstractClass):
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    return str(self.context.options.payload_for_scope(scope).fingerprint(context=self.context))
+    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+    hasher = sha1()
+    for (option_type, option_val) in pairs:
+      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
+      if fp is not None:
+        hasher.update(fp)
+    return hasher.hexdigest()
 
   @property
   def fingerprint(self):
