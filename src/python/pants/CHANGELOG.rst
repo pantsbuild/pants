@@ -16,6 +16,14 @@ pants.ini to retain the old default behavior and turn strict checking off:
   [gen.thrift]
   strict: False
 
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* The psutil dependency used by pants has been upgraded to 3.1.1. Supporting eggs have been uploaded
+  to https://github.com/pantsbuild/cheeseshop/tree/gh-pages/third_party/python/dist. *Please note*
+  that beyond this update, no further binary dependency updates will be provided at this location.
+  `RB #2543 <https://rbcommons.com/s/twitter/r/2543>`_
+
 
 0.0.39 (7/23/2015)
 ------------------
