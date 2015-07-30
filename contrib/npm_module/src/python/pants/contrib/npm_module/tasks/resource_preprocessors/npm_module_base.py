@@ -10,6 +10,7 @@ import shutil
 
 from abc import abstractmethod
 
+from pants.backend.core.tasks.task import Task
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.util.contextutil import pushd, temporary_dir
@@ -17,7 +18,7 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 from twitter.common.util.command_util import CommandUtil
 
-class NpmModuleBase():
+class NpmModuleBase(Task):
   """
     Class to downloads the module tar.gz from hosted binaries and runs the
     binary specified in bin_file
