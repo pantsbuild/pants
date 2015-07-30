@@ -44,7 +44,4 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
     </chain>
   </resolvers>
-  <caches default="default" lockStrategy="no-lock" useOrigin="true">
-    <cache name="default" basedir="${ivy.cache.dir}"/>
-  </caches>
 </ivysettings>
