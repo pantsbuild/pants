@@ -13,8 +13,10 @@ class NpmModuleIntegrationTest(PantsRunIntegrationTest):
   def test_resource_preprocessor(self):
     # TODO fix in PantsRunIntegrationTest to yield workdir
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      command = ['bundle', '--archive=zip','examples/src/java/org/pantsbuild/example/hello/main']
+      command = ['bundle', '--archive=zip',
+                 'contrib/npm_module/examples/src/java/org/pantsbuild/example/npm_module:main']
       self.run_pants_with_workdir(command, workdir)
-      with open_zip('dist/hello-example-bundle/hello-example.jar') as jar:
-        self.assertIn('examples/src/resources/example_less.rtl.css', jar.namelist())
+      with open_zip('dist/npm_module-example-bundle/npm_module-example.jar') as jar:
+        self.assertIn('contrib/npm_module/examples/src/resources/example_less.rtl.css',
+                      jar.namelist())
         self.assertIn('min/main.js', jar.namelist())
