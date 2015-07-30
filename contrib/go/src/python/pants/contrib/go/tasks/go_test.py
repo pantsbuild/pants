@@ -19,6 +19,8 @@ class GoTest(GoTask):
     round_manager.require_data('gopath')
 
   def execute(self):
+    # Only executes the tests from the package specified by the target roots, so
+    # we don't run the tests for _all_ dependencies of said package.
     for target in filter(self.is_go_source, self.context.target_roots):
       gopath = self.context.products.get_data('gopath')[target]
       self.run_go_cmd('test', gopath, target)

@@ -21,7 +21,7 @@ class GoSetupWorkspace(GoTask):
   """Sets up a standard Go workspace and links Go packages to the workspace.
 
   Enables the use of Go tools which require a $GOPATH and correctly organized
-  "src/", "pkg/", and "bin/" directories.
+  "src/", "pkg/", and "bin/" directories (e.g. `go install` or `go test`)
   """
 
   @classmethod
@@ -31,6 +31,7 @@ class GoSetupWorkspace(GoTask):
 
   @classmethod
   def product_types(cls):
+    # Produces a $GOPATH pointing to a "filled in" Go workspace.
     return ['gopath']
 
   def __init__(self, *args, **kwargs):
@@ -49,12 +50,12 @@ class GoSetupWorkspace(GoTask):
         self._symlink_local_pkg(target)
       self.context.products.get_data('gopath')[target] = self._gopath
 
-  def _symlink_local_pkg(self, go_pkg):
+  def _symlink_local_pkg(self, go_local_pkg):
     """Adds a symlink from the current Go workspace to the given local package.
 
-    :param go_pkg: A local Go package -- either a GoPackage or GoBinary target.
+    :param go_local_pkg: A local Go package (either a GoPackage or GoBinary target).
     """
-    basedir = get_basedir(go_pkg.target_base)
+    basedir = get_basedir(go_local_pkg.target_base)
     basedir_link = os.path.join(self._gopath, 'src', basedir)
     if not os.path.islink(basedir_link):
       basedir_abs = os.path.join(get_buildroot(), basedir)

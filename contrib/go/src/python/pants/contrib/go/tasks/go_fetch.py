@@ -44,6 +44,12 @@ class GoFetch(GoTask):
         self.context.products.get_data('go_remote_pkg_source')[vt.target] = dest_dir
 
   def _download_zip(self, zip_url, dest_dir):
+    """Downloads a zip file at the given URL into the given directory.
+
+    :param zip_url string: Full URL pointing to zip file.
+    :param dest_dir string: Absolute path of directory into which the unzipped contents
+                            will be placed into, not including the zip directory itself.
+    """
     safe_mkdir(dest_dir)
     stream = BytesIO(urlopen(zip_url).read())
     zfile = ZipFile(stream)
