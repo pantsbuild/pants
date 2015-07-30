@@ -18,7 +18,6 @@ import urlparse
 from collections import namedtuple
 from datetime import date, datetime
 
-import psutil
 import pystache
 from six.moves import range
 
