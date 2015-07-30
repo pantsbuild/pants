@@ -47,7 +47,7 @@ class GoTask(Task):
     return os.path.relpath(go_remote_pkg.target_base,
                            GoPlatform.global_instance().remote_pkg_root)
 
-  def run_go_cmd(self, cmd, gopath, target):
+  def run_go_cmd(self, cmd, gopath, target, cmd_flags=[], pkg_flags=[]):
     """Runs a Go command on a target from within a Go workspace.
 
     :param cmd string: Go command to execute, e.g. 'test' for `go test`
@@ -55,10 +55,12 @@ class GoTask(Task):
                           to run the command.
     :param target Target: Either a GoPackage or GoBinary whose source the command
                           will execute upon.
+    :param cmd_flags list<str>: Command line flags to pass to command.
+    :param pkg_flags list<str>: Command line flags to pass to target package.
     """
     os.environ['GOPATH'] = gopath
-    args = ['go', cmd, target.target_base]
-    res = Xargs.subprocess(args).execute([])
+    cmd = ['go', cmd] + cmd_flags + [target.target_base] + pkg_flags
+    res = Xargs.subprocess(cmd).execute([])
     if res != 0:
-      raise TaskError('`{args}` exited non-zero ({res})'
-                      .format(args=' '.join(args), res=res))
+      raise TaskError('`{cmd}` exited non-zero ({res})'
+                      .format(cmd=' '.join(cmd), res=res))

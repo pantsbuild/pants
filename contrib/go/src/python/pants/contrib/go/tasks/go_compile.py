@@ -18,6 +18,16 @@ class GoCompile(GoTask):
   """Compiles a Go package into either a library binary or executable binary."""
 
   @classmethod
+  def register_options(cls, register):
+    super(GoCompile, cls).register_options(register)
+    register('--build-flags', default='',
+             help='Build flags to pass to Go compiler.')
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(GoCompile, cls).prepare(options, round_manager)
     round_manager.require_data('gopath')
@@ -31,7 +41,9 @@ class GoCompile(GoTask):
     self.context.products.safe_create_data('go_binary', lambda: defaultdict(str))
     for target in self.context.target_roots:
       gopath = self.context.products.get_data('gopath')[target]
-      self.run_go_cmd('install', gopath, target)
+      self.run_go_cmd('install', gopath, target,
+                      cmd_flags=self.get_options().build_flags.split(),
+                      pkg_flags=self.get_passthru_args())
       if self.is_binary(target):
         binary_path = os.path.join(gopath, 'bin', os.path.basename(target.target_base))
         self.context.products.get_data('go_binary')[target] = binary_path

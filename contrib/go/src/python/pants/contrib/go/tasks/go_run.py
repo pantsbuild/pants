@@ -17,6 +17,10 @@ class GoRun(GoTask):
   """Runs an executable Go binary."""
 
   @classmethod
+  def supports_passthru_args(cls):
+    return True
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(GoRun, cls).prepare(options, round_manager)
     round_manager.require_data('go_binary')
@@ -24,7 +28,7 @@ class GoRun(GoTask):
   def execute(self):
     for target in filter(self.is_binary, self.context.target_roots):
       binary_path = self.context.products.get_data('go_binary')[target]
-      res = Xargs.subprocess([binary_path]).execute([])
+      res = Xargs.subprocess([binary_path]).execute(self.get_passthru_args())
       if res != 0:
         raise TaskError('{bin} exited non-zero ({res})'
                         .format(bin=os.path.basename(binary_path), res=res))

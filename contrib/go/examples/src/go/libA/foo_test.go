@@ -1,21 +1,28 @@
 package libA
 
 import (
+  "flag"
   "testing"
 
   "github.com/fatih/set"
 )
 
+var xfail = flag.Bool("xfail", false, "expect failure")
+
 func TestAdd(t *testing.T) {
   got, exp := Add(3, 4), 7
-  if got != exp {
-    t.Errorf("got: %d, expected: %d", got, exp)
-  }
+  assertEq(t, got, exp)
 }
 
-func TestAddToSet(t *testing.T) {
+func TestSetSize(t *testing.T) {
   got, exp := SetSize(set.New(1, 2, 3)), 3
-  if got != exp {
+  assertEq(t, got, exp)
+}
+
+func assertEq(t *testing.T, got int, exp int) {
+  if got != exp && !*xfail {
     t.Errorf("got: %d, expected: %d", got, exp)
+  } else if got == exp && *xfail {
+    t.Errorf("expected failure")
   }
 }
