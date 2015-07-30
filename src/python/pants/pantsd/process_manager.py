@@ -272,6 +272,12 @@ class ProcessManager(object):
        and also makes the first child a session leader (which can still acquire a tty). By forking a
        second time, we ensure that the second child can never acquire a controlling terminal because
        it's no longer a session leader - but it now has its own separate process group.
+
+       Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
+       the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
+       below) due to the fact that the daemons that pants would run are typically personal user
+       daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
+       differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
