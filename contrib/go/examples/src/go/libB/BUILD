@@ -1,6 +1,6 @@
 go_package(
-  name = 'libB',
-  dependencies = [
+  name='libB',
+  dependencies=[
     'contrib/go/examples/src/go/libA'
   ]
 )
