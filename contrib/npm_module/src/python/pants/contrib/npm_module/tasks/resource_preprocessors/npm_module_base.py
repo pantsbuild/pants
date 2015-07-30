@@ -10,7 +10,6 @@ import shutil
 
 from abc import abstractmethod
 
-from pants.backend.core.tasks.task import Task
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.util.contextutil import pushd, temporary_dir
@@ -18,7 +17,7 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 from twitter.common.util.command_util import CommandUtil
 
-class NpmModuleBase(Task):
+class NpmModuleBase():
   """
     Class to downloads the module tar.gz from hosted binaries and runs the
     binary specified in bin_file
@@ -50,14 +49,6 @@ class NpmModuleBase(Task):
     self._node_cachedir = None
 
   @property
-  def skip_bootstrap(self):
-    return self._skip_bootstrap
-
-  @property
-  def force_get(self):
-    return self._force_get
-
-  @property
   def module_name(self):
     """Name of the NPM Module"""
     return self._module_name
@@ -82,13 +73,6 @@ class NpmModuleBase(Task):
       self._cachedir = os.path.join(self.node_cachedir, NpmModuleBase.NODE_EXECUTABLE,
                                     'node_modules', self.module_name)
     return self._cachedir
-
-  @property
-  def chdir(self):
-    """This property specifies the directory for the executing the command."""
-    if not self._chdir:
-      self._chdir = self.cachedir
-    return self._chdir
 
   def _get_npm_module(self):
     safe_mkdir(self.binary)
@@ -120,7 +104,7 @@ class NpmModuleBase(Task):
       safe_mkdir(self.cachedir)
       with pushd(os.path.join(self.node_cachedir, NpmModuleBase.NODE_EXECUTABLE)):
         self._install_module()
-    with pushd(self.chdir):
+    with pushd(self.cachedir):
       node_environ = os.environ.copy()
       node_environ['PATH'] = os.pathsep.join([os.path.join(self.node_cachedir,
                                                            NpmModuleBase.NODE_EXECUTABLE),
