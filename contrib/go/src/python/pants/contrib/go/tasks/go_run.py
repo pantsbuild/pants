@@ -14,6 +14,7 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoRun(GoTask):
+  """Runs an executable Go binary."""
 
   @classmethod
   def prepare(cls, options, round_manager):

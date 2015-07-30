@@ -11,6 +11,7 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoTest(GoTask):
+  """Runs `go test` on Go packages."""
 
   @classmethod
   def prepare(cls, options, round_manager):

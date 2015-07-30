@@ -19,6 +19,7 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoFetch(GoTask):
+  """Downloads a 3rd party Go package."""
 
   @classmethod
   def product_types(cls):

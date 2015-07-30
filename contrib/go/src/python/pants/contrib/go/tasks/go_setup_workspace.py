@@ -18,6 +18,11 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoSetupWorkspace(GoTask):
+  """Sets up a standard Go workspace and links Go packages to the workspace.
+
+  Enables the use of Go tools which require a $GOPATH and correctly organized
+  "src/", "pkg/", and "bin/" directories.
+  """
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -45,6 +50,10 @@ class GoSetupWorkspace(GoTask):
       self.context.products.get_data('gopath')[target] = self._gopath
 
   def _symlink_local_pkg(self, go_pkg):
+    """Adds a symlink from the current Go workspace to the given local package.
+
+    :param go_pkg: A local Go package -- either a GoPackage or GoBinary target.
+    """
     basedir = get_basedir(go_pkg.target_base)
     basedir_link = os.path.join(self._gopath, 'src', basedir)
     if not os.path.islink(basedir_link):
@@ -52,6 +61,7 @@ class GoSetupWorkspace(GoTask):
       os.symlink(basedir_abs, basedir_link)
 
   def _symlink_remote_pkg(self, go_remote_pkg):
+    """Adds a symlink from the current Go workspace to the source of the given GoRemotePackage."""
     # Transforms github.com/user/lib --> $GOPATH/src/github.com/user
     remote_pkg_dir = os.path.join(self._gopath,
                                   'src',

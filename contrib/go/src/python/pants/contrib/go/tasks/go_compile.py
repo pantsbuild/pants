@@ -15,6 +15,7 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoCompile(GoTask):
+  """Compiles a Go package into either a library binary or executable binary."""
 
   @classmethod
   def prepare(cls, options, round_manager):
