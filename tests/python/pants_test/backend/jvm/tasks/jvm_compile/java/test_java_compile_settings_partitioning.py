@@ -10,7 +10,6 @@ from collections import defaultdict
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatformSettings
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.revision import Revision
 from pants.util.memo import memoized_method
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -49,18 +48,15 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     if ordered:
       # Only works in global! Isolated doesn't need this ordering.
       task = self._task_setup(targets, strategy='global', **options)
-      task.validate_platform_dependencies(targets)
       return task._strategy.ordered_compile_settings_and_targets(targets)
-    task = self._task_setup(targets, **options)
-    task.validate_platform_dependencies(targets)
+    self._task_setup(targets, **options)
     settings_and_targets = defaultdict(set)
     for target in targets:
       settings_and_targets[target.platform].add(target)
     return settings_and_targets.items()
 
   def _partition(self, targets, **options):
-    task = self._task_setup(targets, **options)
-    task.validate_platform_dependencies(targets)
+    self._task_setup(targets, **options)
     partition = defaultdict(set)
     for target in targets:
       partition[target.platform.target_level].add(target)
@@ -121,18 +117,6 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       self._version('1.7'): {java7},
       self._version('1.8'): {java8},
     }, partition)
-
-  def test_invalid_dependent_targets(self):
-    java7 = self._java('seven', '1.7')
-    java6 = self._java('six', '1.6', deps=[java7])
-    with self.assertRaises(JvmCompile.IllegalJavaTargetLevelDependency):
-      self._partition([java6, java7], platforms=self._platforms('1.6', '1.7'))
-
-  def test_invalid_dependent_targets_nonlexographic(self):
-    java7 = self._java('seven', '1.7')
-    java6 = self._java('six', '6', deps=[java7])
-    with self.assertRaises(JvmCompile.IllegalJavaTargetLevelDependency):
-      self._partition([java6, java7], platforms=self._platforms('6', '1.7'))
 
   def test_unspecified_default(self):
     java = self._java('unspecified', None)
