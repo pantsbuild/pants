@@ -12,7 +12,8 @@ from pants.base.target import Target
 
 
 class GenResources(Target):
-  RTL = 'rtl'
+  """Defines a resources and transpilers to run."""
+  RTL = 'R2'
   LESSC = 'lessc'
   REQUIRE_JS = 'requirejs'
 
@@ -35,8 +36,9 @@ class GenResources(Target):
       This is the path where the generated files will be placed in your application bundle.
     """
     if not preprocessors:
-      TargetDefinitionException(self, 'gen_resources should have a list of pre-processors. Refer'
-                                      ' `resources` go/builddictionary to use raw sources as is.')
+      TargetDefinitionException(self, 'gen_resources should have a list of pre-processors.'
+                                      'We currently support following preprocessors '
+                                      '{0}'.format(GenResources._VALID_PROCESSORS))
     self._preprocessors = set(preprocessors)
 
     payload = Payload()

@@ -1,4 +1,4 @@
 generated_resources(name='less',
-  preprocessors = ['lessc', 'rtl'],
+  preprocessors = ['lessc', 'r2'],
   sources=globs('*.less')
 )
