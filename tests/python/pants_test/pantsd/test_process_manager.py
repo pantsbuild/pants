@@ -220,8 +220,9 @@ class TestProcessManager(unittest.TestCase):
 
   def test_is_alive_zombie_exception(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      self.pm._process_name = 'old_proc'
       mock_as_process.side_effect = iter([
-        fake_process(name='test', pid=3, status=psutil.STATUS_IDLE),
+        fake_process(name='new_proc', pid=3, status=psutil.STATUS_IDLE),
         psutil.NoSuchProcess(0)
       ])
       self.assertFalse(self.pm.is_alive())
@@ -236,8 +237,14 @@ class TestProcessManager(unittest.TestCase):
 
   def test_kill(self):
     with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
+      self.pm._pid = 42
       self.pm._kill(0)
-      mock_kill.assert_called_once_with(None, 0)
+      mock_kill.assert_called_once_with(42, 0)
+
+  def test_kill_no_pid(self):
+    with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
+      self.pm._kill(0)
+      self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
   def test_terminate(self):
     with mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:

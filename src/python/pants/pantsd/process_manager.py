@@ -89,8 +89,9 @@ class ProcessManager(object):
     :returns: The command line or else `None` if the underlying process has died.
     """
     try:
-      if self._as_process():
-        return self._as_process().cmdline()
+      process = self._as_process()
+      if process:
+        return process.cmdline()
     except psutil.NoSuchProcess:
       # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       pass
@@ -112,10 +113,7 @@ class ProcessManager(object):
 
   @property
   def socket(self):
-    """The running processes socket/port information.
-
-    :returns: The socket info or else `None` if the underlying process has died.
-    """
+    """The running processes socket/port information (or None)."""
     return self._socket or self._get_socket()
 
   @staticmethod
@@ -126,6 +124,16 @@ class ProcessManager(object):
       return x
 
   def _as_process(self):
+    """Returns a psutil `Process` object wrapping our pid.
+
+    NB: Even with a process object in hand, subsequent method calls against it can always raise
+    `NoSuchProcess`.  Care is needed to document the raises in the public API or else trap them and
+    do something sensible for the API.
+
+    :returns: a psutil Process object or else None if we have no pid.
+    :rtype: :class:`psutil.Process`
+    :raises: :class:`psutil.NoSuchProcess` if the process identified by our pid has died.
+    """
     if self._process is None and self.pid:
       self._process = psutil.Process(self.pid)
     return self._process
@@ -217,10 +225,12 @@ class ProcessManager(object):
     """Return a boolean indicating whether the process is running."""
     try:
       process = self._as_process()
-      if process:
-        if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
-            (self.process_name and self.process_name != process.name())):  # Check for stale pids.
-          return False
+      if not process:
+        # Can happen if we don't find our pid.
+        return False
+      if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
+          (self.process_name and self.process_name != process.name())):  # Check for stale pids.
+        return False
     except psutil.NoSuchProcess:
       # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       return False
@@ -229,7 +239,8 @@ class ProcessManager(object):
 
   def _kill(self, kill_sig):
     """Send a signal to the current process."""
-    os.kill(self.pid, kill_sig)
+    if self.pid:
+      os.kill(self.pid, kill_sig)
 
   def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
