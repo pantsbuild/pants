@@ -13,12 +13,12 @@ from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
-from pants.goal.products import UnionProducts
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
@@ -111,8 +111,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     targets = self.context.targets()
     self.context.products.safe_create_data('ivy_cache_dir', lambda: self._cachedir)
     compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       lambda: UnionProducts())
-
+                                                       lambda: ClasspathProducts())
+    compile_classpath.add_excludes_for_targets(targets)
     # After running ivy, we parse the resulting report, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
     _, resolve_hash_name = self.ivy_resolve(
