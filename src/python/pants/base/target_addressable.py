@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from six import string_types
 
 from pants.base.addressable import Addressable
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 
 

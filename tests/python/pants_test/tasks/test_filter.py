@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-import pytest
-
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.filter import Filter

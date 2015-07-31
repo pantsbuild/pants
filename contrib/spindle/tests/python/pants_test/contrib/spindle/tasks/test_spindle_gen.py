@@ -10,9 +10,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.context import Context
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 from pants.contrib.spindle.targets.spindle_thrift_library import SpindleThriftLibrary

@@ -22,7 +22,6 @@ from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
-from pants.option.options import Options
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element

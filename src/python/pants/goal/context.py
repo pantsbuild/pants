@@ -12,7 +12,6 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import BuildGraph
 from pants.base.source_root import SourceRoot
