@@ -88,12 +88,13 @@ class NodeBinary(object):
       node_path = self._binary_util.select_binary(self._relpath, self.version,
                                                   'node-v{0}.tar.gz'.format(self.version),
                                                   write_mode='w')
-      with temporary_dir(cleanup=False) as staging_dir:
-        stage_root = os.path.join(staging_dir, 'stage')
-        TGZ.extract(node_path, stage_root, 'r:gz')
-        safe_rmtree(self.node_root)
-        logger.debug('Moving {0} to root {0}'.format(node_path, self.node_root))
-        shutil.move(stage_root, self.node_root)
+      if os.path.exists(self.node_root):
+        with temporary_dir(cleanup=False) as staging_dir:
+          stage_root = os.path.join(staging_dir, 'stage')
+          TGZ.extract(node_path, stage_root, 'r:gz')
+          safe_rmtree(self.node_root)
+          logger.debug('Moving {0} to root {0}'.format(node_path, self.node_root))
+          shutil.move(stage_root, self.node_root)
+      return os.path.join(self.node_root, 'bin')
     except IOError as e:
       raise NodeBinary.NodeInstallError('Failed to install fetch node due to {0}'.format(e))
-    return os.path.join(self.node_root, 'bin')

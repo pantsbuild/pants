@@ -21,8 +21,6 @@ jvm_binary(name = 'main-bin',
   ],
   resources=[
     'examples/src/resources/org/pantsbuild/example/hello',
-    'examples/src/resources/org/pantsbuild/example/less',
-    'examples/src/resources/org/pantsbuild/example/requirejs',
   ],
   source = 'HelloMain.java',
   main = 'org.pantsbuild.example.hello.main.HelloMain',

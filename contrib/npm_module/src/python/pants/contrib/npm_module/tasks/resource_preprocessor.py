@@ -41,9 +41,7 @@ class ResourcePreprocessor(Task):
     self._cachedir = os.path.join(self.workdir, self._module_name, self._module_version)
 
   def is_processable_target(self, target):
-    return (isinstance(target, GenResources) and
-            self.processor_name in target.preprocessors and
-            not self.processor_name in target.processed)
+    return (isinstance(target, GenResources) and self.processor_name in target.preprocessors)
 
   @classmethod
   def task_subsystems(cls):
@@ -57,7 +55,6 @@ class ResourcePreprocessor(Task):
     for target in targets:
       try:
         files = self.run_processor(target)
-        target.processed.add(self.processor_name)
         if files:
           self._create_target(target, files)
       except ResourcePreprocessor.ResourcePreprocessorError as e:
