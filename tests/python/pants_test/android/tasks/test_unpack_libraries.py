@@ -179,12 +179,13 @@ class UnpackLibrariesTest(TestAndroidBase):
           isinstance(dep, JarLibrary)
 
   def test_no_manifest(self):
-    with self.assertRaises(UnpackLibraries.MissingElementException):
-      with self.android_library(include_patterns=['**/*.class']) as android_library:
-        with temporary_dir() as temp:
-            contents = self.unpacked_aar_library(temp, manifest=False)
-            task = self.create_task(self.context())
-            archive = 'org.pantsbuild.example-1.0'
+    with self.android_library(include_patterns=['**/*.class']) as android_library:
+      with temporary_dir() as temp:
+          contents = self.unpacked_aar_library(temp, manifest=False)
+          task = self.create_task(self.context())
+          archive = 'org.pantsbuild.example-1.0'
+
+          with self.assertRaises(UnpackLibraries.MissingElementException):
             task.create_android_library_target(android_library, archive, contents)
 
   # Test unpacking process.
@@ -216,15 +217,16 @@ class UnpackLibrariesTest(TestAndroidBase):
 
 
   def test_unexpected_archive_type(self):
-    with self.assertRaises(UnpackLibraries.UnexpectedArchiveType):
-      with temporary_dir() as temp:
-        aar = self.create_aarfile(temp, 'org.pantsbuild.android.test')
-        unexpected_archive = os.path.join(temp, 'org.pantsbuild.android.test{}'.format('.other'))
-        os.rename(aar, unexpected_archive)
-        self.create_unpack_build_file()
+    with temporary_dir() as temp:
+      aar = self.create_aarfile(temp, 'org.pantsbuild.android.test')
+      unexpected_archive = os.path.join(temp, 'org.pantsbuild.android.test{}'.format('.other'))
+      os.rename(aar, unexpected_archive)
+      self.create_unpack_build_file()
 
-        target_name = 'unpack:test'
-        self._make_android_dependency('test-jar', unexpected_archive, '1.0')
+      target_name = 'unpack:test'
+      self._make_android_dependency('test-jar', unexpected_archive, '1.0')
+
+      with self.assertRaises(UnpackLibraries.UnexpectedArchiveType):
         self.unpack_libraries(target_name, unexpected_archive)
 
   # Test aar unpacking and invalidation

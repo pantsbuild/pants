@@ -47,7 +47,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--jvm-options', type=Options.list,
              help='Run the compiler with these JVM options.')
 
-    register('--args', action='append', type=Options.list,
+    register('--args', action='append',
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 

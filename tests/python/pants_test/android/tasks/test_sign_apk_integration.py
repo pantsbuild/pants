@@ -6,8 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-
-import pytest
+import unittest
 
 from pants_test.android.android_integration_test import AndroidIntegrationTest
 
@@ -27,11 +26,10 @@ class SignApkIntegrationTest(AndroidIntegrationTest):
     os.path.join('platforms', 'android-' + AndroidIntegrationTest.TARGET_SDK, 'android.jar')
   ]
 
-  requirements = AndroidIntegrationTest.requirements(TOOLS)
+  tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @pytest.mark.skipif('not SignApkIntegrationTest.requirements',
-                      reason='Jarsigner integration test requires the JDK, Android tools {0!r} '
-                             'and ANDROID_HOME set in path.'.format(TOOLS))
+  @unittest.skipUnless(tools, reason='Jarsigner integration test requires the JDK, Android '
+                                     'tools {0!r} and ANDROID_HOME set in path.'.format(TOOLS))
   def test_sign_apk(self):
     self.sign_apk_test(AndroidIntegrationTest.TEST_TARGET)
 
