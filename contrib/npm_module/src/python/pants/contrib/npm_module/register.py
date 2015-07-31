@@ -15,6 +15,7 @@ from pants.contrib.npm_module.tasks.resource_preprocessors.rtl import RTL
 
 
 def build_file_aliases():
+  # TODO: Rename this to better target once Javascript Pants design is finalized
   return BuildFileAliases.create({'generated_resources': GenResources})
 
 

@@ -12,12 +12,11 @@ import subprocess
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir
 
-from pants.contrib.npm_module.tasks.resource_preprocessors.npm_module_base import NpmModuleBase
 from pants.contrib.npm_module.targets.gen_resources import GenResources
 from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
 
 
-class RequireJS(ResourcePreprocessor, NpmModuleBase):
+class RequireJS(ResourcePreprocessor):
   """
     This Task downloads the requirejs module specified and performs the transformations
     specified by the config file --compile-requirejs-build-profile option.
@@ -38,7 +37,7 @@ class RequireJS(ResourcePreprocessor, NpmModuleBase):
     if len(target.sources_relative_to_buildroot()) > 1:
       raise TaskError('RequireJs processor takes one build profile file per target.')
     build_profile = os.path.join(self.buildroot, target.sources_relative_to_buildroot()[0])
-    cmd = [self.MODULE_EXECUTABLE, '-o', '%s' % build_profile]
+    cmd = [self.module_executable, '-o', '%s' % build_profile]
     self.context.log.debug('Executing: {0}\n'.format(' '.join(cmd)))
     process = subprocess.Popen(cmd, env=node_environ)
     result = process.wait()
@@ -52,7 +51,7 @@ class RequireJS(ResourcePreprocessor, NpmModuleBase):
     safe_mkdir(dest_dir)
     for file in os.listdir(generated_js_dir):
       if not file.endswith('min.js') and file.endswith('.js'):
-        #Copy the file to workdir at expected resource path.
+        # Copy the file to workdir at expected resource path.
         source_file = os.path.join(generated_js_dir, file)
         dest_file = os.path.join(dest_dir, file)
         shutil.copyfile(source_file, dest_file)

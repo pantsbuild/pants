@@ -8,15 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-from pants.contrib.npm_module.tasks.resource_preprocessors.npm_module_base import NpmModuleBase
-
 from pants.contrib.npm_module.targets.gen_resources import GenResources
 from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
 
 from pants.util.dirutil import safe_mkdir
 
 
-class LessC(ResourcePreprocessor, NpmModuleBase):
+class LessC(ResourcePreprocessor):
   """
     This Task downloads the lessc module specified and runs the less compiler
     on the lessc files speficed in the input target.
@@ -40,8 +38,8 @@ class LessC(ResourcePreprocessor, NpmModuleBase):
       source_file = os.path.join(self.buildroot, file)
       (file_name, ext) = os.path.splitext(os.path.basename(file))
       if ext == '.less':
-        dest_file = os.path.join(target.gen_resource_path, '%s.css' % file_name)
-        cmd = [self.MODULE_EXECUTABLE, source_file, '-x', os.path.join(self.workdir,
+        dest_file = os.path.join(target.gen_resource_path, '{0}.css'.format(file_name))
+        cmd = [self.module_executable, source_file, '-x', os.path.join(self.workdir,
                                                               dest_file)]
         self.context.log.debug('Executing: {0}\n'.format(' '.join(cmd)))
         process = subprocess.Popen(cmd, env=node_environ)

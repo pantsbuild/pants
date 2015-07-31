@@ -10,12 +10,11 @@ import subprocess
 
 from pants.util.dirutil import safe_mkdir
 
-from pants.contrib.npm_module.tasks.resource_preprocessors.npm_module_base import NpmModuleBase
 from pants.contrib.npm_module.targets.gen_resources import GenResources
 from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
 
 
-class RTL(ResourcePreprocessor, NpmModuleBase):
+class RTL(ResourcePreprocessor):
   """
     This Task downloads the RTL module and performs the RTL transformations in the .css files
     listed in the input target.
@@ -37,18 +36,17 @@ class RTL(ResourcePreprocessor, NpmModuleBase):
 
   def __init__(self, *args, **kwargs):
     super(RTL, self).__init__(*args, **kwargs)
-    self._module_name = RTL.MODULE_NAME
 
   def execute_cmd(self, target, node_environ):
-    bin = os.path.join(self.cachedir, self.MODULE_EXECUTABLE)
     files = set()
     safe_mkdir(os.path.join(self.workdir, target.gen_resource_path))
     for source_file in target.sources_relative_to_buildroot():
       source_file = os.path.join(self.buildroot, source_file)
       (file_name, ext) = os.path.splitext(os.path.basename(source_file))
-      if (ext == '.css'):
-        dest_file = os.path.join(target.gen_resource_path, '%s.rtl.css' % file_name)
-        cmd = [bin, '%s' % source_file, '%s' % os.path.join(self.workdir, dest_file)]
+      if ext == '.css':
+        dest_file = os.path.join(target.gen_resource_path, '{0}.rtl.css'.format(file_name))
+        cmd = [self.module_executable, '{0}'.format(source_file),
+               '{0}'.format(os.path.join(self.workdir, dest_file))]
         self.context.log.debug('Executing: {0}\n'.format(' '.join(cmd)))
         process = subprocess.Popen(cmd, env=node_environ)
         result = process.wait()

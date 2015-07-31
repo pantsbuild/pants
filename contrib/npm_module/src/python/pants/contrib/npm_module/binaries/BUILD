@@ -1,0 +1,9 @@
+python_library(
+  name='binaries',
+  sources=globs('*.py'),
+  dependencies=[
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
+  ]
+)
