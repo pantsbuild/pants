@@ -55,15 +55,12 @@ class ClasspathUtilTest(BaseTest):
 
     self.assertEqual([path, extra_path], classpath)
 
-  def test_complains_about_paths_outside_buildroot(self):
+  def test_relies_on_product_to_validate_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
 
     classpath_product = UnionProducts()
     classpath_product.add_for_target(a, [('default', '/dev/null')])
 
-    with self.assertRaises(TaskError) as cm:
-      ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
+    classpath = ClasspathUtil.compute_classpath([a], classpath_product, [], ['default'])
 
-    self.assertEqual(
-      str('Classpath entry /dev/null for target a:a is located outside the buildroot.'),
-      str(cm.exception))
+    self.assertEqual(['/dev/null'], classpath)

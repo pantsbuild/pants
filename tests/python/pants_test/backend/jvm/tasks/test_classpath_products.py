@@ -13,6 +13,7 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.base.exceptions import TaskError
 from pants_test.base_test import BaseTest
 
 
@@ -26,16 +27,18 @@ class ClasspathProductsTest(BaseTest):
 
     self.assertEqual([('default', path)], classpath_product.get_for_target(a))
 
-  def test_does_not_fail_if_paths_outside_buildroot(self):
+  def test_fails_if_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
 
     classpath_product = ClasspathProducts()
-    classpath_product.add_for_target(a, [('default', '/dev/null')])
+    with self.assertRaises(TaskError) as cm:
+        classpath_product.add_for_target(a, [('default', '/dev/null')])
 
     classpath = classpath_product.get_for_target(a)
 
     self.assertEqual(
-      [('default', '/dev/null')], classpath)
+      str('Classpath entry /dev/null for target a:a is located outside the buildroot.'),
+      str(cm.exception))
 
   def test_excluded_classpath_element(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])

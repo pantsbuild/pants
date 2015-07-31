@@ -9,9 +9,6 @@ import os
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-
 
 class ClasspathUtil(object):
 
@@ -47,8 +44,6 @@ class ClasspathUtil(object):
 
     classpath_tuples = classpath_products.get_for_target(target)
 
-    cls._validate_classpath_tuples(classpath_tuples, classpath_products)
-
     filtered_classpath_tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
 
     filtered_extra_classpath_tuples = cls._filter_classpath_by_confs(extra_classpath_tuples, confs)
@@ -67,8 +62,6 @@ class ClasspathUtil(object):
     """
     classpath_tuples = classpath_products.get_for_targets(targets)
 
-    cls._validate_classpath_tuples(classpath_tuples, classpath_products)
-
     tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
 
     return cls._pluck_paths(tuples)
@@ -84,19 +77,3 @@ class ClasspathUtil(object):
   @classmethod
   def _pluck_paths(cls, classpath):
     return [path for conf, path in classpath]
-
-  @classmethod
-  def _validate_classpath_tuples(cls, classpath, classpath_products):
-    """Validates that all files are located within the working copy, to simplify relativization."""
-    buildroot = get_buildroot()
-    for classpath_tuple in classpath:
-      cls._validate_path_in_buildroot(buildroot, classpath_tuple, classpath_products)
-
-  @classmethod
-  def _validate_path_in_buildroot(cls, buildroot, classpath_tuple, classpath_products):
-    conf, path = classpath_tuple
-    if os.path.relpath(path, buildroot).startswith('..'):
-      target = classpath_products.target_for_product((conf, path))
-      raise TaskError(
-        'Classpath entry {} for target {} is located outside the buildroot.'
-        .format(path, target.address.spec))
