@@ -220,12 +220,8 @@ class TestProcessManager(unittest.TestCase):
 
   def test_is_alive_zombie_exception(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
-      self.pm._process_name = 'old_proc'
-      mock_as_process.side_effect = iter([
-        fake_process(name='new_proc', pid=3, status=psutil.STATUS_IDLE),
-        psutil.NoSuchProcess(0)
-      ])
-      self.assertFalse(self.pm.is_alive())
+      mock_as_process.side_effect = psutil.NoSuchProcess(0)
+      slf.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_stale_pid(self):
