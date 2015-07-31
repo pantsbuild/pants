@@ -1,5 +1,5 @@
 python_library(
-  name='resource_preprocessors',
+  name='transpilers',
   sources=globs('*.py'),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',

@@ -7,7 +7,7 @@ python_library(
   dependencies=[
     'contrib/npm_module/src/python/pants/contrib/npm_module/targets',
     'contrib/npm_module/src/python/pants/contrib/npm_module/tasks',
-    'contrib/npm_module/src/python/pants/contrib/npm_module/tasks/resource_preprocessors',
+    'contrib/npm_module/src/python/pants/contrib/npm_module/tasks/transpilers',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/base:build_file_aliases',
   ],
