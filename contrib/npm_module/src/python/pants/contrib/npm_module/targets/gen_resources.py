@@ -12,9 +12,9 @@ from pants.base.target import Target
 
 
 class GenResources(Target):
-  """Defines a resources and transpilers to run."""
+  """Defines sources and transpilers to run."""
   RTL = 'R2'
-  LESSC = 'lessc'
+  LESSC = 'less'
   REQUIRE_JS = 'requirejs'
 
   _VALID_PROCESSORS = frozenset([RTL, LESSC, REQUIRE_JS])
