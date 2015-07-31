@@ -13,11 +13,11 @@ from pants.base.target import Target
 
 class GenResources(Target):
   """Defines sources with transpilers to run on these sources."""
-  RTL = 'R2'
-  LESSC = 'less'
+  LESS = 'less'
+  R2 = 'R2'
   REQUIRE_JS = 'requirejs'
 
-  _VALID_TRANSPILERS = frozenset([RTL, LESSC, REQUIRE_JS])
+  _VALID_TRANSPILERS = frozenset([R2, LESS, REQUIRE_JS])
   _TRANSPILERS_DESC = ['less: Less is a CSS pre-processor.',
                        'R2: A CSS LTR to RTL converter',
                        'requirejs: RequireJS is a JavaScript file and module loader.']

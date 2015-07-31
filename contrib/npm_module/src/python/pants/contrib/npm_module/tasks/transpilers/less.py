@@ -52,5 +52,5 @@ class Less(Transpiler):
 
   @property
   def transpiler_name(self):
-    return GenResources.LESSC
+    return GenResources.LESS
 
