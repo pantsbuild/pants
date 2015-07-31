@@ -36,7 +36,7 @@ class OptionsFingerprinter(object):
 
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
-    targets = self._build_graph.resolve_specs(specs)
+    targets = sorted(self._build_graph.resolve_specs(specs))
     hashes = (t.invalidation_hash() for t in targets)
     real_hashes = [h for h in hashes if h is not None]
     if not real_hashes:
