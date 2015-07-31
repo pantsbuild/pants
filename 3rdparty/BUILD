@@ -80,7 +80,7 @@ jar_library(name='protobuf-test-import',
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.17.0'),
+              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.20.0'),
             ])
 
 jar_library(name='shapeless',

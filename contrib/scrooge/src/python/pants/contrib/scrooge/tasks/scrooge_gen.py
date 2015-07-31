@@ -31,7 +31,7 @@ from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 _CONFIG_SECTION = 'scrooge-gen'
 
-_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
+_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaLibrary)
 
 
 class ScroogeGen(NailgunTask):
@@ -319,7 +319,7 @@ class ScroogeGen(NailgunTask):
       return False
 
     language = self._thrift_defaults.language(target)
-    if language not in ('scala', 'java'):
+    if language not in ('scala', 'java', 'android'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 
