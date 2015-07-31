@@ -36,8 +36,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config=config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 and one old cache file
-
+      # One artifact for java 6
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
@@ -48,7 +47,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 (old cache file) and one for 7
+      # One artifact for java 7
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
   def test_leave_none(self):
