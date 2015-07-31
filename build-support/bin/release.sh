@@ -181,6 +181,9 @@ function install_and_test_packages() {
   PIP_ARGS=(
     "$@"
     --quiet
+
+    # Make sure we go out and hit pypi to get the new packages.
+    --no-cache-dir
   )
 
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-$(local_version)!"
