@@ -5,17 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
-import httplib
 import json
 import os
 import sys
 import threading
 import time
-import urllib
 from contextlib import contextmanager
-from urlparse import urlparse
 
+import requests
+
+from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
@@ -23,7 +22,7 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import relative_symlink
+from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
 class RunTracker(Subsystem):
@@ -212,33 +211,45 @@ class RunTracker(Subsystem):
     """Log a message against the current workunit."""
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
-  def upload_stats(self):
-    """Send timing results to URL specified in pants.ini"""
+  @classmethod
+  def post_stats(cls, url, stats, timeout=2):
+    """POST stats to the given url.
+
+    :return: True if upload was successful, False otherwise.
+    """
     def error(msg):
       # Report aleady closed, so just print error.
-      print("WARNING: Failed to upload stats to {} due to {}".format(self.stats_url, msg), file=sys.stderr)
+      print('WARNING: Failed to upload stats to {} due to {}'.format(url, msg),
+            file=sys.stderr)
+      return False
+
+    # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
+    # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
+    # But this will first require changing the upload receiver at every shop that uses this
+    # (probably only Foursquare at present).
+    params = {k: json.dumps(v) for (k, v) in stats.items()}
+    try:
+      r = requests.post(url, data=params, timeout=timeout)
+      if r.status_code != requests.codes.ok:
+        return error("HTTP error code: {}".format(r.status_code))
+    except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
+      return error("Error: {}".format(e))
+    return True
+
+  def upload_stats(self):
+    """Write stats to local cache, and upload to server, if needed."""
+    stats = {
+      'run_info': self.run_info.get_as_dict(),
+      'cumulative_timings': self.cumulative_timings.get_all(),
+      'self_timings': self.self_timings.get_all(),
+      'artifact_cache_stats': self.artifact_cache_stats.get_all()
+    }
+    stats_file = os.path.join(get_pants_cachedir(), 'stats',
+                              '{}.json'.format(self.run_info.get_info('id')))
+    safe_file_dump(stats_file, json.dumps(stats))
 
     if self.stats_url:
-      params = {
-        'run_info': json.dumps(self.run_info.get_as_dict()),
-        'cumulative_timings': json.dumps(self.cumulative_timings.get_all()),
-        'self_timings': json.dumps(self.self_timings.get_all()),
-        'artifact_cache_stats': json.dumps(self.artifact_cache_stats.get_all())
-        }
-
-      headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
-      url = urlparse(self.stats_url)
-      try:
-        if url.scheme == 'https':
-          http_conn = httplib.HTTPSConnection(url.netloc, timeout=self.stats_timeout)
-        else:
-          http_conn = httplib.HTTPConnection(url.netloc, timeout=self.stats_timeout)
-        http_conn.request('POST', url.path, urllib.urlencode(params), headers)
-        resp = http_conn.getresponse()
-        if resp.status != 200:
-          error("HTTP error code: {}".format(resp.status))
-      except Exception as e:
-        error("Error: {}".format(e))
+      self.post_stats(self.stats_url, stats, timeout=self.get_options().stats_upload_timeout)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
