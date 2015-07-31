@@ -149,16 +149,6 @@ python_library(
 )
 
 python_library(
-  name = 'deprecated',
-  sources = ['deprecated.py'],
-  dependencies = [
-    '3rdparty/python:six',
-    ':revision',
-    'src/python/pants:version',
-  ]
-)
-
-python_library(
   name = 'extension_loader',
   sources = ['extension_loader.py'],
   dependencies = [
@@ -302,7 +292,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':addressable',
-    ':deprecated',
     ':exceptions',
   ],
 )
