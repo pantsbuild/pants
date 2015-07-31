@@ -43,9 +43,9 @@ class NodeBinary(object):
       register('--version', recursive=True, advanced=True, default='0.12.7',
                help='Node binary version. Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--node-root', default=os.path.join(register.bootstrap.pants_bootstrapdir,
+      register('--node-root', default=os.path.join(register.bootstrap.pants_workdir,
                                                    'node'),
-               advanced=True, help='Directory where node gets installed')
+               advanced=True, help='Directory where node gets unzipped')
 
     @property
     def node_root(self):
@@ -88,12 +88,14 @@ class NodeBinary(object):
       node_path = self._binary_util.select_binary(self._relpath, self.version,
                                                   'node-v{0}.tar.gz'.format(self.version),
                                                   write_mode='w')
-      if os.path.exists(self.node_root):
+      print(node_path)
+      print(self.node_root)
+      if not os.path.exists(self.node_root):
         with temporary_dir(cleanup=False) as staging_dir:
           stage_root = os.path.join(staging_dir, 'stage')
           TGZ.extract(node_path, stage_root, 'r:gz')
           safe_rmtree(self.node_root)
-          logger.debug('Moving {0} to root {0}'.format(node_path, self.node_root))
+          logger.debug('Moving {0} to root {1}'.format(node_path, self.node_root))
           shutil.move(stage_root, self.node_root)
       return os.path.join(self.node_root, 'bin')
     except IOError as e:

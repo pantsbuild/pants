@@ -122,13 +122,13 @@ class Transpiler(Task):
     result = process.wait()
     if result != 0:
       raise Transpiler.TranspilerError('Could not install module ({0})'
-                                                           .format(self.module_name))
+                                       .format(self.module_name))
 
   def run_transpiler(self, target):
     node_binary_path = NodeBinary.NodeFactory.scoped_instance(self).create().path
     node_environ = os.environ.copy()
     node_environ['PATH'] = os.pathsep.join([node_binary_path, node_environ['PATH']])
-    if not os.path.exists(self.cachedir):
+    if not os.path.exists(self.module_path):
       safe_mkdir(self.cachedir)
       with pushd(self.cachedir):
         self._install_module(node_environ)
