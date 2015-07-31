@@ -101,15 +101,14 @@ class ClasspathProductsTest(BaseTest):
 
     classpath = classpath_product.get_for_target(b)
 
-    self.assertEqual([('default',example_jar_path)], classpath)
+    self.assertEqual([('default', example_jar_path)], classpath)
 
   def test_excludes_used_across_targets(self):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
     classpath_product = ClasspathProducts()
-    example_jar_path = self._example_jar_path()
-    classpath_product.add_for_target(b, [('default', example_jar_path)])
+    classpath_product.add_for_target(b, [('default', self._example_jar_path())])
     classpath_product.add_excludes_for_targets([a])
 
     classpath = classpath_product.get_for_target(a)
@@ -117,32 +116,18 @@ class ClasspathProductsTest(BaseTest):
     self.assertEqual([], classpath)
 
   def test_jar_provided_by_transitive_target_excluded(self):
-    b = self.make_target('b', ExportableJvmLibrary,
+    provider = self.make_target('provider', ExportableJvmLibrary,
                          provides=Artifact('com.example', 'lib', Repository()))
-    a = self.make_target('a', JvmTarget, dependencies=[b])
+    consumer = self.make_target('consumer', JvmTarget)
+    root = self.make_target('root', JvmTarget, dependencies=[provider])
 
     classpath_product = ClasspathProducts()
-    example_jar_path = self._example_jar_path()
-    classpath_product.add_for_target(b, [('default', example_jar_path)])
-    classpath_product.add_excludes_for_targets([a, b])
+    classpath_product.add_for_target(consumer, [('default', self._example_jar_path())])
+    classpath_product.add_excludes_for_targets([root, provider, consumer])
 
-    classpath = classpath_product.get_for_target(a)
+    classpath = classpath_product.get_for_target(root)
 
     self.assertEqual([], classpath)
-
-  def test_compute_classpath_for_target_excludes_ignored_for_resolving_child_target(self):
-    b = self.make_target('b', JvmTarget)
-    a = self.make_target('a', JvmTarget, dependencies=[b],
-                         excludes=[Exclude('com.example', 'lib')])
-
-    classpath_product = ClasspathProducts()
-    example_jar_path = self._example_jar_path()
-    classpath_product.add_for_target(b, [('default', example_jar_path)])
-    classpath_product.add_excludes_for_targets([a])
-
-    classpath = classpath_product.get_for_target(b)
-
-    self.assertEqual([('default', example_jar_path)], classpath)
 
   def _example_jar_path(self):
     return os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
