@@ -215,12 +215,10 @@ class TaskBase(Optionable, AbstractClass):
     If all options have been set to None, _options_fingerprint returns None.
     """
     pairs = self.context.options.get_fingerprintable_for_scope(scope)
-    fingerprints = []
-    for (option_type, option_val) in pairs:
-      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-      if fp is not None:
-        fingerprints.append(fp)
-    return self._combine_fingerprints(fingerprints)
+    fingerprints = (self._options_fingerprinter.fingerprint(option_type, option_val)
+                    for (option_type, option_val) in pairs)
+    real_fingerprints = [fp for fp in fingerprints if fp is not None]
+    return self._combine_fingerprints(real_fingerprints)
 
   @property
   def fingerprint(self):
@@ -234,18 +232,18 @@ class TaskBase(Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     if not self._fingerprint:
-      fingerprints = []
+      real_fingerprints = []
       def add_fingerprint(scope):
         fp = self._options_fingerprint(scope)
         if fp is not None:
-          fingerprints.append(fp)
+          real_fingerprints.append(fp)
 
       add_fingerprint(self.options_scope)
       for subsystem in self.task_subsystems():
         add_fingerprint(subsystem.subscope(self.options_scope))
         add_fingerprint(subsystem.options_scope)
 
-      self._fingerprint = self._combine_fingerprints(fingerprints)
+      self._fingerprint = self._combine_fingerprints(real_fingerprints)
 
     return self._fingerprint
 
