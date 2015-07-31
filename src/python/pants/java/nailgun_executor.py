@@ -36,11 +36,11 @@ class NailgunProcessGroup(ProcessGroup):
 
   def _iter_nailgun_instances(self, everywhere=False):
     def predicate(proc):
-      if proc.name == NailgunExecutor._PROCESS_NAME:
+      if proc.name() == NailgunExecutor._PROCESS_NAME:
         if not everywhere:
-          return NailgunExecutor._PANTS_NG_ARG in proc.cmdline
+          return NailgunExecutor._PANTS_NG_ARG in proc.cmdline()
         else:
-          return any(arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX) for arg in proc.cmdline)
+          return any(arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX) for arg in proc.cmdline())
 
     return self.iter_instances(predicate)
 
