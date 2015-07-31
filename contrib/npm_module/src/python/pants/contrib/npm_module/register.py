@@ -9,9 +9,9 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.npm_module.targets.gen_resources import GenResources
-from pants.contrib.npm_module.tasks.resource_preprocessors.lessc import LessC
-from pants.contrib.npm_module.tasks.resource_preprocessors.requirejs import RequireJS
-from pants.contrib.npm_module.tasks.resource_preprocessors.rtl import RTL
+from pants.contrib.npm_module.tasks.transpilers.lessc import LessC
+from pants.contrib.npm_module.tasks.transpilers.requirejs import RequireJS
+from pants.contrib.npm_module.tasks.transpilers.rtl import RTL
 
 
 def build_file_aliases():

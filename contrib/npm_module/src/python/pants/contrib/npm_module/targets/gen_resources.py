@@ -12,17 +12,18 @@ from pants.base.target import Target
 
 
 class GenResources(Target):
-  """Defines sources and transpilers to run."""
+  """Defines sources with transpilers to run on these sources."""
   RTL = 'R2'
   LESSC = 'less'
   REQUIRE_JS = 'requirejs'
 
-  _VALID_PROCESSORS = frozenset([RTL, LESSC, REQUIRE_JS])
+  _VALID_TRANSPILERS = frozenset([RTL, LESSC, REQUIRE_JS])
+  _VALID_TRANSPILERS_LIST = ', '.join(str(e) for e in _VALID_TRANSPILERS)
 
   def __init__(self,
                address=None,
                sources=None,
-               preprocessors=None,
+               transpilers=None,
                gen_resource_path=None,
                **kwargs):
     """
@@ -30,43 +31,37 @@ class GenResources(Target):
       build file defines the target :class:`pants.base.address.Address`.
     :param sources: A list of filenames representing the resources
       this library provides.
-    :param preprocessors: A list of preprocessors tasks
+    :param transpilers: A list of transpilers tasks
     :param gen_resource_path: The path where the files need to generated.
       [Default] Target base directory
       This is the path where the generated files will be placed in your application bundle.
     """
-    if not preprocessors:
-      TargetDefinitionException(self, 'gen_resources should have a list of pre-processors.'
-                                      'We currently support following preprocessors '
-                                      '{0}'.format(GenResources._VALID_PROCESSORS))
-    self._preprocessors = set(preprocessors)
-
     payload = Payload()
     payload.add_fields({
       'sources': SourcesField(sources=self.assert_list(sources),
                               sources_rel_path=address.spec_path),
-    })
-
+      })
     super(GenResources, self).__init__(address=address, payload=payload, **kwargs)
 
-    for preprocessor in preprocessors:
-      if preprocessor not in GenResources._VALID_PROCESSORS:
-        exp_message = ('Pre-processor {preprocessor} not in found.\nDid you mean one of these?'
-                       '\n{valid}').format(preprocessor=preprocessor,
-                                           valid=GenResources._VALID_PROCESSORS)
+    if not transpilers:
+      raise TargetDefinitionException(self, 'gen_resources should have a list of transpilers.'
+        'We currently support transpilers {0}'.format(GenResources._VALID_TRANSPILERS_LIST))
+
+    self._transpilers = set(transpilers)
+
+    for transpiler in transpilers:
+      if transpiler not in GenResources._VALID_TRANSPILERS:
+        exp_message = ('Transpiler {transpiler} not in found.\nDid you mean one of these?'
+                       '\n{valid}').format(transpiler=transpiler,
+                                           valid=GenResources._VALID_TRANSPILERS_LIST)
         raise TargetDefinitionException(self, exp_message)
 
-    self._processed = set()
     self._gen_resource_path = gen_resource_path or self.target_base
 
   @property
-  def preprocessors(self):
-    return self._preprocessors
+  def transpilers(self):
+    return self._transpilers
 
   @property
   def gen_resource_path(self):
     return self._gen_resource_path
-
-  @property
-  def processed(self):
-    return self._processed

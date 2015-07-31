@@ -11,10 +11,10 @@ import subprocess
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.npm_module.targets.gen_resources import GenResources
-from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
+from pants.contrib.npm_module.tasks.transpiler import Transpiler
 
 
-class RTL(ResourcePreprocessor):
+class RTL(Transpiler):
   """
     This Task downloads the RTL module and performs the RTL transformations in the .css files
     listed in the input target.
@@ -51,11 +51,11 @@ class RTL(ResourcePreprocessor):
         process = subprocess.Popen(cmd, env=node_environ)
         result = process.wait()
         if result != 0:
-          raise ResourcePreprocessor.ResourcePreprocessorError('{0} ... exited non-zero ({1})'
+          raise Transpiler.TranspilerError('{0} ... exited non-zero ({1})'
                                                                .format(self.module_name, result))
         files.add(dest_file)
     return files
 
   @property
-  def processor_name(self):
+  def transpiler_name(self):
     return GenResources.RTL

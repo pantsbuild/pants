@@ -9,12 +9,12 @@ import os
 import subprocess
 
 from pants.contrib.npm_module.targets.gen_resources import GenResources
-from pants.contrib.npm_module.tasks.resource_preprocessor import ResourcePreprocessor
+from pants.contrib.npm_module.tasks.transpiler import Transpiler
 
 from pants.util.dirutil import safe_mkdir
 
 
-class LessC(ResourcePreprocessor):
+class LessC(Transpiler):
   """
     This Task downloads the lessc module specified and runs the less compiler
     on the lessc files speficed in the input target.
@@ -45,12 +45,12 @@ class LessC(ResourcePreprocessor):
         process = subprocess.Popen(cmd, env=node_environ)
         result = process.wait()
         if result != 0:
-          raise ResourcePreprocessor.ResourcePreprocessorError('{0} ... exited non-zero ({1})'
+          raise Transpiler.TranspilerError('{0} ... exited non-zero ({1})'
                                                                .format(self.module_name, result))
         files.add(dest_file)
     return files
 
   @property
-  def processor_name(self):
+  def transpiler_name(self):
     return GenResources.LESSC
 

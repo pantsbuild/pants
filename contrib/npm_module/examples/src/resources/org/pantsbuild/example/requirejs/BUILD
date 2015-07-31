@@ -1,5 +1,5 @@
 generated_resources(name='requirejs',
-  preprocessors = ['requirejs'],
+  transpilers = ['requirejs'],
   sources=['buildconfig.js'],
   gen_resource_path='min'
 )
