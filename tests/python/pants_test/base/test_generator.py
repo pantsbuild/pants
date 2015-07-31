@@ -11,6 +11,7 @@ from pants.base.generator import TemplateData
 
 
 class TemplateDataTest(unittest.TestCase):
+
   def setUp(self):
     self.data = TemplateData(foo = 'bar', baz = 42)
 

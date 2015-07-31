@@ -20,6 +20,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class CheckPublishedDepsTest(ConsoleTaskTestBase):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(

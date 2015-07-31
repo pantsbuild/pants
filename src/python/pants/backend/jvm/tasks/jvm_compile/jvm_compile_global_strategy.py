@@ -197,7 +197,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     return (self._partition_size_hint, locally_changed_targets)
 
-
   def ordered_compile_settings_and_targets(self, relevant_targets):
     """Groups the targets into ordered chunks, dependencies before dependees.
 

@@ -13,6 +13,7 @@ from pants_test.testutils.compile_strategy_utils import provide_compile_strategi
 
 
 class JvmExamplesCompileIntegrationTest(BaseCompileIT):
+
   @provide_compile_strategies
   def test_java_src_zinc_compile(self, strategy):
     self.do_test_compile('examples/src/java/::', strategy, extra_args=['--compile-zinc-java-enabled'])

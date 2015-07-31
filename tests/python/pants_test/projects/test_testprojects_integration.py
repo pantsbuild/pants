@@ -10,6 +10,7 @@ from pants_test.testutils.compile_strategy_utils import provide_compile_strategi
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
+
   @provide_compile_strategies
   def tests_testprojects(self, strategy):
     # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.

@@ -12,6 +12,7 @@ from pants.option.errors import ParseError
 
 
 class CustomTypesTest(unittest.TestCase):
+
   def _do_test(self, expected_val, s):
     if isinstance(expected_val, dict):
       val = dict_type(s)

@@ -345,6 +345,7 @@ class ReportingServer(object):
     renderer = MustacheRenderer(settings.template_dir, __name__)
 
     class MyHandler(PantsHandler):
+
       def __init__(self, request, client_address, server):
         PantsHandler.__init__(self, settings, renderer, request, client_address, server)
 
@@ -359,6 +360,7 @@ class ReportingServer(object):
 
 
 class ReportingServerManager(ProcessManager):
+
   def __init__(self, context=None, options=None):
     ProcessManager.__init__(self, name='reporting_server')
     self.context = context

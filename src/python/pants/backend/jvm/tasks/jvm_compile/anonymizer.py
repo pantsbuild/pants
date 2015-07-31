@@ -58,7 +58,6 @@ class TokenTranslator(object):
     n = random.randint(20, 200)
     return base64.b64encode(os.urandom(n))
 
-
   # Break on delimiters (digits, space, forward slash, dash, underscore, dollar, period) and on
   # upper-case letters.
   _DELIMITER = r'\d|\s|/|-|_|\$|\.'

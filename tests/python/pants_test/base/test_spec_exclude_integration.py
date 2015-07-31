@@ -21,6 +21,7 @@ class Bundles(object):
   phrase_path = 'testprojects/src/java/org/pantsbuild/testproject/phrases'
 
   class Bundle(object):
+
     def __init__(self, spec, text):
       self.spec = spec
       self.text = text

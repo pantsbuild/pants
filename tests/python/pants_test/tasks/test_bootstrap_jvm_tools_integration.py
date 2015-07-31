@@ -10,6 +10,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
+
   def test_scala_java_reuse(self):
     with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
       bootstrap_args = [

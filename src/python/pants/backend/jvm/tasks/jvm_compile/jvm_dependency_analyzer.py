@@ -20,6 +20,7 @@ from pants.base.exceptions import TaskError
 
 
 class JvmDependencyAnalyzer(object):
+
   def __init__(self,
                context,
                check_missing_deps,
@@ -169,7 +170,6 @@ class JvmDependencyAnalyzer(object):
                                   .format(src_tgt.address.reference(), shorten(dep)))
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
-
 
       missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
 

@@ -80,6 +80,7 @@ TEMPLATE_MUSTACHE = """
 
 
 class AllTheThingsTestCase(unittest.TestCase):
+
   def setUp(self):
     self.config = json.loads(CONFIG_JSON)
     self.soups = {
@@ -132,7 +133,6 @@ class AllTheThingsTestCase(unittest.TestCase):
                                   '{{title}}')
     self.assertEqual(p1_html, u'東京 is Tokyo',
                      """Didn't find correct non-ASCII title""")
-
 
   def test_page_toc(self):
     # One of our "pages" has a couple of basic headings.

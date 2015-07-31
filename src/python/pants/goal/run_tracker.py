@@ -305,7 +305,6 @@ class RunTracker(Subsystem):
       self.report.start_workunit(self._background_root_workunit)
     return self._background_root_workunit
 
-
   def background_worker_pool(self):
     if self._background_worker_pool is None:  # Initialize lazily.
       self._background_worker_pool = WorkerPool(parent_workunit=self.get_background_root_workunit(),

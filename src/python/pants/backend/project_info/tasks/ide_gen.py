@@ -126,6 +126,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     """IdeGen Error."""
 
   class TargetUtil(object):
+
     def __init__(self, context):
       self.context = context
 

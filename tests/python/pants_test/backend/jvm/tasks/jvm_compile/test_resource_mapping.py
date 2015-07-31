@@ -10,6 +10,7 @@ from pants_test.base_test import BaseTest
 
 
 class ResourceMappingTest(BaseTest):
+
   def test_resource_mapping_ok(self):
     rel_dir = 'tests/python/pants_test/backend/jvm/tasks/jvm_compile/test-data/resource_mapping'
     resource_mapping = ResourceMapping(rel_dir)
@@ -36,7 +37,6 @@ class ResourceMappingTest(BaseTest):
 
     with self.assertRaises(ResourceMapping.UnparseableLineException):
       resource_mapping.mappings
-
 
   def test_resource_mapping_noitems(self):
     rel_dir = 'tests/python/pants_test/backend/jvm/tasks/jvm_compile/test-data/resource_mapping-broken-missing-items'

@@ -12,6 +12,7 @@ from pants_test.testutils.compile_strategy_utils import provide_compile_strategi
 
 
 class ScalaCompileIntegrationTest(BaseCompileIT):
+
   @provide_compile_strategies
   def test_scala_compile(self, strategy):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless',

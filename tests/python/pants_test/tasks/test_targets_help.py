@@ -13,6 +13,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 # are the PREDEFS, things like "dependencies: Old name for 'target'".
 # But we can make sure they don't blow up.
 class TargetsHelpTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return TargetsHelp

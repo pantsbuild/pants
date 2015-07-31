@@ -20,6 +20,7 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class WireGenTest(TaskTestBase):
+
   @classmethod
   def task_type(cls):
     return WireGen

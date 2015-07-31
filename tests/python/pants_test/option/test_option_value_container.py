@@ -13,6 +13,7 @@ from pants.option.ranked_value import RankedValue
 
 
 class OptionValueContainerTest(unittest.TestCase):
+
   def test_standard_values(self):
     o = OptionValueContainer()
     o.foo = 1

@@ -71,6 +71,7 @@ class BinaryUtil(object):
     pass
 
   class BinaryNotFound(TaskError):
+
     def __init__(self, binary, accumulated_errors):
       super(BinaryUtil.BinaryNotFound, self).__init__(
           'Failed to fetch binary {binary} from any source: ({sources})'

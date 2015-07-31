@@ -18,6 +18,7 @@ from pants_test.base_test import BaseTest
 
 
 class PayloadTest(BaseTest):
+
   def test_excludes_field(self):
     empty = ExcludesField()
     empty_fp = empty.fingerprint()
@@ -264,6 +265,7 @@ class PayloadTest(BaseTest):
 
   def test_fingerprinted_field(self):
     class TestValue(FingerprintedMixin):
+
       def __init__(self, test_value):
         self.test_value = test_value
 

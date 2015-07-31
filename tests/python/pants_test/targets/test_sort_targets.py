@@ -12,6 +12,7 @@ from pants_test.base_test import BaseTest
 
 
 class SortTargetsTest(BaseTest):
+
   def test_validation(self):
     valid = self.make_target(':valid')
 

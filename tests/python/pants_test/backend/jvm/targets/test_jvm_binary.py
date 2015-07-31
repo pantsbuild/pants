@@ -20,6 +20,7 @@ from pants_test.base_test import BaseTest
 
 
 class JarRulesTest(unittest.TestCase):
+
   def test_jar_rule(self):
     dup_rule = Duplicate('foo', Duplicate.REPLACE)
     self.assertEquals('Duplicate(apply_pattern=foo, action=REPLACE)',
@@ -57,6 +58,7 @@ class JarRulesTest(unittest.TestCase):
 
 
 class JvmBinaryTest(BaseTest):
+
   @property
   def alias_groups(self):
     return register_jvm()

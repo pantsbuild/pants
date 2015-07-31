@@ -17,6 +17,7 @@ from pants.option.scope import ScopeInfo
 
 
 class GroupMember(TaskBase):
+
   @classmethod
   def name(cls):
     """Returns a name for this group for display purposes.

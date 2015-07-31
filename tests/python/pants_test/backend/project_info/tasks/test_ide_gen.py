@@ -13,6 +13,7 @@ from pants_test.base_test import BaseTest
 
 
 class IdeGenTest(BaseTest):
+
   def test_collapse_source_root(self):
     source_set_list = []
     self.assertEquals([], Project._collapse_by_source_root(source_set_list))

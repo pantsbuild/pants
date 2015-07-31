@@ -13,6 +13,7 @@ from pants_test.base_test import BaseTest
 
 
 class TestPythonBinary(BaseTest):
+
   def test_python_binary_must_have_some_entry_point(self):
     with pytest.raises(TargetDefinitionException):
       self.make_target(spec=':binary', target_type=PythonBinary)

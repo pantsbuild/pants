@@ -41,6 +41,7 @@ class NailgunSession(object):
     self._err = err
 
   class _InputReader(threading.Thread):
+
     def __init__(self, ins, sock, buff_size):
       threading.Thread.__init__(self)
       self.daemon = True

@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
+
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)

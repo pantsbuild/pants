@@ -129,6 +129,7 @@ class InvalidationCheck(object):
 
     # Hack around the python outer scope problem.
     class VtGroup(object):
+
       def __init__(self):
         self.vts = []
         self.total_chunking_units = 0

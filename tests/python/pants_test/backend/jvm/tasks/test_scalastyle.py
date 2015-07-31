@@ -238,7 +238,6 @@ class ScalastyleTest(NailgunTaskTestBase):
 
     self.execute(context)
 
-
   def test_fail(self):
     # Default scalastyle config (import grouping rule) and no excludes.
 

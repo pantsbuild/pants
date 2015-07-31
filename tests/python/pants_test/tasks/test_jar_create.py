@@ -23,6 +23,7 @@ from pants_test.tasks.task_test_base import ensure_cached
 
 
 class JarCreateTestBase(JarTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return JarCreate
@@ -44,6 +45,7 @@ class JarCreateTestBase(JarTaskTestBase):
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
 
 class JarCreateMiscTest(JarCreateTestBase):
+
   def test_jar_create_init(self):
     self.create_task(self.context(), '/tmp/workdir')
 
@@ -56,6 +58,7 @@ class JarCreateMiscTest(JarCreateTestBase):
 
 
 class JarCreateExecuteTest(JarCreateTestBase):
+
   def java_library(self, path, name, sources, **kwargs):
     return self.create_library(path, 'java_library', name, sources, **kwargs)
 
@@ -118,7 +121,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
     return super(JarCreateExecuteTest, self).context(
       target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
-
 
   def assert_jar_contents(self, context, product_type, target, *contents):
     jar_mapping = context.products.get(product_type).get(target)

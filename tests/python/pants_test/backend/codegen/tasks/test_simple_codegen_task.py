@@ -19,6 +19,7 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class SimpleCodegenTaskTest(TaskTestBase):
+
   @classmethod
   def task_type(cls):
     return cls.DummyGen
@@ -336,5 +337,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
       return JavaLibrary
 
     class DummyGlobalStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
+
       def find_sources(self, target):
         return self._task.sources_generated_by_target(target)

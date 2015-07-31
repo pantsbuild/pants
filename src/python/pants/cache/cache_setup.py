@@ -27,7 +27,6 @@ class InvalidCacheSpecError(ArtifactCacheError): pass
 class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
 
-
 class CacheSetup(Subsystem):
   options_scope = 'cache'
 
@@ -61,6 +60,7 @@ class CacheSetup(Subsystem):
 
 
 class CacheFactory(object):
+
   def __init__(self, options, log, stable_name, pinger=None):
     self._options = options
     self._log = log
