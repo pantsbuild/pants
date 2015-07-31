@@ -46,9 +46,8 @@ class Zipalign(AndroidTask):
     #   : '-f' is to force overwrite of existing outfile.
     #   :  '4' is the mandated byte-alignment boundaries. If not 4, zipalign doesn't do anything.
     #   :   Final two args are infile, outfile.
-
-    outfile = os.path.join(self.zipalign_out(target),
-                           '{0}.signed.apk'.format(target.manifest.package_name))
+    output_name = '{0}.signed.apk'.format(target.manifest.package_name)
+    outfile = os.path.join(self.zipalign_out(target), output_name)
     args = [self.zipalign_binary(target), '-f', '4', package, outfile]
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
