@@ -139,12 +139,13 @@ jar_library(name = 'junit',
 
 jar_library(name = 'scrooge-gen',
             jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.10', rev='3.16.3')
+              jar(org='com.twitter', name='scrooge-generator_2.10', rev='3.20.0')
+                .exclude(org = 'org.apache.thrift', name = 'libthrift')
             ])
 
 jar_library(name = 'scrooge-linter',
             jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.10', rev='3.16.3')
+              jar(org='com.twitter', name='scrooge-linter_2.10', rev='3.20.0')
             ])
 
 jar_library(name = 'spindle-codegen',
