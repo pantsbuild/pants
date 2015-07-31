@@ -18,13 +18,12 @@ from pkg_resources import resource_string
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.plugins import list_plugins
+from pants.backend.python.tasks.checkstyle.plugins.list_plugins import list_plugins
 from pants.backend.python.tasks.python_task import PythonTask
 # from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.util.dirutil import safe_open
 
-
-#from pants.backend.python.tasks.checkstyle.plugins.list_plugins import list_plugins
 
 class PythonStyleException(Exception):pass
 
@@ -82,6 +81,8 @@ class PythonStyle(PythonTask):
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
     register('--suppress', type=str, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
+    register('--fail', default=True, action='store_true',
+             help='Prevent test failure but still produce output for problems.')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -115,7 +116,7 @@ class PythonStyle(PythonTask):
       return should_fail
 
     options = self.get_options()
-    if not(options.enable_plugins or options.disable_plugins or options.all):
+    if not(options.enable_plugins or options.disable_plugins or options.all or options.list):
       return  # Disable the any checks by default
 
     plugins = list_plugins()
@@ -162,7 +163,7 @@ class PythonStyle(PythonTask):
       else:
         should_fail |= parse_and_apply_filter(
           filename, plugins_copy, should_fail, severity, options.strict)
-    if should_fail:
+    if should_fail and options.fail:
       raise PythonStyleException()
 
   def execute(self):
