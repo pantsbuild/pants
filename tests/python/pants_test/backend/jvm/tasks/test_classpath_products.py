@@ -37,7 +37,7 @@ class ClasspathProductsTest(BaseTest):
     classpath = classpath_product.get_for_target(a)
 
     self.assertEqual(
-      str('Classpath entry /dev/null for target a:a is located outside the buildroot.'),
+      'Classpath entry /dev/null for target a:a is located outside the buildroot.',
       str(cm.exception))
 
   def test_excluded_classpath_element(self):

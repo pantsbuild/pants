@@ -81,7 +81,7 @@ class ClasspathProducts(object):
 
   def _validate_path_in_buildroot(self, classpath_tuple, target):
     conf, path = classpath_tuple
-    if os.path.relpath(path, self._buildroot).startswith('..'):
+    if os.path.relpath(path, self._buildroot).startswith(os.pardir):
       raise TaskError(
         'Classpath entry {} for target {} is located outside the buildroot.'
         .format(path, target.address.spec))
