@@ -41,11 +41,11 @@ class GoTask(Task):
     A Go global import identifier is the "url" used to "go get" the remote package.
     Example: "github.com/user/mylib".
 
-    A GoRemotePackage's global identifier is the relative path from the configured
-    "remote-pkg-root" to the BUILD file initializing the GoRemotePackage.
+    A GoRemotePackage's global identifier is the relative path from the source
+    root of all 3rd party Go packages to the BUILD file declaring the GoRemotePacakge.
     """
-    return os.path.relpath(go_remote_pkg.target_base,
-                           GoPlatform.global_instance().remote_pkg_root)
+    return os.path.relpath(go_remote_pkg.address.spec_path,
+                           go_remote_pkg.target_base)
 
   def run_go_cmd(self, cmd, gopath, target, cmd_flags=[], pkg_flags=[]):
     """Runs a Go command on a target from within a Go workspace.
@@ -59,7 +59,7 @@ class GoTask(Task):
     :param pkg_flags list<str>: Command line flags to pass to target package.
     """
     os.environ['GOPATH'] = gopath
-    cmd = ['go', cmd] + cmd_flags + [target.target_base] + pkg_flags
+    cmd = ['go', cmd] + cmd_flags + [target.address.spec_path] + pkg_flags
     res = Xargs.subprocess(cmd).execute([])
     if res != 0:
       raise TaskError('`{cmd}` exited non-zero ({res})'

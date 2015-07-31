@@ -45,5 +45,5 @@ class GoCompile(GoTask):
                       cmd_flags=self.get_options().build_flags.split(),
                       pkg_flags=self.get_passthru_args())
       if self.is_binary(target):
-        binary_path = os.path.join(gopath, 'bin', os.path.basename(target.target_base))
+        binary_path = os.path.join(gopath, 'bin', os.path.basename(target.address.spec_path))
         self.context.products.get_data('go_binary')[target] = binary_path

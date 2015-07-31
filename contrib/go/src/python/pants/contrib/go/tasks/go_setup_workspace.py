@@ -55,7 +55,7 @@ class GoSetupWorkspace(GoTask):
 
     :param go_local_pkg: A local Go package (either a GoPackage or GoBinary target).
     """
-    basedir = get_basedir(go_local_pkg.target_base)
+    basedir = get_basedir(go_local_pkg.address.spec_path)
     basedir_link = os.path.join(self._gopath, 'src', basedir)
     if not os.path.islink(basedir_link):
       basedir_abs = os.path.join(get_buildroot(), basedir)
