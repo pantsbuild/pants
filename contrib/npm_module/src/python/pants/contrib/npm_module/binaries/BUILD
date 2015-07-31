@@ -3,6 +3,7 @@ python_library(
   sources=globs('*.py'),
   dependencies=[
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/fs',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
   ]

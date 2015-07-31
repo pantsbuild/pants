@@ -8,7 +8,6 @@ python_library(
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/binaries:binary_util',
-    'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
