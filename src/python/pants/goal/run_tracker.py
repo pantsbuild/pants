@@ -212,7 +212,7 @@ class RunTracker(Subsystem):
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
-  def post_stats(cls, url, stats):
+  def post_stats(cls, url, stats, timeout=2):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
@@ -229,7 +229,7 @@ class RunTracker(Subsystem):
     # (probably only Foursquare at present).
     params = {k: json.dumps(v) for (k, v) in stats.items()}
     try:
-      r = requests.post(url, data=params)
+      r = requests.post(url, data=params, timeout=timeout)
       if r.status_code != requests.codes.ok:
         return error("HTTP error code: {}".format(r.status_code))
     except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
@@ -249,7 +249,7 @@ class RunTracker(Subsystem):
     safe_file_dump(stats_file, json.dumps(stats))
 
     if self.stats_url:
-      self.post_stats(self.stats_url, stats)
+      self.post_stats(self.stats_url, stats, timeout=self.get_options().stats_upload_timeout)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
