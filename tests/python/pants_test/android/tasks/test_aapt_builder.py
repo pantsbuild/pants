@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.android.tasks.aapt_builder import AaptBuilder
 from pants_test.android.test_android_base import TestAndroidBase, distribution
 
@@ -20,9 +22,8 @@ class TestAaptBuilder(TestAndroidBase):
     task.execute()
 
   def test_creates_apk(self):
-    with self.android_binary(target_name='example',
-                             package_name='org.pantsbuild.example') as binary:
-      self.assertTrue(AaptBuilder.package_name(binary).endswith(".apk"))
+    with self.android_binary(target_name='example', package_name='org.pantsbuild.example') as apk:
+      self.assertTrue(AaptBuilder.package_name(apk).endswith('.apk'))
 
   def test_unique_package_name(self):
     with self.android_binary(target_name='example', package_name='org.pantsbuild.example') as bin1:
@@ -35,7 +36,7 @@ class TestAaptBuilder(TestAndroidBase):
         self.set_options(sdk_path=dist)
         task = self.create_task(self.context())
         rendered_args = task._render_args(android_binary, 'res', ['classes.dex'])
-        self.assertTrue(rendered_args[0].endswith('aapt'))
+        self.assertEquals(os.path.basename(rendered_args[0]), 'aapt')
         self.assertEquals(rendered_args[-1], 'classes.dex')
 
   def test_resource_order_in_args(self):
@@ -49,7 +50,6 @@ class TestAaptBuilder(TestAndroidBase):
 
               res_dirs = [res1.resource_dir, res2.resource_dir]
               rendered_args = task._render_args(target, res_dirs, 'classes.dex')
-              self.assertTrue(rendered_args[0].endswith('/aapt'))
 
               args_string = ' '.join(rendered_args)
               self.assertIn('--auto-add-overlay -S {} -S '

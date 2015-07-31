@@ -28,7 +28,7 @@ class SignApkIntegrationTest(AndroidIntegrationTest):
 
   tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @unittest.skipIf(not tools, reason='Jarsigner integration test requires the JDK, Android '
+  @unittest.skipUnless(tools, reason='Jarsigner integration test requires the JDK, Android '
                                      'tools {0!r} and ANDROID_HOME set in path.'.format(TOOLS))
   def test_sign_apk(self):
     self.sign_apk_test(AndroidIntegrationTest.TEST_TARGET)

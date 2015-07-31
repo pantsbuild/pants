@@ -51,18 +51,20 @@ class TestAaptGen(TestAndroidBase):
   def test_aapt_tool(self):
     with distribution() as dist:
       with self.android_binary() as android_binary:
-        build_tools = '20.0.0'
-        self.set_options(sdk_path=dist, build_tools_version=build_tools)
+        self.set_options(sdk_path=dist, build_tools_version='20.0.0')
         task = self.create_task(self.context())
-        target = android_binary
-        self.assertTrue(task.aapt_tool(target.build_tools_version).endswith('20.0.0/aapt'))
+        aapt_tool = task.aapt_tool(android_binary)
+        self.assertEquals(os.path.basename(os.path.dirname(aapt_tool)), '20.0.0')
+        self.assertEquals(os.path.basename(aapt_tool), 'aapt')
 
   def test_android_tool(self):
     with distribution() as dist:
       with self.android_binary() as android_binary:
-        self.set_options(sdk_path=dist)
+        self.set_options(sdk_path=dist, target_sdk='18')
         task = self.create_task(self.context())
-        self.assertTrue(task.android_jar(android_binary).endswith('android.jar'))
+        android_jar = task.android_jar(android_binary)
+        self.assertEquals(os.path.basename(os.path.dirname(android_jar)), 'android-18')
+        self.assertEquals(os.path.basename(android_jar), 'android.jar')
 
   def test_render_args(self):
     with distribution() as dist:
@@ -71,7 +73,7 @@ class TestAaptGen(TestAndroidBase):
           self.set_options(sdk_path=dist)
           task = self.create_task(self.context())
           rendered_args = task._render_args(binary, binary.manifest, [resources.resource_dir])
-          self.assertTrue(rendered_args[0].endswith('aapt'))
+        self.assertEquals(os.path.basename(rendered_args[0]), 'aapt')
 
   def test_priority_order_in_render_args(self):
     with distribution() as dist:
@@ -88,17 +90,14 @@ class TestAaptGen(TestAndroidBase):
               self.assertIn('--auto-add-overlay -S {} -S '
                             '{}'.format(res1.resource_dir, res2.resource_dir), args_string)
 
-  def test_render_args_force_args(self):
+  def test_render_args_force_ignored(self):
     with distribution() as dist:
       with self.android_resources() as resources:
         with self.android_binary(dependencies=[resources]) as binary:
-          build_tools = '20.0.0'
           ignored = '!picasa.ini:!*~:BUILD*'
-          self.set_options(sdk_path=dist, build_tools_version=build_tools, ignored_assets=ignored)
+          self.set_options(sdk_path=dist, ignored_assets=ignored)
           task = self.create_task(self.context())
           rendered_args = task._render_args(binary, binary.manifest, [resources.resource_dir])
-
-          self.assertTrue(rendered_args[0].endswith('/20.0.0/aapt'))
           self.assertIn(ignored, rendered_args)
 
   def test_create_target(self):

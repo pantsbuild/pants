@@ -65,8 +65,6 @@ class AaptGen(AaptTask):
     :param list binaries: A list of AndroidBinary targets.
     """
     # Prepare exactly N android jar targets where N is the number of SDKs in-play.
-    # sdks = set(ar.target_sdk for ar in binaries)
-    # for sdk in sdks:
     for binary in binaries:
       sdk = binary.target_sdk
       if sdk not in self._jar_library_by_sdk:
@@ -107,22 +105,22 @@ class AaptGen(AaptTask):
   def execute(self):
     # The number of R.java files produced from each library is == |sdks in play for its dependees|.
     # The number of R.java files produced for each android_binary == |android_library deps| + 1
-    targets = self.context.targets(self.is_android_binary)
-    self.create_sdk_jar_deps(targets)
-    for target in targets:
+    binaries = self.context.targets(self.is_android_binary)
+    self.create_sdk_jar_deps(binaries)
+    for binary in binaries:
       # TODO(mateo) add invalidation framework. Adding it here doesn't work right now because the
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
 
-      gentargets = [target]
+      gentargets = [binary]
       def gather_gentargets(tgt):
         """Gather all AndroidLibrary targets that have a manifest."""
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:
           gentargets.append(tgt)
-      target.walk(gather_gentargets)
+      binary.walk(gather_gentargets)
 
       for gen in gentargets:
         aapt_output = self._relative_genfile(gen)
-        aapt_file = os.path.join(self.aapt_out(target), aapt_output)
+        aapt_file = os.path.join(self.aapt_out(binary), aapt_output)
 
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
@@ -131,15 +129,14 @@ class AaptGen(AaptTask):
           if aapt_file not in self._created_library_targets:
 
             # Priority for resources is left->right, so reverse collection order (DFS preorder).
-            resource_dirs.reverse()
-            args = self._render_args(target, gen.manifest, resource_dirs)
+            args = self._render_args(binary, gen.manifest, reversed(resource_dirs))
             with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
               returncode = subprocess.call(args,
                                            stdout=workunit.output('stdout'),
                                            stderr=workunit.output('stderr'))
               if returncode:
                 raise TaskError('The AaptGen process exited non-zero: {}'.format(returncode))
-            new_target = self.create_target(target, gen)
+            new_target = self.create_target(binary, gen)
             self._created_library_targets[aapt_file] = new_target
           gen.inject_dependency(self._created_library_targets[aapt_file].address)
 
@@ -149,18 +146,18 @@ class AaptGen(AaptTask):
     :param AndroidBinary binary: AndroidBinary target whose target_sdk is used.
     :param AndroidTarget gentarget: AndroidBinary or Library that owns the processed resources.
 
-    :returns tgt: Synthetic target for the R.java output of the aapt tool.
-    :rtype JavaLibrary
+    :returns new_target: Synthetic target for the R.java output of the aapt tool.
+    :rtype::class:`pants.backend.jvm.targets.java_library.JavaLibrary`
     """
     spec_path = os.path.join(os.path.relpath(self.aapt_out(binary), get_buildroot()))
     address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
     deps = [self._jar_library_by_sdk[binary.target_sdk]]
-    tgt = self.context.add_new_target(address,
+    new_target = self.context.add_new_target(address,
                                       JavaLibrary,
                                       derived_from=gentarget,
                                       sources=[self._relative_genfile(gentarget)],
                                       dependencies=deps)
-    return tgt
+    return new_target
 
   def aapt_out(self, binary):
     """Location for the output of an aapt invocation.

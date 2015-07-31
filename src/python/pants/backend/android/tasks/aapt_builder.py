@@ -39,7 +39,7 @@ class AaptBuilder(AaptTask):
     super(AaptBuilder, cls).prepare(options, round_manager)
     round_manager.require_data('dex')
 
-  def _render_args(self, binary, resource_dirs, dex_file):
+  def _render_args(self, binary, resource_dirs, dex_files):
     # Glossary of used aapt flags.
     #   : 'package' is the main aapt operation (see class docstring for more info).
     #   : '-f' to 'force' overwrites if the package already exists.
@@ -61,36 +61,35 @@ class AaptBuilder(AaptTask):
     args.extend(['-I', self.android_jar(binary)])
     args.extend(['--ignore-assets', self.ignored_assets])
     args.extend(['-F', os.path.join(self.workdir, self.package_name(binary))])
-    args.extend(dex_file)
+    args.extend(dex_files)
     logger.debug('Executing: {0}'.format(' '.join(args)))
     return args
 
   def execute(self):
     safe_mkdir(self.workdir)
-    targets = self.context.targets(self.is_android_binary)
-    with self.invalidated(targets) as invalidation_check:
+    binaries = self.context.targets(self.is_android_binary)
+    with self.invalidated(binaries) as invalidation_check:
       invalid_targets = []
       for vt in invalidation_check.invalid_vts:
         invalid_targets.extend(vt.targets)
-      for target in invalid_targets:
+      for binary in invalid_targets:
 
-        dex_file = []
+        dex_files = []
         mapping = self.context.products.get('dex')
-        for dex in mapping.get(target):
-          dex_file.append(dex)
+        for dex in mapping.get(binary):
+          dex_files.append(dex)
 
-        resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([target.address])
+        resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([binary.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
         # Priority for resources is left to right, so reverse the collection order (DFS preorder).
-        resource_dirs.reverse()
-        args = self._render_args(target, resource_dirs, dex_file)
+        args = self._render_args(binary, reversed(resource_dirs), dex_files)
         with self.context.new_workunit(name='apk-bundle',
                                        labels=[WorkUnit.MULTITOOL]) as workunit:
           returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                        stderr=workunit.output('stderr'))
           if returncode:
             raise TaskError('Android aapt tool exited non-zero: {0}'.format(returncode))
-    for target in targets:
-      apk_name = self.package_name(target)
-      self.context.products.get('apk').add(target, self.workdir).append(apk_name)
+    for binary in binaries:
+      apk_name = self.package_name(binary)
+      self.context.products.get('apk').add(binary, self.workdir).append(apk_name)

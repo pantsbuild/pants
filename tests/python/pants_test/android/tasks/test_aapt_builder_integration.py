@@ -30,7 +30,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
 
   tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @unittest.skipIf(not tools, reason='Android integration test requires tools {} '
+  @unittest.skipUnless(tools, reason='Android integration test requires tools {} '
                                  'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_aapt_bundle(self):
     self.bundle_test(AndroidIntegrationTest.TEST_TARGET)
@@ -39,7 +39,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
     pants_run = self.run_pants(['apk', target])
     self.assert_success(pants_run)
 
-  @unittest.skipIf(not tools, reason='Android integration test requires tools {} '
+  @unittest.skipUnless(tools, reason='Android integration test requires tools {} '
                                      'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_android_library_products(self):
     # Doing the work under a tempdir gives us a handle for the workdir and guarantees a clean build.

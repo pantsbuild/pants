@@ -19,7 +19,7 @@ class UnpackLibrariesIntegrationTest(AndroidIntegrationTest):
   TOOLS = []
   tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @unittest.skipIf(not tools, reason='UnpackLibraries integration test requires that '
+  @unittest.skipUnless(tools, reason='UnpackLibraries integration test requires that '
                                      'ANDROID_HOME is set.')
   def test_library_unpack(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:

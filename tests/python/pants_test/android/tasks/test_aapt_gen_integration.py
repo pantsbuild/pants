@@ -33,12 +33,12 @@ class AaptGenIntegrationTest(AndroidIntegrationTest):
     pants_run = self.run_pants(['gen', target])
     self.assert_success(pants_run)
 
-  @unittest.skipIf(not tools, reason='Android integration test requires tools {0!r} '
+  @unittest.skipUnless(tools, reason='Android integration test requires tools {0!r} '
                                      'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_aapt_gen(self):
     self.aapt_gen_test(AndroidIntegrationTest.TEST_TARGET)
 
-  @unittest.skipIf(not tools, reason='Android integration test requires tools {0!r} '
+  @unittest.skipUnless(tools, reason='Android integration test requires tools {0!r} '
                                      'and ANDROID_HOME set in path.'.format(TOOLS))
 
   # TODO(mateor) Write a testproject instead of using hello_with_library which may change.

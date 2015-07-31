@@ -27,7 +27,7 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
 
   tools = AndroidIntegrationTest.requirements(TOOLS)
 
-  @unittest.skipIf(not tools, reason='Android integration test requires tools {0!r} '
+  @unittest.skipUnless(tools, reason='Android integration test requires tools {0!r} '
                                      'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_dx_compile(self):
     self.dx_test(AndroidIntegrationTest.TEST_TARGET)
