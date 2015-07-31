@@ -18,7 +18,9 @@ class GenResources(Target):
   REQUIRE_JS = 'requirejs'
 
   _VALID_TRANSPILERS = frozenset([RTL, LESSC, REQUIRE_JS])
-  _VALID_TRANSPILERS_LIST = ', '.join(str(e) for e in _VALID_TRANSPILERS)
+  _TRANSPILERS_DESC = ['less: Less is a CSS pre-processor.',
+                       'R2: A CSS LTR to RTL converter',
+                       'requirejs: RequireJS is a JavaScript file and module loader.']
 
   def __init__(self,
                address=None,
@@ -45,7 +47,7 @@ class GenResources(Target):
 
     if not transpilers:
       raise TargetDefinitionException(self, 'gen_resources should have a list of transpilers.'
-        'We currently support transpilers {0}'.format(GenResources._VALID_TRANSPILERS_LIST))
+        'We currently support transpilers {0}'.format('\n'.join(GenResources._TRANSPILERS_DESC)))
 
     self._transpilers = set(transpilers)
 
@@ -53,7 +55,7 @@ class GenResources(Target):
       if transpiler not in GenResources._VALID_TRANSPILERS:
         exp_message = ('Transpiler {transpiler} not in found.\nDid you mean one of these?'
                        '\n{valid}').format(transpiler=transpiler,
-                                           valid=GenResources._VALID_TRANSPILERS_LIST)
+                                           valid='\n'.join(GenResources._TRANSPILERS_DESC))
         raise TargetDefinitionException(self, exp_message)
 
     self._gen_resource_path = gen_resource_path or self.target_base

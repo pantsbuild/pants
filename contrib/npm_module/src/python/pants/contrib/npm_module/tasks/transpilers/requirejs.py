@@ -18,8 +18,9 @@ from pants.contrib.npm_module.tasks.transpiler import Transpiler
 
 class RequireJS(Transpiler):
   """
-    This Task downloads the requirejs module specified and performs the transformations
+    This Task installs the requirejs module specified and performs the transformations
     specified by the config file --compile-requirejs-build-profile option.
+    http://requirejs.org/
   """
 
   MODULE_NAME = 'requirejs'

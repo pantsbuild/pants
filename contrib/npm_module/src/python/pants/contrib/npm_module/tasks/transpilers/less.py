@@ -8,45 +8,39 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-from pants.util.dirutil import safe_mkdir
-
 from pants.contrib.npm_module.targets.gen_resources import GenResources
 from pants.contrib.npm_module.tasks.transpiler import Transpiler
 
+from pants.util.dirutil import safe_mkdir
 
-class RTL(Transpiler):
-  """
-    This Task downloads the RTL module and performs the RTL transformations in the .css files
-    listed in the input target.
+
+class Less(Transpiler):
+  """This task installs the lessc module specified and runs the less compiler
+    on the lessc files speficed in the input target.
+    For more details: http://lesscss.org/
   """
 
-  MODULE_NAME = 'R2'
-  MODULE_EXECUTABLE = os.path.join('bin', 'r2')
-  # TODO Move this as advanced options so that this is configurable
-  MODULE_VERSION = '1.3.1'
+  MODULE_VERSION = '1.5.1'
+  MODULE_EXECUTABLE = os.path.join('bin', 'lessc')
+  MODULE_NAME = 'less'
 
   @classmethod
   def product_types(cls):
-    return ['rtl_css']
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(RTL, cls).prepare(options, round_manager)
-    round_manager.require_data('less_css')
+    return ['less_css']
 
   def __init__(self, *args, **kwargs):
-    super(RTL, self).__init__(*args, **kwargs)
+    super(Less, self).__init__(*args, **kwargs)
 
   def execute_cmd(self, target, node_environ):
     files = set()
     safe_mkdir(os.path.join(self.workdir, target.gen_resource_path))
-    for source_file in target.sources_relative_to_buildroot():
-      source_file = os.path.join(self.buildroot, source_file)
-      (file_name, ext) = os.path.splitext(os.path.basename(source_file))
-      if ext == '.css':
-        dest_file = os.path.join(target.gen_resource_path, '{0}.rtl.css'.format(file_name))
-        cmd = [self.module_executable, '{0}'.format(source_file),
-               '{0}'.format(os.path.join(self.workdir, dest_file))]
+    for file in target.sources_relative_to_buildroot():
+      source_file = os.path.join(self.buildroot, file)
+      (file_name, ext) = os.path.splitext(os.path.basename(file))
+      if ext == '.less':
+        dest_file = os.path.join(target.gen_resource_path, '{0}.css'.format(file_name))
+        cmd = [self.module_executable, source_file, '-x', os.path.join(self.workdir,
+                                                              dest_file)]
         self.context.log.debug('Executing: {0}\n'.format(' '.join(cmd)))
         process = subprocess.Popen(cmd, env=node_environ)
         result = process.wait()
@@ -58,4 +52,5 @@ class RTL(Transpiler):
 
   @property
   def transpiler_name(self):
-    return GenResources.RTL
+    return GenResources.LESSC
+
