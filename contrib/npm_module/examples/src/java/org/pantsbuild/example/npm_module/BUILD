@@ -9,7 +9,7 @@ jvm_binary(name = 'main',
     'contrib/npm_module/examples/src/resources/org/pantsbuild/example/requirejs',
   ],
   source = 'HelloMain.java',
-  main = 'org.pantsbuild.example.hello.main.HelloMain',
+  main = 'org.pantsbuild.example.npm_module.HelloMain',
   basename = 'npm_module-example',
 )
 

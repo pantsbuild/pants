@@ -50,9 +50,6 @@ class LessC(ResourcePreprocessor):
         files.add(dest_file)
     return files
 
-  def run_processor(self, target):
-    return self.execute_npm_module(target)
-
   @property
   def processor_name(self):
     return GenResources.LESSC

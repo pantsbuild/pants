@@ -55,6 +55,7 @@ class ResourcePreprocessor(Task):
     for target in targets:
       try:
         files = self.run_processor(target)
+        print(files)
         if files:
           self._create_target(target, files)
       except ResourcePreprocessor.ResourcePreprocessorError as e:
@@ -68,8 +69,8 @@ class ResourcePreprocessor(Task):
     syn_address = SyntheticAddress(spec_path=relative_outdir,
                                    target_name='{name}-gen-{id}'.format(name=target.name,
                                                                         id=self.processor_name))
-    remaining_preprocessors = self.get_unprocessed(target)
-
+    remaining_preprocessors = target.preprocessors
+    remaining_preprocessors.remove(self.processor_name)
     if remaining_preprocessors:
       new_target = self.context.add_new_target(syn_address,
                                                GenResources,
@@ -89,10 +90,6 @@ class ResourcePreprocessor(Task):
   @property
   def buildroot(self):
     return get_buildroot()
-
-  @abstractmethod
-  def run_processor(self, target):
-    """Run the preprocessor."""
 
   @abstractproperty
   def processor_name(self):
@@ -128,10 +125,10 @@ class ResourcePreprocessor(Task):
     process = subprocess.Popen(cmd, env=node_environ)
     result = process.wait()
     if result != 0:
-        raise ResourcePreprocessor.ResourcePreprocessorError('Could not install module ({0})'
-                                                             .format(self.module_name))
+      raise ResourcePreprocessor.ResourcePreprocessorError('Could not install module ({0})'
+                                                           .format(self.module_name))
 
-  def execute_npm_module(self, target):
+  def run_processor(self, target):
     node_binary_path = NodeBinary.NodeFactory.scoped_instance(self).create().path
     node_environ = os.environ.copy()
     node_environ['PATH'] = os.pathsep.join([node_binary_path, node_environ['PATH']])

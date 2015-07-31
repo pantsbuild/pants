@@ -59,9 +59,6 @@ class RequireJS(ResourcePreprocessor):
         files.add(resource_path)
     return files
 
-  def run_processor(self, target):
-    return self.execute_npm_module(target)
-
   @property
   def processor_name(self):
     return GenResources.REQUIRE_JS
