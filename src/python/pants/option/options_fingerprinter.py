@@ -10,14 +10,7 @@ import os
 from hashlib import sha1
 
 from pants.option.options import Options
-
-
-def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
-
-
-def stable_json_sha1(obj):
-  return sha1(stable_json_dumps(obj)).hexdigest()
+from pants.util.strutil import stable_json_sha1
 
 
 class OptionsFingerprinter(object):

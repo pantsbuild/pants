@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
 import os
 from abc import abstractmethod
 from hashlib import sha1
@@ -15,14 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.validation import assert_list
 from pants.util.meta import AbstractClass
-
-
-def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
-
-
-def stable_json_sha1(obj):
-  return sha1(stable_json_dumps(obj)).hexdigest()
+from pants.util.strutil import stable_json_sha1
 
 
 def combine_hashes(hashes):

@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import re
 import shlex
+from hashlib import sha1
 
 import six
 
@@ -44,3 +46,11 @@ def safe_shlex_split(text_or_binary):
 def camelcase(string):
   """Convert snake casing (containing - or _ charadcters) to camel casing."""
   return ''.join(word.capitalize() for word in re.split('[-_]', string))
+
+
+def stable_json_dumps(obj):
+  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
+
+
+def stable_json_sha1(obj):
+  return sha1(stable_json_dumps(obj)).hexdigest()
