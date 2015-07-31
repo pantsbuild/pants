@@ -13,7 +13,6 @@ from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
 
 
-
 def _not_excluded_filter(exclude_patterns):
   def not_excluded(path_tuple):
     conf, path = path_tuple
