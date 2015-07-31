@@ -1,7 +1,7 @@
 RELEASE HISTORY
 ===============
 
-0.0.40 (unreleased)
+0.0.40 (7/31/2015)
 -------------------
 
 Release Notes
@@ -19,6 +19,77 @@ pants.ini to retain the old default behavior and turn strict checking off:
 The psutil dependency used by pants has been upgraded to 3.1.1. Supporting eggs have been uploaded
 to https://github.com/pantsbuild/cheeseshop/tree/gh-pages/third_party/python/dist. *Please note*
 that beyond this update, no further binary dependency updates will be provided at this location.
+
+API Changes
+~~~~~~~~~~~
+
+* Integrate the Android SDK, android-library
+  `RB #2528 <https://rbcommons.com/s/twitter/r/2528>`_
+
+Bugfixes
+~~~~~~~~
+
+* Guard against NoSuchProcess in the public API.
+  `RB #2551 <https://rbcommons.com/s/twitter/r/2551>`_
+
+* Fixup psutil.Process attribute accesses.
+  `RB #2549 <https://rbcommons.com/s/twitter/r/2549>`_
+
+* Removes type=Option.list from --compile-jvm-args option and --compile-scala-plugins
+  `RB #2536 <https://rbcommons.com/s/twitter/r/2536>`_
+  `RB #2547 <https://rbcommons.com/s/twitter/r/2547>`_
+
+* Prevent nailgun on nailgun violence when using symlinked java paths
+  `RB #2538 <https://rbcommons.com/s/twitter/r/2538>`_
+
+* Declaring product_types for simple_codegen_task.
+  `RB #2540 <https://rbcommons.com/s/twitter/r/2540>`_
+
+* Fix straggler usage of legacy psutil form
+  `RB #2546 <https://rbcommons.com/s/twitter/r/2546>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Added JvmPlatform subsystem and added platform arg to JvmTarget.
+  `RB #2494 <https://rbcommons.com/s/twitter/r/2494>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Resolve targets before creating PayloadField
+  `RB #2496 <https://rbcommons.com/s/twitter/r/2496>`_
+  `RB #2536 <https://rbcommons.com/s/twitter/r/2536>`_
+
+* Upgrade psutil to 3.1.1
+  `RB #2543 <https://rbcommons.com/s/twitter/r/2543>`_
+
+* Move thrift utils only used by scrooge to contrib/scrooge.
+  `RB #2535 <https://rbcommons.com/s/twitter/r/2535>`_
+
+* docs: add link to slackin self-invite
+  `RB #2537 <https://rbcommons.com/s/twitter/r/2537>`_
+
+* Add Clover Health to the Powered By page
+  `RB #2539 <https://rbcommons.com/s/twitter/r/2539>`_
+
+* Add Powered By page
+  `RB #2532 <https://rbcommons.com/s/twitter/r/2532>`_
+
+* Create test for java_antlr_library
+  `RB #2504 <https://rbcommons.com/s/twitter/r/2504>`_
+
+* Migrate ApacheThriftGen to SimpleCodegenTask.
+  `RB #2534 <https://rbcommons.com/s/twitter/r/2534>`_
+
+* Covert RagelGen to SimpleCodeGen.
+  `RB #2531 <https://rbcommons.com/s/twitter/r/2531>`_
+
+* Shade the Checkstyle task tool jar.
+  `RB #2533 <https://rbcommons.com/s/twitter/r/2533>`_
+
+* Support eggs for setuptools and wheel.
+  `RB #2529 <https://rbcommons.com/s/twitter/r/2529>`_
 
 0.0.39 (7/23/2015)
 ------------------
