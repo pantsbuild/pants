@@ -7,11 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.base.target import Target
 
-from pants.contrib.go.targets.go_target import GoTarget
 
-
-class GoRemotePackage(GoTarget):
+class GoRemotePackage(Target):
 
   def __init__(self, rev='', zip_url='', **kwargs):
     """

@@ -51,10 +51,7 @@ class GoSetupWorkspace(GoTask):
       self.context.products.get_data('gopath')[target] = self._gopath
 
   def _symlink_local_pkg(self, go_local_pkg):
-    """Adds a symlink from the current Go workspace to the given local package.
-
-    :param go_local_pkg: A local Go package (either a GoPackage or GoBinary target).
-    """
+    """Adds a symlink from the current Go workspace to the given GoLocalPackage."""
     basedir = get_basedir(go_local_pkg.address.spec_path)
     basedir_link = os.path.join(self._gopath, 'src', basedir)
     if not os.path.islink(basedir_link):

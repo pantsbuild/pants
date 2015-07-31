@@ -12,7 +12,7 @@ from pants.base.payload import Payload
 from pants.base.target import Target
 
 
-class GoTarget(Target):
+class GoLocalPackage(Target):
 
   def __init__(self, address=None, payload=None, **kwargs):
     sources = glob(os.path.join(address.spec_path, '*.go'))
@@ -22,4 +22,4 @@ class GoTarget(Target):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(GoTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super(GoLocalPackage, self).__init__(address=address, payload=payload, **kwargs)
