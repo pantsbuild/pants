@@ -40,7 +40,7 @@ class ProcessGroup(object):
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name(), pid=process.pid(), process_name=process.name())
+    return ProcessManager(name=process.name(), pid=process.pid, process_name=process.name())
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
