@@ -215,19 +215,17 @@ class ProcessManager(object):
 
   def is_alive(self):
     """Return a boolean indicating whether the process is running."""
-    if self._as_process():
-      try:
-        if self._as_process().status() == psutil.STATUS_ZOMBIE:  # Check for walkers.
+    try:
+      process = self._as_process()
+      if process:
+        if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
+            (self.process_name and self.process_name != process.name())):  # Check for stale pids.
           return False
-        if self.process_name and self.process_name != self._as_process().name():  # Check for stale pids.
-          return False
-      except psutil.NoSuchProcess:
-        # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
-        return False
-
-      return True
-    else:
+    except psutil.NoSuchProcess:
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       return False
+
+    return True
 
   def _kill(self, kill_sig):
     """Send a signal to the current process."""
