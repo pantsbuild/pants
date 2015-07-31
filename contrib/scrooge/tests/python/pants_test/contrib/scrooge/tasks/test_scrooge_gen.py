@@ -10,6 +10,7 @@ from textwrap import dedent
 
 from mock import MagicMock, patch
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
@@ -81,14 +82,7 @@ class ScroogeGenTest(TaskTestBase):
       task._validate_compiler_configs([self.target('test_validate:three')])
 
   def test_smoke(self):
-    contents = dedent('''namespace java org.pantsbuild.example
-      struct Example {
-      1: optional i64 number
-      }
-    ''')
-
-    self.create_file(relpath='test_smoke/a.thrift', contents=contents)
-    self.add_to_build_file('test_smoke', dedent('''
+    build_string = '''
       java_thrift_library(name='a',
         sources=['a.thrift'],
         dependencies=[],
@@ -96,7 +90,33 @@ class ScroogeGenTest(TaskTestBase):
         language='scala',
         rpc_style='finagle'
       )
-    '''))
+    '''
+    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help(build_string, ScalaLibrary, sources)
+
+  def test_android(self):
+    build_string = '''
+      java_thrift_library(name='a',
+        sources=['a.thrift'],
+        dependencies=[],
+        compiler='scrooge',
+        language='android',
+        rpc_style='finagle'
+      )
+    '''
+    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/android_example/Example.java')]
+    self._test_help(build_string, JavaLibrary, sources)
+
+  def _test_help(self, build_string, library_type, sources):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      struct Example {
+      1: optional i64 number
+      }
+    ''')
+
+    self.create_file(relpath='test_smoke/a.thrift', contents=contents)
+    self.add_to_build_file('test_smoke', dedent(build_string))
 
     target = self.target('test_smoke:a')
     context = self.context(target_roots=[target])
@@ -107,7 +127,6 @@ class ScroogeGenTest(TaskTestBase):
     task._outdir.return_value = self.task_outdir
 
     task.gen = MagicMock()
-    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
     task.gen.return_value = {'test_smoke/a.thrift': sources}
 
     saved_add_new_target = Context.add_new_target
@@ -118,7 +137,7 @@ class ScroogeGenTest(TaskTestBase):
       spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
       address = SyntheticAddress.parse(spec=spec)
       Context.add_new_target.assert_called_once_with(address,
-                                                     ScalaLibrary,
+                                                     library_type,
                                                      sources=sources,
                                                      excludes=OrderedSet(),
                                                      dependencies=OrderedSet(),
