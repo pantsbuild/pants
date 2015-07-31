@@ -83,34 +83,40 @@ class ProcessManager(object):
     return self._process_name
 
   @property
-  def status(self):
-    """The process status as reported by psutil. e.g. psutil.PROCESS_IDLE, psutil.PROCESS_ZOMBIE."""
-    return self._get_process_property('status')
-
-  @property
-  def exe_name(self):
-    """The basename of the process executable e.g. 'java'."""
-    return self._get_process_property('name')
-
-  @property
   def cmdline(self):
-    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex']."""
-    return self._get_process_property('cmdline')
+    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex'].
+
+    :returns: The command line or else `None` if the underlying process has died.
+    """
+    try:
+      if self._as_process():
+        return self._as_process().cmdline()
+    except psutil.NoSuchProcess:
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+      pass
+    return None
 
   @property
   def cmd(self):
-    """The first element of the process commandline e.g. '/usr/bin/python2.7'."""
+    """The first element of the process commandline e.g. '/usr/bin/python2.7'.
+
+    :returns: The first element of the process command line or else `None` if the underlying
+              process has died.
+    """
     return (self.cmdline or [None])[0]
 
   @property
   def pid(self):
     """The running processes pid (or None)."""
-    return self._pid or self.get_pid()
+    return self._pid or self._get_pid()
 
   @property
   def socket(self):
-    """The running processes socket/port information (or None)."""
-    return self._socket or self.get_socket()
+    """The running processes socket/port information.
+
+    :returns: The socket info or else `None` if the underlying process has died.
+    """
+    return self._socket or self._get_socket()
 
   @staticmethod
   def _maybe_cast(x, caster):
@@ -119,16 +125,9 @@ class ProcessManager(object):
     except (TypeError, ValueError):
       return x
 
-  def _get_process_property(self, attr):
-    if self.as_process():
-      return getattr(self.as_process(), attr)()
-
-  def as_process(self):
+  def _as_process(self):
     if self._process is None and self.pid:
-      try:
-        self._process = psutil.Process(self.pid)
-      except psutil.NoSuchProcess:
-        pass
+      self._process = psutil.Process(self.pid)
     return self._process
 
   def _read_file(self, filename):
@@ -154,12 +153,12 @@ class ProcessManager(object):
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
     self._wait_for_file(self.get_pid_path(), timeout)
-    return self.get_pid()
+    return self._get_pid()
 
   def await_socket(self, timeout):
     """Wait up to a given timeout for a process to write socket info."""
     self._wait_for_file(self.get_socket_path(), timeout)
-    return self.get_socket()
+    return self._get_socket()
 
   def get_metadata_dir(self):
     """Return a metadata path for the process.
@@ -200,14 +199,14 @@ class ProcessManager(object):
     self._maybe_init_metadata_dir()
     self._write_file(self.get_socket_path(), str(socket_info))
 
-  def get_pid(self):
+  def _get_pid(self):
     """Retrieve and return the running PID."""
     try:
       return self._maybe_cast(self._read_file(self.get_pid_path()), int) or None
     except (IOError, OSError):
       return None
 
-  def get_socket(self):
+  def _get_socket(self):
     """Retrieve and return the running processes socket info."""
     try:
       return self._maybe_cast(self._read_file(self.get_socket_path()), self._socket_type) or None
@@ -216,10 +215,11 @@ class ProcessManager(object):
 
   def is_alive(self):
     """Return a boolean indicating whether the process is running."""
-    if self.as_process():
+    if self._as_process():
       try:
-        if (self.status == psutil.STATUS_ZOMBIE or                        # Check for walkers.
-            (self.process_name and self.process_name != self.exe_name)):  # Check for stale pids.
+        if self._as_process().status() == psutil.STATUS_ZOMBIE:  # Check for walkers.
+          return False
+        if self.process_name and self.process_name != self._as_process().name():  # Check for stale pids.
           return False
       except psutil.NoSuchProcess:
         # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
@@ -229,7 +229,7 @@ class ProcessManager(object):
     else:
       return False
 
-  def kill(self, kill_sig):
+  def _kill(self, kill_sig):
     """Send a signal to the current process."""
     os.kill(self.pid, kill_sig)
 
@@ -238,7 +238,7 @@ class ProcessManager(object):
     if self.is_alive():
       for signal_type in signal_chain:
         try:
-          self.kill(signal_type)
+          self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
                          .format(e=e, signal=signal_type, pid=self.pid))
