@@ -262,6 +262,7 @@ python_library(
   dependencies = [
     ':build_environment',
     'src/python/pants/util:dirutil',
+    'src/python/pants:version',
   ],
 )
 
