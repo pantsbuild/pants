@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.base.workunit import WorkUnit
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary

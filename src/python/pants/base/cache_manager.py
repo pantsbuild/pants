@@ -13,12 +13,6 @@ from pants.base.target import Target
 from pants.util.dirutil import safe_mkdir
 
 
-try:
-  import cPickle as pickle
-except ImportError:
-  import pickle
-
-
 class VersionedTargetSet(object):
   """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the
   list of targets is currently valid.

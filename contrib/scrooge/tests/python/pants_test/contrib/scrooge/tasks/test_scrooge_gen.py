@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from mock import MagicMock, patch
+from mock import MagicMock
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import SyntheticAddress

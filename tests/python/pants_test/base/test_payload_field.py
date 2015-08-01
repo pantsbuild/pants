@@ -10,7 +10,6 @@ from hashlib import sha1
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.base.payload import Payload
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
                                       JarsField, PrimitiveField, PythonRequirementsField,
                                       SourcesField)
