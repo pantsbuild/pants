@@ -36,9 +36,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config=config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 and one old cache file
-
-      self.assertEqual(len(os.listdir(artifact_dir)), 2)
+      # One artifact for java 6
+      self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
       pants_run = self.run_pants(['compile.java',
@@ -48,8 +47,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 (old cache file) and one for 7
-      self.assertEqual(len(os.listdir(artifact_dir)), 2)
+      # One artifact for java 7
+      self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
   def test_leave_none(self):
     """ Ensure that max-old of zero removes all files
@@ -76,9 +75,9 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config=config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 and one old cache file
+      # Cache cleanup disabled for 0
 
-      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+      self.assertEqual(len(os.listdir(artifact_dir)), 6)
 
       # Rerun for java 7
       pants_run = self.run_pants(['compile.java',
@@ -88,5 +87,5 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 (old cache file) and one for 7
-      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+      # Cache cleanup disabled for 0
+      self.assertEqual(len(os.listdir(artifact_dir)), 7)
