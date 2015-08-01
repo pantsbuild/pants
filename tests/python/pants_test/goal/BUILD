@@ -9,6 +9,7 @@ python_tests(
     'src/python/pants/base:address',
     'src/python/pants/base:target',
     'src/python/pants/goal:products',
+    'src/python/pants/goal:run_tracker',
     'tests/python/pants_test:base_test',
   ]
 )
