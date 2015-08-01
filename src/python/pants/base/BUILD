@@ -166,6 +166,16 @@ python_library(
 )
 
 python_library(
+  name = 'deprecated',
+  sources = ['deprecated.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    ':revision',
+    'src/python/pants:version',
+  ]
+)
+
+python_library(
   name = 'exceptions',
   sources = ['exceptions.py'],
 )
