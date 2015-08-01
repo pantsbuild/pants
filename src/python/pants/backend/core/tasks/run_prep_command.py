@@ -15,6 +15,7 @@ from pants.base.workunit import WorkUnit
 
 
 class RunPrepCommand(Task):
+
   def execute(self):
     targets = self.context.targets(postorder=True)
     Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])

@@ -16,6 +16,7 @@ from pants_test.base_test import BaseTest
 
 
 class CmdLineSpecParserTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -153,6 +154,7 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
 class CmdLineSpecParserBadBuildTest(BaseTest):
+
   def setUp(self):
     super(CmdLineSpecParserBadBuildTest, self).setUp()
 

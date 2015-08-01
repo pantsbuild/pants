@@ -21,6 +21,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseFilterTest(ConsoleTaskTestBase):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -39,6 +40,7 @@ class BaseFilterTest(ConsoleTaskTestBase):
 
 
 class FilterEmptyTargetsTest(BaseFilterTest):
+
   def test_no_filters(self):
     self.assert_console_output()
 
@@ -52,6 +54,7 @@ class FilterEmptyTargetsTest(BaseFilterTest):
 
 
 class FilterTest(BaseFilterTest):
+
   def setUp(self):
     super(FilterTest, self).setUp()
 

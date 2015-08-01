@@ -43,6 +43,7 @@ class ScroogeGen(NailgunTask):
     pass
 
   class PartialCmd(namedtuple('PC', ['language', 'rpc_style', 'namespace_map'])):
+
     @property
     def relative_outdir(self):
       namespace_sig = None

@@ -40,6 +40,7 @@ from pants.util.strutil import ensure_text
 
 
 class PushDb(object):
+
   @staticmethod
   def load(path):
     """Loads a pushdb maintained in a properties file at the given path."""
@@ -48,6 +49,7 @@ class PushDb(object):
       return PushDb(properties)
 
   class Entry(object):
+
     def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
       """Records the most recent push/release of an artifact.
 
@@ -211,6 +213,7 @@ class DependencyWriter(object):
 
 
 class PomWriter(DependencyWriter):
+
   def __init__(self, get_db, tag):
     super(PomWriter, self).__init__(
         get_db,

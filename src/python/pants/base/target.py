@@ -148,6 +148,7 @@ class Target(AbstractTarget):
   @classmethod
   def get_addressable_type(target_cls):
     class ConcreteTargetAddressable(TargetAddressable):
+
       @classmethod
       def get_target_type(cls):
         return target_cls

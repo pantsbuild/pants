@@ -91,7 +91,6 @@ class DxCompile(AndroidTask, NailgunTask):
     return self.runjava(classpath=classpath, jvm_options=jvm_options, main=java_main,
                         args=args, workunit_name='dx')
 
-
   def _filter_unpacked_dir(self, target, unpacked_dir, class_files):
     # The Dx tool returns failure if more than one copy of a class is packed into the dex file and
     # it is easy to fetch duplicate libraries (as well as conflicting versions) from the SDK repos.

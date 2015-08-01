@@ -14,17 +14,20 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseSortTargetsTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return SortTargets
 
 
 class SortTargetsEmptyTest(BaseSortTargetsTest):
+
   def test(self):
     self.assert_console_output(targets=[])
 
 
 class SortTargetsTest(BaseSortTargetsTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(targets={'python_library': PythonLibrary})

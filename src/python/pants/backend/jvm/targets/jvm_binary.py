@@ -21,6 +21,7 @@ from pants.util.meta import AbstractClass
 
 
 class JarRule(FingerprintedMixin, AbstractClass):
+
   def __init__(self, apply_pattern, payload=None):
     self.payload = payload or Payload()
     if not isinstance(apply_pattern, string_types):
@@ -115,7 +116,6 @@ class Duplicate(JarRule):
       'action' :  PrimitiveField(self.validate_action(action)),
     })
     super(Duplicate, self).__init__(apply_pattern, payload=payload)
-
 
   @property
   def action(self):

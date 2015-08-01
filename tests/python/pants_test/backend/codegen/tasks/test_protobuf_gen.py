@@ -309,6 +309,7 @@ class ProtobufGenTest(TaskTestBase):
     self.assertEquals(OrderedSet(['project/src/main/proto/proto-lib/foo.proto']), result['project/src/main/proto'])
 
   class MockLogger:
+
     def __init__(self):
       self._warn = []
       self._error = []

@@ -15,6 +15,7 @@ from pants_test.base_test import BaseTest
 
 
 class ClasspathUtilTest(BaseTest):
+
   def test_path_with_differing_conf_ignored(self):
     a = self.make_target('a', JvmTarget)
 
@@ -39,7 +40,6 @@ class ClasspathUtilTest(BaseTest):
                                                 ['not-default', 'default'])
 
     self.assertEqual([path], classpath)
-
 
   def test_extra_path_added(self):
     a = self.make_target('a', JvmTarget)

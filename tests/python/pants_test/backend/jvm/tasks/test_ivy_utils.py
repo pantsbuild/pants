@@ -21,6 +21,7 @@ from pants_test.base_test import BaseTest
 
 
 class IvyUtilsTestBase(BaseTest):
+
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm())
@@ -117,7 +118,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     _, excludes = IvyUtils.calculate_classpath([self.b], gather_excludes=False)
     self.assertSetEqual(excludes, set())
 
-
   def test_excludes_generated_when_requested(self):
     _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=True)
     self.assertSetEqual(excludes, {Exclude(org='commons-lang', name='commons-lang')})
@@ -125,7 +125,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_excludes_empty_when_not_requested(self):
     _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=False)
     self.assertSetEqual(excludes, set())
-
 
   def test_classifiers(self):
     jars, _ = IvyUtils.calculate_classpath([self.c])
@@ -246,7 +245,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             IvyModuleRef(org='org3', name='name3', rev='0.0.1')
           },
           result1)
-
 
   def find_single(self, elem, xpath):
     results = list(elem.findall(xpath))

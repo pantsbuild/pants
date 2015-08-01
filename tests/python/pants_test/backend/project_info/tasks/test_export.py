@@ -30,6 +30,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ProjectInfoTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return Export

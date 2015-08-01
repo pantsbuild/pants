@@ -25,6 +25,7 @@ from pants.option.ranked_value import RankedValue
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
 # Note that subclassing ArgumentParser for this purpose is allowed by the argparse API.
 class CustomArgumentParser(ArgumentParser):
+
   def __init__(self, scope, *args, **kwargs):
     super(CustomArgumentParser, self).__init__(*args, **kwargs)
     self._scope = scope
@@ -164,7 +165,6 @@ class Parser(object):
             warnings.warn('*** {}'.format(self._deprecated_message(dest)), DeprecationWarning,
                           stacklevel=9999) # Out of range stacklevel to suppress printing src line.
     return namespace
-
 
   def registration_args_iter(self):
     """Returns an iterator over the registration arguments of each option in this parser.

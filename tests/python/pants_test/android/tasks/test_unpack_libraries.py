@@ -215,7 +215,6 @@ class UnpackLibrariesTest(TestAndroidBase):
       self.assertIn('Thing.class', files)
       self.assertEqual(len(test_target.dependencies), 0)
 
-
   def test_unexpected_archive_type(self):
     with temporary_dir() as temp:
       aar = self.create_aarfile(temp, 'org.pantsbuild.android.test')

@@ -43,7 +43,6 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
   pass
 
 
-
 class HelpInfoExtracter(object):
   """Extracts information useful for displaying help from option registration args."""
 

@@ -225,7 +225,6 @@ class ZincCompile(JvmCompile):
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
 
-
     zinc_args += args
 
     zinc_args.extend([

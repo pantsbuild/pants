@@ -141,7 +141,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     outdir = package.replace('.', '/')
     return [os.path.join(outdir, '{}.java'.format(name)) for name in names]
 
-
   class JaxbGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
+
     def find_sources(self, target):
       return self._task.sources_generated_by_target(target)

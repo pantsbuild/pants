@@ -81,7 +81,6 @@ class IdeaGen(IdeGen):
                ],
              help='Adds folders to be excluded from the project configuration.')
 
-
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
 

@@ -13,11 +13,13 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailur
 
 
 class ImmediatelyExecutingPool(object):
+
   def submit_async_work(self, work):
     work.func(*work.args_tuples[0])
 
 
 class PrintLogger(object):
+
   def error(self, msg):
     print(msg)
 
@@ -34,6 +36,7 @@ def raising_fn():
 
 
 class ExecutionGraphTest(unittest.TestCase):
+
   def setUp(self):
     self.jobs_run = []
 
@@ -60,7 +63,6 @@ class ExecutionGraphTest(unittest.TestCase):
     self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ["B", "A"])
-
 
   def test_simple_binary_tree(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
@@ -97,7 +99,6 @@ class ExecutionGraphTest(unittest.TestCase):
     self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ["B", "C", "A"])
-
 
   def test_dependee_depends_on_dependency_of_its_dependency(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
@@ -186,7 +187,6 @@ class ExecutionGraphTest(unittest.TestCase):
       self.execute(exec_graph)
 
     self.assertEqual("Error in on_failure for A: I'm an error", str(cm.exception))
-
 
   def test_same_key_scheduled_twice_is_error(self):
     with self.assertRaises(JobExistsError) as cm:

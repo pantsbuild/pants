@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class IvyModuleRef(object):
+
   def __init__(self, org, name, rev):
     self.org = org
     self.name = name
@@ -62,6 +63,7 @@ class IvyModuleRef(object):
 
 
 class IvyInfo(object):
+
   def __init__(self):
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.

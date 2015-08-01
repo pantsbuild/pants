@@ -23,6 +23,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseReverseDepmapTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return ReverseDepmap
@@ -37,11 +38,13 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
 
 
 class ReverseDepmapEmptyTest(BaseReverseDepmapTest):
+
   def test(self):
     self.assert_console_output(targets=[])
 
 
 class ReverseDepmapTest(BaseReverseDepmapTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(

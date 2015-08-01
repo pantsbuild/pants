@@ -15,6 +15,7 @@ from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
 
 
 class BuildFileManipulatorTest(BaseTest):
+
   def setUp(self):
     super(BuildFileManipulatorTest, self).setUp()
     self.complicated_dep_comments = dedent(
@@ -63,7 +64,6 @@ class BuildFileManipulatorTest(BaseTest):
       )
       # Also this one though it's weird"""
     )
-
 
   def test_malformed_targets(self):
     bad_targets = dedent(

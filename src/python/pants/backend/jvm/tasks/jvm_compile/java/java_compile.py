@@ -139,7 +139,6 @@ class JavaCompile(JvmCompile):
       raise TaskError("Set the target JVM version with the 'target' option or with the jvm "
                       "platform, not in 'args'.")
 
-
     if self.get_options().source or self.get_options().target:
       self.context.log.warn('--compile-java-source and --compile-java-target trample and override '
                             'target jvm platform settings, and probably should not be used except '

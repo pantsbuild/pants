@@ -12,6 +12,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class AntlrIntegrationTest(PantsRunIntegrationTest):
+
   def test_run_antlr3(self):
     stdout_data = self.bundle_and_run('examples/src/java/org/pantsbuild/example/antlr3', 'antlr3',
                                       args=['7*8'])
@@ -21,7 +22,6 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
     stdout_data = self.bundle_and_run('examples/src/java/org/pantsbuild/example/antlr4', 'antlr4',
                                       args=['7*6'])
     self.assertEquals('42.0', stdout_data.rstrip(), msg="got output:{0}".format(stdout_data))
-
 
   # Test that antlr3 and antlr4 generated java targets are cache-able.
   def test_compile_antlr_cached(self):

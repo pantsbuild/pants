@@ -14,6 +14,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
+
   def test_bundle_protobuf_normal(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',

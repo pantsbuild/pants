@@ -20,6 +20,7 @@ from pants.util.memo import memoized_property
 class PythonThriftBuilder(CodeGenerator):
   """Generate Python code from thrift IDL files."""
   class UnknownPlatformException(CodeGenerator.Error):
+
     def __init__(self, platform):
       super(PythonThriftBuilder.UnknownPlatformException, self).__init__(
           'Unknown platform: {}!'.format(str(platform)))

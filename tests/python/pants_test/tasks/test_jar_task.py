@@ -25,7 +25,9 @@ from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
 class BaseJarTaskTest(JarTaskTestBase):
+
   class TestJarTask(JarTask):
+
     def execute(self):
       pass
 
@@ -41,7 +43,6 @@ class BaseJarTaskTest(JarTaskTestBase):
         'jvm_binary': JvmBinary,
       },
     ))
-
 
   def setUp(self):
     super(BaseJarTaskTest, self).setUp()
@@ -216,7 +217,6 @@ class JarBuilderTest(BaseJarTaskTest):
     super(JarBuilderTest, self).setUp()
     self.set_options(max_subprocess_args=100)
 
-
   def _add_to_classes_by_target(self, context, tgt, filename):
     class_products = context.products.get_data('classes_by_target',
                                                lambda: defaultdict(MultipleRootedProducts))
@@ -225,7 +225,6 @@ class JarBuilderTest(BaseJarTaskTest):
                                                    os.path.dirname(filename)),
                                       [os.path.basename(filename)])
     class_products[tgt] = java_agent_products
-
 
   def test_agent_manifest(self):
     self.add_to_build_file('src/java/pants/agents', dedent("""

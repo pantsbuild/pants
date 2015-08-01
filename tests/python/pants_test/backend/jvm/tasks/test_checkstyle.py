@@ -46,7 +46,6 @@ class CheckstyleTest(NailgunTaskTestBase):
     }
   """)
 
-
   @classmethod
   def task_type(cls):
     return Checkstyle

@@ -11,6 +11,7 @@ from pants.base.validation import assert_list
 
 
 class ParseValidation(unittest.TestCase):
+
   def test_valid_inputs(self):
     list_result0 = assert_list(["file1.txt"])
     list_result1 = assert_list(["file1.txt", "file2.txt"])
