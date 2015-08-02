@@ -204,7 +204,6 @@ class BuildFileManipulator(object):
                                     'Build file was: {build_file}.  Line number was: {lineno}'
                                     .format(build_file=build_file, lineno=keyword.value.lineno))
 
-
     # Same setup as for getting the target's interval
     target_call_intervals = [t.value.lineno - target_call.lineno for t in target_call.keywords]
     target_call_intervals.append(len(target_source_lines))
@@ -238,7 +237,6 @@ class BuildFileManipulator(object):
     #   print('\n'.join(target_source_lines[start:end]))
     #   print('\n\n')
     # print(target_call_intervals)
-
 
     def get_dependencies_node(target_call):
       for keyword in target_call.keywords:

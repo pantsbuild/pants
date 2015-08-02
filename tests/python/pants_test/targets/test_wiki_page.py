@@ -15,6 +15,7 @@ from pants_test.base_test import BaseTest
 
 
 class WikiPageTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(

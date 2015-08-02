@@ -19,6 +19,7 @@ from pants_test.base_test import BaseTest
 
 
 class JvmAppTest(BaseTest):
+
   @property
   def alias_groups(self):
     return register_jvm()
@@ -174,6 +175,7 @@ class JvmAppTest(BaseTest):
 
 
 class BundleTest(BaseTest):
+
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm())

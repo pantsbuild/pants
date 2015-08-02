@@ -33,6 +33,7 @@ class DummyTask(Task):
 
 
 class MockPinger(object):
+
   def __init__(self, hosts_to_times):
     self._hosts_to_times = hosts_to_times
 

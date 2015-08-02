@@ -18,6 +18,7 @@ from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
 logger = logging.getLogger(__name__)
 
 class BaseLocalArtifactCache(ArtifactCache):
+
   def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
@@ -86,7 +87,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     """
 
     max_entries_per_target = self._max_entries_per_target
-    if os.path.isdir(root) and max_entries_per_target is not None:
+    if os.path.isdir(root) and max_entries_per_target:
       found_files = []
       for old_file in os.listdir(root):
         full_path = os.path.join(root, old_file)
@@ -101,8 +102,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _store_tarball(self, cache_key, src):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
-    self.prune(os.path.dirname(dest))  # Remove old cache files.
     os.rename(src, dest)
+    self.prune(os.path.dirname(dest))  # Remove old cache files.
     return dest
 
   def use_cached_files(self, cache_key):

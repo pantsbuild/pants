@@ -17,18 +17,21 @@ from pants.base.target import Target
 
 
 class TestTarget(Target):
+
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
     super(TestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
 
 
 class NotTestTarget(Target):
+
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
     super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
 
 
 class AnotherTarget(Target):
+
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
     super(AnotherTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)

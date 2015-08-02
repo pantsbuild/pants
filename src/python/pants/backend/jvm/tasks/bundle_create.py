@@ -19,6 +19,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 class BundleCreate(JvmBinaryTask):
+
   @classmethod
   def register_options(cls, register):
     super(BundleCreate, cls).register_options(register)

@@ -23,6 +23,7 @@ class DummyIvyTask(Task):
 
 
 class IvySubsystemTest(JvmToolTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return DummyIvyTask

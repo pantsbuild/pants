@@ -21,6 +21,7 @@ Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 
 
 class JvmdocGen(JvmTask):
+
   @classmethod
   def jvmdoc(cls):
     """Subclasses should return their Jvmdoc configuration."""

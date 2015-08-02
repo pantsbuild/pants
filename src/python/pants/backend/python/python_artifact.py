@@ -15,6 +15,7 @@ from pants.base.payload_field import PayloadField
 class PythonArtifact(PayloadField):
   """Represents a Python setup.py-based project."""
   class MissingArgument(Exception): pass
+
   class UnsupportedArgument(Exception): pass
 
   UNSUPPORTED_ARGS = frozenset([

@@ -25,7 +25,6 @@ class JvmTargetTest(BaseTest):
         'jvm_target': JvmTarget,
         }))
 
-
   def test_traversable_dependency_specs(self):
     build_file = self.add_to_build_file('BUILD', dedent('''
     jvm_target(name='foo',

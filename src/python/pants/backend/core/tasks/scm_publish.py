@@ -15,6 +15,7 @@ from pants.scm.scm import Scm
 
 
 class Version(object):
+
   @staticmethod
   def parse(version):
     """Attempts to parse the given string as Semver, then falls back to Namedver."""
@@ -61,6 +62,7 @@ class Namedver(Version):
 
 
 class Semver(Version):
+
   @staticmethod
   def parse(version):
     components = version.split('.', 3)

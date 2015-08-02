@@ -71,7 +71,12 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Confirm that the same artifact was added to each target.
     context = self.context(target_roots=[losing_lib, winning_lib])
 
-    symlink_map = dict(bogus0='bogus0', bogus1='bogus1', unused='unused')
+    def artifact_path(name):
+      return os.path.join(self.build_root, 'ivy_artifact', name)
+
+    symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
+                   artifact_path('bogus1'): artifact_path('bogus1'),
+                   artifact_path('unused'): artifact_path('unused')}
     context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
 
@@ -94,8 +99,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
       # resolve, it's possible that before it was evicted, it would
       # generate some resolution data.
 
-      artifact_1 = IvyUtilArtifact('bogus0', 'default')
-      unused_artifact = IvyUtilArtifact('unused', 'default')
+      artifact_1 = IvyUtilArtifact(artifact_path('bogus0'), 'default')
+      unused_artifact = IvyUtilArtifact(artifact_path('unused'), 'default')
 
       # Because guava 16.0 was evicted, it has no artifacts
       guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
@@ -105,7 +110,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_info.add_module(guava_0)
       ivy_info.add_module(guava_1)
 
-      artifact_dep_1 = IvyUtilArtifact('bogus1', 'default')
+      artifact_dep_1 = IvyUtilArtifact(artifact_path('bogus1'), 'default')
 
       # Because fake#dep 16.0 was evicted before it was resolved,
       # its deps are never examined, so we don't call add_module.
@@ -132,7 +137,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
     self.assertEquals(losing_cp, winning_cp)
-    self.assertEquals(OrderedSet([(u'default', u'bogus0'), (u'default', u'bogus1')]), winning_cp)
+    self.assertEquals(OrderedSet([(u'default', artifact_path(u'bogus0')),
+                                  (u'default', artifact_path(u'bogus1'))]),
+                      winning_cp)
 
   def test_resolve_multiple_artifacts1(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')

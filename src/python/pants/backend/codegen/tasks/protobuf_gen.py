@@ -251,8 +251,8 @@ class ProtobufGen(SimpleCodegenTask):
     for classname in classnames:
       yield os.path.join(basepath, '{0}.java'.format(classname))
 
-
   class ProtobufGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
+
     def find_sources(self, target):
       return self._task.sources_generated_by_target(target)
 

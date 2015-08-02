@@ -19,6 +19,7 @@ from pants_test.base_test import BaseTest
 # explicit unit tests: addresses_in_spec_path, spec_to_address, spec_to_addresses
 
 class BuildFileAddressMapperTest(BaseTest):
+
   def setUp(self):
     super(BuildFileAddressMapperTest, self).setUp()
 

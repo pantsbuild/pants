@@ -8,6 +8,7 @@ target(
     ':bootstrap_jvm_tools',
     ':bundle_create',
     ':checkstyle',
+    ':classpath_products',
     ':classpath_util',
     ':ivy_imports',
     ':ivy_resolve',
@@ -82,6 +83,19 @@ python_tests(
     'tests/python/pants_test:int-test',
   ]
 )
+
+python_tests(
+  name = 'classpath_products',
+  sources = ['test_classpath_products.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:repository',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
 
 python_tests(
   name = 'classpath_util',

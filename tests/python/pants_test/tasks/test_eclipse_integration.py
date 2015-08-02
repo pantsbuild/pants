@@ -12,6 +12,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class EclipseIntegrationTest(PantsRunIntegrationTest):
+
   def _eclipse_test(self, specs, project_dir=os.path.join('.pants.d', 'tmp', 'test-eclipse'),
                     project_name='project'):
     """Helper method that tests eclipse generation on the input spec list."""

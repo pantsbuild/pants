@@ -26,6 +26,7 @@ class DummyBootstrapperTask(Task):
 
 
 class BootstrapperTest(JvmToolTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return DummyBootstrapperTask

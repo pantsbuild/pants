@@ -9,6 +9,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ThriftLinterTest(PantsRunIntegrationTest):
+
   @staticmethod
   def thrift_test_target(name):
     return 'contrib/scrooge/tests/thrift/org/pantsbuild/contrib/scrooge/thrift_linter:' + name

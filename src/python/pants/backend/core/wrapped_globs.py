@@ -31,6 +31,7 @@ class FilesetWithSpec(object):
 
 
 class FilesetRelPathWrapper(object):
+
   def __init__(self, parse_context):
     self.rel_path = parse_context.rel_path
 

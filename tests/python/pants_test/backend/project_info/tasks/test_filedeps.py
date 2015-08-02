@@ -17,6 +17,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class FileDepsTest(ConsoleTaskTestBase):
+
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm()).merge(register_codegen())
@@ -153,7 +154,6 @@ class FileDepsTest(ConsoleTaskTestBase):
                     )
                   """),
                   sources=['config/app.yaml'])
-
 
   def test_resources(self):
     self.assert_console_output(

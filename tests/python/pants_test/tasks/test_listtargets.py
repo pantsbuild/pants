@@ -18,12 +18,14 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseListTargetsTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return ListTargets
 
 
 class ListTargetsTestEmpty(BaseListTargetsTest):
+
   def test_list_all_empty(self):
     self.assertEqual('', self.execute_task())
     self.assertEqual('', self.execute_task(options={ 'sep': '###' }))
@@ -31,6 +33,7 @@ class ListTargetsTestEmpty(BaseListTargetsTest):
 
 
 class ListTargetsTest(BaseListTargetsTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -52,6 +55,7 @@ class ListTargetsTest(BaseListTargetsTest):
 
     # Setup a BUILD tree for various list tests
     class Lib(object):
+
       def __init__(self, name, provides=False):
         self.name = name
         self.provides = dedent("""
@@ -87,7 +91,6 @@ class ListTargetsTest(BaseListTargetsTest):
           """,
         )
         '''))
-
 
   def test_list_path(self):
     self.assert_console_output('a/b:b', targets=[self.target('a/b')])

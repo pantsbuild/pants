@@ -22,6 +22,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseWhatChangedTest(ConsoleTaskTestBase):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -54,6 +55,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
   def workspace(self, files=None, parent=None, diffspec=None, diff_files=None):
     class MockWorkspace(Workspace):
+
       def touched_files(_, p):
         self.assertEqual(parent or 'HEAD', p)
         return files or []
@@ -64,6 +66,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
+
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 
@@ -82,6 +85,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
 
 
 class WhatChangedTest(BaseWhatChangedTest):
+
   def setUp(self):
     super(WhatChangedTest, self).setUp()
 

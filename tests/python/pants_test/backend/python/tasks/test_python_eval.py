@@ -15,6 +15,7 @@ from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
 
 
 class PythonEvalTest(PythonTaskTest):
+
   @classmethod
   def task_type(cls):
     return PythonEval

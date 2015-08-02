@@ -296,6 +296,7 @@ class GitRepositoryReader(object):
                                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
   class MissingFileException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -304,6 +305,7 @@ class GitRepositoryReader(object):
       return "MissingFileException({}, {})".format(self.relpath, self.rev)
 
   class IsDirException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -312,6 +314,7 @@ class GitRepositoryReader(object):
       return "IsDirException({}, {})".format(self.relpath, self.rev)
 
   class NotADirException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -320,6 +323,7 @@ class GitRepositoryReader(object):
       return "NotADirException({}, {})".format(self.relpath, self.rev)
 
   class SymlinkLoopException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -359,16 +363,19 @@ class GitRepositoryReader(object):
     return False
 
   class Symlink:
+
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
   class Dir:
+
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
   class File:
+
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha

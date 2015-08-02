@@ -97,7 +97,6 @@ class UnpackLibraries(Task):
                                              derived_from=target)
     return new_target
 
-
   def create_resource_target(self, target, archive, manifest, resource_dir):
     """Create an AndroidResources target.
 

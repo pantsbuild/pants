@@ -338,7 +338,6 @@ class JarTask(NailgunTask):
       self._jar = jar
       self._manifest = Manifest()
 
-
     def add_target(self, target, recursive=False):
       """Adds the classes and resources for a target to an open jar.
 
