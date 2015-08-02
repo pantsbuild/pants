@@ -17,6 +17,5 @@ python_library(
     'src/python/pants/backend/core/tasks:common',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/util:dirutil',
   ],
 )
