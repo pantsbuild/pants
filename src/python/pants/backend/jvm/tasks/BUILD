@@ -195,9 +195,7 @@ python_library(
     ':jar_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/fs',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -416,7 +414,6 @@ python_library(
   sources = ['scalastyle.py'],
   dependencies = [
     ':nailgun_task',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/process',
