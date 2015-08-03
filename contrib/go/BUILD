@@ -4,5 +4,5 @@
 source_root('src/python', python_library)
 source_root('tests/python', python_library, python_tests)
 
-source_root('examples/3rdparty/go', go_remote_package)
-source_root('examples/src/go', go_package, go_binary)
+source_root('examples/3rdparty/go', go_remote_library)
+source_root('examples/src/go', go_library, go_binary)

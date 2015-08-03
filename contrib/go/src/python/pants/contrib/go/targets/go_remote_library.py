@@ -10,21 +10,21 @@ from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
 
 
-class GoRemotePackage(Target):
+class GoRemoteLibrary(Target):
 
   def __init__(self, rev='', zip_url='', **kwargs):
     """
-    :param rev string: Identifies which version of the remote package to download.
+    :param rev string: Identifies which version of the remote library to download.
                        This could be a commit SHA (git), node id (hg), etc.
     :param zip_url string:
       - Any URL from which a zipfile can be downloaded containing the source code of the
-        remote package.
+        remote library.
       - Can be a template string using variables {rev} (see :param rev:) and {id}, which
-        is the global import identifier of the package, which is specified by the path to
-        the BUILD file relative to all 3rd party Go packages (see GoPlatform).
+        is the global import identifier of the library, which is specified by the path to
+        the BUILD file relative to all 3rd party Go libraries (see GoPlatform).
           Example: "https://{id}/archive/{rev}.zip"
-      - The zip file is expected to have zipped the package directory itself, and NOT the
-        direct contents of the package.
+      - The zip file is expected to have zipped the library directory itself, and NOT the
+        direct contents of the library.
           Expected: `zip -r mylib.zip mylib/`
                Not: `zip -r mylib.zip mylib/*`
     """
@@ -33,4 +33,4 @@ class GoRemotePackage(Target):
       'rev': PrimitiveField(rev),
       'zip_url': PrimitiveField(zip_url)
     })
-    super(GoRemotePackage, self).__init__(payload=payload, **kwargs)
+    super(GoRemoteLibrary, self).__init__(payload=payload, **kwargs)

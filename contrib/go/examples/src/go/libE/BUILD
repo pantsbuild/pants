@@ -1,3 +1,3 @@
-go_package(
+go_library(
   name='libE'
 )

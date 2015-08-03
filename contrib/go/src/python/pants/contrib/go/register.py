@@ -9,8 +9,8 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.go.targets.go_binary import GoBinary
-from pants.contrib.go.targets.go_package import GoPackage
-from pants.contrib.go.targets.go_remote_package import GoRemotePackage
+from pants.contrib.go.targets.go_library import GoLibrary
+from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
 from pants.contrib.go.tasks.go_run import GoRun
@@ -21,9 +21,9 @@ from pants.contrib.go.tasks.go_test import GoTest
 def build_file_aliases():
   return BuildFileAliases.create(
     targets={
-      'go_package': GoPackage,
+      'go_library': GoLibrary,
       'go_binary': GoBinary,
-      'go_remote_package': GoRemotePackage,
+      'go_remote_library': GoRemoteLibrary,
     }
   )
 
