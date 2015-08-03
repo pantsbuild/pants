@@ -7,7 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
+from functools import partial
+from operator import is_not
 
 from twitter.common.collections import OrderedSet
 
@@ -42,7 +44,7 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.1'
+  DEFAULT_EXPORT_VERSION='1.0.2'
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -63,10 +65,7 @@ class Export(ConsoleTask):
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
     """
-    if jar.rev:
-      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
-    else:
-      return '{0}:{1}'.format(jar.org, jar.name)
+    return ':'.join(filter(partial(is_not, None), [jar.org, jar.name, jar.rev, jar.classifier]))
 
   @staticmethod
   def _exclude_id(jar):
@@ -231,15 +230,7 @@ class Export(ConsoleTask):
     mapping = defaultdict(list)
     jar_data = self.context.products.get_data('ivy_jar_products')
     jar_infos = get_jar_infos(ivy_products=jar_data, confs=['default', 'sources', 'javadoc'])
-    for ivy_module_ref, paths in jar_infos.iteritems():
-      conf_to_jarfile_map = OrderedDict()
-      for conf, pathlist in paths.iteritems():
-        # TODO(Eric Ayers): pathlist can contain multiple jars in the case where classifiers
-        # to resolve extra artifacts are used.  This only captures the first one, meaning the
-        # export is incomplete. See https://github.com/pantsbuild/pants/issues/1489
-        if pathlist:
-          conf_to_jarfile_map[conf] = pathlist[0]
-
+    for ivy_module_ref, conf_to_jarfile_map in jar_infos.iteritems():
       mapping[self._jar_id(ivy_module_ref)] = conf_to_jarfile_map
     return mapping
 

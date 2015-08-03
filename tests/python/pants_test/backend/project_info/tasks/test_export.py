@@ -155,7 +155,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
     '''.strip())
 
-  def test_source_globs(self):
+  def test_source_globs_py(self):
     result = get_json(self.execute_console_task(
       options=dict(globs=True),
       targets=[self.target('src/x')]
@@ -164,6 +164,17 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     self.assertEqual(
       {'globs' : ['src/x/*.py',]},
       result['targets']['src/x:x']['globs']
+    )
+
+  def test_source_globs_java(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('project_info:globular')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['project_info/com/foo/*.scala']},
+      result['targets']['project_info:globular']['globs']
     )
 
   def test_without_dependencies(self):
@@ -176,7 +187,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:first')]
     ))
-    self.assertEqual('1.0.1', result['version'])
+    self.assertEqual('1.0.2', result['version'])
 
   def test_sources(self):
     result = get_json(self.execute_console_task(
@@ -189,17 +200,6 @@ class ProjectInfoTest(ConsoleTaskTestBase):
        'project_info/com/foo/Baz.scala',
       ],
       sorted(result['targets']['project_info:third']['sources'])
-    )
-
-  def test_source_globs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('project_info:globular')]
-    ))
-
-    self.assertEqual(
-      {'globs' : ['project_info/com/foo/*.scala']},
-      result['targets']['project_info:globular']['globs']
     )
 
   def test_with_dependencies(self):

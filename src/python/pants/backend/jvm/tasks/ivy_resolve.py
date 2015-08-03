@@ -142,18 +142,17 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       jar_library_targets = [ t  for t in targets if isinstance(t, JarLibrary) ]
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
-        artifact_paths = []
-        for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
-          if artifact.path in symlink_map:
-            key = artifact.path
+        for artifact_location in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
+          if artifact_location in symlink_map:
+            key = artifact_location
           else:
-            key = os.path.realpath(artifact.path)
+            key = os.path.realpath(artifact_location)
           if key not in symlink_map:
             raise self.UnresolvedJarError(
               'Jar {artifact} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
-              spec=target.address.spec, artifact=artifact, conf=conf))
-          artifact_paths.append(symlink_map[key])
-        compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
+              spec=target.address.spec, artifact=artifact_location, conf=conf))
+          artifact_location = symlink_map[key]
+          compile_classpath.add_for_target(target, [(conf, artifact_location)])
 
     if self._report:
       self._generate_ivy_report(resolve_hash_name)
