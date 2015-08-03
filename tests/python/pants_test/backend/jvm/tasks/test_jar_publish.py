@@ -49,7 +49,7 @@ class JarPublishTest(NailgunTaskTestBase):
 
   def test_options_with_auth(self):
     self._jar_publish._jvm_options = self.DEFAULT_JVM_OPTS
-    
+
     username = 'mjk'
     password = 'h.'
     creds_options = ['-Dlogin={}'.format(username), '-Dpassword={}'.format(password)]
