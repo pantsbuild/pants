@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
+import sys
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
@@ -88,13 +89,13 @@ class GoTask(Task):
     """
     cmd_flags = cmd_flags or []
     pkg_flags = pkg_flags or []
-    os.environ['GOPATH'] = gopath
-    if self.is_remote_lib(target):
-      pkg_path = self.global_import_id(target)
-    else:
-      pkg_path = target.address.spec_path
-    cmd = ['go', cmd] + cmd_flags + [pkg_path] + pkg_flags
-    res = Xargs.subprocess(cmd).execute([])
-    if res != 0:
-      raise TaskError('`{cmd}` exited non-zero ({res})'
-                      .format(cmd=' '.join(cmd), res=res))
+    pkg_path = (self.global_import_id(target) if self.is_remote_lib(target)
+                else target.address.spec_path)
+    envcopy = os.environ.copy()
+    envcopy['GOPATH'] = gopath
+    args = ['go', cmd] + cmd_flags + [pkg_path] + pkg_flags
+    p = subprocess.Popen(args, env=envcopy, stdout=sys.stdout, stderr=sys.stderr)
+    retcode = p.wait()
+    if retcode != 0:
+      raise TaskError('`{}` exited non-zero ({})'
+                      .format(' '.join(args), retcode))
