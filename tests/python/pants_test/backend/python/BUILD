@@ -27,7 +27,7 @@ python_tests(
     'src/python/pants/binaries:thrift_util',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:base_test',
   ]
 )

@@ -90,7 +90,7 @@ python_tests(
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 

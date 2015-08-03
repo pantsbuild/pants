@@ -17,7 +17,7 @@ python_tests(
   dependencies=[
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:java_thrift_library_fingerprint_strategy',
     'src/python/pants/backend/codegen/subsystems:thrift_defaults',
-    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -30,8 +30,13 @@ python_tests(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:scrooge_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:address',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
+    'src/python/pants/goal:context',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/option/util',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

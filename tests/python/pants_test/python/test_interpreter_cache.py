@@ -15,7 +15,7 @@ from pex.resolver import resolve
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.util.contextutil import temporary_dir
-from pants_test.base.context_utils import create_option_values
+from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 class TestInterpreterCache(unittest.TestCase):
@@ -60,9 +60,6 @@ class TestInterpreterCache(unittest.TestCase):
                   [self._interpreter])
 
   def test_setup_using_eggs(self):
-    def options(**kwargs):
-      return create_option_values(kwargs)
-
     def link_egg(repo_root, requirement):
       existing_dist_location = self._interpreter.get_location(requirement)
       if existing_dist_location is not None:
@@ -86,17 +83,18 @@ class TestInterpreterCache(unittest.TestCase):
       setuptools_version = link_egg(egg_dir, 'setuptools')
       wheel_version = link_egg(egg_dir, 'wheel')
 
-      python_setup_options = options(interpreter_cache_dir=None,
-                                     pants_workdir=os.path.join(root, 'workdir'),
-                                     interpreter_requirement=self._interpreter.identity.requirement,
-                                     setuptools_version=setuptools_version,
-                                     wheel_version=wheel_version)
-      python_setup = PythonSetup('test-scope', python_setup_options)
-      python_repos = PythonRepos('test-scope', options(indexes=[], repos=[egg_dir]))
+      interpreter_requirement = self._interpreter.identity.requirement
+      python_setup = create_subsystem(PythonSetup,
+                                      interpreter_cache_dir=None,
+                                      pants_workdir=os.path.join(root, 'workdir'),
+                                      interpreter_requirement=interpreter_requirement,
+                                      setuptools_version=setuptools_version,
+                                      wheel_version=wheel_version)
+      python_repos = create_subsystem(PythonRepos, indexes=[], repos=[egg_dir])
       cache = PythonInterpreterCache(python_setup, python_repos)
 
       interpereters = cache.setup(paths=[os.path.dirname(self._interpreter.binary)],
-                                  filters=[str(self._interpreter.identity.requirement)])
+                                  filters=[str(interpreter_requirement)])
       self.assertGreater(len(interpereters), 0)
 
       def assert_egg_extra(interpreter, name, version):

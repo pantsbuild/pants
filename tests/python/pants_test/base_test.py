@@ -30,10 +30,12 @@ from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
+from pants.option.ranked_value import RankedValue
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
-from pants_test.base.context_utils import create_context, create_option_values
+from pants_test.base.context_utils import create_context
+from pants_test.option.util.fakes import create_option_values, options_registration_function
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
@@ -159,14 +161,8 @@ class BaseTest(unittest.TestCase):
     # All this does is make the names available in code, with the default values.
     # Individual tests can then override the option values they care about.
     def register_func(on_scope):
-      def register(*rargs, **rkwargs):
-        scoped_options = option_values[on_scope]
-        default = rkwargs.get('default')
-        if default is None and rkwargs.get('action') == 'append':
-          default = []
-        for flag_name in rargs:
-          option_name = flag_name.lstrip('-').replace('-', '_')
-          scoped_options[option_name] = default
+      scoped_options = option_values[on_scope]
+      register = options_registration_function(scoped_options)
       register.bootstrap = bootstrap_option_values
       register.scope = on_scope
       return register

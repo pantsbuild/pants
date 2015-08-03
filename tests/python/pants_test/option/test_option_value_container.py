@@ -54,6 +54,22 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertEqual(44, o.foo)
     self.assertEqual(RankedValue.FLAG, o.get_rank('foo'))
 
+  def test_is_flagged(self):
+    o = OptionValueContainer()
+    o.add_forwardings({'foo': 'bar'})
+
+    o.bar = RankedValue(RankedValue.NONE, 11)
+    self.assertFalse(o.is_flagged('foo'))
+
+    o.bar = RankedValue(RankedValue.CONFIG, 11)
+    self.assertFalse(o.is_flagged('foo'))
+
+    o.bar = RankedValue(RankedValue.ENVIRONMENT, 11)
+    self.assertFalse(o.is_flagged('foo'))
+
+    o.bar = RankedValue(RankedValue.FLAG, 11)
+    self.assertTrue(o.is_flagged('foo'))
+
   def test_indexing(self):
     o = OptionValueContainer()
     o.add_forwardings({'foo': 'bar'})
