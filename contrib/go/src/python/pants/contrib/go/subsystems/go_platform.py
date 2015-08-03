@@ -11,3 +11,5 @@ from pants.subsystem.subsystem import Subsystem
 class GoPlatform(Subsystem):
 
   options_scope = 'go-platform'
+
+  # TODO(cgibb): Fetch Go tools using BinaryUtils.

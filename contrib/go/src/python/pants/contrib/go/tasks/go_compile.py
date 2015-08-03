@@ -23,10 +23,6 @@ class GoCompile(GoTask):
              help='Build flags to pass to Go compiler.')
 
   @classmethod
-  def supports_passthru_args(cls):
-    return True
-
-  @classmethod
   def prepare(cls, options, round_manager):
     super(GoCompile, cls).prepare(options, round_manager)
     round_manager.require_data('gopath')
@@ -66,8 +62,7 @@ class GoCompile(GoTask):
             else:
               os.symlink(lib_binary, lib_binary_link)
           self.run_go_cmd('install', gopath, vt.target,
-                          cmd_flags=self.get_options().build_flags.split(),
-                          pkg_flags=self.get_passthru_args())
+                          cmd_flags=self.get_options().build_flags.split())
         if self.is_binary(vt.target):
           binary_path = os.path.join(gopath, 'bin', os.path.basename(vt.target.address.spec_path))
           self.context.products.get_data('exec_binary')[vt.target] = binary_path
