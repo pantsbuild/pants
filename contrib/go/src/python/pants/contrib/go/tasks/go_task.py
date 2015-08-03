@@ -13,6 +13,7 @@ from pants.process.xargs import Xargs
 
 from pants.contrib.go.subsystems.go_platform import GoPlatform
 from pants.contrib.go.targets.go_binary import GoBinary
+from pants.contrib.go.targets.go_local_package import GoLocalPackage
 from pants.contrib.go.targets.go_package import GoPackage
 from pants.contrib.go.targets.go_remote_package import GoRemotePackage
 
@@ -28,12 +29,16 @@ class GoTask(Task):
     return isinstance(target, GoBinary)
 
   @staticmethod
-  def is_go_remote_pkg(target):
+  def is_remote_pkg(target):
     return isinstance(target, GoRemotePackage)
 
   @staticmethod
+  def is_local_pkg(target):
+    return isinstance(target, GoLocalPackage)
+
+  @staticmethod
   def is_go_source(target):
-    return isinstance(target, (GoPackage, GoRemotePackage, GoBinary))
+    return isinstance(target, (GoLocalPackage, GoRemotePackage))
 
   def global_import_id(self, go_remote_pkg):
     """Returns the global import identifier of the given GoRemotePackage.
@@ -59,7 +64,11 @@ class GoTask(Task):
     :param pkg_flags list<str>: Command line flags to pass to target package.
     """
     os.environ['GOPATH'] = gopath
-    cmd = ['go', cmd] + cmd_flags + [target.address.spec_path] + pkg_flags
+    if self.is_remote_pkg(target):
+      pkg_path = self.global_import_id(target)
+    else:
+      pkg_path = target.address.spec_path
+    cmd = ['go', cmd] + cmd_flags + [pkg_path] + pkg_flags
     res = Xargs.subprocess(cmd).execute([])
     if res != 0:
       raise TaskError('`{cmd}` exited non-zero ({res})'

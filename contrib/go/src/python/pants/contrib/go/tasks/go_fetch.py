@@ -32,7 +32,7 @@ class GoFetch(GoTask):
   def execute(self):
     self.context.products.safe_create_data('go_remote_pkg_source', lambda: defaultdict(str))
 
-    with self.invalidated(self.context.targets(self.is_go_remote_pkg)) as invalidation_check:
+    with self.invalidated(self.context.targets(self.is_remote_pkg)) as invalidation_check:
       for vt in invalidation_check.all_vts:
         import_id = self.global_import_id(vt.target)
         dest_dir = os.path.join(vt.results_dir, import_id)

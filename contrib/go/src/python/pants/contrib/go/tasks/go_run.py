@@ -23,11 +23,12 @@ class GoRun(GoTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(GoRun, cls).prepare(options, round_manager)
-    round_manager.require_data('go_binary')
+    round_manager.require_data('exec_binary')
 
   def execute(self):
+    print()
     for target in filter(self.is_binary, self.context.target_roots):
-      binary_path = self.context.products.get_data('go_binary')[target]
+      binary_path = self.context.products.get_data('exec_binary')[target]
       res = Xargs.subprocess([binary_path]).execute(self.get_passthru_args())
       if res != 0:
         raise TaskError('{bin} exited non-zero ({res})'

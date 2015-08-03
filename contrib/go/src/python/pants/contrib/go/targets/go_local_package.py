@@ -19,7 +19,7 @@ class GoLocalPackage(Target):
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources=sources,
-                                           sources_rel_path=address.spec_path,
+                                           sources_rel_path='',
                                            key_arg='sources'),
     })
     super(GoLocalPackage, self).__init__(address=address, payload=payload, **kwargs)
