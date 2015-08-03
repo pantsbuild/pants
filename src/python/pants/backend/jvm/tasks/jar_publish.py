@@ -590,6 +590,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       # No need to copy here, as this list isn't modified by the caller.
       return self._jvm_options
 
+    # Create a copy of the options, so that the modification is appropriately transient.
     jvm_options = copy(self._jvm_options)
     user = repo.get('username')
     password = repo.get('password')

@@ -5,19 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import pytest
-from mock import MagicMock, mock_open, patch
-
 from pants.backend.jvm.tasks.jar_publish import JarPublish
-from pants_test.base_test import BaseTest
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class JarPublishTest(NailgunTaskTestBase):
-  """Tests for junit_run._JUnitRunner class"""
+  """Tests for backend jvm JarPublish class"""
 
-  options_scope = 'jar.publish'
-  _jar_publish = None
+  DEFAULT_JVM_OPTS = ["jvm_opt_1", "jvm_opt_2"]
 
   @classmethod
   def task_type(cls):
@@ -43,29 +38,30 @@ class JarPublishTest(NailgunTaskTestBase):
   def setUp(self):
     super(JarPublishTest, self).setUp()
 
-    # Hack to make sure subsystems are initialized
-    # self.context()
     JarPublish.options_scope = 'jar.publish'
-#    with patch('JarPublish.options_scope', 'jar.publish'):
     self._jar_publish = JarPublish(self._create_context(), ".")
 
-
   def test_options_with_no_auth(self):
-    self._jar_publish._jvm_options = ["jvm_opt_1", "jvm_opt_2"]
+    self._jar_publish._jvm_options = self.DEFAULT_JVM_OPTS
     repo = {}
     modified_opts = self._jar_publish._ivy_jvm_options(repo)
-    self.assertEqual(modified_opts, ["jvm_opt_1", "jvm_opt_2"])
+    self.assertEqual(modified_opts, self.DEFAULT_JVM_OPTS)
 
   def test_options_with_auth(self):
-    self._jar_publish._jvm_options = ["jvm_opt_1", "jvm_opt_2"]
+    self._jar_publish._jvm_options = self.DEFAULT_JVM_OPTS
+    
+    username = 'mjk'
+    password = 'h.'
+    creds_options = ['-Dlogin={}'.format(username), '-Dpassword={}'.format(password)]
+
     repo = {
       'auth': 'blah',
-      'username': 'mjk',
-      'password': 'h.',
+      'username': username,
+      'password': password,
     }
     modified_opts = self._jar_publish._ivy_jvm_options(repo)
-    self.assertEqual(modified_opts, ["jvm_opt_1", "jvm_opt_2", '-Dlogin=mjk', '-Dpassword=h.'])
-    
+    self.assertEqual(modified_opts, self.DEFAULT_JVM_OPTS + creds_options)
+
     # Now run it again, and make sure we don't get dupes.
     modified_opts = self._jar_publish._ivy_jvm_options(repo)
-    self.assertEqual(modified_opts, ["jvm_opt_1", "jvm_opt_2", '-Dlogin=mjk', '-Dpassword=h.'])
+    self.assertEqual(modified_opts, self.DEFAULT_JVM_OPTS + creds_options)
