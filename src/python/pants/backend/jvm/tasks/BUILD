@@ -417,7 +417,7 @@ python_library(
   dependencies = [
     ':nailgun_task',
     'src/python/pants/backend/core/tasks:task',
-    'pants.base:exceptions',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/process',
     'src/python/pants/util:dirutil'
