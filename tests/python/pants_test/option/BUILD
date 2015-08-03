@@ -13,3 +13,11 @@ python_tests(
     'tests/python/pants_test:base_test',
   ],
 )
+
+python_tests(
+  name='testing',
+  sources=globs('*.py'),
+  dependencies=[
+    'src/python/pants/option',
+  ],
+)

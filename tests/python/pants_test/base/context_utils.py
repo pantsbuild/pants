@@ -14,56 +14,7 @@ from twitter.common.collections import maybe_list
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.goal.context import Context
-
-
-def create_option_values(option_values):
-  """Create a fake OptionValues object for testing.
-
-  :param dict option_values: A dict of option name -> value.
-  """
-  class TestOptionValues(object):
-    def __init__(self):
-      self.__dict__ = option_values
-    def __getitem__(self, key):
-      return getattr(self, key)
-    def get(self, key, default=None):
-      if hasattr(self, key):
-        return getattr(self, key, default)
-      return default
-  return TestOptionValues()
-
-
-def create_options(options):
-  """Create a fake Options object for testing.
-
-  Note that the returned object only provides access to the provided options values. There is
-  no registration mechanism on this object. Code under test shouldn't care about resolving
-  cmd-line flags vs. config vs. env vars etc. etc.
-
-  :param dict options: A dict of scope -> (dict of option name -> value).
-  """
-  class TestOptions(object):
-    def for_scope(self, scope):
-      return create_option_values(options[scope])
-
-    def for_global_scope(self):
-      return self.for_scope('')
-
-    def passthru_args_for_scope(self, scope):
-      return []
-
-    def items(self):
-      return options.items()
-
-    def registration_args_iter_for_scope(self, scope):
-      return []
-
-    def get_fingerprintable_for_scope(self, scope):
-      return []
-
-    def __getitem__(self, key):
-      return self.for_scope(key)
-  return TestOptions()
+from pants_test.option.util.fakes import create_options
 
 
 class TestContext(Context):

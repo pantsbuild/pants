@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants_test.base.context_utils import create_option_values
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import create_subsystem
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
   JavaThriftLibraryFingerprintStrategy
@@ -21,7 +21,7 @@ class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
               'rpc_style': 'async'}
 
   def create_strategy(self, option_values):
-    thrift_defaults = ThriftDefaults('test-scope', create_option_values(option_values))
+    thrift_defaults = create_subsystem(ThriftDefaults, **option_values)
     return JavaThriftLibraryFingerprintStrategy(thrift_defaults)
 
   def test_fp_diffs_due_to_option(self):
@@ -36,10 +36,8 @@ class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
     self.assertNotEquals(fp1, fp2)
 
   def test_fp_diffs_due_to_target_change(self):
-    a = self.make_target(':a', target_type=JavaThriftLibrary,
-                         rpc_style='sync', dependencies=[])
-    b = self.make_target(':b', target_type=JavaThriftLibrary,
-                         rpc_style='finagle', dependencies=[])
+    a = self.make_target(':a', target_type=JavaThriftLibrary, rpc_style='sync', dependencies=[])
+    b = self.make_target(':b', target_type=JavaThriftLibrary, rpc_style='finagle', dependencies=[])
 
     fp1 = self.create_strategy(self.options1).compute_fingerprint(a)
     fp2 = self.create_strategy(self.options1).compute_fingerprint(b)

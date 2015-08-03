@@ -20,9 +20,6 @@ class JvmRunTest(TaskTestBase):
   def task_type(cls):
     return JvmRun
 
-  def setUp(self):
-    super(JvmRunTest, self).setUp()
-
   @contextmanager
   def setup_cmdline_run(self, **options):
     """Run the JvmRun task in command line only mode  with the specified extra options.
@@ -32,7 +29,7 @@ class JvmRunTest(TaskTestBase):
     jvm_binary = self.make_target('src/java/org/pantsbuild:binary', JvmBinary,
                                   main='org.pantsbuild.Binary')
     context = self.context(target_roots=[jvm_binary])
-    jvm_run =  self.create_task(context, 'unused')
+    jvm_run = self.create_task(context, 'unused')
     self._cmdline_classpath = [os.path.join(self.build_root, c) for c in ['bob', 'fred']]
     self.populate_compile_classpath(context=jvm_run.context, classpath=self._cmdline_classpath)
     with temporary_dir() as pwd:

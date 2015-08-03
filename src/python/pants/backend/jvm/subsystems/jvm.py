@@ -45,7 +45,9 @@ class JVM(Subsystem):
     for opt in self.get_options().options:
       ret.extend(safe_shlex_split(opt))
 
-    if self.get_options().debug:
+    if (self.get_options().debug or
+        self.get_options().is_flagged('debug_port') or
+        self.get_options().is_flagged('debug_args')):
       debug_port = self.get_options().debug_port
       ret.extend(arg.format(debug_port=debug_port) for arg in self.get_options().debug_args)
     return ret
