@@ -11,7 +11,6 @@ import sys
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
-from pants.process.xargs import Xargs
 
 from pants.contrib.go.subsystems.go_platform import GoPlatform
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -52,17 +51,17 @@ class GoTask(Task):
 
   @property
   def goos_goarch(self):
-    """Returns the current "$GOOS_$GOARCH" environment variables.
+    """Returns concatenated $GOOS and $GOARCH environment variables, separated by an underscore.
 
-    Useful for locating where the Go compiler is placing binaries under "$GOPATH/pkg/".
+    Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
     """
     if self._goos_goarch is None:
       def get_env_var(var):
         p = subprocess.Popen(['go', 'env', var],
                              stdout=subprocess.PIPE)
         out, _ = p.communicate()
-        return out
-      self._goos_goarch = get_env_var('GOOS').strip() + '_' + get_env_var('GOARCH').strip()
+        return out.strip()
+      self._goos_goarch = get_env_var('GOOS') + '_' + get_env_var('GOARCH')
     return self._goos_goarch
 
   def global_import_id(self, go_remote_lib):
