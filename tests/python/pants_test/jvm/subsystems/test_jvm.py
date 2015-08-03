@@ -14,6 +14,11 @@ from pants_test.subsystem.subsystem_util import create_subsystem
 create_JVM = functools.partial(create_subsystem, JVM)
 
 
+def test_options_default():
+  jvm = create_JVM()
+  assert [] == jvm.get_jvm_options()
+
+
 def test_options_simple():
   jvm = create_JVM(options=['-ea'])
   assert ['-ea'] == jvm.get_jvm_options()
@@ -63,6 +68,11 @@ def test_explicit_debug_args():
 def test_explicit_debug_args_with_options():
   jvm = create_JVM(options=['-ea'], debug_args=['fred'])
   assert sorted(['-ea', 'fred']) == sorted(jvm.get_jvm_options())
+
+
+def test_args_default():
+  jvm = create_JVM()
+  assert [] == jvm.get_program_args()
 
 
 def test_args_single_simple():
