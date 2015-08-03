@@ -32,12 +32,9 @@ python_library(
   name = 'depmap',
   sources = ['depmap.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
   ],
