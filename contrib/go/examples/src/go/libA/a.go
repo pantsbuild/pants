@@ -8,7 +8,7 @@ import (
 )
 
 func Speak() {
-  println("Hello from libA! ;)")
+  println("Hello from libA!")
   libB.Speak()
   libC.Speak()
   println("Bye from libA!")

@@ -34,24 +34,21 @@ class GoSetupWorkspace(GoTask):
     # Produces a $GOPATH pointing to a "filled in" Go workspace.
     return ['gopath']
 
-  @property
-  def cache_target_dirs(self):
-    return True
-
   def execute(self):
     self.context.products.safe_create_data('gopath', lambda: defaultdict(str))
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
+        gopath = os.path.join(self.workdir, vt.id)
         if not vt.valid:
           for dir in ('bin', 'pkg', 'src'):
-            safe_mkdir(os.path.join(vt.results_dir, dir))
+            safe_mkdir(os.path.join(gopath, dir))
           for target in vt.target.closure():
             if self.is_remote_lib(target):
-              self._symlink_remote_lib(vt.results_dir, target)
+              self._symlink_remote_lib(gopath, target)
             else:
-              self._symlink_local_src(vt.results_dir, target)
-        self.context.products.get_data('gopath')[vt.target] = vt.results_dir
+              self._symlink_local_src(gopath, target)
+        self.context.products.get_data('gopath')[vt.target] = gopath
 
   def _symlink_local_src(self, gopath, go_local_src):
     """Creates symlinks from the given gopath to the source files of the given local package.

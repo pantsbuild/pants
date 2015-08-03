@@ -51,6 +51,10 @@ class GoTask(Task):
 
   @property
   def goos_goarch(self):
+    """Returns the current "$GOOS_$GOARCH" environment variables.
+
+    Useful for locating where the Go compiler is placing binaries under "$GOPATH/pkg/".
+    """
     if self._goos_goarch is None:
       def get_env_var(var):
         p = subprocess.Popen(['go', 'env', var],
@@ -72,7 +76,7 @@ class GoTask(Task):
     return os.path.relpath(go_remote_lib.address.spec_path,
                            go_remote_lib.target_base)
 
-  def run_go_cmd(self, cmd, gopath, target, cmd_flags=[], pkg_flags=[]):
+  def run_go_cmd(self, cmd, gopath, target, cmd_flags=None, pkg_flags=None):
     """Runs a Go command on a target from within a Go workspace.
 
     :param cmd string: Go command to execute, e.g. 'test' for `go test`
@@ -82,6 +86,8 @@ class GoTask(Task):
     :param cmd_flags list<str>: Command line flags to pass to command.
     :param pkg_flags list<str>: Command line flags to pass to target package.
     """
+    cmd_flags = cmd_flags or []
+    pkg_flags = pkg_flags or []
     os.environ['GOPATH'] = gopath
     if self.is_remote_lib(target):
       pkg_path = self.global_import_id(target)

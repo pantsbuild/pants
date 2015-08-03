@@ -40,7 +40,7 @@ class GoCompile(GoTask):
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True,
                           topological_order=True) as invalidation_check:
-      # Maps target to the compile library binary of said target
+      # Maps each local/remote library target to its compiled binary.
       lib_binary_map = {}
       for vt in invalidation_check.all_vts:
         gopath = self.context.products.get_data('gopath')[vt.target]
@@ -55,9 +55,12 @@ class GoCompile(GoTask):
             if os.path.islink(lib_binary_link):
               if os.stat(lib_binary).st_mtime > os.lstat(lib_binary_link).st_mtime:
                 # The binary under the link was updated after the link was created. Refresh
-                # the link so the mod time of the link is greater than the mod time of the binary.
-                # This prevents Go from seeing inconsistent time stamps, which would cause
-                # it to needlessly re-compile the library.
+                # the link so the mtime (modification time) of the link is greater than the
+                # mtime of the binary. This prevents Go from seeing inconsistent time stamps,
+                # which would cause it to needlessly re-compile the library. (Note that the
+                # inconsistency Go observes is actually between the link mtime and the source
+                # code mtime, but it suffices to just check the binary mtime since it will be
+                # strictly greater than the source code mtime)
                 os.unlink(lib_binary_link)
                 os.symlink(lib_binary, lib_binary_link)
             else:
