@@ -26,8 +26,8 @@ class GoRun(GoTask):
     round_manager.require_data('exec_binary')
 
   def execute(self):
-    print()
-    for target in filter(self.is_binary, self.context.target_roots):
+    target = self.require_single_root_target()
+    if self.is_binary(target):
       binary_path = self.context.products.get_data('exec_binary')[target]
       res = Xargs.subprocess([binary_path]).execute(self.get_passthru_args())
       if res != 0:
