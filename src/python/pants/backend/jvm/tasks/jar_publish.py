@@ -13,6 +13,7 @@ import pkgutil
 import shutil
 import sys
 from collections import OrderedDict, defaultdict
+from copy import copy
 
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
@@ -459,12 +460,13 @@ class JarPublish(ScmPublishMixin, JarTask):
     super(JarPublish, self).__init__(*args, **kwargs)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
-    self._jvm_options = self.get_options().jvm_options
+    options = self.get_options().get
+    self._jvm_options = options('jvm_options')
 
     self.scm = get_scm()
     self.log = self.context.log
 
-    if self.get_options().local:
+    if options('local'):
       local_repo = dict(
         resolver='publish_local',
         path=os.path.abspath(os.path.expanduser(self.get_options().local)),
@@ -473,9 +475,9 @@ class JarPublish(ScmPublishMixin, JarTask):
       )
       self.repos = defaultdict(lambda: local_repo)
       self.commit = False
-      self.local_snapshot = self.get_options().local_snapshot
+      self.local_snapshot = options('local_snapshot')
     else:
-      self.repos = self.get_options().repos
+      self.repos = options('repos')
       if not self.repos:
         raise TaskError("This repo is not configured to publish externally! Please configure per\n"
                         "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
@@ -489,18 +491,18 @@ class JarPublish(ScmPublishMixin, JarTask):
           self.context.log.debug('Found auth for repo={} user={}'.format(repo, user))
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
-      self.commit = self.get_options().commit
-      self.push_postscript = self.get_options().push_postscript or ''
+      self.commit = options('commit')
+      self.push_postscript = options('push_postscript') or ''
       self.local_snapshot = False
 
-    self.named_snapshot = self.get_options().named_snapshot
+    self.named_snapshot = options('named_snapshot')
     if self.named_snapshot:
       self.named_snapshot = Namedver.parse(self.named_snapshot)
 
-    self.dryrun = self.get_options().dryrun
-    self.transitive = self.get_options().transitive
-    self.force = self.get_options().force
-    self.publish_changelog = self.get_options().changelog
+    self.dryrun = options('dryrun')
+    self.transitive = options('transitive')
+    self.force = options('force')
+    self.publish_changelog = options('changelog')
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -526,7 +528,7 @@ class JarPublish(ScmPublishMixin, JarTask):
           .format(message=e, coordinate=coordinate))
 
     self.overrides = {}
-    if self.get_options().override:
+    if options('override'):
       if self.named_snapshot:
         raise TaskError('Options --named-snapshot and --override are mutually exclusive!')
 
@@ -542,11 +544,11 @@ class JarPublish(ScmPublishMixin, JarTask):
         except ValueError:
           raise TaskError('Invalid override: {}'.format(override))
 
-      self.overrides.update(parse_override(o) for o in self.get_options().override)
+      self.overrides.update(parse_override(o) for o in options('override'))
 
     self.restart_at = None
-    if self.get_options().restart_at:
-      self.restart_at = parse_jarcoordinate(self.get_options().restart_at)
+    if options('restart_at'):
+      self.restart_at = parse_jarcoordinate(options('restart_at'))
 
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
@@ -585,9 +587,11 @@ class JarPublish(ScmPublishMixin, JarTask):
     """Get the JVM options for ivy authentication, if needed."""
     # Get authentication for the publish repo if needed.
     if not repo.get('auth'):
+      # No need to copy here, as this list isn't modified by the caller.
       return self._jvm_options
 
-    jvm_options = self._jvm_options
+    # Create a copy of the options, so that the modification is appropriately transient.
+    jvm_options = copy(self._jvm_options)
     user = repo.get('username')
     password = repo.get('password')
     if user and password:
