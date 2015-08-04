@@ -30,6 +30,8 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
+from pants.pantsd.subsystems.pants_daemon_launcher import PantsDaemonLauncher
+from pants.pantsd.subsystems.watchman_launcher import WatchmanLauncher
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
@@ -75,7 +77,7 @@ class GoalRunner(object):
   @property
   def subsystems(self):
     # Subsystems used outside of any task.
-    return SourceRootBootstrapper, Reporting, RunTracker
+    return SourceRootBootstrapper, Reporting, RunTracker, PantsDaemonLauncher, WatchmanLauncher
 
   def setup(self):
     options_bootstrapper = OptionsBootstrapper()
@@ -128,6 +130,12 @@ class GoalRunner(object):
     else:
       self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
+    # Pantsd startup.
+    if PantsDaemonLauncher.global_instance().options.enabled:
+      # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
+      with self.run_tracker.new_workunit(name='pantsd', labels=[WorkUnit.SETUP]):
+        PantsDaemonLauncher.global_instance().maybe_launch()
+
     self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
                                              root_dir=self.root_dir,
                                              run_tracker=self.run_tracker)
@@ -139,9 +147,9 @@ class GoalRunner(object):
       build_file_type = ScmBuildFile
     else:
       build_file_type = FilesystemBuildFile
+
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, build_file_type)
-    self.build_graph = BuildGraph(run_tracker=self.run_tracker,
-                                  address_mapper=self.address_mapper)
+    self.build_graph = BuildGraph(run_tracker=self.run_tracker, address_mapper=self.address_mapper)
 
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):

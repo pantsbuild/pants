@@ -14,7 +14,7 @@ from logging.handlers import RotatingFileHandler
 from pants.util.dirutil import safe_mkdir
 
 
-def setup_logging(level, console_stream=None, log_dir=None, scope=None):
+def setup_logging(level, console_stream=True, log_dir=None, scope=None, log_name=None):
   """Configures logging for a given scope, by default the global scope.
 
   :param str level: The logging level to enable, must be one of the level names listed here:
@@ -43,15 +43,16 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None):
   for handler in logger.handlers:
     logger.removeHandler(handler)
 
-  log_file = None
-  console_handler = StreamHandler(stream=console_stream)
-  console_handler.setFormatter(Formatter(fmt='%(levelname)s] %(message)s'))
-  console_handler.setLevel(level)
-  logger.addHandler(console_handler)
+  if console_stream:
+    log_file = None
+    console_handler = StreamHandler(stream=None if console_stream is True else console_stream)
+    console_handler.setFormatter(Formatter(fmt='%(levelname)s] %(message)s'))
+    console_handler.setLevel(level)
+    logger.addHandler(console_handler)
 
   if log_dir:
     safe_mkdir(log_dir)
-    log_file = os.path.join(log_dir, 'pants.log')
+    log_file = os.path.join(log_dir, log_name or 'pants.log')
     file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=4)
 
     class GlogFormatter(Formatter):
