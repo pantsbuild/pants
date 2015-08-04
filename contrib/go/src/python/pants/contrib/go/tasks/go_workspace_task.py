@@ -39,8 +39,8 @@ class GoWorkspaceTask(GoTask):
     dependencies, and removes any symlinks which do not correspond to any needed dep.
     """
     gopath = self.get_gopath(target)
-    for dir in ('bin', 'pkg', 'src'):
-      safe_mkdir(os.path.join(gopath, dir))
+    for d in ('bin', 'pkg', 'src'):
+      safe_mkdir(os.path.join(gopath, d))
     required_links = set()
     for dep in target.closure():
       if self.is_remote_lib(dep):
@@ -49,9 +49,9 @@ class GoWorkspaceTask(GoTask):
         self._symlink_local_src(gopath, dep, required_links)
     self.remove_unused_links(os.path.join(gopath, 'src'), required_links)
 
-  def remove_unused_links(self, dir, required_links):
-    """Recursively remove any links in dir which are not contained in required_links."""
-    for root, _, files in os.walk(dir):
+  def remove_unused_links(self, dirpath, required_links):
+    """Recursively remove any links in dirpath which are not contained in required_links."""
+    for root, _, files in os.walk(dirpath):
       for f in files:
         fpath = os.path.join(root, f)
         if os.path.islink(fpath) and fpath not in required_links:
