@@ -1,0 +1,5 @@
+# An override config example that uses pantsd. Experimental.
+# ./pants --config-override=pants.ini.pantsd <goal> <targets>
+
+[pantsd]
+enabled: true

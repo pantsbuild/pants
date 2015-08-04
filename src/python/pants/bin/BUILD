@@ -23,6 +23,7 @@ python_library(
     'src/python/pants/goal:run_tracker',
     'src/python/pants/logging',
     'src/python/pants/option',
+    'src/python/pants/pantsd',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
     'src/python/pants/util:filtering',
