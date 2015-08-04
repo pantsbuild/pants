@@ -148,7 +148,7 @@ class RunTracker(Subsystem):
     self._main_root_workunit.set_outcome(outcome)
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -156,6 +156,7 @@ class RunTracker(Subsystem):
               display information about this work.
     - cmd: An optional longer string representing this work.
            E.g., the cmd line of a compiler invocation.
+    - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
 
     Use like this:
 
@@ -168,7 +169,8 @@ class RunTracker(Subsystem):
     outcome explicitly if you want to set it to warning.
     """
     parent = self._threadlocal.current_workunit
-    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd) as workunit:
+    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd,
+                                        log_config=log_config) as workunit:
       self._threadlocal.current_workunit = workunit
       try:
         yield workunit
@@ -176,7 +178,7 @@ class RunTracker(Subsystem):
         self._threadlocal.current_workunit = parent
 
   @contextmanager
-  def new_workunit_under_parent(self, name, parent, labels=None, cmd=''):
+  def new_workunit_under_parent(self, name, parent, labels=None, cmd='', log_config=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -188,7 +190,8 @@ class RunTracker(Subsystem):
 
     Task code should not typically call this directly.
     """
-    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels, cmd=cmd)
+    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels,
+                        cmd=cmd, log_config=log_config)
     workunit.start()
     try:
       self.report.start_workunit(workunit)

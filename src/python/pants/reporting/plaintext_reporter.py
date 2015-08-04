@@ -69,7 +69,7 @@ class PlainTextReporter(Reporter):
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self._is_suppressed(workunit):
       return
 
     if workunit.parent and workunit.parent.has_label(WorkUnit.MULTITOOL):
@@ -80,10 +80,10 @@ class PlainTextReporter(Reporter):
              for x in workunit.parent.ancestors()]):
       # Bootstrapping can be chatty, so don't show anything for its sub-workunits.
       self.emit(b'\n{} {} {}[{}]'.format(
-                        workunit.start_time_string(),
-                        workunit.start_delta_string(),
-                        self._indent(workunit),
-                        workunit.name if self.settings.indent else workunit.path()))
+        workunit.start_time_string(),
+        workunit.start_delta_string(),
+        self._indent(workunit),
+        workunit.name if self.settings.indent else workunit.path()))
       # Start output on a new line.
       if self._show_output_indented(workunit):
         self.emit(self._prefix(workunit, b'\n'))
@@ -93,7 +93,7 @@ class PlainTextReporter(Reporter):
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self._is_suppressed(workunit):
       return
 
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
@@ -105,7 +105,7 @@ class PlainTextReporter(Reporter):
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self._is_suppressed(workunit):
       return
 
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
@@ -120,7 +120,7 @@ class PlainTextReporter(Reporter):
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self._is_suppressed(workunit):
       return
 
     if self._show_output_indented(workunit):
@@ -154,8 +154,8 @@ class PlainTextReporter(Reporter):
   def _format_artifact_cache_stats(self, artifact_cache_stats):
     stats = artifact_cache_stats.get_all()
     return b'No artifact cache reads.' if not stats else \
-    b'\n'.join([b'{cache_name} - Hits: {num_hits} Misses: {num_misses}'.format(**x)
-                for x in stats])
+        b'\n'.join([b'{cache_name} - Hits: {num_hits} Misses: {num_misses}'.format(**x)
+                    for x in stats])
 
   def _indent(self, workunit):
     return b'  ' * (len(workunit.ancestors()) - 1)
@@ -166,6 +166,15 @@ class PlainTextReporter(Reporter):
     if self.settings.indent:
       def replace(x, c):
         return x.replace(c, c + PlainTextReporter._time_string_filler + self._indent(workunit))
+
       return replace(replace(s, b'\r'), b'\n')
     else:
       return PlainTextReporter._time_string_filler + s
+
+  def _is_suppressed(self, workunit):
+    if not self.is_under_main_root(workunit):
+      return True
+    if workunit.log_config and workunit.log_config.level == 'warn' and \
+       workunit.outcome() != WorkUnit.FAILURE and workunit.outcome() != WorkUnit.ABORTED:
+        return True
+    return False
