@@ -14,7 +14,11 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoCompile(GoTask):
-  """Compiles a Go package into either a library binary or executable binary."""
+  """Compiles a Go package into either a library binary or executable binary.
+
+  GoCompile will populate the "bin/" and "pkg/" directories of a Go workspace (previously
+  configured by GoSetupWorkspace) with executables and library binaries respectively.
+  """
 
   @classmethod
   def register_options(cls, register):
@@ -29,7 +33,7 @@ class GoCompile(GoTask):
 
   @classmethod
   def product_types(cls):
-    return ['exec_binary', 'lib_binaries']
+    return ['exec_binary']
 
   def execute(self):
     self.context.products.safe_create_data('exec_binary', lambda: defaultdict(str))
