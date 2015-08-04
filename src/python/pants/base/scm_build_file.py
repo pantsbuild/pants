@@ -60,20 +60,23 @@ class ScmBuildFile(BuildFile):
     with self._reader.open(relpath) as source:
       return source.read()
 
-  def _isdir(self, path):
+  @classmethod
+  def _isdir(cls, path):
     """Returns True if path is a directory"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.isdir(relpath)
+    relpath = os.path.relpath(path, cls._scm_worktree())
+    return cls._reader.isdir(relpath)
 
-  def _isfile(self, path):
+  @classmethod
+  def _isfile(cls, path):
     """Returns True if path is a file"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.isfile(relpath)
+    relpath = os.path.relpath(path, cls._scm_worktree())
+    return cls._reader.isfile(relpath)
 
-  def _exists(self, path):
+  @classmethod
+  def _exists(cls, path):
     """Returns True if path exists"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.exists(relpath)
+    relpath = os.path.relpath(path, cls._scm_worktree())
+    return cls._reader.exists(relpath)
 
   @classmethod
   def _walk(cls, root_dir, root, topdown=False):

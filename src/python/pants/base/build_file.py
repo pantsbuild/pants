@@ -38,6 +38,10 @@ class BuildFile(AbstractClass):
     """Raised when the root_dir specified to a BUILD file is not valid."""
     pass
 
+  class BadPathError(BuildFileError):
+    """Raised when scan_buildfiles is called on a nonexistent directory."""
+    pass
+
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
@@ -104,6 +108,10 @@ class BuildFile(AbstractClass):
               to_remove.append(subdir)
       return to_remove
 
+    if base_path and not cls._isdir(os.path.join(root_dir, base_path)):
+      raise cls.BadPathError('Can only recursive glob directories and {0} is not a valid dir'
+                              .format(base_path))
+
     buildfiles = []
     if not spec_excludes:
       exclude_roots = {}
@@ -124,16 +132,19 @@ class BuildFile(AbstractClass):
   def _walk(self, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk"""
 
+  @classmethod
   @abstractmethod
-  def _isdir(self, path):
+  def _isdir(cls, path):
     """Returns True if path is a directory"""
 
+  @classmethod
   @abstractmethod
-  def _isfile(self, path):
+  def _isfile(cls, path):
     """Returns True if path is a file"""
 
+  @classmethod
   @abstractmethod
-  def _exists(self, path):
+  def _exists(cls, path):
     """Returns True if path exists"""
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
@@ -281,13 +292,16 @@ class FilesystemBuildFile(BuildFile):
     with open(self.full_path, 'rb') as source:
       return source.read()
 
-  def _isdir(self, path):
+  @classmethod
+  def _isdir(cls, path):
     return os.path.isdir(path)
 
-  def _isfile(self, path):
+  @classmethod
+  def _isfile(cls, path):
     return os.path.isfile(path)
 
-  def _exists(self, path):
+  @classmethod
+  def _exists(cls, path):
     return os.path.exists(path)
 
   @classmethod

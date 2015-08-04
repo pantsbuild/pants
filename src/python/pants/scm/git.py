@@ -441,7 +441,7 @@ class GitRepositoryReader(object):
     # Consume components to build path_so_far
     while components:
       component = components.pop(0)
-      if component == '':
+      if component == '' or component == '.':
         continue
 
       parent_tree = self._read_tree(path_so_far)
@@ -491,6 +491,7 @@ class GitRepositoryReader(object):
       else:
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
+    return './'
 
   def _fixup_dot_relative(self, path):
     """Git doesn't understand dot-relative paths."""
