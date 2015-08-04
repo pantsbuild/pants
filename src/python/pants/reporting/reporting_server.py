@@ -25,7 +25,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.dirutil import safe_delete, safe_mkdir
 
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 import unittest
-from collections import namedtuple
 from contextlib import contextmanager
 
 import mock

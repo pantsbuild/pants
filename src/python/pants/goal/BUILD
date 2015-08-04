@@ -32,7 +32,6 @@ python_library(
   dependencies = [
     ':products',
     ':workspace',
-    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:source_root',

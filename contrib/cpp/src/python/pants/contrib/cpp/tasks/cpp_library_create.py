@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
