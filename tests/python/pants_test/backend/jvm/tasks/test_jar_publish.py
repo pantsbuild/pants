@@ -12,7 +12,9 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 class JarPublishTest(NailgunTaskTestBase):
   """Tests for backend jvm JarPublish class"""
 
-  DEFAULT_JVM_OPTS = ["jvm_opt_1", "jvm_opt_2"]
+  def _DEFAULT_JVM_OPTS(self):
+    """Return a fresh copy of this list every time."""
+    return ["jvm_opt_1", "jvm_opt_2"]
 
   @classmethod
   def task_type(cls):
@@ -42,13 +44,19 @@ class JarPublishTest(NailgunTaskTestBase):
     self._jar_publish = JarPublish(self._create_context(), ".")
 
   def test_options_with_no_auth(self):
-    self._jar_publish._jvm_options = self.DEFAULT_JVM_OPTS
+    """When called without authentication credentials, `JarPublish._ivy_jvm_options()` shouldn't
+    modify any options.
+    """
+    self._jar_publish._jvm_options = self._DEFAULT_JVM_OPTS()
     repo = {}
     modified_opts = self._jar_publish._ivy_jvm_options(repo)
-    self.assertEqual(modified_opts, self.DEFAULT_JVM_OPTS)
+    self.assertEqual(modified_opts, self._DEFAULT_JVM_OPTS())
 
   def test_options_with_auth(self):
-    self._jar_publish._jvm_options = self.DEFAULT_JVM_OPTS
+    """`JarPublish._ivy_jvm_options()` should produce the same list, when called multiple times
+    with authentication credentials.
+    """
+    self._jar_publish._jvm_options = self._DEFAULT_JVM_OPTS()
 
     username = 'mjk'
     password = 'h.'
@@ -60,8 +68,8 @@ class JarPublishTest(NailgunTaskTestBase):
       'password': password,
     }
     modified_opts = self._jar_publish._ivy_jvm_options(repo)
-    self.assertEqual(modified_opts, self.DEFAULT_JVM_OPTS + creds_options)
+    self.assertEqual(modified_opts, self._DEFAULT_JVM_OPTS() + creds_options)
 
     # Now run it again, and make sure we don't get dupes.
     modified_opts = self._jar_publish._ivy_jvm_options(repo)
-    self.assertEqual(modified_opts, self.DEFAULT_JVM_OPTS + creds_options)
+    self.assertEqual(modified_opts, self._DEFAULT_JVM_OPTS() + creds_options)

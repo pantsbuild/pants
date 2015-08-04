@@ -460,13 +460,13 @@ class JarPublish(ScmPublishMixin, JarTask):
     super(JarPublish, self).__init__(*args, **kwargs)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
-    opts = self.get_options()
-    self._jvm_options = opts.get('jvm_options')
+    options = self.get_options().get
+    self._jvm_options = options('jvm_options')
 
     self.scm = get_scm()
     self.log = self.context.log
 
-    if opts.get('local'):
+    if options('local'):
       local_repo = dict(
         resolver='publish_local',
         path=os.path.abspath(os.path.expanduser(self.get_options().local)),
@@ -475,9 +475,9 @@ class JarPublish(ScmPublishMixin, JarTask):
       )
       self.repos = defaultdict(lambda: local_repo)
       self.commit = False
-      self.local_snapshot = opts.get('local_snapshot')
+      self.local_snapshot = options('local_snapshot')
     else:
-      self.repos = opts.get('repos')
+      self.repos = options('repos')
       if not self.repos:
         raise TaskError("This repo is not configured to publish externally! Please configure per\n"
                         "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
@@ -491,18 +491,18 @@ class JarPublish(ScmPublishMixin, JarTask):
           self.context.log.debug('Found auth for repo={} user={}'.format(repo, user))
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
-      self.commit = opts.get('commit')
-      self.push_postscript = opts.get('push_postscript') or ''
+      self.commit = options('commit')
+      self.push_postscript = options('push_postscript') or ''
       self.local_snapshot = False
 
-    self.named_snapshot = opts.get('named_snapshot')
+    self.named_snapshot = options('named_snapshot')
     if self.named_snapshot:
       self.named_snapshot = Namedver.parse(self.named_snapshot)
 
-    self.dryrun = opts.get('dryrun')
-    self.transitive = opts.get('transitive')
-    self.force = opts.get('force')
-    self.publish_changelog = opts.get('changelog')
+    self.dryrun = options('dryrun')
+    self.transitive = options('transitive')
+    self.force = options('force')
+    self.publish_changelog = options('changelog')
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -528,7 +528,7 @@ class JarPublish(ScmPublishMixin, JarTask):
           .format(message=e, coordinate=coordinate))
 
     self.overrides = {}
-    if opts.get('override'):
+    if options('override'):
       if self.named_snapshot:
         raise TaskError('Options --named-snapshot and --override are mutually exclusive!')
 
@@ -544,11 +544,11 @@ class JarPublish(ScmPublishMixin, JarTask):
         except ValueError:
           raise TaskError('Invalid override: {}'.format(override))
 
-      self.overrides.update(parse_override(o) for o in opts.get('override'))
+      self.overrides.update(parse_override(o) for o in options('override'))
 
     self.restart_at = None
-    if opts.get('restart_at'):
-      self.restart_at = parse_jarcoordinate(opts.get('restart_at'))
+    if options('restart_at'):
+      self.restart_at = parse_jarcoordinate(options('restart_at'))
 
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
