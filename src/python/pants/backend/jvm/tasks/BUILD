@@ -19,6 +19,7 @@ python_library(
     ':javadoc_gen',
     ':junit_run',
     ':jvm_binary_task',
+    ':jvm_platform_analysis',
     ':jvm_run',
     ':jvm_task',
     ':jvm_tool_task_mixin',
@@ -288,6 +289,19 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
   ],
+)
+
+python_library(
+  name = 'jvm_platform_analysis',
+  sources = ['jvm_platform_analysis.py'],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    'src/python/pants/backend/core/tasks:console_task',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/util:memo',
+  ]
 )
 
 python_library(
