@@ -41,26 +41,7 @@ class GoCompile(GoTask):
       for vt in invalidation_check.all_vts:
         gopath = self.context.products.get_data('gopath')[vt.target]
         if not vt.valid:
-          for dep in vt.target.closure():
-            if dep == vt.target:
-              continue
-            dep_gopath = self.context.products.get_data('gopath')[dep]
-            lib_binary = lib_binary_map[dep]
-            lib_binary_link = os.path.join(gopath, os.path.relpath(lib_binary, dep_gopath))
-            safe_mkdir(os.path.dirname(lib_binary_link))
-            if os.path.islink(lib_binary_link):
-              if os.stat(lib_binary).st_mtime > os.lstat(lib_binary_link).st_mtime:
-                # The binary under the link was updated after the link was created. Refresh
-                # the link so the mtime (modification time) of the link is greater than the
-                # mtime of the binary. This prevents Go from seeing inconsistent time stamps,
-                # which would cause it to needlessly re-compile the library. (Note that the
-                # inconsistency Go observes is actually between the link mtime and the source
-                # code mtime, but it suffices to just check the binary mtime since it will be
-                # strictly greater than the source code mtime)
-                os.unlink(lib_binary_link)
-                os.symlink(lib_binary, lib_binary_link)
-            else:
-              os.symlink(lib_binary, lib_binary_link)
+          self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
           self.run_go_cmd('install', gopath, vt.target,
                           cmd_flags=self.get_options().build_flags.split())
         if self.is_binary(vt.target):
@@ -72,3 +53,44 @@ class GoCompile(GoTask):
           lib_binary_map[vt.target] = os.path.join(gopath, 'pkg',
                                                    self.goos_goarch,
                                                    lib_binary_path) + '.a'
+
+  def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
+    """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.
+
+    :param target Target: Target whose transitive dependencies must be linked.
+    :param gopath str: $GOPATH of target whose "pkg/" directory must be populated with links
+                       to library binaries.
+    :param lib_binary_map
+           dict<Target, str>: Dictionary mapping a remote/local Go library to the path of the
+                              compiled binary (the ".a" file) of the library.
+
+    Required links to binary dependencies under gopath's "pkg/" dir are either created if
+    non-existent, or refreshed if the link is older than the underlying binary. Any pre-existing
+    links within gopath's "pkg/" dir that do not correspond to a transitive dependency of target
+    are deleted.
+    """
+    required_links = set()
+    for dep in target.closure():
+      if dep == target:
+        continue
+      dep_gopath = self.context.products.get_data('gopath')[dep]
+      lib_binary = lib_binary_map[dep]
+      lib_binary_link = os.path.join(gopath, os.path.relpath(lib_binary, dep_gopath))
+      safe_mkdir(os.path.dirname(lib_binary_link))
+      if os.path.islink(lib_binary_link):
+        if os.stat(lib_binary).st_mtime > os.lstat(lib_binary_link).st_mtime:
+          # The binary under the link was updated after the link was created. Refresh
+          # the link so the mtime (modification time) of the link is greater than the
+          # mtime of the binary. This stops Go from needlessly re-compiling the library.
+          os.unlink(lib_binary_link)
+          os.symlink(lib_binary, lib_binary_link)
+      else:
+        os.symlink(lib_binary, lib_binary_link)
+      required_links.add(lib_binary_link)
+
+    # Remove any unused links which were not added to required_links.
+    for root, _, files in os.walk(os.path.join(gopath, 'pkg')):
+      for f in files:
+        fpath = os.path.join(root, f)
+        if os.path.islink(fpath) and fpath not in required_links:
+          os.unlink(fpath)
