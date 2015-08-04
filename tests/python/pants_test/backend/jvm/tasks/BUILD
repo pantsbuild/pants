@@ -150,6 +150,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'jar_publish',
+  sources = ['test_jar_publish.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:jar_publish',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+  ]
+)
+
+python_tests(
   name = 'junit_run',
   sources = ['test_junit_run.py'],
   dependencies = [
