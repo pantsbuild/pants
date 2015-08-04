@@ -40,7 +40,6 @@ class GoCompile(GoWorkspaceTask):
       for vt in invalidation_check.all_vts:
         gopath = self.get_gopath(vt.target)
         if not vt.valid:
-          print('invalid:', gopath)
           self.ensure_workspace(vt.target)
           self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
           self.run_go_cmd('install', gopath, vt.target,
