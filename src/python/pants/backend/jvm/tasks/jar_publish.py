@@ -585,9 +585,11 @@ class JarPublish(ScmPublishMixin, JarTask):
     """Get the JVM options for ivy authentication, if needed."""
     # Get authentication for the publish repo if needed.
     if not repo.get('auth'):
+      # No need to copy here, as this list isn't modified by the caller.
       return self._jvm_options
 
-    jvm_options = self._jvm_options
+    # Create a copy of the options, so that the modification is appropriately transient.
+    jvm_options = self._jvm_options[:]
     user = repo.get('username')
     password = repo.get('password')
     if user and password:
