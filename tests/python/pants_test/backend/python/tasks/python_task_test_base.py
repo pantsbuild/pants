@@ -13,20 +13,18 @@ from pants.base.address import SyntheticAddress
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class PythonTaskTest(TaskTestBase):
+class PythonTaskTestBase(TaskTestBase):
   def setUp(self):
-    super(PythonTaskTest, self).setUp()
+    super(PythonTaskTestBase, self).setUp()
+
     # Use the "real" interpreter cache, so tests don't waste huge amounts of time recreating it.
     # It would be nice to get the location of the real interpreter cache from PythonSetup,
     # but unfortunately real subsystems aren't available here (for example, we have no access
     # to the enclosing pants instance's options), so we have to hard-code it.
+    python_setup_workdir = os.path.join(self.real_build_root, '.pants.d', 'python-setup')
     self.set_options_for_scope('python-setup',
-        interpreter_requirement='CPython>=2.7,<3',
-        interpreter_cache_dir=os.path.join(self.real_build_root, '.pants.d',
-                                           'python-setup', 'interpreters'),
-        chroot_cache_dir=os.path.join(self.real_build_root, '.pants.d',
-                                      'python-setup', 'chroots'),
-        resolver_cache_ttl=1000000000)  # TODO: Do we need this now that there's a default?
+        interpreter_cache_dir=os.path.join(python_setup_workdir, 'interpreters'),
+        chroot_cache_dir=os.path.join(python_setup_workdir, 'chroots'))
 
   @property
   def alias_groups(self):
