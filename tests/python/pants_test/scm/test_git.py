@@ -148,22 +148,24 @@ class GitTest(unittest.TestCase):
   def test_listdir(self):
     reader = self.git.repo_reader(self.initial_rev)
 
-    results = reader.listdir('.')
-    self.assertEquals(['README',
-                       'dir',
-                       'link-to-dir',
-                       'loop1',
-                       'loop2',
-                       'not-a-dir'],
-                      sorted(results))
+    for dirname in '.', './.':
+      results = reader.listdir(dirname)
+      self.assertEquals(['README',
+                         'dir',
+                         'link-to-dir',
+                         'loop1',
+                         'loop2',
+                         'not-a-dir'],
+                        sorted(results))
 
-    results = reader.listdir('dir')
-    self.assertEquals(['f',
-                       'not-absolute\u2764'.encode('utf-8'),
-                       'relative-dotdot',
-                       'relative-nonexistent',
-                       'relative-symlink'],
-                      sorted(results))
+    for dirname in 'dir', './dir':
+      results = reader.listdir('dir')
+      self.assertEquals(['f',
+                         'not-absolute\u2764'.encode('utf-8'),
+                         'relative-dotdot',
+                         'relative-nonexistent',
+                         'relative-symlink'],
+                        sorted(results))
 
     results = reader.listdir('link-to-dir')
     self.assertEquals(['f',
