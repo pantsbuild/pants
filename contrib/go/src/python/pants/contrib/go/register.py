@@ -14,7 +14,6 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
 from pants.contrib.go.tasks.go_run import GoRun
-from pants.contrib.go.tasks.go_setup_workspace import GoSetupWorkspace
 from pants.contrib.go.tasks.go_test import GoTest
 
 
@@ -30,7 +29,6 @@ def build_file_aliases():
 
 def register_goals():
   task(name='go', action=GoFetch).install('resolve')
-  task(name='go-setup-workspace', action=GoSetupWorkspace).install()
   task(name='go', action=GoCompile).install('compile')
   task(name='go', action=GoRun).install('run')
   task(name='go', action=GoTest).install('test')
