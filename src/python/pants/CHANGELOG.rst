@@ -1,6 +1,47 @@
 RELEASE HISTORY
 ===============
 
+0.0.41 (8/4/2015)
+-----------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release for 2 bugs, one causing apache thrift java code generation to fail,
+and the other causing python tasks not to notice certain changes to python targets.
+
+You're encouraged to upgrade from 0.0.40 if you use pants for python or apache thrift java codegen. 
+
+Bugfixes
+~~~~~~~~
+
+* Fix ApacheThriftGen chroot normalization scope.
+  `RB #2568 <https://rbcommons.com/s/twitter/r/2568>`_
+
+* Fixup PythonTask chroot caching.
+  `RB #2567 <https://rbcommons.com/s/twitter/r/2567>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bypass the pip cache when testing released sdists.
+  `RB #2555 <https://rbcommons.com/s/twitter/r/2555>`_
+
+* Add an affordance for 1 flag implying another.
+  `RB #2562 <https://rbcommons.com/s/twitter/r/2562>`_
+
+* Make artifact cache `max-entries-per-target` option name match its behaviour
+  `RB #2550 <https://rbcommons.com/s/twitter/r/2550>`_
+
+* [WS] Fix extra/missing lines
+  `RB #2557 <https://rbcommons.com/s/twitter/r/2557>`_
+
+* Improve stats upload.
+  `RB #2554 <https://rbcommons.com/s/twitter/r/2554>`_
+
+* Introduce a classpath specific product to encapsulate excludes behavior
+  `RB #2541 <https://rbcommons.com/s/twitter/r/2541>`_
+
 0.0.40 (7/31/2015)
 -------------------
 
