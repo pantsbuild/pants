@@ -81,7 +81,7 @@ class JvmRun(JvmTask):
       working_dir = self.get_options().cwd
       if not working_dir:
         working_dir = target.address.spec_path
-    logger.debug ("Working dir is {0}".format(working_dir))
+    logger.debug("Working dir is {0}".format(working_dir))
 
     if isinstance(target, JvmApp):
       binary = target.binary

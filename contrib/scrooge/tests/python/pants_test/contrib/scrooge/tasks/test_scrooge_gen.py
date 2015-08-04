@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from mock import MagicMock, patch
+from mock import MagicMock
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import SyntheticAddress
@@ -17,7 +17,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
-from pants_test.base.context_utils import create_options
+from pants_test.option.util.fakes import create_options
 from pants_test.tasks.task_test_base import TaskTestBase
 from twitter.common.collections import OrderedSet
 
