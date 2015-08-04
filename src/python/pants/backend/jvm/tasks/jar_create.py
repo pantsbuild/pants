@@ -12,8 +12,6 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.fs.fs import safe_filename
-from pants.util.dirutil import safe_mkdir
 
 
 def is_jvm_binary(target):

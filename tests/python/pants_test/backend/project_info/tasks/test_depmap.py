@@ -5,25 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
-import os
 from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.register import build_file_aliases as register_jvm
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

@@ -12,7 +12,6 @@ import re
 import select
 import threading
 import time
-from collections import namedtuple
 
 from six import string_types
 from twitter.common.collections import maybe_list
