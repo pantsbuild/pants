@@ -220,7 +220,7 @@ class ScmPublishMixin(object):
       try:
         log.debug("Trying scm push")
         scm.push()
-        break # success
+        break  # success
       except Scm.RemoteException as scm_exception:
         log.debug("Scm push failed, trying to refresh.")
         # This might fail in the event that there is a real conflict, throwing

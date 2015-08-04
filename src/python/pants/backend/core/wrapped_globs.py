@@ -18,6 +18,7 @@ class FilesetWithSpec(object):
 
   The filespec is what globs or file list it came from.
   """
+
   def __init__(self, rel_root, result, filespec):
     self._rel_root = rel_root
     self._result = result
@@ -77,15 +78,16 @@ class FilesetRelPathWrapper(object):
 
     The globs are in zglobs format.
     """
-    result = {'globs' : [os.path.join(root, arg) for arg in args]}
+    result = {'globs': [os.path.join(root, arg) for arg in args]}
     if excludes:
       result['exclude'] = []
       for exclude in excludes:
         if hasattr(exclude, 'filespec'):
           result['exclude'].append(exclude.filespec)
         else:
-          result['exclude'].append({'globs' : [os.path.join(root, x) for x in exclude]})
+          result['exclude'].append({'globs': [os.path.join(root, x) for x in exclude]})
     return result
+
 
 class Globs(FilesetRelPathWrapper):
   """Returns Fileset containing matching files in same directory as this BUILD file.
@@ -163,10 +165,10 @@ class RGlobs(FilesetRelPathWrapper):
             beginning += os.path.sep
           if item.startswith('**'):
             # .../**/*.java
-            for ending in rglob_path(beginning + item, rest[i+1:]):
+            for ending in rglob_path(beginning + item, rest[i + 1:]):
               endings.append(ending)
             # .../*.java
-            for ending in rglob_path(beginning + item[3:], rest[i+1:]):
+            for ending in rglob_path(beginning + item[3:], rest[i + 1:]):
               endings.append(ending)
             return endings
           else:
@@ -180,6 +182,7 @@ class RGlobs(FilesetRelPathWrapper):
       rglobs.extend(rglob_path('', out))
 
     return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
+
 
 class ZGlobs(FilesetRelPathWrapper):
   """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.

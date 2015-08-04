@@ -37,7 +37,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       extra_flags = ['--idea-project-dir={dir}'.format(dir=project_dir_path)]
 
       if project_name is None:
-        project_name = "project" # to match Pants' built-in default w/o --idea-project-name
+        project_name = "project"  # to match Pants' built-in default w/o --idea-project-name
       else:
         extra_flags += ['--idea-project-name={name}'.format(name=project_name)]
 
@@ -103,7 +103,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_idea_on_protobuf(self):
     self._idea_test(['examples/src/java/org/pantsbuild/example/protobuf::'])
 
-  def test_idea_on_jaxb(self): # Make sure it works without ::, pulling deps as necessary.
+  def test_idea_on_jaxb(self):  # Make sure it works without ::, pulling deps as necessary.
     self._idea_test(['examples/src/java/org/pantsbuild/example/jaxb/main'])
 
   def test_idea_on_unicode(self):
@@ -258,7 +258,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
-      for sourceFolder in  self._get_sourceFolders(dom):
+      for sourceFolder in self._get_sourceFolders(dom):
         found_source_content = True
         url = sourceFolder.getAttribute('url')
         is_test_source = sourceFolder.getAttribute('isTestSource')
@@ -276,7 +276,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(found_source_content)
 
     self._idea_test(['testprojects/maven_layout/resource_collision::', '--idea-use-source-root',
-                     '--idea-infer-test-from-siblings',],
+                     '--idea-infer-test-from-siblings'],
                     check_func=do_check)
 
   def test_idea_exclude_maven_targets(self):
@@ -294,7 +294,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
-      for sourceFolder in  self._get_sourceFolders(dom):
+      for sourceFolder in self._get_sourceFolders(dom):
         found_source_content = True
         url = sourceFolder.getAttribute('url')
         self.assertTrue(url.endswith("testprojects/maven_layout/maven_and_pants/src/main/java"),
@@ -316,7 +316,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                         .format(suffix=suffix, foundExcludeFolders=found_exclude_folders))
     # Test together with --idea-use-source-root because that makes sense in a Maven environment
     self._idea_test(['testprojects/maven_layout/maven_and_pants::', '--idea-exclude-maven-target',
-                     '--idea-use-source-root',],
+                     '--idea-use-source-root'],
                     check_func=do_check)
 
   def test_idea_excludeFolders(self):
@@ -334,21 +334,23 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
           break
       self.assertTrue(found, msg="suffix {suffix} not found in {foundExcludeFolders}"
                       .format(suffix=suffix, foundExcludeFolders=found_exclude_folders))
+
     def do_check_default(path):
-      assertExpectedInExcludeFolders(path, ["/compile", "/ivy",  "/python", "/resources"])
+      assertExpectedInExcludeFolders(path, ["/compile", "/ivy", "/python", "/resources"])
+
     def do_check_override(path):
       assertExpectedInExcludeFolders(path, ["exclude-folder-sentinel"])
 
     self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], check_func=do_check_default)
     self._idea_test(['examples/src/java/org/pantsbuild/example/hello::'], check_func=do_check_override,
-                    config= {
+                    config={
                       'idea': {'exclude_folders': ['exclude-folder-sentinel']}
                     })
 
   def test_all_targets(self):
     # The android targets won't work if the Android ADK is not installed.
     self._idea_test(['src::', 'tests::', 'examples::', 'testprojects::',
-                     '--exclude-target-regexp=.*android.*',])
+                     '--exclude-target-regexp=.*android.*', ])
 
   def test_ivy_classifiers(self):
     def do_check(path):
@@ -357,7 +359,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         # Make sure the .jar files are present on disk
         for jar in expected_jars:
           self.assertTrue(os.path.exists(jar))
-        to_find = set([ 'jar://{}!/'.format(jar) for jar in expected_jars])
+        to_find = set(['jar://{}!/'.format(jar) for jar in expected_jars])
         for external_library in jars:
           to_find.discard(external_library.getAttribute('url'))
         self.assertEqual(set([]), to_find)
@@ -366,7 +368,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
       check_jars(dom, self._get_external_libraries(dom, type='CLASSES'), [
-         os.path.join(get_buildroot(), path, 'external-libs', jar_path )
+         os.path.join(get_buildroot(), path, 'external-libs', jar_path)
         for jar_path in [
           'avro-1.7.7.jar',
           'avro-1.7.7-tests.jar'

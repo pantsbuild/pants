@@ -57,20 +57,19 @@ class JvmPlatformIntegrationMixin(object):
           class_to_version[os.path.relpath(path, tempdir)] = self.determine_version(path)
     return class_to_version
 
-  def _get_compiled_class_versions(self, strategy, spec, more_args=None):
-    more_args = more_args or []
+  def _get_compiled_class_versions(self, strategy, spec):
     jar_name = os.path.basename(spec)
-    while jar_name.endswith(':'):
-      jar_name = jar_name[:-1]
     if ':' in jar_name:
-      jar_name = jar_name[jar_name.find(':')+1:]
+      if ':' in jar_name[:-1]:
+        jar_name = jar_name[jar_name.find(':') + 1:]
+      else:
+        jar_name = jar_name[:-1]
     with temporary_dir() as cache_dir:
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
-          ['binary',] + self.get_pants_compile_args()
-          + ['--jvm-compile-strategy={}'.format(strategy), 'compile.checkstyle', '--skip', spec]
-          + more_args,
+          ['binary', ] + self.get_pants_compile_args()
+          + ['--jvm-compile-strategy={}'.format(strategy), 'compile.checkstyle', '--skip', spec],
           workdir, config)
         self.assert_success(pants_run)
         return self._get_jar_class_versions('{}.jar'.format(jar_name))
@@ -108,12 +107,10 @@ class JvmPlatformIntegrationMixin(object):
   def test_compile_target_coercion(self, strategy):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/targetlevels/unspecified'
     self.assert_class_versions({
-      'org/pantsbuild/testproject/targetlevels/unspecified/Unspecified.class': '1.7',
+      'org/pantsbuild/testproject/targetlevels/unspecified/Unspecified.class': '1.6',
       'org/pantsbuild/testproject/targetlevels/unspecified/Six.class': '1.6',
-    }, self._get_compiled_class_versions(strategy, target_spec, more_args=[
-      '--jvm-platform-validate-check=warn',
-      '--jvm-platform-default-platform=java7',
-    ]))
+      'org/pantsbuild/testproject/targetlevels/unspecified/Seven.class': '1.7',
+    }, self._get_compiled_class_versions(strategy, target_spec))
 
   def _test_compile(self, target_level, class_name, source_contents, strategy, platform_args=None):
     with temporary_dir(root_dir=os.path.abspath('.')) as tmpdir:
@@ -128,7 +125,7 @@ class JvmPlatformIntegrationMixin(object):
                    target_level=target_level)))
       with open(os.path.join(tmpdir, '{}.java'.format(class_name)), 'w') as f:
         f.write(source_contents)
-      platforms=str({
+      platforms = str({
         str(target_level): {
           'source': str(target_level),
           'target': str(target_level),
@@ -209,7 +206,7 @@ class JvmPlatformIntegrationMixin(object):
                                               '--jvm-platform-default-platform={}'.format(platform),
                                               '--jvm-compile-strategy=isolated',
                                               '-ldebug',
-                                              'compile',] + self.get_pants_compile_args() +
+                                              'compile'] + self.get_pants_compile_args() +
                                               ['{}:diamond'.format(tmpdir)], workdir=workdir)
 
         # We shouldn't be able to compile this with -source=6.

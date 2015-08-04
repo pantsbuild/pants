@@ -35,7 +35,7 @@ class BootstrapperTest(JvmToolTaskTestBase):
     super(BootstrapperTest, self).setUp()
     # Make sure subsystems are initialized with the given options.
     self.context(options={
-      Options.GLOBAL_SCOPE: { 'pants_bootstrapdir': self.test_workdir }
+      Options.GLOBAL_SCOPE: {'pants_bootstrapdir': self.test_workdir}
     })
 
   def test_simple(self):

@@ -43,12 +43,12 @@ class FilterEmptyTargetsTest(BaseFilterTest):
     self.assert_console_output()
 
   def test_type(self):
-    self.assert_console_output(options={ 'type': ['page'] })
-    self.assert_console_output(options={ 'type': ['java_library'] })
+    self.assert_console_output(options={'type': ['page']})
+    self.assert_console_output(options={'type': ['java_library']})
 
   def test_regex(self):
-    self.assert_console_output(options={ 'regex': ['^common'] })
-    self.assert_console_output(options={ 'regex': ['-^common'] })
+    self.assert_console_output(options={'regex': ['^common']})
+    self.assert_console_output(options={'regex': ['-^common']})
 
 
 class FilterTest(BaseFilterTest):
@@ -68,7 +68,7 @@ class FilterTest(BaseFilterTest):
             dependencies=[{all_deps}],
             tags=['{tag}']
           )
-          """.format(name=name, tag=name+"_tag", all_deps=','.join(all_deps))))
+          """.format(name=name, tag=name + "_tag", all_deps=','.join(all_deps))))
 
     add_to_build_file('common/a', 'a')
     add_to_build_file('common/b', 'b')
@@ -187,7 +187,7 @@ class FilterTest(BaseFilterTest):
       'overlaps:one',
       'overlaps:foo',
       targets=self.targets('::'),
-      options={ 'ancestor': ['overlaps:one,overlaps:foo'] }
+      options={'ancestor': ['overlaps:one,overlaps:foo']}
     )
 
     self.assert_console_output(
@@ -196,7 +196,7 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       targets=self.targets('::'),
-      options={ 'ancestor': ['-overlaps:one,overlaps:foo'] }
+      options={'ancestor': ['-overlaps:one,overlaps:foo']}
     )
 
   def test_filter_ancestor_out_of_context(self):
@@ -215,7 +215,7 @@ class FilterTest(BaseFilterTest):
       'overlaps:three',
       'overlaps:foo',
       targets=self.targets('::'),
-      options={ 'ancestor': ['-blacklist'] }
+      options={'ancestor': ['-blacklist']}
     )
 
   def test_filter_ancestor_not_passed_targets(self):
@@ -229,19 +229,19 @@ class FilterTest(BaseFilterTest):
       'common/b:foo',
       'common/c:c',
       'common/c:foo',
-      targets=self.targets('common/::'), # blacklist is not in the list of targets
-      options={ 'ancestor': ['-blacklist'] }
+      targets=self.targets('common/::'),  # blacklist is not in the list of targets
+      options={'ancestor': ['-blacklist']}
     )
 
     self.assert_console_output(
-      'common/a:a', # a: _should_ show up if we don't filter.
+      'common/a:a',  # a: _should_ show up if we don't filter.
       'common/a:foo',
       'common/b:b',
       'common/b:foo',
       'common/c:c',
       'common/c:foo',
       targets=self.targets('common/::'),
-      options={ 'ancestor': [] }
+      options={'ancestor': []}
     )
 
   def test_filter_regex(self):
@@ -253,7 +253,7 @@ class FilterTest(BaseFilterTest):
       'common/c:c',
       'common/c:foo',
       targets=self.targets('::'),
-      options={ 'regex': ['^common'] }
+      options={'regex': ['^common']}
     )
 
     self.assert_console_output(
@@ -265,7 +265,7 @@ class FilterTest(BaseFilterTest):
       'overlaps:three',
       'overlaps:foo',
       targets=self.targets('::'),
-      options={ 'regex': ['+foo,^overlaps'] }
+      options={'regex': ['+foo,^overlaps']}
     )
 
     self.assert_console_output(
@@ -273,13 +273,13 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       targets=self.targets('::'),
-      options={ 'regex': ['-^common,foo$'] }
+      options={'regex': ['-^common,foo$']}
     )
 
     # Invalid regex.
     self.assert_console_raises(TaskError,
       targets=self.targets('::'),
-      options={ 'regex': ['abc)']}
+      options={'regex': ['abc)']}
     )
 
   def test_filter_tag_regex(self):
@@ -287,7 +287,7 @@ class FilterTest(BaseFilterTest):
     self.assert_console_output(
       'overlaps:three',
       targets=self.targets('::'),
-      options={ 'tag_regex': ['+e(?=e)'] }
+      options={'tag_regex': ['+e(?=e)']}
     )
 
     # Removals.
@@ -301,13 +301,13 @@ class FilterTest(BaseFilterTest):
       'overlaps:foo',
       'overlaps:three',
       targets=self.targets('::'),
-      options={ 'tag_regex': ['-one|two'] }
+      options={'tag_regex': ['-one|two']}
     )
 
     # Invalid regex.
     self.assert_console_raises(TaskError,
       targets=self.targets('::'),
-      options={ 'tag_regex': ['abc)']}
+      options={'tag_regex': ['abc)']}
     )
 
   def test_filter_tag(self):
@@ -315,7 +315,7 @@ class FilterTest(BaseFilterTest):
     self.assert_console_output(
       'common/a:a',
       targets=self.targets('::'),
-      options={ 'tag': ['+a_tag'] }
+      options={'tag': ['+a_tag']}
     )
 
     # Two matches.
@@ -323,7 +323,7 @@ class FilterTest(BaseFilterTest):
       'common/a:a',
       'common/b:b',
       targets=self.targets('::'),
-      options={ 'tag': ['+a_tag,b_tag'] }
+      options={'tag': ['+a_tag,b_tag']}
     )
 
     # One removal.
@@ -338,7 +338,7 @@ class FilterTest(BaseFilterTest):
       'overlaps:two',
       'overlaps:three',
       targets=self.targets('::'),
-      options={ 'tag': ['-one_tag'] }
+      options={'tag': ['-one_tag']}
     )
 
     # Two removals.
@@ -352,17 +352,17 @@ class FilterTest(BaseFilterTest):
       'overlaps:foo',
       'overlaps:three',
       targets=self.targets('::'),
-      options={ 'tag': ['-one_tag,two_tag'] }
+      options={'tag': ['-one_tag,two_tag']}
     )
 
     # No match.
     self.assert_console_output(
       targets=self.targets('::'),
-      options={ 'tag': ['+abcdefg_tag'] }
+      options={'tag': ['+abcdefg_tag']}
     )
 
     # No match due to AND of separate predicates.
     self.assert_console_output(
       targets=self.targets('::'),
-      options={ 'tag': ['a_tag', 'b_tag'] }
+      options={'tag': ['a_tag', 'b_tag']}
     )

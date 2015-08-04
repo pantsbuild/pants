@@ -43,7 +43,7 @@ class Bundles(object):
   there_was_a_duck = Bundle('there-was-a-duck',
       "And also, there was a duck.")
 
-  all_bundles = [lesser_of_two, once_upon_a_time, ten_thousand, there_was_a_duck,]
+  all_bundles = [lesser_of_two, once_upon_a_time, ten_thousand, there_was_a_duck]
 
 
 class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
@@ -98,34 +98,34 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
   def test_single_run(self):
     """Test whether we can run a single target without special flags."""
     self._test_bundle_existences(
-        [Bundles.lesser_of_two.full_spec,],
-        [Bundles.lesser_of_two,],
+        [Bundles.lesser_of_two.full_spec],
+        [Bundles.lesser_of_two],
     )
 
   def test_double_run(self):
     """Test whether we can run two targets without special flags."""
     self._test_bundle_existences(
-        [Bundles.lesser_of_two.full_spec, Bundles.once_upon_a_time.full_spec,],
-        [Bundles.lesser_of_two, Bundles.once_upon_a_time,],
+        [Bundles.lesser_of_two.full_spec, Bundles.once_upon_a_time.full_spec],
+        [Bundles.lesser_of_two, Bundles.once_upon_a_time],
     )
 
   def test_all_run(self):
     """Test whether we can run everything with ::."""
     self._test_bundle_existences(
-        [Bundles.phrase_path + '::',],
+        [Bundles.phrase_path + '::'],
         Bundles.all_bundles,
     )
 
   def test_exclude_lesser(self):
     self._test_bundle_existences(
-        [Bundles.phrase_path + '::', '--exclude-target-regexp=lesser',],
-        set(Bundles.all_bundles) - set([Bundles.lesser_of_two,]),
+        [Bundles.phrase_path + '::', '--exclude-target-regexp=lesser'],
+        set(Bundles.all_bundles) - set([Bundles.lesser_of_two]),
     )
 
   def test_exclude_thoe(self):
     self._test_bundle_existences(
-        [Bundles.phrase_path + '::', r'--exclude-target-regexp=\bth[oe]',],
-        set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.ten_thousand,]),
+        [Bundles.phrase_path + '::', r'--exclude-target-regexp=\bth[oe]', ],
+        set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.ten_thousand]),
     )
 
   def test_exclude_two(self):
@@ -134,7 +134,7 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
           '--exclude-target-regexp=duck',
           '--exclude-target-regexp=time',
         ],
-        set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.once_upon_a_time,]),
+        set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.once_upon_a_time]),
     )
 
 
