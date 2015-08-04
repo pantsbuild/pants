@@ -5,12 +5,23 @@ target(
   name = 'tasks',
   dependencies = [
     ':antlr_gen',
+    ':apache_thrift_gen',
     ':jaxb_gen',
     ':protobuf_gen',
     ':protobuf_parse',
     ':ragel_gen',
     ':simple_codegen_task',
     ':wire_gen',
+  ],
+)
+
+python_tests(
+  name = 'apache_thrift_gen',
+  sources = ['test_apache_thrift_gen.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/tasks:apache_thrift_gen',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )
 

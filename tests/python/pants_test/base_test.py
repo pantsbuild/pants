@@ -182,9 +182,9 @@ class BaseTest(unittest.TestCase):
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
       task_type.register_options(register_func(scope))
-      for subsystem in (set(task_type.global_subsystems()) |
-                        set(task_type.task_subsystems()) |
-                        self._build_configuration.subsystems()):
+      for subsystem in Subsystem.closure(set(task_type.global_subsystems()) |
+                                         set(task_type.task_subsystems()) |
+                                         self._build_configuration.subsystems()):
         if subsystem not in registered_subsystems:
           subsystem.register_options(register_func(subsystem.options_scope))
           registered_subsystems.add(subsystem)
