@@ -79,12 +79,12 @@ class GoTask(Task):
   def run_go_cmd(self, cmd, gopath, target, cmd_flags=None, pkg_flags=None):
     """Runs a Go command on a target from within a Go workspace.
 
-    :param cmd string: Go command to execute, e.g. 'test' for `go test`
-    :param gopath string: $GOPATH which points to a valid Go workspace from which
-                          to run the command.
-    :param target Target: A Go package whose source the command will execute on.
-    :param cmd_flags list<str>: Command line flags to pass to command.
-    :param pkg_flags list<str>: Command line flags to pass to target package.
+    :param str cmd: Go command to execute, e.g. 'test' for `go test`
+    :param str gopath: $GOPATH which points to a valid Go workspace from which
+                       to run the command.
+    :param Target target: A Go package whose source the command will execute on.
+    :param list<str> cmd_flags: Command line flags to pass to command.
+    :param list<str> pkg_flags: Command line flags to pass to target package.
     """
     cmd_flags = cmd_flags or []
     pkg_flags = pkg_flags or []

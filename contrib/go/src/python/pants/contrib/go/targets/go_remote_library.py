@@ -14,9 +14,9 @@ class GoRemoteLibrary(Target):
 
   def __init__(self, rev='', zip_url='', **kwargs):
     """
-    :param rev string: Identifies which version of the remote library to download.
-                       This could be a commit SHA (git), node id (hg), etc.
-    :param zip_url string:
+    :param str rev: Identifies which version of the remote library to download.
+                    This could be a commit SHA (git), node id (hg), etc.
+    :param str zip_url:
       - Any URL from which a zipfile can be downloaded containing the source code of the
         remote library.
       - Can be a template string using variables {rev} (see :param rev:) and {id}, which

@@ -50,9 +50,9 @@ class GoFetch(GoTask):
   def _download_zip(self, zip_url, dest_dir):
     """Downloads a zip file at the given URL into the given directory.
 
-    :param zip_url string: Full URL pointing to zip file.
-    :param dest_dir string: Absolute path of directory into which the unzipped contents
-                            will be placed into, not including the zip directory itself.
+    :param str zip_url: Full URL pointing to zip file.
+    :param str dest_dir: Absolute path of directory into which the unzipped contents
+                         will be placed into, not including the zip directory itself.
     """
     safe_mkdir(dest_dir)
     stream = BytesIO(urlopen(zip_url).read())

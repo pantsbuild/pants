@@ -13,11 +13,12 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 class GoTest(GoWorkspaceTask):
   """Runs `go test` on Go packages.
 
-  To run a library's tests, GoTest only requires GoSetupWorkspace to link in necessary source
-  files. It does not require GoCompile to first compile the library to be tested -- in fact,
-  GoTest will ignore any binaries in "$GOPATH/pkg/", because Go test files (which live in the
-  package they are testing) are ignored in normal compilation, so Go test must compile
-  everything from scratch.
+  To run a library's tests, GoTest only requires a Go workspace to be initialized
+  (see GoWorkspaceTask) with links to necessary source files. It does not require
+  GoCompile to first compile the library to be tested -- in fact, GoTest will ignore
+  any binaries in "$GOPATH/pkg/", because Go test files (which live in the package
+  they are testing) are ignored in normal compilation, so Go test must compile everything
+  from scratch.
   """
 
   @classmethod

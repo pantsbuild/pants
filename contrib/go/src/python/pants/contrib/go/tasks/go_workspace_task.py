@@ -15,10 +15,12 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoWorkspaceTask(GoTask):
-  """Sets up a standard Go workspace and links Go packages to the workspace.
+  """Sets up a standard Go workspace and links Go source code to the workspace.
 
   Enables the use of Go tools which require a $GOPATH and correctly organized
-  "src/", "pkg/", and "bin/" directories (e.g. `go install` or `go test`)
+  "src/", "pkg/", and "bin/" directories (e.g. `go install` or `go test`).
+
+  Intended as a super class for tasks which require and maintain a Go workspace.
   """
 
   @classmethod

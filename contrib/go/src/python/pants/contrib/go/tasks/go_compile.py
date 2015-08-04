@@ -16,8 +16,8 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 class GoCompile(GoWorkspaceTask):
   """Compiles a Go package into either a library binary or executable binary.
 
-  GoCompile will populate the "bin/" and "pkg/" directories of a Go workspace (previously
-  configured by GoSetupWorkspace) with executables and library binaries respectively.
+  GoCompile will populate the "bin/" and "pkg/" directories of each target's Go
+  workspace (see GoWorkspaceTask) with executables and library binaries respectively.
   """
 
   @classmethod
@@ -58,12 +58,12 @@ class GoCompile(GoWorkspaceTask):
   def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
     """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.
 
-    :param target Target: Target whose transitive dependencies must be linked.
-    :param gopath str: $GOPATH of target whose "pkg/" directory must be populated with links
+    :param Target target: Target whose transitive dependencies must be linked.
+    :param str gopath: $GOPATH of target whose "pkg/" directory must be populated with links
                        to library binaries.
-    :param lib_binary_map
-           dict<Target, str>: Dictionary mapping a remote/local Go library to the path of the
-                              compiled binary (the ".a" file) of the library.
+    :param dict<Target, str> lib_binary_map: Dictionary mapping a remote/local Go library to the
+                                             path of the compiled binary (the ".a" file) of the
+                                             library.
 
     Required links to binary dependencies under gopath's "pkg/" dir are either created if
     non-existent, or refreshed if the link is older than the underlying binary. Any pre-existing
