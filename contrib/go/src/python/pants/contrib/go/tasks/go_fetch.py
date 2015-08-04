@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 from io import BytesIO
-from urllib2 import urlopen
-from zipfile import ZipFile
 
+import requests
 from pants.base.exceptions import TaskError
+from pants.util.contextutil import open_zip
 from pants.util.dirutil import get_basedir, safe_mkdir, safe_open
 
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -54,15 +54,16 @@ class GoFetch(GoTask):
     :param str dest_dir: Absolute path of directory into which the unzipped contents
                          will be placed into, not including the zip directory itself.
     """
-    safe_mkdir(dest_dir)
-    stream = BytesIO(urlopen(zip_url).read())
-    zfile = ZipFile(stream)
-    for info in zfile.infolist():
-      if info.filename.endswith('/'):
-        # Skip directories.
-        continue
-      # Strip zip directory name from files.
-      filename = os.path.relpath(info.filename, get_basedir(info.filename))
-      f = safe_open(os.path.join(dest_dir, filename), 'w')
-      f.write(zfile.read(info))
-      f.close()
+    # TODO(cgibb): Wrap with workunits, progress meters, checksums.
+    res = requests.get(zip_url)
+    with open_zip(BytesIO(res.content)) as zfile:
+      safe_mkdir(dest_dir)
+      for info in zfile.infolist():
+        if info.filename.endswith('/'):
+          # Skip directories.
+          continue
+        # Strip zip directory name from files.
+        filename = os.path.relpath(info.filename, get_basedir(info.filename))
+        f = safe_open(os.path.join(dest_dir, filename), 'w')
+        f.write(zfile.read(info))
+        f.close()
