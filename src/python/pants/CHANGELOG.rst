@@ -10,7 +10,7 @@ Release Notes
 This is a hotfix release for 2 bugs, one causing apache thrift java code generation to fail,
 and the other causing python tasks not to notice certain changes to python targets.
 
-You're encouraged to upgrade from 0.0.40 if you use pants for python or apache thrift java codegen. 
+You're encouraged to upgrade from 0.0.40 if you use pants for python or apache thrift java codegen.
 
 Bugfixes
 ~~~~~~~~
