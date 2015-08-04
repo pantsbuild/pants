@@ -22,10 +22,10 @@ from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class TestSetupPy(PythonTaskTest):
+class TestSetupPy(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return SetupPy
