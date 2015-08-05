@@ -11,7 +11,6 @@ from contextlib import closing
 from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -55,7 +54,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
-    return ('-S-encoding', '-SUTF-8','-S-g:vars')
+    return ('-S-encoding', '-SUTF-8', '-S-g:vars')
 
   @classmethod
   def get_warning_args_default(cls):
@@ -252,6 +251,7 @@ class ZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
+
 
 class ScalaZincCompile(ZincCompile):
   _language = 'scala'

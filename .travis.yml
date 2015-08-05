@@ -18,6 +18,9 @@ before_cache:
   # com.example artifacts, these disrupt the cache but are fast since
   # they're resolved from local files when omitted from the cache.
   - rm -rf $HOME/.ivy2/pants/com.example
+  # The stats cache contains timestamped reports unused by CI but that
+  # thrash the cache.  Skip caching these.
+  - rm -rf $HOME/.cache/pants/stats
 
 cache:
   directories:

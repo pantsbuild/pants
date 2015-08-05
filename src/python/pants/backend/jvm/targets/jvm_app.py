@@ -160,8 +160,8 @@ class JvmApp(Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'basename' : PrimitiveField(basename or name),
-      'binary' : PrimitiveField(binary),
+      'basename': PrimitiveField(basename or name),
+      'binary': PrimitiveField(binary),
       'bundles': BundleField(bundles or []),
       })
     super(JvmApp, self).__init__(name=name, payload=payload, **kwargs)

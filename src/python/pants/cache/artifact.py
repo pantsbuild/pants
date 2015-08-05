@@ -20,6 +20,7 @@ class ArtifactError(Exception):
 
 class Artifact(object):
   """Represents a set of files in an artifact."""
+
   def __init__(self, artifact_root):
     # All files must be under this root.
     self._artifact_root = artifact_root
@@ -45,6 +46,7 @@ class Artifact(object):
 
 class DirectoryArtifact(Artifact):
   """An artifact stored as loose files under a directory."""
+
   def __init__(self, artifact_root, directory):
     Artifact.__init__(self, artifact_root)
     self._directory = directory
@@ -73,6 +75,7 @@ class DirectoryArtifact(Artifact):
 
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
+
   def __init__(self, artifact_root, tarfile, compression=9):
     Artifact.__init__(self, artifact_root)
     self._tarfile = tarfile

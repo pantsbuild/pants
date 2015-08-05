@@ -11,7 +11,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyArtifact as IvyUtilArtifact
-from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyUtils
+from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -224,7 +224,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     """
     with temporary_dir() as realcachedir:
       with temporary_dir() as symlinkdir:
-        symlink_cache_dir=os.path.join(symlinkdir, 'symlinkedcache')
+        symlink_cache_dir = os.path.join(symlinkdir, 'symlinkedcache')
         os.symlink(realcachedir, symlink_cache_dir)
         self.set_options_for_scope('ivy', cache_dir=symlink_cache_dir)
 

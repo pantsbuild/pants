@@ -293,12 +293,12 @@ class _JUnitRunner(object):
     workdirs = defaultdict(OrderedSet)
     for test, target in tests_to_targets.items():
       workdirs[self._infer_workdir(target)].add(test)
-    return { workdir: list(tests) for workdir, tests in workdirs.items() }
+    return {workdir: list(tests) for workdir, tests in workdirs.items()}
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
     for i in range(0, len(tests), stride):
-      yield tests[i:i+stride]
+      yield tests[i:i + stride]
 
   def _get_tests_to_run(self):
     for test_spec in self._tests_to_run:

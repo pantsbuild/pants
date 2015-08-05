@@ -12,7 +12,6 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import BuildGraph
 from pants.base.source_root import SourceRoot
@@ -38,6 +37,7 @@ class Context(object):
 
   class Log(object):
     """A logger facade that logs into the pants reporting framework."""
+
     def __init__(self, run_tracker):
       self._run_tracker = run_tracker
 
@@ -190,7 +190,7 @@ class Context(object):
       # NB: in 2.x, wait() with timeout wakes up often to check, burning CPU. Oh well.
       res = SubprocPool.foreground().map_async(f, items)
       while not res.ready():
-        res.wait(60) # Repeatedly wait for up to a minute.
+        res.wait(60)  # Repeatedly wait for up to a minute.
         if not res.ready():
           self.log.debug('subproc_map result still not ready...')
       return res.get()
@@ -208,8 +208,9 @@ class Context(object):
     """ Acquire the global lock for the root directory associated with this context. When
     a goal requires serialization, it will call this to acquire the lock.
     """
-    if not self._lock.i_am_locking():
-      self._lock.acquire()
+    if self.options.for_global_scope().lock:
+      if not self._lock.i_am_locking():
+        self._lock.acquire()
 
   def release_lock(self):
     """Release the global lock if it's held.

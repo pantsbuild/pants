@@ -11,7 +11,6 @@ import unittest
 from twitter.common.collections import OrderedSet
 
 from pants.base.address import SyntheticAddress, parse_spec
-from pants.base.addressable import AddressableCallProxy
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.source_root import SourceRoot, SourceRootTree
 from pants.base.target import Target
@@ -215,7 +214,7 @@ class SourceRootTest(unittest.TestCase):
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
 
   def _add_siblings1(self, tree, common_root):
-    tree.add_root(os.path.join(common_root, 'src/java'),[NotTestTarget])
+    tree.add_root(os.path.join(common_root, 'src/java'), [NotTestTarget])
     tree.add_root(os.path.join(common_root, 'src/resources'), [NotTestTarget])
     tree.add_root(os.path.join(common_root, 'tests/java'), [NotTestTarget, TestTarget])
     tree.add_root(os.path.join(common_root, 'tests/resources'), [NotTestTarget])

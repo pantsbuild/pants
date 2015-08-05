@@ -31,4 +31,4 @@ class AndroidResources(AndroidTarget):
                                             'resource files.')
 
   def globs_relative_to_buildroot(self):
-    return {'globs' : os.path.join(self.resource_dir, '**')}
+    return {'globs': os.path.join(self.resource_dir, '**')}

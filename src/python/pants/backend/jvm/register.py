@@ -40,6 +40,7 @@ from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCompile,
                                                                      ScalaZincCompile)
+from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
@@ -59,7 +60,7 @@ def build_file_aliases():
       'benchmark': Benchmark,
       'credentials': Credentials,
       'jar_library': JarLibrary,
-      'unpacked_jars' : UnpackedJars,
+      'unpacked_jars': UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'java_tests': JavaTests,
@@ -99,6 +100,9 @@ def register_goals():
   Goal.by_name('invalidate').install(ng_killall, first=True)
   Goal.by_name('clean-all').install(ng_killall, first=True)
   Goal.by_name('clean-all-async').install(ng_killall, first=True)
+
+  task(name='jvm-platform-explain', action=JvmPlatformExplain).install('jvm-platform-explain')
+  task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')
 
   task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap').with_description(
       'Bootstrap tools needed for building.')

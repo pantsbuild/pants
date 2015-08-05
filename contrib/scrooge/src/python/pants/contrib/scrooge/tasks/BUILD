@@ -35,7 +35,6 @@ python_library(
   name='thrift_linter',
   sources=['thrift_linter.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',

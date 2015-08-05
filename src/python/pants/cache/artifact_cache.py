@@ -16,11 +16,14 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+
 class ArtifactCacheError(Exception):
   pass
 
+
 class NonfatalArtifactCacheError(Exception):
   pass
+
 
 class UnreadableArtifact(object):
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
@@ -137,6 +140,7 @@ class ArtifactCache(object):
     """
     pass
 
+
 def call_use_cached_files(tup):
   """Importable helper for multi-proc calling of ArtifactCache.use_cached_files on a cache instance.
 
@@ -153,6 +157,7 @@ def call_use_cached_files(tup):
   else:
     sys.stderr.write(' ')
   return res
+
 
 def call_insert(tup):
   """Importable helper for multi-proc calling of ArtifactCache.insert on an ArtifactCache instance.

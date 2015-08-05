@@ -62,7 +62,7 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def get_warning_args_default(cls):
-    return ('-C-Xlint:all',   '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
+    return ('-C-Xlint:all', '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
 
   @classmethod
   def get_no_warning_args_default(cls):
