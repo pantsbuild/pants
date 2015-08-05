@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from collections import defaultdict
+from itertools import chain
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir
@@ -49,13 +50,17 @@ class GoWorkspaceTask(GoTask):
         self._symlink_local_src(gopath, dep, required_links)
     self.remove_unused_links(os.path.join(gopath, 'src'), required_links)
 
-  def remove_unused_links(self, dirpath, required_links):
-    """Recursively remove any links in dirpath which are not contained in required_links."""
-    for root, _, files in os.walk(dirpath):
-      for f in files:
-        fpath = os.path.join(root, f)
-        if os.path.islink(fpath) and fpath not in required_links:
-          os.unlink(fpath)
+  @staticmethod
+  def remove_unused_links(dirpath, required_links):
+    """Recursively remove any links in dirpath which are not contained in required_links.
+
+    All links in required_links must be absolute paths.
+    """
+    for root, dirs, files in os.walk(dirpath):
+      for p in chain(dirs, files):
+        p = os.path.join(root, p)
+        if os.path.islink(p) and p not in required_links:
+          os.unlink(p)
 
   def _symlink_local_src(self, gopath, go_local_src, required_links):
     """Creates symlinks from the given gopath to the source files of the given local package.
