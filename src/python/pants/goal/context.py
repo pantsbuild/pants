@@ -207,8 +207,9 @@ class Context(object):
     """ Acquire the global lock for the root directory associated with this context. When
     a goal requires serialization, it will call this to acquire the lock.
     """
-    if not self._lock.i_am_locking():
-      self._lock.acquire()
+    if self.options.for_global_scope().lock:
+      if not self._lock.i_am_locking():
+        self._lock.acquire()
 
   def release_lock(self):
     """Release the global lock if it's held.
