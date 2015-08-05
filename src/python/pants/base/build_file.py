@@ -109,7 +109,7 @@ class BuildFile(AbstractClass):
       return to_remove
 
     if base_path and not cls._isdir(os.path.join(root_dir, base_path)):
-      raise cls.BadPathError('Can only recursive glob directories and {0} is not a valid dir'
+      raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
                               .format(base_path))
 
     buildfiles = []
@@ -133,19 +133,19 @@ class BuildFile(AbstractClass):
     """Walk the file tree rooted at `path`.  Works like os.walk"""
 
   @classmethod
-  @abstractmethod
   def _isdir(cls, path):
     """Returns True if path is a directory"""
+    raise NotImplementedError()
 
   @classmethod
-  @abstractmethod
   def _isfile(cls, path):
     """Returns True if path is a file"""
+    raise NotImplementedError()
 
   @classmethod
-  @abstractmethod
   def _exists(cls, path):
     """Returns True if path exists"""
+    raise NotImplementedError()
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.

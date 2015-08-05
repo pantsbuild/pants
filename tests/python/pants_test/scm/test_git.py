@@ -148,7 +148,7 @@ class GitTest(unittest.TestCase):
   def test_listdir(self):
     reader = self.git.repo_reader(self.initial_rev)
 
-    for dirname in ['.', './.']:
+    for dirname in '.', './.':
       results = reader.listdir(dirname)
       self.assertEquals(['README',
                          'dir',
@@ -158,7 +158,7 @@ class GitTest(unittest.TestCase):
                          'not-a-dir'],
                         sorted(results))
 
-    for dirname in ['dir', './dir']:
+    for dirname in 'dir', './dir':
       results = reader.listdir('dir')
       self.assertEquals(['f',
                          'not-absolute\u2764'.encode('utf-8'),
