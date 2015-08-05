@@ -27,7 +27,7 @@ def get_jar_infos(ivy_products, confs=None):
   if ivy_products:
     for conf, info_group in ivy_products.items():
       if conf not in confs:
-        continue # We don't care about it.
+        continue  # We don't care about it.
       for info in info_group:
         for module in info.modules_by_ref.values():
           if module.artifacts:

@@ -28,16 +28,16 @@ _ID_BY_OS = {
 }
 
 _PATH_BY_ID = {
-  ('linux', 'x86_64'):  ['linux', 'x86_64'],
-  ('linux', 'amd64'):   ['linux', 'x86_64'],
-  ('linux', 'i386'):    ['linux', 'i386'],
-  ('linux', 'i686'):    ['linux', 'i386'],
-  ('darwin', '9'):      ['mac', '10.5'],
-  ('darwin', '10'):     ['mac', '10.6'],
-  ('darwin', '11'):     ['mac', '10.7'],
-  ('darwin', '12'):     ['mac', '10.8'],
-  ('darwin', '13'):     ['mac', '10.9'],
-  ('darwin', '14'):     ['mac', '10.10'],
+  ('linux', 'x86_64'): ['linux', 'x86_64'],
+  ('linux', 'amd64'): ['linux', 'x86_64'],
+  ('linux', 'i386'): ['linux', 'i386'],
+  ('linux', 'i686'): ['linux', 'i386'],
+  ('darwin', '9'): ['mac', '10.5'],
+  ('darwin', '10'): ['mac', '10.6'],
+  ('darwin', '11'): ['mac', '10.7'],
+  ('darwin', '12'): ['mac', '10.8'],
+  ('darwin', '13'): ['mac', '10.9'],
+  ('darwin', '14'): ['mac', '10.10'],
 }
 
 
@@ -143,7 +143,7 @@ class BinaryUtil(object):
 
     downloaded_successfully = False
     accumulated_errors = []
-    for baseurl in OrderedSet(self._baseurls): # Wrap in OrderedSet because duplicates are wasteful.
+    for baseurl in OrderedSet(self._baseurls):  # Wrap in OrderedSet because duplicates are wasteful.
       url = posixpath.join(baseurl, binary_path)
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:

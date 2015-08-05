@@ -79,7 +79,7 @@ class CodeGen(Task):
 
   def execute(self):
     gentargets = self.context.targets(self.is_gentarget)
-    capabilities = self.genlangs() # lang_name => predicate
+    capabilities = self.genlangs()  # lang_name => predicate
 
     # Try to eliminate running the codegen task for languages that
     # don't reference the codegen targets.

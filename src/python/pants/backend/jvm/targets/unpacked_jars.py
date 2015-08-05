@@ -44,7 +44,7 @@ class UnpackedJars(ImportJarsMixin, Target):
     self._files = None
 
     if not libraries:
-      raise  self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
+      raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
                                          .format(spec=self.address.spec))
 
   @property

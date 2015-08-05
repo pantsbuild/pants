@@ -47,7 +47,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
     return WhatChanged
 
   def assert_console_output(self, *output, **kwargs):
-    options = { 'spec_excludes': [], 'exclude_target_regexp': [] }
+    options = {'spec_excludes': [], 'exclude_target_regexp': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options
@@ -59,6 +59,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       def touched_files(_, p):
         self.assertEqual(parent or 'HEAD', p)
         return files or []
+
       def changes_in(_, ds):
         self.assertEqual(diffspec, ds)
         return diff_files or []
@@ -195,7 +196,7 @@ class WhatChangedTest(BaseWhatChangedTest):
   def test_spec_excludes(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
-      options = { 'spec_excludes': 'root/src/py/1' },
+      options={'spec_excludes': 'root/src/py/1'},
       workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
     )
 

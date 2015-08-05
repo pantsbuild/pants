@@ -45,7 +45,7 @@ class JMakeAnalysisParser(AnalysisParser):
       p1 = line.find(b'\t')
       clsfile = os.path.join(classes_dir, line[0:p1] + b'.class')
       p2 = line.find(b'\t', p1 + 1)
-      src = line[p1+1:p2]
+      src = line[p1 + 1:p2]
       ret[src].append(clsfile)
     return ret
 

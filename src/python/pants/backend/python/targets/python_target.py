@@ -52,7 +52,7 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
-    self.address=address
+    self.address = address
     if sources_rel_path is None:
       sources_rel_path = address.spec_path
     payload = payload or Payload()

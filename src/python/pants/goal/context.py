@@ -37,6 +37,7 @@ class Context(object):
 
   class Log(object):
     """A logger facade that logs into the pants reporting framework."""
+
     def __init__(self, run_tracker):
       self._run_tracker = run_tracker
 
@@ -189,7 +190,7 @@ class Context(object):
       # NB: in 2.x, wait() with timeout wakes up often to check, burning CPU. Oh well.
       res = SubprocPool.foreground().map_async(f, items)
       while not res.ready():
-        res.wait(60) # Repeatedly wait for up to a minute.
+        res.wait(60)  # Repeatedly wait for up to a minute.
         if not res.ready():
           self.log.debug('subproc_map result still not ready...')
       return res.get()

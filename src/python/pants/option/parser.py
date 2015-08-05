@@ -163,7 +163,7 @@ class Parser(object):
         for dest in deprecated_dests:
           if namespace.get_rank(dest) == RankedValue.FLAG:
             warnings.warn('*** {}'.format(self._deprecated_message(dest)), DeprecationWarning,
-                          stacklevel=9999) # Out of range stacklevel to suppress printing src line.
+                          stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
     return namespace
 
   def registration_args_iter(self):

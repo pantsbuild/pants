@@ -14,6 +14,7 @@ class BinaryUtilTest(BaseTest):
 
   class LambdaReader(object):
     """Class which pretends to be an input stream, but is actually a lambda function."""
+
     def __init__(self, func):
       self._func = func
 
@@ -31,6 +32,7 @@ class BinaryUtilTest(BaseTest):
 
   class MapReader(object):
     """Class which pretends to be a url stream opener, but is actually a dictionary."""
+
     def __init__(self, read_map):
       self._map = read_map
 
@@ -47,7 +49,7 @@ class BinaryUtilTest(BaseTest):
       return self._map.values()
 
     def __getitem__(self, key):
-      return self._map[key] # Vanilla internal map access (without lambda shenanigans).
+      return self._map[key]  # Vanilla internal map access (without lambda shenanigans).
 
   def setUp(self):
     super(BinaryUtilTest, self).setUp()
@@ -98,7 +100,7 @@ class BinaryUtilTest(BaseTest):
     and others are not.
     """
     fake_base, fake_url = self._fake_base, self._fake_url
-    bases = [fake_base('apple'), fake_base('orange'), fake_base('banana'),]
+    bases = [fake_base('apple'), fake_base('orange'), fake_base('banana')]
     binary_util = BinaryUtil(bases, 30, '/tmp')
 
     binaries = {t[2]: t for t in (('bin/protobuf', '2.4.1', 'protoc'),

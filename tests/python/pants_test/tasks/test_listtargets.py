@@ -28,7 +28,7 @@ class ListTargetsTestEmpty(BaseListTargetsTest):
 
   def test_list_all_empty(self):
     self.assertEqual('', self.execute_task())
-    self.assertEqual('', self.execute_task(options={ 'sep': '###' }))
+    self.assertEqual('', self.execute_task(options={'sep': '###'}))
     self.assertEqual([], self.execute_console_task())
 
 
@@ -133,7 +133,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
-        options={ 'sep': ', ' })
+        options={'sep': ', '})
 
     self.assert_console_output(
         'a:a',
@@ -149,14 +149,14 @@ class ListTargetsTest(BaseListTargetsTest):
     self.assert_console_output(
         'a/b:b com.example#b',
         'a/b/c:c2 com.example#c2',
-        options={'provides': True })
+        options={'provides': True})
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
         '/tmp a/b:b http://maven.example.com public com.example#b',
         '/tmp a/b/c:c2 http://maven.example.com public com.example#c2',
-        options={ 'provides': True,
-                  'provides_columns': 'push_db_basedir,address,repo_url,repo_name,artifact_id'}
+        options={'provides': True,
+                 'provides_columns': 'push_db_basedir,address,repo_url,repo_name,artifact_id'}
     )
 
   def test_list_dedups(self):
@@ -174,7 +174,7 @@ class ListTargetsTest(BaseListTargetsTest):
     self.assert_console_output(
       # Confirm empty listing
       targets=[self.target('a/b')],
-      options={'documented': True },
+      options={'documented': True},
     )
 
     self.assert_console_output(
@@ -183,5 +183,5 @@ class ListTargetsTest(BaseListTargetsTest):
         Exercises alias resolution.
         Further description.
       """).strip(),
-      options={ 'documented': True }
+      options={'documented': True}
     )

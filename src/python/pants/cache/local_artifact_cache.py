@@ -17,6 +17,7 @@ from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
 
 logger = logging.getLogger(__name__)
 
+
 class BaseLocalArtifactCache(ArtifactCache):
 
   def __init__(self, artifact_root, compression):
@@ -35,7 +36,7 @@ class BaseLocalArtifactCache(ArtifactCache):
   @contextmanager
   def _tmpfile(self, cache_key, use):
     """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
-    with temporary_file(suffix=cache_key.id+use, root_dir=self._cache_root) as tmpfile:
+    with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root) as tmpfile:
       yield tmpfile
 
   @contextmanager
@@ -60,8 +61,10 @@ class BaseLocalArtifactCache(ArtifactCache):
     """Given a src path to an artifact tarball, store it and return stored artifact's path."""
     pass
 
+
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
+
   def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
@@ -138,6 +141,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
   This implementation does not have a backing _cache_root, and never
   actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
+
   def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.

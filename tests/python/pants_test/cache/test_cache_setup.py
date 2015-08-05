@@ -46,7 +46,7 @@ class TestCacheSetup(BaseTest):
 
   def test_select_best_url(self):
     log = MockLogger()
-    pinger = MockPinger({'host1':  5, 'host2:666': 3, 'host3': 7})
+    pinger = MockPinger({'host1': 5, 'host2:666': 3, 'host3': 7})
     cache_factory = CacheFactory(options={}, log=log, stable_name='test', pinger=pinger)
     spec = 'http://host1|https://host2:666/path/to|http://host3/path/'
     best = cache_factory.select_best_url(spec)
