@@ -11,7 +11,7 @@ import os
 import pkgutil
 import re
 import sys
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ETf
 
 from pkg_resources import resource_string
 

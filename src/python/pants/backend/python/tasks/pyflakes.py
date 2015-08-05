@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pyflakes.checker import Checker as FlakesChecker
 
-from ..common import CheckstylePlugin, Nit
+from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit
 
 
 class FlakeError(Nit):

@@ -9,7 +9,7 @@ import sys
 import tokenize
 from collections import defaultdict
 
-from ..common import CheckstylePlugin
+from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
 class TrailingWhitespace(CheckstylePlugin):

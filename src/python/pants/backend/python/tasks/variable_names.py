@@ -12,7 +12,7 @@ from functools import wraps
 
 from twitter.common.lang import Compatibility
 
-from ..common import CheckstylePlugin
+from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
 ALL_LOWER_CASE_RE = re.compile(r'^[a-z][a-z\d]*$')
