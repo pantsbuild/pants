@@ -99,7 +99,7 @@ class ConfluencePublish(Task):
     ''').strip().format(address, content)
 
     pageopts = dict(
-      versionComment='updated by pants!'
+      versionComment = 'updated by pants!'
     )
     wiki = self.login()
     existing = wiki.getpage(space, title)

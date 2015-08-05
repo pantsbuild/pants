@@ -16,7 +16,6 @@ class ProductError(Exception): pass
 
 class UnionProducts(object):
   """Here, products for a target are the ordered union of the products for its transitive deps."""
-
   def __init__(self):
     # A map of target to OrderedSet of product members.
     self._products_by_target = defaultdict(OrderedSet)
@@ -66,7 +65,6 @@ class RootedProducts(object):
   """File products of a build that have a concept of a 'root' directory.
 
   E.g., classfiles, under a root package directory."""
-
   def __init__(self, root):
     self._root = root
     self._rel_paths = OrderedSet()
@@ -98,7 +96,6 @@ class RootedProducts(object):
 
 class MultipleRootedProducts(object):
   """A product consisting of multiple roots, with associated file products."""
-
   def __init__(self):
     self._rooted_products_by_root = {}
 

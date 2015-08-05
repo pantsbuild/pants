@@ -227,7 +227,6 @@ class IdeGen(JvmToolTaskMixin, Task):
     jars = OrderedSet()
     excludes = OrderedSet()
     compiles = OrderedSet()
-
     def prune(target):
       if target.is_jvm:
         if target.excludes:
@@ -560,7 +559,7 @@ class Project(object):
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
         if target.address.is_synthetic:
-          return []  # Siblings don't make sense for synthetic addresses.
+          return [] # Siblings don't make sense for synthetic addresses.
         candidates = self.target_util.get_all_addresses(target.address.build_file)
         for ancestor in target.address.build_file.ancestors():
           candidates.update(self.target_util.get_all_addresses(ancestor))
@@ -568,7 +567,6 @@ class Project(object):
           candidates.update(self.target_util.get_all_addresses(sibling))
         for descendant in target.address.build_file.descendants(spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
-
         def is_sibling(target):
           return source_target(target) and target_dirset.intersection(find_source_basedirs(target))
 

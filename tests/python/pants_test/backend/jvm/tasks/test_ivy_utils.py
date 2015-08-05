@@ -129,7 +129,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_classifiers(self):
     jars, _ = IvyUtils.calculate_classpath([self.c])
 
-    jars.sort(key=lambda jar: jar.classifier)
+    jars.sort(key=lambda jar : jar.classifier)
 
     self.assertEquals(['fleem', 'morx'], [jar.classifier for jar in jars])
 
@@ -162,7 +162,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_resove_conflict(self):
     v1 = Mock()
     v1.force = False
-    v1.rev = "1"
+    v1.rev ="1"
 
     v1_force = Mock()
     v1_force.force = True
@@ -189,7 +189,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
-
     def collector(r):
       self.assertNotIn(r, seen)
       seen.add(r)
@@ -211,7 +210,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
-
     def collector(r):
       self.assertNotIn(r, seen)
       seen.add(r)
@@ -232,7 +230,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
 
     ref = IvyModuleRef(org='org1', name='name1', rev='0.0.1')
-
     def collector(r):
       return set([r])
 
@@ -258,12 +255,12 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.assertEqual(dict(**kwargs), dict(elem.attrib))
 
   def test_find_new_symlinks(self):
-    map1 = {'foo': 'bar'}
-    map2 = {}
+    map1 = { 'foo' : 'bar'}
+    map2 = { }
     diff_map = IvyUtils._find_new_symlinks(map1, map2)
     self.assertEquals({}, diff_map)
     diff_map = IvyUtils._find_new_symlinks(map2, map1)
-    self.assertEquals({'foo': 'bar'}, diff_map)
+    self.assertEquals({'foo' : 'bar'}, diff_map)
 
   def test_symlink_cachepath(self):
     self.maxDiff = None
@@ -284,7 +281,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
           self.assertEquals(
             {
-              os.path.realpath(foo_path): symlink_foo_path
+              os.path.realpath(foo_path) : symlink_foo_path
             },
             result_map)
           with open(output_path, 'r') as outpath:
@@ -304,8 +301,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
           self.assertEquals(
             {
-              os.path.realpath(foo_path): symlink_foo_path,
-              os.path.realpath(bar_path): symlink_bar_path,
+              os.path.realpath(foo_path) : symlink_foo_path,
+              os.path.realpath(bar_path) : symlink_bar_path,
             },
             result_map)
           with open(output_path, 'r') as outpath:

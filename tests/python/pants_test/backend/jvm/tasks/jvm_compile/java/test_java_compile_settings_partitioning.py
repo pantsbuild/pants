@@ -29,7 +29,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
                             sources=sources)
 
   def _platforms(self, *versions):
-    return {str(v): {'source': str(v)} for v in versions}
+    return { str(v): {'source': str(v)} for v in versions}
 
   @memoized_method
   def _version(self, version):
@@ -70,8 +70,8 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
 
   def assert_partitions_equal(self, expected, received):
     # Convert to normal dicts and remove empty values.
-    expected = {key: set(val) for key, val in expected.items() if val}
-    received = {key: set(val) for key, val in received.items() if val}
+    expected = { key: set(val) for key, val in expected.items() if val }
+    received = { key: set(val) for key, val in received.items() if val }
     self.assertEqual(expected, received, 'Partitions are different!\n  expected: {}\n  received: {}'
                                         .format(self._format_partition(expected),
                                                 self._format_partition(received)))
@@ -88,14 +88,14 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     java8 = self._java('eight', '1.8')
     partition = self._partition([java6, java7, java8],
                                 platforms=self._platforms('1.6', '1.7', '1.8'))
-    expected = {self._version(java.payload.platform): {java}
-                for java in (java6, java7, java8)}
+    expected = { self._version(java.payload.platform): {java}
+                 for java in (java6, java7, java8) }
     self.assertEqual(3, len(partition))
     self.assert_partitions_equal(expected, partition)
 
   def test_java_version_aliases(self):
     expected = {}
-    for version in (6, 7, 8):
+    for version in (6,7,8):
       expected[Revision.lenient('1.{}'.format(version))] = {
         self._java('j1{}'.format(version), '1.{}'.format(version)),
         self._java('j{}'.format(version), '{}'.format(version)),
@@ -172,7 +172,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     b = self._java('b', platform='1.6', deps=[a])
     c = self._java('c', platform='1.6')
     d = self._java('d', platform='1.7')
-    e = self._java('e', platform='1.7', deps=[b, c, d])
+    e = self._java('e', platform='1.7', deps=[b,c,d])
     f = self._java('f', platform='1.7', deps=[e])
     g = self._java('g', platform='1.8', deps=[f])
     h = self._java('h', platform='1.6')
@@ -195,14 +195,14 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       return '{}: ({})'.format(str(settings), ', '.join(sorted(t.address.spec for t in targets)))
 
     expected = [
-      (_settings('1.6'), {a, b, c, h}),
-      (_settings('1.7'), {d, e, f}),
-      (_settings('1.8'), {g, i}),
+      (_settings('1.6'), {a,b,c,h}),
+      (_settings('1.7'), {d,e,f}),
+      (_settings('1.8'), {g,i}),
       (_settings('1.8', ['-Xfoo:bar']), {j}),
       (_settings('1.8'), {k})
     ]
 
-    settings_and_targets = self._settings_and_targets([a, b, c, d, e, f, g, h, i, j, k],
+    settings_and_targets = self._settings_and_targets([a,b,c,d,e,f,g,h,i,j,k],
                                                       ordered=True,
                                                       platforms=platforms)
     received = [(settings, set(targets)) for settings, targets in settings_and_targets]

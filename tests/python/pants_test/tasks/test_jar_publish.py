@@ -258,21 +258,18 @@ class JarPublishTest(TaskTestBase):
     r = map(lambda x: TemplateData(classifier=x), ['a', 'b', 'c'])
     self.assertEquals(r, c)
 
-
 class FailNTimes:
 
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries
     self.exc_type = exc_type
     self.success = success
-
   def __call__(self, *args, **kwargs):
     self.tries -= 1
     if self.tries >= 0:
       raise self.exc_type()
     else:
       return self.success
-
 
 class FailNTimesTest(unittest.TestCase):
 

@@ -39,7 +39,6 @@ class BootstrapOptionsTest(unittest.TestCase):
   def test_bootstrap_option_values(self):
     # Check all defaults.
     buildroot = get_buildroot()
-
     def br(path):
       # Returns the full path of the given path under the buildroot.
       return '{}/{}'.format(buildroot, path)

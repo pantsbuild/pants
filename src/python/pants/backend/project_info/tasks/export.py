@@ -42,7 +42,7 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.1'
+  DEFAULT_EXPORT_VERSION='1.0.1'
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -131,7 +131,6 @@ class Export(ConsoleTask):
         ivy_info = ivy_info_list[0]
 
     ivy_jar_memo = {}
-
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target

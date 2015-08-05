@@ -36,7 +36,6 @@ def combine_hashes(hashes):
 class PayloadField(AbstractClass):
   """An immutable, hashable structure to be mixed into Payload instances."""
   _fingerprint_memo = None
-
   def fingerprint(self):
     """A memoized sha1 hexdigest hashing the contents of this PayloadField
 
@@ -73,7 +72,6 @@ class FingerprintedField(PayloadField):
   The caller must ensure that the class properly implements fingerprint()
   to hash the contents of the object.
   """
-
   def __init__(self, value):
     self._value = value
 
@@ -87,7 +85,6 @@ class FingerprintedField(PayloadField):
 
 class SourcesField(PayloadField):
   """A PayloadField encapsulating specified sources."""
-
   def __init__(self, sources_rel_path, sources, ref_address=None, filespec=None):
     """
     :param sources_rel_path: path that sources parameter may be relative to
@@ -163,7 +160,6 @@ class DeferredSourcesField(SourcesField):
 
   class NotPopulatedError(Exception):
     """ Raised when the PayloadField has not been populated yet."""
-
     def __init__(self):
       super(Exception, self).__init__(
         "Field requires a call to populate() before this method can be called.")
@@ -207,7 +203,6 @@ class PythonRequirementsField(frozenset, PayloadField):
 
   Must be initialized with an iterable of PythonRequirement instances.
   """
-
   def _compute_fingerprint(self):
     def fingerprint_iter():
       for req in self:
@@ -240,7 +235,6 @@ class BundleField(tuple, PayloadField):
 
   Must be initialized with an iterable of Bundle instances.
   """
-
   def _compute_fingerprint(self):
     return combine_hashes(map(hash_bundle, self))
 
@@ -250,7 +244,6 @@ class ExcludesField(OrderedSet, PayloadField):
 
   Must be initialized with an iterable of Excludes instances.
   """
-
   def _compute_fingerprint(self):
     return stable_json_sha1(tuple(repr(exclude) for exclude in self))
 
@@ -260,7 +253,6 @@ class ConfigurationsField(OrderedSet, PayloadField):
 
   Must be initialized with an iterable of strings.
   """
-
   def _compute_fingerprint(self):
     return combine_hashes(sha1(s).hexdigest() for s in self)
 
@@ -270,7 +262,6 @@ class JarsField(tuple, PayloadField):
 
   Must be initialized with an iterable of JarDependency instances.
   """
-
   def _compute_fingerprint(self):
     return stable_json_sha1(tuple(jar.cache_key() for jar in self))
 
@@ -280,7 +271,6 @@ class PrimitiveField(PayloadField):
 
   As long as the contents are JSON representable, their hash can be stably inferred.
   """
-
   def __init__(self, underlying=None):
     self._underlying = underlying
 

@@ -78,7 +78,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.JaxbGlobalCodegenStrategy]
+    return [cls.IsolatedCodegenStrategy, cls.JaxbGlobalCodegenStrategy,]
 
   def sources_generated_by_target(self, target):
     to_generate = []

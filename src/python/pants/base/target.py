@@ -127,7 +127,7 @@ class Target(AbstractTarget):
     """Argument that isn't allowed supplied to Target."""
 
   LANG_DISCRIMINATORS = {
-    'java': lambda t: t.is_jvm,
+    'java':   lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
   }
 
@@ -267,7 +267,6 @@ class Target(AbstractTarget):
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
       hasher = sha1()
-
       def dep_hash_iter():
         for dep in self.dependencies:
           dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy)
@@ -294,7 +293,6 @@ class Target(AbstractTarget):
 
   def inject_dependency(self, dependency_address):
     self._build_graph.inject_dependency(dependent=self.address, dependency=dependency_address)
-
     def invalidate_dependee(dependee):
       dependee.mark_transitive_invalidation_hash_dirty()
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
@@ -503,6 +501,6 @@ class Target(AbstractTarget):
     else:
       sources = sources or []
       assert_list(sources, key_arg=key_arg)
-      filespec = {'globs': [os.path.join(sources_rel_path, src) for src in (sources or [])]}
+      filespec = {'globs' : [os.path.join(sources_rel_path, src) for src in (sources or [])]}
 
     return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)
