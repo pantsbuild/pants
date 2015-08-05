@@ -38,6 +38,10 @@ class BuildFile(AbstractClass):
     """Raised when the root_dir specified to a BUILD file is not valid."""
     pass
 
+  class BadPathError(BuildFileError):
+    """Raised when scan_buildfiles is called on a nonexistent directory."""
+    pass
+
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
@@ -103,6 +107,10 @@ class BuildFile(AbstractClass):
             if subdir in dirs:
               to_remove.append(subdir)
       return to_remove
+
+    if base_path and not cls._isdir(os.path.join(root_dir, base_path)):
+      raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
+                              .format(base_path))
 
     buildfiles = []
     if not spec_excludes:
@@ -284,13 +292,16 @@ class FilesystemBuildFile(BuildFile):
     with open(self.full_path, 'rb') as source:
       return source.read()
 
-  def _isdir(self, path):
+  @classmethod
+  def _isdir(cls, path):
     return os.path.isdir(path)
 
-  def _isfile(self, path):
+  @classmethod
+  def _isfile(cls, path):
     return os.path.isfile(path)
 
-  def _exists(self, path):
+  @classmethod
+  def _exists(cls, path):
     return os.path.exists(path)
 
   @classmethod
