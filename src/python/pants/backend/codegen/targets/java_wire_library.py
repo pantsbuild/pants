@@ -44,7 +44,7 @@ class JavaWireLibrary(ExportableJvmLibrary):
       'roots': PrimitiveField(roots or []),
       'registry_class': PrimitiveField(registry_class or None),
       'enum_options': PrimitiveField(enum_options or []),
-      'no_options': PrimitiveField(no_options or False),
+      'no_options':  PrimitiveField(no_options or False),
     })
 
     if service_writer_options:

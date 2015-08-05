@@ -298,7 +298,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # Collect the artifacts for this target.
     artifacts = []
-
     def add_abs_products(p):
       if p:
         for _, paths in p.abs_paths():

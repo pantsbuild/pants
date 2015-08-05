@@ -73,7 +73,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     # thrift-linter fails if pants.ini has a thrift-linter:strict=True setting
     cmd = ['thrift-linter', self.thrift_test_target('bad-thrift-default')]
     pants_ini_config = {'thrift-linter': {'strict': True}}
-    pants_run = self.run_pants(cmd, config=pants_ini_config)
+    pants_run = self.run_pants(cmd, config = pants_ini_config)
     self.assert_failure(pants_run)
     self.assertTrue('Lint errors found!' in pants_run.stdout_data)
 
@@ -82,6 +82,6 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     # a command line non-strict flag is passed.
     cmd = ['thrift-linter', '--no-strict', self.thrift_test_target('bad-thrift-default')]
     pants_ini_config = {'thrift-linter': {'strict': True}}
-    pants_run = self.run_pants(cmd, config=pants_ini_config)
+    pants_run = self.run_pants(cmd, config = pants_ini_config)
     self.assert_success(pants_run)
     self.assertTrue('Lint errors found!' in pants_run.stdout_data)

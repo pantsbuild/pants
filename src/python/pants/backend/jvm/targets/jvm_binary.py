@@ -34,7 +34,7 @@ class JarRule(FingerprintedMixin, AbstractClass):
                        'is not a valid regular expression: {msg}'
                        .format(pattern=apply_pattern, msg=e))
     self.payload.add_fields({
-      'apply_pattern': PrimitiveField(apply_pattern),
+      'apply_pattern' : PrimitiveField(apply_pattern),
     })
 
   def fingerprint(self):
@@ -61,7 +61,6 @@ class Duplicate(JarRule):
 
   class Error(Exception):
     """Raised by the ``FAIL`` action when a duplicate entry is encountered"""
-
     def __init__(self, path):
       """Creates a duplicate entry error for the given path.
 
@@ -114,7 +113,7 @@ class Duplicate(JarRule):
     """
     payload = Payload()
     payload.add_fields({
-      'action': PrimitiveField(self.validate_action(action)),
+      'action' :  PrimitiveField(self.validate_action(action)),
     })
     super(Duplicate, self).__init__(apply_pattern, payload=payload)
 
@@ -209,7 +208,7 @@ class JarRules(FingerprintedMixin):
     """
     self.payload = Payload()
     self.payload.add_fields({
-      'default_dup_action': PrimitiveField(Duplicate.validate_action(default_dup_action))
+      'default_dup_action' : PrimitiveField(Duplicate.validate_action(default_dup_action))
     })
     self._rules = assert_list(rules, expected_type=JarRule, key_arg="rules")
 
@@ -257,7 +256,7 @@ class ManifestEntries(FingerprintedMixin):
             "entries must be dictionary of strings, got key {} type {}"
             .format(key, type(key).__name__))
     self.payload.add_fields({
-      'entries': PrimitiveField(entries or {}),
+      'entries' : PrimitiveField(entries or {}),
       })
 
   def fingerprint(self):
@@ -341,12 +340,12 @@ class JvmBinary(JvmTarget):
       )
     payload = payload or Payload()
     payload.add_fields({
-      'basename': PrimitiveField(basename or name),
-      'deploy_excludes': ExcludesField(self.assert_list(deploy_excludes,
-                                                        expected_type=Exclude,
-                                                        key_arg='deploy_excludes')),
-      'deploy_jar_rules': FingerprintedField(deploy_jar_rules or JarRules.default()),
-      'manifest_entries': FingerprintedField(ManifestEntries(manifest_entries)),
+      'basename' : PrimitiveField(basename or name),
+      'deploy_excludes' : ExcludesField(self.assert_list(deploy_excludes,
+                                                         expected_type=Exclude,
+                                                         key_arg='deploy_excludes')),
+      'deploy_jar_rules' :  FingerprintedField(deploy_jar_rules or JarRules.default()),
+      'manifest_entries' : FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
       })
 

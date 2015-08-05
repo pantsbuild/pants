@@ -214,7 +214,7 @@ class SourceRootTest(unittest.TestCase):
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
 
   def _add_siblings1(self, tree, common_root):
-    tree.add_root(os.path.join(common_root, 'src/java'), [NotTestTarget])
+    tree.add_root(os.path.join(common_root, 'src/java'),[NotTestTarget])
     tree.add_root(os.path.join(common_root, 'src/resources'), [NotTestTarget])
     tree.add_root(os.path.join(common_root, 'tests/java'), [NotTestTarget, TestTarget])
     tree.add_root(os.path.join(common_root, 'tests/resources'), [NotTestTarget])

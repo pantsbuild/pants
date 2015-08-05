@@ -287,8 +287,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     sorted_targets = [target for target in sorted_targets if target in relevant_targets]
 
     if set(sorted_targets) != relevant_targets:
-      added = '\n  '.join(t.address.spec for t in (set(sorted_targets) - relevant_targets))
-      removed = '\n  '.join(t.address.spec for t in (set(relevant_targets) - sorted_targets))
+      added = '\n  '.join(t.address.spec for t in (set(sorted_targets)-relevant_targets))
+      removed = '\n  '.join(t.address.spec for t in (set(relevant_targets)-sorted_targets))
       raise self.InternalTargetPartitioningError(
         'Internal partitioning targets:\nSorted targets =/= original targets!\n'
         'Added:\n  {}\nRemoved:\n  {}'.format(added, removed)

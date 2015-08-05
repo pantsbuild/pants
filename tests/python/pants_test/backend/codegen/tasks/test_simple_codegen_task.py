@@ -97,7 +97,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                          '  target: {}'.format(target.address.spec))
 
   def _test_execute_strategy(self, strategy, expected_execution_count):
-    dummy_suffixes = ['a', 'b', 'c', ]
+    dummy_suffixes = ['a', 'b', 'c',]
 
     self.add_to_build_file('gen-lib', '\n'.join(dedent('''
       dummy_library(name='{suffix}',
@@ -173,7 +173,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
     parent, good, bad = targets
     task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
     for target in targets:
-      task.execute_codegen([target, ])
+      task.execute_codegen([target,])
 
     task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
     with self.assertRaises(SimpleCodegenTask.IsolatedCodegenStrategy.DuplicateSourceError) as cm:
@@ -194,10 +194,10 @@ class SimpleCodegenTaskTest(TaskTestBase):
       task.codegen_strategy.find_sources(bad)
 
     task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=True)
-    task.codegen_strategy.find_sources(bad)  # Should not raise error, only warning.
+    task.codegen_strategy.find_sources(bad) # Should not raise error, only warning.
 
     task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
-    task.codegen_strategy.find_sources(good)  # Should be completely fine.
+    task.codegen_strategy.find_sources(good) # Should be completely fine.
 
   def test_unsupported_strategy_error(self):
     task = self._create_dummy_task(target_roots=[], forced_codegen_strategy='potato',
@@ -269,11 +269,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
     @classmethod
     def supported_strategy_types(cls):
       if cls._forced_codegen_strategy is None or cls._hard_forced_codegen_strategy:
-        return [cls.IsolatedCodegenStrategy, cls.DummyGlobalStrategy, ]
+        return [cls.IsolatedCodegenStrategy, cls.DummyGlobalStrategy,]
       elif cls._forced_codegen_strategy == 'global':
-        return [cls.DummyGlobalStrategy, ]
+        return [cls.DummyGlobalStrategy,]
       elif cls._forced_codegen_strategy == 'isolated':
-        return [cls.IsolatedCodegenStrategy, ]
+        return [cls.IsolatedCodegenStrategy,]
       raise ValueError('Unrecognized _forced_codegen_strategy for test ({}).'
                        .format(cls._forced_codegen_strategy))
 

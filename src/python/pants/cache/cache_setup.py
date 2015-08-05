@@ -21,17 +21,9 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class EmptyCacheSpecError(ArtifactCacheError): pass
-
-
 class LocalCacheSpecRequiredError(ArtifactCacheError): pass
-
-
 class CacheSpecFormatError(ArtifactCacheError): pass
-
-
 class InvalidCacheSpecError(ArtifactCacheError): pass
-
-
 class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
 

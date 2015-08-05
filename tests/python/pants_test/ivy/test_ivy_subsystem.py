@@ -34,7 +34,7 @@ class IvySubsystemTest(JvmToolTaskTestBase):
     self.context()
 
   def test_parse_proxy_string(self):
-    ivy_subsystem = IvySubsystem.global_instance()
+    ivy_subsystem =IvySubsystem.global_instance()
 
     self.assertEquals(('example.com', 1234),
                       ivy_subsystem._parse_proxy_string('http://example.com:1234'))

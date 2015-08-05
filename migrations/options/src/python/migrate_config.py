@@ -307,9 +307,9 @@ notes = {
                                      'idea and eclipse goals.',
   ('ide', 'extra_jvm_test_paths'): 'extra_jvm_test_paths now must be specified separately for '
                                    'idea and eclipse goals.',
-  ('ide', 'debug_port'): 'debug_port now must be specified separately for idea and eclipse '
-                         'goals.  Also, IDE goals now use their own debug setting and do not '
-                         'inherit from jvm configuration.',
+  ('ide', 'debug_port'):       'debug_port now must be specified separately for idea and eclipse '
+                               'goals.  Also, IDE goals now use their own debug setting and do not '
+                               'inherit from jvm configuration.',
 
   ('tasks', 'build_invalidator'): 'This is no longer configurable. The default will be used.',
 
@@ -381,14 +381,12 @@ def check_option(cp, src, dst):
     if (src_section, src_key) in notes:
       print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
 
-
 def check_config_file(path):
   cp = Config.create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
-
   def section(s):
     return cyan('[{0}]'.format(s))
 

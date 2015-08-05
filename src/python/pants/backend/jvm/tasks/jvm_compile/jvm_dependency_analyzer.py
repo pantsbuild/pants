@@ -146,7 +146,6 @@ class JvmDependencyAnalyzer(object):
         self._compute_missing_deps(srcs, actual_deps)
 
       buildroot = get_buildroot()
-
       def shorten(path):  # Make the output easier to read.
         if path.startswith(buildroot):
           return os.path.relpath(path, buildroot)

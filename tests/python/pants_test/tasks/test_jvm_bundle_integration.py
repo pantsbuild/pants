@@ -26,6 +26,6 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       target = ('testprojects/maven_layout/resource_collision/example_{name}/'
                 'src/main/java/org/pantsbuild/duplicateres/example{name}/'
                 .format(name=name))
-      bundle_name = 'example{proj}'.format(proj=name)
+      bundle_name='example{proj}'.format(proj=name)
       stdout = self.bundle_and_run(target, bundle_name)
       self.assertEquals(stdout, 'Hello world!: resource from example {name}\n'.format(name=name))

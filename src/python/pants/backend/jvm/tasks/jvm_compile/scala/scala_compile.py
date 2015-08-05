@@ -54,7 +54,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
-    return ('-S-encoding', '-SUTF-8', '-S-g:vars')
+    return ('-S-encoding', '-SUTF-8','-S-g:vars')
 
   @classmethod
   def get_warning_args_default(cls):
@@ -251,7 +251,6 @@ class ZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
-
 
 class ScalaZincCompile(ZincCompile):
   _language = 'scala'

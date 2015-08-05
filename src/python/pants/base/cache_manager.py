@@ -66,7 +66,6 @@ class VersionedTarget(VersionedTargetSet):
   """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that
   the wrapped target depends on (after having resolved through any "alias" targets.
   """
-
   def __init__(self, cache_manager, target, cache_key):
     if not isinstance(target, Target):
       raise ValueError("The target {} must be an instance of Target but is not.".format(target.id))
