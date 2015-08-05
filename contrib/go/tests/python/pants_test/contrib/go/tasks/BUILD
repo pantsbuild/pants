@@ -10,3 +10,14 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
   ]
 )
+
+python_tests(
+  name='go_compile',
+  sources=['test_go_compile.py'],
+  dependencies=[
+    'tests/python/pants_test/tasks:task_test_base',
+    'src/python/pants/util:dirutil',
+    'contrib/go/src/python/pants/contrib/go/targets:go_library',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_compile',
+  ]
+)
