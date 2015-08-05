@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.checkstyle.plugins.future_compatibility import FutureCompatibility
+from pants.backend.python.tasks.future_compatibility import FutureCompatibility
 
 
 BAD_CLASS = PythonFile.from_statement("""

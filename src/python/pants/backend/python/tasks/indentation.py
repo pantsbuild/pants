@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import tokenize
 
-from ..common import CheckstylePlugin
+from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
 # TODO(wickman) Update this to sanitize line continuation styling as we have

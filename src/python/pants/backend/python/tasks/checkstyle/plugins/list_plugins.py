@@ -5,20 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks.checkstyle.plugins.class_factoring import ClassFactoring
-from pants.backend.python.tasks.checkstyle.plugins.except_statements import ExceptStatements
-from pants.backend.python.tasks.checkstyle.plugins.future_compatibility import FutureCompatibility
-from pants.backend.python.tasks.checkstyle.plugins.import_order import ImportOrder
-from pants.backend.python.tasks.checkstyle.plugins.indentation import Indentation
-from pants.backend.python.tasks.checkstyle.plugins.missing_contextmanager import \
-  MissingContextManager
-from pants.backend.python.tasks.checkstyle.plugins.new_style_classes import NewStyleClasses
-from pants.backend.python.tasks.checkstyle.plugins.newlines import Newlines
-from pants.backend.python.tasks.checkstyle.plugins.pep8 import PEP8Checker
-from pants.backend.python.tasks.checkstyle.plugins.print_statements import PrintStatements
-from pants.backend.python.tasks.checkstyle.plugins.pyflakes import PyflakesChecker
-from pants.backend.python.tasks.checkstyle.plugins.trailing_whitespace import TrailingWhitespace
-from pants.backend.python.tasks.checkstyle.plugins.variable_names import PEP8VariableNames
+from pants.backend.python.tasks.class_factoring import ClassFactoring
+from pants.backend.python.tasks.except_statements import ExceptStatements
+from pants.backend.python.tasks.future_compatibility import FutureCompatibility
+from pants.backend.python.tasks.import_order import ImportOrder
+from pants.backend.python.tasks.indentation import Indentation
+from pants.backend.python.tasks.missing_contextmanager import MissingContextManager
+from pants.backend.python.tasks.new_style_classes import NewStyleClasses
+from pants.backend.python.tasks.newlines import Newlines
+from pants.backend.python.tasks.pep8 import PEP8Checker
+from pants.backend.python.tasks.print_statements import PrintStatements
+from pants.backend.python.tasks.pyflakes import PyflakesChecker
+from pants.backend.python.tasks.trailing_whitespace import TrailingWhitespace
+from pants.backend.python.tasks.variable_names import PEP8VariableNames
 
 
 def list_plugins():

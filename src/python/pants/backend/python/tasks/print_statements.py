@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 import re
 
-from ..common import CheckstylePlugin
+from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
 class PrintStatements(CheckstylePlugin):

@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.checkstyle.plugins.variable_names import (PEP8VariableNames,
-                                                                          allow_underscores,
-                                                                          is_builtin_name,
-                                                                          is_lower_snake,
-                                                                          is_reserved_name,
-                                                                          is_reserved_with_trailing_underscore,
-                                                                          is_upper_camel)
+from pants.backend.python.tasks.variable_names import (PEP8VariableNames, allow_underscores,
+                                                       is_builtin_name, is_lower_snake,
+                                                       is_reserved_name,
+                                                       is_reserved_with_trailing_underscore,
+                                                       is_upper_camel)
 
 
 def test_allow_underscores():

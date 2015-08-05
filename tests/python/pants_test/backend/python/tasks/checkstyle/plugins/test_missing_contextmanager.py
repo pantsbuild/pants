@@ -6,8 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.checkstyle.plugins.missing_contextmanager import \
-  MissingContextManager
+from pants.backend.python.tasks.missing_contextmanager import MissingContextManager
 
 
 def test_missing_contextmanager():

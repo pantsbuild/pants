@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pep8
 
-from ..common import CheckstylePlugin, Nit, PythonFile
+from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit, PythonFile
 
 
 class PEP8Error(Nit):
