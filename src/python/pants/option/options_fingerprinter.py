@@ -9,14 +9,7 @@ import json
 from hashlib import sha1
 
 from pants.option.options import Options
-
-
-def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
-
-
-def stable_json_sha1(obj):
-  return sha1(stable_json_dumps(obj)).hexdigest()
+from pants.util.strutil import stable_json_sha1
 
 
 class OptionsFingerprinter(object):
@@ -42,10 +35,14 @@ class OptionsFingerprinter(object):
 
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
+    targets = sorted(self._build_graph.resolve_specs(specs))
+    hashes = (t.invalidation_hash() for t in targets)
+    real_hashes = [h for h in hashes if h is not None]
+    if not real_hashes:
+      return None
     hasher = sha1()
-    for spec in sorted(specs):
-      for target in sorted(self._build_graph.resolve(spec)):
-        hasher.update(target.compute_invalidation_hash())
+    for h in real_hashes:
+      hasher.update(h)
     return hasher.hexdigest()
 
   def _fingerprint_file(self, filepath):

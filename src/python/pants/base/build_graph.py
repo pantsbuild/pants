@@ -408,6 +408,13 @@ class BuildGraph(object):
     self.inject_address_closure(address)
     return self.transitive_subgraph_of_addresses([address])
 
+  def resolve_specs(self, specs):
+    """Returns an iterator over non-duplicate target(s) that the given specs point to."""
+    addresses = [SyntheticAddress.parse(spec) for spec in specs]
+    for address in addresses:
+      self.inject_address_closure(address)
+    return self.transitive_subgraph_of_addresses(addresses)
+
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected."""

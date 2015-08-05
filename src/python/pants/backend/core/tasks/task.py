@@ -199,14 +199,25 @@ class TaskBase(Optionable, AbstractClass):
     """
     return self._workdir
 
-  def _options_fingerprint(self, scope):
-    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+  def _combine_fingerprints(self, fingerprints):
+    """Returns None if fingerprints is empty, else a combined hash of all fingerprints."""
+    if not fingerprints:
+      return None
     hasher = sha1()
-    for (option_type, option_val) in pairs:
-      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-      if fp is not None:
-        hasher.update(fp)
+    for fp in fingerprints:
+      hasher.update(fp)
     return hasher.hexdigest()
+
+  def _options_fingerprint(self, scope):
+    """Returns a fingerprint of the task options for the given scope.
+
+    If all options have been set to None, _options_fingerprint returns None.
+    """
+    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+    fingerprints = (self._options_fingerprinter.fingerprint(option_type, option_val)
+                    for (option_type, option_val) in pairs)
+    real_fingerprints = [fp for fp in fingerprints if fp is not None]
+    return self._combine_fingerprints(real_fingerprints)
 
   @property
   def fingerprint(self):
@@ -214,17 +225,25 @@ class TaskBase(Optionable, AbstractClass):
 
     A task fingerprint is composed of the options the task is currently running under.
     Useful for invalidating unchanging targets being executed beneath changing task
-    options that affect outputted artifacts.
+    options that affect outputted artifacts. Returns None if all options have been
+    set to None.
 
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     if not self._fingerprint:
-      hasher = sha1()
-      hasher.update(self._options_fingerprint(self.options_scope))
+      real_fingerprints = []
+      def add_fingerprint(scope):
+        fp = self._options_fingerprint(scope)
+        if fp is not None:
+          real_fingerprints.append(fp)
+
+      add_fingerprint(self.options_scope)
       for subsystem in self.task_subsystems():
-        hasher.update(self._options_fingerprint(subsystem.subscope(self.options_scope)))
-        hasher.update(self._options_fingerprint(subsystem.options_scope))
-      self._fingerprint = str(hasher.hexdigest())
+        add_fingerprint(subsystem.subscope(self.options_scope))
+        add_fingerprint(subsystem.options_scope)
+
+      self._fingerprint = self._combine_fingerprints(real_fingerprints)
+
     return self._fingerprint
 
   def artifact_cache_reads_enabled(self):
