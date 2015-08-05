@@ -8,7 +8,7 @@ mox==0.5.3
 
 # Until https://github.com/pantsbuild/pex/issues/28 is addressed, we cannot
 # do pex<1.1.0.
-pex>=1.0.1,<1.0.999999
+pex>=1.0.2,<1.0.999999
 
 psutil==3.1.1
 lockfile==0.10.2
