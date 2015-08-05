@@ -124,20 +124,17 @@ class BuildFile(AbstractClass):
   def _walk(self, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk"""
 
-  @classmethod
-  def _isdir(cls, path):
+  @abstractmethod
+  def _isdir(self, path):
     """Returns True if path is a directory"""
-    raise NotImplementedError()
 
-  @classmethod
-  def _isfile(cls, path):
+  @abstractmethod
+  def _isfile(self, path):
     """Returns True if path is a file"""
-    raise NotImplementedError()
 
-  @classmethod
-  def _exists(cls, path):
+  @abstractmethod
+  def _exists(self, path):
     """Returns True if path exists"""
-    raise NotImplementedError()
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.

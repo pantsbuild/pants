@@ -48,14 +48,3 @@ class ScmBuildFileTest(BuildFileTestBase):
 
       buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
       self.assertEquals(OrderedSet(), OrderedSet(buildfile.siblings()))
-
-      buildfiles = ScmBuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
-
-      self.assertEquals(OrderedSet([
-        self.create_buildfile('grandparent/parent/BUILD'),
-        self.create_buildfile('grandparent/parent/BUILD.twitter'),
-        self.create_buildfile('grandparent/parent/child1/BUILD'),
-        self.create_buildfile('grandparent/parent/child1/BUILD.twitter'),
-        self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
-        self.create_buildfile('grandparent/parent/child5/BUILD'),
-      ]), buildfiles)
