@@ -116,7 +116,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy, ]
+    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy]
 
   def sources_generated_by_target(self, target):
     genfiles = []

@@ -479,9 +479,9 @@ class OptionsTest(unittest.TestCase):
 
     # Command line has precedence over config
     options = self._parse('./pants compile --a=99',
-                        config={
-                          'DEFAULT': {'a': 100},
-                          })
+                          config={
+                            'DEFAULT': {'a': 100},
+                            })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)

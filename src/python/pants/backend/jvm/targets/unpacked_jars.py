@@ -45,7 +45,7 @@ class UnpackedJars(ImportJarsMixin, Target):
 
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
-                                         .format(spec=self.address.spec))
+                                        .format(spec=self.address.spec))
 
   @property
   def imported_jar_library_specs(self):
