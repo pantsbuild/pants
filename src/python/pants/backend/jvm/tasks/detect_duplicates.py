@@ -102,7 +102,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   def _get_external_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
-    for basedir, externaljar in  self.list_external_jar_dependencies(binary_target):
+    for basedir, externaljar in self.list_external_jar_dependencies(binary_target):
       external_dep = os.path.join(basedir, externaljar)
       self.context.log.debug('  scanning {}'.format(external_dep))
       with open_zip(external_dep) as dep_zip:
@@ -137,4 +137,4 @@ class DuplicateDetector(JvmBinaryTask):
         self.context.log.warn('     {}'.format(duplicate_file))
       if len(dup_list) > self._max_dups:
         self.context.log.warn('     ... {remaining} more ...'
-                              .format(remaining=(len(dup_list)-self._max_dups)))
+                              .format(remaining=(len(dup_list) - self._max_dups)))

@@ -85,7 +85,7 @@ class BaseTest(unittest.TestCase):
                   spec='',
                   target_type=Target,
                   dependencies=None,
-                  resources = None,
+                  resources=None,
                   derived_from=None,
                   **kwargs):
     address = SyntheticAddress.parse(spec)

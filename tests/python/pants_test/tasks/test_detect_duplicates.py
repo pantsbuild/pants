@@ -60,13 +60,13 @@ class DuplicateDetectorTest(TaskTestBase):
           'com/twitter/Test.class': set([test_jar]),
           'com/twitter/commons/Duplicate.class': set([test_jar, jar_with_duplicates]),
           'org/apache/Unique.class': set([jar_with_duplicates]),
-          'cucumber/api/java/zh_cn/假如.class' : set([jar_with_unicode]),
+          'cucumber/api/java/zh_cn/假如.class': set([jar_with_unicode]),
       }
       self.path_without_duplicates = {
           'com/twitter/Test.class': set([test_jar]),
           'com/twitter/commons/Duplicate.class': set([test_jar]),
           'org/apache/Unique.class': set([jar_without_duplicates]),
-          'cucumber/api/java/zh_cn/假如.class' : set([jar_with_unicode]),
+          'cucumber/api/java/zh_cn/假如.class': set([jar_with_unicode]),
       }
 
   def tearDown(self):
@@ -75,7 +75,7 @@ class DuplicateDetectorTest(TaskTestBase):
   def test_duplicate_found(self):
     context = self.context(
       options={
-          self.options_scope: { 'fail_fast': False, 'excludes': [], 'max_dups' : 10 }
+          self.options_scope: {'fail_fast': False, 'excludes': [], 'max_dups': 10}
       }
     )
     task = self.create_task(context, workdir=None)
@@ -85,7 +85,7 @@ class DuplicateDetectorTest(TaskTestBase):
   def test_duplicate_not_found(self):
     context = self.context(
       options={
-          self.options_scope: { 'fail_fast': False, 'excludes': [], 'max_dups' : 10 }
+          self.options_scope: {'fail_fast': False, 'excludes': [], 'max_dups': 10}
       }
     )
     task = self.create_task(context, workdir=None)
@@ -95,7 +95,7 @@ class DuplicateDetectorTest(TaskTestBase):
   def test_fail_fast_error_raised(self):
     context = self.context(
       options={
-          self.options_scope: { 'fail_fast': True, 'excludes': [], 'max_dups' : 10 }
+          self.options_scope: {'fail_fast': True, 'excludes': [], 'max_dups': 10}
       }
     )
     task = self.create_task(context, workdir=None)

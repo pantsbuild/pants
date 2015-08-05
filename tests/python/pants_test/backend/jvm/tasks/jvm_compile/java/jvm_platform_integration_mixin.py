@@ -63,12 +63,12 @@ class JvmPlatformIntegrationMixin(object):
     while jar_name.endswith(':'):
       jar_name = jar_name[:-1]
     if ':' in jar_name:
-      jar_name = jar_name[jar_name.find(':')+1:]
+      jar_name = jar_name[jar_name.find(':') + 1:]
     with temporary_dir() as cache_dir:
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
-          ['binary',] + self.get_pants_compile_args()
+          ['binary'] + self.get_pants_compile_args()
           + ['--jvm-compile-strategy={}'.format(strategy), 'compile.checkstyle', '--skip', spec]
           + more_args,
           workdir, config)
@@ -128,7 +128,7 @@ class JvmPlatformIntegrationMixin(object):
                    target_level=target_level)))
       with open(os.path.join(tmpdir, '{}.java'.format(class_name)), 'w') as f:
         f.write(source_contents)
-      platforms=str({
+      platforms = str({
         str(target_level): {
           'source': str(target_level),
           'target': str(target_level),
@@ -209,7 +209,7 @@ class JvmPlatformIntegrationMixin(object):
                                               '--jvm-platform-default-platform={}'.format(platform),
                                               '--jvm-compile-strategy=isolated',
                                               '-ldebug',
-                                              'compile',] + self.get_pants_compile_args() +
+                                              'compile'] + self.get_pants_compile_args() +
                                               ['{}:diamond'.format(tmpdir)], workdir=workdir)
 
         # We shouldn't be able to compile this with -source=6.

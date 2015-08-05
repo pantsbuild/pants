@@ -22,6 +22,7 @@ from pants.fs.archive import ZIP
 
 logger = logging.getLogger(__name__)
 
+
 class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):

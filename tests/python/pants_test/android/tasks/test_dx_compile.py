@@ -18,7 +18,7 @@ from pants_test.android.test_android_base import TestAndroidBase, distribution
 class DxCompileTest(TestAndroidBase):
 
   JAVA_CLASSES_LOC = os.path.join(get_buildroot(), '.pants.d/compile/java/classes')
-  UNPACKED_LIBS_LOC = os.path.join(get_buildroot(),'.pants.d/unpack-jars/unpack-libs/explode-jars')
+  UNPACKED_LIBS_LOC = os.path.join(get_buildroot(), '.pants.d/unpack-jars/unpack-libs/explode-jars')
 
   @classmethod
   def task_type(cls):
@@ -270,7 +270,7 @@ class DxCompileTest(TestAndroidBase):
         self.set_options(sdk_path=dist)
         task = self.create_task(self.context())
         dx_jar = os.path.join(dist, 'build-tools', android_binary.build_tools_version, 'lib/dx.jar')
-        self.assertEqual(task.dx_jar_tool(android_binary.build_tools_version),dx_jar)
+        self.assertEqual(task.dx_jar_tool(android_binary.build_tools_version), dx_jar)
 
   def test_force_build_tools_version_dx_jar_tool(self):
     with distribution() as dist:
@@ -278,7 +278,7 @@ class DxCompileTest(TestAndroidBase):
         self.set_options(sdk_path=dist, build_tools_version='20.0.0')
         task = self.create_task(self.context())
         dx_jar = os.path.join(dist, 'build-tools', '20.0.0', 'lib/dx.jar')
-        self.assertEqual(task.dx_jar_tool(android_binary.build_tools_version),dx_jar)
+        self.assertEqual(task.dx_jar_tool(android_binary.build_tools_version), dx_jar)
 
   def test_is_dex_target(self):
     with self.android_library() as library:

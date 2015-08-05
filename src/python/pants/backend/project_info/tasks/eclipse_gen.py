@@ -21,7 +21,7 @@ _TEMPLATE_BASEDIR = os.path.join('templates', 'eclipse')
 
 
 _VERSIONS = {
-  '3.5': '3.7', # 3.5-3.7 are .project/.classpath compatible
+  '3.5': '3.7',  # 3.5-3.7 are .project/.classpath compatible
   '3.6': '3.7',
   '3.7': '3.7',
 }

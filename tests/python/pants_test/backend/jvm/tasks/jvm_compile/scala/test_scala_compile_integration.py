@@ -33,6 +33,7 @@ class ScalaCompileIntegrationTest(BaseCompileIT):
 
   def test_scala_shared_sources(self):
     clsname = 'SharedSources.class'
+
     def test(strategy, count):
       with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/sharedsources::',
                                 strategy,

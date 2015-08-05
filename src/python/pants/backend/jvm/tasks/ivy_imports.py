@@ -90,7 +90,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     cached_targets = set(targets) - set(invalid_targets)
     for import_jars_target in cached_targets:
       mapdir = self.mapjar_workdir(import_jars_target)
-      for root, _, files in  safe_walk(mapdir):
+      for root, _, files in safe_walk(mapdir):
         jarfiles = []
         for f in files:
           # We only expect ivy to touch this directory, so it should be just a directory with the
