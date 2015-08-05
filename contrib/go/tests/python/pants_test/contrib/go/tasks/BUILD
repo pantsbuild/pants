@@ -3,6 +3,10 @@ python_tests(
   sources=['test_go_workspace_task.py'],
   dependencies=[
     'tests/python/pants_test/tasks:task_test_base',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'contrib/go/src/python/pants/contrib/go/targets:go_library',
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
   ]
 )

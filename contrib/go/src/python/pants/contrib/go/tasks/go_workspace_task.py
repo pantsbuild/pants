@@ -29,6 +29,9 @@ class GoWorkspaceTask(GoTask):
     super(GoWorkspaceTask, cls).prepare(options, round_manager)
     round_manager.require_data('go_remote_lib_src')
 
+  def execute(self):
+    raise NotImplementedError
+
   def get_gopath(self, target):
     """Returns the $GOPATH for the given target."""
     return os.path.join(self.workdir, target.id)
@@ -54,7 +57,9 @@ class GoWorkspaceTask(GoTask):
   def remove_unused_links(dirpath, required_links):
     """Recursively remove any links in dirpath which are not contained in required_links.
 
-    All links in required_links must be absolute paths.
+    :param str dirpath: Absolute path of directory to search.
+    :param container required_links: Container of "in use" links which should not be removed,
+                                     where each link is an absolute path.
     """
     for root, dirs, files in os.walk(dirpath):
       for p in chain(dirs, files):
