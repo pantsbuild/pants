@@ -135,20 +135,20 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       # Binary file. Display it as hex, split into lines.
       n = 120  # Display lines of this max size.
       content = repr(content)[1:-1]  # Will escape non-printables etc, dropping surrounding quotes.
-      content = '\n'.join([content[i:i + n] for i in range(0, len(content), n)])
+      content = '\n'.join([content[i:i+n] for i in range(0, len(content), n)])
       prettify = False
       prettify_extra_langs = []
     else:
       prettify = True
       if self._settings.assets_dir:
         prettify_extra_dir = os.path.join(self._settings.assets_dir, 'js', 'prettify_extra_langs')
-        prettify_extra_langs = [{'name': x} for x in os.listdir(prettify_extra_dir)]
+        prettify_extra_langs = [ {'name': x} for x in os.listdir(prettify_extra_dir) ]
       else:
         # TODO: Find these from our package, somehow.
         prettify_extra_langs = []
     linenums = True
-    args = {'prettify_extra_langs': prettify_extra_langs, 'content': content,
-            'prettify': prettify, 'linenums': linenums}
+    args = { 'prettify_extra_langs': prettify_extra_langs, 'content': content,
+             'prettify': prettify, 'linenums': linenums }
     self._send_content(self._renderer.render_name('file_content', args), 'text/html')
 
   def _handle_assets(self, relpath, params):
@@ -217,8 +217,8 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     keyfunc = lambda x: datetime.fromtimestamp(float(x['timestamp']))
     sorted_run_infos = sorted(run_infos, key=keyfunc, reverse=True)
-    return [{'date_text': date_text(dt), 'run_infos': [x for x in infos]}
-             for dt, infos in itertools.groupby(sorted_run_infos, lambda x: keyfunc(x).date())]
+    return [ { 'date_text': date_text(dt), 'run_infos': [x for x in infos] }
+             for dt, infos in itertools.groupby(sorted_run_infos, lambda x: keyfunc(x).date()) ]
 
   def _get_run_info_dict(self, run_id):
     """Get the RunInfo for a run, as a dict."""
@@ -246,12 +246,12 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Show a directory listing."""
     relpath = os.path.relpath(abspath, self._root)
     breadcrumbs = self._create_breadcrumbs(relpath)
-    entries = [{'link_path': os.path.join(relpath, e), 'name': e} for e in os.listdir(abspath)]
+    entries = [ {'link_path': os.path.join(relpath, e), 'name': e} for e in os.listdir(abspath)]
     args = self._default_template_args('dir')
-    args.update({'root_parent': os.path.dirname(self._root),
-                 'breadcrumbs': breadcrumbs,
-                 'entries': entries,
-                 'params': params})
+    args.update({ 'root_parent': os.path.dirname(self._root),
+                  'breadcrumbs': breadcrumbs,
+                  'entries': entries,
+                  'params': params })
     self._send_content(self._renderer.render_name('base', args), 'text/html')
 
   def _serve_file(self, abspath, params):
@@ -262,9 +262,9 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     breadcrumbs = self._create_breadcrumbs(relpath)
     link_path = urlparse.urlunparse([None, None, relpath, None, urllib.urlencode(params), None])
     args = self._default_template_args('file')
-    args.update({'root_parent': os.path.dirname(self._root),
-                 'breadcrumbs': breadcrumbs,
-                 'link_path': link_path})
+    args.update({ 'root_parent': os.path.dirname(self._root),
+                  'breadcrumbs': breadcrumbs,
+                  'link_path': link_path })
     self._send_content(self._renderer.render_name('base', args), 'text/html')
 
   def _send_content(self, content, content_type, code=200):
@@ -305,8 +305,8 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       breadcrumbs = []
     else:
       path_parts = [os.path.basename(self._root)] + relpath.split(os.path.sep)
-      path_links = ['/'.join(path_parts[1:i + 1]) for i, name in enumerate(path_parts)]
-      breadcrumbs = [{'link_path': link_path, 'name': name}
+      path_links = ['/'.join(path_parts[1:i+1]) for i, name in enumerate(path_parts)]
+      breadcrumbs = [{'link_path': link_path, 'name': name }
                      for link_path, name in zip(path_links, path_parts)]
     return breadcrumbs
 
@@ -316,7 +316,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       template_name = pystache.render(text, args)
       return self._renderer.render_name(template_name, args)
     # Our base template calls include on the content_template.
-    ret = {'content_template': content_template}
+    ret = { 'content_template': content_template }
     ret['include'] = lambda text: include(text, ret)
     return ret
 

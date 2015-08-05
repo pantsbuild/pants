@@ -12,7 +12,7 @@ from pants.base.build_file import FilesystemBuildFile
 
 
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
-_PREFIX = r'(https?://)?/?'  # http://, https:// or / or nothing.
+_PREFIX = r'(https?://)?/?' # http://, https:// or / or nothing.
 _OPTIONAL_PORT = r'(:\d+)?'
 _REL_PATH_COMPONENT = r'(\w|[-.])+'  # One or more alphanumeric, underscore, dash or dot.
 _ABS_PATH_COMPONENT = r'/' + _REL_PATH_COMPONENT
@@ -27,8 +27,7 @@ _PATH = _PREFIX + _REL_PATH_COMPONENT + _OPTIONAL_PORT + _ABS_PATH_COMPONENTS + 
         _OPTIONAL_TARGET_SUFFIX + '\w'
 _PATH_RE = re.compile(_PATH)
 
-_NO_URL = "no url"  # Sentinel value for non-existent files in linkify's memo
-
+_NO_URL = "no url" # Sentinel value for non-existent files in linkify's memo
 
 def linkify(buildroot, s, memoized_urls):
   """Augment text by heuristically finding URL and file references and turning them into links.

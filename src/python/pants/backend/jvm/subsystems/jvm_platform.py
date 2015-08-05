@@ -33,7 +33,6 @@ class JvmPlatform(Subsystem):
 
   class UndefinedJvmPlatform(TaskError):
     """Platform isn't defined."""
-
     def __init__(self, target, platform_name, platforms_by_name):
       scope_name = JvmPlatform.options_scope
       messages = ['Undefined jvm platform "{}" (referenced by {}).'
@@ -70,7 +69,7 @@ class JvmPlatform(Subsystem):
   @memoized_property
   def platforms_by_name(self):
     platforms = self.get_options().platforms or {}
-    return {name: self._parse_platform(name, platform) for name, platform in platforms.items()}
+    return { name: self._parse_platform(name, platform) for name, platform in platforms.items() }
 
   @property
   def _fallback_platform(self):
@@ -133,7 +132,7 @@ class JvmPlatform(Subsystem):
     :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
     :rtype: Revision
     """
-    conversion = {str(i): '1.{}'.format(i) for i in cls.SUPPORTED_CONVERSION_VERSIONS}
+    conversion = { str(i): '1.{}'.format(i) for i in cls.SUPPORTED_CONVERSION_VERSIONS }
     if str(version) in conversion:
       return Revision.lenient(conversion[str(version)])
 

@@ -135,8 +135,8 @@ class NailgunClient(object):
 
   # For backwards compatibility with nails expecting the ng c client special env vars.
   ENV_DEFAULTS = dict(
-    NAILGUN_FILESEPARATOR=os.sep,
-    NAILGUN_PATHSEPARATOR=os.pathsep
+    NAILGUN_FILESEPARATOR = os.sep,
+    NAILGUN_PATHSEPARATOR = os.pathsep
   )
 
   def __init__(self,

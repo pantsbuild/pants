@@ -25,7 +25,6 @@ from pants.util.meta import AbstractClass
 
 logger = logging.getLogger(__name__)
 
-
 class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language."""
 
@@ -123,7 +122,7 @@ class SimpleCodegenTask(Task):
     :return: the list of types (classes, not instances) that extend from CodegenStrategy.
     :rtype: list
     """
-    return [cls.IsolatedCodegenStrategy, ]
+    return [cls.IsolatedCodegenStrategy,]
 
   @classmethod
   def forced_codegen_strategy(cls):
@@ -145,7 +144,7 @@ class SimpleCodegenTask(Task):
 
     This is generated from the supported_strategy_types list.
     """
-    return {strategy.name(): strategy for strategy in cls.supported_strategy_types()}
+    return { strategy.name() : strategy for strategy in cls.supported_strategy_types() }
 
   def _codegen_strategy_for_name(self, name):
     strategy_type_map = self._codegen_strategy_map()
@@ -404,7 +403,6 @@ class SimpleCodegenTask(Task):
 
     def _find_sources_generated_by_dependencies(self, target):
       sources = OrderedSet()
-
       def add_sources(dep):
         if dep is not target:
           dep_sources = self._find_sources_generated_by_target(dep)

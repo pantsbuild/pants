@@ -124,7 +124,6 @@ class OSSRHPublicationMetadata(PublicationMetadata):
 
   See: http://central.sonatype.org/pages/requirements.html#sufficient-metadata
   """
-
   def __init__(self, description, url, licenses, developers, scm, name=None):
     """All parameters are required except for `name` to pass OSSRH requirements.
 

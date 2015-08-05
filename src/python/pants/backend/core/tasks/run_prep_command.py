@@ -19,7 +19,6 @@ class RunPrepCommand(Task):
   def execute(self):
     targets = self.context.targets(postorder=True)
     Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])
-
     def make_cmdline(target):
       executable = target.payload.get_field_value('prep_command_executable')
       args = target.payload.get_field_value('prep_command_args', [])
@@ -56,7 +55,7 @@ class RunPrepCommand(Task):
             if not process.returncode:
               environment_vars = stdout.split('\0')
               for kvpair in environment_vars:
-                var, value = kvpair.split('=', 1)
+                var, value = kvpair.split('=',1)
                 os.environ[var] = value
           else:
             if workunit:

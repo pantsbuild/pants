@@ -31,7 +31,7 @@ class ProtobufParseTest(unittest.TestCase):
           '''))
         fd.close()
 
-        proto_parser = ProtobufParse(fd.name, filename)
+        proto_parser =  ProtobufParse(fd.name, filename)
         proto_parser.parse()
         self.assertEqual('org.pantsbuild.example.temperature', proto_parser.package)
         self.assertEqual(set(), proto_parser.enums)
@@ -50,7 +50,7 @@ class ProtobufParseTest(unittest.TestCase):
             message joe_bob {}
           '''))
         fd.close()
-        proto_parse_no_whitespace = ProtobufParse(fd.name, filename)
+        proto_parse_no_whitespace =  ProtobufParse(fd.name, filename)
         proto_parse_no_whitespace.parse()
         self.assertEqual('com.twitter.lean', proto_parse_no_whitespace.package)
         self.assertEqual(set(['Jake']), proto_parse_no_whitespace.enums)
@@ -70,12 +70,12 @@ class ProtobufParseTest(unittest.TestCase):
             }
           '''))
         fd.close()
-        proto_parse_with_whitespace = ProtobufParse(fd.name, filename)
+        proto_parse_with_whitespace =  ProtobufParse(fd.name, filename)
         proto_parse_with_whitespace.parse()
         self.assertEqual('com.twitter.lean', proto_parse_with_whitespace.package)
         self.assertEqual(set(['Jake']), proto_parse_with_whitespace.enums)
         self.assertEqual(set(['joe_bob']), proto_parse_with_whitespace.messages)
-        self.assertEqual('JackSpratt', proto_parse_with_whitespace.outer_class_name)
+        self.assertEqual('JackSpratt',proto_parse_with_whitespace.outer_class_name)
 
   def test_update_type_list(self):
     match = MESSAGE_PARSER.match('message Temperature {')
@@ -137,7 +137,7 @@ class ProtobufParseTest(unittest.TestCase):
             }
           '''))
         fd.close()
-        proto_parse = ProtobufParse(fd.name, filename)
+        proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
         self.assertEqual('org.pantsbuild.protos', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)
@@ -153,7 +153,7 @@ class ProtobufParseTest(unittest.TestCase):
         fd.write('package org.pantsbuild.protos; option java_multiple_files = true; message Foo {'
                  + ' enum Bar { BAZ = 0; } } message FooBar { }')
         fd.close()
-        proto_parse = ProtobufParse(fd.name, filename)
+        proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
         self.assertEqual('org.pantsbuild.protos', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)
@@ -169,7 +169,7 @@ class ProtobufParseTest(unittest.TestCase):
         fd.write('package org.pantsbuild.protos; message Foo {'
                  + 'enum Bar { BAZ = 0; } } message FooBar { }')
         fd.close()
-        proto_parse = ProtobufParse(fd.name, filename)
+        proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
         self.assertEqual('org.pantsbuild.protos', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)
@@ -184,11 +184,11 @@ class ProtobufParseTest(unittest.TestCase):
       with open(os.path.join(workdir, filename), 'w') as fd:
         fd.write('package org.pantsbuild.protos; option java_package = "com.example.foo.bar"; message Foo { }')
         fd.close()
-        proto_parse = ProtobufParse(fd.name, filename)
+        proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
         self.assertEqual('com.example.foo.bar', proto_parse.package)
         self.assertEqual(set(), proto_parse.enums)
-        self.assertEqual(set(['Foo', ]), proto_parse.messages)
+        self.assertEqual(set(['Foo',]), proto_parse.messages)
         self.assertEqual(set(), proto_parse.services)
         self.assertEqual('NoNewlineAtAll3', proto_parse.outer_class_name)
 
@@ -212,7 +212,7 @@ class ProtobufParseTest(unittest.TestCase):
             { }
           '''))
         fd.close()
-        proto_parse = ProtobufParse(fd.name, filename)
+        proto_parse =  ProtobufParse(fd.name, filename)
         proto_parse.parse()
         self.assertEqual('com.example.foo.bar', proto_parse.package)
         self.assertEqual(set(['Bar']), proto_parse.enums)

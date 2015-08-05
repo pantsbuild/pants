@@ -71,7 +71,7 @@ class BuildFileAddressMapper(object):
       slash = build.rfind('/')
       if slash < 0:
         return '', build
-      return build[:slash], build[slash + 1:]
+      return build[:slash], build[slash+1:]
 
     def are_siblings(a, b):  # Are the targets in the same directory?
       return path_parts(a)[0] == path_parts(b)[0]
@@ -95,7 +95,7 @@ class BuildFileAddressMapper(object):
 
     # Give different error messages depending on whether BUILD file was empty.
     if valid_specs:
-      one_of = ' one of' if len(valid_specs) > 1 else ''  # Handle plurality, just for UX.
+      one_of = ' one of' if len(valid_specs) > 1 else '' # Handle plurality, just for UX.
       raise self.AddressNotInBuildFile(
         '{target_name} was not found in BUILD file {build_file}. Perhaps you '
         'meant{one_of}: \n  {specs}'.format(target_name=wrong_target_name,

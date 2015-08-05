@@ -39,5 +39,5 @@ class TestBinaryCreate(JvmToolTaskTestBase):
         jvm_binary_products = context.products.get('jvm_binaries')
         self.assertIsNotNone(jvm_binary_products)
         product_data = jvm_binary_products.get(binary_target)
-        self.assertEquals({os.path.join(self.build_root, 'dist'): ['foo-binary.jar']},
+        self.assertEquals({os.path.join(self.build_root, 'dist') : ['foo-binary.jar']},
                           product_data)

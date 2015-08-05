@@ -106,7 +106,7 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
       'outdated org.name#lib1 1.0.0 latest 2.0.0',
       'up-to-date org.name#lib2 2.0.0',
       targets=[self.target('both')],
-      options={'print_uptodate': True}
+      options = { 'print_uptodate': True }
     )
 
   def test_outdated(self):

@@ -116,7 +116,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy, ]
+    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy,]
 
   def sources_generated_by_target(self, target):
     genfiles = []
@@ -184,7 +184,6 @@ class ProtobufGen(SimpleCodegenTask):
 
   def _calculate_sources(self, targets):
     gentargets = OrderedSet()
-
     def add_to_gentargets(target):
       if self.is_gentarget(target):
         gentargets.add(target)
@@ -282,10 +281,10 @@ def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
   :param Context.Log log: writes error messages to the console for conflicts
   """
   sources_by_genfile = {}
-  for base in sources_by_base.keys():  # Need to iterate over /original/ bases.
+  for base in sources_by_base.keys(): # Need to iterate over /original/ bases.
     for path in sources_by_base[base]:
       if not path in sources:
-        continue  # Check to make sure we haven't already removed it.
+        continue # Check to make sure we haven't already removed it.
       source = path[len(base):]
 
       genfiles = task.calculate_genfiles(path, source)
@@ -304,6 +303,6 @@ def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
                      '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
           log.warn('  Arbitrarily favoring proto 1.')
           if path in sources:
-            sources.remove(path)  # Favor the first version.
+            sources.remove(path) # Favor the first version.
           continue
         sources_by_genfile[genfile] = path

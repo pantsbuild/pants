@@ -15,14 +15,11 @@ from pants.option.scope import ScopeInfo
 def task(scope):
   return ScopeInfo(scope, ScopeInfo.TASK)
 
-
 def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
-
 def global_subsys(scope):
   return ScopeInfo(scope, ScopeInfo.GLOBAL_SUBSYSTEM)
-
 
 def task_subsys(scope):
   return ScopeInfo(scope, ScopeInfo.TASK_SUBSYSTEM)
@@ -195,5 +192,5 @@ class ArgSplitterTest(unittest.TestCase):
     # --version in a non-global scope is OK, and not a version request.
     self._split('./pants compile --version src/java/org/pantsbuild/foo',
                 ['compile'],
-                {'': [], 'compile': ['--version']},
+                { '': [], 'compile': ['--version'], },
                 ['src/java/org/pantsbuild/foo'])

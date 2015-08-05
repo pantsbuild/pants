@@ -95,7 +95,6 @@ class JvmTarget(Target, Jarable):
 
   def get_jar_dependencies(self):
     jar_deps = set()
-
     def collect_jar_deps(target):
       if isinstance(target, JarLibrary):
         jar_deps.update(target.payload.jars)

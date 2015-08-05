@@ -224,7 +224,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     """
     with temporary_dir() as realcachedir:
       with temporary_dir() as symlinkdir:
-        symlink_cache_dir = os.path.join(symlinkdir, 'symlinkedcache')
+        symlink_cache_dir=os.path.join(symlinkdir, 'symlinkedcache')
         os.symlink(realcachedir, symlink_cache_dir)
         self.set_options_for_scope('ivy', cache_dir=symlink_cache_dir)
 
