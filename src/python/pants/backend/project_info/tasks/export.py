@@ -65,7 +65,7 @@ class Export(ConsoleTask):
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
     """
-    return ':'.join(filter(partial(is_not, None), [jar.org, jar.name, jar.rev, jar.classifier]))
+    return ':'.join(filter(partial(is_not, None), [jar.org, jar.name, jar.rev]))
 
   @staticmethod
   def _exclude_id(jar):
@@ -222,16 +222,17 @@ class Export(ConsoleTask):
   def _resolve_jars_info(self):
     """Consults ivy_jar_products to export the external libraries.
 
-    :return: mapping of jar_id -> { 'default' : [ <jar_files> ],
-                                    'sources' : [ <jar_files> ],
-                                    'javadoc' : [ <jar_files> ],
+    :return: mapping of jar_id -> { 'default'     : <jar_file>,
+                                    'sources'     : <jar_file>,
+                                    'javadoc'     : <jar_file>,
+                                    <other_confs> : <jar_file>,
                                   }
     """
-    mapping = defaultdict(list)
+    mapping = defaultdict(dict)
     jar_data = self.context.products.get_data('ivy_jar_products')
-    jar_infos = get_jar_infos(ivy_products=jar_data, confs=['default', 'sources', 'javadoc'])
+    jar_infos = get_jar_infos(ivy_products=jar_data)
     for ivy_module_ref, conf_to_jarfile_map in jar_infos.iteritems():
-      mapping[self._jar_id(ivy_module_ref)] = conf_to_jarfile_map
+      mapping[self._jar_id(ivy_module_ref)].update(conf_to_jarfile_map)
     return mapping
 
   def _get_pants_target_alias(self, pants_target_type):

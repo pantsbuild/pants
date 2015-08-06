@@ -139,7 +139,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       )
       # Build the symlink_map product
       ivy_info = ivy_info_list[0]
-      jar_library_targets = [ t  for t in targets if isinstance(t, JarLibrary) ]
+      jar_library_targets = [ t for t in targets if isinstance(t, JarLibrary) ]
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
         for artifact_location in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):

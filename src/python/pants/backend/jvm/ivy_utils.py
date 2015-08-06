@@ -40,7 +40,7 @@ class IvyModuleRef(object):
     self.org = org
     self.name = name
     self.rev = rev
-    self.classifier = classifier
+    self.classifier = classifier or 'default'
 
   def __eq__(self, other):
     return self.org == other.org and \
@@ -157,7 +157,7 @@ class IvyInfo(object):
     ref = IvyModuleRef(jar.org, jar.name, jar.rev)
     def create_collection(dep):
       s = OrderedSet()
-      if ref != dep.unclassified:
+      if ref.unclassified != dep.unclassified:
         s.add(dep)
       return s
     return self.traverse_dependency_graph(ref, create_collection, memo)

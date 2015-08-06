@@ -102,9 +102,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
       unused_artifact = artifact_path('unused')
 
       # Because guava 16.0 was evicted, it has no artifacts
-      guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0', 'default'),
+      guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
                           None, [])
-      guava_1 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0.1', 'default'),
+      guava_1 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0.1'),
                           artifact_1, [])
       ivy_info.add_module(guava_0)
       ivy_info.add_module(guava_1)
@@ -113,17 +113,17 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
       # Because fake#dep 16.0 was evicted before it was resolved,
       # its deps are never examined, so we don't call add_module.
-      guava_dep_0 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.0', 'default'),
+      guava_dep_0 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.0'),
                               None, [guava_0.ref])
-      guava_dep_1 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.1', 'default'),
+      guava_dep_1 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.1'),
                               artifact_dep_1, [guava_1.ref])
 
       ivy_info.add_module(guava_dep_0)
       ivy_info.add_module(guava_dep_1)
 
       # Add an unrelated module to ensure that it's not returned
-      unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0', 'default')
-      unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0', 'default'),
+      unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0')
+      unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0'),
                             unused_artifact, [unrelated_parent])
       ivy_info.add_module(unrelated)
 

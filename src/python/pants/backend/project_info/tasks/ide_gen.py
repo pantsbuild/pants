@@ -300,7 +300,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
     jar_products = self.context.products.get_data('ivy_jar_products')
-    jar_paths = get_jar_infos(jar_products, confs=['default', 'sources', 'javadoc'])
+    jar_paths = get_jar_infos(jar_products)
     for entry in jar_paths.values():
       binary_jar  = self.copy_jar(entry.get('default'), external_jar_dir)
       sources_jar = self.copy_jar(entry.get('sources'), external_jar_dir)
