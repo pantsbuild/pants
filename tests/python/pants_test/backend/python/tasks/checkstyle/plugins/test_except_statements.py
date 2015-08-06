@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.except_statements import ExceptStatements
+from pants.backend.python.tasks.checkstyle.except_statements import ExceptStatements
 
 
 EXCEPT_TEMPLATE = """

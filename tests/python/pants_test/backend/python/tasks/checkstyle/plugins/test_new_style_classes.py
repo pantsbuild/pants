@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.new_style_classes import NewStyleClasses
+from pants.backend.python.tasks.checkstyle.new_style_classes import NewStyleClasses
 
 
 def test_new_style_classes():

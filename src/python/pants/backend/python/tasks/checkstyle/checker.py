@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.exceptions import TaskError
 
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
@@ -112,10 +113,12 @@ class PythonCheckStyleTask(PythonTask):
     sources = [src for src in sources if os.path.dirname(src) not in suppressions]
 
     should_fail = False
+    print()
     for filename in sources:
       should_fail |= self.parse_and_apply_filter(filename, severity)
 
-    return should_fail and self.options.fail
+    if should_fail and self.options.fail:
+      raise TaskError('Python Style issues found', exit_code=should_fail)
 
   def execute(self):
     targets = self.context.targets(self._is_checked)

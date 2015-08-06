@@ -47,13 +47,11 @@ class PyflakesChecker(CheckstylePlugin):
     for message in sorted(checker.messages, key=lambda msg: msg.lineno):
       yield FlakeError(self.python_file, message)
 
+
 class FlakeCheck(PythonCheckStyleTask):
   def __init__(self, *args, **kwargs):
-    print('>>>', args, kwargs)
-    print('\n'*5)
     super(FlakeCheck, self).__init__(*args, **kwargs)
-    # Need to create a partial so that FlakeError can be called properly with the flake_message
-    self._checker = FlakeError
+    self._checker = PyflakesChecker
     self._name = 'FlakeError'
 
   @classmethod

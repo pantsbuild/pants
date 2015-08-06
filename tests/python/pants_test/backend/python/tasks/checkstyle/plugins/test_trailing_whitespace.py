@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.trailing_whitespace import TrailingWhitespace
+from pants.backend.python.tasks.checkstyle.trailing_whitespace import TrailingWhitespace
 
 
 def test_exception_map():
