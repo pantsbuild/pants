@@ -15,10 +15,10 @@ import coverage
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import pushd
-from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class PythonTestBuilderTestBase(PythonTaskTest):
+class PythonTestBuilderTestBase(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return PytestRun

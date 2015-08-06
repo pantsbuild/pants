@@ -23,6 +23,7 @@ def _cautious_rmtree(root):
 
 class Invalidator(Task):
   """Invalidate the entire build."""
+
   def execute(self):
     build_invalidator_dir = os.path.join(self.get_options().pants_workdir, 'build_invalidator')
     _cautious_rmtree(build_invalidator_dir)
@@ -30,5 +31,6 @@ class Invalidator(Task):
 
 class Cleaner(Task):
   """Clean all current build products."""
+
   def execute(self):
     _cautious_rmtree(self.get_options().pants_workdir)

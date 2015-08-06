@@ -20,6 +20,7 @@ class RunInfo(object):
 
   Can only be appended to, never edited.
   """
+
   def __init__(self, info_file):
     self._info_file = info_file
     safe_mkdir_for(self._info_file)

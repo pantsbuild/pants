@@ -9,8 +9,7 @@ from collections import defaultdict
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatformSettings
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.base.revision import Revision
 from pants.util.memo import memoized_method
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -20,7 +19,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return JavaCompile
+    return JmakeCompile
 
   def _java(self, name, platform=None, deps=None, sources=None):
     return self.make_target(spec='java:{}'.format(name),
@@ -30,7 +29,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
                             sources=sources)
 
   def _platforms(self, *versions):
-    return { str(v): {'source': str(v)} for v in versions}
+    return {str(v): {'source': str(v)} for v in versions}
 
   @memoized_method
   def _version(self, version):
@@ -49,18 +48,15 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     if ordered:
       # Only works in global! Isolated doesn't need this ordering.
       task = self._task_setup(targets, strategy='global', **options)
-      task.validate_platform_dependencies(targets)
       return task._strategy.ordered_compile_settings_and_targets(targets)
-    task = self._task_setup(targets, **options)
-    task.validate_platform_dependencies(targets)
+    self._task_setup(targets, **options)
     settings_and_targets = defaultdict(set)
     for target in targets:
       settings_and_targets[target.platform].add(target)
     return settings_and_targets.items()
 
   def _partition(self, targets, **options):
-    task = self._task_setup(targets, **options)
-    task.validate_platform_dependencies(targets)
+    self._task_setup(targets, **options)
     partition = defaultdict(set)
     for target in targets:
       partition[target.platform.target_level].add(target)
@@ -74,8 +70,8 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
 
   def assert_partitions_equal(self, expected, received):
     # Convert to normal dicts and remove empty values.
-    expected = { key: set(val) for key, val in expected.items() if val }
-    received = { key: set(val) for key, val in received.items() if val }
+    expected = {key: set(val) for key, val in expected.items() if val}
+    received = {key: set(val) for key, val in received.items() if val}
     self.assertEqual(expected, received, 'Partitions are different!\n  expected: {}\n  received: {}'
                                         .format(self._format_partition(expected),
                                                 self._format_partition(received)))
@@ -92,14 +88,14 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     java8 = self._java('eight', '1.8')
     partition = self._partition([java6, java7, java8],
                                 platforms=self._platforms('1.6', '1.7', '1.8'))
-    expected = { self._version(java.payload.platform): {java}
-                 for java in (java6, java7, java8) }
+    expected = {self._version(java.payload.platform): {java}
+                for java in (java6, java7, java8)}
     self.assertEqual(3, len(partition))
     self.assert_partitions_equal(expected, partition)
 
   def test_java_version_aliases(self):
     expected = {}
-    for version in (6,7,8):
+    for version in (6, 7, 8):
       expected[Revision.lenient('1.{}'.format(version))] = {
         self._java('j1{}'.format(version), '1.{}'.format(version)),
         self._java('j{}'.format(version), '{}'.format(version)),
@@ -121,18 +117,6 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       self._version('1.7'): {java7},
       self._version('1.8'): {java8},
     }, partition)
-
-  def test_invalid_dependent_targets(self):
-    java7 = self._java('seven', '1.7')
-    java6 = self._java('six', '1.6', deps=[java7])
-    with self.assertRaises(JvmCompile.IllegalJavaTargetLevelDependency):
-      self._partition([java6, java7], platforms=self._platforms('1.6', '1.7'))
-
-  def test_invalid_dependent_targets_nonlexographic(self):
-    java7 = self._java('seven', '1.7')
-    java6 = self._java('six', '6', deps=[java7])
-    with self.assertRaises(JvmCompile.IllegalJavaTargetLevelDependency):
-      self._partition([java6, java7], platforms=self._platforms('6', '1.7'))
 
   def test_unspecified_default(self):
     java = self._java('unspecified', None)
@@ -188,7 +172,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     b = self._java('b', platform='1.6', deps=[a])
     c = self._java('c', platform='1.6')
     d = self._java('d', platform='1.7')
-    e = self._java('e', platform='1.7', deps=[b,c,d])
+    e = self._java('e', platform='1.7', deps=[b, c, d])
     f = self._java('f', platform='1.7', deps=[e])
     g = self._java('g', platform='1.8', deps=[f])
     h = self._java('h', platform='1.6')
@@ -211,14 +195,14 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       return '{}: ({})'.format(str(settings), ', '.join(sorted(t.address.spec for t in targets)))
 
     expected = [
-      (_settings('1.6'), {a,b,c,h}),
-      (_settings('1.7'), {d,e,f}),
-      (_settings('1.8'), {g,i}),
+      (_settings('1.6'), {a, b, c, h}),
+      (_settings('1.7'), {d, e, f}),
+      (_settings('1.8'), {g, i}),
       (_settings('1.8', ['-Xfoo:bar']), {j}),
       (_settings('1.8'), {k})
     ]
 
-    settings_and_targets = self._settings_and_targets([a,b,c,d,e,f,g,h,i,j,k],
+    settings_and_targets = self._settings_and_targets([a, b, c, d, e, f, g, h, i, j, k],
                                                       ordered=True,
                                                       platforms=platforms)
     received = [(settings, set(targets)) for settings, targets in settings_and_targets]

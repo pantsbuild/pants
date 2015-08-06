@@ -5,18 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import pytest
-
 from pants_test.backend.jvm.tasks.jvm_compile.java.jvm_platform_integration_mixin import \
   JvmPlatformIntegrationMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class JavaZincCompileJvmPlatformIntegrationTest(JvmPlatformIntegrationMixin,
-                                                PantsRunIntegrationTest):
-
+class ZincCompileJvmPlatformIntegrationTest(JvmPlatformIntegrationMixin,
+                                            PantsRunIntegrationTest):
   def get_pants_compile_args(self):
-    return ['--compile-zinc-java-enabled', 'compile.zinc-java']
+    return ['--no-compile-java-use-jmake', 'compile.zinc']
 
   def test_compile_stale_platform_settings(self):
-    super(JavaZincCompileJvmPlatformIntegrationTest, self).test_compile_stale_platform_settings()
+    super(ZincCompileJvmPlatformIntegrationTest, self).test_compile_stale_platform_settings()

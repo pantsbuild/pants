@@ -129,9 +129,6 @@ class CmdLineSpecParser(object):
       addresses = set()
       spec_path = spec[:-len('::')]
       spec_dir = normalize_spec_path(spec_path)
-      if not os.path.isdir(os.path.join(self._root_dir, spec_dir)):
-        raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
-                                .format(spec_dir))
       try:
         build_files = self._address_mapper.scan_buildfiles(self._root_dir, spec_dir,
                                                            spec_excludes=self._spec_excludes)

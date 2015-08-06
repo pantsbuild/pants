@@ -46,5 +46,5 @@ class TestBundleCreate(JvmToolTaskTestBase):
         products = context.products.get('jvm_bundles')
         self.assertIsNotNone(products)
         product_data = products.get(app_target)
-        self.assertEquals({os.path.join(self.build_root, 'dist') : ['FooApp-bundle']},
+        self.assertEquals({os.path.join(self.build_root, 'dist'): ['FooApp-bundle']},
                           product_data)

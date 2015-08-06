@@ -20,10 +20,10 @@ from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
-from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class PythonReplTest(PythonTaskTest):
+class PythonReplTest(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return PythonRepl

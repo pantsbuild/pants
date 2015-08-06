@@ -11,10 +11,10 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_eval import PythonEval
 from pants.base.source_root import SourceRoot
-from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class PythonEvalTest(PythonTaskTest):
+class PythonEvalTest(PythonTaskTestBase):
 
   @classmethod
   def task_type(cls):

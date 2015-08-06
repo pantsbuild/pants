@@ -130,6 +130,7 @@ class Export(ConsoleTask):
         ivy_info = ivy_info_list[0]
 
     ivy_jar_memo = {}
+
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target

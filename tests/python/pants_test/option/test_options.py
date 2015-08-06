@@ -127,16 +127,16 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('test').x)
 
     # Test action=append option.
-    options = self._parse('./pants', config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+    options = self._parse('./pants', config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99], options.for_global_scope().y)
 
     options = self._parse('./pants --y=5 --y=-6 --y=77',
-                          config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+                          config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
 
     # Test list-typed option.
     options = self._parse('./pants --listy=\'["c", "d"]\'',
-                          config={ 'DEFAULT': {'listy': ["a", "b"] }})
+                          config={'DEFAULT': {'listy': ["a", "b"]}})
     self.assertEqual(['c', 'd'], options.for_global_scope().listy)
 
     # Test dict-typed option.
@@ -238,9 +238,9 @@ class OptionsTest(unittest.TestCase):
 
     # Get defaults from config and environment.
     config = {
-      'DEFAULT': { 'num': '88' },
-      'compile': { 'num': '77' },
-      'compile.java': { 'num': '66' }
+      'DEFAULT': {'num': '88'},
+      'compile': {'num': '77'},
+      'compile.java': {'num': '66'}
     }
     options = self._parse('./pants compile.java -n22', config=config)
     self.assertEqual(88, options.for_global_scope().num)
@@ -283,8 +283,8 @@ class OptionsTest(unittest.TestCase):
     # The example from the design doc.
     # Get defaults from config and environment.
     config = {
-      'DEFAULT': { 'b': '99' },
-      'compile': { 'a': '88', 'c': '77' },
+      'DEFAULT': {'b': '99'},
+      'compile': {'a': '88', 'c': '77'},
     }
 
     env = {
@@ -460,52 +460,52 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    options=self._parse('./pants',
-                        config={
-                          'DEFAULT': {'a' : 100},
-                          'compile': {'a' : 99},
-                          })
+    options = self._parse('./pants',
+                          config={
+                            'DEFAULT': {'a': 100},
+                            'compile': {'a': 99},
+                            })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    options=self._parse('./pants',
-                        env={
-                          'PANTS_A': 100,
-                          'PANTS_COMPILE_A' : 99})
+    options = self._parse('./pants',
+                          env={
+                            'PANTS_A': 100,
+                            'PANTS_COMPILE_A': 99})
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over config
-    options=self._parse('./pants compile --a=99',
-                        config={
-                          'DEFAULT': {'a' : 100},
-                          })
+    options = self._parse('./pants compile --a=99',
+                          config={
+                            'DEFAULT': {'a': 100},
+                            })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over environment
-    options=self._parse('./pants compile --a=99',
-                        env={'PANTS_A':  100},)
+    options = self._parse('./pants compile --a=99',
+                          env={'PANTS_A': 100},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Env has precedence over config
-    options=self._parse('./pants ',
-                        config={
-                          'DEFAULT': {'a' : 100},
-                          },
-                        env={'PANTS_COMPILE_A':  99},)
+    options = self._parse('./pants ',
+                          config={
+                            'DEFAULT': {'a': 100},
+                            },
+                          env={'PANTS_COMPILE_A': 99},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope setting in then env
-    options=self._parse('./pants --a=100',
-                        env={'PANTS_COMPILE_A':  99},)
+    options = self._parse('./pants --a=100',
+                          env={'PANTS_COMPILE_A': 99},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -513,7 +513,7 @@ class OptionsTest(unittest.TestCase):
     # Command line global overrides the middle scope in config
     options = self._parse('./pants --a=100 ',
                           config={
-                            'compile': {'a' : 99},
+                            'compile': {'a': 99},
                             })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
@@ -522,9 +522,9 @@ class OptionsTest(unittest.TestCase):
     # Env global overrides the middle scope in config
     options = self._parse('./pants --a=100 ',
                           config={
-                            'compile': {'a' : 99},
+                            'compile': {'a': 99},
                             },
-                          env={'PANTS_A':  100},)
+                          env={'PANTS_A': 100},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -532,7 +532,7 @@ class OptionsTest(unittest.TestCase):
   def test_registration_arg_iter(self):
     options = self._parse('./pants',
                           config={
-                            'compile': {'a' : 99},
+                            'compile': {'a': 99},
                           })
 
     def get_registration_args(scope, name):

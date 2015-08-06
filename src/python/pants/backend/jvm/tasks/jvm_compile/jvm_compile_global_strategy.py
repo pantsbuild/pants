@@ -34,36 +34,36 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     """Error partitioning targets by jvm platform settings."""
 
   @classmethod
-  def register_options(cls, register, language, supports_concurrent_execution):
+  def register_options(cls, register, compile_task_name, supports_concurrent_execution):
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
-             help='Check for missing dependencies in {0} code. Reports actual dependencies A -> B '
+             help='Check for missing dependencies in code compiled with {0}. Reports actual dependencies A -> B '
                   'where there is no transitive BUILD file dependency path from A to B. If fatal, '
-                  'missing deps are treated as a build error.'.format(language))
+                  'missing deps are treated as a build error.'.format(compile_task_name))
 
     register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
-             help='Check for missing direct dependencies in {0} code. Reports actual dependencies '
+             help='Check for missing direct dependencies in code compiled with {0}. Reports actual dependencies '
                   'A -> B where there is no direct BUILD file dependency path from A to B. This is '
                   'a very strict check; In practice it is common to rely on transitive, indirect '
                   'dependencies, e.g., due to type inference or when the main target in a BUILD '
                   'file is modified to depend on other targets in the same BUILD file, as an '
                   'implementation detail. However it may still be useful to use this on '
-                  'occasion. '.format(language))
+                  'occasion. '.format(compile_task_name))
 
     register('--missing-deps-whitelist', type=Options.list,
              help="Don't report these targets even if they have missing deps.")
 
     register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
-             help='Check for declared dependencies in {0} code that are not needed. This is a very '
+             help='Check for declared dependencies in code compiled with {0} that are not needed. This is a very '
                   'strict check. For example, generated code will often legitimately have BUILD '
-                  'dependencies that are unused in practice.'.format(language))
+                  'dependencies that are unused in practice.'.format(compile_task_name))
 
     register('--changed-targets-heuristic-limit', type=int, default=0,
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name, sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                   language, sources_predicate)
+                                                   compile_task_name, sources_predicate)
 
     # Various working directories.
     # NB: These are grandfathered in with non-strategy-specific names, but to prevent
@@ -287,8 +287,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     sorted_targets = [target for target in sorted_targets if target in relevant_targets]
 
     if set(sorted_targets) != relevant_targets:
-      added = '\n  '.join(t.address.spec for t in (set(sorted_targets)-relevant_targets))
-      removed = '\n  '.join(t.address.spec for t in (set(relevant_targets)-sorted_targets))
+      added = '\n  '.join(t.address.spec for t in (set(sorted_targets) - relevant_targets))
+      removed = '\n  '.join(t.address.spec for t in (set(relevant_targets) - sorted_targets))
       raise self.InternalTargetPartitioningError(
         'Internal partitioning targets:\nSorted targets =/= original targets!\n'
         'Added:\n  {}\nRemoved:\n  {}'.format(added, removed)

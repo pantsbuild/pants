@@ -77,7 +77,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'welcome-0.0.1-SNAPSHOT.jar',
                          'welcome-0.0.1-SNAPSHOT.pom',
-                         'welcome-0.0.1-SNAPSHOT-sources.jar'],}
+                         'welcome-0.0.1-SNAPSHOT-sources.jar']}
     self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish:jvm-run-example-lib',
                       dict(unique_artifacts.items() + shared_artifacts('0.0.1-SNAPSHOT').items()),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties',
@@ -102,7 +102,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                         ['ivy-0.0.1-SNAPSHOT.xml',
                          'distance-0.0.1-SNAPSHOT.jar',
                          'distance-0.0.1-SNAPSHOT.pom',
-                         'distance-0.0.1-SNAPSHOT-sources.jar'],}
+                         'distance-0.0.1-SNAPSHOT-sources.jar']}
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/protobuf:protobuf-java',
                       unique_artifacts,
                       ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/publish.properties',
@@ -135,6 +135,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   #
   # Run through all the permutations of the config parameters for publish_extras.
   #
+
   def test_publish_extras_name_classifier(self):
     self.publish_extras_runner(extra_config=publish_extra_config({
                                 'override_name': '{target_provides_name}-extra_example',

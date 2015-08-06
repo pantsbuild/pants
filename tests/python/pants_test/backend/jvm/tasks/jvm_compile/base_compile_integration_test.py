@@ -54,8 +54,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
         'compile',
         '--compile-apt-strategy={}'.format(strategy),
         '--compile-java-strategy={}'.format(strategy),
-        '--compile-scala-strategy={}'.format(strategy),
-        '--compile-zinc-java-strategy={}'.format(strategy),
+        '--compile-zinc-strategy={}'.format(strategy),
         target,
       ] + (extra_args if extra_args else [])
     # Clean-all on the first iteration.

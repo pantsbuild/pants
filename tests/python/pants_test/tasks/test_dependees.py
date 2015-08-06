@@ -30,7 +30,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
 
   def assert_console_output(self, *args, **kwargs):
     # Ensure that the globally-registered spec_excludes option is set, as Dependees consults it.
-    options = { 'spec_excludes': [] }
+    options = {'spec_excludes': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options

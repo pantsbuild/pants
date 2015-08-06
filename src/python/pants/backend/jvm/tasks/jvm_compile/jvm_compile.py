@@ -31,12 +31,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   mentioned below under "Subclasses must implement".
   """
 
-  class IllegalJavaTargetLevelDependency(TaskError):
-    """A jvm target depends on another jvm target with a newer java target level.
-
-    E.g., a java_library targeted for Java 6 depends on a java_library targeted for java 7.
-    """
-
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
@@ -44,7 +38,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--jvm-options', type=Options.list,
+    register('--jvm-options', type=Options.list, default=[],
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append',
@@ -80,12 +74,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-    register('--validate-platform-dependencies', default=True, action='store_true',
-             advanced=True,
-             help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
-
-    JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
-    JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
+    JvmCompileGlobalStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
+    JvmCompileIsolatedStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
 
   @classmethod
   def product_types(cls):
@@ -114,7 +104,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   # Subclasses must implement.
   # --------------------------
-  _language = None
+  _name = None
   _file_suffix = None
   _supports_concurrent_execution = None
 
@@ -126,7 +116,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   @classmethod
   def name(cls):
-    return cls._language
+    return cls._name
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -155,6 +145,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def select(self, target):
     return target.has_sources(self._file_suffix)
+
+  def select_source(self, source_file_path):
+    """Source predicate for the strategy."""
+    return source_file_path.endswith(self._file_suffix)
 
   def create_analysis_tools(self):
     """Returns an AnalysisTools implementation.
@@ -231,8 +225,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
-                                          self._language,
-                                          lambda s: s.endswith(self._file_suffix))
+                                          self._name,
+                                          self.select_source)
 
   def _fingerprint_strategy(self):
     return TaskIdentityFingerprintStrategy(self)
@@ -251,46 +245,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def prepare_execute(self, chunks):
     targets_in_chunks = list(itertools.chain(*chunks))
 
-    if self.get_options().validate_platform_dependencies:
-      self.validate_platform_dependencies(targets_in_chunks)
-
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._fingerprint_strategy())
     self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
-
-  def validate_platform_dependencies(self, targets):
-    transitive_deps = defaultdict(set)
-
-    def is_invalid(target, dependency):
-      if isinstance(target, JvmTarget) and isinstance(dependency, JvmTarget):
-        return dependency.platform.target_level > target.platform.target_level
-      return False
-
-    def check(target):
-      if target.dependencies:
-        for dep in target.dependencies:
-          transitive_deps[target].add(dep)
-          transitive_deps[target].update(transitive_deps[dep])
-      if not isinstance(target, JvmTarget):
-        return
-      invalid_dependencies = [dep for dep in transitive_deps[target] if is_invalid(target, dep)]
-      if invalid_dependencies:
-        message = ('Dependencies cannot have a higher java target level than dependees!'
-                   '\n  {target} targeting "{platform_name}"\n  depends on:'
-                   '{dependencies}')
-        raise self.IllegalJavaTargetLevelDependency(message.format(
-          target=target.address.spec,
-          platform_name=target.platform.name,
-          dependencies=''.join('\n    {} targeting "{}"'.format(d.address.spec, d.platform.name)
-                               for d in invalid_dependencies)
-        ))
-
-    self.context.build_graph.walk_transitive_dependency_graph(
-      addresses=[t.address for t in targets],
-      work=check,
-      postorder=True,
-    )
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 import shutil
 import tempfile
@@ -140,8 +141,8 @@ class PythonTask(Task):
     # The process of building a pex modifies it further.
     pex_info = pex_info or PexInfo.default()
 
-    path = self._chroot_path(PythonSetup.global_instance(), interpreter, pex_info, targets,
-                             platforms, extra_requirements, executable_file_content)
+    path = self._chroot_path(interpreter, pex_info, targets, platforms, extra_requirements,
+                             executable_file_content)
     if not os.path.exists(path):
       path_tmp = path + '.tmp'
       self._build_chroot(path_tmp, interpreter, pex_info, targets, platforms,
@@ -152,7 +153,7 @@ class PythonTask(Task):
     # created when that pex was built.
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
-    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
     chroot = self.create_chroot(
       interpreter=interpreter,
       builder=builder,
@@ -177,7 +178,7 @@ class PythonTask(Task):
   def _build_chroot(self, path, interpreter, pex_info, targets, platforms,
                      extra_requirements=None, executable_file_content=None):
     """Create a PythonChroot with the specified args."""
-    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
     with self.context.new_workunit('chroot'):
       chroot = self.create_chroot(
         interpreter=interpreter,
@@ -196,8 +197,8 @@ class PythonTask(Task):
       builder.freeze()
     return chroot
 
-  def _chroot_path(self, python_setup, interpreter, pex_info, targets, platforms,
-                   extra_requirements, executable_file_content):
+  def _chroot_path(self, interpreter, pex_info, targets, platforms, extra_requirements,
+                   executable_file_content):
     """Pick a unique, well-known directory name for the chroot with the specified parameters.
 
     TODO: How many of these do we expect to have? Currently they are all under a single
@@ -205,13 +206,25 @@ class PythonTask(Task):
     entries well. GC'ing old chroots may be enough of a solution, assuming this is even a problem.
     """
     fingerprint_components = [str(interpreter.identity)]
+
     if pex_info:
-      fingerprint_components.append(pex_info.dump())
-    fingerprint_components.extend(filter(None, [t.payload.fingerprint() for t in targets]))
+      # TODO(John Sirois): When https://rbcommons.com/s/twitter/r/2517/ lands, leverage the dump
+      # **kwargs to sort keys or else find some other better way to get a stable fingerprint of
+      # PexInfo.
+      fingerprint_components.append(json.dumps(json.loads(pex_info.dump()), sort_keys=True))
+
+    fingerprint_components.extend(sorted(t.transitive_invalidation_hash() for t in set(targets)))
+
     if platforms:
-      fingerprint_components.extend(platforms)
+      fingerprint_components.extend(sorted(set(platforms)))
+
     if extra_requirements:
-      fingerprint_components.extend([r.cache_key() for r in extra_requirements])
+      # TODO(John Sirois): The extras should be uniqified before fingerprinting, but
+      # PythonRequirement arguably does not have a proper __eq__.  For now we lean on the cache_key
+      # of unique PythonRequirement being unique - which is probably good enough (the cache key is
+      # narrower than the full scope of PythonRequirement attributes at present, thus the hedge).
+      fingerprint_components.extend(sorted(set(r.cache_key() for r in extra_requirements)))
+
     if executable_file_content is not None:
       fingerprint_components.append(executable_file_content)
 

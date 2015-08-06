@@ -139,6 +139,7 @@ class IvyInfo(object):
     :rtype: list of str
     """
     artifacts = OrderedSet()
+
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
@@ -371,7 +372,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=maybe_list(confs), # Mustache doesn't like sets.
+        configurations=maybe_list(confs),  # Mustache doesn't like sets.
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)

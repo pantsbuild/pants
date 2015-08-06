@@ -110,7 +110,7 @@ class ScroogeGen(NailgunTask):
         try:
           dependencies.update(self.context.resolve(depspec))
         except AddressLookupError as e:
-          raise self.DepLookupError("{message}\n  referenced from [{section}] key: " \
+          raise self.DepLookupError("{message}\n  referenced from [{section}] key: "
                                     "gen->deps->{category} in pants.ini".format(
                                       message=e,
                                       section=_CONFIG_SECTION,
@@ -340,6 +340,7 @@ class ScroogeGen(NailgunTask):
 
     for target in filter(lambda t: isinstance(t, JavaThriftLibrary), targets):
       mycompilerconfig = compiler_config(target)
+
       def collect(dep):
         if mycompilerconfig != compiler_config(dep):
           mismatched_compiler_configs[target].add(dep)
