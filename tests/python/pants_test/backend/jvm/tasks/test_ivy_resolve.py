@@ -62,9 +62,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
     # due to an ivy eviction where the declared version loses to a transitive version.
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0',
-                               artifacts=[IvyArtifact('guava16.0', classifier='default')])
+                               artifacts=[IvyArtifact('guava16.0')])
     winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1',
-                               artifacts=[IvyArtifact('guava16.0.1', classifier='default')])
+                               artifacts=[IvyArtifact('guava16.0.1')])
     losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
     winning_lib = self.make_target('//:b', JarLibrary, jars=[winning_dep])
     # Confirm that the same artifact was added to each target.
