@@ -21,5 +21,5 @@ class ProjectIntegrationTest(PantsRunIntegrationTest):
       'test'
       '--compile-apt-strategy={}'.format(strategy),
       '--compile-java-strategy={}'.format(strategy),
-      '--compile-scala-strategy={}'.format(strategy),
+      '--compile-zinc-strategy={}'.format(strategy),
     ] + command + self._android_flags())
