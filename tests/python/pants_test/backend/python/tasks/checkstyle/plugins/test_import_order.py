@@ -9,7 +9,7 @@ import ast
 import textwrap
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
-from pants.backend.python.tasks.import_order import ImportOrder, ImportType
+from pants.backend.python.tasks.checkstyle.import_order import ImportOrder, ImportType
 
 
 def strip_newline(stmt):

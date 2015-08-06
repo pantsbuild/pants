@@ -17,7 +17,6 @@
 python_library(
   name = 'all',
   sources = rglobs('*.py'),
-  resources = globs('templates/python_eval/*.mustache'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
