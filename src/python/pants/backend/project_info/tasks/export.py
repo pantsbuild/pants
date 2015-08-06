@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 from collections import defaultdict
-from functools import partial
-from operator import is_not
 
 from twitter.common.collections import OrderedSet
 
@@ -65,7 +63,10 @@ class Export(ConsoleTask):
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
     """
-    return ':'.join(filter(partial(is_not, None), [jar.org, jar.name, jar.rev]))
+    if jar.rev:
+      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
+    else:
+      return '{0}:{1}'.format(jar.org, jar.name)
 
   @staticmethod
   def _exclude_id(jar):

@@ -40,7 +40,7 @@ class IvyModuleRef(object):
     self.org = org
     self.name = name
     self.rev = rev
-    self.classifier = classifier or 'default'
+    self.classifier = classifier
 
   def __eq__(self, other):
     return self.org == other.org and \

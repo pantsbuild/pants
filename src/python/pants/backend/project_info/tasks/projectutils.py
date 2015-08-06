@@ -16,17 +16,13 @@ def get_jar_infos(ivy_products):
   will never be present if 'default' isn't.
 
   :param ivy_products: ivy_jar_products data from a context
-  :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
-    left unspecified.
-  :returns mapping of IvyModuleRef --> {'default' : <jar_filenames>,
-                                        'sources' : <jar_filenames>,
-                                        'javadoc' : <jar_filenames>}
+  :returns mapping of unclassified IvyModuleRef --> mapping of <classifier> --> <jar_path>
   """
   classpath_maps = defaultdict(dict)
   if ivy_products:
-    for conf, info_group in ivy_products.items():
+    for _, info_group in ivy_products.items():
       for info in info_group:
         for module in info.modules_by_ref.values():
           if module.artifact:
-            classpath_maps[module.ref.unclassified][module.ref.classifier or conf] = module.artifact
+            classpath_maps[module.ref.unclassified][module.ref.classifier or 'default'] = module.artifact
   return classpath_maps
