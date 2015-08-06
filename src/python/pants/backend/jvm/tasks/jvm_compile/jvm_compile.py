@@ -38,7 +38,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--jvm-options', type=Options.list,
+    register('--jvm-options', type=Options.list, default=[],
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append',
