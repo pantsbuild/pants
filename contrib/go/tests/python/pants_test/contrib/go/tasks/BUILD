@@ -1,3 +1,28 @@
+target(
+  name='all',
+  dependencies=[
+    ':unit',
+    ':integration',
+  ]
+)
+
+target(
+  name='unit',
+  dependencies=[
+    ':go_workspace_task',
+    ':go_compile',
+  ]
+)
+
+target(
+  name='integration',
+  dependencies=[
+    ':go_compile_integration',
+    ':go_test_integration',
+    ':go_run_integration',
+  ]
+)
+
 python_tests(
   name='go_workspace_task',
   sources=['test_go_workspace_task.py'],
@@ -19,5 +44,30 @@ python_tests(
     'src/python/pants/util:dirutil',
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_compile',
+  ]
+)
+
+python_tests(
+  name='go_compile_integration',
+  sources=['test_go_compile_integration.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
+  name='go_test_integration',
+  sources=['test_go_test_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
+  name='go_run_integration',
+  sources=['test_go_run_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
   ]
 )

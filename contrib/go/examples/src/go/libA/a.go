@@ -1,8 +1,6 @@
 package libA
 
 import (
-  "github.com/fatih/set"
-
   "contrib/go/examples/src/go/libB"
   "contrib/go/examples/src/go/libC"
 )
@@ -16,8 +14,4 @@ func Speak() {
 
 func Add(a int, b int) int {
   return a + b
-}
-
-func SetSize(s *set.Set) int {
-  return s.Size()
 }

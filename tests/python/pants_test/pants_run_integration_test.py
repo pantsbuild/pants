@@ -9,7 +9,7 @@ import ConfigParser
 import os
 import subprocess
 import unittest
-from collections import namedtuple
+from collections import Counter, defaultdict, namedtuple
 from operator import eq, ne
 
 from pants.base.build_environment import get_buildroot
@@ -178,3 +178,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
+
+  def assert_contains_files(self, directory, expected_files, ignore_links=False):
+    found = Counter()
+    to_find = Counter(expected_files)
+    for root, _, files in os.walk(directory):
+      for f in files:
+        if f in to_find:
+          if ignore_links and os.path.islink(os.path.join(root, f)):
+            continue
+          found[f] += 1
+
+    def flatten2d(l):
+      return [e for sublist in l for e in sublist]
+
+    to_find.subtract(found)
+    not_found = flatten2d([[f] * c for f, c in to_find.items() if c > 0])
+    extras = flatten2d([[f] * c for f, c, in to_find.items() if c < 0])
+    self.assertEqual(not_found, [],
+                    'Failed to find the following files: {}'.format(not_found))
+    self.assertEqual(extras, [],
+                    'Found extra unexpected files: {}'.format(extras))
