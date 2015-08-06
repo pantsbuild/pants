@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
+from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
@@ -66,10 +66,10 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
   def test_nocache(self, strategy):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir,
-          JavaCompile.stable_name(),
+          JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
       good_artifact_dir = os.path.join(cache_dir,
-          JavaCompile.stable_name(),
+          JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
@@ -91,7 +91,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     # produces two different artifacts.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JavaCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
@@ -122,7 +122,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir,
-          JavaCompile.stable_name(),
+          JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 

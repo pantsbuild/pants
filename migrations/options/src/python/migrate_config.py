@@ -251,6 +251,10 @@ migrations = {
 
   ('gen.thrift', 'java'): None,  # Notes only one to many migration: see notes below.
   ('gen.thrift', 'python'): None,  # Notes only pure deletion migration: see notes below.
+
+  ('compile.zinc-java', 'enabled'): ('compile.java', 'use-jmake'),
+
+  ('compile.scala', 'args'): ('compile.zinc', 'args'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -343,6 +347,11 @@ notes = {
 
   ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
   ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
+
+  ('compile.zinc-java', 'enabled'): 'The enabled flag has moved from "enable zinc for java" '
+                                    'to "disable jmake for java", more precisely, instead of '
+                                    '--compile-zinc-java-enabled, use --no-compile-java-use-jmake',
+  ('compile.scala', 'args'): 'ALL `compile.scala` options have moved to `compile.zinc`.',
 }
 
 

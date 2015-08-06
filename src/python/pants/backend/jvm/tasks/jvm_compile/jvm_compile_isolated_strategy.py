@@ -25,17 +25,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
 
   @classmethod
-  def register_options(cls, register, language, supports_concurrent_execution):
+  def register_options(cls, register, compile_task_name, supports_concurrent_execution):
     if supports_concurrent_execution:
       register('--worker-count', type=int, default=1, advanced=True,
-               help='The number of concurrent workers to use compiling {lang} sources with the isolated'
-                    ' strategy.'.format(lang=language))
+               help='The number of concurrent workers to use compiling with {task} with the isolated'
+                    ' strategy.'.format(task=compile_task_name))
     register('--capture-log', action='store_true', default=False, advanced=True,
             help='Capture compilation output to per-target logs.')
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name, sources_predicate):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                     language, sources_predicate)
+                                                     compile_task_name, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
@@ -84,7 +84,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
 
-    with self.context.new_workunit('validate-{}-analysis'.format(self._language)):
+    with self.context.new_workunit('validate-{}-analysis'.format(self._compile_task_name)):
       for target in relevant_targets:
         cc = self.compile_context(target)
         safe_mkdir(cc.classes_dir)
@@ -92,7 +92,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         self.validate_analysis(cc.analysis_file)
 
     # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._language)) \
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._compile_task_name)) \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running

@@ -33,6 +33,8 @@ _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 class ZincCompile(JvmCompile):
   _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
 
+  _name = 'zinc'
+
   _supports_concurrent_execution = True
 
   @staticmethod
@@ -91,6 +93,12 @@ class ZincCompile(JvmCompile):
     cls.register_jvm_tool(register, 'sbt-interface', fingerprint=True)
 
     cls.register_jvm_tool(register, 'plugin-jars', default=[], fingerprint=True)
+
+  def select(self, target):
+    return target.has_sources('.java') or target.has_sources('.scala')
+
+  def select_source(self, source_file_path):
+    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
 
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
@@ -251,31 +259,3 @@ class ZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
-
-
-class ScalaZincCompile(ZincCompile):
-  _language = 'scala'
-  _file_suffix = '.scala'
-
-
-class JavaZincCompile(ZincCompile):
-  _language = 'java'
-  _file_suffix = '.java'
-
-  @classmethod
-  def get_args_default(cls, bootstrap_option_values):
-    return super(JavaZincCompile, cls).get_args_default(bootstrap_option_values) + ('-java-only',)
-
-  @classmethod
-  def name(cls):
-    # Use a different name from 'java' so options from JMake version won't interfere.
-    return "zinc-java"
-
-  @classmethod
-  def register_options(cls, register):
-    super(JavaZincCompile, cls).register_options(register)
-    register('--enabled', action='store_true', default=False,
-             help='Use zinc to compile Java targets')
-
-  def select(self, target):
-    return self.get_options().enabled and super(JavaZincCompile, self).select(target)

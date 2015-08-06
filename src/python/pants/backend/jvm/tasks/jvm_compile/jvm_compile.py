@@ -74,8 +74,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-    JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
-    JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
+    JvmCompileGlobalStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
+    JvmCompileIsolatedStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
 
   @classmethod
   def product_types(cls):
@@ -104,7 +104,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   # Subclasses must implement.
   # --------------------------
-  _language = None
+  _name = None
   _file_suffix = None
   _supports_concurrent_execution = None
 
@@ -116,7 +116,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   @classmethod
   def name(cls):
-    return cls._language
+    return cls._name
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -145,6 +145,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def select(self, target):
     return target.has_sources(self._file_suffix)
+
+  def select_source(self, source_file_path):
+    """Source predicate for the strategy."""
+    return source_file_path.endswith(self._file_suffix)
 
   def create_analysis_tools(self):
     """Returns an AnalysisTools implementation.
@@ -221,8 +225,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
-                                          self._language,
-                                          lambda s: s.endswith(self._file_suffix))
+                                          self._name,
+                                          self.select_source)
 
   def _fingerprint_strategy(self):
     return TaskIdentityFingerprintStrategy(self)
