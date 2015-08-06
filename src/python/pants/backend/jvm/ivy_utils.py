@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class IvyModuleRef(object):
-  
+
   def __init__(self, org, name, rev, classifier=None):
     self.org = org
     self.name = name

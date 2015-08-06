@@ -303,12 +303,17 @@ class IdeGen(JvmToolTaskMixin, Task):
     jar_paths = get_jar_infos(jar_products)
     for entry in jar_paths.values():
       binary_jar  = self.copy_jar(entry.get('default'), external_jar_dir)
-      sources_jar = self.copy_jar(entry.get('sources'), external_jar_dir)
-      javadoc_jar = self.copy_jar(entry.get('javadoc'), external_jar_dir)
+      sources_jar = self.copy_jar(entry.get('sources'), external_source_jar_dir)
+      javadoc_jar = self.copy_jar(entry.get('javadoc'), external_javadoc_jar_dir)
       if binary_jar:
         self._project.external_jars.add(ClasspathEntry(jar=binary_jar,
                                                        source_jar=sources_jar,
                                                        javadoc_jar=javadoc_jar))
+      # treat all other jars as binaries
+      for classifier, jar in entry.iteritems():
+        if classifier not in {'default', 'sources', 'javadoc'}:
+          binary_jar  = self.copy_jar(jar, external_jar_dir)
+          self._project.external_jars.add(ClasspathEntry(binary_jar))
 
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
