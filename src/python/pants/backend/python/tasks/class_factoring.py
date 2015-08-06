@@ -38,23 +38,12 @@ class ClassFactoring(CheckstylePlugin):
             node)
 
 
-class ClassFactoring(PythonCheckStyleTask):
+class ClassFactoringCheck(PythonCheckStyleTask):
   def __init__(self, *args, **kwargs):
-    super(ClassFactoring, self).__init__(*args, **kwargs)
-    self._checker = ClassFactoring()
+    super(ClassFactoringCheck, self).__init__(*args, **kwargs)
+    self._checker = ClassFactoring
     self._name = 'ClassFactoring'
 
   @classmethod
   def register_options(cls, register):
-    super(ClassFactoring, cls).register_options(register)
-    register('--args', action='append', help='Run with these extra args to main().')
-    register('--severity', default='COMMENT', type=str,
-             help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
-    register('--strict', default=False, action='store_true',
-             help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-    register('--suppress', type=str, default=None,
-             help='Takes a XML file where specific rules on specific files will be skipped.')
-    register('--fail', default=True, action='store_true',
-             help='Prevent test failure but still produce output for problems.')
+    super(ClassFactoringCheck, cls).register_options(register)

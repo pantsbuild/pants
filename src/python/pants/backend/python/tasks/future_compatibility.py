@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -28,8 +29,6 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 #
 # Class internals:
 #   __metaclass__
-
-
 
 
 class FutureCompatibility(CheckstylePlugin):
@@ -62,3 +61,13 @@ class FutureCompatibility(CheckstylePlugin):
           if name.id == '__metaclass__':
             yield self.warning('T605',
                 'This metaclass style is deprecated and gone entirely in Python 3.x.', name)
+
+class FutureCompatibilityCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(FutureCompatibilityCheck, self).__init__(*args, **kwargs)
+    self._checker = FutureCompatibility
+    self._name = 'FutureCompatibility'
+
+  @classmethod
+  def register_options(cls, register):
+    super(FutureCompatibilityCheck, cls).register_options(register)

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 from distutils import sysconfig
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -187,3 +188,14 @@ class ImportOrder(CheckstylePlugin):
           self.python_file.tree))
 
     return errors
+
+
+class ImportOrderCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(ImportOrderCheck, self).__init__(*args, **kwargs)
+    self._checker = ImportOrder
+    self._name = 'ImportOrder'
+
+  @classmethod
+  def register_options(cls, register):
+    super(ImportOrderCheck, cls).register_options(register)

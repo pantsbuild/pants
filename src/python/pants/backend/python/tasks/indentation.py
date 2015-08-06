@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import tokenize
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -31,3 +32,13 @@ class Indentation(CheckstylePlugin):
         indents.append(token_text)
       elif token_type is tokenize.DEDENT:
         indents.pop()
+
+class IndentationCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(IndentationCheck, self).__init__(*args, **kwargs)
+    self._checker = Indentation
+    self._name = 'Indentation'
+
+  @classmethod
+  def register_options(cls, register):
+    super(IndentationCheck, cls).register_options(register)

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -17,3 +18,13 @@ class NewStyleClasses(CheckstylePlugin):
     for class_def in self.iter_ast_types(ast.ClassDef):
       if not class_def.bases:
         yield self.error('T606', 'Classes must be new-style classes.', class_def)
+
+class NewStyleClassesCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(NewStyleClassesCheck, self).__init__(*args, **kwargs)
+    self._checker = NewStyleClasses
+    self._name = 'NewStyleClasses'
+
+  @classmethod
+  def register_options(cls, register):
+    super(NewStyleClassesCheck, cls).register_options(register)

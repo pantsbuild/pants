@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pyflakes.checker import Checker as FlakesChecker
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit
 
 
@@ -45,3 +46,16 @@ class PyflakesChecker(CheckstylePlugin):
     checker = FlakesChecker(self.python_file.tree, self.python_file.filename)
     for message in sorted(checker.messages, key=lambda msg: msg.lineno):
       yield FlakeError(self.python_file, message)
+
+class FlakeCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    print('>>>', args, kwargs)
+    print('\n'*5)
+    super(FlakeCheck, self).__init__(*args, **kwargs)
+    # Need to create a partial so that FlakeError can be called properly with the flake_message
+    self._checker = FlakeError
+    self._name = 'FlakeError'
+
+  @classmethod
+  def register_options(cls, register):
+    super(FlakeCheck, cls).register_options(register)
