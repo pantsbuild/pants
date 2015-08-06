@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -42,3 +43,14 @@ class Newlines(CheckstylePlugin):
         if subnode.lineno - node.lineno > 1 and previous_blank_lines != 1:
           yield self.error('T301', 'Expected 1 blank lines, found %d' % previous_blank_lines,
               subnode)
+
+
+class NewlinesCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(NewlinesCheck, self).__init__(*args, **kwargs)
+    self._checker = Newlines
+    self._name = 'Newlines'
+
+  @classmethod
+  def register_options(cls, register):
+    super(NewlinesCheck, cls).register_options(register)

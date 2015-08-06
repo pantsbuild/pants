@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import re
 import xml.etree.ElementTree as ET
 
@@ -41,6 +42,16 @@ class PythonCheckStyleTask(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonCheckStyleTask, cls).register_options(register)
+    register('--severity', default='COMMENT', type=str,
+             help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
+    register('--strict', default=False, action='store_true',
+             help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
+    register('--suppress', type=str, default=None,
+             help='Takes a XML file where specific rules on specific files will be skipped.')
+    register('--fail', default=True, action='store_true',
+             help='Prevent test failure but still produce output for problems.')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -89,22 +100,20 @@ class PythonCheckStyleTask(PythonTask):
     if self.options.skip:
       return
 
-    root = ET.parse(self.options.suppress).getroot() if self.options.suppress else []
+    # If the user specifies an invalid severity use comment
+    severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
 
-    severity = Nit.COMMENT
-    for number, name in Nit.SEVERITY.items():
-      if name == self.options.severity:
-        severity = number
+    # Update sources to strip out any suppressed files
+    root = ET.parse(self.options.suppress).getroot() if self.options.suppress else []
+    suppressions = {
+      child.attrib['files']: True for child in root
+      if child.attrib['checks'] == '.*' or self._name in child.attrib['checks'].split('|')
+      }
+    sources = [src for src in sources if os.path.dirname(src) not in suppressions]
 
     should_fail = False
     for filename in sources:
-      for child in root:
-        path, rules = (child.attrib['files'], child.attrib['checks'])
-        if filename == path or filename.startswith(path):
-          root.remove(child)  # improve performance  <<< I'm not sure this is safe, what if you have two files match the rule? >>>
-          plugins_to_skip = rules.split('|')
-          if not(rules == '.*' or self._name in plugins_to_skip):
-            should_fail |= self.parse_and_apply_filter(filename, severity)
+      should_fail |= self.parse_and_apply_filter(filename, severity)
 
     return should_fail and self.options.fail
 

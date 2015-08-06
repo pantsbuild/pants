@@ -12,6 +12,7 @@ from functools import wraps
 
 from twitter.common.lang import Compatibility
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -143,3 +144,13 @@ class PEP8VariableNames(CheckstylePlugin):
                   is_builtin_name(function_def.name),
                   is_reserved_with_trailing_underscore(function_def.name))):
         yield self.error('T002', 'Method names must be lower_snake_cased', function_def)
+
+class VariableNamesCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(VariableNamesCheck, self).__init__(*args, **kwargs)
+    self._checker = PEP8VariableNames
+    self._name = 'PEP8VariableNames'
+
+  @classmethod
+  def register_options(cls, register):
+    super(VariableNamesCheck, cls).register_options(register)

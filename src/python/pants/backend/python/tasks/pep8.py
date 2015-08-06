@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pep8
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit, PythonFile
 
 
@@ -78,3 +79,13 @@ class PEP8Checker(CheckstylePlugin):
   def nits(self):
     report = self.STYLE_GUIDE.check_files([self.python_file.filename])
     return report.twitter_errors
+
+class PEP8Check(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(PEP8Check, self).__init__(*args, **kwargs)
+    self._checker = PEP8Checker
+    self._name = 'PEP8'
+
+  @classmethod
+  def register_options(cls, register):
+    super(PEP8Check, cls).register_options(register)

@@ -9,6 +9,7 @@ import sys
 import tokenize
 from collections import defaultdict
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -53,3 +54,13 @@ class TrailingWhitespace(CheckstylePlugin):
       if line.rstrip().endswith('\\'):
         if not self.has_exception(line_number, len(line.rstrip()) - 1):
           yield self.error('T201', 'Line has trailing slashes.', line_number)
+
+class TrailingWhitespaceCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(TrailingWhitespaceCheck, self).__init__(*args, **kwargs)
+    self._checker = TrailingWhitespace
+    self._name = 'TrailingWhitespace'
+
+  @classmethod
+  def register_options(cls, register):
+    super(TrailingWhitespaceCheck, cls).register_options(register)

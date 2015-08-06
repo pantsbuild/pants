@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 import re
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -26,3 +27,13 @@ class PrintStatements(CheckstylePlugin):
       stripped_line = logical_line[print_offset + len('print'):]
       if not self.FUNCTIONY_EXPRESSION.match(stripped_line):
         yield self.error('T607', 'Print used as a statement.', print_stmt)
+
+class PrintStatementsCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(PrintStatementsCheck, self).__init__(*args, **kwargs)
+    self._checker = PrintStatements
+    self._name = 'PrintStatements'
+
+  @classmethod
+  def register_options(cls, register):
+    super(PrintStatementsCheck, cls).register_options(register)

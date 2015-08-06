@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 
 
@@ -32,3 +33,13 @@ class MissingContextManager(CheckstylePlugin):
       if isinstance(call.func, ast.Name) and call.func.id == 'open' and (
           call not in with_context_calls):
         yield self.warning('T802', 'open() calls should be made within a contextmanager.', call)
+
+class MissingContextManagerCheck(PythonCheckStyleTask):
+  def __init__(self, *args, **kwargs):
+    super(MissingContextManagerCheck, self).__init__(*args, **kwargs)
+    self._checker = MissingContextManager
+    self._name = 'ClassFactoring'
+
+  @classmethod
+  def register_options(cls, register):
+    super(MissingContextManagerCheck, cls).register_options(register)
