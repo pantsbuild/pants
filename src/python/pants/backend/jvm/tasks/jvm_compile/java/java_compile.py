@@ -42,7 +42,7 @@ _JMAKE_ERROR_CODES = {
 _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
 
-class JavaCompile(JvmCompile):
+class JmakeCompile(JvmCompile):
   _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False
@@ -70,8 +70,8 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(JavaCompile, cls).register_options(register)
-    register('--enabled', action='store_true', default=True, help='Use jmake to compile Java targets')
+    super(JmakeCompile, cls).register_options(register)
+    register('--use-jmake', action='store_true', default=True, help='Use jmake to compile Java targets')
     register('--source', advanced=True, fingerprint=True,
              help='Provide source compatibility with this release. Overrides the jvm platform '
                   'source.',
@@ -85,10 +85,10 @@ class JavaCompile(JvmCompile):
     cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
 
   def select(self, target):
-    return self.get_options().enabled and super(JavaCompile, self).select(target)
+    return self.get_options().use_jmake and super(JmakeCompile, self).select(target)
 
   def __init__(self, *args, **kwargs):
-    super(JavaCompile, self).__init__(*args, **kwargs)
+    super(JmakeCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
@@ -162,7 +162,7 @@ class JavaCompile(JvmCompile):
 
     args.extend(sources)
     result = self.runjava(classpath=jmake_classpath,
-                          main=JavaCompile._JMAKE_MAIN,
+                          main=JmakeCompile._JMAKE_MAIN,
                           jvm_options=jvm_options,
                           args=args,
                           workunit_name='jmake',

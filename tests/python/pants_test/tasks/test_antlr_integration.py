@@ -25,7 +25,7 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
 
   # Test that antlr3 and antlr4 generated java targets are cache-able.
   def test_compile_antlr_cached(self):
-    for enable_jmake in ['--compile-java-enabled', '--no-compile-java-enabled']:
+    for enable_jmake in ['--compile-java-use-jmake', '--no-compile-java-use-jmake']:
       # Use the same temporary workdir because generated target's name includes the workdir.
       # Use the same artifact_cache dir to share artifacts across two runs.
       with temporary_dir(root_dir=self.workdir_root()) as tmp_workdir:
