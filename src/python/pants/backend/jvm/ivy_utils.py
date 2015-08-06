@@ -150,14 +150,14 @@ class IvyInfo(object):
 
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar
-    :param jar an IvyModuleRef for a third party dependency.
+    :param jar an JarDependency for a third party dependency.
     :param memo see `traverse_dependency_graph`
     """
 
-    ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+    ref = IvyModuleRef(jar.org, jar.name, jar.rev, jar.classifier).unversioned
     def create_collection(dep):
       s = OrderedSet()
-      if ref.unclassified != dep.unclassified:
+      if ref != dep.unversioned:
         s.add(dep)
       return s
     return self.traverse_dependency_graph(ref, create_collection, memo)
