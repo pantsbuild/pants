@@ -19,6 +19,15 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
+# TODO(cgibb): Find a better home for this.
+def get_cmd_output(args, shell=False):
+    if shell:
+      args = ' '.join(args)
+    p = subprocess.Popen(args, shell=shell, stdout=subprocess.PIPE)
+    out, _ = p.communicate()
+    return out.strip()
+
+
 class GoTask(Task):
 
   @classmethod
@@ -45,6 +54,12 @@ class GoTask(Task):
   def is_go(target):
     return isinstance(target, (GoLocalSource, GoRemoteLibrary))
 
+  @staticmethod
+  def lookup_goos_goarch():
+    goos = get_cmd_output(['go', 'env', 'GOOS'])
+    goarch = get_cmd_output(['go', 'env', 'GOARCH'])
+    return goos + '_' + goarch
+
   def __init__(self, *args, **kwargs):
     super(GoTask, self).__init__(*args, **kwargs)
     self._goos_goarch = None
@@ -56,12 +71,7 @@ class GoTask(Task):
     Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
     """
     if self._goos_goarch is None:
-      def get_env_var(var):
-        p = subprocess.Popen(['go', 'env', var],
-                             stdout=subprocess.PIPE)
-        out, _ = p.communicate()
-        return out.strip()
-      self._goos_goarch = get_env_var('GOOS') + '_' + get_env_var('GOARCH')
+      self._goos_goarch = self.lookup_goos_goarch()
     return self._goos_goarch
 
   def global_import_id(self, go_remote_lib):

@@ -5,8 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+
+from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoCompileIntegrationTest(PantsRunIntegrationTest):
@@ -17,5 +21,12 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
               'contrib/go/examples/src/go/libA']
       pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
-      expected_files = ['libA.a', 'libB.a', 'libC.a', 'libD.a', 'libE.a']
-      self.assert_contains_files(workdir, expected_files, ignore_links=True)
+      # TODO(cgibb): Is it appropriate to be calling a GoTask static method from
+      # an integration test?
+      goos_goarch = GoTask.lookup_goos_goarch()
+      expected_files = set(['contrib.go.examples.src.go.{libname}.{libname}/'
+                            'pkg/{goos_goarch}/contrib/go/examples/src/go/{libname}.a'
+                            .format(libname=libname, goos_goarch=goos_goarch)
+                            for libname in ('libA', 'libB', 'libC', 'libD', 'libE')])
+      self.assert_contains_exact_files(os.path.join(workdir, 'compile', 'go'),
+                                       expected_files)
