@@ -51,6 +51,7 @@ python_tests(
   name='go_compile_integration',
   sources=['test_go_compile_integration.py'],
   dependencies=[
+    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ]

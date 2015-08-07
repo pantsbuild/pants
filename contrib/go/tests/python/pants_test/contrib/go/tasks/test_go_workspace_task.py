@@ -19,11 +19,18 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
+class MockGoWorkspaceTask(GoWorkspaceTask):
+  """Used to test instance methods of abstract class GoWorkspaceTask."""
+
+  def execute(self):
+    pass
+
+
 class GoWorkspaceTaskTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return GoWorkspaceTask
+    return MockGoWorkspaceTask
 
   def test_remove_unused_links(self):
     with temporary_dir() as d:
@@ -58,14 +65,14 @@ class GoWorkspaceTaskTest(TaskTestBase):
       ws_task = self.create_task(self.context())
       gopath = ws_task.get_gopath(go_lib)
 
-      def islinked(src):
+      def assert_is_linked(src):
         link = os.path.join(gopath, 'src', spec, src)
-        return (os.path.islink(link) and
-                (os.readlink(link) == os.path.join(self.build_root, spec, src)))
+        self.assertTrue(os.path.islink(link))
+        self.assertEqual(os.readlink(link), os.path.join(self.build_root, spec, src))
 
       ws_task._symlink_local_src(gopath, go_lib, set())
       for src in sources:
-        self.assertTrue(islinked(src))
+        assert_is_linked(src)
 
       # Sleep so that first round of linking has 1 second earlier mtime than future links.
       time.sleep(1)
@@ -77,12 +84,12 @@ class GoWorkspaceTaskTest(TaskTestBase):
 
       ws_task._symlink_local_src(gopath, go_lib, set())
       for src in chain(sources, ['w.go']):
-        self.assertTrue(islinked(src))
+        assert_is_linked(src)
 
       mtime = lambda src: os.lstat(os.path.join(gopath, 'src', spec, src)).st_mtime
       for src in sources:
         # Ensure none of the old links were overwritten.
-        self.assertTrue(mtime(src) <= mtime('w.go') - 1)
+        self.assertLessEqual(mtime(src), mtime('w.go') - 1)
 
   def test_symlink_remote_lib(self):
     with pushd(self.build_root):
@@ -102,5 +109,5 @@ class GoWorkspaceTaskTest(TaskTestBase):
         gopath = ws_task.get_gopath(go_remote_lib)
         ws_task._symlink_remote_lib(gopath, go_remote_lib, set())
         link = os.path.join(gopath, 'src', spec)
-        self.assertTrue(os.path.islink(link) and
-                        os.readlink(link) == os.path.join(d, spec))
+        self.assertTrue(os.path.islink(link))
+        self.assertEqual(os.readlink(link), os.path.join(d, spec))

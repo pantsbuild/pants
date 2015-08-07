@@ -20,7 +20,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import get_basedir, safe_mkdir, safe_open
 
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
-from pants.contrib.go.tasks.go_task import GoTask
+from pants.contrib.go.tasks.go_task import GoTask, get_cmd_output
 
 
 class GoFetch(GoTask):
@@ -38,7 +38,7 @@ class GoFetch(GoTask):
   def go_stdlib(self):
     if self._go_stdlib is None:
       args = ['go', 'list', 'std']
-      self._go_stdlib = set(self.get_cmd_output(args).split())
+      self._go_stdlib = set(get_cmd_output(args).split())
     return self._go_stdlib
 
   @property
@@ -148,5 +148,5 @@ class GoFetch(GoTask):
 
   def _get_remote_import_ids(self, pkg_dir):
     args = ['go', 'list', '-json', os.path.join(pkg_dir, '*.go')]
-    imports = json.loads(self.get_cmd_output(args, shell=True))['Imports']
+    imports = json.loads(get_cmd_output(args, shell=True))['Imports']
     return [imp for imp in imports if imp not in self.go_stdlib]

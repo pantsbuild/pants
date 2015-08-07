@@ -29,9 +29,6 @@ class GoWorkspaceTask(GoTask):
     super(GoWorkspaceTask, cls).prepare(options, round_manager)
     round_manager.require_data('go_remote_lib_src')
 
-  def execute(self):
-    raise NotImplementedError
-
   def get_gopath(self, target):
     """Returns the $GOPATH for the given target."""
     return os.path.join(self.workdir, target.id)

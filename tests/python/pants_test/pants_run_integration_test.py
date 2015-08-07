@@ -179,23 +179,25 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     assertion(value, pants_run.returncode, error_msg)
 
-  def assert_contains_files(self, directory, expected_files, ignore_links=False):
-    found = Counter()
-    to_find = Counter(expected_files)
+  def assert_contains_exact_files(self, directory, expected_files, ignore_links=True):
+    """Asserts that the only files which directory contains are expected_files.
+
+    :param str directory: Path to directory to search.
+    :param set expected_files: Set of filepaths relative to directory to search for.
+    :param bool ignore_links: Indicates to ignore any file links.
+    """
+    found = set()
     for root, _, files in os.walk(directory):
       for f in files:
-        if f in to_find:
-          if ignore_links and os.path.islink(os.path.join(root, f)):
-            continue
-          found[f] += 1
+        p = os.path.join(root, f)
+        if ignore_links and os.path.islink(p):
+          continue
+        found.add(os.path.relpath(p, directory))
+        # print(p)
 
-    def flatten2d(l):
-      return [e for sublist in l for e in sublist]
-
-    to_find.subtract(found)
-    not_found = flatten2d([[f] * c for f, c in to_find.items() if c > 0])
-    extras = flatten2d([[f] * c for f, c, in to_find.items() if c < 0])
-    self.assertEqual(not_found, [],
+    not_found = expected_files - found
+    extras = found - expected_files
+    self.assertEqual(len(not_found), 0,
                     'Failed to find the following files: {}'.format(not_found))
-    self.assertEqual(extras, [],
+    self.assertEqual(len(extras), 0,
                     'Found extra unexpected files: {}'.format(extras))

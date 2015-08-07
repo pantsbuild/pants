@@ -45,8 +45,8 @@ class GoCompileTest(TaskTestBase):
     self.go_compile._sync_binary_dep_links(a, a_gopath, lib_binary_map)
 
     b_link = os.path.join(a_gopath, 'pkg', b.address.spec)
-    self.assertTrue(os.path.islink(b_link)
-                    and os.readlink(b_link) == lib_binary_map[b])
+    self.assertTrue(os.path.islink(b_link))
+    self.assertEqual(os.readlink(b_link), lib_binary_map[b])
 
   def test_sync_binary_dep_links_removes_unused_links(self):
     b = self.make_target(spec='libB', target_type=GoLibrary)
@@ -84,4 +84,4 @@ class GoCompileTest(TaskTestBase):
 
     mtime = lambda t: os.lstat(os.path.join(os.path.join(a_gopath, 'pkg', t.address.spec))).st_mtime
     # Make sure c's link was untouched, while b's link was refreshed.
-    self.assertTrue(mtime(c) <= mtime(b) - 1)
+    self.assertLessEqual(mtime(c), mtime(b) - 1)
