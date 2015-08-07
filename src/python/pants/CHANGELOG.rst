@@ -1,6 +1,90 @@
 RELEASE HISTORY
 ===============
 
+0.0.41 (8/7/2025)
+-----------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+Configuration for specifying scala/java compilation using zinc has
+changed in this release.
+
+You may need to combine `[compile.zinc-java]` and `[compile.scala]`
+into the new section `[compile.zinc]`
+
+The `migrate_config` tool will help you migrate your pants.ini settings
+for this new release.  Download the pants source code and run:
+
+.. code::
+
+  ./pants run migrations/options/src/python:migrate_config --  <path to your pants.ini>
+
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade pex to 1.0.2.
+  `RB #2571 <https://rbcommons.com/s/twitter/r/2571>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Fix ApacheThriftGen chroot normalization scope.
+  `RB #2568 <https://rbcommons.com/s/twitter/r/2568>`_
+
+* Fix crasher when no jvm_options are set
+  `RB #2578 <https://rbcommons.com/s/twitter/r/2578>`_
+
+* Handle recursive globs with build-file-rev
+  `RB #2572 <https://rbcommons.com/s/twitter/r/2572>`_
+
+* Fixup PythonTask chroot caching.
+  `RB #2567 <https://rbcommons.com/s/twitter/r/2567>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add "omnivorous" ZincCompile to consume both java and scala sources
+  `RB #2561 <https://rbcommons.com/s/twitter/r/2561>`_
+
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Do fewer classpath calculations in `junit_run`.
+  `RB #2576 <https://rbcommons.com/s/twitter/r/2576>`_
+
+* fix misc ws issues
+  `RB #2564 <https://rbcommons.com/s/twitter/r/2564>`_
+  `RB #2557 <https://rbcommons.com/s/twitter/r/2557>`_
+
+* Resurrect the --[no-]lock global flag
+  `RB #2563 <https://rbcommons.com/s/twitter/r/2563>`_
+
+* Avoid caching volatile ~/.cache/pants/stats dir.
+  `RB #2574 <https://rbcommons.com/s/twitter/r/2574>`_
+
+* remove unused imports
+  `RB #2556 <https://rbcommons.com/s/twitter/r/2556>`_
+
+* Moved logic which validates jvm platform dependencies.
+  `RB #2565 <https://rbcommons.com/s/twitter/r/2565>`_
+
+* Bypass the pip cache when testing released sdists.
+  `RB #2555 <https://rbcommons.com/s/twitter/r/2555>`_
+
+* Add an affordance for 1 flag implying another.
+  `RB #2562 <https://rbcommons.com/s/twitter/r/2562>`_
+
+* Make artifact cache `max-entries-per-target` option name match its behaviour
+  `RB #2550 <https://rbcommons.com/s/twitter/r/2550>`_
+
+* Improve stats upload.
+  `RB #2554 <https://rbcommons.com/s/twitter/r/2554>`_
+
+
 0.0.40 (7/31/2015)
 -------------------
 
