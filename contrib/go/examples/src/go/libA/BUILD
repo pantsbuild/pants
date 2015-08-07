@@ -1,6 +1,8 @@
 go_library(
   name='libA',
   dependencies=[
+    'contrib/go/examples/3rdparty/go/github.com/fatih/set',
+    'contrib/go/examples/3rdparty/go/github.com/gorilla/mux',
     'contrib/go/examples/src/go/libB',
     'contrib/go/examples/src/go/libC',
   ]

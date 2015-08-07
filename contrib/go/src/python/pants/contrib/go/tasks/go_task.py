@@ -56,12 +56,9 @@ class GoTask(Task):
     Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
     """
     if self._goos_goarch is None:
-      def get_env_var(var):
-        p = subprocess.Popen(['go', 'env', var],
-                             stdout=subprocess.PIPE)
-        out, _ = p.communicate()
-        return out.strip()
-      self._goos_goarch = get_env_var('GOOS') + '_' + get_env_var('GOARCH')
+      goos = self.get_cmd_output(['go', 'env', 'GOOS'])
+      goarch = self.get_cmd_output(['go', 'env', 'GOARCH'])
+      self._goos_goarch = goos + '_' + goarch
     return self._goos_goarch
 
   def global_import_id(self, go_remote_lib):
@@ -98,3 +95,10 @@ class GoTask(Task):
     if retcode != 0:
       raise TaskError('`{}` exited non-zero ({})'
                       .format(' '.join(args), retcode))
+
+  def get_cmd_output(self, args, shell=False):
+    if shell:
+      args = ' '.join(args)
+    p = subprocess.Popen(args, shell=shell, stdout=subprocess.PIPE)
+    out, _ = p.communicate()
+    return out.strip()

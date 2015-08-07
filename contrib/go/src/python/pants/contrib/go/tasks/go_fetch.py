@@ -5,11 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 from collections import defaultdict
 from io import BytesIO
 
 import requests
+from pants.base.address import BuildFileAddress
+from pants.base.build_environment import get_buildroot
+from pants.base.build_file import FilesystemBuildFile
+from pants.base.build_graph import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import get_basedir, safe_mkdir, safe_open
@@ -25,19 +30,66 @@ class GoFetch(GoTask):
   def product_types(cls):
     return ['go_remote_lib_src']
 
+  def __init__(self, *args, **kwargs):
+    super(GoFetch, self).__init__(*args, **kwargs)
+    self._go_stdlib = None
+
+  @property
+  def go_stdlib(self):
+    if self._go_stdlib is None:
+      args = ['go', 'list', 'std']
+      self._go_stdlib = set(self.get_cmd_output(args).split())
+    return self._go_stdlib
+
   @property
   def cache_target_dirs(self):
     return True
 
   def execute(self):
     self.context.products.safe_create_data('go_remote_lib_src', lambda: defaultdict(str))
+    undeclared_deps = self._transitive_download_remote_libs(self.context.targets(self.is_remote_lib))
+    if undeclared_deps:
+      self._log_undeclared_deps(undeclared_deps)
+      raise TaskError('Failed to resolve transitive Go remote dependencies.')
 
-    with self.invalidated(self.context.targets(self.is_remote_lib)) as invalidation_check:
+  def _log_undeclared_deps(self, undeclared_deps):
+    for import_id, deps in undeclared_deps.items():
+      self.context.log.error('{import_id} has remote dependencies which require local declaration:'
+                             .format(import_id=import_id))
+      for dep_import_id, spec_path in deps:
+        self.context.log.error('\t--> {dep_import_id} (expected go_remote_library declaration '
+                               'at {spec_path})'.format(dep_import_id=dep_import_id,
+                                                        spec_path=spec_path))
+
+  def _transitive_download_remote_libs(self, go_remote_libs):
+    """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
+
+    Returns a dict<str, set<tuple<str, str>>>, which maps a global import id of a remote dep to a
+    set of unresolved remote dependencies, each dependency expressed as a tuple containing the
+    global import id of the dependency and the location of the expected BUILD file. If all
+    transitive dependencies were successfully resolved, returns and empty dict.
+
+    Downloads as many invalidated transitive dependencies as possible, and returns as many
+    undeclared dependencies as possible. However, because the dependencies of a remote library
+    can only be determined _after_ it has been downloaded, a transitive dependency of an undeclared
+    remote library will never be detected.
+
+    Because go_remote_libraries do not declare dependencies (rather, they are inferred), injects
+    all successfully resolved transitive dependencies into the build graph.
+    """
+    if not go_remote_libs:
+      return {}
+
+    resolved_remote_libs = []
+    undeclared_deps = defaultdict(set)
+
+    with self.invalidated(go_remote_libs) as invalidation_check:
       for vt in invalidation_check.all_vts:
         import_id = self.global_import_id(vt.target)
         dest_dir = os.path.join(vt.results_dir, import_id)
 
         if not vt.valid:
+          # Only download invalidated remote libraries.
           rev = vt.target.payload.get_field_value('rev')
           zip_url = vt.target.payload.get_field_value('zip_url').format(id=import_id, rev=rev)
           if not zip_url:
@@ -47,6 +99,31 @@ class GoFetch(GoTask):
 
         self.context.products.get_data('go_remote_lib_src')[vt.target] = dest_dir
 
+        remote_source_root = vt.target.target_base
+        for remote_import_id in self._get_remote_import_ids(dest_dir):
+          spec_path = os.path.join(remote_source_root, remote_import_id)
+          try:
+            build_file = FilesystemBuildFile(get_buildroot(), relpath=spec_path)
+          except FilesystemBuildFile.MissingBuildFileError:
+            undeclared_deps[import_id].add((remote_import_id, spec_path))
+            continue
+
+          address = BuildFileAddress(build_file)
+          self.context.build_graph.inject_address_closure(address)
+          self.context.build_graph.inject_dependency(vt.target.address, address)
+          resolved_remote_libs.append(self.context.build_graph.get_target(address))
+
+    trans_undeclared_deps = self._transitive_download_remote_libs(resolved_remote_libs)
+    self._absorb_dict(undeclared_deps, trans_undeclared_deps)
+
+    return undeclared_deps
+
+  @staticmethod
+  def _absorb_dict(main_dict, other_dict):
+    for k, v in other_dict.items():
+      if k not in main_dict:
+        main_dict[k] = v
+
   def _download_zip(self, zip_url, dest_dir):
     """Downloads a zip file at the given URL into the given directory.
 
@@ -55,6 +132,7 @@ class GoFetch(GoTask):
                          will be placed into, not including the zip directory itself.
     """
     # TODO(cgibb): Wrap with workunits, progress meters, checksums.
+    self.context.log.info('Downloading {}...'.format(zip_url))
     res = requests.get(zip_url)
     with open_zip(BytesIO(res.content)) as zfile:
       safe_mkdir(dest_dir)
@@ -67,3 +145,8 @@ class GoFetch(GoTask):
         f = safe_open(os.path.join(dest_dir, filename), 'w')
         f.write(zfile.read(info))
         f.close()
+
+  def _get_remote_import_ids(self, pkg_dir):
+    args = ['go', 'list', '-json', os.path.join(pkg_dir, '*.go')]
+    imports = json.loads(self.get_cmd_output(args, shell=True))['Imports']
+    return [imp for imp in imports if imp not in self.go_stdlib]
