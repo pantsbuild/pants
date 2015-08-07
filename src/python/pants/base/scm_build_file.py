@@ -86,7 +86,8 @@ class ScmBuildFile(BuildFile):
     Works like os.walk.
     """
     worktree = cls._scm_worktree()
-    scm_rootpath = os.path.relpath(root_dir, worktree)
+    scm_rootpath = os.path.relpath(os.path.realpath(root_dir), os.path.realpath(worktree))
+
     if root:
       relpath = os.path.join(scm_rootpath, root)
     else:
