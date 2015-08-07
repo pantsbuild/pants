@@ -135,13 +135,13 @@ class ApacheThriftGen(SimpleCodegenTask):
         if result != 0:
           raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
 
-        # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
-        # relocate the generated java sources to the root of the `work_dir` so that our base class
-        # maps them properly for source jars and the like.
-        gen_dir = os.path.join(work_dir, 'gen-java')
-        for path in os.listdir(gen_dir):
-          shutil.move(os.path.join(gen_dir, path), work_dir)
-        os.rmdir(gen_dir)
+    # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
+    # relocate the generated java sources to the root of the `work_dir` so that our base class
+    # maps them properly for source jars and the like.
+    gen_dir = os.path.join(work_dir, 'gen-java')
+    for path in os.listdir(gen_dir):
+      shutil.move(os.path.join(gen_dir, path), work_dir)
+    os.rmdir(gen_dir)
 
   def execute_codegen(self, invalid_targets):
     for target in invalid_targets:
