@@ -21,6 +21,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.binaries import binary_util
+from pants.fs.fs import safe_filename
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -257,28 +258,40 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     internal_jars = self.context.products.get('jars')
     internal_source_jars = self.context.products.get('source_jars')
+
+    def jarname(target):
+      """Creates a safe jar name based on the target artifact info"""
+      _, id_, _ = target.get_artifact_info()
+      # Cap jar names quite a bit lower than the standard fs limit of 255 characters since these
+      # artifacts will often be used outside pants and those uses may manipulate (expand) the jar
+      # filenames blindly.
+      return safe_filename(id_, '.jar', max_length=200)
+
+    def copy_jar(target, base, jars, dest):
+      """Copies the singleton jar list for the given target from base to dest."""
+      if len(jars) != 1:
+        raise IdeGen.Error('Unexpected mapping, multiple jars for %s: %s'
+                                  % (target, jars))
+      jar = jars[0]
+      if not base.startswith(self.get_options().pants_workdir):
+        raise TwitterIdeGen.Error('Internal {} jar was not located under the pants workdir: {}/{}'
+                                  % (target, base, jar))
+      rel_base = os.path.relpath(base, self.get_options().pants_workdir)
+      cp_jar = os.path.join(dest, rel_base, jarname(target))
+      safe_mkdir(os.path.dirname(cp_jar))
+      shutil.copy(os.path.join(base, jar), cp_jar)
+      return cp_jar
+
     for target in targets:
       mappings = internal_jars.get(target)
       if mappings:
         for base, jars in mappings.items():
-          if len(jars) != 1:
-            raise IdeGen.Error('Unexpected mapping, multiple jars for {}: {}'.format(target, jars))
-
-          jar = jars[0]
-          cp_jar = os.path.join(internal_jar_dir, jar)
-          shutil.copy(os.path.join(base, jar), cp_jar)
-
+          cp_jar = copy_jar(target, base, jars, internal_jar_dir)
           cp_source_jar = None
           mappings = internal_source_jars.get(target)
           if mappings:
             for base, jars in mappings.items():
-              if len(jars) != 1:
-                raise IdeGen.Error(
-                  'Unexpected mapping, multiple source jars for {}: {}'.format(target, jars)
-                )
-              jar = jars[0]
-              cp_source_jar = os.path.join(internal_source_jar_dir, jar)
-              shutil.copy(os.path.join(base, jar), cp_source_jar)
+              cp_jar = copy_jar(target, base, jars, internal_jar_dir)
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
