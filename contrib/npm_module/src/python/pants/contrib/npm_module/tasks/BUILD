@@ -1,0 +1,14 @@
+python_library(
+  name='tasks',
+  sources=globs('*.py'),
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'contrib/npm_module/src/python/pants/contrib/npm_module/binaries',
+    'contrib/npm_module/src/python/pants/contrib/npm_module/targets',
+    'src/python/pants/backend/core/targets:all',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)
