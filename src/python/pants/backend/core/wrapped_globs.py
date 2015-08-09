@@ -7,12 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import fnmatch
 import os
-from pants.util.memo import memoized_property
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.util.memo import memoized_property
+
 
 def globs_matches(path, patterns):
   return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)

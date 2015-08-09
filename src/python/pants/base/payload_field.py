@@ -11,8 +11,8 @@ from abc import abstractmethod
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
-from pants.backend.core import wrapped_globs
 
+from pants.backend.core import wrapped_globs
 from pants.base.build_environment import get_buildroot
 from pants.base.validation import assert_list
 from pants.util.meta import AbstractClass
