@@ -22,7 +22,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
 
@@ -49,7 +49,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                   'implementation detail. However it may still be useful to use this on '
                   'occasion. '.format(compile_task_name))
 
-    register('--missing-deps-whitelist', type=Options.list,
+    register('--missing-deps-whitelist', type=list_option,
              help="Don't report these targets even if they have missing deps.")
 
     register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',

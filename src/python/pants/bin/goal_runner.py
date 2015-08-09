@@ -26,8 +26,8 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
+from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
 from pants.reporting.invalidation_report import InvalidationReport
@@ -49,7 +49,7 @@ class SourceRootBootstrapper(Subsystem):
     super(SourceRootBootstrapper, cls).register_options(register)
     # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load
     # time.
-    register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
+    register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
              help='Initialize state by evaluating these buildfiles.')
 
   def bootstrap(self, address_mapper, build_file_parser):

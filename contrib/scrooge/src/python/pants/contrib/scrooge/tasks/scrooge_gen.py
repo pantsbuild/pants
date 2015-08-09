@@ -20,7 +20,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
-from pants.option.options import Options
+from pants.option.custom_types import dict_option, list_option
 from pants.util.dirutil import safe_mkdir, safe_open
 from twitter.common.collections import OrderedSet
 
@@ -61,12 +61,12 @@ class ScroogeGen(NailgunTask):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
     register('--strict', default=False, action='store_true', help='Enable strict compilation.')
-    register('--jvm-options', default=[], advanced=True, type=Options.list,
+    register('--jvm-options', default=[], advanced=True, type=list_option,
              help='Use these jvm options when running Scrooge.')
-    register('--service-deps', default={}, advanced=True, type=Options.dict,
+    register('--service-deps', default={}, advanced=True, type=dict_option,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain services.')
-    register('--structs-deps', default={}, advanced=True, type=Options.dict,
+    register('--structs-deps', default={}, advanced=True, type=dict_option,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain structs.')
     cls.register_jvm_tool(register, 'scrooge-gen')

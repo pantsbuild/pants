@@ -20,7 +20,7 @@ def _parse_error(s, msg):
   return ParseError('Error while parsing option value {0}: {1}'.format(s, msg))
 
 
-def dict_type(s):
+def dict_option(s):
   """An option of type 'dict'.
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
@@ -28,7 +28,7 @@ def dict_type(s):
   return _convert(s, (dict,))
 
 
-def list_type(s):
+def list_option(s):
   """An option of type 'list'.
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a
@@ -37,12 +37,12 @@ def list_type(s):
   return _convert(s, (list, tuple))
 
 
-def target_list_type(s):
-  """Same type as 'list_type', but indicates list contents are target specs."""
+def target_list_option(s):
+  """Same type as 'list_option', but indicates list contents are target specs."""
   return _convert(s, (list, tuple))
 
 
-def file_type(s):
+def file_option(s):
   """Same type as 'str', but indicates string represents a filepath."""
   if not os.path.isfile(s):
     raise ParseError('Options file "{filepath}" does not exist.'.format(filepath=s))

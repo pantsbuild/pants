@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 
 
 class ThriftLintError(Exception):
@@ -35,7 +35,7 @@ class ThriftLinter(NailgunTask):
     register('--strict-default', default=False, advanced=True, action='store_true',
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
-    register('--linter-args', default=[], advanced=True, type=Options.list,
+    register('--linter-args', default=[], advanced=True, type=list_option,
              help='Additional options passed to the linter.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')

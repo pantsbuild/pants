@@ -16,7 +16,7 @@ import six.moves.urllib.request as urllib_request
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
@@ -52,7 +52,7 @@ class BinaryUtil(object):
 
     @classmethod
     def register_options(cls, register):
-      register('--baseurls', type=Options.list, advanced=True,
+      register('--baseurls', type=list_option, advanced=True,
                default=['https://dl.bintray.com/pantsbuild/bin/build-support'],
                help='List of urls from which binary tools are downloaded.  Urls are searched in '
                     'order until the requested path is found.')
@@ -211,10 +211,10 @@ def safe_args(args,
   """
   max_args = max_args or options.max_subprocess_args
   if len(args) > max_args:
-    def create_argfile(fp):
-      fp.write(delimiter.join(args))
-      fp.close()
-      return [quoter(fp.name) if quoter else '@{}'.format(fp.name)]
+    def create_argfile(f):
+      f.write(delimiter.join(args))
+      f.close()
+      return [quoter(f.name) if quoter else '@{}'.format(f.name)]
 
     if argfile:
       try:

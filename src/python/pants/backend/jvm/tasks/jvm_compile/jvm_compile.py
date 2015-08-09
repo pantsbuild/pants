@@ -11,16 +11,14 @@ from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
-from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.goal.products import MultipleRootedProducts
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
 
 
@@ -38,14 +36,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--jvm-options', type=Options.list, default=[],
+    register('--jvm-options', type=list_option, default=[],
              help='Run the compiler with these JVM options.')
 
     register('--args', action='append',
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
-    register('--confs', type=Options.list, default=['default'],
+    register('--confs', type=list_option, default=['default'],
              help='Compile for these Ivy confs.')
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
@@ -167,7 +165,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     :param list args: Arguments to the compiler (such as jmake or zinc).
     :param list classpath: List of classpath entries.
     :param list sources: Source files.
-    :param str classess_output_dir: Where to put the compiled output.
+    :param str classes_output_dir: Where to put the compiled output.
     :param upstream_analysis:
     :param analysis_file: Where to write the compile analysis.
     :param log_file: Where to write logs.
@@ -324,7 +322,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                      log_file, settings)
 
   def check_artifact_cache(self, vts):
-    post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
+    post_process_cached_vts = lambda cvts: self._strategy.post_process_cached_vts(cvts)
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
 
   def _create_empty_products(self):

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.option.custom_types import dict_type, list_type
+from pants.option.custom_types import dict_option, list_option
 from pants.option.errors import ParseError
 
 
@@ -15,9 +15,9 @@ class CustomTypesTest(unittest.TestCase):
 
   def _do_test(self, expected_val, s):
     if isinstance(expected_val, dict):
-      val = dict_type(s)
+      val = dict_option(s)
     elif isinstance(expected_val, (list, tuple)):
-      val = list_type(s)
+      val = list_option(s)
     else:
       raise Exception('Expected value {0} is of unsupported type: {1}'.format(expected_val,
                                                                               type(expected_val)))

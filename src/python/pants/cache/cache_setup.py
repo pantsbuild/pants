@@ -16,7 +16,7 @@ from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import Pinger
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -48,11 +48,11 @@ class CacheSetup(Subsystem):
     register('--overwrite', action='store_true', recursive=True,
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
-    register('--read-from', type=Options.list, recursive=True,
+    register('--read-from', type=list_option, recursive=True,
              help='The URIs of artifact caches to read from. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')
-    register('--write-to', type=Options.list, recursive=True,
+    register('--write-to', type=list_option, recursive=True,
              help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')

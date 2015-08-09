@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.option.custom_types import dict_type, list_type
+from pants.option.custom_types import dict_option, list_option
 from pants.option.help_info_extracter import HelpInfoExtracter
 
 
@@ -32,8 +32,8 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {}, ['--foo=<str>'], ['--foo'])
     do_test(['--foo'], {'metavar': 'xx'}, ['--foo=xx'], ['--foo'])
     do_test(['--foo'], {'type': int}, ['--foo=<int>'], ['--foo'])
-    do_test(['--foo'], {'type': list_type}, ['--foo="[\'str1\',\'str2\',...]"'], ['--foo'])
-    do_test(['--foo'], {'type': dict_type}, ['--foo="{ \'key1\': val1,\'key2\': val2,...}"'],
+    do_test(['--foo'], {'type': list_option}, ['--foo="[\'str1\',\'str2\',...]"'], ['--foo'])
+    do_test(['--foo'], {'type': dict_option}, ['--foo="{ \'key1\': val1,\'key2\': val2,...}"'],
                                             ['--foo'])
     do_test(['--foo'], {'action': 'append'},
             ['--foo="[\'str1\',\'str2\',...]" (--foo="[\'str1\',\'str2\',...]") ...'], ['--foo'])

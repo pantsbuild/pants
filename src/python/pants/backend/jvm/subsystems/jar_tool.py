@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.base.workunit import WorkUnit
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -18,7 +18,7 @@ class JarTool(JvmToolMixin, Subsystem):
   def register_options(cls, register):
     super(JarTool, cls).register_options(register)
     # TODO: All jvm tools will need this option, so might as well have register_jvm_tool add it?
-    register('--jvm-options', advanced=True, type=Options.list, default=['-Xmx64M'],
+    register('--jvm-options', advanced=True, type=list_option, default=['-Xmx64M'],
              help='Run the jar tool with these JVM options.')
     cls.register_jvm_tool(register, 'jar-tool')
 
