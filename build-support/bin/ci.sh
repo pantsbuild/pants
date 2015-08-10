@@ -178,7 +178,17 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   banner "Running core python tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex --except-statement-skip \
+                --future-compatibility-skip \
+                --import-order-skip \
+                --indentation-skip \
+                --new-style-classes-skip \
+                --newlines-skip \
+                --pep8-skip \
+                --pyflakes-skip \
+                --trailing-whitespace-skip \
+                --variable-names-skip \
+                ${PANTS_ARGS[@]} test.pytest \
       --fail-slow \
       --coverage=paths:pants/ \
       --shard=${python_unit_shard} \
@@ -205,7 +215,17 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
+    ./pants.pex --except-statement-skip \
+                --future-compatibility-skip \
+                --import-order-skip \
+                --indentation-skip \
+                --new-style-classes-skip \
+                --newlines-skip \
+                --pep8-skip \
+                --pyflakes-skip \
+                --trailing-whitespace-skip \
+                --variable-names-skip \
+                ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
       $(./pants.pex list tests/python:: | \
           xargs ./pants.pex filter --filter-type=python_tests | \
           grep integration)

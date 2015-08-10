@@ -111,7 +111,7 @@ class PythonCheckStyleTask(PythonTask):
       return
 
     excluder = FileExcluder(self.options.suppress, self.context.log)
-    sources = [src for src in sources if excluder.should_include(src)]
+    sources = [src for src in sources if excluder.should_include(src, self._name)]
 
     should_fail = False
     print()
