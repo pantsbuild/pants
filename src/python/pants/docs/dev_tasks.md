@@ -38,7 +38,7 @@ Task Installation: Associate Task with Goal[s]
 
 Defining a Task is nice, but doesn't hook it up so users can get to it.
 *Install* a task to make it available to users. To do this, you register
-it with Pants, associating it with a goal. A plugin's `register.py`
+it with Pants, associating it with a goal. A [[plugin's|pants('src/python/pants/docs:howto_plugin')]]plugin's `register.py`
 registers goals in its `register_goals` function. Here's an excerpt from
 [Pants' own JVM
 backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/register.py):

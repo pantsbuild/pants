@@ -88,6 +88,7 @@ page(
   source='internals.md',
   links=[
     ':dev_tasks',
+    ':howto_plugin',
     'src/docs:first_concepts',
     'src/python/pants/docs:dev_tasks',
   ]
