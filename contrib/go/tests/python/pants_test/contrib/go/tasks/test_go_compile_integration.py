@@ -23,7 +23,11 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       # TODO(cgibb): Is it appropriate to be calling a GoTask static method from
       # an integration test?
-      goos_goarch = GoTask.lookup_goos_goarch()
+      try:
+        goos_goarch = GoTask.lookup_goos_goarch()
+      except OSError:
+        # Go isn't installed -- just stop the test here.
+        return
       expected_files = set('contrib.go.examples.src.go.{libname}.{libname}/'
                            'pkg/{goos_goarch}/contrib/go/examples/src/go/{libname}.a'
                            .format(libname=libname, goos_goarch=goos_goarch)
