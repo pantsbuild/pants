@@ -442,13 +442,13 @@ def check_config_file(path):
       value = value.strip()
       if value.startswith('['):
         try:
-          custom_types.list_type(value)
+          custom_types.list_option(value)
         except ParseError:
           print('Value of {key} in section {section} is not a valid '
                 'JSON list.'.format(key=green(key), section=section(sec)))
       elif value.startswith('{'):
         try:
-          custom_types.dict_type(value)
+          custom_types.dict_option(value)
         except ParseError:
           print('Value of {key} in section {section} is not a valid '
                 'JSON object.'.format(key=green(key), section=section(sec)))

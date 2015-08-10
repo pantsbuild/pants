@@ -22,7 +22,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.java import util
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)
-    register('--javadeps', type=Options.list, default=['//:wire-runtime'],
+    register('--javadeps', type=list_option, default=['//:wire-runtime'],
              help='Runtime dependencies for wire-using Java code.')
     cls.register_jvm_tool(register, 'wire-compiler')
 

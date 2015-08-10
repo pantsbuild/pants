@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.deprecated import PastRemovalVersionError
+from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
 from pants.option.errors import ParseError
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -36,7 +38,7 @@ class OptionsTest(unittest.TestCase):
 
   def _register(self, options):
     def register_global(*args, **kwargs):
-      options.register(Options.GLOBAL_SCOPE, *args, **kwargs)
+      options.register(GLOBAL_SCOPE, *args, **kwargs)
 
     register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True)
@@ -52,10 +54,10 @@ class OptionsTest(unittest.TestCase):
     register_global('--store-false-def-true-flag', action='store_false', default=True)
 
     # Custom types.
-    register_global('--dicty', type=Options.dict, default='{"a": "b"}')
-    register_global('--listy', type=Options.list, default='[1, 2, 3]')
-    register_global('--target_listy', type=Options.target_list, default=[':a', ':b'])
-    register_global('--filey', type=Options.file, default='default.txt')
+    register_global('--dicty', type=dict_option, default='{"a": "b"}')
+    register_global('--listy', type=list_option, default='[1, 2, 3]')
+    register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
+    register_global('--filey', type=file_option, default='default.txt')
 
     # For the design doc example test.
     register_global('--a', type=int, recursive=True)
@@ -381,8 +383,8 @@ class OptionsTest(unittest.TestCase):
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
       options = Options({}, FakeConfig({}), OptionsTest._known_scope_infos, "./pants")
-      options.register(Options.GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
-                              deprecated_hint='The semver for this option has already passed.')
+      options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
+                       deprecated_hint='The semver for this option has already passed.')
 
   @contextmanager
   def warnings_catcher(self):

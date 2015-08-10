@@ -28,9 +28,8 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options import Options
-from pants.option.ranked_value import RankedValue
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
@@ -170,11 +169,11 @@ class BaseTest(unittest.TestCase):
     # TODO: This sequence is a bit repetitive of the real registration sequence.
 
     # Register bootstrap options and grab their default values for use in subsequent registration.
-    GlobalOptionsRegistrar.register_bootstrap_options(register_func(Options.GLOBAL_SCOPE))
-    bootstrap_option_values = create_option_values(copy.copy(option_values[Options.GLOBAL_SCOPE]))
+    GlobalOptionsRegistrar.register_bootstrap_options(register_func(GLOBAL_SCOPE))
+    bootstrap_option_values = create_option_values(copy.copy(option_values[GLOBAL_SCOPE]))
 
     # Now register the full global scope options.
-    GlobalOptionsRegistrar.register_options(register_func(Options.GLOBAL_SCOPE))
+    GlobalOptionsRegistrar.register_options(register_func(GLOBAL_SCOPE))
 
     # Now register task and subsystem options for relevant tasks.
     for task_type in for_task_types:
@@ -207,7 +206,7 @@ class BaseTest(unittest.TestCase):
     # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
     # and therefore only have to inherit from our immediately enclosing scope.
     for scope in sorted(all_scopes):
-      if scope != Options.GLOBAL_SCOPE:
+      if scope != GLOBAL_SCOPE:
         enclosing_scope = scope.rpartition('.')[0]
         opts = option_values[scope]
         for key, val in option_values.get(enclosing_scope, {}).items():

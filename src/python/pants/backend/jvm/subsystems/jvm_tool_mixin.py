@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
-from pants.option.options import Options
+from pants.option.custom_types import target_list_option
 
 
 class JvmToolMixin(object):
@@ -45,7 +45,7 @@ class JvmToolMixin(object):
     """
     register('--{0}'.format(key),
              advanced=True,
-             type=Options.target_list,
+             type=target_list_option,
              default=['//:{0}'.format(key)] if default is None else default,
              help='Target specs for bootstrapping the {0} tool.'.format(key),
              fingerprint=fingerprint)
