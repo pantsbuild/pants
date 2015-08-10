@@ -10,7 +10,6 @@ import sys
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal
-from pants.option import custom_types
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
@@ -61,24 +60,6 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
-  GLOBAL_SCOPE = GLOBAL_SCOPE
-
-  # Custom option types. You can specify these with type= when registering options.
-
-  # A dict-typed option.
-  dict = staticmethod(custom_types.dict_type)
-
-  # A list-typed option. Note that this is different than an action='append' option:
-  # An append option will append the cmd-line values to the default. A list-typed option
-  # will replace the default with the cmd-line value.
-  list = staticmethod(custom_types.list_type)
-
-  # A list-typed option that indicates the list elements are target specs.
-  target_list = staticmethod(custom_types.target_list_type)
-
-  # A string-typed option that indicates the string is a filepath.
-  file = staticmethod(custom_types.file_type)
-
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.

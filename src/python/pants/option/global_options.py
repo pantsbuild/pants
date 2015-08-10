@@ -9,12 +9,13 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
-from pants.option.options import Options
 
 
 class GlobalOptionsRegistrar(Optionable):
-  options_scope = Options.GLOBAL_SCOPE
+  options_scope = GLOBAL_SCOPE
 
   @classmethod
   def register_bootstrap_options(cls, register):
@@ -31,8 +32,8 @@ class GlobalOptionsRegistrar(Optionable):
     status as "bootstrap options" is only pertinent during option registration.
     """
     buildroot = get_buildroot()
-    register('--plugins', advanced=True, type=Options.list, help='Load these plugins.')
-    register('--backend-packages', advanced=True, type=Options.list,
+    register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
+    register('--backend-packages', advanced=True, type=list_option,
              help='Load backends from these packages that are already on the path.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
