@@ -29,7 +29,7 @@ def register_goals():
   task(name='checkstyle', action=Checkstyle).install('compile')
   task(name='scalastyle', action=Scalastyle).install('compile')
 
-  task(name='style-class-factoring', action=ClassFactoringCheck).install('compile')
+  task(name='class-factoring', action=ClassFactoringCheck).install('compile')
   task(name='except-statement', action=ExceptStatementsCheck).install('compile')
   task(name='future-compatibility', action=FutureCompatibilityCheck).install('compile')
   task(name='import-order', action=ImportOrderCheck).install('compile')
