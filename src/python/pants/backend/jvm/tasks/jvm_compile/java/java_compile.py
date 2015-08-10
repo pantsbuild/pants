@@ -13,7 +13,7 @@ from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMake
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import relativize_paths, safe_mkdir
 
 
@@ -169,7 +169,7 @@ class JmakeCompile(JvmCompile):
                           jvm_options=jvm_options,
                           args=args,
                           workunit_name='jmake',
-                          workunit_labels=[WorkUnit.COMPILER])
+                          workunit_labels=[WorkUnitLabel.COMPILER])
     if result:
       default_message = 'Unexpected error - JMake returned {}'.format(result)
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))

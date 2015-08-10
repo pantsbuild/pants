@@ -26,7 +26,7 @@ from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_open
 
@@ -277,7 +277,7 @@ class MarkdownToHtml(Task):
         if not page.dependencies and page not in interior_nodes:
           roots.add(page)
 
-    with self.context.new_workunit(name='render', labels=[WorkUnit.MULTITOOL]):
+    with self.context.new_workunit(name='render', labels=[WorkUnitLabel.MULTITOOL]):
       plaingenmap = self.context.products.get('markdown_html')
       wikigenmap = self.context.products.get('wiki_html')
       show = []

@@ -20,7 +20,7 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
@@ -272,7 +272,7 @@ class _JUnitRunner(object):
             args=self._args + batch_tests + [u'-xmlreport'],
             workunit_factory=self._context.new_workunit,
             workunit_name='run',
-            workunit_labels=[WorkUnit.TEST],
+            workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
           ))
 

@@ -12,7 +12,7 @@ import subprocess
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
 
@@ -85,7 +85,7 @@ class AaptBuilder(AaptTask):
         # Priority for resources is left to right, so reverse the collection order (DFS preorder).
         args = self._render_args(binary, reversed(resource_dirs), dex_files)
         with self.context.new_workunit(name='apk-bundle',
-                                       labels=[WorkUnit.MULTITOOL]) as workunit:
+                                       labels=[WorkUnitLabel.MULTITOOL]) as workunit:
           returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                        stderr=workunit.output('stderr'))
           if returncode:

@@ -26,7 +26,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -120,7 +120,7 @@ class PytestRun(PythonTask):
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',
-                                     labels=[WorkUnit.TOOL, WorkUnit.TEST]) as workunit:
+                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         # pytest uses py.io.terminalwriter for output. That class detects the terminal
         # width and attempts to use all of it. However we capture and indent the console
         # output, leading to weird-looking line wraps. So we trick the detection code

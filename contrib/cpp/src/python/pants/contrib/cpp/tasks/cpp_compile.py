@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
@@ -50,7 +50,7 @@ class CppCompile(CppTask):
         for source in vt.target.sources_relative_to_buildroot():
           if is_cc(source):
             if not vt.valid:
-              with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.MULTITOOL]):
+              with self.context.new_workunit(name='cpp-compile', labels=[WorkUnitLabel.MULTITOOL]):
                 # TODO: Parallelise the compilation.
                 # TODO: Only recompile source files that have changed since the
                 #       object file was last written. Also use the output from
@@ -87,7 +87,7 @@ class CppCompile(CppTask):
     cmd.extend(self.get_options().cc_options)
 
     # TODO: submit_async_work with self.run_command, [(cmd)] as a Work object.
-    with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.COMPILER]) as workunit:
+    with self.context.new_workunit(name='cpp-compile', labels=[WorkUnitLabel.COMPILER]) as workunit:
       self.run_command(cmd, workunit)
 
     self.context.log.info('Built c++ object: {0}'.format(obj))

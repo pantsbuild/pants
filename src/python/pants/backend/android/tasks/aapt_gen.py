@@ -18,7 +18,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
 
@@ -130,7 +130,7 @@ class AaptGen(AaptTask):
 
             # Priority for resources is left->right, so reverse collection order (DFS preorder).
             args = self._render_args(binary, gen.manifest, reversed(resource_dirs))
-            with self.context.new_workunit(name='aaptgen', labels=[WorkUnit.MULTITOOL]) as workunit:
+            with self.context.new_workunit(name='aaptgen', labels=[WorkUnitLabel.MULTITOOL]) as workunit:
               returncode = subprocess.call(args,
                                            stdout=workunit.output('stdout'),
                                            stderr=workunit.output('stderr'))

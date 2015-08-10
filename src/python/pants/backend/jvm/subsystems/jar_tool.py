@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
@@ -29,4 +29,4 @@ class JarTool(JvmToolMixin, Subsystem):
                    jvm_options=self.get_options().jvm_options,
                    args=args,
                    workunit_name='jar-tool',
-                   workunit_labels=[WorkUnit.TOOL, WorkUnit.JVM, WorkUnit.NAILGUN])
+                   workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.JVM, WorkUnitLabel.NAILGUN])

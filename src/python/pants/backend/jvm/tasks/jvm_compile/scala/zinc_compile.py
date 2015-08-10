@@ -18,7 +18,7 @@ from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincA
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.shader import Shader
 from pants.option.custom_types import dict_option
@@ -251,7 +251,7 @@ class ZincCompile(JvmCompile):
                     jvm_options=jvm_options,
                     args=zinc_args,
                     workunit_name='zinc',
-                    workunit_labels=[WorkUnit.COMPILER]):
+                    workunit_labels=[WorkUnitLabel.COMPILER]):
       raise TaskError('Zinc compile failed.')
 
   def log_zinc_file(self, analysis_file):

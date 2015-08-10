@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
@@ -35,7 +35,7 @@ class CppBinaryCreate(CppTask):
     return True
 
   def execute(self):
-    with self.context.new_workunit(name='cpp-binary', labels=[WorkUnit.TASK]):
+    with self.context.new_workunit(name='cpp-binary', labels=[WorkUnitLabel.TASK]):
       targets = self.context.targets(self.is_binary)
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
         binary_mapping = self.context.products.get('exe')
@@ -85,5 +85,5 @@ class CppBinaryCreate(CppTask):
     if self.get_options().ld_options != None:
       cmd.extend(('-Wl,{0}'.format(o) for o in self.get_options().ld_options.split(' ')))
 
-    with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]) as workunit:
+    with self.context.new_workunit(name='cpp-link', labels=[WorkUnitLabel.COMPILER]) as workunit:
       self.run_command(cmd, workunit)

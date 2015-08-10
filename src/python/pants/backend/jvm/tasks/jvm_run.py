@@ -11,7 +11,7 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.fs.fs import expand_path
 from pants.java.executor import CommandLineGrabber
 from pants.java.util import execute_java
@@ -102,7 +102,7 @@ class JvmRun(JvmTask):
         args=self.args,
         workunit_factory=self.context.new_workunit,
         workunit_name='run',
-        workunit_labels=[WorkUnit.RUN],
+        workunit_labels=[WorkUnitLabel.RUN],
         cwd=working_dir,
       )
 

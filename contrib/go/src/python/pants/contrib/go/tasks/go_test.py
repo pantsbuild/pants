@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
@@ -46,4 +46,4 @@ class GoTest(GoWorkspaceTask):
             + self.get_passthru_args())
     self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
                                 workunit_factory=self.context.new_workunit,
-                                workunit_labels=[WorkUnit.TEST])
+                                workunit_labels=[WorkUnitLabel.TEST])

@@ -18,7 +18,7 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import list_option
 from pants.util.dirutil import safe_mkdir
@@ -127,7 +127,7 @@ class ApacheThriftGen(SimpleCodegenTask):
       cmd = target_cmd[:]
       cmd.append(os.path.join(get_buildroot(), source))
       with self.context.new_workunit(name=source,
-                                     labels=[WorkUnit.TOOL],
+                                     labels=[WorkUnitLabel.TOOL],
                                      cmd=' '.join(cmd)) as workunit:
         result = subprocess.call(cmd,
                                  stdout=workunit.output('stdout'),
