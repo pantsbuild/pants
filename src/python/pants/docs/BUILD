@@ -25,6 +25,10 @@ page(
 page(
   name='dev_tasks',
   source='dev_tasks.md',
+  links=[
+    ':howto_plugin',
+    'src/docs:invoking',
+  ],
 )
 
 page(
@@ -88,7 +92,6 @@ page(
   source='internals.md',
   links=[
     ':dev_tasks',
-    ':howto_plugin',
     'src/docs:first_concepts',
     'src/python/pants/docs:dev_tasks',
   ]

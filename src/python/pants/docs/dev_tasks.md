@@ -103,21 +103,35 @@ this function to find out which targets to generate the product for:
 Task Configuration
 ------------------
 
-Tasks may be configured via options.
+Tasks may be configured via the options system.
 
 To define an option, handle your Task's `register_options`
 class method and call the passed-in `register` function:
 
-!inc[start-after=ListGoals&end-before=console_output](../backend/core/tasks/list_goals.py)
+!inc[start-at=  def register_options&end-before=--confs](../backend/jvm/tasks/checkstyle.py)
+
+### Fine-tuning Options (aka "Option Options")
+
+When calling the `register` function, passing a few additional arguments
+will affect the behaviour of the registered option. The most common parameters are:
+  - `default`: Sets a default value that will be used if the option is not specified by the user.
+  - `type`: Constrains the type of the option. If not specified, the option will be a string. Takes
+  a python type constructor (like `int`), or a type like `Options.list` from [pants.option.options.Options](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
+.
+  - `fingerprint`: Indicates that the value of the registered option affects the products
+  of the task, such that changing the option would result in different products. When `True`,
+  changing the option will cause targets built by the task to be invalidated and rebuilt.
+
+### Scopes
 
 Option values are available via `self.get_options()`:
 
     :::python
-    # Did user pass in the --my-option CLI flag (or set it in .ini)?
+    # Did user pass in the --my-option CLI flag (or set it in pants.ini)?
     if self.get_options().my_option:
 
-Every task has an options scope: If the task is registered as `task` in goal `goal`, then its
-scope is `goal.task`, unless goal and task are the same string, in which case the scope is simply
+Every task has an options scope: If the task is registered as `my-task` in goal `my-goal`, then its
+scope is `my-goal.my-task`, unless goal and task are the same string, in which case the scope is simply
 that string. For example, the `JavaCompile` task has scope `compile.java`, and the `filemap`
 task has the scope `filemap`.
 
@@ -125,11 +139,12 @@ The scope is used to set options values. E.g., the value of `self.get_options().
 task with scope `scope` is set by, in this order:
   - The value of the cmd-line flag `--scope-my-option`.
   - The value of the environment variable `PANTS_SCOPE_MY_OPTION`.
-  - The value of the config var `my_option` in section `scope`.
+  - The value of the pants.ini var `my_option` in section `scope`.
 
 Note that if the task being run is specified explicitly on the command line, you can omit the
 scope from the cmd-line flag name. For example, instead of
-`./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`.
+`./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`. See
+[[Invoking Pants|pants('src/docs:invoking')]] for more information.
 
 
 GroupTask
