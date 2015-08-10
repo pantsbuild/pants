@@ -9,7 +9,6 @@ import os
 
 from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.jvm_app import JvmApp, Bundle
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
@@ -22,12 +21,10 @@ class FilesetRelPathWrapperTest(BaseTest):
     return BuildFileAliases.create(
       targets={
         'java_library': JavaLibrary,
-        'jvm_app': JvmApp,
       },
       context_aware_object_factories={
         'globs': Globs,
         'rglobs': RGlobs,
-        'bundle': Bundle.factory,
       },
     )
 
