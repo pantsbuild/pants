@@ -63,19 +63,18 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install().with_description(
     'Build setup.py-based Python projects from python_library targets.')
 
-  task(name='style-class-factoring', action=ClassFactoringCheck).install('pythonstyle').with_description(
-    'Python Style Checker'
-  )
-  task(name='style-except-statement', action=ExceptStatementsCheck).install('pythonstyle')
-  task(name='style-future-compatibility', action=FutureCompatibilityCheck).install('pythonstyle')
-  task(name='style-import-order', action=ImportOrderCheck).install('pythonstyle')
-  task(name='style-indentation', action=IndentationCheck).install('pythonstyle')
-  task(name='style-missing-context-manager', action=MissingContextManagerCheck).install('pythonstyle')
-  task(name='style-new-style-classes', action=NewStyleClassesCheck).install('pythonstyle')
-  task(name='style-newlines', action=NewlinesCheck).install('pythonstyle')
-  task(name='style-pep8', action=PEP8Check).install('pythonstyle')
-  task(name='style-print-statements', action=PrintStatementsCheck).install('pythonstyle')
-  task(name='style-pyflakes', action=FlakeCheck).install('pythonstyle')
-  task(name='style-trailing-whitespace', action=TrailingWhitespaceCheck).install('pythonstyle')
-  task(name='style-variable-names', action=VariableNamesCheck).install('pythonstyle')
-  #task(name='python-style', action=PythonStyle).install('python-style').with_description('test')
+  # task(name='style-class-factoring', action=ClassFactoringCheck).install('pythonstyle').with_description(
+  #   'Python Style Checker'
+  # )
+  # task(name='except-statement', action=ExceptStatementsCheck).install('test')
+  # task(name='future-compatibility', action=FutureCompatibilityCheck).install('test')
+  # task(name='import-order', action=ImportOrderCheck).install('test')
+  # task(name='indentation', action=IndentationCheck).install('test')
+  # task(name='missing-context-manager', action=MissingContextManagerCheck).install('test')
+  # task(name='new-style-classes', action=NewStyleClassesCheck).install('test')
+  # task(name='newlines', action=NewlinesCheck).install('test')
+  # task(name='pep8', action=PEP8Check).install('test')
+  # task(name='print-statements', action=PrintStatementsCheck).install('test')
+  # task(name='pyflakes', action=FlakeCheck).install('test')
+  # task(name='trailing-whitespace', action=TrailingWhitespaceCheck).install('test')
+  # task(name='variable-names', action=VariableNamesCheck).install('test')
