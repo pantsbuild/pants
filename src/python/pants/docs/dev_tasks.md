@@ -38,12 +38,12 @@ Task Installation: Associate Task with Goal[s]
 
 Defining a Task is nice, but doesn't hook it up so users can get to it.
 *Install* a task to make it available to users. To do this, you register
-it with Pants, associating it with a goal. A [[plugin's|pants('src/python/pants/docs:howto_plugin')]]plugin's `register.py`
+it with Pants, associating it with a goal. A [[plugin's|pants('src/python/pants/docs:howto_plugin')]] `register.py`
 registers goals in its `register_goals` function. Here's an excerpt from
-[Pants' own JVM
-backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/register.py):
+[Pants' own Python
+backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py):
 
-!inc[start-after=pants/issues/604 register_goals&end-before=Compilation](../backend/jvm/register.py)
+!inc[start-at=def register_goals&end-at=Python projects from python_library](../backend/python/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
@@ -63,12 +63,12 @@ tell Pants about these inter-task dependencies...
 The "early" task class defines a `product_types` class method that
 returns a list of strings:
 
-!inc[start-after=pants/issues/604 product_types start&end-before=pants/issues/604 product_types finish](../backend/jvm/tasks/ivy_imports.py)
+!inc[start-at=  def product_types&end-at=resources_by_target](../backend/jvm/tasks/resources_task.py)
 
 The "late" task defines a `prepare` method that calls
 `round_manager.require_data` to "require" one of those same strings:
 
-!inc[start-after=pants/issues/604 prep start&end-before=pants/issues/604 prep finish](../backend/codegen/tasks/protobuf_gen.py)
+!inc[start-at=  def prepare&end-at=resources_by_target](../backend/jvm/tasks/detect_duplicates.py)
 
 Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
