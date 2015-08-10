@@ -19,9 +19,10 @@ class FileExcluder(object):
         raise TaskError('Excludes file does not exist: {0}'.format(excludes_path))
       with open(excludes_path) as fh:
         for line in fh.readlines():
-          pattern, plugins = line.strip().split('::', 2)
-          plugins = plugins.split()
-          if pattern and not pattern.startswith('#'):
+          if line and not line.startswith('#') and '::' in line:
+            pattern, plugins = line.strip().split('::', 2)
+            plugins = plugins.split()
+
             self.excludes[pattern] = {
               'regex': re.compile(pattern),
               'plugins': plugins
@@ -31,9 +32,9 @@ class FileExcluder(object):
       log.debug('No excludes file specified. All scala sources will be checked.')
 
   def should_include(self, source_filename, plugin):
-    for exclude_rule in self.excludes.iteritems():
+    for exclude_rule in self.excludes.values():
       if exclude_rule['regex'].match(source_filename) and (
-        exclude_rule['plugins'] == ['.*'] or plugin in exclude_rule['plugins']
+        (exclude_rule['plugins'] == ['.*']) or (plugin in exclude_rule['plugins'])
       ):
         return False
     return True
