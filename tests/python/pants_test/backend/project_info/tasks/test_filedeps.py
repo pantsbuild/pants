@@ -174,7 +174,6 @@ class FileDepsTest(ConsoleTaskTestBase):
     )
 
   def test_globs_app(self):
-    self.maxDiff=None
     self.assert_console_output(
       'project/BUILD',
       'src/java/bin/BUILD',
