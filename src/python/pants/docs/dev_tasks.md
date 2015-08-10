@@ -52,6 +52,22 @@ goal `foo`, use `Goal.by_name('foo').install`. You can install more than
 one task in a goal; e.g., there are separate tasks to run Java tests and
 Python tests; but both are in the `test` goal.
 
+Products: how one task consumes the output of another
+---------------------------------------------------
+
+One task might need to consume the "products" (outputs) of another. E.g., the Java test runner
+task uses Java `.class` files that the Java compile task produces. Pants
+tasks keep track of this in the
+[pants.goal.products.ProductMapping](https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/products.py)
+that is provided in the task's context at `self.context.products`.
+
+The `ProductMapping` is basically a dict. Calling
+`self.context.products.get('jar_dependencies')` looks up
+`jar_dependencies` in that dict. Tasks can set/change the value stored
+at that key; later tasks can read (and perhaps further change) that
+value. That value might be, say, a dictionary that maps target specs to
+file paths.
+
 `product_types` and `require_data`: Why "test" comes after "compile"
 --------------------------------------------------------------------
 
@@ -83,21 +99,6 @@ were required&mdash;`require` takes an optional target filter predicate function
 this function to find out which targets to generate the product for:
 
 !inc[start-at=isrequired('jar_dependencies')&end-before=def](../backend/jvm/tasks/ivy_resolve.py)
-
-Products Map: how one task uses products of another
----------------------------------------------------
-
-One task might need the products of another. E.g., the Java test runner
-task uses Java `.class` files that the Java compile task produces. Pants
-tasks keep track of this in a
-[pants.goal.products.ProductMapping.](https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/products.py)
-
-The `ProductMapping` is basically a dict. Calling
-`self.context.products.get('jar_dependencies')` looks up
-`jar_dependencies` in that dict. Tasks can set/change the value stored
-at that key; later tasks can read (and perhaps further change) that
-value. That value might be, say, a dictionary that maps target specs to
-file paths.
 
 Task Configuration
 ------------------
