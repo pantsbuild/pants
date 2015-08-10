@@ -12,7 +12,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit
 from pants.console import stty_utils
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 
 
 class PythonRepl(PythonTask):
@@ -23,7 +23,7 @@ class PythonRepl(PythonTask):
              help='Run an IPython REPL instead of the standard python one.')
     register('--ipython-entry-point', advanced=True, default='IPython:start_ipython',
              help='The IPython REPL entry point.')
-    register('--ipython-requirements', advanced=True, type=Options.list, default=['ipython==1.0.0'],
+    register('--ipython-requirements', advanced=True, type=list_option, default=['ipython==1.0.0'],
              help='The IPython interpreter version to use.')
 
   # NB: **pex_run_kwargs is used by tests only, execute nominally has (void)void signature.

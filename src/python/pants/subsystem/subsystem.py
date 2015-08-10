@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from twitter.common.collections import OrderedSet
 
 from pants.option.optionable import Optionable
+from pants.option.scope import ScopeInfo
 
 
 class SubsystemError(Exception):
@@ -32,6 +33,7 @@ class Subsystem(Optionable):
   For example, the global artifact cache options would be in scope `cache`, but the
   compile.java task can override those options in scope `cache.compile.java`.
   """
+  options_scope_category = ScopeInfo.SUBSYSTEM
 
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
@@ -39,6 +41,13 @@ class Subsystem(Optionable):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
       super(Subsystem.CycleException, self).__init__(message)
+
+  @classmethod
+  def get_scope_info(cls, subscope=None):
+    if subscope is None:
+      return super(Subsystem, cls).get_scope_info()
+    else:
+      return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
 
   @classmethod
   def closure(cls, subsystem_types):
@@ -94,8 +103,6 @@ class Subsystem(Optionable):
   def global_instance(cls):
     """Returns the global instance of this subsystem.
 
-    The global instance is the subsystem singleton instance for the main subsystem `options_scope`.
-
     :returns: The global subsystem instance.
     :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
@@ -103,10 +110,7 @@ class Subsystem(Optionable):
 
   @classmethod
   def scoped_instance(cls, optionable):
-    """Returns an instance of this subsystem scoped by the given `optionable`.
-
-    The scoped instance is the subsystem singleton instance for the main subsystem `options_scope`
-    qualified by `optionable`'s scope.
+    """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
     :param optionable: An optionable type or instance to scope this subsystem under.
     :type: :class:`pants.option.optionable.Optionable`

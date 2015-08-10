@@ -21,7 +21,7 @@ from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.shader import Shader
-from pants.option.options import Options
+from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import relativize_paths, safe_open
 
@@ -71,7 +71,7 @@ class ZincCompile(JvmCompile):
     super(ZincCompile, cls).register_options(register)
     register('--plugins', action='append', fingerprint=True,
              help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=Options.dict, default={}, fingerprint=True,
+    register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
     register('--name-hashing', action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
