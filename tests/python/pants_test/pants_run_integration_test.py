@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ConfigParser
 import os
+import re
 import subprocess
 import unittest
 from collections import Counter, defaultdict, namedtuple
@@ -201,3 +202,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
                     'Failed to find the following files: {}'.format(not_found))
     self.assertEqual(len(extras), 0,
                     'Found extra unexpected files: {}'.format(extras))
+
+  def normalize(self, s):
+    """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
+    ansi_escape = re.compile(r'\x1b[^m]*m')
+    return ansi_escape.sub('', ''.join(s.split()))

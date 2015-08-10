@@ -19,15 +19,6 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
-# TODO(cgibb): Find a better home for this.
-def get_cmd_output(args, shell=False):
-    if shell:
-      args = ' '.join(args)
-    p = subprocess.Popen(args, shell=shell, stdout=subprocess.PIPE)
-    out, _ = p.communicate()
-    return out.strip()
-
-
 class GoTask(Task):
 
   @classmethod
@@ -56,8 +47,10 @@ class GoTask(Task):
 
   @staticmethod
   def lookup_goos_goarch():
-    goos = get_cmd_output(['go', 'env', 'GOOS'])
-    goarch = get_cmd_output(['go', 'env', 'GOARCH'])
+    def get_env_var(var):
+      return subprocess.check_output(['go', 'env', var]).strip()
+    goos = get_env_var('GOOS')
+    goarch = get_env_var('GOARCH')
     return goos + '_' + goarch
 
   def __init__(self, *args, **kwargs):
