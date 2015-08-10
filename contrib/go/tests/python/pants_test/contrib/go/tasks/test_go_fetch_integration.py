@@ -45,3 +45,11 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
           --> github.com/fakeuser/rlib6 (expected go_remote_library declaration at contrib/go/examples/3rdparty/go/github.com/fakeuser/rlib6)
       """
       self.assertIn(self.normalize(expected), self.normalize(pants_run.stdout_data))
+
+  def test_go_fetch_go_run_integration(self):
+    with zipfile_server():
+      args = ['run',
+              'contrib/go/examples/src/go/useRemoteLibs']
+      pants_run = self.run_pants(args)
+      self.assert_success(pants_run)
+      self.assertIn('Hello from main!', pants_run.stdout_data)
