@@ -5,27 +5,13 @@ python_test_suite(
   ]
 )
 
-python_test_suite(
+python_tests(
   name = 'checkstyle',
+  sources = globs('*.py'),
   dependencies = [
-    ':test_common',
-    ':test_noqa',
-    'tests/python/pants_test/backend/python/tasks/checkstyle/plugins:all',
-  ]
-)
-
-python_tests(
-  name = 'test_common',
-  sources = ['test_common.py'],
-  dependencies = [
+    '3rdparty/python:mock',
     'src/python/pants/backend/python/tasks/checkstyle:all',
-  ]
-)
-
-python_tests(
-  name = 'test_noqa',
-  sources = ['test_noqa.py'],
-  dependencies = [
-    'src/python/pants/backend/python/tasks/checkstyle:all',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'tests/python/pants_test:base_test',
   ]
 )

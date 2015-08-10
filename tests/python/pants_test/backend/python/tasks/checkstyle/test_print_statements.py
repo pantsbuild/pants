@@ -9,7 +9,7 @@ from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.print_statements import PrintStatements
 
 
-def test_print_statements():
+def test_print_override():
   ps = PrintStatements(PythonFile.from_statement("""
     from __future__ import print_function
     print("I do what I want")
@@ -20,11 +20,13 @@ def test_print_statements():
   """))
   assert len(list(ps.nits())) == 0
 
+def test_print_function():
   ps = PrintStatements(PythonFile.from_statement("""
     print("I do what I want")
   """))
   assert len(list(ps.nits())) == 0
 
+def test_print_statement():
   ps = PrintStatements(PythonFile.from_statement("""
     print["I do what I want"]
   """))

@@ -5,11 +5,24 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import pytest
+
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.trailing_whitespace import TrailingWhitespace
 
 
-def test_exception_map():
+@pytest.mark.parametrize("test_input,results", [
+  ([9,0,0], False),
+  ([3,0,1], False),
+  ([3,17,17], False),
+  ([3,18,18], True),
+  ([3,18,10000], True),  # """ continued strings have no ends
+  ([6,8,8], False),
+  ([6,19,19], True),
+  ([6,19,23], True),
+  ([6,23,25], False),  # ("  " continued have string termination
+])
+def test_exception_map(test_input, results):
   tw = TrailingWhitespace(PythonFile.from_statement("""
   test_string_001 = ""
   test_string_002 = " "
@@ -26,15 +39,7 @@ def test_exception_map():
   # comment 013
   """))
   assert len(list(tw.nits())) == 0
-  assert not tw.has_exception(9, 0, 0)
-  assert not tw.has_exception(3, 0, 1)
-  assert not tw.has_exception(3, 17, 17)
-  assert tw.has_exception(3, 18, 18)
-  assert tw.has_exception(3, 18, 10000)  # """ continuated strings have no ends. 
-  assert not tw.has_exception(6, 8, 8)
-  assert tw.has_exception(6, 19, 19)
-  assert tw.has_exception(6, 19, 23)
-  assert not tw.has_exception(6, 23, 25)  # ("  " continuations have string termination
+  assert bool(tw.has_exception(*test_input)) == results
 
 
 def test_continuation_with_exception():

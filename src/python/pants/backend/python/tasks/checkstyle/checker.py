@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-import xml.etree.ElementTree as ET
+from xml.etree import ElementTree
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
@@ -34,7 +34,7 @@ class PythonCheckStyleTask(PythonTask):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)
     self.options = self.get_options()
 
-    self._checker = []  # Default to emtpy iterator
+    self._checker = lambda x: iter([])  # Default to emtpy iterator
     self._name = 'DefaultStyleChecker'
 
   def _is_checked(self, target):
@@ -58,7 +58,10 @@ class PythonCheckStyleTask(PythonTask):
   def supports_passthru_args(cls):
     return True
 
-  def apply_filter(self, python_file):
+  def get_nits(self, python_file):
+    """Iterate over the instances style checker and yield Nits
+    :param python_file: PythonFile Object
+    """
     if noqa_file_filter(python_file):
       return
 
@@ -74,19 +77,26 @@ class PythonCheckStyleTask(PythonTask):
         else:
           yield nit
 
-  def parse_and_apply_filter(self, filename, severity):
-    is_strict = self.options.strict
-    should_fail = False
+  def check_file(self, filename):
+    """Process python file looking for indications of problems.
+    :param filename: (str) Python source filename
+    :return: (bool) flag indicating failure
+    """
     try:
       python_file = PythonFile.parse(filename)
     except SyntaxError as e:
       print('%s:SyntaxError: %s' % (filename, e))
-      return should_fail
+      return True
 
-    for nit in self.apply_filter(python_file):
+    # If the user specifies an invalid severity use comment
+    severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
+
+    should_fail = False
+    fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
+    for nit in self.get_nits(python_file):
       if nit.severity >= severity:
         print('{nit}\n'.format(nit=nit))
-      should_fail |= nit.severity >= Nit.ERROR or (nit.severity >= Nit.WARNING and is_strict)
+      should_fail |= (nit.severity >= fail_threshold)
     return should_fail
 
   def checkstyle(self, sources):
@@ -101,26 +111,25 @@ class PythonCheckStyleTask(PythonTask):
     if self.options.skip:
       return
 
-    # If the user specifies an invalid severity use comment
-    severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
-
-    # Update sources to strip out any suppressed files
-    root = ET.parse(self.options.suppress).getroot() if self.options.suppress else []
-    suppressions = {
-      child.attrib['files']: True for child in root
-      if child.attrib['checks'] == '.*' or self._name in child.attrib['checks'].split('|')
-      }
-    sources = [src for src in sources if os.path.dirname(src) not in suppressions]
+    # Disabled for now, need to update scalastyle suppression to work with python
+    # # Update sources to strip out any suppressed files
+    # root = ElementTree.parse(self.options.suppress).getroot() if self.options.suppress else []
+    # suppressions = {
+    #   child.attrib['files']: True for child in root
+    #   if child.attrib['checks'] == '.*' or self._name in child.attrib['checks'].split('|')
+    # }
+    # sources = [src for src in sources if os.path.dirname(src) not in suppressions]
 
     should_fail = False
     print()
     for filename in sources:
-      should_fail |= self.parse_and_apply_filter(filename, severity)
+      should_fail |= self.check_file(filename)
 
     if should_fail and self.options.fail:
       raise TaskError('Python Style issues found', exit_code=should_fail)
 
   def execute(self):
+    """Run Checkstyle on all found source files"""
     targets = self.context.targets(self._is_checked)
     sources = self.calculate_sources(targets)
 
@@ -128,6 +137,7 @@ class PythonCheckStyleTask(PythonTask):
       return self.checkstyle(sources)
 
   def calculate_sources(self, targets):
+    """Generate a set of source files from the given targets"""
     sources = set()
     for target in targets:
       sources.update(
