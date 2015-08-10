@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import fnmatch
 import os
 
 from six import string_types
@@ -12,6 +13,19 @@ from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
 
+def globs_matches(path, patters):
+  for pattern in patters:
+    if fnmatch.fnmatch(path, pattern):
+      return True
+  return False
+
+def matches_filespec(path, spec):
+  if not globs_matches(path, spec.get('globs', [])):
+    return False
+  for spec in spec.get('exclude', []):
+    if matches_filespec(path, spec):
+      return False
+  return True
 
 class FilesetWithSpec(object):
   """A set of files with that keeps track of how we got it.
@@ -19,16 +33,23 @@ class FilesetWithSpec(object):
   The filespec is what globs or file list it came from.
   """
 
-  def __init__(self, rel_root, result, filespec):
+  def __init__(self, rel_root, filespec, files_calculator):
     self._rel_root = rel_root
-    self._result = result
     self.filespec = filespec
+    self._files = None
+    self._files_calculator = files_calculator
+
+  @property
+  def files(self):
+    if not self._files:
+      self._files = self._files_calculator()
+    return self._files
 
   def __iter__(self):
-    return self._result.__iter__()
+    return self.files.__iter__()
 
   def __getitem__(self, index):
-    return self._result[index]
+    return self.files[index]
 
 
 class FilesetRelPathWrapper(object):
@@ -49,20 +70,24 @@ class FilesetRelPathWrapper(object):
         excludes[i] = [exclude]
 
     for glob in args:
-      if(self._is_glob_dir_outside_root(glob, root)):
+      if self._is_glob_dir_outside_root(glob, root):
         raise ValueError('Invalid glob {}, points outside BUILD file root dir {}'.format(glob, root))
 
-    result = self.wrapped_fn(root=root, *args, **kwargs)
+    def files_calculator():
+      result = self.wrapped_fn(root=root, *args, **kwargs)
 
-    for exclude in excludes:
-      result -= exclude
+      for exclude in excludes:
+        result -= exclude
+
+      return result
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
-    return FilesetWithSpec(rel_root, result, filespec)
+    return FilesetWithSpec(rel_root, filespec, files_calculator)
 
-  def _is_glob_dir_outside_root(self, glob, root):
+  @staticmethod
+  def _is_glob_dir_outside_root(glob, root):
     # The assumption is that a correct glob starts with the root,
     # even after normalizing.
     glob_path = os.path.normpath(os.path.join(root, glob))
