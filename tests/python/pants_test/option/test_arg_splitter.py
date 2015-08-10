@@ -20,18 +20,14 @@ def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
-def global_subsys(scope):
-  return ScopeInfo(scope, ScopeInfo.GLOBAL_SUBSYSTEM)
-
-
-def task_subsys(scope):
-  return ScopeInfo(scope, ScopeInfo.TASK_SUBSYSTEM)
+def subsys(scope):
+  return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
 class ArgSplitterTest(unittest.TestCase):
   _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
-                        global_subsys('jvm'), task_subsys('jvm.test.junit'),
-                        global_subsys('reporting'), intermediate('test'), task('test.junit')]
+                        subsys('jvm'), subsys('jvm.test.junit'),
+                        subsys('reporting'), intermediate('test'), task('test.junit')]
 
   def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
              expected_passthru=None, expected_passthru_owner=None,
@@ -141,6 +137,10 @@ class ArgSplitterTest(unittest.TestCase):
                 ['test'],
                 {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test': []}, ['foo'])
     # Unqualified task subsystem flag in task scope.
+    # Note that this exposes a small problem: You can't set an option on the cmd-line if that
+    # option's name begins with any subsystem scope. For example, if test.junit has some option
+    # named --jvm-foo, then it cannot be set on the cmd-line, because the ArgSplitter will assume
+    # it's an option --foo on the jvm subsystem.
     self._split('./pants test.junit --jvm-options=-Dbar=baz foo',
                 ['test'],
                 {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test.junit': []}, ['foo'])

@@ -11,6 +11,7 @@ import sys
 from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
 from pants.option.scope import ScopeInfo
@@ -66,7 +67,7 @@ class Options(object):
 
     E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
     """
-    ret = {ScopeInfo.for_global_scope()}
+    ret = {GlobalOptionsRegistrar.get_scope_info()}
     for scope_info in scope_infos:
       ret.add(scope_info)
 
@@ -108,7 +109,7 @@ class Options(object):
     self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
-    self._known_scopes = set([s[0] for s in known_scope_infos])
+    self._known_scopes = set([s.scope for s in known_scope_infos])
 
   @property
   def target_specs(self):

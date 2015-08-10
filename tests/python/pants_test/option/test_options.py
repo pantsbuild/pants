@@ -16,6 +16,7 @@ from pants.base.deprecated import PastRemovalVersionError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
 from pants.option.errors import ParseError
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -556,11 +557,12 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(for_x[2].get('action'), 'store_true')
 
   def test_complete_scopes(self):
-    _global = ScopeInfo.for_global_scope()
+    _global = GlobalOptionsRegistrar.get_scope_info()
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
-                      Options.complete_scopes({ScopeInfo.for_global_scope(), task('foo.bar.baz')}))
+                      Options.complete_scopes({GlobalOptionsRegistrar.get_scope_info(),
+                                               task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({intermediate('foo'), task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
