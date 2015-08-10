@@ -21,11 +21,11 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 # TODO(cgibb): Find a better home for this.
 def get_cmd_output(args, shell=False):
-    if shell:
-      args = ' '.join(args)
-    p = subprocess.Popen(args, shell=shell, stdout=subprocess.PIPE)
-    out, _ = p.communicate()
-    return out.strip()
+  if shell:
+    args = ' '.join(args)
+  p = subprocess.Popen(args, shell=shell, stdout=subprocess.PIPE)
+  out, _ = p.communicate()
+  return out.strip()
 
 
 class GoTask(Task):

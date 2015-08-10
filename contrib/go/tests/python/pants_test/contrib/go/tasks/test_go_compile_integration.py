@@ -24,9 +24,9 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
       # TODO(cgibb): Is it appropriate to be calling a GoTask static method from
       # an integration test?
       goos_goarch = GoTask.lookup_goos_goarch()
-      expected_files = set(['contrib.go.examples.src.go.{libname}.{libname}/'
-                            'pkg/{goos_goarch}/contrib/go/examples/src/go/{libname}.a'
-                            .format(libname=libname, goos_goarch=goos_goarch)
-                            for libname in ('libA', 'libB', 'libC', 'libD', 'libE')])
+      expected_files = set('contrib.go.examples.src.go.{libname}.{libname}/'
+                           'pkg/{goos_goarch}/contrib/go/examples/src/go/{libname}.a'
+                           .format(libname=libname, goos_goarch=goos_goarch)
+                           for libname in ('libA', 'libB', 'libC', 'libD', 'libE'))
       self.assert_contains_exact_files(os.path.join(workdir, 'compile', 'go'),
                                        expected_files)
