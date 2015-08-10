@@ -90,5 +90,3 @@ class PEP8Check(PythonCheckStyleTask):
   @classmethod
   def register_options(cls, register):
     super(PEP8Check, cls).register_options(register)
-    register('--ignore-codes', default=IGNORE_CODES, type=Options.list,
-             help='PEP8 codes to ignore during checks')
