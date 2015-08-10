@@ -5,12 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import re
-from xml.etree import ElementTree
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
+from pants.backend.python.tasks.checkstyle.file_excluder import FileExcluder
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 
@@ -111,14 +110,8 @@ class PythonCheckStyleTask(PythonTask):
     if self.options.skip:
       return
 
-    # Disabled for now, need to update scalastyle suppression to work with python
-    # # Update sources to strip out any suppressed files
-    # root = ElementTree.parse(self.options.suppress).getroot() if self.options.suppress else []
-    # suppressions = {
-    #   child.attrib['files']: True for child in root
-    #   if child.attrib['checks'] == '.*' or self._name in child.attrib['checks'].split('|')
-    # }
-    # sources = [src for src in sources if os.path.dirname(src) not in suppressions]
+    excluder = FileExcluder(self.options.suppress, self.context.log)
+    sources = [src for src in sources if excluder.should_include(src)]
 
     should_fail = False
     print()
