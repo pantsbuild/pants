@@ -121,6 +121,7 @@ class Bundle(object):
 
     if fileset is not None:
       self._add([fileset])
+    self.fileset = fileset
 
   def _add(self, filesets):
     for fileset in filesets:
@@ -168,6 +169,18 @@ class JvmApp(Target):
 
     if name == basename:
       raise TargetDefinitionException(self, 'basename must not equal name.')
+
+  def globs_relative_to_buildroot(self):
+    globs = []
+    for bundle in self.bundles:
+      fileset = bundle.fileset
+      if fileset is None:
+        continue
+      elif hasattr(fileset, 'filespec'):
+        globs += bundle.fileset.filespec['globs']
+      else:
+        globs += bundle.fileset
+    return {'globs' : globs}
 
   @property
   def traversable_dependency_specs(self):

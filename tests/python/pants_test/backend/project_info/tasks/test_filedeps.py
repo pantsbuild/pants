@@ -173,6 +173,27 @@ class FileDepsTest(ConsoleTaskTestBase):
       options=dict(globs=True),
     )
 
+  def test_globs_app(self):
+    self.maxDiff=None
+    self.assert_console_output(
+      'project/BUILD',
+      'src/java/bin/BUILD',
+      'src/java/core/BUILD',
+      'src/java/bin/main.java',
+      'src/java/core/core*.java',
+      'src/java/lib/BUILD',
+      'src/java/lib/lib1.java',
+      'src/resources/lib/BUILD',
+      'src/resources/lib/data.json',
+      'src/scala/core/BUILD',
+      'src/scala/core/core1.scala',
+      'src/thrift/storage/BUILD',
+      'src/thrift/storage/data_types.thrift',
+      'tools/BUILD',
+      targets=[self.target('project:app')],
+      options=dict(globs=True),
+    )
+
   def test_scala_java_cycle_scala_end(self):
     self.assert_console_output(
       'tools/BUILD',

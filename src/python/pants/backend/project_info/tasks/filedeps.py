@@ -52,6 +52,6 @@ class FileDeps(ConsoleTask):
           files.update(os.path.join(buildroot, src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to
       # SourcesPayload to allow this special-casing to go away.
-      if isinstance(target, JvmApp):
+      if isinstance(target, JvmApp) and not output_globs:
         files.update(itertools.chain(*[bundle.filemap.keys() for bundle in target.bundles]))
     return files
