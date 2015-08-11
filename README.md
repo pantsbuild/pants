@@ -21,3 +21,5 @@ At a minimum, pants requires the following to run properly:
 * A C compiler, system headers, Python headers (to compile native Python modules)
 * OpenJDK 7 or greater, Oracle JDK 6 or greater
 * Internet access (so that pants can fully bootstrap itself)
+FRED
+BOB
