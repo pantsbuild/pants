@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-import pytest
 from pants.util.contextutil import temporary_dir
 from pants_test.contrib.go.tasks.go_tool import GoTool
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
