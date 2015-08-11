@@ -89,7 +89,9 @@ class BuildFile(AbstractClass):
       result = defaultdict(set)
       for exclude in excludes:
         if exclude:
-          if not os.path.isabs(exclude):
+          if os.path.isabs(exclude):
+            exclude = os.path.realpath(exclude)
+          else:
             exclude = os.path.join(root_dir, exclude)
           if exclude.startswith(root_dir):
             result[os.path.dirname(exclude)].add(os.path.basename(exclude))
@@ -107,6 +109,8 @@ class BuildFile(AbstractClass):
             if subdir in dirs:
               to_remove.append(subdir)
       return to_remove
+
+    root_dir = os.path.realpath(root_dir)
 
     if base_path and not cls._isdir(os.path.join(root_dir, base_path)):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'

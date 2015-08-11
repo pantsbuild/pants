@@ -35,7 +35,7 @@ class ScmBuildFile(BuildFile):
   @classmethod
   def _scm_worktree(cls):
     if not hasattr(cls, '_cached_scm_worktree'):
-      cls._cached_scm_worktree = cls._scm.detect_worktree()
+      cls._cached_scm_worktree = os.path.realpath(cls._scm.detect_worktree())
     return cls._cached_scm_worktree
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
@@ -86,7 +86,8 @@ class ScmBuildFile(BuildFile):
     Works like os.walk.
     """
     worktree = cls._scm_worktree()
-    scm_rootpath = os.path.relpath(root_dir, worktree)
+    scm_rootpath = os.path.relpath(os.path.realpath(root_dir), worktree)
+
     if root:
       relpath = os.path.join(scm_rootpath, root)
     else:
