@@ -14,8 +14,8 @@ import mox
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, relative_symlink, relativize_paths,
-                                safe_mkdir)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, get_basedir, relative_symlink,
+                                relativize_paths, safe_mkdir)
 
 
 class DirutilTest(unittest.TestCase):
@@ -127,3 +127,8 @@ class DirutilTest(unittest.TestCase):
       link = os.path.join('foo', 'bar')
       with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
+
+  def test_get_basedir(self):
+    self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
+    self.assertEquals(get_basedir('/foo/bar/baz'), '')
+    self.assertEquals(get_basedir('foo'), 'foo')
