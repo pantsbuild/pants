@@ -12,7 +12,7 @@ import sys
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 
-from pants.contrib.go.subsystems.go_platform import GoPlatform
+from pants.contrib.go.subsystems.go_distribution import GoDistribution
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_local_source import GoLocalSource
@@ -32,7 +32,8 @@ class GoTask(Task):
 
   @classmethod
   def global_subsystems(cls):
-    return super(GoTask, cls).global_subsystems() + (GoPlatform, )
+    # TODO(John Sirois): Actualy use the GoDistribution.Factory to create/run go commands.
+    return super(GoTask, cls).global_subsystems() + (GoDistribution.Factory,)
 
   @staticmethod
   def is_binary(target):
