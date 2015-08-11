@@ -9,7 +9,6 @@ import Queue as queue
 import time
 import traceback
 from collections import defaultdict
-from heapq import heappop, heappush
 
 from pants.base.worker_pool import Work
 
@@ -272,12 +271,11 @@ class ExecutionGraph(object):
             raise ExecutionFailure("Error in on_success for {}".format(finished_key), e)
 
           print("before computing ready_deps: {}".format(time.time() - finish_time[finished_key]))
+          ready_dependees = []
           for dependee in direct_dependees:
             completed_dependencies[dependee] += 1
-
-          ready_dependees = [dependee for dependee in direct_dependees
-                             # if status_table.are_all_successful(self._jobs[dependee].dependencies)]
-                             if completed_dependencies[dependee] == len(self._jobs[dependee].dependencies)]
+            if completed_dependencies[dependee] == len(self._jobs[dependee].dependencies):
+              ready_dependees.append(dependee)
 
           print("before submit: {}".format(time.time() - finish_time[finished_key]))
           submit_jobs(ready_dependees)
