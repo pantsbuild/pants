@@ -24,7 +24,7 @@ python_library(
   sources=['go_run.py'],
   dependencies=[
     'src/python/pants/base:exceptions',
-    'src/python/pants/process:xargs',
+    'src/python/pants/process',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
   ]
 )
