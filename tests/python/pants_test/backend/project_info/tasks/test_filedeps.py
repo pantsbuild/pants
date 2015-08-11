@@ -83,9 +83,7 @@ class FileDepsTest(ConsoleTaskTestBase):
                   definition=dedent("""
                     resources(
                       name='lib',
-                      sources=[
-                        'data.json'
-                      ]
+                      sources=globs('*.json')
                     )
                   """),
                   sources=['data.json'])
@@ -170,6 +168,27 @@ class FileDepsTest(ConsoleTaskTestBase):
       'src/java/core/BUILD',
       'src/java/core/core*.java',
       targets=[self.target('src/scala/core')],
+      options=dict(globs=True),
+    )
+
+  def test_globs_app(self):
+    self.assert_console_output(
+      'project/BUILD',
+      'project/config/app.yaml',
+      'src/java/bin/BUILD',
+      'src/java/core/BUILD',
+      'src/java/bin/main.java',
+      'src/java/core/core*.java',
+      'src/java/lib/BUILD',
+      'src/java/lib/lib1.java',
+      'src/resources/lib/*.json',
+      'src/resources/lib/BUILD',
+      'src/scala/core/BUILD',
+      'src/scala/core/core1.scala',
+      'src/thrift/storage/BUILD',
+      'src/thrift/storage/data_types.thrift',
+      'tools/BUILD',
+      targets=[self.target('project:app')],
       options=dict(globs=True),
     )
 

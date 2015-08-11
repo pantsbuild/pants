@@ -44,10 +44,11 @@ class FileDeps(ConsoleTask):
     output_globs = self.get_options().globs
     for target in concrete_targets:
       files.add(target.address.build_file.full_path)
-      if target.has_sources():
+      if output_globs or target.has_sources():
         if output_globs:
           globs_obj = target.globs_relative_to_buildroot()
-          files.update(os.path.join(buildroot, src) for src in globs_obj['globs'])
+          if globs_obj:
+            files.update(os.path.join(buildroot, src) for src in globs_obj['globs'])
         else:
           files.update(os.path.join(buildroot, src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to
