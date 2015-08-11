@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.shader import Shader
-from pants.option.custom_types import dict_option, file_option
+from pants.option.options import dict_option, file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import safe_open
 
