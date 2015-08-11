@@ -2,20 +2,17 @@ ansicolors==1.0.2
 beautifulsoup4>=4.3.2,<4.4
 coverage>=3.7,<3.8
 docutils>=0.12,<0.13
+lockfile==0.10.2
 Markdown==2.1.1
 mock==1.0.1
 mox==0.5.3
-
-# Until https://github.com/pantsbuild/pex/issues/28 is addressed, we cannot
-# do pex<1.1.0.
-pex>=1.0.2,<1.0.999999
-
+# Until https://github.com/pantsbuild/pex/issues/28 is addressed, we cannot do pex>=1.1.0.
+pex==1.0.3
 psutil==3.1.1
-lockfile==0.10.2
 Pygments==1.4
 pystache==0.5.3
-pytest>=2.6,<2.7
 pytest-cov>=1.8,<1.9
+pytest>=2.6,<2.7
 requests>=2.5.0,<2.6
 setuptools==5.4.1
 six==1.8.0
