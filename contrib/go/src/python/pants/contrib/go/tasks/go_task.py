@@ -24,7 +24,6 @@ class GoTask(Task):
 
   @classmethod
   def global_subsystems(cls):
-    # TODO(John Sirois): Actualy use the GoDistribution.Factory to create/run go commands.
     return super(GoTask, cls).global_subsystems() + (GoDistribution.Factory,)
 
   @staticmethod

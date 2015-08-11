@@ -23,6 +23,7 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
               'contrib/go/examples/src/go/libA']
       pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
+      # TODO(jsirois): Kill this check and the GoTool utility by using Go subsystem
       if GoTool.go_installed():
         goos = subprocess.check_output(['go', 'env', 'GOOS']).strip()
         goarch = subprocess.check_output(['go', 'env', 'GOARCH']).strip()
