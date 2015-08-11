@@ -19,15 +19,6 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
-# TODO(cgibb): Find a better home for this.
-def get_cmd_output(args, shell=False):
-  if shell:
-    args = ' '.join(args)
-  p = subprocess.Popen(args, shell=shell, stdout=subprocess.PIPE)
-  out, _ = p.communicate()
-  return out.strip()
-
-
 class GoTask(Task):
 
   @classmethod
@@ -55,15 +46,16 @@ class GoTask(Task):
   def is_go(target):
     return isinstance(target, (GoLocalSource, GoRemoteLibrary))
 
-  @staticmethod
-  def lookup_goos_goarch():
-    goos = get_cmd_output(['go', 'env', 'GOOS'])
-    goarch = get_cmd_output(['go', 'env', 'GOARCH'])
-    return goos + '_' + goarch
-
   def __init__(self, *args, **kwargs):
     super(GoTask, self).__init__(*args, **kwargs)
     self._goos_goarch = None
+    self._go_dist = None
+
+  @property
+  def go_dist(self):
+    if self._go_dist is None:
+      self._go_dist = GoDistribution.Factory.global_instance().create()
+    return self._go_dist
 
   @property
   def goos_goarch(self):
@@ -72,8 +64,12 @@ class GoTask(Task):
     Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
     """
     if self._goos_goarch is None:
-      self._goos_goarch = self.lookup_goos_goarch()
+      self._goos_goarch = '{goos}_{goarch}'.format(goos=self._lookup_go_env_var('GOOS'),
+                                                   goarch=self._lookup_go_env_var('GOARCH'))
     return self._goos_goarch
+
+  def _lookup_go_env_var(self, var):
+    return self.go_dist.create_go_cmd('env', args=[var]).get_output().strip()
 
   def global_import_id(self, go_remote_lib):
     """Returns the global import identifier of the given GoRemoteLibrary.
@@ -101,11 +97,9 @@ class GoTask(Task):
     pkg_flags = pkg_flags or []
     pkg_path = (self.global_import_id(target) if self.is_remote_lib(target)
                 else target.address.spec_path)
-    envcopy = os.environ.copy()
-    envcopy['GOPATH'] = gopath
-    args = ['go', cmd] + cmd_flags + [pkg_path] + pkg_flags
-    p = subprocess.Popen(args, env=envcopy, stdout=sys.stdout, stderr=sys.stderr)
-    retcode = p.wait()
+    args = cmd_flags + [pkg_path] + pkg_flags
+    retcode = self.go_dist.execute_go_cmd(cmd, gopath=gopath, args=args,
+                                          workunit_factory=self.context.new_workunit)
     if retcode != 0:
-      raise TaskError('`{}` exited non-zero ({})'
-                      .format(' '.join(args), retcode))
+      raise TaskError('`go {cmd} {args}` exited non-zero ({retcode})'
+                      .format(cmd=cmd, args=' '.join(args), retcode=retcode))

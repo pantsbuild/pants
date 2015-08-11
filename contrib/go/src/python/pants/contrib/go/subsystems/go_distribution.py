@@ -96,6 +96,12 @@ class GoDistribution(object):
       env.update(self.env)
       return subprocess.Popen(self.cmdline, env=env, **kwargs)
 
+    def get_output(self, env=None, **kwargs):
+      """Wrapper for spawn that returns the output produced by the GoCommand."""
+      p = self.spawn(env=env, stdout=subprocess.PIPE, **kwargs)
+      out, _ = p.communicate()
+      return out
+
     def __str__(self):
       return (' '.join('{}={}'.format(k, v) for k, v in self.env.items()) +
               ' ' +

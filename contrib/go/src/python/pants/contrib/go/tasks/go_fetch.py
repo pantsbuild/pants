@@ -15,7 +15,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import get_basedir, safe_mkdir, safe_open
 
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
-from pants.contrib.go.tasks.go_task import GoTask, get_cmd_output
+from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoFetch(GoTask):
