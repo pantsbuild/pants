@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import Queue as queue
-import time
 import traceback
 from collections import defaultdict
 
@@ -146,15 +145,12 @@ class ExecutionGraph(object):
     if len(self._job_keys_with_no_dependencies) == 0:
       raise NoRootJobError()
 
-    self._job_sizes = {}
-    jobs_with_sizes = zip(job_list, job_sizes)
-    for (job, job_size) in jobs_with_sizes:
-      self._job_sizes[job.key] = job_size
+    self._job_size = {}
+    for (job, job_size) in zip(job_list, job_sizes):
+      self._job_size[job.key] = job_size
 
-    print("COMPUTING WEIGHTS")
-    self._job_weights = dict()
-    self._compute_weights()
-    print("COMPUTED WEIGHTS")
+    self._job_priority = {}
+    self._compute_job_priorities()
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -176,20 +172,20 @@ class ExecutionGraph(object):
     for dep_name in dependency_keys:
       self._dependees[dep_name].append(key)
 
-  def _compute_weights(self):
-    def subgraph_size(v):
-      if self._job_weights.get(v) is not None:
-        return self._job_weights[v]
+  def _compute_job_priorities(self):
+    def compute_job_priority(v):
+      if self._job_priority.get(v) is not None:
+        return self._job_priority[v]
 
-      max_for_subgraph = 0
+      max_dependee_priority = 0
       for dependee_key in self._dependees[v]:
-        max_for_subgraph = max(max_for_subgraph, subgraph_size(dependee_key))
+        max_dependee_priority = max(max_dependee_priority, compute_job_priority(dependee_key))
 
-      self._job_weights[v] = self._job_sizes[v] + max_for_subgraph
-      return self._job_weights[v]
+      self._job_priority[v] = self._job_size[v] + max_dependee_priority
+      return self._job_priority[v]
 
     for job_key in self._job_keys_with_no_dependencies:
-      subgraph_size(job_key)
+      compute_job_priority(job_key)
 
   def execute(self, pool, log):
     """Runs scheduled work, ensuring all dependencies for each element are done before execution.
@@ -216,10 +212,12 @@ class ExecutionGraph(object):
 
     status_table = StatusTable(self._job_keys_as_scheduled)
     finished_queue = queue.Queue()
-    in_flight = []
-    heap = queue.PriorityQueue()
-    finish_time = {}
     completed_dependencies = defaultdict(int)
+
+    heap = queue.PriorityQueue()
+    # this should really be just an atomic counter but I don't know how to do that nicely
+    # if I make it a number, python says "unresolved reference"
+    in_flight = []
 
     def submit_jobs(job_keys):
       def worker(worker_key, work):
@@ -228,20 +226,15 @@ class ExecutionGraph(object):
           result = (worker_key, SUCCESSFUL, None)
         except Exception as e:
           result = (worker_key, FAILED, e)
-        finish_time[worker_key] = time.time()
         finished_queue.put(result)
-        print("pushed to queue: {}".format(time.time() - finish_time[worker_key]))
-        in_flight.pop()
+        in_flight.pop()  # should be a decrement
 
       for job_key in job_keys:
-        heap.put((-self._job_weights[job_key], job_key))
+        heap.put((-self._job_priority[job_key], job_key))
 
-      while heap.qsize() > 0 and len(in_flight) < pool._pool._processes:
+      while heap.qsize() > 0 and len(in_flight) < pool.num_workers:
         priority, job_key = heap.get()
-        in_flight.append(1)
-
-        print("Submitting job {} with priority {}".format(job_key, -priority))
-        print("Currently in heap: " + str(heap))
+        in_flight.append(0)  # should be an increment
         status_table.mark_as(QUEUED, job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
@@ -251,7 +244,6 @@ class ExecutionGraph(object):
       while not status_table.are_all_done():
         try:
           finished_key, result_status, value = finished_queue.get(timeout=10)
-          print("popped from queue: {}".format(time.time() - finish_time[finished_key]))
         except queue.Empty:
           log.debug("Waiting on \n  {}\n".format("\n  ".join(
             "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
@@ -262,7 +254,6 @@ class ExecutionGraph(object):
         status_table.mark_as(result_status, finished_key)
 
         # Queue downstream tasks.
-        print("before if succ: {}".format(time.time() - finish_time[finished_key]))
         if result_status is SUCCESSFUL:
           try:
             finished_job.run_success_callback()
@@ -270,16 +261,13 @@ class ExecutionGraph(object):
             log.debug(traceback.format_exc())
             raise ExecutionFailure("Error in on_success for {}".format(finished_key), e)
 
-          print("before computing ready_deps: {}".format(time.time() - finish_time[finished_key]))
           ready_dependees = []
           for dependee in direct_dependees:
             completed_dependencies[dependee] += 1
             if completed_dependencies[dependee] == len(self._jobs[dependee].dependencies):
               ready_dependees.append(dependee)
 
-          print("before submit: {}".format(time.time() - finish_time[finished_key]))
           submit_jobs(ready_dependees)
-          print("after submit: {}".format(time.time() - finish_time[finished_key]))
         else:  # Failed or canceled.
           try:
             finished_job.run_failure_callback()

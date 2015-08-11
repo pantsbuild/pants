@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import time
-import threading
 import zipfile
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
@@ -255,13 +253,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                       on_success=vts.update,
                       on_failure=vts.force_invalidate))
 
-      def file_line_count(fname):
-        with open(fname) as f:
-          x = len(f.readlines())
-        return x
+      def file_line_count(source_file_name):
+        with open(source_file_name) as file_handle:
+          line_count = len(file_handle.readlines())
+        return line_count
 
-      # job_sizes.append(sum([file_line_count(filepath) for filepath in compile_context.sources]))
-      job_sizes.append(len(compile_context.sources))
+      # job size is the total line count in the target:
+      job_sizes.append(sum([file_line_count(filepath) for filepath in compile_context.sources]))
+
+      # job size is the number of files in the target:
+      # job_sizes.append(len(compile_context.sources))
+
     return jobs, job_sizes
 
   def compile_chunk(self,
