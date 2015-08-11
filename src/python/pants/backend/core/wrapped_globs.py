@@ -13,8 +13,8 @@ from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
 
-def globs_matches(path, patters):
-  for pattern in patters:
+def globs_matches(path, patterns):
+  for pattern in patterns:
     if fnmatch.fnmatch(path, pattern):
       return True
   return False
@@ -41,7 +41,7 @@ class FilesetWithSpec(object):
 
   @property
   def files(self):
-    if not self._files:
+    if self._files is None:
       self._files = self._files_calculator()
     return self._files
 

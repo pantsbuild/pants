@@ -10,7 +10,7 @@ import re
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
-from pants.base.source_mapper import SourceMapper
+from pants.base.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
 
 
@@ -46,7 +46,7 @@ class ChangeCalculator(object):
   @property
   def _mapper(self):
     if self._mapper_cache is None:
-      self._mapper_cache = SourceMapper(self._address_mapper, self._build_graph, self._fast)
+      self._mapper_cache = SpecSourceMapper(self._address_mapper, self._build_graph, self._fast)
     return self._mapper_cache
 
   def changed_files(self):
