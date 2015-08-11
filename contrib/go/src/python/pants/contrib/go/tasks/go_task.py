@@ -69,7 +69,7 @@ class GoTask(Task):
     return self._goos_goarch
 
   def _lookup_go_env_var(self, var):
-    return self.go_dist.create_go_cmd('env', args=[var]).get_output().strip()
+    return self.go_dist.create_go_cmd('env', args=[var]).check_output().strip()
 
   def global_import_id(self, go_remote_lib):
     """Returns the global import identifier of the given GoRemoteLibrary.
