@@ -64,6 +64,7 @@ class JarDependency(object):
     'org',
     'name',
     'rev',
+    'classifier',
     'force',
     'excludes',
     'transitive',

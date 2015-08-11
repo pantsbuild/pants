@@ -2,4 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 source_root('src/python', python_library)
-source_root('tests/python', python_tests, target)
+source_root('tests/python', python_library, python_tests)
+
+source_root('examples/3rdparty/go', go_remote_library)
+source_root('examples/src/go', go_library, go_binary)

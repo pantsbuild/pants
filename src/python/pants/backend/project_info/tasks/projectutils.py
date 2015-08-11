@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import defaultdict
 
 
-def get_jar_infos(ivy_products, confs=None):
+def get_jar_infos(ivy_products):
   """Returns a list of dicts containing the paths of various jar file resources.
 
   Keys include 'default' (normal jar path), 'sources' (path to source jar), and 'javadoc'
@@ -16,20 +16,13 @@ def get_jar_infos(ivy_products, confs=None):
   will never be present if 'default' isn't.
 
   :param ivy_products: ivy_jar_products data from a context
-  :param confs: List of key types to return (eg ['default', 'sources']). Just returns 'default' if
-    left unspecified.
-  :returns mapping of IvyModuleRef --> {'default' : [<jar_filenames>],
-                                        'sources' : [<jar_filenames>],
-                                        'javadoc' : [<jar_filenames>]}
+  :returns mapping of unclassified IvyModuleRef --> mapping of <classifier> --> <jar_path>
   """
-  confs = confs or ['default']
   classpath_maps = defaultdict(dict)
   if ivy_products:
-    for conf, info_group in ivy_products.items():
-      if conf not in confs:
-        continue  # We don't care about it.
+    for _, info_group in ivy_products.items():
       for info in info_group:
         for module in info.modules_by_ref.values():
-          if module.artifacts:
-            classpath_maps[module.ref][conf] = [artifact.path for artifact in module.artifacts]
+          if module.artifact:
+            classpath_maps[module.ref.unclassified][module.ref.classifier or 'default'] = module.artifact
   return classpath_maps
