@@ -102,8 +102,8 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     self.assertEqual(True, options.for_global_scope().v)
-    options = self._parse('./pants -v compile tgt')
-    self.assertEqual(['tgt'], options.target_specs)
+    options = self._parse('./pants -v compile path/to/tgt')
+    self.assertEqual(['path/to/tgt'], options.target_specs)
     self.assertEqual(True, options.for_global_scope().verbose)
     self.assertEqual(True, options.for_global_scope().v)
 
@@ -319,12 +319,13 @@ class OptionsTest(unittest.TestCase):
         '''
       ))
       tmp.flush()
-      cmdline = './pants --target-spec-file={filename} compile morx fleem'.format(filename=tmp.name)
+      cmdline = './pants --target-spec-file={filename} compile morx:tgt fleem:tgt'.format(
+        filename=tmp.name)
       bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
       bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
       options = self._parse(cmdline, bootstrap_option_values=bootstrap_options)
       sorted_specs = sorted(options.target_specs)
-      self.assertEqual(['bar', 'fleem', 'foo', 'morx'], sorted_specs)
+      self.assertEqual(['bar', 'fleem:tgt', 'foo', 'morx:tgt'], sorted_specs)
 
   def test_passthru_args(self):
     options = self._parse('./pants compile foo -- bar --baz')

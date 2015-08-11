@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import sys
+from abc import ABCMeta
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
@@ -35,16 +37,36 @@ class SplitArgs(namedtuple('SplitArgs',
   pass
 
 
-class HelpRequest(namedtuple('HelpRequest', ['version', 'advanced', 'all_scopes'])):
-  """A help request from the user.
+class HelpRequest(object):
+  """Represents an implicit or explicit request for help by the user."""
+  __metaclass__ = ABCMeta
 
-  version: Did the user ask for version info.
-  advanced: Did the user ask for advanced help (e.g., using --help-advanced).
-  all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
-  """
-  @classmethod
-  def basic(cls):
-    return cls(version=False, advanced=False, all_scopes=False)
+
+class VersionHelp(HelpRequest):
+  """The user requested the version of pants."""
+  pass
+
+
+class OptionsHelp(HelpRequest):
+  def __init__(self, advanced=False, all_scopes=False):
+    """The user requested help for cmd-line options.
+
+    :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
+    :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
+    """
+    self.advanced = advanced
+    self.all_scopes = all_scopes
+
+
+class UnknownGoalHelp(HelpRequest):
+  """The user specified an unknown goal (or task)."""
+  def __init__(self, unknown_goals):
+    self.unknown_goals = unknown_goals
+
+
+class NoGoalHelp(HelpRequest):
+  """The user specified no goals."""
+  pass
 
 
 class ArgSplitter(object):
@@ -70,6 +92,7 @@ class ArgSplitter(object):
     self._known_scope_infos = known_scope_infos
     self._known_scopes = (set([si.scope for si in known_scope_infos]) |
                           {'help', 'help-advanced', 'help-all'})
+    self._unknown_scopes = []
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._help_request = None  # Will be set if we encounter any help flags.
 
@@ -91,13 +114,14 @@ class ArgSplitter(object):
   def _check_for_help_request(self, arg):
     if not arg in self._HELP_ARGS:
       return False
-    # First ensure that we have a basic HelpRequest.
+    # First ensure that we have a basic OptionsHelp.
     if not self._help_request:
-      self._help_request = HelpRequest.basic()
+      self._help_request = OptionsHelp()
     # Now see if we need to enhance it.
-    advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
-    all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
-    self._help_request = HelpRequest(False, advanced, all_scopes)
+    if isinstance(self._help_request, OptionsHelp):
+      advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
+      all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
+      self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
     return True
 
   def split_args(self, args=None):
@@ -142,7 +166,7 @@ class ArgSplitter(object):
     for version_arg in self._VERSION_ARGS:
       if version_arg in global_flags:
         if not self._help_request:
-          self._help_request = HelpRequest(True, False, False)
+          self._help_request = VersionHelp()
         global_flags.remove(version_arg)
 
     add_scope(GLOBAL_SCOPE)
@@ -164,15 +188,21 @@ class ArgSplitter(object):
         # We assume any args here are in global scope.
         if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
-      else:
+      elif os.path.sep in arg or ':' in arg or os.path.isdir(arg):
         targets.append(arg)
+      else:
+        self._unknown_scopes.append(arg)
 
     if self._at_double_dash():
       self._unconsumed_args.pop()
       passthru = list(reversed(self._unconsumed_args))
 
+    if self._unknown_scopes:
+      self._help_request = UnknownGoalHelp(self._unknown_scopes)
+
     if not goals and not self._help_request:
-      self._help_request = HelpRequest.basic()
+      self._help_request = NoGoalHelp()
+
     return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
 
   def _consume_scope(self):

@@ -126,5 +126,5 @@ class GlobalOptionsRegistrar(Optionable):
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')
     register('--lock', action='store_true', default=True,
-             help='Use a global lock to exclude other versions of pants from running during critical'
-                  'operations.')
+             help='Use a global lock to exclude other versions of pants from running during '
+                  'criticaloperations.')
