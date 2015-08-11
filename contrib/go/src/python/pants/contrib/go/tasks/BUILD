@@ -35,7 +35,7 @@ python_library(
   dependencies=[
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
-    'contrib/go/src/python/pants/contrib/go/subsystems:go_platform',
+    'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
