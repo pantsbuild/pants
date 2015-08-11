@@ -54,6 +54,7 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    ':go_tool',
   ]
 )
 
@@ -62,6 +63,7 @@ python_tests(
   sources=['test_go_test_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    ':go_tool',
   ]
 )
 
@@ -70,5 +72,11 @@ python_tests(
   sources=['test_go_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    ':go_tool',
   ]
+)
+
+python_library(
+  name='go_tool',
+  sources=['go_tool.py'],
 )
