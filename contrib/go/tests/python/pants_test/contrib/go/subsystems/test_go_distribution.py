@@ -19,7 +19,7 @@ class GoDistributionTest(unittest.TestCase):
   def setUp(self):
     # TODO(John Sirois): Learn create_subsystem how to handle subsystem dependencies and do:
     #   `create_subsystem(GoDistribution.Factory)`
-    # Instead of manually replicating default susbsystem options here.
+    # Instead of manually replicating default subsystem options here.
     binary_util = BinaryUtil(baseurls=['https://dl.bintray.com/pantsbuild/bin/build-support'],
                              timeout_secs=30,
                              bootstrapdir=get_pants_cachedir())
