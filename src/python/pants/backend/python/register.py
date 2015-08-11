@@ -62,19 +62,3 @@ def register_goals():
   task(name='py', action=PythonRepl).install('repl')
   task(name='setup-py', action=SetupPy).install().with_description(
     'Build setup.py-based Python projects from python_library targets.')
-
-  # task(name='style-class-factoring', action=ClassFactoringCheck).install('pythonstyle').with_description(
-  #   'Python Style Checker'
-  # )
-  # task(name='except-statement', action=ExceptStatementsCheck).install('test')
-  # task(name='future-compatibility', action=FutureCompatibilityCheck).install('test')
-  # task(name='import-order', action=ImportOrderCheck).install('test')
-  # task(name='indentation', action=IndentationCheck).install('test')
-  # task(name='missing-context-manager', action=MissingContextManagerCheck).install('test')
-  # task(name='new-style-classes', action=NewStyleClassesCheck).install('test')
-  # task(name='newlines', action=NewlinesCheck).install('test')
-  # task(name='pep8', action=PEP8Check).install('test')
-  # task(name='print-statements', action=PrintStatementsCheck).install('test')
-  # task(name='pyflakes', action=FlakeCheck).install('test')
-  # task(name='trailing-whitespace', action=TrailingWhitespaceCheck).install('test')
-  # task(name='variable-names', action=VariableNamesCheck).install('test')
