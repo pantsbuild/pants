@@ -2,6 +2,7 @@ python_library(
   name='go_compile',
   sources=['go_compile.py'],
   dependencies=[
+    'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
   ]
@@ -47,6 +48,7 @@ python_library(
   name='go_test',
   sources=['go_test.py'],
   dependencies=[
+    'src/python/pants/base:workunit',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
   ]
 )

@@ -82,24 +82,3 @@ class GoTask(Task):
     """
     return os.path.relpath(go_remote_lib.address.spec_path,
                            go_remote_lib.target_base)
-
-  def run_go_cmd(self, cmd, gopath, target, cmd_flags=None, pkg_flags=None):
-    """Runs a Go command on a target from within a Go workspace.
-
-    :param str cmd: Go command to execute, e.g. 'test' for `go test`
-    :param str gopath: $GOPATH which points to a valid Go workspace from which
-                       to run the command.
-    :param Target target: A Go package whose source the command will execute on.
-    :param list<str> cmd_flags: Command line flags to pass to command.
-    :param list<str> pkg_flags: Command line flags to pass to target package.
-    """
-    cmd_flags = cmd_flags or []
-    pkg_flags = pkg_flags or []
-    pkg_path = (self.global_import_id(target) if self.is_remote_lib(target)
-                else target.address.spec_path)
-    args = cmd_flags + [pkg_path] + pkg_flags
-    retcode = self.go_dist.execute_go_cmd(cmd, gopath=gopath, args=args,
-                                          workunit_factory=self.context.new_workunit)
-    if retcode != 0:
-      raise TaskError('`go {cmd} {args}` exited non-zero ({retcode})'
-                      .format(cmd=cmd, args=' '.join(args), retcode=retcode))
