@@ -74,8 +74,8 @@ class GoWorkspaceTaskTest(TaskTestBase):
       for src in sources:
         assert_is_linked(src)
 
-      # Sleep so that first round of linking has 1 second earlier mtime than future links.
-      time.sleep(1)
+      # Sleep so that first round of linking has 1.5 second earlier mtime than future links.
+      time.sleep(1.5)
 
       # Add source file and re-make library.
       self.create_file(os.path.join(spec, 'w.go'))
