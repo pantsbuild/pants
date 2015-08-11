@@ -38,7 +38,7 @@ class GoDistribution(object):
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
-      # Its not unreasonable to imagine multiple go version in play; for example: when
+      # It's not unreasonable to imagine multiple go versions in play; for example: when
       # transitioning from the 1.x series to the 2.x series.
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
@@ -54,7 +54,7 @@ class GoDistribution(object):
     """Returns the version of the Go distribution.
 
     :returns: The Go distribution version number string.
-    :rtype: string`
+    :rtype: string
     """
     return self._version
 
@@ -63,7 +63,7 @@ class GoDistribution(object):
     """Returns the $GOROOT for this go distribution.
 
     :returns: The Go distribution $GOROOT.
-    :rtype: string`
+    :rtype: string
     """
     go_distribution = self._binary_util.select_binary(self._relpath, self.version, 'go.tar.gz')
     distribution_workdir = os.path.dirname(go_distribution)
