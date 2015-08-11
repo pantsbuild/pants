@@ -52,7 +52,7 @@ goal `foo`, use `Goal.by_name('foo').install`. You can install more than
 one task in a goal; e.g., there are separate tasks to run Java tests and
 Python tests; but both are in the `test` goal.
 
-Products: how one task consumes the output of another
+Products: How one Task consumes the output of another
 ---------------------------------------------------
 
 One task might need to consume the "products" (outputs) of another. E.g., the Java test runner
@@ -105,22 +105,10 @@ Task Configuration
 
 Tasks may be configured via the options system.
 
-To define an option, handle your Task's `register_options`
+To define an option, implement your Task's `register_options`
 class method and call the passed-in `register` function:
 
 !inc[start-at=  def register_options&end-before=--confs](../backend/jvm/tasks/checkstyle.py)
-
-### Fine-tuning Options (aka "Option Options")
-
-When calling the `register` function, passing a few additional arguments
-will affect the behaviour of the registered option. The most common parameters are:
-  - `default`: Sets a default value that will be used if the option is not specified by the user.
-  - `type`: Constrains the type of the option. If not specified, the option will be a string. Takes
-  a python type constructor (like `int`), or a type like `Options.list` from [pants.option.options.Options](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
-.
-  - `fingerprint`: Indicates that the value of the registered option affects the products
-  of the task, such that changing the option would result in different products. When `True`,
-  changing the option will cause targets built by the task to be invalidated and rebuilt.
 
 ### Scopes
 
@@ -145,6 +133,18 @@ Note that if the task being run is specified explicitly on the command line, you
 scope from the cmd-line flag name. For example, instead of
 `./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`. See
 [[Invoking Pants|pants('src/docs:invoking')]] for more information.
+
+### Fine-tuning Options (aka "Option Options")
+
+When calling the `register` function, passing a few additional arguments
+will affect the behaviour of the registered option. The most common parameters are:
+
+- `type`: Constrains the type of the option. Takes a python type constructor (like `int`), or a
+  type like `Options.list` from [pants.option.options.Options](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py). If not specified, the option will be a string.
+- `default`: Sets a default value that will be used if the option is not specified by the user.
+- `fingerprint`: Indicates that the value of the registered option affects the products
+  of the task, such that changing the option would result in different products. When `True`,
+  changing the option will cause targets built by the task to be invalidated and rebuilt.
 
 
 GroupTask
