@@ -6,7 +6,6 @@ lockfile==0.10.2
 Markdown==2.1.1
 mock==1.0.1
 mox==0.5.3
-# Until https://github.com/pantsbuild/pex/issues/28 is addressed, we cannot do pex>=1.1.0.
 pex==1.0.3
 psutil==3.1.1
 Pygments==1.4
