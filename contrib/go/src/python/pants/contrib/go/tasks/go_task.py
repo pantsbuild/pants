@@ -11,6 +11,7 @@ import sys
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+from pants.util.memo import memoized_property
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -46,27 +47,18 @@ class GoTask(Task):
   def is_go(target):
     return isinstance(target, (GoLocalSource, GoRemoteLibrary))
 
-  def __init__(self, *args, **kwargs):
-    super(GoTask, self).__init__(*args, **kwargs)
-    self._goos_goarch = None
-    self._go_dist = None
-
-  @property
+  @memoized_property
   def go_dist(self):
-    if self._go_dist is None:
-      self._go_dist = GoDistribution.Factory.global_instance().create()
-    return self._go_dist
+    return GoDistribution.Factory.global_instance().create()
 
-  @property
+  @memoized_property
   def goos_goarch(self):
     """Returns concatenated $GOOS and $GOARCH environment variables, separated by an underscore.
 
     Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
     """
-    if self._goos_goarch is None:
-      self._goos_goarch = '{goos}_{goarch}'.format(goos=self._lookup_go_env_var('GOOS'),
-                                                   goarch=self._lookup_go_env_var('GOARCH'))
-    return self._goos_goarch
+    return '{goos}_{goarch}'.format(goos=self._lookup_go_env_var('GOOS'),
+                                    goarch=self._lookup_go_env_var('GOARCH'))
 
   def _lookup_go_env_var(self, var):
     return self.go_dist.create_go_cmd('env', args=[var]).check_output().strip()
