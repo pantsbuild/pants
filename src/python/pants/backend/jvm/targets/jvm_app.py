@@ -180,7 +180,7 @@ class JvmApp(Target):
         globs += bundle.fileset.filespec['globs']
       else:
         globs += bundle.fileset
-    super_globs = super(JvmApp, self).globs_relative_to_buildroot(self)
+    super_globs = super(JvmApp, self).globs_relative_to_buildroot()
     if super_globs:
       globs += super_globs['globs']
     return {'globs' : globs}
