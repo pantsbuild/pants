@@ -13,6 +13,7 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailur
 
 
 class ImmediatelyExecutingPool(object):
+  num_workers = 4
 
   def submit_async_work(self, work):
     work.func(*work.args_tuples[0])
@@ -144,7 +145,7 @@ class ExecutionGraphTest(unittest.TestCase):
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
-    self.assertEqual(["B", "F", "A"], self.jobs_run)
+    self.assertTrue(self.jobs_run == ["B", "F", "A"] or self.jobs_run == ["B", "A", "F"])
     self.assertEqual("Failed jobs: F", str(cm.exception))
 
   def test_failure_of_disconnected_job_does_not_cancel_non_dependents(self):

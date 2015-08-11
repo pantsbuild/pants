@@ -125,7 +125,7 @@ class ExecutionGraph(object):
   global execution graph.
   """
 
-  def __init__(self, job_list, job_sizes):
+  def __init__(self, job_list, job_sizes=None):
     """
 
     :param job_list Job: list of Jobs to schedule and run.
@@ -144,6 +144,9 @@ class ExecutionGraph(object):
 
     if len(self._job_keys_with_no_dependencies) == 0:
       raise NoRootJobError()
+
+    if job_sizes is None:
+      job_sizes = [1] * len(job_list)
 
     self._job_size = {}
     for (job, job_size) in zip(job_list, job_sizes):
