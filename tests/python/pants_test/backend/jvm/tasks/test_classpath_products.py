@@ -118,7 +118,7 @@ class ClasspathProductsTest(BaseTest):
 
   def test_excludes_similar_org_name(self):
     b = self.make_target('b', JvmTarget)
-    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.exam')])
+    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.exam')], dependencies=[b])
 
     classpath_product = ClasspathProducts()
     classpath_product.add_for_target(b, [('default', self._example_jar_path())])
@@ -126,7 +126,7 @@ class ClasspathProductsTest(BaseTest):
 
     classpath = classpath_product.get_for_target(a)
 
-    self.assertEqual([], classpath)
+    self.assertEqual([('default', self._example_jar_path())], classpath)
 
   def test_jar_provided_by_transitive_target_excluded(self):
     provider = self.make_target('provider', ExportableJvmLibrary,
