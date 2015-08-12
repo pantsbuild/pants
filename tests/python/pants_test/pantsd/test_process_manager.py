@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 import unittest
-from collections import namedtuple
+from contextlib import contextmanager
 
 import mock
 import psutil
@@ -20,7 +20,10 @@ from pants.util.contextutil import temporary_dir
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-FakeProcess = namedtuple('Process', 'pid name status')
+def fake_process(**kwargs):
+  proc = mock.create_autospec(psutil.Process, spec_set=True)
+  [setattr(getattr(proc, k), 'return_value', v) for k, v in kwargs.items()]
+  return proc
 
 
 class TestProcessGroup(unittest.TestCase):
@@ -46,8 +49,8 @@ class TestProcessGroup(unittest.TestCase):
   def test_iter_instances(self):
     with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       mock_process_iter.return_value = [
-        FakeProcess(name='a_test', pid=3, status=psutil.STATUS_IDLE),
-        FakeProcess(name='b_test', pid=4, status=psutil.STATUS_IDLE)
+        fake_process(name='a_test', pid=3, status=psutil.STATUS_IDLE),
+        fake_process(name='b_test', pid=4, status=psutil.STATUS_IDLE)
       ]
 
       items = [item for item in self.pg.iter_instances()]
@@ -61,6 +64,25 @@ class TestProcessGroup(unittest.TestCase):
 class TestProcessManager(unittest.TestCase):
   def setUp(self):
     self.pm = ProcessManager('test')
+
+  def test_process_properties(self):
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = fake_process(name='name',
+                                                  cmdline=['cmd', 'line'],
+                                                  status='status')
+      self.assertEqual(self.pm.cmdline, ['cmd', 'line'])
+      self.assertEqual(self.pm.cmd, 'cmd')
+
+  def test_process_properties_cmd_indexing(self):
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = fake_process(cmdline='')
+      self.assertEqual(self.pm.cmd, None)
+
+  def test_process_properties_none(self):
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_asproc:
+      mock_asproc.return_value = None
+      self.assertEqual(self.pm.cmdline, None)
+      self.assertEqual(self.pm.cmd, None)
 
   def test_maybe_cast(self):
     self.assertIsNone(self.pm._maybe_cast(None, int))
@@ -79,10 +101,18 @@ class TestProcessManager(unittest.TestCase):
     with mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
       mock_proc.return_value = sentinel
       self.pm._pid = sentinel
-      self.assertEqual(self.pm.as_process(), sentinel)
+      self.assertEqual(self.pm._as_process(), sentinel)
+
+  def test_as_process_no_pid(self):
+    fake_pid = 3
+    with mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
+      mock_proc.side_effect = psutil.NoSuchProcess(fake_pid)
+      self.pm._pid = fake_pid
+      with self.assertRaises(psutil.NoSuchProcess):
+        self.pm._as_process()
 
   def test_as_process_none(self):
-    self.assertEqual(self.pm.as_process(), None)
+    self.assertEqual(self.pm._as_process(), None)
 
   def test_wait_for_file(self):
     with temporary_dir() as td:
@@ -161,52 +191,55 @@ class TestProcessManager(unittest.TestCase):
   def test_get_pid(self):
     with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
       patched_pm.return_value = '3333'
-      self.assertEqual(self.pm.get_pid(), 3333)
+      self.assertEqual(self.pm._get_pid(), 3333)
 
   def test_get_socket(self):
     with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
       patched_pm.return_value = '3333'
-      self.assertEqual(self.pm.get_socket(), 3333)
+      self.assertEqual(self.pm._get_socket(), 3333)
 
   def test_is_alive_neg(self):
-    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = None
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_once_with(self.pm)
 
   def test_is_alive(self):
-    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
-      mock_as_process.return_value = FakeProcess(name='test', pid=3, status=psutil.STATUS_IDLE)
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_IDLE)
       self.pm._process = mock.Mock(status=psutil.STATUS_IDLE)
       self.assertTrue(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_zombie(self):
-    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
-      mock_as_process.return_value = FakeProcess(name='test', pid=3, status=psutil.STATUS_ZOMBIE)
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_ZOMBIE)
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_zombie_exception(self):
-    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
-      mock_as_process.side_effect = iter([
-        FakeProcess(name='test', pid=3, status=psutil.STATUS_IDLE),
-        psutil.NoSuchProcess(0)
-      ])
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.side_effect = psutil.NoSuchProcess(0)
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_stale_pid(self):
-    with mock.patch.object(ProcessManager, 'as_process', **PATCH_OPTS) as mock_as_process:
-      mock_as_process.return_value = FakeProcess(name='not_test', pid=3, status=psutil.STATUS_IDLE)
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = fake_process(name='not_test', pid=3, status=psutil.STATUS_IDLE)
       self.pm._process_name = 'test'
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_kill(self):
     with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
-      self.pm.kill(0)
-      mock_kill.assert_called_once_with(None, 0)
+      self.pm._pid = 42
+      self.pm._kill(0)
+      mock_kill.assert_called_once_with(42, 0)
+
+  def test_kill_no_pid(self):
+    with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
+      self.pm._kill(0)
+      self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
   def test_terminate(self):
     with mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:
@@ -221,48 +254,42 @@ class TestProcessManager(unittest.TestCase):
     proc.wait()
     self.assertEqual(proc.communicate()[0].strip(), test_str)
 
-  @mock.patch('os.umask', **PATCH_OPTS)
-  @mock.patch('os.chdir', **PATCH_OPTS)
-  @mock.patch('os._exit', **PATCH_OPTS)
-  @mock.patch('os.setsid', **PATCH_OPTS)
+  @contextmanager
+  def mock_daemonize_context(self, chk_pre=True, chk_post_child=False, chk_post_parent=False):
+    with mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent:
+      with mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child:
+        with mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre:
+          with mock.patch('os.chdir', **PATCH_OPTS):
+            with mock.patch('os._exit', **PATCH_OPTS):
+              with mock.patch('os.setsid', **PATCH_OPTS):
+                with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
+                  yield mock_fork
+
+                  if chk_pre: mock_pre.assert_called_once_with(self.pm)
+                  if chk_post_child: mock_post_child.assert_called_once_with(self.pm)
+                  if chk_post_parent: mock_post_parent.assert_called_once_with(self.pm)
+
   def test_daemonize_parent(self, *args):
-    with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
+    with self.mock_daemonize_context() as mock_fork:
       mock_fork.side_effect = [1, 1]    # Simulate the parent.
       self.pm.daemonize(write_pid=False)
-      # TODO(Kris Wilson): check that callbacks were called appropriately here and for daemon_spawn.
 
-  @mock.patch('os.umask', **PATCH_OPTS)
-  @mock.patch('os.chdir', **PATCH_OPTS)
-  @mock.patch('os._exit', **PATCH_OPTS)
-  @mock.patch('os.setsid', **PATCH_OPTS)
   def test_daemonize_child(self, *args):
-    with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
+    with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
       mock_fork.side_effect = [0, 0]    # Simulate the child.
       self.pm.daemonize(write_pid=False)
 
-  @mock.patch('os.umask', **PATCH_OPTS)
-  @mock.patch('os.chdir', **PATCH_OPTS)
-  @mock.patch('os._exit', **PATCH_OPTS)
-  @mock.patch('os.setsid', **PATCH_OPTS)
   def test_daemonize_child_parent(self, *args):
-    with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
+    with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
       mock_fork.side_effect = [0, 1]    # Simulate the childs parent.
       self.pm.daemonize(write_pid=False)
 
-  @mock.patch('os.umask', **PATCH_OPTS)
-  @mock.patch('os.chdir', **PATCH_OPTS)
-  @mock.patch('os._exit', **PATCH_OPTS)
-  @mock.patch('os.setsid', **PATCH_OPTS)
   def test_daemon_spawn_parent(self, *args):
-    with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
-      mock_fork.return_value = 1    # Simulate the parent.
+    with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
+      mock_fork.return_value = 1        # Simulate the parent.
       self.pm.daemon_spawn()
 
-  @mock.patch('os.umask', **PATCH_OPTS)
-  @mock.patch('os.chdir', **PATCH_OPTS)
-  @mock.patch('os._exit', **PATCH_OPTS)
-  @mock.patch('os.setsid', **PATCH_OPTS)
   def test_daemon_spawn_child(self, *args):
-    with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
-      mock_fork.return_value = 0    # Simulate the child.
+    with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
+      mock_fork.return_value = 0        # Simulate the child.
       self.pm.daemon_spawn()

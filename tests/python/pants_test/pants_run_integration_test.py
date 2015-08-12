@@ -194,14 +194,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
         if ignore_links and os.path.islink(p):
           continue
         found.add(os.path.relpath(p, directory))
-        # print(p)
 
-    not_found = expected_files - found
-    extras = found - expected_files
-    self.assertEqual(len(not_found), 0,
-                    'Failed to find the following files: {}'.format(not_found))
-    self.assertEqual(len(extras), 0,
-                    'Found extra unexpected files: {}'.format(extras))
+    self.assertEqual(expected_files, found)
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""

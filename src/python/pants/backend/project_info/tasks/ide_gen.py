@@ -12,7 +12,6 @@ from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants import binary_util
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -21,6 +20,7 @@ from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -126,6 +126,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     """IdeGen Error."""
 
   class TargetUtil(object):
+
     def __init__(self, context):
       self.context = context
 
@@ -226,6 +227,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     jars = OrderedSet()
     excludes = OrderedSet()
     compiles = OrderedSet()
+
     def prune(target):
       if target.is_jvm:
         if target.excludes:
@@ -280,14 +282,14 @@ class IdeGen(JvmToolTaskMixin, Task):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  def copy_jars(self, jar_list, dest_dir):
-    cp_jars = []
-    if jar_list:
-      for jar in jar_list:
-        cp_jar = os.path.join(dest_dir, os.path.basename(jar))
-        shutil.copy(jar, cp_jar)
-        cp_jars.append(cp_jar)
-    return cp_jars
+  @staticmethod
+  def copy_jar(jar, dest_dir):
+    if jar:
+      cp_jar = os.path.join(dest_dir, os.path.basename(jar))
+      shutil.copy(jar, cp_jar)
+      return cp_jar
+    else:
+      return None
 
   def map_external_jars(self):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
@@ -299,27 +301,20 @@ class IdeGen(JvmToolTaskMixin, Task):
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
     jar_products = self.context.products.get_data('ivy_jar_products')
-    jar_paths = get_jar_infos(jar_products, confs=['default', 'sources', 'javadoc'])
+    jar_paths = get_jar_infos(jar_products)
     for entry in jar_paths.values():
-      binary_jars = entry.get('default')
-      sources_jars = entry.get('sources')
-      javadoc_jars = entry.get('javadoc')
-      cp_jars = self.copy_jars(binary_jars, external_jar_dir)
-      cp_source_jars = self.copy_jars(sources_jars, external_source_jar_dir)
-      cp_javadoc_jars = self.copy_jars(javadoc_jars, external_javadoc_jar_dir)
-      for i in range(len(cp_jars)):
-        cp_jar = cp_jars[i]
-        if i < len(cp_source_jars):
-          cp_source_jar = cp_source_jars[i]
-        else:
-          cp_source_jar = None
-        if i < len(cp_javadoc_jars):
-          cp_javadoc_jar = cp_javadoc_jars[i]
-        else:
-          cp_javadoc_jar = None
-        self._project.external_jars.add(ClasspathEntry(cp_jar,
-                                                       source_jar=cp_source_jar,
-                                                       javadoc_jar=cp_javadoc_jar))
+      binary_jar  = self.copy_jar(entry.get('default'), external_jar_dir)
+      sources_jar = self.copy_jar(entry.get('sources'), external_source_jar_dir)
+      javadoc_jar = self.copy_jar(entry.get('javadoc'), external_javadoc_jar_dir)
+      if binary_jar:
+        self._project.external_jars.add(ClasspathEntry(jar=binary_jar,
+                                                       source_jar=sources_jar,
+                                                       javadoc_jar=javadoc_jar))
+      # treat all other jars as binaries
+      for classifier, jar in entry.iteritems():
+        if classifier not in {'default', 'sources', 'javadoc'}:
+          binary_jar  = self.copy_jar(jar, external_jar_dir)
+          self._project.external_jars.add(ClasspathEntry(binary_jar))
 
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
@@ -558,7 +553,7 @@ class Project(object):
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
         if target.address.is_synthetic:
-          return [] # Siblings don't make sense for synthetic addresses.
+          return []  # Siblings don't make sense for synthetic addresses.
         candidates = self.target_util.get_all_addresses(target.address.build_file)
         for ancestor in target.address.build_file.ancestors():
           candidates.update(self.target_util.get_all_addresses(ancestor))
@@ -566,6 +561,7 @@ class Project(object):
           candidates.update(self.target_util.get_all_addresses(sibling))
         for descendant in target.address.build_file.descendants(spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
+
         def is_sibling(target):
           return source_target(target) and target_dirset.intersection(find_source_basedirs(target))
 

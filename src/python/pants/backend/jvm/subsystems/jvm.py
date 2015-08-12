@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_split
 
@@ -26,7 +26,7 @@ class JVM(Subsystem):
              help='Run the JVM with remote debugging.')
     register('--debug-port', advanced=True, recursive=True, type=int, default=5005,
              help='The JVM will listen for a debugger on this port.')
-    register('--debug-args', advanced=True, recursive=True, type=Options.list,
+    register('--debug-args', advanced=True, recursive=True, type=list_option,
              default=[
                '-Xdebug',
                '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'
@@ -45,7 +45,9 @@ class JVM(Subsystem):
     for opt in self.get_options().options:
       ret.extend(safe_shlex_split(opt))
 
-    if self.get_options().debug:
+    if (self.get_options().debug or
+        self.get_options().is_flagged('debug_port') or
+        self.get_options().is_flagged('debug_args')):
       debug_port = self.get_options().debug_port
       ret.extend(arg.format(debug_port=debug_port) for arg in self.get_options().debug_args)
     return ret

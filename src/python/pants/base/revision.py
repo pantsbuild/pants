@@ -87,3 +87,15 @@ class Revision(object):
 
   def __repr__(self):
     return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr, self._components)))
+
+  def __eq__(self, other):
+    return hasattr(other, '_components') and tuple(self._components) == tuple(other._components)
+
+  def __ne__(self, other):
+    return not self.__eq__(other)
+
+  def __hash__(self):
+    return hash(self._components)
+
+  def __str__(self):
+    return '.'.join(str(c) for c in self._components)

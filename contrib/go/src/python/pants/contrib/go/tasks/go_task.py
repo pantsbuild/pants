@@ -11,8 +11,9 @@ import sys
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+from pants.util.memo import memoized_property
 
-from pants.contrib.go.subsystems.go_platform import GoPlatform
+from pants.contrib.go.subsystems.go_distribution import GoDistribution
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_local_source import GoLocalSource
@@ -23,7 +24,7 @@ class GoTask(Task):
 
   @classmethod
   def global_subsystems(cls):
-    return super(GoTask, cls).global_subsystems() + (GoPlatform, )
+    return super(GoTask, cls).global_subsystems() + (GoDistribution.Factory,)
 
   @staticmethod
   def is_binary(target):
@@ -45,27 +46,21 @@ class GoTask(Task):
   def is_go(target):
     return isinstance(target, (GoLocalSource, GoRemoteLibrary))
 
-  @staticmethod
-  def lookup_goos_goarch():
-    def get_env_var(var):
-      return subprocess.check_output(['go', 'env', var]).strip()
-    goos = get_env_var('GOOS')
-    goarch = get_env_var('GOARCH')
-    return goos + '_' + goarch
+  @memoized_property
+  def go_dist(self):
+    return GoDistribution.Factory.global_instance().create()
 
-  def __init__(self, *args, **kwargs):
-    super(GoTask, self).__init__(*args, **kwargs)
-    self._goos_goarch = None
-
-  @property
+  @memoized_property
   def goos_goarch(self):
     """Returns concatenated $GOOS and $GOARCH environment variables, separated by an underscore.
 
     Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
     """
-    if self._goos_goarch is None:
-      self._goos_goarch = self.lookup_goos_goarch()
-    return self._goos_goarch
+    return '{goos}_{goarch}'.format(goos=self._lookup_go_env_var('GOOS'),
+                                    goarch=self._lookup_go_env_var('GOARCH'))
+
+  def _lookup_go_env_var(self, var):
+    return self.go_dist.create_go_cmd('env', args=[var]).check_output().strip()
 
   def global_import_id(self, go_remote_lib):
     """Returns the global import identifier of the given GoRemoteLibrary.
@@ -78,26 +73,3 @@ class GoTask(Task):
     """
     return os.path.relpath(go_remote_lib.address.spec_path,
                            go_remote_lib.target_base)
-
-  def run_go_cmd(self, cmd, gopath, target, cmd_flags=None, pkg_flags=None):
-    """Runs a Go command on a target from within a Go workspace.
-
-    :param str cmd: Go command to execute, e.g. 'test' for `go test`
-    :param str gopath: $GOPATH which points to a valid Go workspace from which
-                       to run the command.
-    :param Target target: A Go package whose source the command will execute on.
-    :param list<str> cmd_flags: Command line flags to pass to command.
-    :param list<str> pkg_flags: Command line flags to pass to target package.
-    """
-    cmd_flags = cmd_flags or []
-    pkg_flags = pkg_flags or []
-    pkg_path = (self.global_import_id(target) if self.is_remote_lib(target)
-                else target.address.spec_path)
-    envcopy = os.environ.copy()
-    envcopy['GOPATH'] = gopath
-    args = ['go', cmd] + cmd_flags + [pkg_path] + pkg_flags
-    p = subprocess.Popen(args, env=envcopy, stdout=sys.stdout, stderr=sys.stderr)
-    retcode = p.wait()
-    if retcode != 0:
-      raise TaskError('`{}` exited non-zero ({})'
-                      .format(' '.join(args), retcode))

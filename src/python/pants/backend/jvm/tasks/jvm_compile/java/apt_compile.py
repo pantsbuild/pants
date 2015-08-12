@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
+from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.base.target import Target
 from pants.util.dirutil import safe_open
 
@@ -22,7 +22,7 @@ would not be smart enough to compile the apt processors 1st and activate them.
 """
 
 
-class AptCompile(JavaCompile):
+class AptCompile(JmakeCompile):
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 

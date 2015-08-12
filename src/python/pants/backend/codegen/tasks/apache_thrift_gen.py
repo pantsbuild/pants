@@ -19,8 +19,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit
-from pants.option.options import Options
-from pants.thrift_util import ThriftBinary
+from pants.binaries.thrift_binary import ThriftBinary
+from pants.option.custom_types import list_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
@@ -39,9 +39,9 @@ class ApacheThriftGen(SimpleCodegenTask):
 
     register('--gen-options', advanced=True, fingerprint=True,
              help='Use these apache thrift java gen options.')
-    register('--deps', advanced=True, type=Options.list,
+    register('--deps', advanced=True, type=list_option,
              help='A list of specs pointing to dependencies of thrift generated java code.')
-    register('--service-deps', advanced=True, type=Options.list,
+    register('--service-deps', advanced=True, type=list_option,
              help='A list of specs pointing to dependencies of thrift generated java service '
                   'code.  If not supplied, then --deps will be used for service deps.')
 
@@ -135,13 +135,13 @@ class ApacheThriftGen(SimpleCodegenTask):
         if result != 0:
           raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
 
-        # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
-        # relocate the generated java sources to the root of the `work_dir` so that our base class
-        # maps them properly for source jars and the like.
-        gen_dir = os.path.join(work_dir, 'gen-java')
-        for path in os.listdir(gen_dir):
-          shutil.move(os.path.join(gen_dir, path), work_dir)
-        os.rmdir(gen_dir)
+    # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
+    # relocate the generated java sources to the root of the `work_dir` so that our base class
+    # maps them properly for source jars and the like.
+    gen_dir = os.path.join(work_dir, 'gen-java')
+    for path in os.listdir(gen_dir):
+      shutil.move(os.path.join(gen_dir, path), work_dir)
+    os.rmdir(gen_dir)
 
   def execute_codegen(self, invalid_targets):
     for target in invalid_targets:

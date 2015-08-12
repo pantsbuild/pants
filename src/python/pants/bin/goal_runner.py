@@ -26,10 +26,9 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
+from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import ScopeInfo
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
@@ -49,7 +48,7 @@ class SourceRootBootstrapper(Subsystem):
     super(SourceRootBootstrapper, cls).register_options(register)
     # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load
     # time.
-    register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
+    register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
              help='Initialize state by evaluating these buildfiles.')
 
   def bootstrap(self, address_mapper, build_file_parser):
@@ -97,14 +96,14 @@ class GoalRunner(object):
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
 
-    known_scope_infos = [ScopeInfo.for_global_scope()]
+    known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]
 
     # Add scopes for all needed subsystems.
     subsystems = Subsystem.closure(set(self.subsystems) |
                                    Goal.subsystems() |
                                    build_configuration.subsystems())
     for subsystem in subsystems:
-      known_scope_infos.append(ScopeInfo(subsystem.options_scope, ScopeInfo.GLOBAL_SUBSYSTEM))
+      known_scope_infos.append(subsystem.get_scope_info())
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():

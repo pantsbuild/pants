@@ -5,11 +5,11 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
     'src/python/pants/goal:context',
+    'tests/python/pants_test/option/util',
   ]
 )
 
@@ -287,7 +287,6 @@ python_tests(
     'src/python/pants/backend/core',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python:python_requirement',
-    'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'tests/python/pants_test:base_test',
   ]
@@ -341,7 +340,6 @@ python_tests(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:address',
-    'src/python/pants/base:addressable',
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
     ]

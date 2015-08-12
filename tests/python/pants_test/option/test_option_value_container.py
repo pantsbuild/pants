@@ -13,6 +13,7 @@ from pants.option.ranked_value import RankedValue
 
 
 class OptionValueContainerTest(unittest.TestCase):
+
   def test_standard_values(self):
     o = OptionValueContainer()
     o.foo = 1
@@ -54,6 +55,22 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertEqual(44, o.foo)
     self.assertEqual(RankedValue.FLAG, o.get_rank('foo'))
 
+  def test_is_flagged(self):
+    o = OptionValueContainer()
+    o.add_forwardings({'foo': 'bar'})
+
+    o.bar = RankedValue(RankedValue.NONE, 11)
+    self.assertFalse(o.is_flagged('foo'))
+
+    o.bar = RankedValue(RankedValue.CONFIG, 11)
+    self.assertFalse(o.is_flagged('foo'))
+
+    o.bar = RankedValue(RankedValue.ENVIRONMENT, 11)
+    self.assertFalse(o.is_flagged('foo'))
+
+    o.bar = RankedValue(RankedValue.FLAG, 11)
+    self.assertTrue(o.is_flagged('foo'))
+
   def test_indexing(self):
     o = OptionValueContainer()
     o.add_forwardings({'foo': 'bar'})
@@ -84,11 +101,11 @@ class OptionValueContainerTest(unittest.TestCase):
     o.add_forwardings({'foo': 'bar'})
     o.add_forwardings({'baz': 'qux'})
     o.bar = 1
-    o.qux = { 'a': 111 }
+    o.qux = {'a': 111}
     p = copy.copy(o)
     o.baz['b'] = 222  # Add to original dict.
     self.assertEqual(1, p.foo)
-    self.assertEqual({ 'a': 111, 'b': 222 }, p.baz)  # Ensure dict was not copied.
+    self.assertEqual({'a': 111, 'b': 222}, p.baz)  # Ensure dict was not copied.
 
   def test_deepcopy(self):
     # deepcopy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.

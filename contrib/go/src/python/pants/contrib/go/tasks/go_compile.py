@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from pants.base.workunit import WorkUnit
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -42,8 +43,7 @@ class GoCompile(GoWorkspaceTask):
         if not vt.valid:
           self.ensure_workspace(vt.target)
           self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
-          self.run_go_cmd('install', gopath, vt.target,
-                          cmd_flags=self.get_options().build_flags.split())
+          self._go_install(vt.target, gopath)
         if self.is_binary(vt.target):
           binary_path = os.path.join(gopath, 'bin', os.path.basename(vt.target.address.spec_path))
           self.context.products.get_data('exec_binary')[vt.target] = binary_path
@@ -53,6 +53,14 @@ class GoCompile(GoWorkspaceTask):
           lib_binary_map[vt.target] = os.path.join(gopath, 'pkg',
                                                    self.goos_goarch,
                                                    lib_binary_path) + '.a'
+
+  def _go_install(self, target, gopath):
+    pkg_path = (self.global_import_id(target) if self.is_remote_lib(target)
+                else target.address.spec_path)
+    args = self.get_options().build_flags.split() + [pkg_path]
+    self.go_dist.execute_go_cmd('install', gopath=gopath, args=args,
+                                workunit_factory=self.context.new_workunit,
+                                workunit_labels=[WorkUnit.COMPILER])
 
   def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
     """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.

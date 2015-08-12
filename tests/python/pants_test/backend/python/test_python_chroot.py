@@ -24,13 +24,13 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.source_root import SourceRoot
-from pants.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.thrift_util import ThriftBinary
 from pants.util.contextutil import temporary_dir
-from pants_test.base.context_utils import create_option_values
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 def test_get_current_platform():
@@ -41,32 +41,19 @@ def test_get_current_platform():
 class PythonChrootTest(BaseTest):
   @contextmanager
   def dumped_chroot(self, targets):
-    def options(**kwargs):
-      return create_option_values(kwargs)
-
     with temporary_dir() as chroot:
-      # TODO(John Sirois): Find a way to get easy access to pants option defaults.
       python_setup_workdir = os.path.join(self.real_build_root, '.pants.d', 'python-setup')
 
-      python_setup_options = options(
-          artifact_cache_dir=os.path.join(python_setup_workdir, 'artifacts'),
-          interpreter_cache_dir=os.path.join(python_setup_workdir, 'interpreters'),
-          interpreter_requirement='CPython>=2.7,<3',
-          resolver_cache_dir=os.path.join(python_setup_workdir, 'resolved_requirements'),
-          resolver_cache_ttl=None,
-          setuptools_version='5.4.1',
-          wheel_version='0.24.0')
-      python_setup = PythonSetup('test-scope', python_setup_options)
-      python_repos = PythonRepos('test-scope',
-                                 options(repos=[], indexes=['https://pypi.python.org/simple/']))
+      def cache_dir(name):
+        return os.path.join(python_setup_workdir, name)
 
-      ivy_subsystem_options = options(ivy_profile='2.4.0',
-                                      ivy_settings=None,
-                                      cache_dir=os.path.expanduser('~/.ivy2/pants'),
-                                      http_proxy=None,
-                                      https_proxy=None,
-                                      pants_bootstrapdir=get_pants_cachedir())
-      ivy_subsystem = IvySubsystem('test-scope', ivy_subsystem_options)
+      python_setup = create_subsystem(PythonSetup,
+                                      artifact_cache_dir=cache_dir('artifacts'),
+                                      interpreter_cache_dir=cache_dir('interpreters'),
+                                      resolver_cache_dir=cache_dir('resolved_requirements'))
+      python_repos = create_subsystem(PythonRepos)
+
+      ivy_subsystem = create_subsystem(IvySubsystem, pants_bootstrapdir=get_pants_cachedir())
       ivy_bootstrapper = Bootstrapper(ivy_subsystem=ivy_subsystem)
 
       def thrift_binary_factory():

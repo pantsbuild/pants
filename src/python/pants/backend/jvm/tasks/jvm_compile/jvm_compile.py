@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import sys
-from abc import abstractmethod
 from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
@@ -18,7 +18,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDepen
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.goal.products import MultipleRootedProducts
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
 
 
@@ -36,14 +36,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--jvm-options', type=Options.list,
+    register('--jvm-options', type=list_option, default=[],
              help='Run the compiler with these JVM options.')
 
-    register('--args', action='append', default=list(cls.get_args_default(register.bootstrap)),
-             fingerprint=True,
+    register('--args', action='append',
+             default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
-    register('--confs', type=Options.list, default=['default'],
+    register('--confs', type=list_option, default=['default'],
              help='Compile for these Ivy confs.')
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
@@ -72,8 +72,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-    JvmCompileGlobalStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
-    JvmCompileIsolatedStrategy.register_options(register, cls._language, cls._supports_concurrent_execution)
+    JvmCompileGlobalStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
+    JvmCompileIsolatedStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
 
   @classmethod
   def product_types(cls):
@@ -102,13 +102,19 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   # Subclasses must implement.
   # --------------------------
-  _language = None
+  _name = None
   _file_suffix = None
   _supports_concurrent_execution = None
 
   @classmethod
+  def task_subsystems(cls):
+    # NB(gmalmquist): This is only used to make sure the JvmTargets get properly fingerprinted.
+    # See: java_zinc_compile_jvm_platform_integration#test_compile_stale_platform_settings.
+    return super(JvmCompile, cls).task_subsystems() + (JvmPlatform,)
+
+  @classmethod
   def name(cls):
-    return cls._language
+    return cls._name
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -138,6 +144,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def select(self, target):
     return target.has_sources(self._file_suffix)
 
+  def select_source(self, source_file_path):
+    """Source predicate for the strategy."""
+    return source_file_path.endswith(self._file_suffix)
+
   def create_analysis_tools(self):
     """Returns an AnalysisTools implementation.
 
@@ -145,12 +155,23 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     raise NotImplementedError()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
 
-    Subclasses must implement."""
+    Subclasses must implement.
+    :param list args: Arguments to the compiler (such as jmake or zinc).
+    :param list classpath: List of classpath entries.
+    :param list sources: Source files.
+    :param str classes_output_dir: Where to put the compiled output.
+    :param upstream_analysis:
+    :param analysis_file: Where to write the compile analysis.
+    :param log_file: Where to write logs.
+    :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
+      javac to use.
+    """
     raise NotImplementedError()
 
   # Subclasses may override.
@@ -178,6 +199,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
+    self._targets_to_compile_settings = None
 
     # JVM options for running the compiler.
     self._jvm_options = self.get_options().jvm_options
@@ -201,8 +223,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.get_options(),
                                           self.workdir,
                                           self.create_analysis_tools(),
-                                          self._language,
-                                          lambda s: s.endswith(self._file_suffix))
+                                          self._name,
+                                          self.select_source)
 
   def _fingerprint_strategy(self):
     return TaskIdentityFingerprintStrategy(self)
@@ -229,7 +251,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
       return
-
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     partition_size_hint, locally_changed_targets = self._strategy.invalidation_hints(relevant_targets)
@@ -237,8 +258,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          topological_order=True,
-                          fingerprint_strategy=self._fingerprint_strategy()) as invalidation_check:
+                          fingerprint_strategy=self._fingerprint_strategy(),
+                          topological_order=True) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid targets for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
@@ -264,7 +285,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
-  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir, log_file, progress_message):
+  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
+                   log_file, progress_message, settings):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -296,10 +318,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
-        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file, log_file)
+        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
+                     log_file, settings)
 
   def check_artifact_cache(self, vts):
-    post_process_cached_vts = lambda vts: self._strategy.post_process_cached_vts(vts)
+    post_process_cached_vts = lambda cvts: self._strategy.post_process_cached_vts(cvts)
     return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
 
   def _create_empty_products(self):

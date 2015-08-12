@@ -7,16 +7,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.option.custom_types import dict_type, list_type
+from pants.option.custom_types import dict_option, list_option
 from pants.option.errors import ParseError
 
 
 class CustomTypesTest(unittest.TestCase):
+
   def _do_test(self, expected_val, s):
     if isinstance(expected_val, dict):
-      val = dict_type(s)
+      val = dict_option(s)
     elif isinstance(expected_val, (list, tuple)):
-      val = list_type(s)
+      val = list_option(s)
     else:
       raise Exception('Expected value {0} is of unsupported type: {1}'.format(expected_val,
                                                                               type(expected_val)))
@@ -32,13 +33,13 @@ class CustomTypesTest(unittest.TestCase):
 
   def test_dict(self):
     self._do_test({}, '{}')
-    self._do_test({ 'a': 'b' }, '{ "a": "b" }')
-    self._do_test({ 'a': 'b' }, "{ 'a': 'b' }")
-    self._do_test({ 'a': [1, 2, 3] }, '{ "a": [1, 2, 3] }')
-    self._do_test({ 'a': [1, 2, 3, 4] }, '{ "a": [1, 2] + [3, 4] }')
+    self._do_test({'a': 'b'}, '{ "a": "b" }')
+    self._do_test({'a': 'b'}, "{ 'a': 'b' }")
+    self._do_test({'a': [1, 2, 3]}, '{ "a": [1, 2, 3] }')
+    self._do_test({'a': [1, 2, 3, 4]}, '{ "a": [1, 2] + [3, 4] }')
     self._do_test({}, {})
-    self._do_test({ 'a': 'b' }, { 'a': 'b' })
-    self._do_test({ 'a': [1, 2, 3] }, { 'a': [1, 2, 3] })
+    self._do_test({'a': 'b'}, {'a': 'b'})
+    self._do_test({'a': [1, 2, 3]}, {'a': [1, 2, 3]})
     self._do_test_dict_error('[]')
     self._do_test_dict_error('[1, 2, 3]')
     self._do_test_dict_error('1')

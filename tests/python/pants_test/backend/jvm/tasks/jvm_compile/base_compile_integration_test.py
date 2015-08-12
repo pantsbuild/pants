@@ -14,6 +14,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BaseCompileIT(PantsRunIntegrationTest):
+
   @contextmanager
   def do_test_compile(self, target, strategy,
       expected_files=None, iterations=2, expect_failure=False, extra_args=None):
@@ -53,8 +54,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
         'compile',
         '--compile-apt-strategy={}'.format(strategy),
         '--compile-java-strategy={}'.format(strategy),
-        '--compile-scala-strategy={}'.format(strategy),
-        '--compile-zinc-java-strategy={}'.format(strategy),
+        '--compile-zinc-strategy={}'.format(strategy),
         target,
       ] + (extra_args if extra_args else [])
     # Clean-all on the first iteration.

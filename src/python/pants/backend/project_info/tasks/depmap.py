@@ -5,21 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
-import os
-from collections import defaultdict
-
-from twitter.common.collections import OrderedSet
-
-from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 
 

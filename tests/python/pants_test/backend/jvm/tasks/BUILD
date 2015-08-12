@@ -8,11 +8,13 @@ target(
     ':bootstrap_jvm_tools',
     ':bundle_create',
     ':checkstyle',
+    ':classpath_products',
     ':classpath_util',
     ':ivy_imports',
     ':ivy_resolve',
     ':ivy_utils',
     ':junit_run',
+    ':jvm_platform_analysis',
     ':jvm_run',
     ':resources_task',
     ':prepare_resources',
@@ -84,6 +86,19 @@ python_tests(
 )
 
 python_tests(
+  name = 'classpath_products',
+  sources = ['test_classpath_products.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm:artifact',
+    'src/python/pants/backend/jvm:repository',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+
+python_tests(
   name = 'classpath_util',
   sources = ['test_classpath_util.py'],
   dependencies = [
@@ -132,6 +147,17 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',
+  ]
+)
+
+python_tests(
+  name = 'jvm_platform_analysis',
+  sources = ['test_jvm_platform_analysis.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

@@ -11,7 +11,6 @@ from contextlib import closing
 from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -22,7 +21,7 @@ from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnit
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.shader import Shader
-from pants.option.options import Options
+from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import relativize_paths, safe_open
 
@@ -33,6 +32,8 @@ _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 class ZincCompile(JvmCompile):
   _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
+
+  _name = 'zinc'
 
   _supports_concurrent_execution = True
 
@@ -55,7 +56,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
-    return ('-S-encoding', '-SUTF-8','-S-g:vars')
+    return ('-S-encoding', '-SUTF-8', '-S-g:vars')
 
   @classmethod
   def get_warning_args_default(cls):
@@ -70,7 +71,7 @@ class ZincCompile(JvmCompile):
     super(ZincCompile, cls).register_options(register)
     register('--plugins', action='append', fingerprint=True,
              help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=Options.dict, default={}, fingerprint=True,
+    register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
     register('--name-hashing', action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
@@ -92,6 +93,12 @@ class ZincCompile(JvmCompile):
     cls.register_jvm_tool(register, 'sbt-interface', fingerprint=True)
 
     cls.register_jvm_tool(register, 'plugin-jars', default=[], fingerprint=True)
+
+  def select(self, target):
+    return target.has_sources('.java') or target.has_sources('.scala')
+
+  def select_source(self, source_file_path):
+    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
 
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
@@ -190,7 +197,8 @@ class ZincCompile(JvmCompile):
       ret.append((root, [plugin_info_file]))
     return ret
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -226,12 +234,20 @@ class ZincCompile(JvmCompile):
 
     zinc_args += args
 
+    zinc_args.extend([
+      '-C-source', '-C{}'.format(settings.source_level),
+      '-C-target', '-C{}'.format(settings.target_level),
+    ])
+    zinc_args.extend(settings.args)
+
+    jvm_options = list(self._jvm_options)
+
     zinc_args.extend(sources)
 
     self.log_zinc_file(analysis_file)
     if self.runjava(classpath=self.zinc_classpath(),
                     main=self._ZINC_MAIN,
-                    jvm_options=self._jvm_options,
+                    jvm_options=jvm_options,
                     args=zinc_args,
                     workunit_name='zinc',
                     workunit_labels=[WorkUnit.COMPILER]):
@@ -243,30 +259,3 @@ class ZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
-
-class ScalaZincCompile(ZincCompile):
-  _language = 'scala'
-  _file_suffix = '.scala'
-
-
-class JavaZincCompile(ZincCompile):
-  _language = 'java'
-  _file_suffix = '.java'
-
-  @classmethod
-  def get_args_default(cls, bootstrap_option_values):
-    return super(JavaZincCompile, cls).get_args_default(bootstrap_option_values) + ('-java-only',)
-
-  @classmethod
-  def name(cls):
-    # Use a different name from 'java' so options from JMake version won't interfere.
-    return "zinc-java"
-
-  @classmethod
-  def register_options(cls, register):
-    super(JavaZincCompile, cls).register_options(register)
-    register('--enabled', action='store_true', default=False,
-             help='Use zinc to compile Java targets')
-
-  def select(self, target):
-    return self.get_options().enabled and super(JavaZincCompile, self).select(target)

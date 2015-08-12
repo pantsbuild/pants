@@ -136,8 +136,10 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
         avro_lib_info.get('default'),
         os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
       )
-      # TODO(Eric Ayers): this BUILD file also requests the avro 'tests' jar using
-      # a classifier in the JarDependency.  See https://github.com/pantsbuild/pants/issues/1489
+      self.assertEquals(
+        avro_lib_info.get('tests'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
+      )
 
       # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
       #self.assertEquals(

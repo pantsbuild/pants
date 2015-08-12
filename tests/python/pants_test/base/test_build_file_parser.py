@@ -28,11 +28,13 @@ from pants_test.base_test import BaseTest
 # parse_build_file_family
 
 class ErrorTarget(Target):
+
   def __init__(self, *args, **kwargs):
     assert False, "This fake target should never be initialized in this test!"
 
 
 class BuildFileParserBasicsTest(BaseTest):
+
   def test_addressable_exceptions(self):
     self.add_to_build_file('a/BUILD', 'target()')
     build_file_a = FilesystemBuildFile(self.build_root, 'a/BUILD')
@@ -67,6 +69,7 @@ class BuildFileParserBasicsTest(BaseTest):
 
 
 class BuildFileParserTargetTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(targets={'fake': ErrorTarget})
@@ -164,6 +167,7 @@ class BuildFileParserTargetTest(BaseTest):
 
 
 class BuildFileParserExposedObjectTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(objects={'fake_object': object()})
@@ -176,6 +180,7 @@ class BuildFileParserExposedObjectTest(BaseTest):
 
 
 class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
+
   @staticmethod
   def make_lib(parse_context):
     def real_make_lib(org, name, rev):
@@ -195,9 +200,9 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
         if provides_name is None:
           return None
         jvm_repo = Repository(
-          name = 'maven-central',
-          url = 'http://maven.example.com',
-          push_db_basedir = os.path.join('build-support', 'ivy', 'pushdb'),
+          name='maven-central',
+          url='http://maven.example.com',
+          push_db_basedir=os.path.join('build-support', 'ivy', 'pushdb'),
         )
         return parse_context.create_object('artifact',
                                            org=org,
@@ -336,7 +341,6 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
     build_file = FilesystemBuildFile(self.build_root, 'BUILD')
     with self.assertRaises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file)
-
 
   def test_build_file_parser_error_hierarcy(self):
     """Exception handling code depends on the fact that all explicit exceptions from BuildFileParser are

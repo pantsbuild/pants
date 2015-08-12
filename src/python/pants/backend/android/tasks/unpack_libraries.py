@@ -83,8 +83,8 @@ class UnpackLibraries(Task):
     :param AndroidLibrary target: The new JarLibrary will be derived from this AndroidLibrary .
     :param string archive: Archive name as fetched by ivy, e.g. 'org.pantsbuild.example-1.0.aar'.
     :param string jar_file: Full path of the classes.jar contained within unpacked aar files.
-    :return: A new Target.
-    :rtype: JarLibrary
+    :return: new_target.
+    :rtype::class:`pants.backend.jvm.targets.java_library.JarLibrary`
     """
     # TODO(mateor) add another JarDependency for every jar under 'libs'.
 
@@ -97,15 +97,14 @@ class UnpackLibraries(Task):
                                              derived_from=target)
     return new_target
 
-
   def create_resource_target(self, target, archive, manifest, resource_dir):
     """Create an AndroidResources target.
 
     :param AndroidLibrary target: AndroidLibrary that the new AndroidResources target derives from.
     :param string archive: Archive name as fetched by ivy, e.g. 'org.pantsbuild.example-1.0.aar'.
     :param string resource_dir: Full path of the res directory contained within aar files.
-    :return: A new Target.
-    :rtype: AndroidResources
+    :return: new_target.
+    :rtype::class:`pants.backend.android.targets.AndroidResources`
     """
 
     address = SyntheticAddress(self.workdir, '{}-resources'.format(archive))
@@ -121,8 +120,8 @@ class UnpackLibraries(Task):
     :param AndroidLibrary target: AndroidLibrary that the new AndroidLibrary target derives from.
     :param string archive: An archive name as fetched by ivy, e.g. 'org.pantsbuild.example-1.0.aar'.
     :param string unpacked_aar_location: Full path of dir holding contents of an unpacked aar file.
-    :return: A new Target.
-    :rtype: AndroidLibrary
+    :return: new_target
+    :rtype::class:`pants.backend.android.targets.AndroidLibrary`
     """
     # The following three elements of an aar file have names mandated by the aar spec:
     #   http://tools.android.com/tech-docs/new-build-system/aar-format

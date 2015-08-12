@@ -9,12 +9,15 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
-from pants.option.options import Options
+from pants.option.scope import ScopeInfo
 
 
 class GlobalOptionsRegistrar(Optionable):
-  options_scope = Options.GLOBAL_SCOPE
+  options_scope = GLOBAL_SCOPE
+  options_scope_category = ScopeInfo.GLOBAL
 
   @classmethod
   def register_bootstrap_options(cls, register):
@@ -31,8 +34,8 @@ class GlobalOptionsRegistrar(Optionable):
     status as "bootstrap options" is only pertinent during option registration.
     """
     buildroot = get_buildroot()
-    register('--plugins', advanced=True, type=Options.list, help='Load these plugins.')
-    register('--backend-packages', advanced=True, type=Options.list,
+    register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
+    register('--backend-packages', advanced=True, type=list_option,
              help='Load backends from these packages that are already on the path.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
@@ -116,9 +119,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('--fail-fast', action='store_true',
              help='When parsing specs, will stop on the first erronous BUILD file encountered. '
                   'Otherwise, will parse all builds in a spec and then throw an Exception.')
-    register('--max-subprocess-args', type=int, default=100,  advanced=True, recursive=True,
+    register('--max-subprocess-args', type=int, default=100, advanced=True, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking'
              'the command up into multiple invocations')
     register('--build-file-rev',
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')
+    register('--lock', action='store_true', default=True,
+             help='Use a global lock to exclude other versions of pants from running during critical'
+                  'operations.')

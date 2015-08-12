@@ -56,12 +56,12 @@ class UnpackJarsTest(TaskTestBase):
       UnpackJars._compile_patterns([45])
 
   def _run_filter(self, filename, include_patterns=None, exclude_patterns=None):
-    return UnpackJars._unpack_filter(
+    return UnpackJars._file_filter(
       filename,
       UnpackJars._compile_patterns(include_patterns or []),
       UnpackJars._compile_patterns(exclude_patterns or []))
 
-  def test_unpack_filter(self):
+  def test_file_filter(self):
     # If no patterns are specified, everything goes through
     self.assertTrue(self._run_filter("foo/bar.java"))
 
@@ -177,7 +177,7 @@ class UnpackJarsTest(TaskTestBase):
       # Change the library version and the target should be unpacked again.
       self._make_jar_library('0.0.2')
       self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
-      foo_target = self.target('unpack:foo') # Re-inject the target
+      foo_target = self.target('unpack:foo')  # Re-inject the target
       self._add_dummy_product(foo_target, jar_filename, unpack_task)
       unpack_task = self.create_task(self.context(target_roots=[foo_target]))
       unpacked_targets = unpack_task.execute()

@@ -36,6 +36,7 @@ def combine_hashes(hashes):
 class PayloadField(AbstractClass):
   """An immutable, hashable structure to be mixed into Payload instances."""
   _fingerprint_memo = None
+
   def fingerprint(self):
     """A memoized sha1 hexdigest hashing the contents of this PayloadField
 
@@ -46,22 +47,10 @@ class PayloadField(AbstractClass):
       self._fingerprint_memo = self._compute_fingerprint()
     return self._fingerprint_memo
 
-  def fingerprint_with_context(self, context):
-    if self._fingerprint_memo is None:
-      self._fingerprint_memo = self._compute_fingerprint_with_context(context)
-    return self._fingerprint_memo
-
   @abstractmethod
   def _compute_fingerprint(self):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
     pass
-
-  def _compute_fingerprint_with_context(self, context):
-    """Subclasses can override this method if they required a context when fingerprinting.
-
-    By default, the context is ignored.
-    """
-    return self._compute_fingerprint()
 
   @property
   def value(self):
@@ -84,6 +73,7 @@ class FingerprintedField(PayloadField):
   The caller must ensure that the class properly implements fingerprint()
   to hash the contents of the object.
   """
+
   def __init__(self, value):
     self._value = value
 
@@ -97,6 +87,7 @@ class FingerprintedField(PayloadField):
 
 class SourcesField(PayloadField):
   """A PayloadField encapsulating specified sources."""
+
   def __init__(self, sources_rel_path, sources, ref_address=None, filespec=None):
     """
     :param sources_rel_path: path that sources parameter may be relative to
@@ -172,6 +163,7 @@ class DeferredSourcesField(SourcesField):
 
   class NotPopulatedError(Exception):
     """ Raised when the PayloadField has not been populated yet."""
+
     def __init__(self):
       super(Exception, self).__init__(
         "Field requires a call to populate() before this method can be called.")
@@ -215,6 +207,7 @@ class PythonRequirementsField(frozenset, PayloadField):
 
   Must be initialized with an iterable of PythonRequirement instances.
   """
+
   def _compute_fingerprint(self):
     def fingerprint_iter():
       for req in self:
@@ -247,6 +240,7 @@ class BundleField(tuple, PayloadField):
 
   Must be initialized with an iterable of Bundle instances.
   """
+
   def _compute_fingerprint(self):
     return combine_hashes(map(hash_bundle, self))
 
@@ -256,6 +250,7 @@ class ExcludesField(OrderedSet, PayloadField):
 
   Must be initialized with an iterable of Excludes instances.
   """
+
   def _compute_fingerprint(self):
     return stable_json_sha1(tuple(repr(exclude) for exclude in self))
 
@@ -265,6 +260,7 @@ class ConfigurationsField(OrderedSet, PayloadField):
 
   Must be initialized with an iterable of strings.
   """
+
   def _compute_fingerprint(self):
     return combine_hashes(sha1(s).hexdigest() for s in self)
 
@@ -274,6 +270,7 @@ class JarsField(tuple, PayloadField):
 
   Must be initialized with an iterable of JarDependency instances.
   """
+
   def _compute_fingerprint(self):
     return stable_json_sha1(tuple(jar.cache_key() for jar in self))
 
@@ -283,6 +280,7 @@ class PrimitiveField(PayloadField):
 
   As long as the contents are JSON representable, their hash can be stably inferred.
   """
+
   def __init__(self, underlying=None):
     self._underlying = underlying
 
@@ -292,37 +290,3 @@ class PrimitiveField(PayloadField):
 
   def _compute_fingerprint(self):
     return stable_json_sha1(self._underlying)
-
-
-class FileField(PayloadField):
-  """A field that represents the contents of an individual file."""
-
-  def __init__(self, filepath):
-    self._filepath = filepath
-
-  def _compute_fingerprint(self):
-    hasher = sha1()
-    hasher.update(self._filepath)
-    with open(self._filepath, 'rb') as f:
-      hasher.update(f.read())
-    return hasher.hexdigest()
-
-
-class TargetListField(PayloadField):
-  """A field that represents a list of target specs.
-
-  The fingerprint of a TargetListField is the combined fingerprints of the
-  resolved target specs.
-  """
-  def __init__(self, target_specs):
-    self._target_specs = target_specs
-
-  def _compute_fingerprint(self):
-    raise NotImplementedError
-
-  def _compute_fingerprint_with_context(self, context):
-    hasher = sha1()
-    for spec in sorted(self._target_specs):
-      for target in sorted(context.resolve(spec)):
-        hasher.update(target.compute_invalidation_hash())
-    return hasher.hexdigest()

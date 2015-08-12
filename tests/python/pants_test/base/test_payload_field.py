@@ -10,14 +10,14 @@ from hashlib import sha1
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.base.payload import Payload
-from pants.base.payload_field import (ExcludesField, FileField, FingerprintedField,
-                                      FingerprintedMixin, JarsField, PrimitiveField,
-                                      PythonRequirementsField, SourcesField, TargetListField)
+from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
+                                      JarsField, PrimitiveField, PythonRequirementsField,
+                                      SourcesField)
 from pants_test.base_test import BaseTest
 
 
 class PayloadTest(BaseTest):
+
   def test_excludes_field(self):
     empty = ExcludesField()
     empty_fp = empty.fingerprint()
@@ -264,6 +264,7 @@ class PayloadTest(BaseTest):
 
   def test_fingerprinted_field(self):
     class TestValue(FingerprintedMixin):
+
       def __init__(self, test_value):
         self.test_value = test_value
 
@@ -290,30 +291,3 @@ class PayloadTest(BaseTest):
 
     with self.assertRaises(NotImplementedError):
       FingerprintedField(TestUnimplementedValue()).fingerprint()
-
-  def test_file_field(self):
-    fp1 = FileField(self.create_file('foo/bar.config', contents='blah blah blah')).fingerprint()
-    fp2 = FileField(self.create_file('foo/bar.config', contents='meow meow meow')).fingerprint()
-    fp3 = FileField(self.create_file('spam/egg.config', contents='blah blah blah')).fingerprint()
-
-    self.assertNotEquals(fp1, fp2)
-    self.assertNotEquals(fp1, fp3)
-    self.assertNotEquals(fp2, fp3)
-
-  def test_target_list_field(self):
-    specs = [':t1', ':t2', ':t3']
-    payloads = [Payload() for i in range(3)]
-    for i, (s, p) in enumerate(zip(specs, payloads)):
-      p.add_field('foo', PrimitiveField(i))
-      self.make_target(s, payload=p)
-
-    s1, s2, s3 = specs
-
-    context = self.context()
-
-    fp1 = TargetListField([s1, s2]).fingerprint_with_context(context)
-    fp2 = TargetListField([s2, s1]).fingerprint_with_context(context)
-    fp3 = TargetListField([s1, s3]).fingerprint_with_context(context)
-
-    self.assertEquals(fp1, fp2)
-    self.assertNotEquals(fp1, fp3)

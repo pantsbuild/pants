@@ -251,6 +251,10 @@ migrations = {
 
   ('gen.thrift', 'java'): None,  # Notes only one to many migration: see notes below.
   ('gen.thrift', 'python'): None,  # Notes only pure deletion migration: see notes below.
+
+  ('compile.zinc-java', 'enabled'): ('compile.java', 'use-jmake'),
+
+  ('compile.scala', 'args'): ('compile.zinc', 'args'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -272,9 +276,14 @@ notes = {
                          'move to a subsystem, which will fix this requirement.',
   ('jvm', 'debug_args'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
                          'move to a subsystem, which will fix this requirement.',
-  ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
-                                  'target: options. Other args should be placed in args: and '
-                                  'prefixed with -C.',
+  ('java-compile', 'javac_args'): 'Source, target, and bootclasspath args should be specified in '
+                                  'the jvm-platform subsystem. Other args can be placed in args: '
+                                  'and prefixed with -C, or also be included in the jvm-platform '
+                                  'args.',
+  ('java-compile', 'source'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
+  ('java-compile', 'target'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
   ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
@@ -302,9 +311,9 @@ notes = {
                                      'idea and eclipse goals.',
   ('ide', 'extra_jvm_test_paths'): 'extra_jvm_test_paths now must be specified separately for '
                                    'idea and eclipse goals.',
-  ('ide', 'debug_port'):       'debug_port now must be specified separately for idea and eclipse '
-                               'goals.  Also, IDE goals now use their own debug setting and do not '
-                               'inherit from jvm configuration.',
+  ('ide', 'debug_port'): 'debug_port now must be specified separately for idea and eclipse '
+                         'goals.  Also, IDE goals now use their own debug setting and do not '
+                         'inherit from jvm configuration.',
 
   ('tasks', 'build_invalidator'): 'This is no longer configurable. The default will be used.',
 
@@ -338,6 +347,11 @@ notes = {
 
   ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
   ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
+
+  ('compile.zinc-java', 'enabled'): 'The enabled flag has moved from "enable zinc for java" '
+                                    'to "disable jmake for java", more precisely, instead of '
+                                    '--compile-zinc-java-enabled, use --no-compile-java-use-jmake',
+  ('compile.scala', 'args'): 'ALL `compile.scala` options have moved to `compile.zinc`.',
 }
 
 
@@ -376,12 +390,14 @@ def check_option(cp, src, dst):
     if (src_section, src_key) in notes:
       print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
 
+
 def check_config_file(path):
   cp = Config.create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
+
   def section(s):
     return cyan('[{0}]'.format(s))
 
@@ -426,13 +442,13 @@ def check_config_file(path):
       value = value.strip()
       if value.startswith('['):
         try:
-          custom_types.list_type(value)
+          custom_types.list_option(value)
         except ParseError:
           print('Value of {key} in section {section} is not a valid '
                 'JSON list.'.format(key=green(key), section=section(sec)))
       elif value.startswith('{'):
         try:
-          custom_types.dict_type(value)
+          custom_types.dict_option(value)
         except ParseError:
           print('Value of {key} in section {section} is not a valid '
                 'JSON object.'.format(key=green(key), section=section(sec)))

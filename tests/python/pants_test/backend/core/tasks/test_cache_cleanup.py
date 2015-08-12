@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
+from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -19,7 +19,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
     """ Ensure that max-old of 1 removes all but one files"""
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JavaCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
@@ -32,13 +32,12 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       pants_run = self.run_pants(['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-                                  '--cache-max-entries-per-target=1',],
+                                  '--cache-max-entries-per-target=1'],
                                  config=config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 and one old cache file
-
-      self.assertEqual(len(os.listdir(artifact_dir)), 2)
+      # One artifact for java 6
+      self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
       pants_run = self.run_pants(['compile.java',
@@ -48,8 +47,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 (old cache file) and one for 7
-      self.assertEqual(len(os.listdir(artifact_dir)), 2)
+      # One artifact for java 7
+      self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
   def test_leave_none(self):
     """ Ensure that max-old of zero removes all files
@@ -59,7 +58,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
     """
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JavaCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
@@ -72,13 +71,13 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       pants_run = self.run_pants(['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-                                  '--cache-max-entries-per-target=0',],
+                                  '--cache-max-entries-per-target=0'],
                                  config=config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 and one old cache file
+      # Cache cleanup disabled for 0
 
-      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+      self.assertEqual(len(os.listdir(artifact_dir)), 6)
 
       # Rerun for java 7
       pants_run = self.run_pants(['compile.java',
@@ -88,5 +87,5 @@ class CacheCleanupTest(PantsRunIntegrationTest):
                                  config)
       self.assert_success(pants_run)
 
-      # One artifact for java 6 (old cache file) and one for 7
-      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+      # Cache cleanup disabled for 0
+      self.assertEqual(len(os.listdir(artifact_dir)), 7)

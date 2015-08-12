@@ -19,6 +19,7 @@ from pants_test.base_test import BaseTest
 # explicit unit tests: addresses_in_spec_path, spec_to_address, spec_to_addresses
 
 class BuildFileAddressMapperTest(BaseTest):
+
   def setUp(self):
     super(BuildFileAddressMapperTest, self).setUp()
 
@@ -70,7 +71,7 @@ class BuildFileAddressMapperTest(BaseTest):
   def test_scan_addresses_with_excludes(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    spec_excludes = [ os.path.join(self.build_root, 'subdir')]
+    spec_excludes = [os.path.join(self.build_root, 'subdir')]
     self.assertEquals(set([BuildFileAddress(root_build_file, 'foo')]),
                       self.address_mapper.scan_addresses(root=self.build_root, spec_excludes=spec_excludes))
 

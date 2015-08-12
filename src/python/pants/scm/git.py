@@ -281,13 +281,14 @@ class GitRepositoryReader(object):
   commit. This is useful for pants-aware git sparse checkouts.
 
   """
+
   def __init__(self, scm, rev):
     self.scm = scm
     self.rev = rev
     self._cat_file_process = None
     # Trees is a dict from path to [list of Dir, Symlink or File objects]
     self._trees = {}
-    self._realpath_cache = {'.' : './' , '' : './'}
+    self._realpath_cache = {'.': './', '': './'}
 
   def _maybe_start_cat_file_process(self):
     if not self._cat_file_process:
@@ -296,6 +297,7 @@ class GitRepositoryReader(object):
                                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
   class MissingFileException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -304,6 +306,7 @@ class GitRepositoryReader(object):
       return "MissingFileException({}, {})".format(self.relpath, self.rev)
 
   class IsDirException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -312,6 +315,7 @@ class GitRepositoryReader(object):
       return "IsDirException({}, {})".format(self.relpath, self.rev)
 
   class NotADirException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -320,6 +324,7 @@ class GitRepositoryReader(object):
       return "NotADirException({}, {})".format(self.relpath, self.rev)
 
   class SymlinkLoopException(Exception):
+
     def __init__(self, rev, relpath):
       self.relpath = relpath
       self.rev = rev
@@ -359,16 +364,19 @@ class GitRepositoryReader(object):
     return False
 
   class Symlink:
+
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
   class Dir:
+
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
   class File:
+
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
@@ -434,7 +442,7 @@ class GitRepositoryReader(object):
     # Consume components to build path_so_far
     while components:
       component = components.pop(0)
-      if component == '':
+      if component == '' or component == '.':
         continue
 
       parent_tree = self._read_tree(path_so_far)
@@ -484,6 +492,7 @@ class GitRepositoryReader(object):
       else:
         # Programmer error
         raise self.UnexpectedGitObjectTypeException()
+    return './'
 
   def _fixup_dot_relative(self, path):
     """Git doesn't understand dot-relative paths."""
@@ -514,12 +523,12 @@ class GitRepositoryReader(object):
       while tree_data[i] != ' ':
         i += 1
       mode = tree_data[start:i]
-      i += 1 # skip space
+      i += 1  # skip space
       start = i
       while tree_data[i] != NUL:
         i += 1
       name = tree_data[start:i]
-      sha = tree_data[i+1:i+1+GIT_HASH_LENGTH].encode('hex')
+      sha = tree_data[i + 1:i + 1 + GIT_HASH_LENGTH].encode('hex')
       i += 1 + GIT_HASH_LENGTH
       if mode == '120000':
         tree[name] = self.Symlink(name, sha)

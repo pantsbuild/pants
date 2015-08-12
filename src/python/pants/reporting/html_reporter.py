@@ -87,14 +87,14 @@ class HtmlReporter(Reporter):
                                      self._linkify_memo)
 
     # Create the template arguments.
-    args = { 'indent': len(workunit.ancestors()) * 10,
-             'html_path_base': self._html_path_base,
-             'workunit': workunit_dict,
-             'header_text': workunit.name,
-             'initially_open': is_test or not (is_bootstrap or is_tool or is_multitool),
-             'is_tool': is_tool,
-             'is_multitool': is_multitool }
-    args.update({ 'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args) })
+    args = {'indent': len(workunit.ancestors()) * 10,
+            'html_path_base': self._html_path_base,
+            'workunit': workunit_dict,
+            'header_text': workunit.name,
+            'initially_open': is_test or not (is_bootstrap or is_tool or is_multitool),
+            'is_tool': is_tool,
+            'is_multitool': is_multitool}
+    args.update({'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args)})
 
     # Render the workunit's div.
     s = self._renderer.render_name('workunit_start', args)
@@ -126,11 +126,11 @@ class HtmlReporter(Reporter):
       unaccounted_time_secs = workunit.unaccounted_time()
       if unaccounted_time_secs >= 1 and unaccounted_time_secs > 0.05 * duration:
         unaccounted_time = '{:.3f}'.format(unaccounted_time_secs)
-    args = { 'workunit': workunit.to_dict(),
-             'status': HtmlReporter._outcome_css_classes[workunit.outcome()],
-             'timing': timing,
-             'unaccounted_time': unaccounted_time,
-             'aborted': workunit.outcome() == WorkUnit.ABORTED }
+    args = {'workunit': workunit.to_dict(),
+            'status': HtmlReporter._outcome_css_classes[workunit.outcome()],
+            'timing': timing,
+            'unaccounted_time': unaccounted_time,
+            'aborted': workunit.outcome() == WorkUnit.ABORTED}
 
     s = ''
     if workunit.has_label(WorkUnit.TOOL):
@@ -193,10 +193,11 @@ class HtmlReporter(Reporter):
   _log_level_css_map = {
     Report.FATAL: 'fatal',
     Report.ERROR: 'error',
-    Report.WARN:  'warn',
-    Report.INFO:  'info',
+    Report.WARN: 'warn',
+    Report.INFO: 'info',
     Report.DEBUG: 'debug'
   }
+
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
     content = '<span class="{}">{}</span>'.format(
@@ -238,7 +239,7 @@ class HtmlReporter(Reporter):
       # Map assumes None for missing values, so this will pick the default for those.
       (text, detail, detail_id, detail_initially_visible) = \
         map(lambda x, y: x or y, element, defaults)
-      element_args = {'text': self._htmlify_text(text) }
+      element_args = {'text': self._htmlify_text(text)}
       if detail is not None:
         detail_id = detail_id or uuid.uuid4()
         detail_ids.append(detail_id)
@@ -248,8 +249,8 @@ class HtmlReporter(Reporter):
           'detail-id': detail_id
         })
       elements.append(element_args)
-    args = { 'elements': elements,
-             'all-detail-ids': detail_ids }
+    args = {'elements': elements,
+            'all-detail-ids': detail_ids}
     return self._renderer.render_name('message', args)
 
   def _emit(self, s):

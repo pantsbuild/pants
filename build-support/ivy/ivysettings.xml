@@ -5,15 +5,21 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
 <ivysettings>
+
   <settings defaultResolver="pants-chain-repos"/>
 
+  <properties environment="env" />
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
 
+  <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
+  <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
+  <property name="google.repo.dir" value="${env.ANDROID_HOME}/extras/google/m2repository"/>
   <resolvers>
+
     <chain name="pants-chain-repos" returnFirst="true">
       <!-- By default ivy does not require metadata (or successful metadata downloads).
            This can lead to jars downloading without their transitive deps which leads
@@ -21,11 +27,21 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            We setup the maven central resolver to require successful pom downloads here. -->
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
 
+      <!-- Android SDK Support Library, found in reference to the ANDROID_HOME variable. -->
+      <ibiblio name="local.android"
+               m2compatible="true"
+               root="file://${android.repo.dir}/"/>
+      <!-- Google Libraries for the Android SDK, found in reference to ANDROID_HOME. -->
+      <ibiblio name="local.google"
+               m2compatible="true"
+               root="file://${google.repo.dir}/"/>
+
       <!-- The mvn standard local filesystem repo/cache -->
       <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
         <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
         <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
       </filesystem>
+
     </chain>
   </resolvers>
 </ivysettings>

@@ -20,6 +20,7 @@ from pants.util.strutil import ensure_text
 
 
 class Archiver(AbstractClass):
+
   @classmethod
   def extract(cls, path, outdir):
     """Extracts an archive's contents to the specified outdir."""

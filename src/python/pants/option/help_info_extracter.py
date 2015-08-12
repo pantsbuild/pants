@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import namedtuple
 
-from pants.option.custom_types import dict_type, list_type
+from pants.option.custom_types import dict_option, list_option
 from pants.option.option_util import is_boolean_flag
 
 
@@ -43,7 +43,6 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
   pass
 
 
-
 class HelpInfoExtracter(object):
   """Extracts information useful for displaying help from option registration args."""
 
@@ -57,9 +56,9 @@ class HelpInfoExtracter(object):
 
     action = kwargs.get('action')
     typ = kwargs.get('type', str)
-    if typ == list_type or action == 'append':
+    if typ == list_option or action == 'append':
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
-    elif typ == dict_type:
+    elif typ == dict_option:
       default_str = '{{ {} }}'.format(
         ','.join(["'{}':'{}'".format(k, v) for k, v in default.items()]))
     else:
@@ -73,9 +72,9 @@ class HelpInfoExtracter(object):
     metavar = kwargs.get('metavar')
     if not metavar:
       typ = kwargs.get('type', str)
-      if typ == list_type or action == 'append':
+      if typ == list_option or action == 'append':
         metavar = '"[\'str1\',\'str2\',...]"'
-      elif typ == dict_type:
+      elif typ == dict_option:
         metavar = '"{ \'key1\': val1,\'key2\': val2,...}"'
       else:
         metavar = '<{}>'.format(typ.__name__)

@@ -9,6 +9,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
+
   def test_smoke(self):
     pants_run = self.run_pants(['bundle',
                                 'testprojects/src/java/org/pantsbuild/testproject/bundle'])

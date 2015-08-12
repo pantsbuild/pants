@@ -17,9 +17,9 @@ _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
 _ENTRY = re.compile(ur'^\d+,\S+,(init|pre-check|post-check),(True|False)')
-_INIT = re.compile(ur'^\d+,JavaCompile,\w+,\S+,init,(True|False)')
-_POST = re.compile(ur'^\d+,JavaCompile,\w+,\S+,post-check,(True|False)')
-_PRE = re.compile(ur'^\d+,JavaCompile,\w+,\S+,pre-check,(True|False)')
+_INIT = re.compile(ur'^\d+,JmakeCompile,\w+,\S+,init,(True|False)')
+_POST = re.compile(ur'^\d+,JmakeCompile,\w+,\S+,post-check,(True|False)')
+_PRE = re.compile(ur'^\d+,JmakeCompile,\w+,\S+,pre-check,(True|False)')
 
 
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):

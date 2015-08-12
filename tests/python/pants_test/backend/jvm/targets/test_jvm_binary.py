@@ -20,6 +20,7 @@ from pants_test.base_test import BaseTest
 
 
 class JarRulesTest(unittest.TestCase):
+
   def test_jar_rule(self):
     dup_rule = Duplicate('foo', Duplicate.REPLACE)
     self.assertEquals('Duplicate(apply_pattern=foo, action=REPLACE)',
@@ -57,6 +58,7 @@ class JarRulesTest(unittest.TestCase):
 
 
 class JvmBinaryTest(BaseTest):
+
   @property
   def alias_groups(self):
     return register_jvm()
@@ -109,11 +111,11 @@ class JvmBinaryTest(BaseTest):
     )
     '''))
     target = self.target('//:foo')
-    jar_rules =  target.deploy_jar_rules
+    jar_rules = target.deploy_jar_rules
     self.assertEquals(1, len(jar_rules.rules))
     self.assertEquals('foo', jar_rules.rules[0].apply_pattern.pattern)
     self.assertEquals(repr(Duplicate.SKIP),
-                      repr(jar_rules.rules[0].action)) # <object object at 0x...>
+                      repr(jar_rules.rules[0].action))  # <object object at 0x...>
     self.assertEquals(Duplicate.FAIL, jar_rules.default_dup_action)
 
   def test_bad_source_declaration(self):
@@ -194,7 +196,7 @@ class JvmBinaryTest(BaseTest):
     target = self.target('//:foo')
     self.assertTrue(isinstance(target.payload.manifest_entries, ManifestEntries))
     entries = target.payload.manifest_entries.entries
-    self.assertEquals({ 'Foo-Field' : 'foo'}, entries)
+    self.assertEquals({'Foo-Field': 'foo'}, entries)
 
   def test_manifest_not_dict(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -223,8 +225,8 @@ class JvmBinaryTest(BaseTest):
 
   def test_manifest_entries_fingerprint(self):
     field1 = ManifestEntries()
-    field2 = ManifestEntries({'Foo-Field' : 'foo'})
-    field2_same = ManifestEntries({'Foo-Field' : 'foo'})
-    field3 = ManifestEntries({'Foo-Field' : 'foo', 'Bar-Field' : 'bar'})
+    field2 = ManifestEntries({'Foo-Field': 'foo'})
+    field2_same = ManifestEntries({'Foo-Field': 'foo'})
+    field3 = ManifestEntries({'Foo-Field': 'foo', 'Bar-Field': 'bar'})
     self.assertEquals(field2.fingerprint(), field2_same.fingerprint())
     self._assert_fingerprints_not_equal([field1, field2, field3])

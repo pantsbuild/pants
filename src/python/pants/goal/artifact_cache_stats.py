@@ -14,13 +14,15 @@ from pants.util.dirutil import safe_mkdir
 # Lists of target addresses.
 CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
 
+
 class ArtifactCacheStats(object):
   """Tracks the hits and misses in the artifact cache.
 
   If dir is specified, writes the hits and misses to files in that dir."""
+
   def __init__(self, dir=None):
     def init_stat():
-      return CacheStat([],[])
+      return CacheStat([], [])
     self.stats_per_cache = defaultdict(init_stat)
     self._dir = dir
     safe_mkdir(self._dir)

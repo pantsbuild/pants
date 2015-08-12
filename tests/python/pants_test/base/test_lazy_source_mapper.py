@@ -12,6 +12,7 @@ from pants_test.base_test import BaseTest
 
 
 class LazySourceMapperTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -49,7 +50,7 @@ class LazySourceMapperTest(BaseTest):
 
   def test_nested(self):
     # A root-level BUILD file's sources are found or not correctly.
-    self.create_library('date', 'java_library', 'date', ['day.py','time/unit/hour.py'])
+    self.create_library('date', 'java_library', 'date', ['day.py', 'time/unit/hour.py'])
     self.create_file('date/time/unit/minute.py')
     # Shallow, simple source still works.
     self.owner(['date:date'], 'date/day.py')

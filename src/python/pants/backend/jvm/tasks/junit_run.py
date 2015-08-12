@@ -15,13 +15,13 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
-from pants import binary_util
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnit
+from pants.binaries import binary_util
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
@@ -142,10 +142,11 @@ class _JUnitRunner(object):
       return
 
     bootstrapped_cp = self._task_exports.tool_classpath('junit')
-    junit_classpath = self._task_exports.classpath(targets, cp=bootstrapped_cp)
+    def compute_complete_classpath():
+      return self._task_exports.classpath(targets, cp=bootstrapped_cp)
 
     self._context.release_lock()
-    self.instrument(targets, tests_and_targets.keys(), junit_classpath)
+    self.instrument(targets, tests_and_targets.keys(), compute_complete_classpath)
 
     def _do_report(exception=None):
       self.report(targets, tests_and_targets.keys(), tests_failed_exception=exception)
@@ -156,7 +157,7 @@ class _JUnitRunner(object):
       _do_report(exception=e)
       raise
 
-  def instrument(self, targets, tests, junit_classpath):
+  def instrument(self, targets, tests, compute_junit_classpath):
     """Called from coverage classes. Run any code instrumentation needed.
 
     Subclasses should override this if they need more work done.
@@ -164,7 +165,7 @@ class _JUnitRunner(object):
     :param targets: an iterable that contains the targets to run tests for.
     :param tests: an iterable that contains all the test class names
       extracted from the testing targets.
-    :param junit_classpath: the classpath that the instrumation tool needs.
+    :param compute_junit_classpath: a function to compute a complete classpath for the context.
     """
     pass
 
@@ -254,7 +255,9 @@ class _JUnitRunner(object):
     result = 0
     for workdir, tests in self._tests_by_workdir(tests_to_targets).items():
       for batch in self._partition(tests):
-        classpath = self._task_exports.classpath(map(tests_to_targets.get, batch),
+        # Batches of test classes will likely exist within the same targets: dedupe them.
+        relevant_targets = set(map(tests_to_targets.get, batch))
+        classpath = self._task_exports.classpath(relevant_targets,
                                                  cp=self._task_exports.tool_classpath('junit'))
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
@@ -293,12 +296,12 @@ class _JUnitRunner(object):
     workdirs = defaultdict(OrderedSet)
     for test, target in tests_to_targets.items():
       workdirs[self._infer_workdir(target)].add(test)
-    return { workdir: list(tests) for workdir, tests in workdirs.items() }
+    return {workdir: list(tests) for workdir, tests in workdirs.items()}
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
     for i in range(0, len(tests), stride):
-      yield tests[i:i+stride]
+      yield tests[i:i + stride]
 
   def _get_tests_to_run(self):
     for test_spec in self._tests_to_run:
@@ -405,7 +408,7 @@ class _Coverage(_JUnitRunner):
     self._coverage_force = options.coverage_force
 
   @abstractmethod
-  def instrument(self, targets, tests, junit_classpath):
+  def instrument(self, targets, tests, compute_junit_classpath):
     pass
 
   @abstractmethod
@@ -447,7 +450,8 @@ class Emma(_Coverage):
   def register_options(cls, register, register_jvm_tool):
     register_jvm_tool(register, 'emma')
 
-  def instrument(self, targets, tests, junit_classpath):
+  def instrument(self, targets, tests, compute_junit_classpath):
+    junit_classpath = compute_junit_classpath()
     safe_mkdir(self._coverage_instrument_dir, clean=True)
     self._emma_classpath = self._task_exports.tool_classpath('emma')
     with binary_util.safe_args(self.get_coverage_patterns(targets),
@@ -554,7 +558,8 @@ class Cobertura(_Coverage):
         self._include_filters.append(filt)
     self._nothing_to_instrument = True
 
-  def instrument(self, targets, tests, junit_classpath):
+  def instrument(self, targets, tests, compute_junit_classpath):
+    junit_classpath = compute_junit_classpath()
     cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
     aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)

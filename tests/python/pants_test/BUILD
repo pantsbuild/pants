@@ -44,6 +44,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/option/util',
   ]
 )
 
@@ -59,32 +60,12 @@ python_library(
 )
 
 python_tests(
-  name = 'test_binary_util',
-  sources = ['test_binary_util.py',],
-  dependencies = [
-    ':base_test',
-    'src/python/pants:binary_util',
-  ]
-)
-
-python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
     ':base_test',
     'src/python/pants/backend/maven_layout',
     'src/python/pants/base:build_file_aliases',
-  ]
-)
-
-python_tests(
-  name = 'test_thrift_util',
-  sources = ['test_thrift_util.py'],
-  dependencies = [
-    ':base_test',
-    'src/python/pants:thrift_util',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -102,9 +83,7 @@ target(
 target(
   name = 'all',
   dependencies = [
-    ':test_binary_util',
     ':test_maven_layout',
-    ':test_thrift_util',
     'tests/python/pants_test/android',
     'tests/python/pants_test/authentication:netrc',
     'tests/python/pants_test/backend',

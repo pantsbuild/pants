@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -16,7 +16,7 @@ import six.moves.urllib.request as urllib_request
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
@@ -28,23 +28,22 @@ _ID_BY_OS = {
 }
 
 _PATH_BY_ID = {
-  ('linux', 'x86_64'):  ['linux', 'x86_64'],
-  ('linux', 'amd64'):   ['linux', 'x86_64'],
-  ('linux', 'i386'):    ['linux', 'i386'],
-  ('linux', 'i686'):    ['linux', 'i386'],
-  ('darwin', '9'):      ['mac', '10.5'],
-  ('darwin', '10'):     ['mac', '10.6'],
-  ('darwin', '11'):     ['mac', '10.7'],
-  ('darwin', '12'):     ['mac', '10.8'],
-  ('darwin', '13'):     ['mac', '10.9'],
-  ('darwin', '14'):     ['mac', '10.10'],
+  ('linux', 'x86_64'): ['linux', 'x86_64'],
+  ('linux', 'amd64'): ['linux', 'x86_64'],
+  ('linux', 'i386'): ['linux', 'i386'],
+  ('linux', 'i686'): ['linux', 'i386'],
+  ('darwin', '9'): ['mac', '10.5'],
+  ('darwin', '10'): ['mac', '10.6'],
+  ('darwin', '11'): ['mac', '10.7'],
+  ('darwin', '12'): ['mac', '10.8'],
+  ('darwin', '13'): ['mac', '10.9'],
+  ('darwin', '14'): ['mac', '10.10'],
 }
 
 
 logger = logging.getLogger(__name__)
 
 
-# TODO(John Sirois): Extract this subsystem to its own file.
 class BinaryUtil(object):
   """Wraps utility methods for finding binary executables."""
 
@@ -53,7 +52,7 @@ class BinaryUtil(object):
 
     @classmethod
     def register_options(cls, register):
-      register('--baseurls', type=Options.list, advanced=True,
+      register('--baseurls', type=list_option, advanced=True,
                default=['https://dl.bintray.com/pantsbuild/bin/build-support'],
                help='List of urls from which binary tools are downloaded.  Urls are searched in '
                     'order until the requested path is found.')
@@ -72,6 +71,7 @@ class BinaryUtil(object):
     pass
 
   class BinaryNotFound(TaskError):
+
     def __init__(self, binary, accumulated_errors):
       super(BinaryUtil.BinaryNotFound, self).__init__(
           'Failed to fetch binary {binary} from any source: ({sources})'
@@ -143,7 +143,7 @@ class BinaryUtil(object):
 
     downloaded_successfully = False
     accumulated_errors = []
-    for baseurl in OrderedSet(self._baseurls): # Wrap in OrderedSet because duplicates are wasteful.
+    for baseurl in OrderedSet(self._baseurls):  # Wrap in OrderedSet because duplicates are wasteful.
       url = posixpath.join(baseurl, binary_path)
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
@@ -211,10 +211,10 @@ def safe_args(args,
   """
   max_args = max_args or options.max_subprocess_args
   if len(args) > max_args:
-    def create_argfile(fp):
-      fp.write(delimiter.join(args))
-      fp.close()
-      return [quoter(fp.name) if quoter else '@{}'.format(fp.name)]
+    def create_argfile(f):
+      f.write(delimiter.join(args))
+      f.close()
+      return [quoter(f.name) if quoter else '@{}'.format(f.name)]
 
     if argfile:
       try:

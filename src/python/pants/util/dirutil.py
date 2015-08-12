@@ -31,12 +31,18 @@ def safe_mkdir(directory, clean=False):
       raise
 
 
-def safe_mkdir_for(path, clean=False):
+def safe_mkdir_for(path):
   """Ensure that the parent directory for a file is present.
 
-  If it's not there, create it. If it is, no-op. If clean is True, ensure the directory is empty.
+  If it's not there, create it. If it is, no-op.
   """
-  safe_mkdir(os.path.dirname(path), clean)
+  safe_mkdir(os.path.dirname(path), clean=False)
+
+
+def safe_file_dump(path, content):
+  safe_mkdir_for(path)
+  with open(path, 'w') as outfile:
+    outfile.write(content)
 
 
 def safe_walk(path, **kwargs):

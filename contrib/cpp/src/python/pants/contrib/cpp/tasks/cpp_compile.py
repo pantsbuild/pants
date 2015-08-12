@@ -9,7 +9,6 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 

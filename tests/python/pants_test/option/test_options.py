@@ -13,7 +13,10 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.deprecated import PastRemovalVersionError
+from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
 from pants.option.errors import ParseError
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -36,7 +39,7 @@ class OptionsTest(unittest.TestCase):
 
   def _register(self, options):
     def register_global(*args, **kwargs):
-      options.register(Options.GLOBAL_SCOPE, *args, **kwargs)
+      options.register(GLOBAL_SCOPE, *args, **kwargs)
 
     register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True)
@@ -52,10 +55,10 @@ class OptionsTest(unittest.TestCase):
     register_global('--store-false-def-true-flag', action='store_false', default=True)
 
     # Custom types.
-    register_global('--dicty', type=Options.dict, default='{"a": "b"}')
-    register_global('--listy', type=Options.list, default='[1, 2, 3]')
-    register_global('--target_listy', type=Options.target_list, default=[':a', ':b'])
-    register_global('--filey', type=Options.file, default='default.txt')
+    register_global('--dicty', type=dict_option, default='{"a": "b"}')
+    register_global('--listy', type=list_option, default='[1, 2, 3]')
+    register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
+    register_global('--filey', type=file_option, default='default.txt')
 
     # For the design doc example test.
     register_global('--a', type=int, recursive=True)
@@ -127,16 +130,16 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('test').x)
 
     # Test action=append option.
-    options = self._parse('./pants', config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+    options = self._parse('./pants', config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99], options.for_global_scope().y)
 
     options = self._parse('./pants --y=5 --y=-6 --y=77',
-                          config={ 'DEFAULT': { 'y': ['88', '-99'] }})
+                          config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
 
     # Test list-typed option.
     options = self._parse('./pants --listy=\'["c", "d"]\'',
-                          config={ 'DEFAULT': {'listy': ["a", "b"] }})
+                          config={'DEFAULT': {'listy': ["a", "b"]}})
     self.assertEqual(['c', 'd'], options.for_global_scope().listy)
 
     # Test dict-typed option.
@@ -238,9 +241,9 @@ class OptionsTest(unittest.TestCase):
 
     # Get defaults from config and environment.
     config = {
-      'DEFAULT': { 'num': '88' },
-      'compile': { 'num': '77' },
-      'compile.java': { 'num': '66' }
+      'DEFAULT': {'num': '88'},
+      'compile': {'num': '77'},
+      'compile.java': {'num': '66'}
     }
     options = self._parse('./pants compile.java -n22', config=config)
     self.assertEqual(88, options.for_global_scope().num)
@@ -283,8 +286,8 @@ class OptionsTest(unittest.TestCase):
     # The example from the design doc.
     # Get defaults from config and environment.
     config = {
-      'DEFAULT': { 'b': '99' },
-      'compile': { 'a': '88', 'c': '77' },
+      'DEFAULT': {'b': '99'},
+      'compile': {'a': '88', 'c': '77'},
     }
 
     env = {
@@ -381,8 +384,8 @@ class OptionsTest(unittest.TestCase):
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
       options = Options({}, FakeConfig({}), OptionsTest._known_scope_infos, "./pants")
-      options.register(Options.GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
-                              deprecated_hint='The semver for this option has already passed.')
+      options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
+                       deprecated_hint='The semver for this option has already passed.')
 
   @contextmanager
   def warnings_catcher(self):
@@ -460,52 +463,52 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    options=self._parse('./pants',
-                        config={
-                          'DEFAULT': {'a' : 100},
-                          'compile': {'a' : 99},
-                          })
+    options = self._parse('./pants',
+                          config={
+                            'DEFAULT': {'a': 100},
+                            'compile': {'a': 99},
+                            })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    options=self._parse('./pants',
-                        env={
-                          'PANTS_A': 100,
-                          'PANTS_COMPILE_A' : 99})
+    options = self._parse('./pants',
+                          env={
+                            'PANTS_A': 100,
+                            'PANTS_COMPILE_A': 99})
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over config
-    options=self._parse('./pants compile --a=99',
-                        config={
-                          'DEFAULT': {'a' : 100},
-                          })
+    options = self._parse('./pants compile --a=99',
+                          config={
+                            'DEFAULT': {'a': 100},
+                            })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over environment
-    options=self._parse('./pants compile --a=99',
-                        env={'PANTS_A':  100},)
+    options = self._parse('./pants compile --a=99',
+                          env={'PANTS_A': 100},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Env has precedence over config
-    options=self._parse('./pants ',
-                        config={
-                          'DEFAULT': {'a' : 100},
-                          },
-                        env={'PANTS_COMPILE_A':  99},)
+    options = self._parse('./pants ',
+                          config={
+                            'DEFAULT': {'a': 100},
+                            },
+                          env={'PANTS_COMPILE_A': 99},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope setting in then env
-    options=self._parse('./pants --a=100',
-                        env={'PANTS_COMPILE_A':  99},)
+    options = self._parse('./pants --a=100',
+                          env={'PANTS_COMPILE_A': 99},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -513,7 +516,7 @@ class OptionsTest(unittest.TestCase):
     # Command line global overrides the middle scope in config
     options = self._parse('./pants --a=100 ',
                           config={
-                            'compile': {'a' : 99},
+                            'compile': {'a': 99},
                             })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
@@ -522,9 +525,9 @@ class OptionsTest(unittest.TestCase):
     # Env global overrides the middle scope in config
     options = self._parse('./pants --a=100 ',
                           config={
-                            'compile': {'a' : 99},
+                            'compile': {'a': 99},
                             },
-                          env={'PANTS_A':  100},)
+                          env={'PANTS_A': 100},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -532,7 +535,7 @@ class OptionsTest(unittest.TestCase):
   def test_registration_arg_iter(self):
     options = self._parse('./pants',
                           config={
-                            'compile': {'a' : 99},
+                            'compile': {'a': 99},
                           })
 
     def get_registration_args(scope, name):
@@ -554,24 +557,23 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(for_x[2].get('action'), 'store_true')
 
   def test_complete_scopes(self):
-    _global = ScopeInfo.for_global_scope()
+    _global = GlobalOptionsRegistrar.get_scope_info()
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
-                      Options.complete_scopes({ScopeInfo.for_global_scope(), task('foo.bar.baz')}))
+                      Options.complete_scopes({GlobalOptionsRegistrar.get_scope_info(),
+                                               task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({intermediate('foo'), task('foo.bar.baz')}))
     self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
 
-  def test_payload_for_scope(self):
+  def test_get_fingerprintable_for_scope(self):
     val = 'blah blah blah'
     options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
 
-    payload = options.payload_for_scope('compile.scala')
-
-    self.assertEquals(len(payload.fields), 1)
-    for key, field in payload.fields:
-      self.assertEquals(key, 'modifycompile')
-      self.assertEquals(field.value, val)
+    pairs = options.get_fingerprintable_for_scope('compile.scala')
+    self.assertEquals(len(pairs), 1)
+    _, v = pairs[0]
+    self.assertEquals(v, val)

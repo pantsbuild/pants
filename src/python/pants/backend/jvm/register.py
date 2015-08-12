@@ -37,9 +37,9 @@ from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
-from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import (JavaZincCompile,
-                                                                     ScalaZincCompile)
+from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
+from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
@@ -59,7 +59,7 @@ def build_file_aliases():
       'benchmark': Benchmark,
       'credentials': Credentials,
       'jar_library': JarLibrary,
-      'unpacked_jars' : UnpackedJars,
+      'unpacked_jars': UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'java_tests': JavaTests,
@@ -100,6 +100,9 @@ def register_goals():
   Goal.by_name('clean-all').install(ng_killall, first=True)
   Goal.by_name('clean-all-async').install(ng_killall, first=True)
 
+  task(name='jvm-platform-explain', action=JvmPlatformExplain).install('jvm-platform-explain')
+  task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')
+
   task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap').with_description(
       'Bootstrap tools needed for building.')
 
@@ -122,20 +125,11 @@ def register_goals():
       product_type=['classes_by_target', 'classes_by_source'],
       flag_namespace=['compile'])
 
-  # Here we register the ScalaCompile group member before the java group members very deliberately.
-  # At some point ScalaLibrary targets will be able to own mixed scala and java source sets. At that
-  # point, the ScalaCompile group member will still only select targets via has_sources('*.scala');
-  # however if the JavaCompile group member were registered earlier, it would claim the ScalaLibrary
-  # targets with mixed source sets leaving those targets un-compiled by scalac and resulting in
-  # systemic compile errors.
-  jvm_compile.add_member(ScalaZincCompile)
-
-  # Its important we add AptCompile before JavaCompile since it 1st selector wins and apt code is a
-  # subset of java code
+  # It's important we add AptCompile before other java-compiling tasks since the first selector wins,
+  # and apt code is a subset of java code.
   jvm_compile.add_member(AptCompile)
-
-  jvm_compile.add_member(JavaZincCompile)
-  jvm_compile.add_member(JavaCompile)
+  jvm_compile.add_member(JmakeCompile)
+  jvm_compile.add_member(ZincCompile)
 
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
 

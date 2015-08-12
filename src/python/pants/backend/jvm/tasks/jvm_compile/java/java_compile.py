@@ -42,8 +42,8 @@ _JMAKE_ERROR_CODES = {
 _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
 
-class JavaCompile(JvmCompile):
-  _language = 'java'
+class JmakeCompile(JvmCompile):
+  _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False
 
@@ -62,7 +62,7 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def get_warning_args_default(cls):
-    return ('-C-Xlint:all',   '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
+    return ('-C-Xlint:all', '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
 
   @classmethod
   def get_no_warning_args_default(cls):
@@ -70,16 +70,25 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(JavaCompile, cls).register_options(register)
+    super(JmakeCompile, cls).register_options(register)
+    register('--use-jmake', action='store_true', default=True, help='Use jmake to compile Java targets')
     register('--source', advanced=True, fingerprint=True,
-             help='Provide source compatibility with this release.')
+             help='Provide source compatibility with this release. Overrides the jvm platform '
+                  'source.',
+             deprecated_hint='The -source arg to javac should be specified by the jvm-platform.',
+             deprecated_version='0.0.43')
     register('--target', advanced=True, fingerprint=True,
-             help='Generate class files for this JVM version.')
+             help='Generate class files for this JVM version. Overrides the jvm platform target.',
+             deprecated_hint='The -target arg to javac should be specified by the jvm-platform.',
+             deprecated_version='0.0.43')
     cls.register_jvm_tool(register, 'jmake', fingerprint=True)
     cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
 
+  def select(self, target):
+    return self.get_options().use_jmake and super(JmakeCompile, self).select(target)
+
   def __init__(self, *args, **kwargs):
-    super(JavaCompile, self).__init__(*args, **kwargs)
+    super(JmakeCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
@@ -98,7 +107,8 @@ class JavaCompile(JvmCompile):
   def create_analysis_tools(self):
     return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings):
     relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath('jmake')
     args = [
@@ -119,28 +129,41 @@ class JavaCompile(JvmCompile):
       '-jcmainclass', 'org.pantsbuild.tools.compiler.Compiler',
       ])
 
-    if self.get_options().source:
-      args.extend(['-C-source', '-C{0}'.format(self.get_options().source)])
-    if self.get_options().target:
-      args.extend(['-C-target', '-C{0}'.format(self.get_options().target)])
-
-    if '-C-source' in self._args:
-      raise TaskError("Set the source Java version with the 'source' option, not in 'args'.")
-    if '-C-target' in self._args:
-      raise TaskError("Set the target JVM version with the 'target' option, not in 'args'.")
     if not self.get_options().colors:
       filtered_args = filter(lambda arg: not arg == '-C-Tcolor', self._args)
     else:
       filtered_args = self._args
     args.extend(filtered_args)
+    args.extend(settings.args)
+
+    if '-C-source' in args:
+      raise TaskError("Set the source Java version with the 'source' or with the jvm platform, not "
+                      "in 'args'.")
+    if '-C-target' in args:
+      raise TaskError("Set the target JVM version with the 'target' option or with the jvm "
+                      "platform, not in 'args'.")
+
+    if self.get_options().source or self.get_options().target:
+      self.context.log.warn('--compile-java-source and --compile-java-target trample and override '
+                            'target jvm platform settings, and probably should not be used except '
+                            'for testing.')
+
+    source_level = self.get_options().source or settings.source_level
+    target_level = self.get_options().target or settings.target_level
+    if source_level:
+      args.extend(['-C-source', '-C{0}'.format(source_level)])
+    if target_level:
+      args.extend(['-C-target', '-C{0}'.format(target_level)])
 
     args.append('-C-Tdependencyfile')
     args.append('-C{}'.format(self._depfile))
 
+    jvm_options = list(self._jvm_options)
+
     args.extend(sources)
     result = self.runjava(classpath=jmake_classpath,
-                          main=JavaCompile._JMAKE_MAIN,
-                          jvm_options=self._jvm_options,
+                          main=JmakeCompile._JMAKE_MAIN,
+                          jvm_options=jvm_options,
                           args=args,
                           workunit_name='jmake',
                           workunit_labels=[WorkUnit.COMPILER])

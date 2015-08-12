@@ -14,6 +14,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
+
   def test_bundle_protobuf_normal(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',
@@ -46,8 +47,8 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_unpacked_jars(self):
     pants_run = self.run_pants(
-      [ 'bundle', 'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars',
-        '--bundle-deployjar',])
+      ['bundle', 'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars',
+       '--bundle-deployjar'])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
                       "got stderr:\n{1}\n"
@@ -83,13 +84,13 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
 
       def pairs(iterable):
-        return [(iterable[i], iterable[i+1]) for i in range(len(iterable)-1)]
+        return [(iterable[i], iterable[i + 1]) for i in range(len(iterable) - 1)]
 
       def find_protoc_blocks(lines):
         split_pattern = re.compile(r'Executing: .*?\bprotoc')
         split_points = [index for index, line in enumerate(lines)
                         if split_pattern.search(line) or not line]
-        return [lines[start:end] for start, end in pairs(split_points+[-1,]) if lines[start]]
+        return [lines[start:end] for start, end in pairs(split_points + [-1, ]) if lines[start]]
 
       # Scraping debug statements for protoc compilation.
       all_blocks = list(find_protoc_blocks([l.strip() for l in pants_run.stdout_data.split('\n')]))

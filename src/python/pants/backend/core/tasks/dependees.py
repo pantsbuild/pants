@@ -31,7 +31,6 @@ class ReverseDepmap(ConsoleTask):
                   "can be specified at once in a comma separated list or else by "
                   "using multiple instances of this flag.")
 
-
   def __init__(self, *args, **kwargs):
     super(ReverseDepmap, self).__init__(*args, **kwargs)
 
@@ -39,7 +38,6 @@ class ReverseDepmap(ConsoleTask):
     self._closed = self.get_options().closed
     self._dependees_type = self.get_options().type
     self._spec_excludes = self.get_options().spec_excludes
-
 
   def console_output(self, _):
     buildfiles = OrderedSet()

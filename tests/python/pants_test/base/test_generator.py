@@ -11,8 +11,9 @@ from pants.base.generator import TemplateData
 
 
 class TemplateDataTest(unittest.TestCase):
+
   def setUp(self):
-    self.data = TemplateData(foo = 'bar', baz = 42)
+    self.data = TemplateData(foo='bar', baz=42)
 
   def test_member_access(self):
     try:
@@ -31,7 +32,7 @@ class TemplateDataTest(unittest.TestCase):
       pass
 
   def test_extend(self):
-    self.assertEqual(self.data.extend(jake = 0.3), TemplateData(baz = 42, foo = 'bar', jake = 0.3))
+    self.assertEqual(self.data.extend(jake=0.3), TemplateData(baz=42, foo='bar', jake=0.3))
 
   def test_equals(self):
-    self.assertEqual(self.data, TemplateData(baz = 42).extend(foo = 'bar'))
+    self.assertEqual(self.data, TemplateData(baz=42).extend(foo='bar'))

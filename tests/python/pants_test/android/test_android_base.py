@@ -24,29 +24,30 @@ class TestAndroidBase(TaskTestBase):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @staticmethod
-  def android_manifest(package_name=None):
+  def android_manifest(package_name=None, target_sdk=None):
     package_name = package_name or 'org.pantsbuild.example.hello'
+    sdk = target_sdk or 19
     manifest = textwrap.dedent(
       """<?xml version="1.0" encoding="utf-8"?>
       <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="{}" >
           <uses-sdk
               android:minSdkVersion="8"
-              android:targetSdkVersion="19" />
+              android:targetSdkVersion="{}" />
       </manifest>
-      """.format(package_name))
+      """.format(package_name, sdk))
     return manifest
 
   @contextmanager
-  def android_target(self, name=None, package_name=None, dependencies=None,
+  def android_target(self, target_name=None, package_name=None, target_sdk=None, dependencies=None,
                      target_type=AndroidTarget, **kwargs):
     """Represent an Android target."""
     with temporary_file() as manifest:
-      manifest.write(self.android_manifest(package_name=package_name))
+      manifest.write(self.android_manifest(package_name=package_name, target_sdk=target_sdk))
       manifest.close()
-      name = name or 'target'
+      target_name = target_name or 'target'
       deps = dependencies or []
-      target = self.make_target(spec=':{}'.format(name),
+      target = self.make_target(spec=':{}'.format(target_name),
                                 target_type=target_type,
                                 manifest=manifest.name,
                                 dependencies=deps,
@@ -54,19 +55,20 @@ class TestAndroidBase(TaskTestBase):
       yield target
 
   @contextmanager
-  def android_binary(self, name=None, dependencies=None, package_name=None):
+  def android_binary(self, target_name=None, dependencies=None, package_name=None, target_sdk=None):
     """Represent an android_binary target."""
-    with self.android_target(name=name or 'binary',
+    with self.android_target(target_name=target_name or 'binary',
                              dependencies=dependencies,
                              package_name=package_name,
+                             target_sdk=target_sdk,
                              target_type=AndroidBinary) as binary:
       yield binary
 
   @contextmanager
-  def android_resources(self, name=None, dependencies=None, package_name=None):
+  def android_resources(self, target_name=None, dependencies=None, package_name=None):
     """Represent an android_resources target."""
     with temporary_dir() as temp:
-      with self.android_target(name=name or 'resources',
+      with self.android_target(target_name=target_name or 'resources',
                                dependencies=dependencies,
                                resource_dir=temp,
                                package_name=package_name,
@@ -74,10 +76,10 @@ class TestAndroidBase(TaskTestBase):
         yield resources
 
   @contextmanager
-  def android_library(self, name=None, libraries=None, include_patterns=None,
+  def android_library(self, target_name=None, libraries=None, include_patterns=None,
                       exclude_patterns=None, dependencies=None, package_name=None):
     """Represent an android_library target."""
-    with self.android_target(name=name or 'library',
+    with self.android_target(target_name=target_name or 'library',
                              libraries=libraries,
                              include_patterns=include_patterns,
                              exclude_patterns=exclude_patterns,

@@ -23,13 +23,14 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseReverseDepmapTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return ReverseDepmap
 
   def assert_console_output(self, *args, **kwargs):
     # Ensure that the globally-registered spec_excludes option is set, as Dependees consults it.
-    options = { 'spec_excludes': [] }
+    options = {'spec_excludes': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options
@@ -37,11 +38,13 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
 
 
 class ReverseDepmapEmptyTest(BaseReverseDepmapTest):
+
   def test(self):
     self.assert_console_output(targets=[])
 
 
 class ReverseDepmapTest(BaseReverseDepmapTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(

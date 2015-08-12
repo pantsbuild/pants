@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.base.workunit import WorkUnit
+
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
@@ -34,8 +36,14 @@ class GoTest(GoWorkspaceTask):
   def execute(self):
     # Only executes the tests from the package specified by the target roots, so
     # we don't run the tests for _all_ dependencies of said package.
-    for target in filter(self.is_go, self.context.target_roots):
+    for target in filter(self.is_local_src, self.context.target_roots):
       self.ensure_workspace(target)
-      self.run_go_cmd('test', self.get_gopath(target), target,
-                      cmd_flags=self.get_options().build_and_test_flags.split(),
-                      pkg_flags=self.get_passthru_args())
+      self._go_test(target)
+
+  def _go_test(self, target):
+    args = (self.get_options().build_and_test_flags.split()
+            + [target.address.spec_path]
+            + self.get_passthru_args())
+    self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
+                                workunit_factory=self.context.new_workunit,
+                                workunit_labels=[WorkUnit.TEST])

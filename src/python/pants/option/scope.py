@@ -8,17 +8,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 
 
-class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category'])):
+class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls'])):
   """Information about a scope."""
 
   # Symbolic constants for different categories of scope.
   GLOBAL = 'GLOBAL'
   TASK = 'TASK'
-  GLOBAL_SUBSYSTEM = 'GLOBAL_SUBSYSTEM'
-  TASK_SUBSYSTEM = 'TASK_SUBSYSTEM'
-  INTERMEDIATE = 'INTERMEDIATE'  # Scoped added automatically to fill out the scope hierarchy.
+  SUBSYSTEM = 'SUBSYSTEM'
+  INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
 
 
-  @classmethod
-  def for_global_scope(cls):
-    return cls('', cls.GLOBAL)
+# Allow the optionable_cls to default to None.
+ScopeInfo.__new__.__defaults__ = (None, )

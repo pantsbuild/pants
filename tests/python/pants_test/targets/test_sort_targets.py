@@ -12,6 +12,7 @@ from pants_test.base_test import BaseTest
 
 
 class SortTargetsTest(BaseTest):
+
   def test_validation(self):
     valid = self.make_target(':valid')
 
@@ -51,6 +52,6 @@ class SortTargetsTest(BaseTest):
     d = self.make_target(':d', dependencies=[c, a])
     e = self.make_target(':e', dependencies=[d])
 
-    self.assertEquals(sort_targets([a,b,c,d,e]), [e,d,c,b,a])
-    self.assertEquals(sort_targets([b,d,a,e,c]), [e,d,c,b,a])
-    self.assertEquals(sort_targets([e,d,c,b,a]), [e,d,c,b,a])
+    self.assertEquals(sort_targets([a, b, c, d, e]), [e, d, c, b, a])
+    self.assertEquals(sort_targets([b, d, a, e, c]), [e, d, c, b, a])
+    self.assertEquals(sort_targets([e, d, c, b, a]), [e, d, c, b, a])

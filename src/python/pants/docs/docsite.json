@@ -29,6 +29,7 @@
     "JVMProjects": "dist/markdown/html/examples/src/java/org/pantsbuild/example/readme.html",
     "page": "dist/markdown/html/examples/src/java/org/pantsbuild/example/page.html",
     "pex_design": "dist/markdown/html/examples/src/python/example/pex_design.html",
+    "powered_by": "dist/markdown/html/src/docs/powered_by.html",
     "publish": "dist/markdown/html/src/docs/publish.html",
     "python-readme": "dist/markdown/html/examples/src/python/example/readme.html",
     "release": "dist/markdown/html/src/python/pants/docs/release.html",

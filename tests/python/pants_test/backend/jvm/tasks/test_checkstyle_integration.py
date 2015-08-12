@@ -13,6 +13,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
+
   def test_checkstyle_cached(self):
     with temporary_dir(root_dir=self.workdir_root()) as cache:
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -94,4 +95,5 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'examples/src/java/org/pantsbuild/example/hello/simple'
           ]
         pants_run = self.run_pants_with_workdir(args, workdir)
+        print(pants_run.stdout_data)
         self.assert_success(pants_run)

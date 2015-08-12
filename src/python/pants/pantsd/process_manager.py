@@ -40,7 +40,7 @@ class ProcessGroup(object):
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name, pid=process.pid, process_name=process.name)
+    return ProcessManager(name=process.name(), pid=process.pid, process_name=process.name())
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
@@ -83,24 +83,38 @@ class ProcessManager(object):
     return self._process_name
 
   @property
-  def exe(self):
-    """The full path of the process executable e.g. '/opt/java/jdk1.7.0/Contents/Home/bin/java'."""
-    return getattr(self.as_process(), 'exe', None)
+  def cmdline(self):
+    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex'].
+
+    :returns: The command line or else `None` if the underlying process has died.
+    """
+    try:
+      process = self._as_process()
+      if process:
+        return process.cmdline()
+    except psutil.NoSuchProcess:
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+      pass
+    return None
 
   @property
-  def exe_name(self):
-    """The basename of the process executable e.g. 'java'."""
-    return getattr(self.as_process(), 'name', None)
+  def cmd(self):
+    """The first element of the process commandline e.g. '/usr/bin/python2.7'.
+
+    :returns: The first element of the process command line or else `None` if the underlying
+              process has died.
+    """
+    return (self.cmdline or [None])[0]
 
   @property
   def pid(self):
     """The running processes pid (or None)."""
-    return self._pid or self.get_pid()
+    return self._pid or self._get_pid()
 
   @property
   def socket(self):
     """The running processes socket/port information (or None)."""
-    return self._socket or self.get_socket()
+    return self._socket or self._get_socket()
 
   @staticmethod
   def _maybe_cast(x, caster):
@@ -109,12 +123,19 @@ class ProcessManager(object):
     except (TypeError, ValueError):
       return x
 
-  def as_process(self):
+  def _as_process(self):
+    """Returns a psutil `Process` object wrapping our pid.
+
+    NB: Even with a process object in hand, subsequent method calls against it can always raise
+    `NoSuchProcess`.  Care is needed to document the raises in the public API or else trap them and
+    do something sensible for the API.
+
+    :returns: a psutil Process object or else None if we have no pid.
+    :rtype: :class:`psutil.Process`
+    :raises: :class:`psutil.NoSuchProcess` if the process identified by our pid has died.
+    """
     if self._process is None and self.pid:
-      try:
-        self._process = psutil.Process(self.pid)
-      except psutil.NoSuchProcess:
-        pass
+      self._process = psutil.Process(self.pid)
     return self._process
 
   def _read_file(self, filename):
@@ -140,12 +161,12 @@ class ProcessManager(object):
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
     self._wait_for_file(self.get_pid_path(), timeout)
-    return self.get_pid()
+    return self._get_pid()
 
   def await_socket(self, timeout):
     """Wait up to a given timeout for a process to write socket info."""
     self._wait_for_file(self.get_socket_path(), timeout)
-    return self.get_socket()
+    return self._get_socket()
 
   def get_metadata_dir(self):
     """Return a metadata path for the process.
@@ -186,14 +207,14 @@ class ProcessManager(object):
     self._maybe_init_metadata_dir()
     self._write_file(self.get_socket_path(), str(socket_info))
 
-  def get_pid(self):
+  def _get_pid(self):
     """Retrieve and return the running PID."""
     try:
       return self._maybe_cast(self._read_file(self.get_pid_path()), int) or None
     except (IOError, OSError):
       return None
 
-  def get_socket(self):
+  def _get_socket(self):
     """Retrieve and return the running processes socket info."""
     try:
       return self._maybe_cast(self._read_file(self.get_socket_path()), self._socket_type) or None
@@ -202,29 +223,31 @@ class ProcessManager(object):
 
   def is_alive(self):
     """Return a boolean indicating whether the process is running."""
-    if self.as_process():
-      try:
-        if (self.as_process().status == psutil.STATUS_ZOMBIE or           # Check for walkers.
-            (self.process_name and self.process_name != self.exe_name)):  # Check for stale pids.
-          return False
-      except psutil.NoSuchProcess:
-        # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+    try:
+      process = self._as_process()
+      if not process:
+        # Can happen if we don't find our pid.
         return False
-
-      return True
-    else:
+      if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
+          (self.process_name and self.process_name != process.name())):  # Check for stale pids.
+        return False
+    except psutil.NoSuchProcess:
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       return False
 
-  def kill(self, kill_sig):
+    return True
+
+  def _kill(self, kill_sig):
     """Send a signal to the current process."""
-    os.kill(self.pid, kill_sig)
+    if self.pid:
+      os.kill(self.pid, kill_sig)
 
   def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
     if self.is_alive():
       for signal_type in signal_chain:
         try:
-          self.kill(signal_type)
+          self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
                          .format(e=e, signal=signal_type, pid=self.pid))
@@ -258,6 +281,12 @@ class ProcessManager(object):
        and also makes the first child a session leader (which can still acquire a tty). By forking a
        second time, we ensure that the second child can never acquire a controlling terminal because
        it's no longer a session leader - but it now has its own separate process group.
+
+       Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
+       the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
+       below) due to the fact that the daemons that pants would run are typically personal user
+       daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
+       differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
@@ -267,7 +296,6 @@ class ProcessManager(object):
       if second_pid == 0:
         try:
           os.chdir(self._buildroot)
-          os.umask(0)
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logging.critical(traceback.format_exc())
@@ -296,7 +324,6 @@ class ProcessManager(object):
       try:
         os.setsid()
         os.chdir(self._buildroot)
-        os.umask(0)
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logging.critical(traceback.format_exc())

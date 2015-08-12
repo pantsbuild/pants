@@ -57,15 +57,14 @@ class IvyArtifact(PayloadField):
             .format(self.name, self.type_, self.ext, self.conf, self.url, self.classifier))
 
 
-
 class JarDependency(object):
   """A pre-built Maven repository dependency."""
-
 
   _HASH_KEYS = (
     'org',
     'name',
     'rev',
+    'classifier',
     'force',
     'excludes',
     'transitive',

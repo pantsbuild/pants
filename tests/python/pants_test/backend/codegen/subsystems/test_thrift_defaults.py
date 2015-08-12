@@ -5,20 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import uuid
 from contextlib import contextmanager
 
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.base.target import Target
-from pants_test.base.context_utils import create_option_values
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 class TestThriftDefaults(BaseTest):
-  def create_thrift_defaults(self, compiler=None, language=None, rpc_style=None):
-    option_values = dict(compiler=compiler, language=language, rpc_style=rpc_style)
-    return ThriftDefaults('test-scope', create_option_values(option_values))
+  create_thrift_defaults = functools.partial(create_subsystem, ThriftDefaults)
 
   @contextmanager
   def invalid_fixtures(self):

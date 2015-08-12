@@ -71,6 +71,22 @@ class OptionValueContainer(object):
     else:  # Values without rank are assumed to be flag values set by argparse.
       return RankedValue.FLAG
 
+  def is_flagged(self, key):
+    """Returns `True` if the value for the specified key was supplied via a flag.
+
+    A convenience equivalent to `get_rank(key) == RankedValue.FLAG`.
+
+    This check can be useful to determine whether or not a user explicitly set an option for this
+    run.  Although a user might also set an option explicitly via an environment variable, ie via:
+    `ENV_VAR=value ./pants ...`, this is an ambiguous case since the environment variable could also
+    be permanently set in the user's environment.
+
+    :param string key: The name of the option to check.
+    :returns: `True` if the option was explicitly flagged by the user from the command line.
+    :rtype: bool
+    """
+    return self.get_rank(key) == RankedValue.FLAG
+
   def update(self, attrs):
     """Set attr values on this object from the data in the attrs dict."""
     for k, v in attrs.items():

@@ -19,6 +19,7 @@ from pants_test.base_test import BaseTest
 
 
 class JvmAppTest(BaseTest):
+
   @property
   def alias_groups(self):
     return register_jvm()
@@ -174,6 +175,7 @@ class JvmAppTest(BaseTest):
 
 
 class BundleTest(BaseTest):
+
   @property
   def alias_groups(self):
     return register_core().merge(register_jvm())
@@ -344,3 +346,17 @@ class BundleTest(BaseTest):
       if k.endswith('archimedes/volume/config/metal/dense.xml'):
         stonexml_key = k
     self.assertEquals(app2.bundles[0].filemap[stonexml_key], 'config/metal/dense.xml')
+
+  def test_globs_relative_to_build_root(self):
+    self.add_to_build_file('y/BUILD', dedent('''
+      java_library(name="y", sources=globs('*.java'))
+      jvm_app(name="app",
+        dependencies = ["y"],
+        bundles = [
+          bundle(relative_to="config", fileset=globs("z/*")),
+          bundle(relative_to="config", fileset=["a/b"])
+        ]
+      )'''))
+    graph = self.context().scan(self.build_root)
+    globs = graph.get_target_from_spec('y:app').globs_relative_to_buildroot()
+    self.assertEquals(['a/b', 'y/z/*'], sorted(globs['globs']))

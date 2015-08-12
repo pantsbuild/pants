@@ -6,7 +6,6 @@ python_library(
   dependencies = [
     ':antlr_gen',
     ':apache_thrift_gen',
-    ':code_gen',
     ':jaxb_gen',
     ':protobuf_gen',
     ':protobuf_parse',
@@ -37,10 +36,10 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/binaries:thrift_util',
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants:thrift_util',
   ],
 )
 
@@ -56,16 +55,6 @@ python_library(
     'src/python/pants/java:util',
     'src/python/pants/option:option',
     'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'code_gen',
-  sources = ['code_gen.py'],
-  dependencies = [
-    ':common',
-    'src/python/pants/base:address_lookup_error',
-    'src/python/pants/base:build_environment',
   ],
 )
 
@@ -102,7 +91,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants:binary_util',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
@@ -125,10 +114,10 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants:binary_util',
   ],
 )
 

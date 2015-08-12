@@ -64,6 +64,7 @@ python_library(
     ':jvm_compile_isolated_strategy',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/goal:products',
     'src/python/pants/option',

@@ -16,6 +16,7 @@ from pants_test.base_test import BaseTest
 
 
 class CmdLineSpecParserTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -129,7 +130,7 @@ class CmdLineSpecParserTest(BaseTest):
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
   def test_pants_dot_d_excluded(self):
-    expected_specs=[':root', 'a', 'a:b', 'a/b', 'a/b:c']
+    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
     self.add_to_build_file('.pants.d/some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
@@ -141,7 +142,7 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
   def test_exclude_malformed_build_file(self):
-    expected_specs=[':root', 'a', 'a:b', 'a/b', 'a/b:c']
+    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
     self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
@@ -152,7 +153,9 @@ class CmdLineSpecParserTest(BaseTest):
                                          exclude_target_regexps=[r'.*some/dir.*'])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
+
 class CmdLineSpecParserBadBuildTest(BaseTest):
+
   def setUp(self):
     super(CmdLineSpecParserBadBuildTest, self).setUp()
 

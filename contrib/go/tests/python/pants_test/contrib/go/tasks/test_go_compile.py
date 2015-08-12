@@ -74,8 +74,8 @@ class GoCompileTest(TaskTestBase):
     a_gopath = self.go_compile.get_gopath(a)
     self.go_compile._sync_binary_dep_links(a, a_gopath, lib_binary_map)
 
-    # Ensure future links are older than original links by at least 1 second.
-    time.sleep(1)
+    # Ensure future links are older than original links by at least 1.5 seconds.
+    time.sleep(1.5)
 
     # "Modify" b's binary.
     touch(lib_binary_map[b])

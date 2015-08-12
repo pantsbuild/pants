@@ -35,6 +35,6 @@ class OwnerPrintingPIDLockFile(pidlockfile.PIDLockFile):
   def cmdline_for_pid(pid):
     try:
       process = psutil.Process(pid)
-      return ' '.join(process.cmdline)
+      return ' '.join(process.cmdline())
     except psutil.NoSuchProcess:
       return None

@@ -10,7 +10,7 @@ import os
 from pants.backend.core.tasks.task import Task
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.option.options import Options
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -26,6 +26,7 @@ class DummyBootstrapperTask(Task):
 
 
 class BootstrapperTest(JvmToolTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return DummyBootstrapperTask
@@ -34,7 +35,7 @@ class BootstrapperTest(JvmToolTaskTestBase):
     super(BootstrapperTest, self).setUp()
     # Make sure subsystems are initialized with the given options.
     self.context(options={
-      Options.GLOBAL_SCOPE: { 'pants_bootstrapdir': self.test_workdir }
+      GLOBAL_SCOPE: {'pants_bootstrapdir': self.test_workdir}
     })
 
   def test_simple(self):

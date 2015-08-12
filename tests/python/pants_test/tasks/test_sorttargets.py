@@ -14,17 +14,20 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseSortTargetsTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return SortTargets
 
 
 class SortTargetsEmptyTest(BaseSortTargetsTest):
+
   def test(self):
     self.assert_console_output(targets=[])
 
 
 class SortTargetsTest(BaseSortTargetsTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(targets={'python_library': PythonLibrary})
@@ -52,4 +55,4 @@ class SortTargetsTest(BaseSortTargetsTest):
   def test_sort_reverse(self):
     targets = [self.target('common/c'), self.target('common/a'), self.target('common/b')]
     self.assertEqual(['common/c:c', 'common/b:b', 'common/a:a'],
-                     list(self.execute_console_task(targets=targets, options={ 'reverse': True })))
+                     list(self.execute_console_task(targets=targets, options={'reverse': True})))

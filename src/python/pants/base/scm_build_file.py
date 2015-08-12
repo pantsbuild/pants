@@ -35,7 +35,7 @@ class ScmBuildFile(BuildFile):
   @classmethod
   def _scm_worktree(cls):
     if not hasattr(cls, '_cached_scm_worktree'):
-      cls._cached_scm_worktree = cls._scm.detect_worktree()
+      cls._cached_scm_worktree = os.path.realpath(cls._scm.detect_worktree())
     return cls._cached_scm_worktree
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
@@ -60,20 +60,23 @@ class ScmBuildFile(BuildFile):
     with self._reader.open(relpath) as source:
       return source.read()
 
-  def _isdir(self, path):
+  @classmethod
+  def _isdir(cls, path):
     """Returns True if path is a directory"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.isdir(relpath)
+    relpath = os.path.relpath(path, cls._scm_worktree())
+    return cls._reader.isdir(relpath)
 
-  def _isfile(self, path):
+  @classmethod
+  def _isfile(cls, path):
     """Returns True if path is a file"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.isfile(relpath)
+    relpath = os.path.relpath(path, cls._scm_worktree())
+    return cls._reader.isfile(relpath)
 
-  def _exists(self, path):
+  @classmethod
+  def _exists(cls, path):
     """Returns True if path exists"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.exists(relpath)
+    relpath = os.path.relpath(path, cls._scm_worktree())
+    return cls._reader.exists(relpath)
 
   @classmethod
   def _walk(cls, root_dir, root, topdown=False):
@@ -83,7 +86,8 @@ class ScmBuildFile(BuildFile):
     Works like os.walk.
     """
     worktree = cls._scm_worktree()
-    scm_rootpath = os.path.relpath(root_dir, worktree)
+    scm_rootpath = os.path.relpath(os.path.realpath(root_dir), worktree)
+
     if root:
       relpath = os.path.join(scm_rootpath, root)
     else:

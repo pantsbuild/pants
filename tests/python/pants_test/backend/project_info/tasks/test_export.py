@@ -30,6 +30,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ProjectInfoTest(ConsoleTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return Export
@@ -154,15 +155,26 @@ class ProjectInfoTest(ConsoleTaskTestBase):
       python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
     '''.strip())
 
-  def test_source_globs(self):
+  def test_source_globs_py(self):
     result = get_json(self.execute_console_task(
       options=dict(globs=True),
       targets=[self.target('src/x')]
     ))
 
     self.assertEqual(
-      {'globs' : ['src/x/*.py',]},
+      {'globs': ['src/x/*.py']},
       result['targets']['src/x:x']['globs']
+    )
+
+  def test_source_globs_java(self):
+    result = get_json(self.execute_console_task(
+      options=dict(globs=True),
+      targets=[self.target('project_info:globular')]
+    ))
+
+    self.assertEqual(
+      {'globs' : ['project_info/com/foo/*.scala']},
+      result['targets']['project_info:globular']['globs']
     )
 
   def test_without_dependencies(self):
@@ -175,7 +187,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:first')]
     ))
-    self.assertEqual('1.0.1', result['version'])
+    self.assertEqual('1.0.2', result['version'])
 
   def test_sources(self):
     result = get_json(self.execute_console_task(
@@ -188,17 +200,6 @@ class ProjectInfoTest(ConsoleTaskTestBase):
        'project_info/com/foo/Baz.scala',
       ],
       sorted(result['targets']['project_info:third']['sources'])
-    )
-
-  def test_source_globs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('project_info:globular')]
-    ))
-
-    self.assertEqual(
-      {'globs' : ['project_info/com/foo/*.scala']},
-      result['targets']['project_info:globular']['globs']
     )
 
   def test_with_dependencies(self):
@@ -325,9 +326,9 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/exclude/*.py',],
-       'exclude' : [{
-         'globs' : ['src/exclude/foo.py']
+      {'globs': ['src/exclude/*.py'],
+       'exclude': [{
+         'globs': ['src/exclude/foo.py']
        }],
      },
       result['targets']['src/exclude:exclude']['globs']
@@ -340,7 +341,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/**/*.py','src/y/*.py',]},
+      {'globs': ['src/y/**/*.py', 'src/y/*.py']},
       result['targets']['src/y:y']['globs']
     )
 
@@ -351,7 +352,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/subdir/**/*.py', 'src/y/subdir/*.py',]},
+      {'globs': ['src/y/subdir/**/*.py', 'src/y/subdir/*.py']},
       result['targets']['src/y:y2']['globs']
     )
 
@@ -362,7 +363,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/y/Test*.py',]},
+      {'globs': ['src/y/Test*.py']},
       result['targets']['src/y:y3']['globs']
     )
 
@@ -373,7 +374,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     ))
 
     self.assertEqual(
-      {'globs' : ['src/z/**/*.py',]},
+      {'globs': ['src/z/**/*.py']},
       result['targets']['src/z:z']['globs']
     )
 

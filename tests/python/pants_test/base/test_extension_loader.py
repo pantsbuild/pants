@@ -27,6 +27,7 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class MockMetadata(EmptyProvider):
+
   def __init__(self, metadata):
     self.metadata = metadata
 
@@ -49,6 +50,7 @@ class DummySubsystem2(Subsystem):
 
 
 class DummyTarget(Target):
+
   @classmethod
   def subsystems(cls):
     return super(DummyTarget, cls).subsystems() + (DummySubsystem1, )
@@ -60,16 +62,19 @@ class DummyObject1(object):
 
 
 class DummyObject2(object):
+
   @classmethod
   def subsystems(cls):
     return (DummySubsystem2, )
 
 
 class DummyTask(Task):
+
   def execute(self): return 42
 
 
 class LoaderTest(unittest.TestCase):
+
   def setUp(self):
     self.build_configuration = BuildConfiguration()
     self.working_set = WorkingSet()
@@ -164,7 +169,6 @@ class LoaderTest(unittest.TestCase):
   def test_load_missing_plugin(self):
     with self.assertRaises(PluginNotFound):
       self.load_plugins(['Foobar'])
-
 
   def get_mock_plugin(self, name, version, reg=None, alias=None, after=None):
     """Make a fake Distribution (optionally with entry points)
