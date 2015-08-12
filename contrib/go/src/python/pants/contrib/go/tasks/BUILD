@@ -2,6 +2,7 @@ python_library(
   name='go_compile',
   sources=['go_compile.py'],
   dependencies=[
+    'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
   ]
@@ -35,6 +36,7 @@ python_library(
   dependencies=[
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/util:memo',
     'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
@@ -47,6 +49,7 @@ python_library(
   name='go_test',
   sources=['go_test.py'],
   dependencies=[
+    'src/python/pants/base:workunit',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
   ]
 )

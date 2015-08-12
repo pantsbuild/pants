@@ -5,14 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import pytest
-from pants_test.contrib.go.tasks.go_tool import GoTool
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class GoTestIntegrationTest(PantsRunIntegrationTest):
 
-  @pytest.mark.skipif('not GoTool.go_installed()', reason='requires `go` command.')
   def test_go_test_simple(self):
     args = ['test',
             'contrib/go/examples/src/go/libA']
