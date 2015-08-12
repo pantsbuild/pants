@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 from collections import defaultdict
+from glob import glob
 from io import BytesIO
 
 import requests
@@ -173,8 +174,7 @@ class GoFetch(GoTask):
 
   def _get_remote_import_ids(self, pkg_dir):
     """Returns the remote import ids declared by the Go package at pkg_dir."""
-    # Needs to execute through shell for wildcard ('*.go').
-    cmd = self.go_dist.create_go_cmd('list', args=['-json', os.path.join(pkg_dir, '*.go')])
-    out = cmd.check_output(shell=True)
+    sources = glob(os.path.join(pkg_dir, '*.go'))
+    out = self.go_dist.create_go_cmd('list', args=['-json'] + sources).check_output()
     imports = json.loads(out)['Imports']
     return [imp for imp in imports if imp not in self.go_stdlib]
