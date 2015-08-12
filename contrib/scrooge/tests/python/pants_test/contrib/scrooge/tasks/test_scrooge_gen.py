@@ -44,8 +44,8 @@ class ScroogeGenTest(TaskTestBase):
   def test_validate_compiler_configs(self):
     # Set synthetic defaults for the global scope.
     self.set_options_for_scope('thrift-defaults',
-                               compile='scrooge',
-                               language='bf',
+                               compiler='unchecked',
+                               language='uniform',
                                rpc_style='async')
 
     self.add_to_build_file('test_validate', dedent('''
