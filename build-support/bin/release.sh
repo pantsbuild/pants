@@ -89,6 +89,12 @@ function execute_packaged_pants_with_internal_backends() {
     shift
   fi
 
+  local extra_bootstrap_buildfiles
+  if [[ "$1" =~ "extra_bootstrap_buildfiles" ]]; then
+    extra_bootstrap_buildfiles=${1#*=}
+    shift
+  fi
+
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   pants \
@@ -100,7 +106,10 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_backend.utilities', \
         ${extra_backend_packages}
       ]" \
-    --goals-bootstrap-buildfiles="['${ROOT}/BUILD']" \
+    --goals-bootstrap-buildfiles="[ \
+        '${ROOT}/BUILD', \
+        ${extra_bootstrap_buildfiles}
+      ]" \
     "$@"
 }
 
