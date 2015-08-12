@@ -248,9 +248,11 @@ class Options(object):
       elif isinstance(self._help_request, UnknownGoalHelp):
         print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
         print_hint()
+        # TODO: Should probably cause a non-zero exit code.
       elif isinstance(self._help_request, NoGoalHelp):
         print('No goals specified.')
         print_hint()
+        # TODO: Should probably cause a non-zero exit code.
       return True
     else:
       return False
@@ -274,26 +276,13 @@ class Options(object):
         if scope.partition('.')[0] in help_scopes:
           help_scopes.add(scope)
 
-    help_scopes = sorted(help_scopes)
-    help_scope_infos = [self._known_scope_to_info[s] for s in help_scopes]
+    help_scope_infos = [self._known_scope_to_info[s] for s in sorted(help_scopes)]
     if help_scope_infos:
       for scope_info in help_scope_infos:
         help_str = self._format_options_help_for_scope(scope_info)
         if help_str:
           print(help_str)
       return
-
-    # goals = (Goal.all() if show_all_help else [Goal.by_name(goal_name) for goal_name in self.goals])
-    # if goals:
-    #   for goal in goals:
-    #     if not goal.ordered_task_names():
-    #       print('\nUnknown goal: {}'.format(goal.name))
-    #     else:
-    #       print('\n{0}: {1}\n'.format(goal.name, goal.description))
-    #       for scope_info in goal.known_scope_infos():
-    #         help_str = self._format_options_help_for_scope(scope_info)
-    #         if help_str:
-    #           print(help_str)
     else:
       print(pants_release())
       print('\nUsage:')

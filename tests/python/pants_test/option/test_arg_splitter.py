@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import shlex
 import unittest
 
-from pants.option.arg_splitter import ArgSplitter, OptionsHelp, VersionHelp
+from pants.option.arg_splitter import (ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
+                                       VersionHelp)
 from pants.option.scope import ScopeInfo
 
 
@@ -60,9 +61,19 @@ class ArgSplitterTest(unittest.TestCase):
 
   def _split_version(self, args_str):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
-    args = shlex.split(args_str)
-    splitter.split_args(args)
+    splitter.split_args(shlex.split(args_str))
     self.assertTrue(isinstance(splitter.help_request, VersionHelp))
+
+  def _split_unknown_goal(self, args_str, unknown_goals):
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+    splitter.split_args(shlex.split(args_str))
+    self.assertTrue(isinstance(splitter.help_request, UnknownGoalHelp))
+    self.assertSetEqual(set(unknown_goals), set(splitter.help_request.unknown_goals))
+
+  def _split_no_goal(self, args_str):
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+    splitter.split_args(shlex.split(args_str))
+    self.assertTrue(isinstance(splitter.help_request, NoGoalHelp))
 
   def test_basic_arg_splitting(self):
     # Various flag combos.
@@ -190,6 +201,15 @@ class ArgSplitterTest(unittest.TestCase):
                      {'': [], 'compile': []}, [], True, False)
     self._split_help('./pants compile help-all test --help', ['compile', 'test'],
                      {'': [], 'compile': [], 'test': []}, [], False, True)
+
+  def test_unknown_goal_detection(self):
+    self._split_unknown_goal('./pants foo', ['foo'])
+    self._split_unknown_goal('./pants compile foo', ['foo'])
+    self._split_unknown_goal('./pants foo bar baz:qux', ['foo', 'bar'])
+    self._split_unknown_goal('./pants foo compile bar baz:qux', ['foo', 'bar'])
+
+  def test_no_goal_detection(self):
+    self._split_no_goal('./pants foo/bar:baz')
 
   def test_version_request_detection(self):
     self._split_version('./pants -V')

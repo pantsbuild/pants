@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import sys
-from abc import ABCMeta
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import ScopeInfo
+from pants.util.meta import AbstractClass
 
 
 GLOBAL_SCOPE = ''
@@ -37,9 +37,9 @@ class SplitArgs(namedtuple('SplitArgs',
   pass
 
 
-class HelpRequest(object):
+class HelpRequest(AbstractClass):
   """Represents an implicit or explicit request for help by the user."""
-  __metaclass__ = ABCMeta
+  pass
 
 
 class VersionHelp(HelpRequest):
@@ -54,6 +54,7 @@ class OptionsHelp(HelpRequest):
     :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
     :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
     """
+    super(OptionsHelp, self).__init__()
     self.advanced = advanced
     self.all_scopes = all_scopes
 
@@ -61,6 +62,7 @@ class OptionsHelp(HelpRequest):
 class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
   def __init__(self, unknown_goals):
+    super(UnknownGoalHelp, self).__init__()
     self.unknown_goals = unknown_goals
 
 
@@ -90,6 +92,9 @@ class ArgSplitter(object):
 
   def __init__(self, known_scope_infos):
     self._known_scope_infos = known_scope_infos
+    # TODO: Get rid of our reliance on known scopes here. We don't really need it now
+    # that we heuristically identify target specs based on it containing /, : or being
+    # a top-level directory.
     self._known_scopes = (set([si.scope for si in known_scope_infos]) |
                           {'help', 'help-advanced', 'help-all'})
     self._unknown_scopes = []
@@ -190,7 +195,7 @@ class ArgSplitter(object):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
       elif os.path.sep in arg or ':' in arg or os.path.isdir(arg):
         targets.append(arg)
-      else:
+      elif arg not in self._known_scopes:
         self._unknown_scopes.append(arg)
 
     if self._at_double_dash():
