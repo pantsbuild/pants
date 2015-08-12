@@ -6,54 +6,34 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 
-from pants.backend.core.tasks.task import Task
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
-class DummyBootstrapperTask(Task):
-  """A placeholder task used as a hint to BaseTest to initialize the Bootstrapper subsystem."""
-  @classmethod
-  def options_scope(cls):
-    return 'dummy-bootstrapper'
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(DummyBootstrapperTask, cls).global_subsystems() + (IvySubsystem, )
-
-
-class BootstrapperTest(JvmToolTaskTestBase):
-
-  @classmethod
-  def task_type(cls):
-    return DummyBootstrapperTask
-
-  def setUp(self):
-    super(BootstrapperTest, self).setUp()
-    # Make sure subsystems are initialized with the given options.
-    self.context(options={
-      GLOBAL_SCOPE: {'pants_bootstrapdir': self.test_workdir}
-    })
+class BootstrapperTest(unittest.TestCase):
 
   def test_simple(self):
-    bootstrapper = Bootstrapper.instance()
-    ivy = bootstrapper.ivy()
-    self.assertIsNotNone(ivy.ivy_cache_dir)
-    self.assertIsNone(ivy.ivy_settings)
-    bootstrap_jar_path = os.path.join(self.test_workdir,
-                                      'tools', 'jvm', 'ivy', 'bootstrap.jar')
-    self.assertTrue(os.path.exists(bootstrap_jar_path))
+    with subsystem_instance(IvySubsystem) as ivy_subsystem:
+      bootstrapper = Bootstrapper(ivy_subsystem=ivy_subsystem)
+      ivy = bootstrapper.ivy()
+      self.assertIsNotNone(ivy.ivy_cache_dir)
+      self.assertIsNone(ivy.ivy_settings)
+      bootstrap_jar_path = os.path.join(ivy_subsystem.get_options().pants_bootstrapdir,
+                                        'tools', 'jvm', 'ivy', 'bootstrap.jar')
+      self.assertTrue(os.path.exists(bootstrap_jar_path))
 
   def test_reset(self):
-    bootstrapper1 = Bootstrapper.instance()
-    Bootstrapper.reset_instance()
-    bootstrapper2 = Bootstrapper.instance()
-    self.assertNotEqual(bootstrapper1, bootstrapper2)
+    with subsystem_instance(IvySubsystem):
+      bootstrapper1 = Bootstrapper.instance()
+      Bootstrapper.reset_instance()
+      bootstrapper2 = Bootstrapper.instance()
+      self.assertIsNot(bootstrapper1, bootstrapper2)
 
   def test_default_ivy(self):
-    ivy = Bootstrapper.default_ivy()
-    self.assertIsNotNone(ivy.ivy_cache_dir)
-    self.assertIsNone(ivy.ivy_settings)
+    with subsystem_instance(IvySubsystem):
+      ivy = Bootstrapper.default_ivy()
+      self.assertIsNotNone(ivy.ivy_cache_dir)
+      self.assertIsNone(ivy.ivy_settings)

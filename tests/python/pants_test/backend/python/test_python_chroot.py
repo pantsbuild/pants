@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
@@ -22,15 +21,13 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.base.build_environment import get_pants_cachedir
 from pants.base.source_root import SourceRoot
-from pants.binaries.binary_util import BinaryUtil
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import create_subsystem
+from pants_test.subsystem.subsystem_util import create_subsystem, subsystem_instance
 
 
 def test_get_current_platform():
@@ -39,50 +36,44 @@ def test_get_current_platform():
 
 
 class PythonChrootTest(BaseTest):
+
+  def setUp(self):
+    # Capture PythonSetup with the real BUILD_ROOT before that is reset to a tmpdir by super.
+    with subsystem_instance(PythonSetup) as python_setup:
+      self.python_setup = python_setup
+
+    super(PythonChrootTest, self).setUp()
+
   @contextmanager
   def dumped_chroot(self, targets):
-    with temporary_dir() as chroot:
-      python_setup_workdir = os.path.join(self.real_build_root, '.pants.d', 'python-setup')
+    python_repos = create_subsystem(PythonRepos)
 
-      def cache_dir(name):
-        return os.path.join(python_setup_workdir, name)
-
-      python_setup = create_subsystem(PythonSetup,
-                                      artifact_cache_dir=cache_dir('artifacts'),
-                                      interpreter_cache_dir=cache_dir('interpreters'),
-                                      resolver_cache_dir=cache_dir('resolved_requirements'))
-      python_repos = create_subsystem(PythonRepos)
-
-      ivy_subsystem = create_subsystem(IvySubsystem, pants_bootstrapdir=get_pants_cachedir())
+    with subsystem_instance(IvySubsystem) as ivy_subsystem:
       ivy_bootstrapper = Bootstrapper(ivy_subsystem=ivy_subsystem)
 
-      def thrift_binary_factory():
-        binary_util = BinaryUtil(baseurls=['https://dl.bintray.com/pantsbuild/bin/build-support'],
-                                 timeout_secs=30,
-                                 bootstrapdir=get_pants_cachedir())
-        return ThriftBinary(binary_util=binary_util, relpath='bin/thrift', version='0.9.2')
+      with subsystem_instance(ThriftBinary.Factory) as thrift_binary_factory:
+        interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
+        interpreter_cache.setup()
+        interpreters = list(interpreter_cache.matches([self.python_setup.interpreter_requirement]))
+        self.assertGreater(len(interpreters), 0)
+        interpreter = interpreters[0]
 
-      interpreter_cache = PythonInterpreterCache(python_setup, python_repos)
-      interpreter_cache.setup()
-      interpreters = list(interpreter_cache.matches([python_setup.interpreter_requirement]))
-      self.assertGreater(len(interpreters), 0)
-      interpreter = interpreters[0]
+        with temporary_dir() as chroot:
+          pex_builder = PEXBuilder(path=chroot, interpreter=interpreter)
 
-      pex_builder = PEXBuilder(path=chroot, interpreter=interpreter)
-
-      python_chroot = PythonChroot(python_setup=python_setup,
-                                   python_repos=python_repos,
-                                   ivy_bootstrapper=ivy_bootstrapper,
-                                   thrift_binary_factory=thrift_binary_factory,
-                                   interpreter=interpreter,
-                                   builder=pex_builder,
-                                   targets=targets,
-                                   platforms=['current'])
-      try:
-        python_chroot.dump()
-        yield pex_builder, python_chroot
-      finally:
-        python_chroot.delete()
+          python_chroot = PythonChroot(python_setup=self.python_setup,
+                                       python_repos=python_repos,
+                                       ivy_bootstrapper=ivy_bootstrapper,
+                                       thrift_binary_factory=thrift_binary_factory.create,
+                                       interpreter=interpreter,
+                                       builder=pex_builder,
+                                       targets=targets,
+                                       platforms=['current'])
+          try:
+            python_chroot.dump()
+            yield pex_builder, python_chroot
+          finally:
+            python_chroot.delete()
 
   def test_antlr(self):
     SourceRoot.register('src/antlr', PythonThriftLibrary)

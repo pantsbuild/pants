@@ -5,8 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from contextlib import contextmanager
+
+from pants.option.optionable import Optionable
+from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem import Subsystem
-from pants_test.option.util.fakes import create_option_values_for_optionable
+from pants_test.option.util.fakes import (create_option_values_for_optionable,
+                                          create_options_for_optionables)
 
 
 def create_subsystem(subsystem_type, scope='test-scope', **options):
@@ -23,3 +28,30 @@ def create_subsystem(subsystem_type, scope='test-scope', **options):
 
   option_values = create_option_values_for_optionable(subsystem_type, **options)
   return subsystem_type(scope, option_values)
+
+
+@contextmanager
+def subsystem_instance(subsystem_type, scope=None, options=None):
+  """Creates a Subsystem instance for test.
+
+  :param type subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
+                              to create.
+  :param string scope: An optional scope to create the subsystem in; defaults to global.
+  :param **options: Keyword args representing option values explicitly set via the command line.
+  """
+  if not issubclass(subsystem_type, Subsystem):
+    raise TypeError('The given `subsystem_type` was not a subclass of `Subsystem`: {}'
+                    .format(subsystem_type))
+
+  optionables = Subsystem.closure([subsystem_type])
+  Subsystem._options = create_options_for_optionables(optionables, options=options)
+  try:
+    if scope is None:
+      yield subsystem_type.global_instance()
+    else:
+      class ScopedOptionable(Optionable):
+        options_scope = scope
+        options_scope_category = ScopeInfo.SUBSYSTEM
+      yield subsystem_type.scoped_instance(ScopedOptionable)
+  finally:
+    Subsystem.reset()

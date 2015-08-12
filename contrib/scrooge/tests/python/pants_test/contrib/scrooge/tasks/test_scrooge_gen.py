@@ -17,7 +17,6 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
-from pants_test.option.util.fakes import create_options
 from pants_test.tasks.task_test_base import TaskTestBase
 from twitter.common.collections import OrderedSet
 
@@ -44,10 +43,10 @@ class ScroogeGenTest(TaskTestBase):
 
   def test_validate_compiler_configs(self):
     # Set synthetic defaults for the global scope.
-    option_values = {'compiler': 'scrooge',
-                     'language': 'bf',
-                     'rpc_style': 'async'}
-    options = create_options({'thrift-defaults': option_values})
+    self.set_options_for_scope('thrift-defaults',
+                               compiler='unchecked',
+                               language='uniform',
+                               rpc_style='async')
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
@@ -72,7 +71,7 @@ class ScroogeGenTest(TaskTestBase):
     '''))
 
     target = self.target('test_validate:one')
-    context = self.context(options=options, target_roots=[target])
+    context = self.context(target_roots=[target])
     task = self.create_task(context)
     task._validate_compiler_configs([self.target('test_validate:one')])
     task._validate_compiler_configs([self.target('test_validate:two')])
