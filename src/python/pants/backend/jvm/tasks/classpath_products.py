@@ -16,9 +16,6 @@ from pants.goal.products import UnionProducts
 def _not_excluded_filter(exclude_patterns):
   def not_excluded(path_tuple):
     conf, path = path_tuple
-    for excluded in exclude_patterns:
-      if excluded in path:
-        print ('Path %s excluded due to %s' % (path, excluded))
     return not any(excluded in path for excluded in exclude_patterns)
   return not_excluded
 
