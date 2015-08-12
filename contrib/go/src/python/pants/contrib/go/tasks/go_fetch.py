@@ -19,6 +19,7 @@ from pants.base.build_graph import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import get_basedir, safe_mkdir, safe_open
+from pants.util.memo import memoized_property
 
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_task import GoTask
@@ -30,18 +31,6 @@ class GoFetch(GoTask):
   @classmethod
   def product_types(cls):
     return ['go_remote_lib_src']
-
-  def __init__(self, *args, **kwargs):
-    super(GoFetch, self).__init__(*args, **kwargs)
-    self._go_stdlib = None
-
-  @property
-  def go_stdlib(self):
-    if self._go_stdlib is None:
-      args = ['go', 'list', 'std']
-      out = subprocess.check_output(args)
-      self._go_stdlib = set(out.strip().split())
-    return self._go_stdlib
 
   @property
   def cache_target_dirs(self):
@@ -177,10 +166,15 @@ class GoFetch(GoTask):
         f.write(zfile.read(info))
         f.close()
 
+  @memoized_property
+  def go_stdlib(self):
+    out = self.go_dist.create_go_cmd('list', args=['std']).check_output()
+    return set(out.strip().split())
+
   def _get_remote_import_ids(self, pkg_dir):
     """Returns the remote import ids declared by the Go package at pkg_dir."""
-    args = ['go', 'list', '-json', os.path.join(pkg_dir, '*.go')]
     # Needs to execute through shell for wildcard ('*.go').
-    out = subprocess.check_output(' '.join(args), shell=True)
+    cmd = self.go_dist.create_go_cmd('list', args=['-json', os.path.join(pkg_dir, '*.go')])
+    out = cmd.check_output(shell=True)
     imports = json.loads(out)['Imports']
     return [imp for imp in imports if imp not in self.go_stdlib]

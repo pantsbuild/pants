@@ -96,18 +96,20 @@ class GoDistribution(object):
       env.update(self.env)
       return subprocess.Popen(self.cmdline, env=env, **kwargs)
 
-    def check_output(self, env=None, **kwargs):
+    def check_output(self, env=None, shell=False, **kwargs):
       """Returns the output of the executed Go command.
 
       :param dict env: A custom environment to launch the Go command in.  If `None` the current
                        environment is used.
-      :param **kwargs: Keyword arguments to pass through to `subprocess.check_output`.
+      :param bool shell: Run command in shell.
+      :param **kwargs: Extra eyword arguments to pass through to `subprocess.check_output`.
       :return str: Output of Go command.
       :raises subprocess.CalledProcessError: Raises if Go command fails.
       """
       env = (env or os.environ).copy()
       env.update(self.env)
-      return subprocess.check_output(self.cmdline, env=env, **kwargs)
+      cmd = ' '.join(self.cmdline) if shell else self.cmdline
+      return subprocess.check_output(cmd, env=env, shell=shell, **kwargs)
 
     def __str__(self):
       return (' '.join('{}={}'.format(k, v) for k, v in self.env.items()) +
