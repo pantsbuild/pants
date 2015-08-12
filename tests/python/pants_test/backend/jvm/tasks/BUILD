@@ -161,6 +161,7 @@ python_tests(
   ]
 )
 
+
 python_tests(
   name = 'junit_run',
   sources = ['test_junit_run.py'],
@@ -176,6 +177,7 @@ python_tests(
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

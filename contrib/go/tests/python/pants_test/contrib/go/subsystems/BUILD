@@ -13,7 +13,6 @@ python_tests(
   sources=['test_go_distribution.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/binaries:binary_util',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
