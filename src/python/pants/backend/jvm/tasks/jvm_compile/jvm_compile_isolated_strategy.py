@@ -254,15 +254,17 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                       on_failure=vts.force_invalidate))
 
       def file_line_count(source_file_name):
-        with open(source_file_name) as file_handle:
-          line_count = len(file_handle.readlines())
-        return line_count
+        with open(source_file_name, 'rb') as fh:
+          return sum(1 for line in fh)
 
       # job size is the total line count in the target:
       job_sizes.append(sum([file_line_count(filepath) for filepath in compile_context.sources]))
 
       # job size is the number of files in the target:
       # job_sizes.append(len(compile_context.sources))
+
+      # job size is the total byte size of files in the target:
+      # job_sizes.append(sum([os.path.getsize(filepath) for filepath in compile_context.sources]))
 
     return jobs, job_sizes
 

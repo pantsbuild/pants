@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import Queue as queue
+import threading
 import traceback
 from collections import defaultdict
 
@@ -118,6 +119,19 @@ class JobExistsError(UnexecutableGraphError):
                                           .format(key))
 
 
+class ThreadSafeCounter(object):
+  def __init__(self):
+    self.lock = threading.Lock()
+    self.counter = 0
+
+  def increment(self):
+    with self.lock:
+      self.counter += 1
+
+  def decrement(self):
+    with self.lock:
+      self.counter -= 1
+
 class ExecutionGraph(object):
   """A directed acyclic graph of work to execute.
 
@@ -148,9 +162,7 @@ class ExecutionGraph(object):
     if job_sizes is None:
       job_sizes = [1] * len(job_list)
 
-    self._job_size = {}
-    for (job, job_size) in zip(job_list, job_sizes):
-      self._job_size[job.key] = job_size
+    self._job_size = {job.key: job_size for job, job_size in zip(job_list, job_sizes)}
 
     self._job_priority = {}
     self._compute_job_priorities()
@@ -220,7 +232,7 @@ class ExecutionGraph(object):
     heap = queue.PriorityQueue()
     # this should really be just an atomic counter but I don't know how to do that nicely
     # if I make it a number, python says "unresolved reference"
-    in_flight = []
+    in_flight = ThreadSafeCounter()
 
     def submit_jobs(job_keys):
       def worker(worker_key, work):
@@ -230,14 +242,15 @@ class ExecutionGraph(object):
         except Exception as e:
           result = (worker_key, FAILED, e)
         finished_queue.put(result)
-        in_flight.pop()  # should be a decrement
+        in_flight.decrement()
 
       for job_key in job_keys:
+        # minus because we need jobs with larger priority first
         heap.put((-self._job_priority[job_key], job_key))
 
-      while heap.qsize() > 0 and len(in_flight) < pool.num_workers:
+      while heap.qsize() > 0 and in_flight.counter < pool.num_workers:
         priority, job_key = heap.get()
-        in_flight.append(0)  # should be an increment
+        in_flight.increment()
         status_table.mark_as(QUEUED, job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
