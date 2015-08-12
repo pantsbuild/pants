@@ -258,6 +258,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'scala_repl_integration',
+  sources = ['test_scala_repl_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'unpack_jars',
   sources = ['test_unpack_jars.py'],
   dependencies = [
