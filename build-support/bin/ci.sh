@@ -221,7 +221,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
+    ./pants.pex $IGNORE_STYLE ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
       $(./pants.pex list tests/python:: | \
           xargs ./pants.pex filter --filter-type=python_tests | \
           grep integration)
