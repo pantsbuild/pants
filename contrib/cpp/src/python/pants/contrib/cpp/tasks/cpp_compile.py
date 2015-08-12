@@ -14,17 +14,16 @@ from pants.contrib.cpp.tasks.cpp_task import CppTask
 
 
 class CppCompile(CppTask):
-  """Compiles object files from C++ sources."""
+  """Compile C++ sources into object files."""
 
   @classmethod
   def register_options(cls, register):
     super(CppCompile, cls).register_options(register)
-    register('--cc-options',
+    register('--cc-options', advanced=True, action='append', default=[],
              help='Append these options to the compiler command line.')
-    register('--cc-extensions',
-             default=['cc', 'cxx', 'cpp'],
-             help=('The list of extensions (without the .) to consider when '
-                   'determining if a file is a C++ source file.'))
+    register('--cc-extensions', advanced=True, action='append', default=['.cc', '.cxx', '.cpp'],
+             help=('The list of extensions to consider when determining if a file is a '
+                   'C++ source file.'))
 
   @classmethod
   def product_types(cls):
@@ -39,7 +38,7 @@ class CppCompile(CppTask):
 
     def is_cc(source):
       _, ext = os.path.splitext(source)
-      return ext[1:] in self.get_options().cc_extensions
+      return ext in self.get_options().cc_extensions
 
     targets = self.context.targets(self.is_cpp)
 
@@ -84,8 +83,7 @@ class CppCompile(CppTask):
     cmd.extend(['-c'])
     cmd.extend(('-I{0}'.format(i) for i in include_dirs))
     cmd.extend(['-o' + obj, abs_source])
-    if self.get_options().cc_options != None:
-      cmd.extend([self.get_options().cc_options])
+    cmd.extend(self.get_options().cc_options)
 
     # TODO: submit_async_work with self.run_command, [(cmd)] as a Work object.
     with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.COMPILER]) as workunit:

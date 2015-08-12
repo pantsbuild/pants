@@ -43,7 +43,7 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 
 
 class JmakeCompile(JvmCompile):
-  """Compile Java code with JMake."""
+  """Compile Java code using JMake."""
   _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False
@@ -72,7 +72,8 @@ class JmakeCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JmakeCompile, cls).register_options(register)
-    register('--use-jmake', action='store_true', default=True, help='Use jmake to compile Java targets')
+    register('--use-jmake', advanced=True, action='store_true', default=True,
+             help='Use jmake to compile Java targets')
     register('--source', advanced=True, fingerprint=True,
              help='Provide source compatibility with this release. Overrides the jvm platform '
                   'source.',

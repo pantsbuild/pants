@@ -27,13 +27,14 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   @classmethod
   def register_options(cls, register, compile_task_name, supports_concurrent_execution):
     if supports_concurrent_execution:
-      register('--worker-count', type=int, default=1, advanced=True,
-               help='The number of concurrent workers to use compiling with {task} with the isolated'
-                    ' strategy.'.format(task=compile_task_name))
-    register('--capture-log', action='store_true', default=False, advanced=True,
+      register('--worker-count', advanced=True, type=int, default=1,
+               help='The number of concurrent workers to use compiling with {task} with the '
+                    'isolated strategy.'.format(task=compile_task_name))
+    register('--capture-log', advanced=True, action='store_true', default=False,
             help='Capture compilation output to per-target logs.')
 
-  def __init__(self, context, options, workdir, analysis_tools, compile_task_name, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name,
+               sources_predicate):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
                                                      compile_task_name, sources_predicate)
 
