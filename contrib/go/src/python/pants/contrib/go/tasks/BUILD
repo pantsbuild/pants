@@ -1,3 +1,13 @@
+target(
+  name='tasks',
+  dependencies=[
+    ':go_compile',
+    ':go_fetch',
+    ':go_run',
+    ':go_test',
+  ]
+)
+
 python_library(
   name='go_compile',
   sources=['go_compile.py'],

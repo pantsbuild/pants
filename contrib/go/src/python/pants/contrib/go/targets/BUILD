@@ -1,3 +1,13 @@
+target(
+  name='targets',
+  dependencies=[
+    ':go_binary',
+    ':go_library',
+    ':go_local_source',
+    ':go_remote_library',
+  ]
+)
+
 python_library(
   name='go_binary',
   sources=['go_binary.py'],
