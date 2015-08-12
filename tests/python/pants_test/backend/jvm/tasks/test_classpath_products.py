@@ -135,7 +135,7 @@ class ClasspathProductsTest(BaseTest):
   def test_jar_provided_exclude_with_similar_lib(self):
     # note exclude 'jars/com.example/l' should not match jars/com.example/lib/jars/123.4.jar
     provider = self.make_target('provider', ExportableJvmLibrary,
-                         provides=Artifact('com.example', 'l', Repository()))
+                         provides=Artifact('com.example', 'abc', Repository()))
     consumer = self.make_target('consumer', JvmTarget)
     root = self.make_target('root', JvmTarget, dependencies=[provider])
 
@@ -145,7 +145,7 @@ class ClasspathProductsTest(BaseTest):
 
     classpath = classpath_product.get_for_target(root)
 
-    self.assertEqual([], classpath)
+    self.assertEqual([('default', self._example_jar_path())], classpath)
 
   def _example_jar_path(self):
     return os.path.join(self.build_root, 'ivy/jars/com.example/lib/jars/123.4.jar')
