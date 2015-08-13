@@ -30,6 +30,12 @@ class GoFetch(GoTask):
   """Downloads a 3rd party Go library."""
 
   @classmethod
+  def register_options(cls, register):
+    register('--remote-lib-host',
+             help='Host to fetch Go remote libraries from. Go remote library targets may '
+                  'include this host in their `zip_url` field via template variable {host}.')
+
+  @classmethod
   def product_types(cls):
     return ['go_remote_lib_src']
 
@@ -85,7 +91,8 @@ class GoFetch(GoTask):
         if not vt.valid:
           # Only download invalidated remote libraries.
           rev = vt.target.payload.get_field_value('rev')
-          zip_url = vt.target.payload.get_field_value('zip_url').format(id=import_id, rev=rev)
+          zip_url = vt.target.payload.get_field_value('zip_url').format(
+                        id=import_id, rev=rev, host=self.get_options().remote_lib_host)
           if not zip_url:
             raise TaskError('No zip url specified for go_remote_library {id}'
                             .format(id=import_id))
@@ -142,6 +149,24 @@ class GoFetch(GoTask):
       if k not in main_dict:
         main_dict[k] = v
 
+  class LocalFileAdapter(requests.adapters.HTTPAdapter):
+    """Allows requests to GET file:// urls."""
+    def send(self, req, **kwargs):
+      # Strip "file://" from url.
+      filepath = req.url[7:]
+      res = requests.Response()
+      try:
+        res.raw = open(filepath, 'rb')
+        res.status_code = 200
+        res.reason = 'OK'
+      except (OSError, IOError) as err:
+        res.status_code = 500
+        res.reason = str(err)
+      res.url = req.url
+      res.request = req
+      res.connection = self
+      return res
+
   def _download_zip(self, zip_url, dest_dir):
     """Downloads a zip file at the given URL into the given directory.
 
@@ -151,7 +176,9 @@ class GoFetch(GoTask):
     """
     # TODO(cgibb): Wrap with workunits, progress meters, checksums.
     self.context.log.info('Downloading {}...'.format(zip_url))
-    res = requests.get(zip_url)
+    sess = requests.session()
+    sess.mount('file://', self.LocalFileAdapter())
+    res = sess.get(zip_url)
     if not res.status_code == requests.codes['ok']:
       raise TaskError('Failed to download {} ({} error)'.format(zip_url, res.status_code))
 

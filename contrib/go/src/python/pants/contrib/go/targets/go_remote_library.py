@@ -17,10 +17,13 @@ class GoRemoteLibrary(Target):
     :param str zip_url:
       - Any URL from which a zipfile can be downloaded containing the source code of the
         remote library.
-      - Can be a template string using variables {rev} (see :param rev:) and {id}, which
-        is the global import identifier of the library, which is specified by the path to
-        the BUILD file relative to all 3rd party Go libraries (see GoPlatform).
-          Example: "https://{id}/archive/{rev}.zip"
+      - Can be a template string using variables {host}, {id}, {rev}.
+        Example: "{host}/{id}/{rev}.zip"
+          - {host} The host address to download zip files from. Specified by an option to
+                   GoFetch, '--remote-lib-host'.
+          - {id} The global import identifier of the library, which is specified by the path to
+                 the BUILD file relative to all 3rd party Go libraries (see GoPlatform).
+          - {rev} See :param rev:
       - The zip file is expected to have zipped the library directory itself, and NOT the
         direct contents of the library.
           Expected: `zip -r mylib.zip mylib/`

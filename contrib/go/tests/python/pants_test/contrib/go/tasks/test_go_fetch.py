@@ -6,12 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
-from pants_test.contrib.go.tasks.fetch_utils import get_zip_url, zipfile_server
+from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -29,15 +31,15 @@ class GoFetchTest(TaskTestBase):
     self.go_fetch = self.create_task(self.context())
 
   def test_download_zip(self):
-    with zipfile_server() as (host, port):
-      with temporary_dir() as d:
-        url = get_zip_url(host, port, 'rlib1.zip')
-        self.go_fetch._download_zip(url, d)
-        self.assertTrue(os.path.isfile(os.path.join(d, 'rlib1.go')))
+    with temporary_dir() as dest:
+      with temporary_dir() as src:
+        touch(os.path.join(src, 'mydir', 'myfile.go'))
+        zfile = shutil.make_archive(os.path.join(src, 'mydir'), 'zip', root_dir=src, base_dir='mydir')
+        self.go_fetch._download_zip('file://' + zfile, dest)
+        self.assertTrue(os.path.isfile(os.path.join(dest, 'myfile.go')))
 
         with self.assertRaises(TaskError):
-          bad_url = get_zip_url(host, port, 'badzip.zip')
-          self.go_fetch._download_zip(bad_url, d)
+          self.go_fetch._download_zip('file://' + zfile + 'notreal', dest)
 
   def test_get_remote_import_ids(self):
     self.create_file('github.com/u/a/a.go', contents="""
