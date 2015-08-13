@@ -52,9 +52,6 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(args)
     self.assert_failure(pants_run)
     expected = """
-      [go]
-      Invalidated 1 target.
-      Downloading {host}/github.com/fakeuser/rlib5.zip...
       github.com/fakeuser/rlib5 has remote dependencies which require local declaration:
         --> github.com/fakeuser/rlib6 (expected go_remote_library declaration at contrib/go/examples/3rdparty/go/github.com/fakeuser/rlib6)
     """.format(host=self.rlib_host)

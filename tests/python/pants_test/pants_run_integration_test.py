@@ -7,11 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ConfigParser
 import os
-import re
 import subprocess
 import unittest
 from collections import Counter, defaultdict, namedtuple
 from operator import eq, ne
+
+from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
@@ -199,5 +200,4 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
-    ansi_escape = re.compile(r'\x1b[^m]*m')
-    return ansi_escape.sub('', ''.join(s.split()))
+    return ''.join(strip_color(s).split())

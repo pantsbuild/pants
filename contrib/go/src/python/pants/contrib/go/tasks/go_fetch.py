@@ -65,7 +65,7 @@ class GoFetch(GoTask):
     Returns a dict<str, set<tuple<str, str>>>, which maps a global import id of a remote dep to a
     set of unresolved remote dependencies, each dependency expressed as a tuple containing the
     global import id of the dependency and the location of the expected BUILD file. If all
-    transitive dependencies were successfully resolved, returns and empty dict.
+    transitive dependencies were successfully resolved, returns an empty dict.
 
     Downloads as many invalidated transitive dependencies as possible, and returns as many
     undeclared dependencies as possible. However, because the dependencies of a remote library
@@ -78,11 +78,10 @@ class GoFetch(GoTask):
     if not go_remote_libs:
       return {}
 
-    resolved_remote_libs = []
+    resolved_remote_libs = set()
     undeclared_deps = defaultdict(set)
 
     # Remove duplicate remote libraries.
-    go_remote_libs = set(go_remote_libs)
     with self.invalidated(go_remote_libs) as invalidation_check:
       for vt in invalidation_check.all_vts:
         import_id = self.global_import_id(vt.target)
@@ -103,14 +102,15 @@ class GoFetch(GoTask):
         for remote_import_id in self._get_remote_import_ids(dest_dir):
           try:
             remote_lib = self._resolve_and_inject(vt.target, remote_import_id)
-            resolved_remote_libs.append(remote_lib)
+            if remote_lib:
+              resolved_remote_libs.add(remote_lib)
           except self.UndeclaredRemoteLibError as e:
             undeclared_deps[import_id].add((remote_import_id, e.spec_path))
 
     # Recurse after the invalidated block, so the libraries we downloaded are now "valid"
     # and thus we don't try to download a library twice.
     trans_undeclared_deps = self._transitive_download_remote_libs(resolved_remote_libs)
-    self._absorb_dict(undeclared_deps, trans_undeclared_deps)
+    undeclared_deps.update(trans_undeclared_deps)
 
     return undeclared_deps
 
@@ -118,36 +118,33 @@ class GoFetch(GoTask):
     def __init__(self, spec_path):
       self.spec_path = spec_path
 
-  def _resolve_and_inject(self, dependent_remote_lib, dependee_import_id):
-    """Resolves dependee_import_id's BUILD file and injects it into the build graph.
+  def _resolve_and_inject(self, dependent_remote_lib, dependency_import_id):
+    """Resolves dependency_import_id's BUILD file and injects it into the build graph.
 
     :param GoRemoteLibrary dependent_remote_lib:
-        Injects the resolved target of dependee_import_id as a dependency of this
+        Injects the resolved target of dependency_import_id as a dependency of this
         remote library.
-    :param str dependee_import_id:
+    :param str dependency_import_id:
         Global import id of the remote library whose BUILD file to look up.
     :return GoRemoteLibrary:
         Returns the resulting resolved remote library after injecting it in the build graph.
+        If the resulting library has already been resolved/injected, returns None.
     :raises UndeclaredRemoteLibError:
-        If no BUILD file exists for dependee_import_id under the same source root of
+        If no BUILD file exists for dependency_import_id under the same source root of
         dependent_remote_lib, raises exception.
     """
     remote_source_root = dependent_remote_lib.target_base
-    spec_path = os.path.join(remote_source_root, dependee_import_id)
+    spec_path = os.path.join(remote_source_root, dependency_import_id)
     try:
       build_file = FilesystemBuildFile(get_buildroot(), relpath=spec_path)
     except FilesystemBuildFile.MissingBuildFileError:
       raise self.UndeclaredRemoteLibError(spec_path)
     address = BuildFileAddress(build_file)
+    if self.context.build_graph.contains_address(address):
+      return None
     self.context.build_graph.inject_address_closure(address)
     self.context.build_graph.inject_dependency(dependent_remote_lib.address, address)
     return self.context.build_graph.get_target(address)
-
-  @staticmethod
-  def _absorb_dict(main_dict, other_dict):
-    for k, v in other_dict.items():
-      if k not in main_dict:
-        main_dict[k] = v
 
   class LocalFileAdapter(requests.adapters.HTTPAdapter):
     """Allows requests to GET file:// urls."""
@@ -179,7 +176,7 @@ class GoFetch(GoTask):
     sess = requests.session()
     sess.mount('file://', self.LocalFileAdapter())
     res = sess.get(zip_url)
-    if not res.status_code == requests.codes['ok']:
+    if not res.status_code == requests.codes.ok:
       raise TaskError('Failed to download {} ({} error)'.format(zip_url, res.status_code))
 
     with open_zip(BytesIO(res.content)) as zfile:
