@@ -298,7 +298,8 @@ class Options(object):
       print('    dir:: to include all targets found recursively under the directory.')
       print('\nFriendly docs:\n  http://pantsbuild.github.io/')
 
-      print(self.get_parser(GLOBAL_SCOPE).format_help('Global', self._help_request.advanced))
+      print(self.get_parser(GLOBAL_SCOPE).format_help('Global', 'Global options',
+                                                      show_advanced=self._help_request.advanced))
 
   def _format_options_help_for_scope(self, scope_info):
     """Generate a help message for options at the specified scope.
