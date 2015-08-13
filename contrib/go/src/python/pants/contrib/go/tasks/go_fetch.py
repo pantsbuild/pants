@@ -31,7 +31,7 @@ class GoFetch(GoTask):
 
   @classmethod
   def register_options(cls, register):
-    register('--remote-lib-host',
+    register('--remote-lib-host', default='',
              help='Host to fetch Go remote libraries from. Go remote library targets may '
                   'include this host in their `zip_url` field via template variable {host}.')
 
