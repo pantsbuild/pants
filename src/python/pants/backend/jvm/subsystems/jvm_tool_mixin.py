@@ -22,7 +22,7 @@ class JvmToolMixin(object):
   _tool_keys = []  # List of (scope, key, main, custom_rule) tuples.
 
   @classmethod
-  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None, fingerprint=False):
+  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None, fingerprint=True):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
     Classpaths can be retrieved in `execute` scope via `tool_classpath`.
@@ -42,6 +42,8 @@ class JvmToolMixin(object):
                               have a uniform name between the tool and the user code and so the
                               shared code must be excluded from shading.
     :param bool fingerprint: Indicates whether to include the jvm tool in the task's fingerprint.
+                             Note that unlike for other options, fingerprinting is enabled for tools
+                             by default.
     """
     register('--{0}'.format(key),
              advanced=True,

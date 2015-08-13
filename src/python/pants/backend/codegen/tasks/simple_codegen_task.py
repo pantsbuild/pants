@@ -40,19 +40,19 @@ class SimpleCodegenTask(Task):
   @classmethod
   def register_options(cls, register):
     super(SimpleCodegenTask, cls).register_options(register)
-    register('--allow-empty', action='store_true', default=True,
+    register('--allow-empty', action='store_true', default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
     strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
     if cls.forced_codegen_strategy() is None:
-      register('--strategy', choices=strategy_names,
+      register('--strategy', choices=strategy_names, fingerprint=True,
                default=strategy_names[0],
                help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                     'global directory for all generated code, and the "isolated" strategy uses '
                     'per-target codegen directories.',
                advanced=True)
     if 'isolated' in strategy_names:
-      register('--allow-dups', action='store_true', default=False,
+      register('--allow-dups', action='store_true', default=False, fingerprint=True,
                help='Allow multiple targets specifying the same sources when using the isolated '
                     'strategy. If duplicates are allowed, the logic of find_sources in '
                     'IsolatedCodegenStrategy will associate generated sources with '

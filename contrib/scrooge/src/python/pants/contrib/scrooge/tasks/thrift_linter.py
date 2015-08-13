@@ -28,14 +28,15 @@ class ThriftLinter(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
-    register('--skip', action='store_true', help='Skip thrift linting.')
-    register('--strict', default=None, action='store_true',
+    register('--skip', action='store_true', fingerprint=True, help='Skip thrift linting.')
+    register('--strict', default=None, action='store_true', fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
     register('--strict-default', default=False, advanced=True, action='store_true',
+             fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
-    register('--linter-args', default=[], advanced=True, type=list_option,
+    register('--linter-args', default=[], advanced=True, type=list_option, fingerprint=True,
              help='Additional options passed to the linter.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')
