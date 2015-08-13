@@ -73,7 +73,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
   @classmethod
   def register_options(cls, register):
     super(JvmPlatformValidate, cls).register_options(register)
-    register('--check', default='fatal', choices=['off', 'warn', 'fatal'],
+    register('--check', default='off', choices=['off', 'warn', 'fatal'],
              help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
     register('--children-before-parents', default=False, action='store_true',
              help='Organize output in the form target -> dependencies, rather than '
