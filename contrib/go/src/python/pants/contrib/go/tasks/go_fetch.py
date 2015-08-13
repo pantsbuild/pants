@@ -171,7 +171,7 @@ class GoFetch(GoTask):
     :param str dest_dir: Absolute path of directory into which the unzipped contents
                          will be placed into, not including the zip directory itself.
     """
-    # TODO(cgibb): Wrap with workunits, progress meters, checksums.
+    # TODO(jsirois): Wrap with workunits, progress meters, checksums.
     self.context.log.info('Downloading {}...'.format(zip_url))
     sess = requests.session()
     sess.mount('file://', self.LocalFileAdapter())
