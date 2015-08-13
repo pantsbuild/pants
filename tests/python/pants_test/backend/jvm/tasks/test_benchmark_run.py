@@ -42,8 +42,6 @@ class BenchmarkRunTest(JvmToolTaskTestBase):
     return BenchmarkRun
 
   def test_benchmark_complains_on_python_target(self):
-    """Run pants against a `python_tests` target. Should execute without error.
-    """
     self.add_to_build_file('foo', dedent('''
         python_tests(
           name='hello',

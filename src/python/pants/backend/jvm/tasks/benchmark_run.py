@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
-from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
@@ -56,7 +56,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
   def execute(self):
     targets = self.context.targets()
-    if not any(isinstance(t, JvmTarget) for t in targets):
+    if not any(isinstance(t, Benchmark) for t in targets):
       raise TaskError('No jvm targets specified for benchmarking.')
 
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
