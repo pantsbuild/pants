@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
 
 from pants.base.build_environment import get_buildroot
+from pants.util.dirutil import safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -15,8 +17,15 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
 
   def setUp(self):
     super(GoFetchIntegrationTest, self).setUp()
-    zipdir = 'contrib/go/examples/test_remote_zips/zipfiles'
-    self.rlib_host = 'file://{}'.format(os.path.join(get_buildroot(), zipdir))
+    self.zipdir = os.path.join(self.workdir_root(), 'zipdir')
+    safe_mkdir(self.zipdir)
+    rlib_dir = 'contrib/go/examples/test_remote_libs'
+    for p in os.listdir(rlib_dir):
+      d = os.path.join(get_buildroot(), rlib_dir, p)
+      if os.path.isdir(d):
+        zfile = os.path.join(self.zipdir, 'github.com/fakeuser', p)
+        shutil.make_archive(zfile, 'zip', root_dir=rlib_dir, base_dir=p)
+    self.rlib_host = 'file://{}'.format(os.path.join(get_buildroot(), self.zipdir))
 
   def test_go_fetch(self):
     args = ['resolve',

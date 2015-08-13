@@ -34,7 +34,8 @@ class GoFetchTest(TaskTestBase):
     with temporary_dir() as dest:
       with temporary_dir() as src:
         touch(os.path.join(src, 'mydir', 'myfile.go'))
-        zfile = shutil.make_archive(os.path.join(src, 'mydir'), 'zip', root_dir=src, base_dir='mydir')
+        zfile = shutil.make_archive(os.path.join(src, 'mydir'), 'zip',
+                                    root_dir=src, base_dir='mydir')
         self.go_fetch._download_zip('file://' + zfile, dest)
         self.assertTrue(os.path.isfile(os.path.join(dest, 'myfile.go')))
 
