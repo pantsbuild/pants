@@ -35,33 +35,37 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   @classmethod
   def register_options(cls, register, compile_task_name, supports_concurrent_execution):
-    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
-             help='Check for missing dependencies in code compiled with {0}. Reports actual dependencies A -> B '
-                  'where there is no transitive BUILD file dependency path from A to B. If fatal, '
-                  'missing deps are treated as a build error.'.format(compile_task_name))
+    register('--missing-deps', advanced=True, choices=['off', 'warn', 'fatal'], default='warn',
+             help='Check for missing dependencies in code compiled with {0}. Reports actual '
+                  'dependencies A -> B where there is no transitive BUILD file dependency path '
+                  'from A to B. If fatal, missing deps are treated as a build error.'.format(
+               compile_task_name))
 
-    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'], default='off',
-             help='Check for missing direct dependencies in code compiled with {0}. Reports actual dependencies '
-                  'A -> B where there is no direct BUILD file dependency path from A to B. This is '
-                  'a very strict check; In practice it is common to rely on transitive, indirect '
-                  'dependencies, e.g., due to type inference or when the main target in a BUILD '
-                  'file is modified to depend on other targets in the same BUILD file, as an '
-                  'implementation detail. However it may still be useful to use this on '
-                  'occasion. '.format(compile_task_name))
+    register('--missing-direct-deps', advanced=True, choices=['off', 'warn', 'fatal'],
+             default='off',
+             help='Check for missing direct dependencies in code compiled with {0}. Reports actual '
+                  'dependencies A -> B where there is no direct BUILD file dependency path from '
+                  'A to B. This is a very strict check; In practice it is common to rely on '
+                  'transitive, indirect dependencies, e.g., due to type inference or when the main '
+                  'target in a BUILD file is modified to depend on other targets in the same BUILD '
+                  'file, as an implementation detail. However it may still be useful to use this '
+                  'on occasion. '.format(compile_task_name))
 
-    register('--missing-deps-whitelist', type=list_option,
+    register('--missing-deps-whitelist', advanced=True, type=list_option,
              help="Don't report these targets even if they have missing deps.")
 
-    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
-             help='Check for declared dependencies in code compiled with {0} that are not needed. This is a very '
-                  'strict check. For example, generated code will often legitimately have BUILD '
-                  'dependencies that are unused in practice.'.format(compile_task_name))
+    register('--unnecessary-deps', advanced=True, choices=['off', 'warn', 'fatal'], default='off',
+             help='Check for declared dependencies in code compiled with {0} that are not needed. '
+                  'This is a very strict check. For example, generated code will often '
+                  'legitimately have BUILD dependencies that are unused in practice.'.format(
+               compile_task_name))
 
-    register('--changed-targets-heuristic-limit', type=int, default=0,
+    register('--changed-targets-heuristic-limit', advanced=True, type=int, default=0,
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
 
-  def __init__(self, context, options, workdir, analysis_tools, compile_task_name, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name,
+               sources_predicate):
     super(JvmCompileGlobalStrategy, self).__init__(context, options, workdir, analysis_tools,
                                                    compile_task_name, sources_predicate)
 
@@ -144,7 +148,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       self.validate_analysis(f)
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
-    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets, relevant_targets)
+    super(JvmCompileGlobalStrategy, self).prepare_compile(cache_manager, all_targets,
+                                                          relevant_targets)
 
     # Update the classpath for us and for downstream tasks.
     compile_classpaths = self.context.products.get_data('compile_classpath')
@@ -623,7 +628,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     with open(os.path.join(self._target_sources_dir, target.identifier), 'w') as outfile:
       for src in sources:
         outfile.write(os.path.join(get_buildroot(), src))
-        outfile.write('\n')
+        outfile.write(b'\n')
 
   def _compute_deleted_sources(self):
     """Computes the list of sources present in the last analysis that have since been deleted.

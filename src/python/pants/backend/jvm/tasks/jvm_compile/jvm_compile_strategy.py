@@ -61,7 +61,8 @@ class JvmCompileStrategy(object):
     The abstract base class does not register any options itself: those are left to JvmCompile.
     """
 
-  def __init__(self, context, options, workdir, analysis_tools, compile_task_name, sources_predicate):
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name,
+               sources_predicate):
     self._compile_task_name = compile_task_name
     self.context = context
     self._analysis_tools = analysis_tools
@@ -114,8 +115,7 @@ class JvmCompileStrategy(object):
                     extra_compile_time_classpath_elements,
                     compile_vts,
                     register_vts,
-                    update_artifact_cache_vts_work,
-                    settings):
+                    update_artifact_cache_vts_work):
     """Executes compilations for that invalid targets contained in a single language chunk."""
 
   @abstractmethod
