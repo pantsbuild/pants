@@ -98,8 +98,6 @@ python_tests(
   name='go_fetch_integration',
   sources=['test_go_fetch_integration.py'],
   dependencies=[
-    'src/python/pants/util:dirutil',
-    'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ]
 )
