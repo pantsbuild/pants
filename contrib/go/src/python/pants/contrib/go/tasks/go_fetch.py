@@ -78,6 +78,9 @@ class GoFetch(GoTask):
     if not go_remote_libs:
       return {}
 
+    # TODO(cgibb): If performance is an issue (unlikely), use dict instead of set,
+    # mapping import_id to resolved target to avoid resolving the same import_id's
+    # multiple times.
     resolved_remote_libs = set()
     undeclared_deps = defaultdict(set)
 
@@ -102,8 +105,7 @@ class GoFetch(GoTask):
         for remote_import_id in self._get_remote_import_ids(dest_dir):
           try:
             remote_lib = self._resolve_and_inject(vt.target, remote_import_id)
-            if remote_lib:
-              resolved_remote_libs.add(remote_lib)
+            resolved_remote_libs.add(remote_lib)
           except self.UndeclaredRemoteLibError as e:
             undeclared_deps[import_id].add((remote_import_id, e.spec_path))
 
@@ -140,8 +142,6 @@ class GoFetch(GoTask):
     except FilesystemBuildFile.MissingBuildFileError:
       raise self.UndeclaredRemoteLibError(spec_path)
     address = BuildFileAddress(build_file)
-    if self.context.build_graph.contains_address(address):
-      return None
     self.context.build_graph.inject_address_closure(address)
     self.context.build_graph.inject_dependency(dependent_remote_lib.address, address)
     return self.context.build_graph.get_target(address)
@@ -200,5 +200,8 @@ class GoFetch(GoTask):
     """Returns the remote import ids declared by the Go package at pkg_dir."""
     sources = glob(os.path.join(pkg_dir, '*.go'))
     out = self.go_dist.create_go_cmd('list', args=['-json'] + sources).check_output()
-    imports = json.loads(out)['Imports']
+    try:
+      imports = json.loads(out)['Imports']
+    except KeyError:
+      return []
     return [imp for imp in imports if imp not in self.go_stdlib]

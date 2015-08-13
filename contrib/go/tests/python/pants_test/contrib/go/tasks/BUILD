@@ -53,11 +53,14 @@ python_tests(
   name='go_fetch',
   sources=['test_go_fetch.py'],
   dependencies=[
-    'tests/python/pants_test/tasks:task_test_base',
-    'src/python/pants/util:contextutil',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
     'src/python/pants/base:source_root',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
   ]
