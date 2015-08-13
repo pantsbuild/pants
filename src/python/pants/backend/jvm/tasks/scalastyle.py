@@ -11,9 +11,9 @@ import re
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
+from pants.option.custom_types import file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import touch
-from pants.option.custom_types import file_option
 
 
 # TODO: Move somewhere more general?
