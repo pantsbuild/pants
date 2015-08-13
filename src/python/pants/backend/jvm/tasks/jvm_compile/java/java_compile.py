@@ -43,6 +43,7 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 
 
 class JmakeCompile(JvmCompile):
+  """Compile Java code with JMake."""
   _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False

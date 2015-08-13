@@ -10,7 +10,8 @@ import sys
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal
-from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
+from pants.option.arg_splitter import (GLOBAL_SCOPE, ArgSplitter, NoGoalHelp, OptionsHelp,
+                                       UnknownGoalHelp, VersionHelp)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
@@ -109,7 +110,7 @@ class Options(object):
     self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
     self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
     self._bootstrap_option_values = bootstrap_option_values
-    self._known_scopes = set([s.scope for s in known_scope_infos])
+    self._known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
 
   @property
   def target_specs(self):
@@ -123,7 +124,7 @@ class Options(object):
 
   def is_known_scope(self, scope):
     """Whether the given scope is known by this instance."""
-    return scope in self._known_scopes
+    return scope in self._known_scope_to_info
 
   def passthru_args_for_scope(self, scope):
     # Passthru args "belong" to the last scope mentioned on the command-line.
@@ -237,31 +238,51 @@ class Options(object):
     Otherwise return False.
     """
     if self._help_request:
-      if self._help_request.version:
+      def print_hint():
+        print('Use `pants goals` to list goals.')
+        print('Use `pants help` to get help.')
+      if isinstance(self._help_request, VersionHelp):
         print(pants_version())
-      else:
-        self._print_help()
+      elif isinstance(self._help_request, OptionsHelp):
+        self._print_options_help()
+      elif isinstance(self._help_request, UnknownGoalHelp):
+        print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
+        print_hint()
+        # TODO: Should probably cause a non-zero exit code.
+      elif isinstance(self._help_request, NoGoalHelp):
+        print('No goals specified.')
+        print_hint()
+        # TODO: Should probably cause a non-zero exit code.
       return True
     else:
       return False
 
-  def _print_help(self):
-    """Print a help screen, followed by an optional message.
+  def _print_options_help(self):
+    """Print a help screen.
+
+    Assumes that self._help_request is an instance of OptionsHelp.
 
     Note: Ony useful if called after options have been registered.
     """
-    show_all_help = self._help_request and self._help_request.all_scopes
-    goals = (Goal.all() if show_all_help else [Goal.by_name(goal_name) for goal_name in self.goals])
-    if goals:
-      for goal in goals:
-        if not goal.ordered_task_names():
-          print('\nUnknown goal: {}'.format(goal.name))
-        else:
-          print('\n{0}: {1}\n'.format(goal.name, goal.description))
-          for scope_info in goal.known_scope_infos():
-            help_str = self._format_help_for_scope(scope_info.scope)
-            if help_str:
-              print(help_str)
+    show_all_help = self._help_request.all_scopes
+    if show_all_help:
+      help_scopes = self._known_scope_to_info.keys()
+    else:
+      # The scopes explicitly mentioned by the user on the cmd line.
+      help_scopes = set(self._scope_to_flags.keys()) - set([GLOBAL_SCOPE])
+      # Add all subscopes (e.g., so that `pants help compile` shows help for all tasks under
+      # `compile`.) Note that sorting guarantees that we only need to check the immediate parent.
+      for scope in sorted(self._known_scope_to_info.keys()):
+        if scope.partition('.')[0] in help_scopes:
+          help_scopes.add(scope)
+
+    help_scope_infos = [self._known_scope_to_info[s] for s in sorted(help_scopes)]
+    if help_scope_infos:
+      for scope_info in help_scope_infos:
+        help_str = self._format_options_help_for_scope(scope_info)
+        if help_str:
+          print(help_str)
+      return
     else:
       print(pants_release())
       print('\nUsage:')
@@ -277,9 +298,15 @@ class Options(object):
       print('    dir:: to include all targets found recursively under the directory.')
       print('\nFriendly docs:\n  http://pantsbuild.github.io/')
 
-    if show_all_help or not goals:
       print(self.get_parser(GLOBAL_SCOPE).format_help('Global', self._help_request.advanced))
 
-  def _format_help_for_scope(self, scope):
-    """Generate a help message for options at the specified scope."""
-    return self.get_parser(scope).format_help(scope, self._help_request.advanced)
+  def _format_options_help_for_scope(self, scope_info):
+    """Generate a help message for options at the specified scope.
+
+    Assumes that self._help_request is an instance of OptionsHelp.
+
+    :param scope_info: A ScopeInfo for the speicified scope.
+    """
+    description = scope_info.optionable_cls.get_description() if scope_info.optionable_cls else None
+    return self.get_parser(scope_info.scope).format_help(scope_info.scope, description,
+                                                         self._help_request.advanced)

@@ -186,17 +186,18 @@ class Parser(object):
     """
     return HelpInfoExtracter(self._scope).get_option_scope_help_info(self._registration_args)
 
-  def format_help(self, header, show_advanced=False, color=None):
+  def format_help(self, scope, description, show_advanced=False, color=None):
     """Return a help message for the options registered on this object.
 
-    :param header: Value to display as a header.
+    :param scope: Scope of the options.
+    :param description: Description of scope.
     :param bool show_advanced: Whether to display advanced options.
     :param bool color: Whether to use color. If None, use color only if writing to a terminal.
     """
     if color is None:
       color = sys.stdout.isatty()
     help_formatter = HelpFormatter(scope=self._scope, show_advanced=show_advanced, color=color)
-    return '\n'.join(help_formatter.format_options(header, self._registration_args))
+    return '\n'.join(help_formatter.format_options(scope, description, self._registration_args))
 
   def register(self, *args, **kwargs):
     """Register an option, using argparse params.
