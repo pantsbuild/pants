@@ -19,9 +19,10 @@ class CppCompile(CppTask):
   @classmethod
   def register_options(cls, register):
     super(CppCompile, cls).register_options(register)
-    register('--cc-options', advanced=True, action='append', default=[],
+    register('--cc-options', advanced=True, action='append', default=[], fingerprint=True,
              help='Append these options to the compiler command line.')
-    register('--cc-extensions', advanced=True, action='append', default=['.cc', '.cxx', '.cpp'],
+    register('--cc-extensions', advanced=True, action='append', fingerprint=True,
+             default=['.cc', '.cxx', '.cpp'],
              help=('The list of extensions to consider when determining if a file is a '
                    'C++ source file.'))
 

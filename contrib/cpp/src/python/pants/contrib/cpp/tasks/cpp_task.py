@@ -32,7 +32,7 @@ class CppTask(Task):
   @classmethod
   def register_options(cls, register):
     super(CppTask, cls).register_options(register)
-    register('--compiler', advanced=True,
+    register('--compiler', advanced=True, fingerprint=True,
              help='Set a specific compiler to use (eg, g++-4.8, clang++)')
 
   def execute(self):

@@ -355,6 +355,11 @@ notes = {
                                     'to "disable jmake for java", more precisely, instead of '
                                     '--compile-zinc-java-enabled, use --no-compile-java-use-jmake',
   ('compile.scala', 'args'): 'ALL `compile.scala` options have moved to `compile.zinc`.',
+
+  ('compile.cpp-compile', 'cc_options'): 'Value used to be a string, is now a list.',
+  ('compile.cpp-compile', 'cc_extensions'): 'Value used to be a string (but default was a list), '
+                                            'is now a list. Values also now include the dot, e.g.,'
+                                            'it\'s now .cpp, not cpp.',
 }
 
 
