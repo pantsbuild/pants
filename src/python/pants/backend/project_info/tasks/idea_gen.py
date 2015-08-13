@@ -133,7 +133,11 @@ class IdeaGen(IdeGen):
           return True
       return False
 
-    sibling_paths = SourceRoot.find_siblings_by_path(os.path.join(source_set.source_base, source_set.path))
+    if source_set.path:
+      path = os.path.join(source_set.source_base, source_set.path)
+    else:
+      path = source_set.source_base
+    sibling_paths = SourceRoot.find_siblings_by_path(path)
     for sibling_path in sibling_paths:
       if has_test_type(SourceRoot.types(sibling_path)):
         return True
@@ -149,11 +153,19 @@ class IdeaGen(IdeGen):
       else:
         is_test = source_set.is_test
 
+      if source_set.resources_only:
+        if source_set.is_test:
+          content_type = 'java-test-resource'
+        else:
+          content_type = 'java-resource'
+      else:
+        content_type = ''
+
       sources = TemplateData(
         path=root_relative_path,
         package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
         is_test=is_test,
-        content_type=source_set.content_type
+        content_type=content_type
       )
 
       return TemplateData(
