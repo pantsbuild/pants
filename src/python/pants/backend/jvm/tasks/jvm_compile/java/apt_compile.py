@@ -23,6 +23,7 @@ would not be smart enough to compile the apt processors 1st and activate them.
 
 
 class AptCompile(JmakeCompile):
+  """Compile Java annotation processors."""
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
