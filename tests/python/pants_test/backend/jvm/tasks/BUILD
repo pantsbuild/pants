@@ -4,6 +4,7 @@
 target(
   name = 'tasks',
   dependencies = [
+    ':benchmark_run',
     ':binary_create',
     ':bootstrap_jvm_tools',
     ':bundle_create',
@@ -47,6 +48,17 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/java/jar:shader',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'benchmark_run',
+  sources = ['test_benchmark_run.py'],
+  dependencies = [
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/tasks:benchmark_run',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )

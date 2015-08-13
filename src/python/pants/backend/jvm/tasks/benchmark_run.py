@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
@@ -23,6 +24,8 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     super(BenchmarkRun, cls).register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
     register('--memory', default=False, action='store_true', help='Enable memory profiling.')
+    register('--debug', action='store_true', recursive=True, help='Run the benchmark tool with in process debugging.')
+
     cls.register_jvm_tool(register, 'benchmark-tool', main=cls._CALIPER_MAIN, default=['//:benchmark-caliper-0.5'])
     cls.register_jvm_tool(register, 'benchmark-agent',
                           default=['//:benchmark-java-allocation-instrumenter-2.1'])
@@ -52,6 +55,10 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
       self.args.append('--debug')
 
   def execute(self):
+    targets = self.context.targets()
+    if not any(isinstance(t, JvmTarget) for t in targets):
+      raise TaskError('No jvm targets specified for benchmarking.')
+
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.
     # The MANIFEST list a jar 'allocation.jar' this is why we have to rename it
@@ -66,7 +73,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
     benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
-    classpath = self.classpath(self.context.targets(), benchmark_tools_classpath)
+    classpath = self.classpath(targets, benchmark_tools_classpath)
 
     exit_code = execute_java(classpath=classpath,
                              main=self._CALIPER_MAIN,
