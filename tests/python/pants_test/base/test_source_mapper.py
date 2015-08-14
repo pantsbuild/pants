@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -7,11 +7,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.lazy_source_mapper import LazySourceMapper
+from pants.base.source_mapper import LazySourceMapper, SpecSourceMapper
 from pants_test.base_test import BaseTest
 
 
-class LazySourceMapperTest(BaseTest):
+class SourceMapperTest(object):
+  def __init__(self, methodName):
+    super(SourceMapperTest, self).__init__(methodName)
+    self._mapper = None
+
+  def get_mapper(self):
+    return self._mapper
 
   @property
   def alias_groups(self):
@@ -22,14 +28,14 @@ class LazySourceMapperTest(BaseTest):
     )
 
   def setUp(self):
-    super(LazySourceMapperTest, self).setUp()
+    super(SourceMapperTest, self).setUp()
     self.set_mapper()
 
   def set_mapper(self, fast=False):
-    self.mapper = LazySourceMapper(self.address_mapper, self.build_graph, stop_after_match=fast)
+    raise NotImplementedError
 
   def owner(self, owner, f):
-    self.assertEqual(set(owner), set(i.spec for i in self.mapper.target_addresses_for_source(f)))
+    self.assertEqual(set(owner), set(i.spec for i in self.get_mapper().target_addresses_for_source(f)))
 
   def test_joint_ownership(self):
     # A simple target with two sources.
@@ -87,4 +93,12 @@ class LazySourceMapperTest(BaseTest):
     self.set_mapper(fast=True)
     self.owner(['a/b:b'], 'a/b/bar.py')
     self.owner([':top'], 'foo.py')
-    self.owner([':top', 'a/b:b'], 'a/b/bar.py')
+
+class LazySourceMapperTest(SourceMapperTest, BaseTest):
+  def set_mapper(self, fast=False):
+    self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)
+
+
+class SpecSourceMapperTest(SourceMapperTest, BaseTest):
+  def set_mapper(self, fast=False):
+    self._mapper = SpecSourceMapper(self.address_mapper, self.build_graph, fast)

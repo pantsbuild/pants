@@ -145,8 +145,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'lazy_source_mapper',
-  sources = ['test_lazy_source_mapper.py'],
+  name = 'source_mapper',
+  sources = ['test_source_mapper.py'],
   dependencies = [
     'tests/python/pants_test:base_test',
     'src/python/pants/base:target',
