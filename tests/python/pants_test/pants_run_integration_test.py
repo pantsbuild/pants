@@ -12,6 +12,8 @@ import unittest
 from collections import Counter, defaultdict, namedtuple
 from operator import eq, ne
 
+from colors import strip_color
+
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
@@ -193,4 +195,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         if ignore_links and os.path.islink(p):
           continue
         found.add(os.path.relpath(p, directory))
+
     self.assertEqual(expected_files, found)
+
+  def normalize(self, s):
+    """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
+    return ''.join(strip_color(s).split())

@@ -11,6 +11,7 @@ target(
   dependencies=[
     ':go_workspace_task',
     ':go_compile',
+    ':go_fetch',
   ]
 )
 
@@ -20,6 +21,7 @@ target(
     ':go_compile_integration',
     ':go_test_integration',
     ':go_run_integration',
+    ':go_fetch_integration',
   ]
 )
 
@@ -48,6 +50,23 @@ python_tests(
 )
 
 python_tests(
+  name='go_fetch',
+  sources=['test_go_fetch.py'],
+  dependencies=[
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
+  ]
+)
+
+python_tests(
   name='go_compile_integration',
   sources=['test_go_compile_integration.py'],
   dependencies=[
@@ -72,7 +91,14 @@ python_tests(
   sources=['test_go_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
-    ':go_tool',
+  ]
+)
+
+python_tests(
+  name='go_fetch_integration',
+  sources=['test_go_fetch_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
   ]
 )
 
