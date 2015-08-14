@@ -20,9 +20,6 @@ API Changes
   `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
   `RB #2622 <https://rbcommons.com/s/twitter/r/2622>`_
 
-* Add `pants_plugin` and `contrib_plugin` targets.
-  `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
-
 * Pin pex==1.0.3, alpha-sort & remove line breaks
   `RB #2598 <https://rbcommons.com/s/twitter/r/2598>`_
   `RB #2596 <https://rbcommons.com/s/twitter/r/2596>`_
@@ -121,6 +118,9 @@ Small improvements, Refactoring and Tooling
 
 * Add the optionable class to ScopeInfo. #docfixit
   `RB #2588 <https://rbcommons.com/s/twitter/r/2588>`_
+
+* Add `pants_plugin` and `contrib_plugin` targets.
+  `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
 
 0.0.41 (8/7/2025)
 -----------------
