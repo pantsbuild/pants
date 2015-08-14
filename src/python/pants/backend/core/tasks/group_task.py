@@ -357,7 +357,10 @@ class GroupTask(Task):
 
       # chunk zig zag
       for group_member, chunk in ordered_chunks:
-        group_member.execute_chunk(chunk)
+        log_config = WorkUnit.LogConfig(
+            level=group_member.get_options().level, colors=group_member.get_options().colors)
+        with self.context.new_workunit(name=group_member.name(), log_config=log_config):
+          group_member.execute_chunk(chunk)
 
       # finalize
       for group_member in self._group_members:
