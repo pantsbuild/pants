@@ -230,12 +230,15 @@ class MarkdownToHtml(Task):
   @classmethod
   def register_options(cls, register):
     register('--code-style', choices=list(get_all_styles()), default='friendly',
+             fingerprint=True,
              help='Use this stylesheet for code highlights.')
     register('--open', action='store_true',
              help='Open the generated documents in a browser.')
     register('--fragment', action='store_true',
+             fingerprint=True,
              help='Generate a fragment of html to embed in a page.')
     register('--ignore-failure', default=False, action='store_true',
+             fingerprint=True,
              help='Do not consider rendering errors to be build errors.')
 
   @classmethod

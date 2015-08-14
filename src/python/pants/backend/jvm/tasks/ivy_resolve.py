@@ -53,6 +53,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                   'in a browser (implies --report)')
     register('--outdir', help='Emit ivy report outputs in to this directory.')
     register('--args', action='append',
+             fingerprint=True,
              help='Pass these extra args to ivy.')
     register('--confs', action='append', default=['default'],
              help='Pass a configuration to ivy in addition to the default ones.')

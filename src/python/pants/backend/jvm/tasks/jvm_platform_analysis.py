@@ -75,8 +75,10 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     super(JvmPlatformValidate, cls).register_options(register)
     # TODO: disabled by default: see https://github.com/pantsbuild/pants/issues/1972
     register('--check', default='off', choices=['off', 'warn', 'fatal'],
+             fingerprint=True,
              help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
     register('--children-before-parents', default=False, action='store_true',
+             fingerprint=True,
              help='Organize output in the form target -> dependencies, rather than '
                   'target -> dependees.')
 
