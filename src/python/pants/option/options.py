@@ -81,36 +81,77 @@ class Options(object):
         scope = scope.rpartition('.')[0]
     return ret
 
-  def __init__(self, env, config, known_scope_infos, args=sys.argv, bootstrap_option_values=None):
+  @classmethod
+  def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
     :param config: data from a config file (must support config.get[list](section, name, default=)).
     :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-    :param args: a list of cmd-line args.
+    :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
     """
     # We need parsers for all the intermediate scopes, so inherited option values
     # can propagate through them.
-    complete_known_scope_infos = self.complete_scopes(known_scope_infos)
+    complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
     splitter = ArgSplitter(complete_known_scope_infos)
-    self._goals, self._scope_to_flags, self._target_specs, self._passthru, self._passthru_owner = \
-      splitter.split_args(args)
+    args = sys.argv if args is None else args
+    goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
 
     if bootstrap_option_values:
       target_spec_files = bootstrap_option_values.target_spec_files
       if target_spec_files:
         for spec in target_spec_files:
           with open(spec) as f:
-            self._target_specs.extend(filter(None, [line.strip() for line in f]))
+            target_specs.extend(filter(None, [line.strip() for line in f]))
 
-    self._help_request = splitter.help_request
+    help_request = splitter.help_request
 
-    self._parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
-    self._values_by_scope = {}  # Arg values, parsed per-scope on demand.
+    parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
+    values_by_scope = {}  # Arg values, parsed per-scope on demand.
+    bootstrap_option_values = bootstrap_option_values
+    known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
+    return cls(goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
+               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info)
+
+  def __init__(self, goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
+               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info):
+    """The low-level constructor for an Options instance.
+
+    Dependees should use `Options.create` instead.
+    """
+    self._goals = goals
+    self._scope_to_flags = scope_to_flags
+    self._target_specs = target_specs
+    self._passthru = passthru
+    self._passthru_owner = passthru_owner
+    self._help_request = help_request
+    self._parser_hierarchy = parser_hierarchy
+    self._values_by_scope = values_by_scope
     self._bootstrap_option_values = bootstrap_option_values
-    self._known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
+    self._known_scope_to_info = known_scope_to_info
+
+  def drop_flag_values(self):
+    """Returns a copy of these options that ignores values specified via flags.
+
+    Any pre-cached option values are cleared and only option values that come from option defaults,
+    the config or the environment are used.
+    """
+    # An empty scope_to_flags to force all values to come via the config -> env hierarchy alone
+    # and empty values in case we already cached some from flags.
+    no_flags = {}
+    no_values = {}
+    return Options(self._goals,
+                   no_flags,
+                   self._target_specs,
+                   self._passthru,
+                   self._passthru_owner,
+                   self._help_request,
+                   self._parser_hierarchy,
+                   no_values,
+                   self._bootstrap_option_values,
+                   self._known_scope_to_info)
 
   @property
   def target_specs(self):

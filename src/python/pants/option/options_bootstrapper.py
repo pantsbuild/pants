@@ -19,12 +19,12 @@ from pants.option.options import Options
 class OptionsBootstrapper(object):
   """An object that knows how to create options in two stages: bootstrap, and then full options."""
   def __init__(self, env=None, configpath=None, args=None):
-    self._env = env or os.environ.copy()
+    self._env = env if env is not None else os.environ.copy()
     self._configpath = configpath
     self._post_bootstrap_config = None  # Will be set later.
-    self._args = args or sys.argv
+    self._args = sys.argv if args is None else args
     self._bootstrap_options = None  # We memoize the bootstrap options here.
-    self._full_options = None  # We memoize the full options here.
+    self._full_options = {}  # We memoize the full options here.
 
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
@@ -62,7 +62,7 @@ class OptionsBootstrapper(object):
       pre_bootstrap_config = Config.load(configpaths)
 
       def bootstrap_options_from_config(config):
-        bootstrap_options = Options(env=self._env, config=config,
+        bootstrap_options = Options.create(env=self._env, config=config,
             known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs)
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
@@ -92,17 +92,19 @@ class OptionsBootstrapper(object):
     return self._bootstrap_options
 
   def get_full_options(self, known_scope_infos):
-    """Get the full Options instance bootstrapped by this object.
+    """Get the full Options instance bootstrapped by this object for the given known scopes.
 
     :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
+    :param bool masked: If `True`, masks
     """
-    if not self._full_options:
+    key = frozenset(sorted(known_scope_infos))
+    if key not in self._full_options:
       # Note: Don't inline this into the Options() call, as this populates
       # self._post_bootstrap_config, which is another argument to that call.
-      bootstrap_options = self.get_bootstrap_options()
-      self._full_options = Options(self._env,
-                                   self._post_bootstrap_config,
-                                   known_scope_infos,
-                                   args=self._args,
-                                   bootstrap_option_values=bootstrap_options.for_global_scope())
-    return self._full_options
+      bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
+      self._full_options[key] = Options.create(self._env,
+                                               self._post_bootstrap_config,
+                                               known_scope_infos,
+                                               args=self._args,
+                                               bootstrap_option_values=bootstrap_option_values)
+    return self._full_options[key]

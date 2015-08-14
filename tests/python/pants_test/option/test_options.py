@@ -34,8 +34,16 @@ def intermediate(scope):
 
 
 class OptionsTest(unittest.TestCase):
-  _known_scope_infos = [intermediate('compile'), task('compile.java'), task('compile.scala'),
-                        intermediate('stale'), intermediate('test'), task('test.junit')]
+  _known_scope_infos = [intermediate('compile'),
+                        task('compile.java'),
+                        task('compile.scala'),
+                        intermediate('stale'),
+                        intermediate('test'),
+                        task('test.junit'),
+                        task('simple'),
+                        task('simple-dashed'),
+                        task('scoped.a.bit'),
+                        task('scoped.and-dashed')]
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -90,10 +98,16 @@ class OptionsTest(unittest.TestCase):
     options.register('compile.scala', '--modifycompile', fingerprint=True)
     options.register('compile.scala', '--modifylogs')
 
+    # For scoped env vars test
+    options.register('simple', '--spam')
+    options.register('simple-dashed', '--spam')
+    options.register('scoped.a.bit', '--spam')
+    options.register('scoped.and-dashed', '--spam')
+
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
-    options = Options(env or {}, FakeConfig(config or {}), OptionsTest._known_scope_infos, args,
-                      bootstrap_option_values=bootstrap_option_values)
+    options = Options.create(env or {}, FakeConfig(config or {}), OptionsTest._known_scope_infos,
+                             args, bootstrap_option_values=bootstrap_option_values)
     self._register(options)
     return options
 
@@ -166,8 +180,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_boolean_set_option(self):
     options = self._parse('./pants --store-true-flag --store-false-flag '
-                          + ' --store-true-def-true-flag --store-true-def-false-flag '
-                          + ' --store-false-def-true-flag --store-false-def-false-flag')
+                          ' --store-true-def-true-flag --store-true-def-false-flag '
+                          ' --store-false-def-true-flag --store-false-def-false-flag')
 
     self.assertTrue(options.for_global_scope().store_true_flag)
     self.assertFalse(options.for_global_scope().store_false_flag)
@@ -178,8 +192,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_boolean_negate_option(self):
     options = self._parse('./pants --no-store-true-flag --no-store-false-flag '
-                          + ' --no-store-true-def-true-flag --no-store-true-def-false-flag '
-                          + ' --no-store-false-def-true-flag --no-store-false-def-false-flag')
+                          ' --no-store-true-def-true-flag --no-store-true-def-false-flag '
+                          ' --no-store-false-def-true-flag --no-store-false-def-false-flag')
     self.assertFalse(options.for_global_scope().store_true_flag)
     self.assertTrue(options.for_global_scope().store_false_flag)
     self.assertFalse(options.for_global_scope().store_true_def_false_flag)
@@ -382,9 +396,41 @@ class OptionsTest(unittest.TestCase):
     check_bar_baz(None, {
     })
 
+  def test_scoped_env_vars(self):
+    def check_scoped_spam(scope, expected_val, env):
+      val = self._parse('./pants', env=env).for_scope(scope).spam
+      self.assertEqual(expected_val, val)
+
+    check_scoped_spam('simple', 'value', {'PANTS_SIMPLE_SPAM': 'value'})
+    check_scoped_spam('simple-dashed', 'value', {'PANTS_SIMPLE_DASHED_SPAM': 'value'})
+    check_scoped_spam('scoped.a.bit', 'value', {'PANTS_SCOPED_A_BIT_SPAM': 'value'})
+    check_scoped_spam('scoped.and-dashed', 'value', {'PANTS_SCOPED_AND_DASHED_SPAM': 'value'})
+
+  def test_drop_flag_values(self):
+    options = self._parse('./pants --bar-baz=fred -n33 --pants-foo=red simple -n1',
+                          env={'PANTS_FOO': 'BAR'},
+                          config={'simple': {'num': 42}})
+    defaulted_only_options = options.drop_flag_values()
+
+    # No option value supplied in any form.
+    self.assertEqual('fred', options.for_global_scope().bar_baz)
+    self.assertIsNone(defaulted_only_options.for_global_scope().bar_baz)
+
+    # A defaulted option value.
+    self.assertEqual(33, options.for_global_scope().num)
+    self.assertEqual(99, defaulted_only_options.for_global_scope().num)
+
+    # An config specified option value.
+    self.assertEqual(1, options.for_scope('simple').num)
+    self.assertEqual(42, defaulted_only_options.for_scope('simple').num)
+
+    # An env var specified option value.
+    self.assertEqual('red', options.for_global_scope().pants_foo)
+    self.assertEqual('BAR', defaulted_only_options.for_global_scope().pants_foo)
+
   def test_deprecated_option_past_removal(self):
     with self.assertRaises(PastRemovalVersionError):
-      options = Options({}, FakeConfig({}), OptionsTest._known_scope_infos, "./pants")
+      options = Options.create({}, FakeConfig({}), OptionsTest._known_scope_infos, "./pants")
       options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                        deprecated_hint='The semver for this option has already passed.')
 
@@ -572,7 +618,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_get_fingerprintable_for_scope(self):
     val = 'blah blah blah'
-    options = self._parse('./pants compile.scala --modifycompile="{}" --modifylogs="durrrr"'.format(val))
+    options = self._parse('./pants compile.scala --modifycompile="{}" '
+                          '--modifylogs="durrrr"'.format(val))
 
     pairs = options.get_fingerprintable_for_scope('compile.scala')
     self.assertEquals(len(pairs), 1)

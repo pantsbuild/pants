@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import re
 import sys
 import warnings
 from argparse import ArgumentParser, _HelpAction
@@ -332,6 +333,8 @@ class Parser(object):
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
     return dest
 
+  _ENV_SANITIZER_RE = re.compile(r'[.-]')
+
   def _select_dest(self, args):
     """Select the dest name for the option.
 
@@ -359,7 +362,8 @@ class Parser(object):
       if udest.startswith('PANTS_'):
         env_vars.append(udest)
     else:
-      env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
+      sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', config_section.upper())
+      env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
     value_type = self.str_to_bool if is_boolean_flag(kwargs) else kwargs.get('type', str)
     env_val_str = None
     if self._env:
