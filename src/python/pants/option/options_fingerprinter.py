@@ -45,7 +45,10 @@ class OptionsFingerprinter(object):
     hasher = sha1()
     for spec in sorted(specs):
       for target in sorted(self._build_graph.resolve(spec)):
-        hasher.update(target.compute_invalidation_hash())
+        # Not all targets have hashes; in particular, `Dependencies` targets don't.
+        h = target.compute_invalidation_hash()
+        if h:
+          hasher.update(h)
     return hasher.hexdigest()
 
   def _fingerprint_file(self, filepath):
