@@ -34,7 +34,7 @@ function pkg_pants_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) || die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || die "'pants list src::' failed in venv!"
-  [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
+  [[ "$(execute_packaged_pants_with_internal_backends --pants-version 2>/dev/null)" \
      == "$(local_version)" ]] || die "Installed version of pants does match local version!"
 }
 
@@ -125,7 +125,7 @@ function pkg_install_test_func() {
 }
 
 function local_version() {
-  run_local_pants --version 2>/dev/null
+  run_local_pants --pants-version 2>/dev/null
 }
 
 function build_packages() {

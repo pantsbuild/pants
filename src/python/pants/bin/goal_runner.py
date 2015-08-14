@@ -77,18 +77,25 @@ class GoalRunner(object):
 
   def setup(self, options_bootstrapper, working_set):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
+    global_bootstrap_options = bootstrap_options.for_global_scope()
+
+    # The pants_version may be set in pants.ini for bootstrapping, so we make sure the user actually
+    # requested the version on the command line before deciding to print the version and exit.
+    if global_bootstrap_options.is_flagged('pants_version'):
+      print(global_bootstrap_options.pants_version)
+      sys.exit(0)
 
     # Get logging setup prior to loading backends so that they can log as needed.
-    self._setup_logging(bootstrap_options.for_global_scope())
+    self._setup_logging(global_bootstrap_options)
 
     # Add any extra paths to python path (eg for loading extra source backends)
-    for path in bootstrap_options.for_global_scope().pythonpath:
+    for path in global_bootstrap_options.pythonpath:
       sys.path.append(path)
       pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    plugins = bootstrap_options.for_global_scope().plugins
-    backend_packages = bootstrap_options.for_global_scope().backend_packages
+    plugins = global_bootstrap_options.plugins
+    backend_packages = global_bootstrap_options.backend_packages
     build_configuration = load_plugins_and_backends(plugins, working_set, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.

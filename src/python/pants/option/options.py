@@ -8,10 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import sys
 
-from pants.base.build_environment import pants_release, pants_version
-from pants.goal.goal import Goal
+from pants.base.build_environment import pants_release
 from pants.option.arg_splitter import (GLOBAL_SCOPE, ArgSplitter, NoGoalHelp, OptionsHelp,
-                                       UnknownGoalHelp, VersionHelp)
+                                       UnknownGoalHelp)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy
@@ -282,9 +281,7 @@ class Options(object):
       def print_hint():
         print('Use `pants goals` to list goals.')
         print('Use `pants help` to get help.')
-      if isinstance(self._help_request, VersionHelp):
-        print(pants_version())
-      elif isinstance(self._help_request, OptionsHelp):
+      if isinstance(self._help_request, OptionsHelp):
         self._print_options_help()
       elif isinstance(self._help_request, UnknownGoalHelp):
         print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
