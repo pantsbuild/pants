@@ -23,6 +23,7 @@ class ThriftBinary(object):
     @classmethod
     def register_options(cls, register):
       register('--supportdir', recursive=True, advanced=True, default='bin/thrift',
+               fingerprint=True,
                help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
       register('--version', recursive=True, advanced=True, default='0.9.2', fingerprint=True,
