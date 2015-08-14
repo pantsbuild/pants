@@ -200,8 +200,5 @@ class GoFetch(GoTask):
     """Returns the remote import ids declared by the Go package at pkg_dir."""
     sources = glob(os.path.join(pkg_dir, '*.go'))
     out = self.go_dist.create_go_cmd('list', args=['-json'] + sources).check_output()
-    try:
-      imports = json.loads(out)['Imports']
-    except KeyError:
-      return []
+    imports = json.loads(out).get('Imports', [])
     return [imp for imp in imports if imp not in self.go_stdlib]

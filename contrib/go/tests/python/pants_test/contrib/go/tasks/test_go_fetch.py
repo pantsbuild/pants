@@ -86,10 +86,10 @@ class GoFetchTest(TaskTestBase):
       go_fetch._resolve_and_inject(r1, 'r2')
     self.assertEqual(cm.exception.spec_path, '3rdparty/r2')
 
-  def _create_package(self, dir, name, deps):
-    """Creates a Go package inside dir named 'name' importing deps."""
+  def _create_package(self, dirpath, name, deps):
+    """Creates a Go package inside dirpath named 'name' importing deps."""
     imports = ['import "{}"'.format(d) for d in deps]
-    f = os.path.join(dir, '{name}/{name}.go'.format(name=name))
+    f = os.path.join(dirpath, '{name}/{name}.go'.format(name=name))
     self.create_file(f, contents=
       """package {name}
         {imports}
