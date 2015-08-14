@@ -9,8 +9,8 @@ import os
 from textwrap import dedent
 
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.exceptions import TaskError
+from pants.base.target import Target
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -21,7 +21,7 @@ class BenchmarkRunTest(JvmToolTaskTestBase):
     return BenchmarkRun
 
   def test_benchmark_complains_on_python_target(self):
-    self.make_target('foo:hello', target_type=PythonTests, sources=['some_file.py'])
+    self.make_target('foo:hello', target_type=Target)
 
     self.set_options(target='foo:hello')
     context = self.context(target_roots=[self.target('foo:hello')])

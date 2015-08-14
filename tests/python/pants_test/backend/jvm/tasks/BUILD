@@ -56,9 +56,9 @@ python_tests(
   name = 'benchmark_run',
   sources = ['test_benchmark_run.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/tasks:benchmark_run',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:target',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
