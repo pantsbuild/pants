@@ -83,8 +83,8 @@ class JmakeCompile(JvmCompile):
              help='Generate class files for this JVM version. Overrides the jvm platform target.',
              deprecated_hint='The -target arg to javac should be specified by the jvm-platform.',
              deprecated_version='0.0.43')
-    cls.register_jvm_tool(register, 'jmake', fingerprint=True)
-    cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
+    cls.register_jvm_tool(register, 'jmake')
+    cls.register_jvm_tool(register, 'java-compiler')
 
   def select(self, target):
     return self.get_options().use_jmake and super(JmakeCompile, self).select(target)

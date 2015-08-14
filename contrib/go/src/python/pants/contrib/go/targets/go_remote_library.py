@@ -22,7 +22,9 @@ class GoRemoteLibrary(Target):
           - {host} The host address to download zip files from. Specified by an option to
                    GoFetch, '--remote-lib-host'.
           - {id} The global import identifier of the library, which is specified by the path to
-                 the BUILD file relative to all 3rd party Go libraries (see GoPlatform).
+                 the BUILD file relative to the source root of all 3rd party Go libraries.
+                 For example, If the 3rd party source root is "3rdparty/go", a target at
+                 "3rdparty/go/github.com/user/lib" would have an {id} of "github.com/user/lib".
           - {rev} See :param rev:
       - The zip file is expected to have zipped the library directory itself, and NOT the
         direct contents of the library.

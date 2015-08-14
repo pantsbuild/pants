@@ -345,7 +345,7 @@ python_library(
     ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:lazy_source_mapper',
+    'src/python/pants/base:source_mapper',
     'src/python/pants/goal:workspace',
   ],
 )

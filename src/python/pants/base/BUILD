@@ -203,8 +203,8 @@ python_library(
 )
 
 python_library(
-  name = 'lazy_source_mapper',
-  sources = ['lazy_source_mapper.py'],
+  name = 'source_mapper',
+  sources = ['source_mapper.py'],
   dependencies = [
     ':build_environment',
   ]
@@ -287,9 +287,9 @@ python_library(
     ':build_environment',
     ':fingerprint_strategy',
     ':hash_utils',
-    ':lazy_source_mapper',
     ':payload',
     ':payload_field',
+    ':source_mapper',
     ':source_root',
     ':target_addressable',
     'src/python/pants/backend/core:wrapped_globs',

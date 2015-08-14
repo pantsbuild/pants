@@ -89,12 +89,11 @@ class ZincCompile(JvmCompile):
                             Shader.exclude_package('scala', recursive=True),
                             Shader.exclude_package('xsbt', recursive=True),
                             Shader.exclude_package('xsbti', recursive=True),
-                          ],
-                          fingerprint=True)
-    cls.register_jvm_tool(register, 'compiler-interface', fingerprint=True)
-    cls.register_jvm_tool(register, 'sbt-interface', fingerprint=True)
+                          ])
+    cls.register_jvm_tool(register, 'compiler-interface')
+    cls.register_jvm_tool(register, 'sbt-interface')
 
-    cls.register_jvm_tool(register, 'plugin-jars', default=[], fingerprint=True)
+    cls.register_jvm_tool(register, 'plugin-jars', default=[])
 
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')

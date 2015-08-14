@@ -11,6 +11,7 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.what_changed import WhatChanged
+from pants.backend.core.wrapped_globs import RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -36,6 +37,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       },
       context_aware_object_factories={
         'source_root': SourceRoot.factory,
+        'rglobs': RGlobs,
       },
       objects={
         'jar': JarDependency,
@@ -162,7 +164,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.add_to_build_file('root/src/java/a', dedent("""
       java_library(
         name='a_java',
-        sources=['a.java'],
+        sources=rglobs("*.java"),
       )
     """))
 
@@ -277,6 +279,16 @@ class WhatChangedTest(BaseWhatChangedTest):
       workspace=self.workspace(
         diffspec='42',
         diff_files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'],
+      ),
+    )
+
+  def test_diffspec_removed_files(self):
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      options={'diffspec': '42'},
+      workspace=self.workspace(
+        diffspec='42',
+        diff_files=['root/src/java/a/b/c/Foo.java'],
       ),
     )
 
