@@ -76,7 +76,7 @@ Contrib plugins should generally follow 3 basic setup steps:
    The `contrib_plugin` target assumes 1 source of `register.py`; so, the sources argument should be
    removed.  It still accepts dependencies and other python target arguments with some special
    additions to help define the plugin distribution.  You'll need to supply a `distribution_name`
-   and a `description` of the plugin suitable for [pypi](https://pypi.python.org/pypi) as well
+   and a `description` of the plugin suitable for [pypi](https://pypi.python.org/pypi) as well as
    parameters indicating which plugin entry points your plugin implements:
    ```python
    contrib_plugin(
