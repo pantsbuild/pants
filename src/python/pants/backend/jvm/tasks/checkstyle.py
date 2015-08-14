@@ -41,7 +41,6 @@ class Checkstyle(NailgunTask):
              help='Run checkstyle with these extra jvm options.')
     cls.register_jvm_tool(register,
                           'checkstyle',
-                          fingerprint=True,
                           main=cls._CHECKSTYLE_MAIN,
                           custom_rules=[
                               # Checkstyle uses reflection to load checks and has an affordance that

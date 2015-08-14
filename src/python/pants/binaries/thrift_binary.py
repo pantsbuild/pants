@@ -25,7 +25,7 @@ class ThriftBinary(object):
       register('--supportdir', recursive=True, advanced=True, default='bin/thrift',
                help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', recursive=True, advanced=True, default='0.9.2',
+      register('--version', recursive=True, advanced=True, default='0.9.2', fingerprint=True,
                help='Thrift compiler version.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
 
