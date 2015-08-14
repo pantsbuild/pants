@@ -64,11 +64,13 @@ class SourceRootBootstrapper(Subsystem):
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
-  def __init__(self, root_dir):
+  def __init__(self, root_dir, exiter=sys.exit):
     """
     :param root_dir: The root directory of the pants workspace.
+    :param exiter: An optional function that accepts an int exit code value and exits (for testing).
     """
     self.root_dir = root_dir
+    self._exiter = exiter
 
   @property
   def subsystems(self):
@@ -83,7 +85,7 @@ class GoalRunner(object):
     # requested the version on the command line before deciding to print the version and exit.
     if global_bootstrap_options.is_flagged('pants_version'):
       print(global_bootstrap_options.pants_version)
-      sys.exit(0)
+      self._exiter(0)
 
     # Get logging setup prior to loading backends so that they can log as needed.
     self._setup_logging(global_bootstrap_options)
@@ -191,7 +193,7 @@ class GoalRunner(object):
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
     if self.options.print_help_if_requested():
-      sys.exit(0)
+      self._exiter(0)
 
     self.requested_goals = goals
 

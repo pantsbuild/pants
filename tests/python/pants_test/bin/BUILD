@@ -4,7 +4,20 @@
 target(
   name='bin',
   dependencies=[
+    ':goal_runner',
     ':plugin_resolver',
+  ]
+)
+
+python_tests(
+  name='goal_runner',
+  sources=['test_goal_runner.py'],
+  dependencies=[
+    '3rdparty/python:mock',
+    '3rdparty/python:setuptools',
+    'src/python/pants/bin',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/option/util',
   ]
 )
 
