@@ -85,7 +85,8 @@ class LoaderTest(unittest.TestCase):
     Goal.clear()
 
   @contextmanager
-  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None, module_name='register'):
+  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
+                      module_name='register'):
 
     package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
     self.assertFalse(package_name in sys.modules)
@@ -218,7 +219,7 @@ class LoaderTest(unittest.TestCase):
     return Distribution(project_name=name, version=version, metadata=MockMetadata(metadata))
 
   def load_plugins(self, plugins):
-    load_plugins(self.build_configuration, plugins, load_from=self.working_set)
+    load_plugins(self.build_configuration, plugins, self.working_set)
 
   def test_plugin_load_and_order(self):
     d1 = self.get_mock_plugin('demo1', '0.0.1', after=lambda: ['demo2'])

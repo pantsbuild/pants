@@ -28,7 +28,6 @@ from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
 from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
@@ -76,8 +75,7 @@ class GoalRunner(object):
     # Subsystems used outside of any task.
     return SourceRootBootstrapper, Reporting, RunTracker
 
-  def setup(self):
-    options_bootstrapper = OptionsBootstrapper()
+  def setup(self, options_bootstrapper, working_set):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
 
     # Get logging setup prior to loading backends so that they can log as needed.
@@ -91,7 +89,7 @@ class GoalRunner(object):
     # Load plugins and backends.
     plugins = bootstrap_options.for_global_scope().plugins
     backend_packages = bootstrap_options.for_global_scope().backend_packages
-    build_configuration = load_plugins_and_backends(plugins, backend_packages)
+    build_configuration = load_plugins_and_backends(plugins, working_set, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []

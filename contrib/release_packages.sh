@@ -20,13 +20,11 @@ PKG_SCROOGE=(
   "pkg_scrooge_install_test"
 )
 function pkg_scrooge_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.contrib.scrooge==$(local_version) && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge']" \
+    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
     --explain gen | grep "scrooge" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge']" \
+    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
     goals | grep "thrift-linter" &> /dev/null
 }
 
@@ -47,10 +45,8 @@ PKG_SPINDLE=(
   "pkg_spindle_install_test"
 )
 function pkg_spindle_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.contrib.spindle==$(local_version) && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.spindle']" \
+    --plugins="['pantsbuild.pants.contrib.spindle==$(local_version)']" \
     --explain gen | grep "spindle" &> /dev/null
 }
 
@@ -60,11 +56,9 @@ PKG_GO=(
   "pkg_go_install_test"
 )
 function pkg_go_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.contrib.go==$(local_version) && \
   execute_packaged_pants_with_internal_backends \
     "extra_bootstrap_buildfiles='${ROOT}/contrib/go/BUILD'" \
-      --plugins="['pantsbuild.pants.contrib.go']" \
+      --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
       compile.go contrib/go/examples::
 }
 

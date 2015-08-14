@@ -99,10 +99,8 @@ Contrib plugins should generally follow 3 basic setup steps:
      "pkg_example_install_test"
    )
    function pkg_example_install_test() {
-     PIP_ARGS="$@"
-     pip install ${PIP_ARGS} pantsbuild.pants.contrib.example==$(local_version) && \
      execute_packaged_pants_with_internal_backends \
-       --plugins="['pantsbuild.pants.contrib.example']" \
+       --plugins="['pantsbuild.pants.contrib.example==$(local_version)']" \
        goals | grep "example-goal" &> /dev/null
    }
 
