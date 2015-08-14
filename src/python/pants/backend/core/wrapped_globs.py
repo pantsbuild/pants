@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import fnmatch
 import os
+from pants.util.memo import memoized_property
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
@@ -28,7 +29,7 @@ def matches_filespec(path, spec):
   return True
 
 class FilesetWithSpec(object):
-  """A set of files with that keeps track of how we got it.
+  """A set of files that keeps track of how we got it.
 
   The filespec is what globs or file list it came from.
   """
@@ -36,14 +37,11 @@ class FilesetWithSpec(object):
   def __init__(self, rel_root, filespec, files_calculator):
     self._rel_root = rel_root
     self.filespec = filespec
-    self._files = None
     self._files_calculator = files_calculator
 
-  @property
+  @memoized_property
   def files(self):
-    if self._files is None:
-      self._files = self._files_calculator()
-    return self._files
+    return self._files_calculator()
 
   def __iter__(self):
     return self.files.__iter__()

@@ -12,6 +12,13 @@ from pants_test.base_test import BaseTest
 
 
 class SourceMapperTest(object):
+  def __init__(self, methodName):
+    super(SourceMapperTest, self).__init__(methodName)
+    self._mapper = None
+
+  def get_mapper(self):
+    return self._mapper
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -25,12 +32,6 @@ class SourceMapperTest(object):
     self.set_mapper()
 
   def set_mapper(self, fast=False):
-    raise NotImplementedError
-
-  def get_mapper(self):
-    """
-    :rtype: pants.base.source_mapper.SourceMapper
-    """
     raise NotImplementedError
 
   def owner(self, owner, f):
@@ -94,24 +95,10 @@ class SourceMapperTest(object):
     self.owner([':top'], 'foo.py')
 
 class LazySourceMapperTest(SourceMapperTest, BaseTest):
-  def __init__(self, methodName):
-    super(LazySourceMapperTest, self).__init__(methodName)
-    self._mapper = None
-
-  def get_mapper(self):
-    return self._mapper
-
   def set_mapper(self, fast=False):
     self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)
 
 
 class SpecSourceMapperTest(SourceMapperTest, BaseTest):
-  def __init__(self, methodName):
-    super(SpecSourceMapperTest, self).__init__(methodName)
-    self._mapper = None
-
-  def get_mapper(self):
-    return self._mapper
-
   def set_mapper(self, fast=False):
     self._mapper = SpecSourceMapper(self.address_mapper, self.build_graph, fast)
