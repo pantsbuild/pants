@@ -43,8 +43,8 @@ def load_plugins(build_configuration, plugins, load_from=None):
   is already on the path and an error will be thrown if it is not. Plugins should define their
   entrypoints in the `pantsbuild.plugin` group when configuring their distribution.
 
-  Like source backends, the `build_file_aliases`, `global_subsystems` and `register_goals` methods are called if
-  those entry points are defined.
+  Like source backends, the `build_file_aliases`, `global_subsystems` and `register_goals` methods
+  are called if those entry points are defined.
 
   * Plugins are loaded in the order they are provided. *
 

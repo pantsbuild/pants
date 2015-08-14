@@ -4,14 +4,13 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/cpp/src/python/pants/contrib/cpp/targets:targets',
-    'contrib/cpp/src/python/pants/contrib/cpp/tasks:tasks',
-    'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
+    'contrib/go/src/python/pants/contrib/go/targets',
+    'contrib/go/src/python/pants/contrib/go/tasks',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal:task_registrar',
   ],
-  distribution_name='pantsbuild.pants.contrib.cpp',
-  description='C++ pants plugin.',
+  distribution_name='pantsbuild.pants.contrib.go',
+  description='Go language support for pants.',
   build_file_aliases=True,
   register_goals=True,
 )

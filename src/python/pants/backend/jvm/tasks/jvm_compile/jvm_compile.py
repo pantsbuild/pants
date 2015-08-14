@@ -32,44 +32,45 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
+    register('--partition-size-hint', advanced=True, type=int, default=sys.maxint,
+             metavar='<# source files>',
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--jvm-options', type=list_option, default=[],
+    register('--jvm-options', advanced=True, type=list_option, default=[],
              help='Run the compiler with these JVM options.')
 
-    register('--args', action='append',
+    register('--args', advanced=True, action='append',
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
-    register('--confs', type=list_option, default=['default'],
+    register('--confs', advanced=True, type=list_option, default=['default'],
              help='Compile for these Ivy confs.')
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
     # https://github.com/pantsbuild/pants/issues/1351
-    register('--clear-invalid-analysis', default=False, action='store_true',
-             advanced=True,
+    register('--clear-invalid-analysis', advanced=True, default=False, action='store_true',
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
 
-    register('--warning-args', action='append', default=list(cls.get_warning_args_default()),
-             advanced=True,
+    register('--warning-args', advanced=True, action='append',
+             default=list(cls.get_warning_args_default()),
              help='Extra compiler args to use when warnings are enabled.')
 
-    register('--no-warning-args', action='append', default=list(cls.get_no_warning_args_default()),
-             advanced=True,
+    register('--no-warning-args', advanced=True, action='append',
+             default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--strategy', choices=['global', 'isolated'], default='global', fingerprint=True,
+    register('--strategy', advanced=True, choices=['global', 'isolated'], default='global',
+             fingerprint=True,
              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
 
-    register('--delete-scratch', default=True, action='store_true',
+    register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
     JvmCompileGlobalStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)

@@ -31,6 +31,8 @@ _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 
 class ZincCompile(JvmCompile):
+  """Compile Scala and Java code using Zinc."""
+
   _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
 
   _name = 'zinc'
@@ -69,11 +71,11 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', action='append', fingerprint=True,
+    register('--plugins', advanced=True, action='append', fingerprint=True,
              help='Use these scalac plugins.')
     register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
-    register('--name-hashing', action='store_true', default=False, fingerprint=True,
+    register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
 
     cls.register_jvm_tool(register,

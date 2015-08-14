@@ -1,3 +1,13 @@
+target(
+  name='tasks',
+  dependencies=[
+    ':go_compile',
+    ':go_fetch',
+    ':go_run',
+    ':go_test',
+  ]
+)
+
 python_library(
   name='go_compile',
   sources=['go_compile.py'],
@@ -15,6 +25,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
   ]

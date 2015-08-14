@@ -25,7 +25,7 @@ def build_file_aliases():
   )
 
 def register_goals():
-  task(name='cpp-compile', action=CppCompile).install('compile')
-  task(name='cpp-library', action=CppLibraryCreate).install('binary')
-  task(name='cpp-binary', action=CppBinaryCreate).install('binary')
-  task(name='cpp-run', action=CppRun).install('run')
+  task(name='cpp', action=CppCompile).install('compile')
+  task(name='cpplib', action=CppLibraryCreate).install('binary')
+  task(name='cpp', action=CppBinaryCreate).install('binary')
+  task(name='cpp', action=CppRun).install('run')

@@ -27,8 +27,9 @@ class OptionHelpFormatterTest(unittest.TestCase):
     args = ['--foo']
     kwargs = {'advanced': True}
     lines = HelpFormatter(scope='', show_advanced=False, color=False).format_options(
-      '', [(args, kwargs)])
+      '', '', [(args, kwargs)])
     self.assertEquals(0, len(lines))
     lines = HelpFormatter(scope='', show_advanced=True, color=False).format_options(
-      '', [(args, kwargs)])
-    self.assertEquals(4, len(lines))
+      '', '', [(args, kwargs)])
+    print(lines)
+    self.assertEquals(5, len(lines))

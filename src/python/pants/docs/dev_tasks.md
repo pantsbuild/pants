@@ -134,14 +134,22 @@ scope from the cmd-line flag name. For example, instead of
 `./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`. See
 [[Invoking Pants|pants('src/docs:invoking')]] for more information.
 
-### Fine-tuning Options (aka "Option Options")
+### Fine-tuning Options
 
 When calling the `register` function, passing a few additional arguments
 will affect the behaviour of the registered option. The most common parameters are:
 
 - `type`: Constrains the type of the option. Takes a python type constructor (like `int`), or a
-  type like `Options.list` from [pants.option.options.Options](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py). If not specified, the option will be a string.
+  constructor like `list_option` from [pants.option.custom_types](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py). If not specified, the option will be a string.
 - `default`: Sets a default value that will be used if the option is not specified by the user.
+- `action`: A string action that specifies that passing the registered option should do something other than
+  set a literal value (which is the default when no `action` is specified.) The two most common actions are:
+    - *store_true*: Causes the presence of the option to set the option value to `True`. Also automatically
+    creates an inverse option prefixed with "--no-".
+    - *append*: If an option is specified multiple times, the `append` action will append them to a list
+    representing the option's value.
+- `advanced`: Indicates that an option is intended either for use by power users, or for use in
+  pants.ini. By default, advanced options are not displayed in `./pants help`.
 - `fingerprint`: Indicates that the value of the registered option affects the products
   of the task, such that changing the option would result in different products. When `True`,
   changing the option will cause targets built by the task to be invalidated and rebuilt.

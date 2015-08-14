@@ -255,6 +255,9 @@ migrations = {
   ('compile.zinc-java', 'enabled'): ('compile.java', 'use-jmake'),
 
   ('compile.scala', 'args'): ('compile.zinc', 'args'),
+
+  ('compile.cpp-compile', 'cc_options'): ('compile.cpp', 'cc_options'),
+  ('compile.cpp-compile', 'cc_extensions'): ('compile.cpp', 'cc_extensions'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -352,6 +355,11 @@ notes = {
                                     'to "disable jmake for java", more precisely, instead of '
                                     '--compile-zinc-java-enabled, use --no-compile-java-use-jmake',
   ('compile.scala', 'args'): 'ALL `compile.scala` options have moved to `compile.zinc`.',
+
+  ('compile.cpp-compile', 'cc_options'): 'Value used to be a string, is now a list.',
+  ('compile.cpp-compile', 'cc_extensions'): 'Value used to be a string (but default was a list), '
+                                            'is now a list. Values also now include the dot, e.g.,'
+                                            'it\'s now .cpp, not cpp.',
 }
 
 
