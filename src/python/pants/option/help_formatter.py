@@ -33,7 +33,7 @@ class HelpFormatter(object):
   def _maybe_color(self, color, s):
     return color(s) if self._color else s
 
-  def format_options(self, header, registration_args):
+  def format_options(self, scope, description, registration_args):
     """Return a help message for the specified options.
 
     :param registration_args: A list of (args, kwargs) pairs, as passed in to options registration.
@@ -43,9 +43,13 @@ class HelpFormatter(object):
     def add_option(category, ohis):
       if ohis:
         lines.append('')
-        lines.append(self._maybe_blue('{}{}{} options:'.format(header,
-                                                               ' ' if category else '',
-                                                               category)))
+        if category:
+          lines.append(self._maybe_blue('{} {} options:'.format(scope, category)))
+        else:
+          lines.append(self._maybe_blue('{}:'.format(scope)))
+          if description:
+            lines.append(description)
+        lines.append(' ')
         for ohi in ohis:
           lines.extend(self.format_option(ohi))
     add_option('', oshi.basic)

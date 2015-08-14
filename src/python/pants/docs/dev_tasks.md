@@ -38,12 +38,12 @@ Task Installation: Associate Task with Goal[s]
 
 Defining a Task is nice, but doesn't hook it up so users can get to it.
 *Install* a task to make it available to users. To do this, you register
-it with Pants, associating it with a goal. A plugin's `register.py`
+it with Pants, associating it with a goal. A [[plugin's|pants('src/python/pants/docs:howto_plugin')]] `register.py`
 registers goals in its `register_goals` function. Here's an excerpt from
-[Pants' own JVM
-backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/register.py):
+[Pants' own Python
+backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py):
 
-!inc[start-after=pants/issues/604 register_goals&end-before=Compilation](../backend/jvm/register.py)
+!inc[start-at=def register_goals&end-at=Python projects from python_library](../backend/python/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
@@ -51,6 +51,22 @@ installs the task in a goal with the same name. To install a task in
 goal `foo`, use `Goal.by_name('foo').install`. You can install more than
 one task in a goal; e.g., there are separate tasks to run Java tests and
 Python tests; but both are in the `test` goal.
+
+Products: How one Task consumes the output of another
+---------------------------------------------------
+
+One task might need to consume the "products" (outputs) of another. E.g., the Java test runner
+task uses Java `.class` files that the Java compile task produces. Pants
+tasks keep track of this in the
+[pants.goal.products.ProductMapping](https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/products.py)
+that is provided in the task's context at `self.context.products`.
+
+The `ProductMapping` is basically a dict. Calling
+`self.context.products.get('jar_dependencies')` looks up
+`jar_dependencies` in that dict. Tasks can set/change the value stored
+at that key; later tasks can read (and perhaps further change) that
+value. That value might be, say, a dictionary that maps target specs to
+file paths.
 
 `product_types` and `require_data`: Why "test" comes after "compile"
 --------------------------------------------------------------------
@@ -63,12 +79,12 @@ tell Pants about these inter-task dependencies...
 The "early" task class defines a `product_types` class method that
 returns a list of strings:
 
-!inc[start-after=pants/issues/604 product_types start&end-before=pants/issues/604 product_types finish](../backend/jvm/tasks/ivy_imports.py)
+!inc[start-at=  def product_types&end-at=resources_by_target](../backend/jvm/tasks/resources_task.py)
 
 The "late" task defines a `prepare` method that calls
 `round_manager.require_data` to "require" one of those same strings:
 
-!inc[start-after=pants/issues/604 prep start&end-before=pants/issues/604 prep finish](../backend/codegen/tasks/protobuf_gen.py)
+!inc[start-at=  def prepare&end-at=resources_by_target](../backend/jvm/tasks/detect_duplicates.py)
 
 Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
@@ -84,39 +100,26 @@ this function to find out which targets to generate the product for:
 
 !inc[start-at=isrequired('jar_dependencies')&end-before=def](../backend/jvm/tasks/ivy_resolve.py)
 
-Products Map: how one task uses products of another
----------------------------------------------------
-
-One task might need the products of another. E.g., the Java test runner
-task uses Java `.class` files that the Java compile task produces. Pants
-tasks keep track of this in a
-[pants.goal.products.ProductMapping.](https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/products.py)
-
-The `ProductMapping` is basically a dict. Calling
-`self.context.products.get('jar_dependencies')` looks up
-`jar_dependencies` in that dict. Tasks can set/change the value stored
-at that key; later tasks can read (and perhaps further change) that
-value. That value might be, say, a dictionary that maps target specs to
-file paths.
-
 Task Configuration
 ------------------
 
-Tasks may be configured via options.
+Tasks may be configured via the options system.
 
-To define an option, handle your Task's `register_options`
+To define an option, implement your Task's `register_options`
 class method and call the passed-in `register` function:
 
-!inc[start-after=ListGoals&end-before=console_output](../backend/core/tasks/list_goals.py)
+!inc[start-at=  def register_options&end-before=--confs](../backend/jvm/tasks/checkstyle.py)
 
 Option values are available via `self.get_options()`:
 
     :::python
-    # Did user pass in the --my-option CLI flag (or set it in .ini)?
+    # Did user pass in the --my-option CLI flag (or set it in pants.ini)?
     if self.get_options().my_option:
 
-Every task has an options scope: If the task is registered as `task` in goal `goal`, then its
-scope is `goal.task`, unless goal and task are the same string, in which case the scope is simply
+### Scopes
+
+Every task has an options *scope*: If the task is registered as `my-task` in goal `my-goal`, then its
+scope is `my-goal.my-task`, unless goal and task are the same string, in which case the scope is simply
 that string. For example, the `JavaCompile` task has scope `compile.java`, and the `filemap`
 task has the scope `filemap`.
 
@@ -124,11 +127,32 @@ The scope is used to set options values. E.g., the value of `self.get_options().
 task with scope `scope` is set by, in this order:
   - The value of the cmd-line flag `--scope-my-option`.
   - The value of the environment variable `PANTS_SCOPE_MY_OPTION`.
-  - The value of the config var `my_option` in section `scope`.
+  - The value of the pants.ini var `my_option` in section `scope`.
 
 Note that if the task being run is specified explicitly on the command line, you can omit the
 scope from the cmd-line flag name. For example, instead of
-`./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`.
+`./pants compile --compile-java-foo-bar` you can do `./pants compile.java --foo-bar`. See
+[[Invoking Pants|pants('src/docs:invoking')]] for more information.
+
+### Fine-tuning Options
+
+When calling the `register` function, passing a few additional arguments
+will affect the behaviour of the registered option. The most common parameters are:
+
+- `type`: Constrains the type of the option. Takes a python type constructor (like `int`), or a
+  constructor like `list_option` from [pants.option.custom_types](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py). If not specified, the option will be a string.
+- `default`: Sets a default value that will be used if the option is not specified by the user.
+- `action`: A string action that specifies that passing the registered option should do something other than
+  set a literal value (which is the default when no `action` is specified.) The two most common actions are:
+    - *store_true*: Causes the presence of the option to set the option value to `True`. Also automatically
+    creates an inverse option prefixed with "--no-".
+    - *append*: If an option is specified multiple times, the `append` action will append them to a list
+    representing the option's value.
+- `advanced`: Indicates that an option is intended either for use by power users, or for use in
+  pants.ini. By default, advanced options are not displayed in `./pants help`.
+- `fingerprint`: Indicates that the value of the registered option affects the products
+  of the task, such that changing the option would result in different products. When `True`,
+  changing the option will cause targets built by the task to be invalidated and rebuilt.
 
 
 GroupTask

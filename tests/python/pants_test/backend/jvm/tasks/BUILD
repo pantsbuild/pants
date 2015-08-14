@@ -161,6 +161,7 @@ python_tests(
   ]
 )
 
+
 python_tests(
   name = 'junit_run',
   sources = ['test_junit_run.py'],
@@ -176,6 +177,7 @@ python_tests(
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
@@ -253,6 +255,14 @@ python_tests(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/tasks:task_test_base',
   ]
+)
+
+python_tests(
+  name = 'scala_repl_integration',
+  sources = ['test_scala_repl_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(

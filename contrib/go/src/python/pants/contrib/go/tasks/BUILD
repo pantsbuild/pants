@@ -1,0 +1,75 @@
+target(
+  name='tasks',
+  dependencies=[
+    ':go_compile',
+    ':go_fetch',
+    ':go_run',
+    ':go_test',
+  ]
+)
+
+python_library(
+  name='go_compile',
+  sources=['go_compile.py'],
+  dependencies=[
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
+  ]
+)
+
+python_library(
+  name='go_fetch',
+  sources=['go_fetch.py'],
+  dependencies=[
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
+  ]
+)
+
+python_library(
+  name='go_run',
+  sources=['go_run.py'],
+  dependencies=[
+    'src/python/pants/base:exceptions',
+    'src/python/pants/process',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
+  ]
+)
+
+python_library(
+  name='go_task',
+  sources=['go_task.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:memo',
+    'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go/targets:go_library',
+    'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+  ]
+)
+
+python_library(
+  name='go_test',
+  sources=['go_test.py'],
+  dependencies=[
+    'src/python/pants/base:workunit',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
+  ]
+)
+
+python_library(
+  name='go_workspace_task',
+  sources=['go_workspace_task.py'],
+  dependencies=[
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
+  ]
+)

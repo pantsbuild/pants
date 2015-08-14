@@ -231,3 +231,14 @@ def touch(path, times=None):
 
   with safe_open(path, 'a'):
     os.utime(path, times)
+
+
+def get_basedir(path):
+  """Returns the base directory of a path.
+
+  Examples:
+    get_basedir('foo/bar/baz') --> 'foo'
+    get_basedir('/foo/bar/baz') --> ''
+    get_basedir('foo') --> 'foo'
+  """
+  return path[:path.index(os.sep)] if os.sep in path else path

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import copy
 import os
 import unittest
 from collections import defaultdict
@@ -28,14 +27,11 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
-from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options import Options
-from pants.option.ranked_value import RankedValue
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
-from pants_test.option.util.fakes import create_option_values, options_registration_function
+from pants_test.option.util.fakes import create_options_for_optionables
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
@@ -146,73 +142,33 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None):
-    for_task_types = for_task_types or []
-    options = options or {}
+  def context(self, for_task_types=None, options=None, target_roots=None, console_outstream=None,
+              workspace=None):
 
-    option_values = defaultdict(dict)
-    registered_subsystems = set()
-    bootstrap_option_values = None  # We fill these in after registering bootstrap options.
+    optionables = set()
+    extra_scopes = set()
 
-    # We provide our own test-only registration implementation, bypassing argparse.
-    # When testing we set option values directly, so we don't care about cmd-line flags, config,
-    # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
-    # All this does is make the names available in code, with the default values.
-    # Individual tests can then override the option values they care about.
-    def register_func(on_scope):
-      scoped_options = option_values[on_scope]
-      register = options_registration_function(scoped_options)
-      register.bootstrap = bootstrap_option_values
-      register.scope = on_scope
-      return register
-
-    # TODO: This sequence is a bit repetitive of the real registration sequence.
-
-    # Register bootstrap options and grab their default values for use in subsequent registration.
-    GlobalOptionsRegistrar.register_bootstrap_options(register_func(Options.GLOBAL_SCOPE))
-    bootstrap_option_values = create_option_values(copy.copy(option_values[Options.GLOBAL_SCOPE]))
-
-    # Now register the full global scope options.
-    GlobalOptionsRegistrar.register_options(register_func(Options.GLOBAL_SCOPE))
-
-    # Now register task and subsystem options for relevant tasks.
+    for_task_types = for_task_types or ()
     for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
-      task_type.register_options(register_func(scope))
-      for subsystem in Subsystem.closure(set(task_type.global_subsystems()) |
-                                         set(task_type.task_subsystems()) |
-                                         self._build_configuration.subsystems()):
-        if subsystem not in registered_subsystems:
-          subsystem.register_options(register_func(subsystem.options_scope))
-          registered_subsystems.add(subsystem)
+      optionables.add(task_type)
+      extra_scopes.update([si.scope for si in task_type.known_scope_infos()])
+      optionables.update(Subsystem.closure(set(task_type.global_subsystems()) |
+                                           set(task_type.task_subsystems()) |
+                                           self._build_configuration.subsystems()))
 
-    # Now default option values override with any caller-specified values.
+    # Now default the option values and override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
+    options = options.copy() if options else {}
+    for s, opts in self.options.items():
+      scoped_opts = options.setdefault(s, {})
+      scoped_opts.update(opts)
 
-    for scope, opts in options.items():
-      for key, val in opts.items():
-        option_values[scope][key] = val
-
-    for scope, opts in self.options.items():
-      for key, val in opts.items():
-        option_values[scope][key] = val
-
-    # Make inner scopes inherit option values from their enclosing scopes.
-    all_scopes = set(option_values.keys())
-    for task_type in for_task_types:  # Make sure we know about pre-task subsystem scopes.
-      all_scopes.update([si.scope for si in task_type.known_scope_infos()])
-    # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
-    # and therefore only have to inherit from our immediately enclosing scope.
-    for scope in sorted(all_scopes):
-      if scope != Options.GLOBAL_SCOPE:
-        enclosing_scope = scope.rpartition('.')[0]
-        opts = option_values[scope]
-        for key, val in option_values.get(enclosing_scope, {}).items():
-          if key not in opts:  # Inner scope values override the inherited ones.
-            opts[key] = val
+    option_values = create_options_for_optionables(optionables,
+                                                   extra_scopes=extra_scopes,
+                                                   options=options)
 
     context = create_context(options=option_values,
                              target_roots=target_roots,
@@ -227,6 +183,7 @@ class BaseTest(unittest.TestCase):
   def tearDown(self):
     SourceRoot.reset()
     FilesystemBuildFile.clear_cache()
+    Subsystem.reset()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.
@@ -320,11 +277,13 @@ class BaseTest(unittest.TestCase):
     in the context, which holds the classpath value for targets.
 
     :param context: The execution context where the products data mapping lives.
-    :param classpath: a list of classpath strings. If not specified, [os.path.join(self.buildroot, 'none')] will be used.
+    :param classpath: a list of classpath strings. If not specified,
+                      [os.path.join(self.buildroot, 'none')] will be used.
     """
     classpath = classpath or [os.path.join(self.build_root, 'none')]
     compile_classpaths = context.products.get_data('compile_classpath', lambda: UnionProducts())
-    compile_classpaths.add_for_targets(context.targets(), [('default', entry) for entry in classpath])
+    compile_classpaths.add_for_targets(context.targets(),
+                                       [('default', entry) for entry in classpath])
 
   @contextmanager
   def add_data(self, context_products, data_type, target, *products):

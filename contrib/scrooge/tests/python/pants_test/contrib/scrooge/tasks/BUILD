@@ -36,7 +36,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/goal:context',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/option/util',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

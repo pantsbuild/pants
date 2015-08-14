@@ -83,6 +83,19 @@ Use Apache Thrift compiler (the default):
       # maybe set an rpc_style
     )
 
+**Android**
+
+Scrooge compiler can now generate java code with a limited number of getters and
+setters which is more suitable for Android applications which have a 65K limit on the
+number of methods.
+
+    :::python
+    java_thrift_library(  # Yes, a "java" library to generate Scala
+      compiler='scrooge', # default compiler does not gen android; Scrooge does
+      language='android',
+    )
+
+
 Thrift Example
 --------------
 

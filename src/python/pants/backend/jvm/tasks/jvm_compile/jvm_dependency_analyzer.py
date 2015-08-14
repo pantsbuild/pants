@@ -88,9 +88,9 @@ class JvmDependencyAnalyzer(object):
       def register_transitive_jars_for_ref(ivyinfo, ref):
         deps_by_ref_memo = {}
 
-        def get_transitive_jars_by_ref(ref1, visited=None):
+        def get_transitive_jars_by_ref(ref1):
           def create_collection(current_ref):
-            return set(ivyinfo.modules_by_ref[current_ref].artifacts)
+            return {ivyinfo.modules_by_ref[current_ref].artifact}
           return ivyinfo.traverse_dependency_graph(ref1, create_collection, memo=deps_by_ref_memo)
 
         target_key = (ref.org, ref.name)
@@ -98,9 +98,9 @@ class JvmDependencyAnalyzer(object):
           # These targets provide all the jars in ref, and all the jars ref transitively depends on.
           jarlib_targets = jarlibs_by_id[target_key]
 
-          for jar in get_transitive_jars_by_ref(ref):
+          for jar_path in get_transitive_jars_by_ref(ref):
             # Register that each jarlib_target provides jar (via all its symlinks).
-            symlink = all_symlinks_map.get(os.path.realpath(jar.path), None)
+            symlink = all_symlinks_map.get(os.path.realpath(jar_path), None)
             if symlink:
               for jarlib_target in jarlib_targets:
                 targets_by_file[symlink].add(jarlib_target)

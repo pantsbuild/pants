@@ -14,7 +14,6 @@ from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_boolean_flag
 from pants.option.options import Options
-from pants.option.scope import ScopeInfo
 
 
 class OptionsBootstrapper(object):
@@ -64,7 +63,7 @@ class OptionsBootstrapper(object):
 
       def bootstrap_options_from_config(config):
         bootstrap_options = Options(env=self._env, config=config,
-            known_scope_infos=[ScopeInfo.for_global_scope()], args=bargs)
+            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs)
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
         GlobalOptionsRegistrar.register_bootstrap_options(register_global)

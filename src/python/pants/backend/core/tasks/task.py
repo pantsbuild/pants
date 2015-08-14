@@ -52,6 +52,8 @@ class TaskBase(Optionable, AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+  options_scope_category = ScopeInfo.TASK
+
   # Tests may override this to provide a stable name despite the class name being a unique,
   # synthetic name.
   _stable_name = None
@@ -100,10 +102,10 @@ class TaskBase(Optionable, AbstractClass):
   def known_scope_infos(cls):
     """Yields ScopeInfo for all known scopes for this task, in no particular order."""
     # The task's own scope.
-    yield ScopeInfo(cls.options_scope, ScopeInfo.TASK)
+    yield cls.get_scope_info()
     # The scopes of any task-specific subsystems it uses.
     for subsystem in cls.task_subsystems():
-      yield ScopeInfo(subsystem.subscope(cls.options_scope), ScopeInfo.TASK_SUBSYSTEM)
+      yield subsystem.get_scope_info(subscope=cls.options_scope)
 
   @classmethod
   def supports_passthru_args(cls):

@@ -61,8 +61,7 @@ class IvyTaskMixin(object):
 
   The creation of the 'ivy_resolve_symlink_map' product is a side effect of
   running `def ivy_resolve`. The product is a map of paths in Ivy's resolve cache to
-  stable locations within the working copy. To consume the map, consume a parsed Ivy
-  report which will give you IvyArtifact instances: the artifact path is key.
+  stable locations within the working copy.
   """
 
   @classmethod
