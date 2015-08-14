@@ -44,3 +44,51 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
           elif _POST.match(line):
             post = True
         self.assertTrue(init and pre and post)
+
+  INFO_LEVEL_COMPILE_MSG='Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
+  DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
+
+  def test_ouput_level_warn(self):
+    command = ['compile', '--compile-java-strategy=isolated',
+               'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-level=warn']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertFalse(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+    self.assertFalse(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+
+  def test_output_level_info(self):
+    command = ['compile', '--compile-java-strategy=isolated',
+               'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-level=info']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+    self.assertFalse(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+
+  def test_output_level_debug(self):
+    command = ['compile', '--compile-java-strategy=isolated',
+               'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-level=debug']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+    self.assertTrue(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+
+  def test_output_color_enabled(self):
+    command = ['compile', '--compile-java-strategy=isolated',
+               'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-colors']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertTrue(self.INFO_LEVEL_COMPILE_MSG + '\x1b[0m' in pants_run.stdout_data)
+
+  def test_output_level_group_compile(self):
+    """Set level with the scope 'compile' and see that it propagates to the task level."""
+    command = ['compile', '--compile-java-strategy=isolated',
+               'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-level=debug']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+    self.assertTrue(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)

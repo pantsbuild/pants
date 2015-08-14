@@ -11,7 +11,8 @@ from pants.java.nailgun_executor import NailgunExecutor
 
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
-                 workunit_factory=None, workunit_name=None, workunit_labels=None, cwd=None):
+                 workunit_factory=None, workunit_name=None, workunit_labels=None,
+                 cwd=None, workunit_log_config=None):
   """Executes the java program defined by the classpath and main.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -26,6 +27,7 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   :param string workunit_name: an optional name for the work unit; defaults to the main
   :param list workunit_labels: an optional sequence of labels for the work unit
   :param string cwd: optionally set the working directory
+  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
 
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -41,11 +43,12 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                         workunit_factory=workunit_factory,
                         workunit_name=workunit_name,
                         workunit_labels=workunit_labels,
-                        cwd=cwd)
+                        cwd=cwd,
+                        workunit_log_config=workunit_log_config)
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-    cwd=None):
+                   cwd=None, workunit_log_config=None):
   """Executes the given java runner.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -55,6 +58,7 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   :param string workunit_name: an optional name for the work unit; defaults to the main
   :param list workunit_labels: an optional sequence of labels for the work unit
   :param string cwd: optionally set the working directory
+  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
 
   Returns the exit code of the java runner.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -68,10 +72,12 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   else:
     workunit_labels = [
         WorkUnit.TOOL,
-        WorkUnit.NAILGUN if isinstance(runner.executor, NailgunExecutor) else WorkUnit.JVM
+        WorkUnit.NAILGUN if isinstance(runner.executor,
+                                       NailgunExecutor) else WorkUnit.JVM
     ] + (workunit_labels or [])
 
-    with workunit_factory(name=workunit_name, labels=workunit_labels, cmd=runner.cmd) as workunit:
+    with workunit_factory(name=workunit_name, labels=workunit_labels,
+                          cmd=runner.cmd, log_config=workunit_log_config) as workunit:
       ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
       return ret

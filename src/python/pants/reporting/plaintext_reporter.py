@@ -112,7 +112,7 @@ class PlainTextReporter(Reporter):
     # useful way to display it on the console.
     elements = [e if isinstance(e, six.string_types) else e[0] for e in msg_elements]
     msg = b'\n' + b''.join(elements)
-    if self.settings.color:
+    if self.use_color_for_workunit(workunit, self.settings.color):
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
 
     self.emit(self._prefix(workunit, msg))

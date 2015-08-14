@@ -65,7 +65,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
       return SubprocessExecutor(self._dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
-              workunit_labels=None):
+              workunit_labels=None, workunit_log_config=None):
     """Runs the java main using the given classpath and args.
 
     If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
@@ -81,7 +81,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                executor=executor,
                                workunit_factory=self.context.new_workunit,
                                workunit_name=workunit_name,
-                               workunit_labels=workunit_labels)
+                               workunit_labels=workunit_labels,
+                               workunit_log_config=workunit_log_config)
     except executor.Error as e:
       raise TaskError(e)
 

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, deque
+from contextlib import contextmanager
 
 from pants.backend.core.tasks.task import Task, TaskBase
 from pants.base.build_graph import invert_dependencies
@@ -331,9 +332,19 @@ class GroupTask(Task):
     """GroupTask must be sub-classed to provide a group name."""
 
   def execute(self):
+
+    @contextmanager
+    def workunit_for(group_member, desc):
+      log_config = WorkUnit.LogConfig(
+        level=group_member.get_options().level, colors=group_member.get_options().colors)
+      with self.context.new_workunit(name='{}-{}'.format(group_member.name(), desc),
+                                     log_config=log_config) as workunit:
+        yield workunit
+
     with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):
       for group_member in self._group_members:
-        group_member.pre_execute()
+        with workunit_for(group_member, 'pre'):
+          group_member.pre_execute()
 
       # TODO(John Sirois): implement group-level invalidation? This might be able to be done in
       # prepare_execute though by members.
@@ -353,12 +364,15 @@ class GroupTask(Task):
 
       # prep
       for group_member, chunks in chunks_by_member.items():
-        group_member.prepare_execute(chunks)
+        with workunit_for(group_member, 'prepare'):
+          group_member.prepare_execute(chunks)
 
       # chunk zig zag
       for group_member, chunk in ordered_chunks:
-        group_member.execute_chunk(chunk)
+        with workunit_for(group_member, 'execute'):
+          group_member.execute_chunk(chunk)
 
       # finalize
       for group_member in self._group_members:
-        group_member.post_execute()
+        with workunit_for(group_member, 'post'):
+          group_member.post_execute()

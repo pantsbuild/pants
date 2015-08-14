@@ -104,6 +104,7 @@ class BaseGroupTaskTest(BaseTest):
 
   def setUp(self):
     super(BaseGroupTaskTest, self).setUp()
+    self.set_options_for_scope('test.RecordingGroupMember', level='info', colors='False')
 
     self.maxDiff = None
 
