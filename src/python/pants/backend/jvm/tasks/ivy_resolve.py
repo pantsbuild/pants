@@ -40,6 +40,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
     register('--override', action='append',
+             fingerprint=True,
              help='Specifies a jar dependency override in the form: '
              '[org]#[name]=(revision|url) '
              'Multiple overrides can be specified using repeated invocations of this flag. '
@@ -58,6 +59,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     register('--confs', action='append', default=['default'],
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--mutable-pattern',
+             fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
     cls.register_jvm_tool(register, 'xalan')
