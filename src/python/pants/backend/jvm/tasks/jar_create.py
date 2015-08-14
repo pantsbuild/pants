@@ -39,6 +39,7 @@ class JarCreate(JarTask):
   def register_options(cls, register):
     super(JarCreate, cls).register_options(register)
     register('--compressed', default=True, action='store_true',
+             fingerprint=True,
              help='Create compressed jars.')
 
   @classmethod

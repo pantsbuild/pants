@@ -73,6 +73,7 @@ class JmakeCompile(JvmCompile):
   def register_options(cls, register):
     super(JmakeCompile, cls).register_options(register)
     register('--use-jmake', advanced=True, action='store_true', default=True,
+             fingerprint=True,
              help='Use jmake to compile Java targets')
     register('--source', advanced=True, fingerprint=True,
              help='Provide source compatibility with this release. Overrides the jvm platform '

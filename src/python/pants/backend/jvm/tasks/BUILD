@@ -430,6 +430,7 @@ python_library(
     ':nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
+    'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/util:dirutil'
   ],

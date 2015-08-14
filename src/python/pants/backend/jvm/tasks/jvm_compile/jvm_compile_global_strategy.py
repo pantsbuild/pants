@@ -36,6 +36,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
   @classmethod
   def register_options(cls, register, compile_task_name, supports_concurrent_execution):
     register('--missing-deps', advanced=True, choices=['off', 'warn', 'fatal'], default='warn',
+             fingerprint=True,
              help='Check for missing dependencies in code compiled with {0}. Reports actual '
                   'dependencies A -> B where there is no transitive BUILD file dependency path '
                   'from A to B. If fatal, missing deps are treated as a build error.'.format(
@@ -43,6 +44,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     register('--missing-direct-deps', advanced=True, choices=['off', 'warn', 'fatal'],
              default='off',
+             fingerprint=True,
              help='Check for missing direct dependencies in code compiled with {0}. Reports actual '
                   'dependencies A -> B where there is no direct BUILD file dependency path from '
                   'A to B. This is a very strict check; In practice it is common to rely on '
@@ -52,9 +54,11 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                   'on occasion. '.format(compile_task_name))
 
     register('--missing-deps-whitelist', advanced=True, type=list_option,
+             fingerprint=True,
              help="Don't report these targets even if they have missing deps.")
 
     register('--unnecessary-deps', advanced=True, choices=['off', 'warn', 'fatal'], default='off',
+             fingerprint=True,
              help='Check for declared dependencies in code compiled with {0} that are not needed. '
                   'This is a very strict check. For example, generated code will often '
                   'legitimately have BUILD dependencies that are unused in practice.'.format(
