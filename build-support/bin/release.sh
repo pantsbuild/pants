@@ -55,8 +55,6 @@ PKG_PANTS_BACKEND_ANDROID=(
   "pkg_pants_backend_android_install_test"
 )
 function pkg_pants_backend_android_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.backend.android==$(local_version) && \
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.backend.android']" \
     goals | grep "apk" &> /dev/null
@@ -93,7 +91,7 @@ function execute_packaged_pants_with_internal_backends() {
 
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  pants \
+  PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[ \
         'internal_backend.optional', \

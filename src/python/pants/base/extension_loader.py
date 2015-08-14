@@ -28,8 +28,8 @@ def load_plugins_and_backends(plugins, working_set, backends):
   """Load named plugins and source backends
 
   :param list<str> plugins: Plugins to load (see `load_plugins`).
-  :param list<str> backends: Source backends to load (see `load_build_configuration_from_source`).
   :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
+  :param list<str> backends: Source backends to load (see `load_build_configuration_from_source`).
   """
   build_configuration = BuildConfiguration()
   load_plugins(build_configuration, plugins or [], working_set)
