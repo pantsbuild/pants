@@ -1,6 +1,130 @@
 RELEASE HISTORY
 ===============
 
+0.0.42 (8/14/2025)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This was #docfixit week, so the release contains more doc and help improvements than usual.
+Thanks in particular to Benjy for continued `./pants help` polish!
+
+This release also add support for golang in the `contrib/go` package. Thanks to Cody Gibb and
+John Sirois for that work.
+
+API Changes
+~~~~~~~~~~~
+
+* Elevate the pants version to a first class option
+  `RB #2627 <https://rbcommons.com/s/twitter/r/2627>`_
+
+* Support pants plugin resolution for easier inclusion of published plugins
+  `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
+  `RB #2622 <https://rbcommons.com/s/twitter/r/2622>`_
+
+* Pin pex==1.0.3, alpha-sort & remove line breaks
+  `RB #2598 <https://rbcommons.com/s/twitter/r/2598>`_
+  `RB #2596 <https://rbcommons.com/s/twitter/r/2596>`_
+
+* Moved classifier from IvyArtifact to IvyModuleRef
+  `RB #2579 <https://rbcommons.com/s/twitter/r/2579>`_
+
+Bugfixes
+~~~~~~~~
+
+* Ignore 'NonfatalArtifactCacheError' when calling the artifact cache in the background
+  `RB #2624 <https://rbcommons.com/s/twitter/r/2624>`_
+
+* Re-Add debug option to benchmark run task, complain on no jvm targets, add test
+  `RB #2619 <https://rbcommons.com/s/twitter/r/2619>`_
+
+* Fixed what_changed for removed files
+  `RB #2589 <https://rbcommons.com/s/twitter/r/2589>`_
+
+* Disable jvm-platform-analysis by default
+  `Issue #1972 <https://github.com/pantsbuild/pants/issues/1972>`_
+  `RB #2618 <https://rbcommons.com/s/twitter/r/2618>`_
+
+* Fix ./pants help_advanced
+  `RB #2616 <https://rbcommons.com/s/twitter/r/2616>`_
+
+* Fix some more missing globs in build-file-rev mode.
+  `RB #2591 <https://rbcommons.com/s/twitter/r/2591>`_
+
+* Make jvm bundles output globs in filedeps with --globs.
+  `RB #2583 <https://rbcommons.com/s/twitter/r/2583>`_
+
+* Fix more realpath issues
+  `Issue #1933 <https://github.com/pantsbuild/pants/issues/1933>`_
+  `RB #2582 <https://rbcommons.com/s/twitter/r/2582>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow plaintext-reporter to be able to respect a task's --level and --colors options.
+  `RB #2580 <https://rbcommons.com/s/twitter/r/2580>`_
+  `RB #2614 <https://rbcommons.com/s/twitter/r/2614>`_
+
+* contrib/go: Support for Go
+  `RB #2544 <https://rbcommons.com/s/twitter/r/2544>`_
+
+* contrib/go: Setup a release sdist
+  `RB #2609 <https://rbcommons.com/s/twitter/r/2609>`_
+
+* contrib/go: Remote library support
+  `RB #2611 <https://rbcommons.com/s/twitter/r/2611>`_
+  `RB #2623 <https://rbcommons.com/s/twitter/r/2623>`_
+
+* contrib/go: Introduce GoDistribution
+  `RB #2595 <https://rbcommons.com/s/twitter/r/2595>`_
+
+* contrib/go: Integrate GoDistribution with GoTask
+  `RB #2600 <https://rbcommons.com/s/twitter/r/2600>`_
+
+* Add support for android compilation with contrib/scrooge
+  `RB #2553 <https://rbcommons.com/s/twitter/r/2553>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added more testimonials to the Powered By page. #docfixit
+  `RB #2625 <https://rbcommons.com/s/twitter/r/2625>`_
+
+* Fingerprint more task options; particularly scalastyle configs
+  `RB #2628 <https://rbcommons.com/s/twitter/r/2628>`_
+
+* Fingerprint jvm tools task options by default
+  `RB #2620 <https://rbcommons.com/s/twitter/r/2620>`_
+
+* Make most compile-related options advanced. #docfixit
+  `RB #2617 <https://rbcommons.com/s/twitter/r/2617>`_
+
+* Make almost all global options advanced. #docfixit
+  `RB #2602 <https://rbcommons.com/s/twitter/r/2602>`_
+
+* Improve cmd-line help output. #docfixit
+  `RB #2599 <https://rbcommons.com/s/twitter/r/2599>`_
+
+* Default `-Dscala.usejavacp=true` for ScalaRepl.
+  `RB #2613 <https://rbcommons.com/s/twitter/r/2613>`_
+
+* Additional Option details for the Task developers guide. #docfixit
+  `RB #2594 <https://rbcommons.com/s/twitter/r/2594>`_
+  `RB #2612 <https://rbcommons.com/s/twitter/r/2612>`_
+
+* Improve subsystem testing support in subsystem_util.
+  `RB #2603 <https://rbcommons.com/s/twitter/r/2603>`_
+
+* Cleanups to the tasks developer's guide #docfixit
+  `RB #2594 <https://rbcommons.com/s/twitter/r/2594>`_
+
+* Add the optionable class to ScopeInfo. #docfixit
+  `RB #2588 <https://rbcommons.com/s/twitter/r/2588>`_
+
+* Add `pants_plugin` and `contrib_plugin` targets.
+  `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
+
 0.0.41 (8/7/2025)
 -----------------
 
