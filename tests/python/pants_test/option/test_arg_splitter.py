@@ -8,8 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import shlex
 import unittest
 
-from pants.option.arg_splitter import (ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
-                                       VersionHelp)
+from pants.option.arg_splitter import ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp
 from pants.option.scope import ScopeInfo
 
 
@@ -49,7 +48,6 @@ class ArgSplitterTest(unittest.TestCase):
     self.assertEquals(expected_help_all,
                       (isinstance(splitter.help_request, OptionsHelp) and
                        splitter.help_request.all_scopes))
-    self.assertFalse(isinstance(splitter.help_request, VersionHelp))
 
   def _split_help(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
                   expected_help_advanced=False, expected_help_all=False):
@@ -58,11 +56,6 @@ class ArgSplitterTest(unittest.TestCase):
                 expected_is_help=True,
                 expected_help_advanced=expected_help_advanced,
                 expected_help_all=expected_help_all)
-
-  def _split_version(self, args_str):
-    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
-    splitter.split_args(shlex.split(args_str))
-    self.assertTrue(isinstance(splitter.help_request, VersionHelp))
 
   def _split_unknown_goal(self, args_str, unknown_goals):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
@@ -210,13 +203,3 @@ class ArgSplitterTest(unittest.TestCase):
 
   def test_no_goal_detection(self):
     self._split_no_goal('./pants foo/bar:baz')
-
-  def test_version_request_detection(self):
-    self._split_version('./pants -V')
-    self._split_version('./pants --version')
-
-    # --version in a non-global scope is OK, and not a version request.
-    self._split('./pants compile --version src/java/org/pantsbuild/foo',
-                ['compile'],
-                {'': [], 'compile': ['--version']},
-                ['src/java/org/pantsbuild/foo'])

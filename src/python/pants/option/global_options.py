@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.base.build_environment import (get_buildroot, get_pants_cachedir, get_pants_configdir,
+                                          pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
@@ -47,6 +48,21 @@ class GlobalOptionsRegistrar(Optionable):
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', action='store_true', default=True, recursive=True,
              help='Set whether log messages are displayed in color.')
+
+    # NB: Right now this option is a placeholder that is unused within pants itself except when
+    # specified on the command line to print the OSS pants version.  Both the IntelliJ Pants plugin
+    # and the pantsbuild/setup bootstrap script grep for pants_version though so this option
+    # registration serves in part as documentation of the dependency.
+    # TODO(John Sirois): Move pantsbuild.pants bootstrapping into pants itself and have it use this
+    # version option directly.
+    register('-V', '--pants-version', '--version',  # NB: pants_version is the 1st long option
+                                                    # since that's the one read from pants.ini;
+                                                    # the version form only works from the CLI.
+             nargs='?',  # Allows using the flag with no args on the CLI to print version as well
+                         # as setting the version in pants.ini
+             default=pants_version(),  # Displays the current version correctly in `./pants -h`.
+             const=pants_version(),  # Displays the current version via `./pants -V`.
+             help="Prints pants' version number and exits.")
 
     register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
     register('--backend-packages', advanced=True, type=list_option,

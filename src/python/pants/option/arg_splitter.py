@@ -42,11 +42,6 @@ class HelpRequest(AbstractClass):
   pass
 
 
-class VersionHelp(HelpRequest):
-  """The user requested the version of pants."""
-  pass
-
-
 class OptionsHelp(HelpRequest):
   def __init__(self, advanced=False, all_scopes=False):
     """The user requested help for cmd-line options.
@@ -87,8 +82,6 @@ class ArgSplitter(object):
   _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
   _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
   _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS
-
-  _VERSION_ARGS = ('-V', '--version')
 
   def __init__(self, known_scope_infos):
     self._known_scope_infos = known_scope_infos
@@ -166,13 +159,6 @@ class ArgSplitter(object):
       scope_to_flags[flag_scope].append(descoped_flag)
 
     global_flags = self._consume_flags()
-    # We only check for _VERSION_ARGS in the global flags. It's reasonable for tasks
-    # to have a --version flag with different meaning.
-    for version_arg in self._VERSION_ARGS:
-      if version_arg in global_flags:
-        if not self._help_request:
-          self._help_request = VersionHelp()
-        global_flags.remove(version_arg)
 
     add_scope(GLOBAL_SCOPE)
     for flag in global_flags:
