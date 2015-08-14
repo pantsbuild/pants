@@ -15,10 +15,7 @@ from twitter.common.dirutil.fileset import Fileset
 from pants.base.build_environment import get_buildroot
 
 def globs_matches(path, patterns):
-  for pattern in patterns:
-    if fnmatch.fnmatch(path, pattern):
-      return True
-  return False
+  return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
 def matches_filespec(path, spec):
   if not globs_matches(path, spec.get('globs', [])):
