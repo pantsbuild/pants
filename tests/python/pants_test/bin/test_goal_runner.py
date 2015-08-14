@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import mock
 import pytest
 from pkg_resources import WorkingSet
 
@@ -21,13 +20,10 @@ def test_version_request(version_flag):
       self.exit_code = exit_code
 
   with temporary_dir() as build_root:
-    on_exit = mock.Mock()
-
-    def exited(exit_code):
+    def exiter(exit_code):
       raise ExitException(exit_code)
-    on_exit.side_effect = exited
 
-    goal_runner = GoalRunner(build_root, exiter=on_exit)
+    goal_runner = GoalRunner(build_root, exiter=exiter)
     options_bootstrapper = OptionsBootstrapper(args=[version_flag])
 
     with pytest.raises(ExitException) as excinfo:
