@@ -26,6 +26,14 @@ Open Source Projects
 Testimonials
 ------------
 
+> "Scala compilation is notoriously slow, making build times prohibitively long at scale. Pants'
+> fine-grained dependency management and robust build cache helped us shrink build times and
+> increase productivity despite the fast growth of our codebase. Its modularity and extensibility
+> made it easy for us to add custom build steps, such as code generation, and to reason
+> programmatically about dependencies. Pants has proven to be a core part of a powerful toolchain
+> that has scaled up well with our codebase." -- Benjy Weinberger, Foursquare
+
+
 > "At Square, we have a large git repo with hundreds of projects.  We build and ship
 > from a master branch that gets hundreds of commits daily.  Pants gives our developers
 > a faster and more reliable incremental build experience than Maven in this environment.
