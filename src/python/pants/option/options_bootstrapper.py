@@ -28,7 +28,7 @@ class OptionsBootstrapper(object):
 
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
-    :rtype: Options
+    :rtype: :class:`Options`
     """
     if not self._bootstrap_options:
       flags = set()
@@ -95,7 +95,9 @@ class OptionsBootstrapper(object):
     """Get the full Options instance bootstrapped by this object for the given known scopes.
 
     :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-    :param bool masked: If `True`, masks
+    :returns: A bootrapped Options instance that also carries options for all the supplied known
+              scopes.
+    :rtype: :class:`Options`
     """
     key = frozenset(sorted(known_scope_infos))
     if key not in self._full_options:

@@ -420,7 +420,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(33, options.for_global_scope().num)
     self.assertEqual(99, defaulted_only_options.for_global_scope().num)
 
-    # An config specified option value.
+    # A config specified option value.
     self.assertEqual(1, options.for_scope('simple').num)
     self.assertEqual(42, defaulted_only_options.for_scope('simple').num)
 

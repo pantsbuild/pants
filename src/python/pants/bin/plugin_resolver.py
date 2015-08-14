@@ -110,6 +110,10 @@ class PluginResolver(object):
 
   @memoized_property
   def _options(self):
+    # NB: The PluginResolver runs very early in the pants startup sequence before the standard
+    # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
+    # (PythonRepos, PythonSetup) returned as `dependencies()`.  Instead it does the minimum possible
+    # work to hand-roll bootstrapping of the Subsystems it needs.
     subsystems = Subsystem.closure([PythonRepos, PythonSetup])
     known_scope_infos = [subsystem.get_scope_info() for subsystem in subsystems]
     options = self._options_bootstrapper.get_full_options(known_scope_infos)
