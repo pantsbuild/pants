@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Alexander Johnson
 + Alyssa Pohahau
@@ -60,6 +60,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lei Wang
 + Leo Kim
 + Luc Cary
++ Luca Clementi
 + Marc Abramowitz
 + Marius Eriksen
 + Mark Chu-Carroll
