@@ -56,7 +56,7 @@ PKG_PANTS_BACKEND_ANDROID=(
 )
 function pkg_pants_backend_android_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.backend.android']" \
+    --plugins="['pantsbuild.pants.backend.android==$(local_version)']" \
     goals | grep "apk" &> /dev/null
 }
 

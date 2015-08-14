@@ -21,10 +21,10 @@ PKG_SCROOGE=(
 )
 function pkg_scrooge_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge']" \
+    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
     --explain gen | grep "scrooge" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge']" \
+    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
     goals | grep "thrift-linter" &> /dev/null
 }
 
@@ -46,7 +46,7 @@ PKG_SPINDLE=(
 )
 function pkg_spindle_install_test() {
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.spindle']" \
+    --plugins="['pantsbuild.pants.contrib.spindle==$(local_version)']" \
     --explain gen | grep "spindle" &> /dev/null
 }
 
