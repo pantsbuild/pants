@@ -86,11 +86,11 @@ def test_plugins():
 
     dist = working_set.find(req('jake'))
     assert dist is not None
-    assert cache_dir == os.path.dirname(dist.location)
+    assert os.path.realpath(cache_dir) == os.path.realpath(os.path.dirname(dist.location))
 
     dist = working_set.find(req('jane'))
     assert dist is not None
-    assert cache_dir == os.path.dirname(dist.location)
+    assert os.path.realpath(cache_dir) == os.path.realpath(os.path.dirname(dist.location))
 
 
 def test_exact_requirements():
