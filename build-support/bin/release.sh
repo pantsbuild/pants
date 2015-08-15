@@ -367,9 +367,9 @@ function list_owners() {
 
 function check_owner() {
    username="$1"
-   packagename="$2"
+   package_name="$2"
 
-   for owner in $(get_owners ${packagename})
+   for owner in $(get_owners ${package_name})
    do
      if [[ "${username}" == "${owner}" ]]
      then
@@ -395,7 +395,7 @@ function check_owners() {
     then
       if ! check_owner "${username}" "${package_name}"
       then
-        dont_own+=("${packagename}")
+        dont_own+=("${package_name}")
       fi
     else
       echo "The ${package_name} package is new!  There are no owners yet."
