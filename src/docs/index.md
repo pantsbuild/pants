@@ -9,7 +9,7 @@ many distinct projects.
 Installing Pants
 ----------------
 
-Learn how to install pants in your code repository and setup pants plugins.
+Learn how to install pants in your code repository and set up pants plugins.
 
 + [[Installing Pants|pants('src/docs:install')]]
 
