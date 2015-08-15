@@ -9,6 +9,8 @@ import os
 import re
 import xml.dom.minidom as minidom
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -393,3 +395,144 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
     self._idea_test(['testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier::'],
                     check_func=do_check)
+
+  def test_resource_only_content_type(self):
+    """Folders containing just resources() targets should be marked as Resources in IntelliJ"""
+
+    def do_check(path):
+      """The contents of the .iml file should certain sourceFolder entries:
+
+      <sourceFolder url=".../testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_and_code" isTestSource="false" />
+      <sourceFolder url=".../testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_only" type="java-resource" />
+      <sourceFolder url=".../testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly" type="java-resource" />
+          ...
+      """
+      found = set()
+      iml_file = os.path.join(path, 'project.iml')
+      self.assertTrue(os.path.exists(iml_file))
+      dom = minidom.parse(iml_file)
+      for sourceFolder in self._get_sourceFolders(dom):
+        url = sourceFolder.getAttribute('url')
+        is_test_source = sourceFolder.getAttribute('isTestSource')
+        type_attr = sourceFolder.getAttribute('type')
+        url = re.sub(r'^.*/testprojects/', 'testprojects/', url)
+        found.add(url)
+        if url == 'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/code':
+          self.assertEquals('', type_attr)
+          self.assertEquals('False', is_test_source)
+        if url == 'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/code':
+          self.assertEquals('', type_attr)
+          self.assertEquals('True', is_test_source)
+        if url == 'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_only':
+          self.assertEquals('java-resource', type_attr)
+          self.assertEquals('False', is_test_source)
+        if url == 'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/resources_only':
+          self.assertEquals('java-test-resource', type_attr)
+          self.assertEquals('False', is_test_source)
+        if url == 'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly':
+          self.assertEquals('java-resource', type_attr)
+          self.assertEquals('False', is_test_source)
+        if url == 'testprojects/tests/resources/org/pantsbuild/testproject/idearesourcesonly':
+          self.assertEquals('java-test-resource', type_attr)
+          self.assertEquals('True', is_test_source)
+
+      self.assertEquals(set([
+        'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly',
+        'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/code',
+        'testprojects/tests/resources/org/pantsbuild/testproject/idearesourcesonly',
+        'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/code',
+
+        # TODO(Eric Ayers): These directories should be picked up but aren't currently
+        # because there are no references to them.
+        #'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_only',
+        #'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/resources_only'
+      ]), found)
+
+    self._idea_test([
+        'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly::',
+        'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly::'
+      ], check_func=do_check)
+
+  @pytest.mark.xfail
+  def test_resource_and_code_content_type(self):
+    """Folders containing just resources() targets should be marked as Resources in IntelliJ.
+
+    This test introduces more cases, like code co-mingled with resources targets, and test targets
+    that rely on non-test resources folders
+    """
+
+    def do_check(path):
+      """The contents of the .iml file should certain sourceFolder entries:
+
+      <sourceFolder url=".../testprojects/src/java/org/pantsbuild/testproject/ideacodeandresources/resources_and_code" isTestSource="false" />
+      <sourceFolder url=".../testprojects/src/java/org/pantsbuild/testproject/ideacodeandresources/resources_only" type="java-resource" />
+      <sourceFolder url=".../testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources" type="java-resource" />
+          ...
+      """
+      found = set()
+      iml_file = os.path.join(path, 'project.iml')
+      self.assertTrue(os.path.exists(iml_file))
+      dom = minidom.parse(iml_file)
+      for sourceFolder in self._get_sourceFolders(dom):
+        url = sourceFolder.getAttribute('url')
+        is_test_source = sourceFolder.getAttribute('isTestSource')
+        type_attr = sourceFolder.getAttribute('type')
+        url = re.sub(r'^.*/testprojects/', 'testprojects/', url)
+        found.add(url)
+        if url == 'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources':
+          self.assertEquals('java-resource', type_attr)
+          self.assertEquals('False', is_test_source)
+        if url == 'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources':
+          self.assertEquals('java-test-resource', type_attr)
+          self.assertEquals('True', is_test_source)
+
+        # TODO(Eric Ayers) Both code directories are currently incorrectly tagged as resources
+        if url == 'testprojects/src/java/org/pantsbuild/testproject/ideacodeandresources':
+          self.assertEquals('', type_attr)
+          self.assertEquals('False', is_test_source)
+        if url == 'testprojects/tests/java/org/pantsbuild/testproject/ideacodeandresources':
+          self.assertEquals('', type_attr)
+          self.assertEquals('True', is_test_source)
+
+      self.assertEquals(set([
+        'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources',
+        'testprojects/src/java/org/pantsbuild/testproject/ideacodeandresources',
+        'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources',
+        'testprojects/tests/java/org/pantsbuild/testproject/ideacodeandresources',
+      ]), found)
+
+    self._idea_test([
+      'testprojects/src/java/org/pantsbuild/testproject/ideacodeandresources::',
+      'testprojects/tests/java/org/pantsbuild/testproject/ideacodeandresources::'
+    ], check_func=do_check)
+
+  @pytest.mark.xfail
+  def test_library_and_test_code(self):
+    """Folders containing both junit_tests() and java_library() targets should be Test folders."""
+
+    def do_check(path):
+      """The contents of the .iml file should certain sourceFolder entries:
+
+      <sourceFolder url=".../testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib" isTestSource="true" />
+      """
+      found = set()
+      iml_file = os.path.join(path, 'project.iml')
+      self.assertTrue(os.path.exists(iml_file))
+      dom = minidom.parse(iml_file)
+      for sourceFolder in self._get_sourceFolders(dom):
+        url = sourceFolder.getAttribute('url')
+        is_test_source = sourceFolder.getAttribute('isTestSource')
+        type_attr = sourceFolder.getAttribute('type')
+        url = re.sub(r'^.*/testprojects/', 'testprojects/', url)
+        found.add(url)
+        if url == 'testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib':
+          self.assertEquals('', type_attr)
+          self.assertEquals('True', is_test_source)
+
+      self.assertEquals(set([
+        'testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib',
+      ]), found)
+
+    self._idea_test([
+      'testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib::'
+    ], check_func=do_check)

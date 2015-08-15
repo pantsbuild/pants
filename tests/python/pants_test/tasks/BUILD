@@ -51,9 +51,6 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':eclipse_integration',
-    ':ensime_integration',
-    ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
     ':junit_tests_integration',
@@ -249,34 +246,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:filter',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_file_aliases',
-  ],
-)
-
-python_tests(
-  name = 'idea_integration',
-  sources = ['test_idea_integration.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
-  name = 'eclipse_integration',
-  sources = ['test_eclipse_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
-  name = 'ensime_integration',
-  sources = ['test_ensime_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
   ],
 )
 
