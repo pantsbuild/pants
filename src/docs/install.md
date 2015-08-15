@@ -12,7 +12,7 @@ After you have pants installed, you'll need to
 Virtualenv-based Installation
 -----------------------------
 
-To setup pants in your repo, you can use our self-contained virtualenv-based `pants` bash script:
+To set up pants in your repo, you can use our self-contained virtualenv-based `pants` bash script:
 
       :::bash
       curl -O https://pantsbuild.github.io/setup/pants
