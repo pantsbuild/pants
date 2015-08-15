@@ -34,8 +34,6 @@ class ClasspathProductsTest(BaseTest):
     with self.assertRaises(TaskError) as cm:
         classpath_product.add_for_target(a, [('default', '/dev/null')])
 
-    classpath = classpath_product.get_for_target(a)
-
     self.assertEqual(
       'Classpath entry /dev/null for target a:a is located outside the buildroot.',
       str(cm.exception))
@@ -118,11 +116,35 @@ class ClasspathProductsTest(BaseTest):
 
     self.assertEqual([], classpath)
 
+  def test_excludes_similar_org_name(self):
+    b = self.make_target('b', JvmTarget)
+    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.exam')], dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    classpath_product.add_for_target(b, [('default', self._example_jar_path())])
+    classpath_product.add_excludes_for_targets([a])
+
+    classpath = classpath_product.get_for_target(a)
+
+    self.assertEqual([('default', self._example_jar_path())], classpath)
+
+  def test_excludes_org_name(self):
+    b = self.make_target('b', JvmTarget)
+    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example')], dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    classpath_product.add_for_target(b, [('default', self._example_jar_path())])
+    classpath_product.add_excludes_for_targets([a])
+
+    classpath = classpath_product.get_for_target(a)
+
+    self.assertEqual([], classpath)
+
   def test_jar_provided_by_transitive_target_excluded(self):
     provider = self.make_target('provider', ExportableJvmLibrary,
                          provides=Artifact('com.example', 'lib', Repository()))
     consumer = self.make_target('consumer', JvmTarget)
-    root = self.make_target('root', JvmTarget, dependencies=[provider])
+    root = self.make_target('root', JvmTarget, dependencies=[provider, consumer])
 
     classpath_product = ClasspathProducts()
     classpath_product.add_for_target(consumer, [('default', self._example_jar_path())])
@@ -132,5 +154,32 @@ class ClasspathProductsTest(BaseTest):
 
     self.assertEqual([], classpath)
 
+  def test_jar_provided_exclude_with_similar_name(self):
+    # note exclude 'jars/com.example/l' should not match jars/com.example/lib/jars/123.4.jar
+    provider = self.make_target('provider', ExportableJvmLibrary,
+                         provides=Artifact('com.example', 'li', Repository()))
+    root = self.make_target('root', JvmTarget, dependencies=[provider])
+
+    classpath_product = ClasspathProducts()
+    classpath_product.add_for_target(root, [('default', self._example_jar_path())])
+    classpath_product.add_excludes_for_targets([root, provider])
+
+    classpath = classpath_product.get_for_target(root)
+
+    self.assertEqual([('default', self._example_jar_path())], classpath)
+
+  def test_jar_provided_exclude_with_similar_org(self):
+    provider = self.make_target('provider', ExportableJvmLibrary,
+                         provides=Artifact('com.example.lib', '', Repository()))
+    root = self.make_target('root', JvmTarget, dependencies=[provider])
+
+    classpath_product = ClasspathProducts()
+    classpath_product.add_for_target(root, [('default', self._example_jar_path())])
+    classpath_product.add_excludes_for_targets([root, provider])
+
+    classpath = classpath_product.get_for_target(root)
+
+    self.assertEqual([('default', self._example_jar_path())], classpath)
+
   def _example_jar_path(self):
-    return os.path.join(self.build_root, 'ivy/jars/com.example/lib/123.4.jar')
+    return os.path.join(self.build_root, 'ivy/jars/com.example/lib/jars/123.4.jar')
