@@ -1,7 +1,7 @@
 Installing Pants
 ================
 
-There are a few ways to get a runnable version of Pants into a developer's workspace. Before
+There are a few ways to get a runnable version of pants set up for your workspace. Before
 beginning, please [consult the README](https://github.com/pantsbuild/pants/blob/master/README.md),
 to make sure your machine fits the requirements. In particular, you'll want to make sure that you
 have Python 2.7.x -- pants itself needs to be hosted on that version.
@@ -12,7 +12,7 @@ After you have pants installed, you'll need to
 Virtualenv-based Installation
 -----------------------------
 
-To setup pants in your repo, you can use our self-contained virtualenv wrapper bash script:
+To setup pants in your repo, you can use our self-contained virtualenv-based `pants` bash script:
 
       :::bash
       curl -O https://pantsbuild.github.io/setup/pants
@@ -27,18 +27,19 @@ version of pants you just installed:
       ./pants --version
       0.0.42
 
-Then add an entry like so to pants.ini:
+Then add an entry like so to pants.ini with that version:
 
       :::ini
       [DEFAULT]
       pants_version: 0.0.42
 
-When you;d like to upgrade pants, jst edit the version in pants.ini and pants will self-update on
-the next run.  This script stored the various pants versions you use centrally in
-`~/.cache/pants/setup` and so when you switch back and forth between branches pants will select the
+When you'd like to upgrade pants, just edit the version in pants.ini and pants will self-update on
+the next run.  This script stores the various pants versions you use centrally in
+`~/.cache/pants/setup`.  When you switch back and forth between branches pants will select the
 correct version from your local cache and use that.
 
-If you use pants plugins published to pypi you can configure them as follows, also in pants.ini:
+If you use pants plugins published to pypi you can configure them by adding a `plugins` list as
+follows:
 
       :::ini
       [DEFAULT]
@@ -52,7 +53,8 @@ If you use pants plugins published to pypi you can configure them as follows, al
 Pants will notice you changed your plugins and install them.
 NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be
 indented by at least one white space to form logical continuation lines. This is standard for python
-ini files, see RFC #822 section 3.1.1 for the full rules python uses to parse ini file entries.
+ini files, see [RFC #822](http://tools.ietf.org/html/rfc822.html#section-3.1) section 3.1.1 for the
+full rules python uses to parse ini file entries.
 
 PEX-based Installation
 ----------------------
