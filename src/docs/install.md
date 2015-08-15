@@ -46,8 +46,8 @@ follows:
       pants_version: 0.0.42
 
       plugins: [
-          'pantsbuild.pants.contrib.go==0.0.42',
-          'pantsbuild.pants.contrib.scrooge==0.0.42',
+          'pantsbuild.pants.contrib.go==%(pants_version)s',
+          'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
         ]
 
 Pants notices you changed your plugins and it installs them.
@@ -62,14 +62,14 @@ PEX-based Installation
 To support hermetic builds and not depend on a local pants installation (e.g.: CI machines may
 prohibit software installation), some sites fetch a pre-built `pants.pex` using the `pants_version`
 defined in `pants.ini`. To upgrade pants, they generate a `pants.pex` and upload it to a file
-server at a location computable from the version number. They then set up write their own `./pants`
+server at a location computable from the version number. They then write their own `./pants`
 script that checks the `pants.ini` `pants_version` and downloads the appropriate pex from the file
 server to the correct spot.
 
 Troubleshooting
 ---------------
 
-While pants is written in pure Python, some of it's dependencies contain native code. Therefore,
+While pants is written in pure Python, some of its dependencies contain native code. Therefore,
 you'll need to make sure you have the appropriate compiler infrastructure installed on the machine
 where you are attempting to bootstrap pants. In particular, if you see an error similar to this:
 
