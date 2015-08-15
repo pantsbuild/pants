@@ -327,6 +327,12 @@ function list_packages() {
   done
 }
 
+function package_exists() {
+  package_name="$1"
+
+  curl --fail --head https://pypi.python.org/pypi/${package_name} &>/dev/null
+}
+
 function get_owners() {
   package_name="$1"
 
@@ -344,21 +350,26 @@ function list_owners() {
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     package_name=$(pkg_name $PACKAGE)
-    echo "Owners of ${package_name}:"
-    owners=($(get_owners ${package_name}))
-    for owner in "${owners[@]}"
-    do
-      echo "  ${owner}"
-    done
+    if package_exists ${package_name}
+    then
+      echo "Owners of ${package_name}:"
+      owners=($(get_owners ${package_name}))
+      for owner in "${owners[@]}"
+      do
+        echo "  ${owner}"
+      done
+    else
+      echo "The ${package_name} package is new!  There are no owners yet."
+    fi
     echo
   done
 }
 
 function check_owner() {
    username="$1"
-   packagename="$2"
+   package_name="$2"
 
-   for owner in $(get_owners ${packagename})
+   for owner in $(get_owners ${package_name})
    do
      if [[ "${username}" == "${owner}" ]]
      then
@@ -378,11 +389,16 @@ function check_owners() {
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     index=$((index+1))
-    packagename="$(pkg_name $PACKAGE)"
-    banner "[${index}/${total}] checking that ${username} owns ${packagename}..."
-    if ! check_owner "${username}" "${packagename}"
+    package_name="$(pkg_name $PACKAGE)"
+    banner "[${index}/${total}] checking that ${username} owns ${package_name}..."
+    if package_exists ${package_name}
     then
-      dont_own+=("${packagename}")
+      if ! check_owner "${username}" "${package_name}"
+      then
+        dont_own+=("${package_name}")
+      fi
+    else
+      echo "The ${package_name} package is new!  There are no owners yet."
     fi
   done
 
