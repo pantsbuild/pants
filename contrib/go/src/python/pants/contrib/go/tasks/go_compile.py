@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -60,7 +60,7 @@ class GoCompile(GoWorkspaceTask):
     args = self.get_options().build_flags.split() + [pkg_path]
     self.go_dist.execute_go_cmd('install', gopath=gopath, args=args,
                                 workunit_factory=self.context.new_workunit,
-                                workunit_labels=[WorkUnit.COMPILER])
+                                workunit_labels=[WorkUnitLabel.COMPILER])
 
   def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
     """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.

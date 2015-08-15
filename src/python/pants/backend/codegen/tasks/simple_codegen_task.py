@@ -17,7 +17,7 @@ from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -336,7 +336,7 @@ class SimpleCodegenTask(Task):
       return 'global'
 
     def execute_codegen(self, targets):
-      with self._task.context.new_workunit(name='execute', labels=[WorkUnit.MULTITOOL]):
+      with self._task.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         self._do_execute_codegen(targets)
 
     @abstractmethod
@@ -368,7 +368,7 @@ class SimpleCodegenTask(Task):
       return 'isolated'
 
     def execute_codegen(self, targets):
-      with self._task.context.new_workunit(name='execute', labels=[WorkUnit.MULTITOOL]):
+      with self._task.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         ordered = [target for target in reversed(sort_targets(targets)) if target in targets]
         for target in ordered:
           with self._task.context.new_workunit(name=target.address.spec):

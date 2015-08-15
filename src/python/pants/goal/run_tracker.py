@@ -17,7 +17,7 @@ import requests
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
@@ -160,7 +160,7 @@ class RunTracker(Subsystem):
 
     Use like this:
 
-    with run_tracker.new_workunit(name='compile', labels=[WorkUnit.TASK]) as workunit:
+    with run_tracker.new_workunit(name='compile', labels=[WorkUnitLabel.TASK]) as workunit:
       <do scoped work here>
       <set the outcome on workunit if necessary>
 

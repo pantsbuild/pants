@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import list_option
 
 
@@ -97,7 +97,7 @@ class ThriftLinter(NailgunTask):
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
                               jvm_options=self.get_options().jvm_options,
-                              workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
+                              workunit_labels=[WorkUnitLabel.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
       raise ThriftLintError(

@@ -321,6 +321,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/rwbuf',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

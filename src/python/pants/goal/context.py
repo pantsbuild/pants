@@ -17,7 +17,7 @@ from pants.base.build_graph import BuildGraph
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.worker_pool import SubprocPool
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.java.distribution.distribution import Distribution
@@ -164,7 +164,7 @@ class Context(object):
       # This is slightly funky, but the with-context usage is so pervasive and
       # useful elsewhere that it's worth the funkiness in this one place.
       workunit_parent_ctx = self.run_tracker.new_workunit_under_parent(
-        name=parent_workunit_name, labels=[WorkUnit.MULTITOOL], parent=background_root_workunit)
+        name=parent_workunit_name, labels=[WorkUnitLabel.MULTITOOL], parent=background_root_workunit)
       workunit_parent = workunit_parent_ctx.__enter__()
       done_hook = lambda: workunit_parent_ctx.__exit__(None, None, None)
     else:

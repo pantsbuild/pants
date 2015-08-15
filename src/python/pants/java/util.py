@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor
 
@@ -71,9 +71,8 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
     return runner.run()
   else:
     workunit_labels = [
-        WorkUnit.TOOL,
-        WorkUnit.NAILGUN if isinstance(runner.executor,
-                                       NailgunExecutor) else WorkUnit.JVM
+        WorkUnitLabel.TOOL,
+        WorkUnitLabel.NAILGUN if isinstance(runner.executor, NailgunExecutor) else WorkUnitLabel.JVM
     ] + (workunit_labels or [])
 
     with workunit_factory(name=workunit_name, labels=workunit_labels,

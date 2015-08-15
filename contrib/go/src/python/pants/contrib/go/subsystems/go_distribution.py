@@ -9,7 +9,7 @@ import os
 import subprocess
 from collections import OrderedDict, namedtuple
 
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
@@ -150,7 +150,7 @@ class GoDistribution(object):
       return go_cmd.spawn(**kwargs).wait()
     else:
       name = workunit_name or cmd
-      labels = [WorkUnit.TOOL] + (workunit_labels or [])
+      labels = [WorkUnitLabel.TOOL] + (workunit_labels or [])
       with workunit_factory(name=name, labels=labels, cmd=str(go_cmd)) as workunit:
         process = go_cmd.spawn(env=env,
                                stdout=workunit.output('stdout'),

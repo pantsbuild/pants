@@ -14,7 +14,7 @@ from pants.backend.android.keystore.keystore_resolver import KeystoreResolver
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import Distribution
 from pants.util.dirutil import safe_mkdir
 
@@ -151,7 +151,7 @@ class SignApkTask(Task):
             safe_mkdir(outdir)
             args = self._render_args(target, keystores[key], unsigned_apk, outdir)
             with self.context.new_workunit(name='sign_apk',
-                                           labels=[WorkUnit.MULTITOOL]) as workunit:
+                                           labels=[WorkUnitLabel.MULTITOOL]) as workunit:
               returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                            stderr=workunit.output('stderr'))
               if returncode:

@@ -19,7 +19,7 @@ from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.scm_build_file import ScmBuildFile
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -150,7 +150,7 @@ class GoalRunner(object):
                                   address_mapper=self.address_mapper)
 
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
-    with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
+    with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
       source_root_bootstrapper = SourceRootBootstrapper.global_instance()
       source_root_bootstrapper.bootstrap(self.address_mapper, self.build_file_parser)
 
@@ -197,11 +197,11 @@ class GoalRunner(object):
 
     self.requested_goals = goals
 
-    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
+    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
                                       spec_excludes=self.spec_excludes,
                                       exclude_target_regexps=self.global_options.exclude_target_regexp)
-      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
         def filter_for_tag(tag):
           return lambda target: tag in map(str, target.tags)
         tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))

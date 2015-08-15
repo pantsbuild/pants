@@ -12,9 +12,8 @@ from contextlib import contextmanager
 
 from pants.backend.core.tasks.task import Task, TaskBase
 from pants.base.build_graph import invert_dependencies
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.goal import Goal
-from pants.option.scope import ScopeInfo
 
 
 class GroupMember(TaskBase):
@@ -341,7 +340,7 @@ class GroupTask(Task):
                                      log_config=log_config) as workunit:
         yield workunit
 
-    with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):
+    with self.context.new_workunit(name=self.group_name, labels=[WorkUnitLabel.GROUP]):
       for group_member in self._group_members:
         with workunit_for(group_member, 'pre'):
           group_member.pre_execute()

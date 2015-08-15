@@ -92,3 +92,44 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
     self.assertTrue(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
+
+  def test_default_console(self):
+    command = ['compile',
+               'examples/src/java/org/pantsbuild/example/hello::',
+               '--compile-java-strategy=isolated']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertIn('Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+                  pants_run.stdout_data)
+    # Check jmake's label and stdout
+    self.assertIn('Writing project database...  Done.', pants_run.stdout_data)
+    self.assertIn('[jmake]\n', pants_run.stdout_data)
+
+  def test_suppress_compiler_output(self):
+    command = ['compile',
+               'examples/src/java/org/pantsbuild/example/hello::',
+               '--reporting-console-label-format={ "COMPILER" : "SUPPRESS" }',
+               '--reporting-console-tool-output-format={ "COMPILER" : "CHILD_SUPPRESS"}',
+               '--compile-java-strategy=isolated']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertIn('Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+                  pants_run.stdout_data)
+    # jmake's stdout should be suppressed
+    self.assertNotIn('Writing project database...  Done.', pants_run.stdout_data)
+    # jmake's label should be suppressed
+    self.assertNotIn('[jmake]\n', pants_run.stdout_data)
+
+  def test_invalid_config(self):
+    command = ['compile',
+               'examples/src/java/org/pantsbuild/example/hello::',
+               '--reporting-console-label-format={ "FOO" : "BAR" }',
+               '--reporting-console-tool-output-format={ "BAZ" : "QUX"}',
+               '--compile-java-strategy=isolated']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertIn('*** Got invalid key FOO for --reporting-console-label-format. Expected one of [', pants_run.stdout_data)
+    self.assertIn('*** Got invalid value BAR for --reporting-console-label-format. Expected one of [', pants_run.stdout_data)
+    self.assertIn('*** Got invalid key BAZ for --reporting-console-tool-output-format. Expected one of [', pants_run.stdout_data)
+    self.assertIn('*** Got invalid value QUX for --reporting-console-tool-output-format. Expected one of [', pants_run.stdout_data)
+    self.assertIn('', pants_run.stdout_data)
