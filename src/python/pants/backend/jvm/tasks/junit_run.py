@@ -85,7 +85,7 @@ class _JUnitRunner(object):
     register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', action='store_true', default=True,
+    register('--suppress-output', advanced=True, action='store_true', default=True,
              help='Redirect test output to files in .pants.d/test/junit.')
     register('--cwd', advanced=True,
              help='Set the working directory. If no argument is passed, use the build root. '
