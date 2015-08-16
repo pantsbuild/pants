@@ -258,6 +258,8 @@ migrations = {
 
   ('compile.cpp-compile', 'cc_options'): ('compile.cpp', 'cc_options'),
   ('compile.cpp-compile', 'cc_extensions'): ('compile.cpp', 'cc_extensions'),
+
+  ('test.junit', 'coverage_html_open'): ('test.junit', 'coverage_open'),
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -360,6 +362,9 @@ notes = {
   ('compile.cpp-compile', 'cc_extensions'): 'Value used to be a string (but default was a list), '
                                             'is now a list. Values also now include the dot, e.g.,'
                                             'it\'s now .cpp, not cpp.',
+  ('test.junit', 'coverage_console'): 'Option no longer exists. Coverage always written to stdout.',
+  ('test.junit', 'coverage_html'): 'Option no longer exists. Coverage always written to html file.',
+  ('test.junit', 'coverage_xml'): 'Option no longer exists. Coverage always written to xml file.',
 }
 
 
