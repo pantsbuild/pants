@@ -30,6 +30,7 @@ python_tests(
   ],
   dependencies = [
     ':common',
+    '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
