@@ -72,23 +72,24 @@ class _JUnitRunner(object):
     register('--skip', action='store_true', help='Skip running junit.')
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
-    register('--batch-size', type=int, default=sys.maxint,
+    register('--batch-size', advanced=True, type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
     register('--test', action='append',
              help='Force running of just these tests.  Tests can be specified using any of: '
                   '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
     register('--per-test-timer', action='store_true', help='Show progress and timer for each test.')
-    register('--default-parallel', action='store_true',
+    register('--default-parallel', advanced=True, action='store_true',
              help='Run classes without @TestParallel or @TestSerial annotations in parallel.')
-    register('--parallel-threads', type=int, default=0,
+    register('--parallel-threads', advanced=True, type=int, default=0,
              help='Number of threads to run tests in parallel. 0 for autoset.')
-    register('--test-shard',
+    register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', action='store_true', default=True,
+    register('--suppress-output', advanced=True, action='store_true', default=True,
              help='Redirect test output to files in .pants.d/test/junit.')
-    register('--cwd', help='Set the working directory. If no argument is passed, use the build '
-                           'root. If cwd is set on a target, it will supersede this argument.')
+    register('--cwd', advanced=True,
+             help='Set the working directory. If no argument is passed, use the build root. '
+                  'If cwd is set on a target, it will supersede this argument.')
     register_jvm_tool(register,
                       'junit',
                       main=JUnitRun._MAIN,
@@ -359,24 +360,18 @@ class _Coverage(_JUnitRunner):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--coverage-patterns', action='append',
+    register('--coverage-patterns', advanced=True, action='append',
              help='Restrict coverage measurement. Values are class name prefixes in dotted form '
                   'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
-                  'example, to include all code in org.pantsbuild.raven except claws and the eye you '
-                  'would use: {flag}=org.pantsbuild.raven.* {flag}=-org.pantsbuild.raven.claw '
+                  'example, to include all code in org.pantsbuild.raven except claws and the eye '
+                  'you would use: {flag}=org.pantsbuild.raven.* {flag}=-org.pantsbuild.raven.claw '
                   '{flag}=-org.pantsbuild.raven.Eye.'.format(flag='--coverage_patterns'))
-    register('--coverage-jvm-options', action='append',
+    register('--coverage-jvm-options', advanced=True, action='append',
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
-    register('--coverage-console', action='store_true', default=True,
-             help='Output a simple coverage report to the console.')
-    register('--coverage-xml', action='store_true',
-             help='Output an XML coverage report.')
-    register('--coverage-html', action='store_true',
-            help='Output an HTML coverage report.')
-    register('--coverage-html-open', action='store_true',
-             help='Open the generated HTML coverage report in a browser. Implies --coverage-html.')
-    register('--coverage-force', action='store_true',
+    register('--coverage-open', action='store_true',
+             help='Open the generated HTML coverage report in a browser. Implies --coverage.')
+    register('--coverage-force', advanced=True, action='store_true',
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 
@@ -396,15 +391,10 @@ class _Coverage(_JUnitRunner):
     # may be emma-specific. Resolve when we also provide cobertura support.
     self._coverage_metadata_file = os.path.join(self._coverage_dir, 'coverage.em')
     self._coverage_file = os.path.join(self._coverage_dir, 'coverage.ec')
-    self._coverage_report_console = options.coverage_console
     self._coverage_console_file = os.path.join(self._coverage_dir, 'coverage.txt')
-
-    self._coverage_report_xml = options.coverage_xml
     self._coverage_xml_file = os.path.join(self._coverage_dir, 'coverage.xml')
-
-    self._coverage_report_html_open = options.coverage_html_open
-    self._coverage_report_html = self._coverage_report_html_open or options.coverage_html
     self._coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
+    self._coverage_open = options.coverage_open
     self._coverage_force = options.coverage_force
 
   @abstractmethod
@@ -507,15 +497,12 @@ class Emma(_Coverage):
       args.extend(['-sp', source_base])
 
     sorting = ['-Dreport.sort', '+name,+class,+method,+block']
-    if self._coverage_report_console:
-      args.extend(['-r', 'txt',
-                   '-Dreport.txt.out.file={0}'.format(self._coverage_console_file)] + sorting)
-    if self._coverage_report_xml:
-      args.extend(['-r', 'xml', '-Dreport.xml.out.file={0}'.format(self._coverage_xml_file)])
-    if self._coverage_report_html:
-      args.extend(['-r', 'html',
-                   '-Dreport.html.out.file={0}'.format(self._coverage_html_file),
-                   '-Dreport.out.encoding=UTF-8'] + sorting)
+    args.extend(['-r', 'txt',
+                 '-Dreport.txt.out.file={0}'.format(self._coverage_console_file)] + sorting)
+    args.extend(['-r', 'xml', '-Dreport.xml.out.file={0}'.format(self._coverage_xml_file)])
+    args.extend(['-r', 'html',
+                 '-Dreport.html.out.file={0}'.format(self._coverage_html_file),
+                 '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
     result = execute_java(classpath=self._emma_classpath,
@@ -528,10 +515,9 @@ class Emma(_Coverage):
       raise TaskError("java {0} ... exited non-zero ({1})"
                       " 'failed to generate code coverage reports'".format(main, result))
 
-    if self._coverage_report_console:
-      with safe_open(self._coverage_console_file) as console_report:
-        sys.stdout.write(console_report.read())
-    if self._coverage_report_html_open:
+    with safe_open(self._coverage_console_file) as console_report:
+      sys.stdout.write(console_report.read())
+    if self._coverage_open:
       binary_util.ui_open(self._coverage_html_file)
 
 
@@ -696,10 +682,8 @@ class Cobertura(_Coverage):
       else:
         self._context.log.error('class {0} does not exist in a source file!'.format(cls))
     report_formats = []
-    if self._coverage_report_xml:
-      report_formats.append('xml')
-    if self._coverage_report_html:
-      report_formats.append('html')
+    report_formats.append('xml')
+    report_formats.append('html')
     for report_format in report_formats:
       report_dir = os.path.join(self._coverage_dir, report_format)
       safe_mkdir(report_dir, clean=True)
@@ -734,7 +718,8 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     for c in [_JUnitRunner, _Coverage, Emma, Cobertura]:
       c.register_options(register, cls.register_jvm_tool)
     register('--coverage', action='store_true', help='Collect code coverage data.')
-    register('--coverage-processor', default='emma', help='Which coverage subsystem to use.')
+    register('--coverage-processor', advanced=True, default='emma',
+             help='Which coverage subsystem to use.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -758,7 +743,7 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
                                 workdir=self.workdir)
 
     options = self.get_options()
-    if options.coverage or options.coverage_html_open:
+    if options.coverage or options.is_flagged('coverage_open'):
       coverage_processor = options.coverage_processor
       if coverage_processor == 'emma':
         self._runner = Emma(task_exports, self.context)
