@@ -50,12 +50,18 @@ class HelpInfoExtracter(object):
   def compute_default(kwargs):
     """Compute the default value to display in help for an option registered with these kwargs."""
     ranked_default = kwargs.get('default')
-    default = ranked_default.value if ranked_default else None
-    if default is None:
-      return 'None'
-
     action = kwargs.get('action')
     typ = kwargs.get('type', str)
+
+    default = ranked_default.value if ranked_default else None
+    if default is None:
+      if action == 'store_true':
+        return 'False'
+      elif action == 'store_false':
+        return 'True'
+      else:
+        return 'None'
+
     if typ == list_option or action == 'append':
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
     elif typ == dict_option:
