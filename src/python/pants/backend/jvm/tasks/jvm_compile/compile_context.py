@@ -25,6 +25,9 @@ class CompileContext(object):
   def __eq__(self, other):
     return self._id == other._id
 
+  def __ne__(self, other):
+    return self._id != other._id
+
   def __hash__(self):
     return hash(self._id)
 

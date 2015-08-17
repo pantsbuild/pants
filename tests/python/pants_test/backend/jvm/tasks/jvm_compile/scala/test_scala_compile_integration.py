@@ -31,9 +31,9 @@ class ScalaCompileIntegrationTest(BaseCompileIT):
     with self.do_test_compile(SHAPELESS_TARGET,
                               'isolated',
                               expected_files=[jar_suffix]) as found:
-      # Confirm that we got a jar containing the expected class.
       with open_zip(self.get_only(found, jar_suffix), 'r') as jar:
-        self.assertTrue(jar.getinfo(SHAPELESS_CLSFILE))
+        self.assertTrue(jar.getinfo(SHAPELESS_CLSFILE),
+                        'Expected a jar containing the expected class.')
 
   @provide_compile_strategies
   def test_scala_empty_compile(self, strategy):
