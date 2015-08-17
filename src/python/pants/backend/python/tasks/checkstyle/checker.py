@@ -53,7 +53,6 @@ class PythonCheckStyleTask(PythonTask):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)
     self._plugins = []
     self.options = self.get_options()
-    self.excluder = FileExcluder(self.options.suppress, self.context.log)
 
     self.register_plugin(dict(name='class-factoring', checker=ClassFactoring))
     self.register_plugin(dict(name='except-statement', checker=ExceptStatements))
@@ -112,8 +111,9 @@ class PythonCheckStyleTask(PythonTask):
       return
 
     #Filter out any suppressed plugins
+    excluder = FileExcluder(self.options.suppress, self.context.log)
     check_plugins = [plugin for plugin in self._plugins
-                     if self.excluder.should_include(python_file.filename, plugin['name'])]
+                     if excluder.should_include(python_file.filename, plugin['name'])]
 
     for plugin in check_plugins:
       for nit in plugin['checker'](python_file):
