@@ -19,6 +19,8 @@ class PEP8Subsystem(Subsystem):
     super(PEP8Subsystem, cls).register_options(register)
     register('--ignore', type=list_option, default=DEFAULT_IGNORE_CODES,
              help='Prevent test failure but still produce output for problems.')
+    register('--max-length', type=int, default=100,
+             help='Max line length to use for PEP8 checks.')
 
 
 class PEP8Error(Nit):
@@ -26,14 +28,14 @@ class PEP8Error(Nit):
     super(PEP8Error, self).__init__(code, Nit.ERROR, python_file, text, line_number)
 
 
-class TwitterReporter(pep8.BaseReport):
+class PantsReporter(pep8.BaseReport):
   def init_file(self, filename, lines, expected, line_offset):
-    super(TwitterReporter, self).init_file(filename, lines, expected, line_offset)
+    super(PantsReporter, self).init_file(filename, lines, expected, line_offset)
     self._python_file = PythonFile.parse(filename)
     self._twitter_errors = []
 
   def error(self, line_number, offset, text, check):
-    code = super(TwitterReporter, self).error(line_number, offset, text, check)
+    code = super(PantsReporter, self).error(line_number, offset, text, check)
     if code:
       self._twitter_errors.append(
           PEP8Error(self._python_file, code, line_number, offset, text[5:], check.__doc__))
@@ -81,11 +83,12 @@ class PEP8Checker(CheckstylePlugin):
   """Enforce PEP8 checks from the pep8 tool."""
   subsystem = PEP8Subsystem
 
-  def __init__(self):
+  def __init__(self, *args, **kwargs):
+    super(PEP8Checker, self).__init__(self, *args, **kwargs)
     self.STYLE_GUIDE = pep8.StyleGuide(
-        max_line_length=100,
+        max_line_length=self.subsystem.global_instance().get_options.max_length,
         verbose=False,
-        reporter=TwitterReporter,
+        reporter=PantsReporter,
         ignore=self.subsystem.global_instance().get_options().ignore)
 
   def nits(self):
