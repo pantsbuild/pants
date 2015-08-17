@@ -207,6 +207,7 @@ python_library(
   sources = ['source_mapper.py'],
   dependencies = [
     ':build_environment',
+    ':payload_field',
   ]
 )
 
