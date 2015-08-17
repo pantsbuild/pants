@@ -24,7 +24,7 @@ class GoDistribution(object):
     options_scope = 'go-distribution'
 
     @classmethod
-    def dependencies(cls):
+    def subsystem_dependencies(cls):
       return (BinaryUtil.Factory,)
 
     @classmethod

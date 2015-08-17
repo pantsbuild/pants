@@ -53,7 +53,7 @@ def temporary_dir(root_dir=None, cleanup=True):
     A with-context that creates a temporary directory.
 
     You may specify the following keyword args:
-    :param str root_dir: The parent directory to create the temporary directory.
+    :param str|unicode root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
   """
   path = tempfile.mkdtemp(dir=root_dir)

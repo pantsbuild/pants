@@ -9,13 +9,14 @@ from twitter.common.collections import OrderedSet
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, SubsystemDependency
 
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-class Subsystem(Optionable):
+class Subsystem(SubsystemClientMixin, Optionable):
   """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
@@ -32,6 +33,8 @@ class Subsystem(Optionable):
 
   For example, the global artifact cache options would be in scope `cache`, but the
   compile.java task can override those options in scope `cache.compile.java`.
+
+  Subsystems may depend on other subsystems, and therefore mix in SubsystemClientMixin.
   """
   options_scope_category = ScopeInfo.SUBSYSTEM
 
@@ -41,6 +44,14 @@ class Subsystem(Optionable):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
       super(Subsystem.CycleException, self).__init__(message)
+
+  @classmethod
+  def scoped(cls, optionable):
+    """Returns a dependency on this subsystem, scoped to `optionable`.
+
+    Return value is suitable for use in SubsystemClientMixin.subsystem_dependencies().
+    """
+    return SubsystemDependency(cls, optionable.options_scope)
 
   @classmethod
   def get_scope_info(cls, subscope=None):
@@ -70,7 +81,7 @@ class Subsystem(Optionable):
       path.add(subsystem)
       if subsystem not in known_subsystem_types:
         known_subsystem_types.add(subsystem)
-        for dependency in subsystem.dependencies():
+        for dependency in subsystem.subsystem_dependencies():
           collect_subsystems(dependency)
       path.remove(subsystem)
 
@@ -78,14 +89,6 @@ class Subsystem(Optionable):
       collect_subsystems(subsystem_type)
 
     return known_subsystem_types
-
-  @classmethod
-  def dependencies(cls):
-    """The subsystems this subsystem uses.
-
-    A tuple of subsystem types.
-    """
-    return tuple()
 
   @classmethod
   def subscope(cls, scope):
