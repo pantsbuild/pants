@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from threading import Thread
 
 from pants.base.build_invalidator import CacheKey
-from pants.cache.artifact_cache import call_insert, call_use_cached_files
+from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
@@ -50,6 +50,28 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     self.end_headers()
 
 
+class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+  """Reject all requests"""
+  def __init__(self, request, client_address, server):
+    SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
+
+  def _return_failed(self):
+    self.send_response(401, 'Forced test failure')
+    self.end_headers()
+
+  def do_HEAD(self):
+    return self._return_failed()
+
+  def do_GET(self):
+    return self._return_failed()
+
+  def do_PUT(self):
+    return self._return_failed()
+
+  def do_DELETE(self):
+    return self._return_failed()
+
+
 TEST_CONTENT1 = 'muppet'
 TEST_CONTENT2 = 'kermit'
 
@@ -62,13 +84,17 @@ class TestArtifactCache(unittest.TestCase):
         yield LocalArtifactCache(artifact_root, cache_root, compression=0)
 
   @contextmanager
-  def setup_server(self):
+  def setup_server(self, return_failed=False):
     httpd = None
     httpd_thread = None
     try:
       with temporary_dir() as cache_root:
         with pushd(cache_root):  # SimpleRESTHandler serves from the cwd.
-          httpd = SocketServer.TCPServer(('localhost', 0), SimpleRESTHandler)
+          if return_failed:
+            handler = FailRESTHandler
+          else:
+            handler = SimpleRESTHandler
+          httpd = SocketServer.TCPServer(('localhost', 0), handler)
           port = httpd.server_address[1]
           httpd_thread = Thread(target=httpd.serve_forever)
           httpd_thread.start()
@@ -80,10 +106,10 @@ class TestArtifactCache(unittest.TestCase):
         httpd_thread.join()
 
   @contextmanager
-  def setup_rest_cache(self, local=None):
+  def setup_rest_cache(self, local=None, return_failed=False):
     with temporary_dir() as artifact_root:
       local = local or TempLocalArtifactCache(artifact_root, 0)
-      with self.setup_server() as base_url:
+      with self.setup_server(return_failed=return_failed) as base_url:
         yield RESTfulArtifactCache(artifact_root, base_url, local)
 
   @contextmanager
@@ -189,3 +215,14 @@ class TestArtifactCache(unittest.TestCase):
       with self.setup_test_file(cache.artifact_root) as path:
         context.subproc_map(call_insert, [(cache, key, [path], False)])
       self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
+
+  def test_failed_multiproc(self):
+    context = create_context()
+    key = CacheKey('muppet_key', 'fake_hash', 55)
+
+    # Failed requests should return failure status, but not raise exceptions
+    with self.setup_rest_cache(return_failed=True) as cache:
+      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key)])[0])
+      with self.setup_test_file(cache.artifact_root) as path:
+        context.subproc_map(call_insert, [(cache, key, [path], False)])
+      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key)])[0])

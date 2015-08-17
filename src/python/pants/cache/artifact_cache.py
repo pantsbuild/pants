@@ -47,6 +47,9 @@ class UnreadableArtifact(object):
   def __nonzero__(self):
     return self.__bool__()
 
+  def __str__(self):
+    return "key={} err={}".format(self.key, self.err)
+
 
 class ArtifactCache(object):
   """A map from cache key to a set of build artifacts.
