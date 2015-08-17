@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 import codecs
+import io
 import itertools
 import re
 import textwrap
@@ -85,7 +86,7 @@ class PythonFile(object):
 
   @classmethod
   def parse(cls, filename):
-    with codecs.open(filename) as fp:
+    with io.open(filename) as fp:
        blob = fp.read()
     return cls(blob, filename)
 

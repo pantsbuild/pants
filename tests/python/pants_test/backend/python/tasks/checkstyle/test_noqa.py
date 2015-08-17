@@ -66,8 +66,8 @@ class TestPyStyleTask(PythonTaskTestBase):
 
     PythonCheckStyleTask.options_scope = 'py.check'
     self.style_check = PythonCheckStyleTask(self._create_context(), ".")
+    self.style_check._plugins = [{'name': 'Troll', 'checker': Rage}]
     self.style_check.options.suppress = None
-    self.style_check._checker = Rage
 
   def test_noqa_line_filter_length(self):
     """Verify the number of lines filtered is what we expect"""
