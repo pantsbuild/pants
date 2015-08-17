@@ -140,6 +140,10 @@ class Address(AbstractClass):
 
   @property
   def path_safe_spec(self):
+    """Return spec address in a form safe for use as a filename on unix systems.
+
+    This is exactly as unique as the spec itself when compared with other path_spec_names.
+    """
     return ('{safe_spec_path}.{target_name}'
             .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
                     target_name=self._target_name))
