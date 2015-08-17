@@ -109,22 +109,6 @@ PANTS_ARGS=(
   "${INTERPRETER_ARGS[@]}"
 )
 
-IGNORE_STYLE="\
---compile-indentation-skip \
---compile-scalastyle-skip \
---compile-import-order-skip \
---compile-checkstyle-skip \
---compile-future-compatibility-skip \
---compile-class-factoring-skip \
---compile-variable-names-skip \
---compile-pyflakes-skip \
---compile-new-style-classes-skip \
---compile-missing-context-manager-skip \
---compile-pep8-skip \
---compile-print-statements-skip \
---compile-trailing-whitespace-skip \
---compile-except-statement-skip \
---compile-newlines-skip "
 
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   banner "Bootstrapping pants"
@@ -132,7 +116,7 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants $IGNORE_STYLE ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
+    ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex --version && \
@@ -181,7 +165,7 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
-    ./pants.pex $IGNORE_STYLE ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
       --fail-slow \
         $(./pants.pex list pants-plugins/tests/python:: | \
             xargs ./pants.pex filter --filter-type=python_tests)
@@ -194,7 +178,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   banner "Running core python tests${shard_desc}"
   (
-    ./pants.pex $IGNORE_STYLE ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
       --fail-slow \
       --coverage=paths:pants/ \
       --shard=${python_unit_shard} \
@@ -211,7 +195,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     # test (ie: pants_test.contrib) namespace packages.
     # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
     #  https://github.com/pantsbuild/pants/issues/1149
-    ./pants.pex $IGNORE_STYLE ${PANTS_ARGS[@]} test.pytest --fail-slow --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --no-fast contrib::
   ) || die "Contrib python test failure"
 fi
 
@@ -221,7 +205,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex $IGNORE_STYLE ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
       $(./pants.pex list tests/python:: | \
           xargs ./pants.pex filter --filter-type=python_tests | \
           grep integration)

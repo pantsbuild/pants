@@ -17,9 +17,16 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
+class MissingContextManagerSubsystem(Subsystem):
+  options_scope = 'pycheck-context-manager'
+  @classmethod
+  def register_options(cls, register):
+    super(MissingContextManagerSubsystem, cls).register_options(register)
+
+
 class MissingContextManager(CheckstylePlugin):
   """Recommend the use of contextmanagers when it seems appropriate."""
-  subsystem = MissingCMSubsystem
+  subsystem = MissingContextManagerSubsystem
 
   def nits(self):
     with_contexts = set(self.iter_ast_types(ast.With))
@@ -27,12 +34,7 @@ class MissingContextManager(CheckstylePlugin):
         if isinstance(node.context_expr, ast.Call))
 
     for call in self.iter_ast_types(ast.Call):
-      if isinstance(call.func, ast.Name) and call.func.id == 'open' and (
-          call not in with_context_calls):
-        yield self.warning('T802', 'open() calls should be made within a contextmanager.', call)
+      if isinstance(call.func, ast.Name) and call.func.id == 'open' \
+        and (call not in with_context_calls):
 
-class MissingCMSubsystem(Subsystem):
-  options_scope = 'pycheck-context-manager'
-  @classmethod
-  def register_options(cls, register):
-    super(MissingCMSubsystem, cls).register_options(register)
+        yield self.warning('T802', 'open() calls should be made within a contextmanager.', call)

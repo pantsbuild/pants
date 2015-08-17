@@ -77,6 +77,12 @@ def is_builtin_name(name):
 def is_constant(name):
   return UPPER_SNAKE_RE.match(name) is not None
 
+class VariableNamesSubsystem(Subsystem):
+  options_scope = 'pycheck-variable-names'
+  @classmethod
+  def register_options(cls, register):
+    super(VariableNamesSubsystem, cls).register_options(register)
+
 
 class PEP8VariableNames(CheckstylePlugin):
   """Enforces PEP8 recommendations for variable names.
@@ -144,9 +150,3 @@ class PEP8VariableNames(CheckstylePlugin):
                   is_builtin_name(function_def.name),
                   is_reserved_with_trailing_underscore(function_def.name))):
         yield self.error('T002', 'Method names must be lower_snake_cased', function_def)
-
-class VariableNamesSubsystem(Subsystem):
-  options_scope = 'pycheck-variable-names'
-  @classmethod
-  def register_options(cls, register):
-    super(VariableNamesSubsystem, cls).register_options(register)

@@ -11,6 +11,13 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit
 from pants.subsystem.subsystem import Subsystem
 
 
+class FlakeCheckSubsystem(Subsystem):
+  options_scope = 'pycheck-pyflakes'
+  @classmethod
+  def register_options(cls, register):
+    super(FlakeCheckSubsystem, cls).register_options(register)
+
+
 class FlakeError(Nit):
   # TODO(wickman) There is overlap between this and Flake8 -- consider integrating
   # checkstyle plug-ins into the PEP8 tool directly so that this can be inherited
@@ -47,10 +54,3 @@ class PyflakesChecker(CheckstylePlugin):
     checker = FlakesChecker(self.python_file.tree, self.python_file.filename)
     for message in sorted(checker.messages, key=lambda msg: msg.lineno):
       yield FlakeError(self.python_file, message)
-
-
-class FlakeCheckSubsystem(Subsystem):
-  options_scope = 'pycheck-pyflakes'
-  @classmethod
-  def register_options(cls, register):
-    super(FlakeCheckSubsystem, cls).register_options(register)

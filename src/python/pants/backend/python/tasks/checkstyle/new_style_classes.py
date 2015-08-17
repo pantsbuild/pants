@@ -11,6 +11,13 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
+class NewStyleClassesSubsystem(Subsystem):
+  options_scope = 'pycheck-newstyle-classesØ'
+  @classmethod
+  def register_options(cls, register):
+    super(NewStyleClassesSubsystem, cls).register_options(register)
+
+
 class NewStyleClasses(CheckstylePlugin):
   """Enforce the use of new-style classes."""
   subsystem = NewStyleClassesSubsystem
@@ -19,9 +26,3 @@ class NewStyleClasses(CheckstylePlugin):
     for class_def in self.iter_ast_types(ast.ClassDef):
       if not class_def.bases:
         yield self.error('T606', 'Classes must be new-style classes.', class_def)
-
-class NewStyleClassesSubsystem(Subsystem):
-  options_scope = 'pycheck-newstyle-classesØ'
-  @classmethod
-  def register_options(cls, register):
-    super(NewStyleClassesSubsystem, cls).register_options(register)

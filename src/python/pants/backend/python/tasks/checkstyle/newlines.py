@@ -11,6 +11,13 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
+class NewlinesSubsystem(Subsystem):
+  options_scope = 'pycheck-newlinesØ'
+  @classmethod
+  def register_options(cls, register):
+    super(NewlinesSubsystem, cls).register_options(register)
+
+
 class Newlines(CheckstylePlugin):
   subsystem = NewlinesSubsystem
 
@@ -45,10 +52,3 @@ class Newlines(CheckstylePlugin):
         if subnode.lineno - node.lineno > 1 and previous_blank_lines != 1:
           yield self.error('T301', 'Expected 1 blank lines, found %d' % previous_blank_lines,
               subnode)
-
-
-class NewlinesSubsystem(Subsystem):
-  options_scope = 'pycheck-newlinesØ'
-  @classmethod
-  def register_options(cls, register):
-    super(NewlinesSubsystem, cls).register_options(register)

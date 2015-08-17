@@ -13,6 +13,13 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
+class TrailingWhitespaceSubsystem(Subsystem):
+  options_scope = 'pycheck-trailing-whitespace'
+  @classmethod
+  def register_options(cls, register):
+    super(TrailingWhitespaceSubsystem, cls).register_options(register)
+
+
 class TrailingWhitespace(CheckstylePlugin):
   """Warn on invalid trailing whitespace."""
   subsystem = TrailingWhitespaceSubsystem
@@ -55,9 +62,3 @@ class TrailingWhitespace(CheckstylePlugin):
       if line.rstrip().endswith('\\'):
         if not self.has_exception(line_number, len(line.rstrip()) - 1):
           yield self.error('T201', 'Line has trailing slashes.', line_number)
-
-class TrailingWhitespaceSubsystem(Subsystem):
-  options_scope = 'pycheck-trailing-whitespace'
-  @classmethod
-  def register_options(cls, register):
-    super(TrailingWhitespaceSubsystem, cls).register_options(register)
