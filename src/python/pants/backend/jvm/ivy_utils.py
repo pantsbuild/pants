@@ -17,6 +17,7 @@ from copy import deepcopy
 
 from twitter.common.collections import OrderedSet, maybe_list
 
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_environment import get_buildroot
@@ -83,6 +84,8 @@ class IvyInfo(object):
     self._artifacts_by_ref = defaultdict(OrderedSet)
 
   def add_module(self, module):
+    if module.ref in self.modules_by_ref:
+      raise Exception("Already defined module {}, would be overwritten".format(module.ref))
     self.modules_by_ref[module.ref] = module
     if not module.artifact:
       # Module was evicted, so do not record information about it
@@ -124,7 +127,7 @@ class IvyInfo(object):
     memo[ref] = acc
     return acc
 
-  def get_artifacts_for_jar_library(self, jar_library, memo=None):
+  def get_resolved_jars_for_jar_library(self, jar_library, memo=None):
     """Collects jars for the passed jar_library.
 
     Because artifacts are only fetched for the "winning" version of a module, the artifacts
@@ -138,16 +141,23 @@ class IvyInfo(object):
     :returns: all the artifacts for all of the jars in this library, including transitive deps
     :rtype: list of str
     """
-    artifacts = OrderedSet()
-
+    def to_resolved_jar(jar_module_ref, artifact_path):
+      return ResolvedJar(coordinate=M2Coordinate(org=jar_module_ref.org, name=jar_module_ref.name,
+                                                 ref=jar_module_ref.rev,
+                                                 classifier=jar_module_ref.classifier),
+                         cache_path=artifact_path
+      )
+    resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
       for classifier in jar.artifact_classifiers:
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-          artifacts.update(self._artifacts_by_ref[module_ref.unversioned])
-    return artifacts
+          resolved_jars.update(
+            to_resolved_jar(jar_module_ref, artifact_path)
+            for artifact_path in self._artifacts_by_ref[module_ref.unversioned])
+    return resolved_jars
 
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar

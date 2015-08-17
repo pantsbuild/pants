@@ -164,6 +164,7 @@ python_library(
     ':ivy_task_mixin',
     ':nailgun_task',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/goal:products',
