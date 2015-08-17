@@ -31,6 +31,11 @@ class UnionProducts(object):
     for target in targets:
       self.add_for_target(target, products)
 
+  def remove_for_target(self, target, products):
+    """Updates the products for a particular target, removing the given existing entries."""
+    for product in products:
+      self._products_by_target[target].discard(product)
+
   def get_for_target(self, target):
     """Gets the transitive product deps for the given target."""
     return self.get_for_targets([target])

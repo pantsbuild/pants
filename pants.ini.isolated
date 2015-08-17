@@ -11,7 +11,6 @@ use_jmake: False
 
 [compile.zinc]
 strategy: isolated
-capture_log: True
 worker_count: 4
 zinc: [':zinc']
 jvm_options: [

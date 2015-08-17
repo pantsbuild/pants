@@ -20,29 +20,6 @@ class JvmCompileStrategy(object):
   """An abstract base strategy for JVM compilation."""
 
   __metaclass__ = ABCMeta
-
-  class CompileContext(object):
-    """A context for the compilation of a target.
-
-    This can be used to differentiate between a partially completed compile in a temporary location
-    and a finalized compile in its permanent location.
-    """
-    def __init__(self, target, analysis_file, classes_dir, sources):
-      self.target = target
-      self.analysis_file = analysis_file
-      self.classes_dir = classes_dir
-      self.sources = sources
-
-    @property
-    def _id(self):
-      return (self.target, self.analysis_file, self.classes_dir)
-
-    def __eq__(self, other):
-      return self._id == other._id
-
-    def __hash__(self):
-      return hash(self._id)
-
   # Common code.
   # ------------
   @staticmethod
@@ -155,6 +132,10 @@ class JvmCompileStrategy(object):
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
+
+  def finalize_compile(self, relevant_targets):
+    """Executed once after all targets have been compiled."""
+    pass
 
   def class_name_for_class_file(self, compile_context, class_file_name):
     if not class_file_name.endswith(".class"):

@@ -15,6 +15,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
@@ -127,10 +128,10 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     Temporary compile contexts are private to the strategy.
     """
-    return self.CompileContext(target,
-                               self._analysis_file,
-                               self._classes_dir,
-                               self._sources_for_target(target))
+    return CompileContext(target,
+                          self._analysis_file,
+                          self._classes_dir,
+                          self._sources_for_target(target))
 
   def move(self, src, dst):
     if self.delete_scratch:

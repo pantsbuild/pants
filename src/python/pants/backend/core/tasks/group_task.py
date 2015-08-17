@@ -65,6 +65,18 @@ class GroupMember(TaskBase):
     :param list targets: A list of targets that should be processed together (ie: 1 chunk)
     """
 
+  def finalize_execute(self, chunks):
+    """Finalize execution of the group action across the given target chunks
+
+    Only called if chunks have been selected by this group member.
+
+    Chunks are guaranteed to be presented in least dependent to most dependent order and to contain
+    only directly or indirectly invalidated targets.
+
+    :param list chunks: A list of chunks, each chunk being a list of targets that should be
+      processed together.
+    """
+
   def post_execute(self):
     """Called when all invalid targets claimed by the group have been processed.
 
@@ -372,6 +384,11 @@ class GroupTask(Task):
           group_member.execute_chunk(chunk)
 
       # finalize
+      for group_member, chunks in chunks_by_member.items():
+        with workunit_for(group_member, 'finalize'):
+          group_member.finalize_execute(chunks)
+
+      # complete
       for group_member in self._group_members:
         with workunit_for(group_member, 'post'):
           group_member.post_execute()

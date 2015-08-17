@@ -7,21 +7,33 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import xml.etree.ElementTree as ET
 
+from pants.util.contextutil import open_tar, open_zip
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
+SHAPELESS_CLSNAME = 'ShapelessExample.class'
+SHAPELESS_CLSFILE = 'org/pantsbuild/testproject/unicode/shapeless/ShapelessExample.class'
+SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
+
+
 class ScalaCompileIntegrationTest(BaseCompileIT):
 
-  @provide_compile_strategies
-  def test_scala_compile(self, strategy):
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless',
-                              strategy,
-                              expected_files=['ShapelessExample.class']) as found:
+  def test_scala_global_compile(self):
+    with self.do_test_compile(SHAPELESS_TARGET,
+                              'global',
+                              expected_files=[SHAPELESS_CLSNAME]) as found:
 
-      self.assertTrue(
-          self.get_only(found, 'ShapelessExample.class').endswith(
-              'org/pantsbuild/testproject/unicode/shapeless/ShapelessExample.class'))
+      self.assertTrue(self.get_only(found, SHAPELESS_CLSNAME).endswith(SHAPELESS_CLSFILE))
+
+  def test_scala_isolated_compile_jar(self):
+    jar_suffix = 'testprojects.src.scala.org.pantsbuild.testproject.unicode.shapeless.shapeless.jar'
+    with self.do_test_compile(SHAPELESS_TARGET,
+                              'isolated',
+                              expected_files=[jar_suffix]) as found:
+      with open_zip(self.get_only(found, jar_suffix), 'r') as jar:
+        self.assertTrue(jar.getinfo(SHAPELESS_CLSFILE),
+                        'Expected a jar containing the expected class.')
 
   @provide_compile_strategies
   def test_scala_empty_compile(self, strategy):

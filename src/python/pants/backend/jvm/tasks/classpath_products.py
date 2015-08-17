@@ -41,6 +41,10 @@ class ClasspathProducts(object):
     for target in targets:
       self._add_excludes_for_target(target)
 
+  def remove_for_target(self, target, classpath_elements):
+    """Removes the given entries for the target"""
+    self._classpaths.remove_for_target(target, classpath_elements)
+
   def get_for_target(self, target):
     """Gets the transitive classpath products for the given target, in order, respecting target
        excludes."""
