@@ -142,8 +142,8 @@ class GoDistribution(object):
     :param string workunit_name: An optional name for the work unit; defaults to the `cmd`
     :param list workunit_labels: An optional sequence of labels for the work unit.
     :param **kwargs: Keyword arguments to pass through to `subprocess.Popen`.
-    :returns: The exit code of the go command.
-    :rtype: int
+    :returns: A tuple of the exit code and the go command that was run.
+    :rtype: (int, :class:`GoDistribution.GoCommand`)
     """
     go_cmd = self.GoCommand._create(self.goroot, cmd, gopath=gopath, args=args)
     if workunit_factory is None:
@@ -158,4 +158,4 @@ class GoDistribution(object):
                                **kwargs)
         returncode = process.wait()
         workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
-        return returncode
+        return returncode, go_cmd

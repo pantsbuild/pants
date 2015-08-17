@@ -5,37 +5,57 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
 
 
 class GoRemoteLibrary(Target):
+  """TODO(John Sirois): DOCME ???"""
 
-  def __init__(self, zip_url, rev='', **kwargs):
+  @classmethod
+  def from_packages(cls, parse_context, packages, rev='', **kwargs):
+    """TODO(John Sirois): DOCME XXX"""
+    for pkg in packages:
+      name = pkg or os.path.basename(parse_context.rel_path)
+      parse_context.create_object(cls, name=name, pkg=pkg, rev=rev, **kwargs)
+
+  def __init__(self, pkg='', rev='', address=None, payload=None, **kwargs):
     """
-    :param str zip_url:
-      - Any URL from which a zipfile can be downloaded containing the source code of the
-        remote library.
-      - Can be a template string using variables {host}, {id}, {rev}.
-        Example: "{host}/{id}/{rev}.zip"
-          - {host} The host address to download zip files from. Specified by an option to
-                   GoFetch, '--remote-lib-host'.
-          - {id} The global import identifier of the library, which is specified by the path to
-                 the BUILD file relative to the source root of all 3rd party Go libraries.
-                 For example, If the 3rd party source root is "3rdparty/go", a target at
-                 "3rdparty/go/github.com/user/lib" would have an {id} of "github.com/user/lib".
-          - {rev} See :param rev:
-      - The zip file is expected to have zipped the library directory itself, and NOT the
-        direct contents of the library.
-          Expected: `zip -r mylib.zip mylib/`
-               Not: `zip -r mylib.zip mylib/*`
-    :param str rev: Identifies which version of the remote library to download.
-                    This could be a commit SHA (git), node id (hg), etc.
+    :param str pkg: The package name within the remote library; by default the root ('') package.
+    :param str rev: Identifies which version of the remote library to download. This could be a
+                    commit SHA (git), node id (hg), etc.  If left unspecified the version will
+                    default to the latest available.  It's highly recommended to not accept the
+                    default and instead pin the rev explicitly for repeatable builds.
     """
-    payload = Payload()
+    if 'dependencies' in kwargs:
+      raise TargetDefinitionException(address.spec,
+                                      'A go_remote_library does not accept dependencies; instead, '
+                                      'they are discovered and when they are on foreign remote '
+                                      'libraries the versions are taken from other '
+                                      'go_remote_library targets you\'ve defined in the same '
+                                      'source root.')
+
+    payload = payload or Payload()
     payload.add_fields({
-      'rev': PrimitiveField(rev),
-      'zip_url': PrimitiveField(zip_url)
+      'rev': PrimitiveField(rev or ''),  # Guard against/allow `None`.
+      'pkg': PrimitiveField(pkg or ''),  # Guard against/allow `None`.
     })
-    super(GoRemoteLibrary, self).__init__(payload=payload, **kwargs)
+
+    super(GoRemoteLibrary, self).__init__(address=address, payload=payload, **kwargs)
+
+  @property
+  def pkg(self):
+    return self.payload.pkg
+
+  @property
+  def rev(self):
+    return self.payload.rev
+
+  @property
+  def import_path(self):
+    rel_path = os.path.relpath(self.address.spec_path, self.target_base)
+    return os.path.join(rel_path, self.pkg) if self.pkg else rel_path

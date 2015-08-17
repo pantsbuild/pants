@@ -1,8 +1,8 @@
 package libA
 
 import (
-  "contrib/go/examples/src/go/libB"
-  "contrib/go/examples/src/go/libC"
+  "libB"
+  "libC"
 )
 
 func Speak() {
