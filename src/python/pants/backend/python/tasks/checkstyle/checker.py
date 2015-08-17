@@ -8,8 +8,27 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.tasks.checkstyle.class_factoring import (ClassFactoring,
+                                                                   ClassFactoringSubsystem)
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
+from pants.backend.python.tasks.checkstyle.except_statements import (ExceptStatements,
+                                                                     ExceptStatementsSubsystem)
 from pants.backend.python.tasks.checkstyle.file_excluder import FileExcluder
+from pants.backend.python.tasks.checkstyle.future_compatibility import (FutureCompatibility,
+                                                                        FutureCompatibilitySubsystem)
+from pants.backend.python.tasks.checkstyle.import_order import ImportOrder, ImportOrderSubsystem
+from pants.backend.python.tasks.checkstyle.indentation import Indentation, IndentationSubsystem
+from pants.backend.python.tasks.checkstyle.missing_contextmanager import MissingContextManager
+from pants.backend.python.tasks.checkstyle.new_style_classes import (NewStyleClasses,
+                                                                     NewStyleClassesSubsystem)
+from pants.backend.python.tasks.checkstyle.newlines import Newlines, NewlinesSubsystem
+from pants.backend.python.tasks.checkstyle.pep8 import PEP8Checker, PEP8Subsystem
+from pants.backend.python.tasks.checkstyle.print_statements import (PrintStatements,
+                                                                    PrintStatementsSubsystem)
+from pants.backend.python.tasks.checkstyle.pyflakes import FlakeCheckSubsystem, PyflakesChecker
+from pants.backend.python.tasks.checkstyle.trailing_whitespace import (TrailingWhitespace,
+                                                                       TrailingWhitespaceSubsystem)
+from pants.backend.python.tasks.checkstyle.variable_names import PEP8VariableNames
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 
@@ -25,19 +44,39 @@ def noqa_line_filter(python_file, line_number):
 def noqa_file_filter(python_file):
   return any(_NOQA_FILE_SEARCH(line) is not None for line in python_file.lines)
 
-
 class PythonCheckStyleTask(PythonTask):
   _PYTHON_SOURCE_EXTENSION = '.py'
 
   def __init__(self, *args, **kwargs):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)
+    self._plugins = []
     self.options = self.get_options()
+    self.excluder = FileExcluder(self.options.suppress, self.context.log)
 
-    self._checker = lambda x: iter([])  # Default to emtpy iterator
-    self._name = 'DefaultStyleChecker'
+    self.register_plugin(dict(name='class-factoring', checker=ClassFactoring))
+    self.register_plugin(dict(name='except-statement', checker=ExceptStatements))
+    self.register_plugin(dict(name='future-compatibility', checker=FutureCompatibility))
+    self.register_plugin(dict(name='import-order', checker=ImportOrder))
+    self.register_plugin(dict(name='indentation', checker=Indentation))
+    self.register_plugin(dict(name='missing-context-manager', checker=MissingContextManager))
+    self.register_plugin(dict(name='new-style-classes', checker=NewStyleClasses))
+    self.register_plugin(dict(name='newlines', checker=Newlines))
+    self.register_plugin(dict(name='print-statements', checker=PrintStatements))
+    self.register_plugin(dict(name='pyflakes', checker=PyflakesChecker))
+    self.register_plugin(dict(name='tailing-whitespace', checker=TrailingWhitespace))
+    self.register_plugin(dict(name='variable-names', checker=PEP8VariableNames))
+    self.register_plugin(dict(name='pep8', checker=PEP8Checker))
 
-  def _is_checked(self, target):
-    return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(PythonTask, cls).global_subsystems() + (
+      ClassFactoringSubsystem, ExceptStatementsSubsystem, PEP8Subsystem, ExceptStatementsSubsystem,
+      FutureCompatibilitySubsystem, ImportOrderSubsystem, IndentationSubsystem,
+      MissingContextManagerSubsystem, NewStyleClassesSubsystem, NewlinesSubsystem,
+      PrintStatementsSubsystem, FlakeCheckSubsystem, TrailingWhitespaceSubsystem,
+      PEP8VariableNamesSubsystem
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -46,8 +85,9 @@ class PythonCheckStyleTask(PythonTask):
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
     register('--strict', default=False, action='store_true',
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
+    # Add this to subsystem
+    # register('--skip', default=False, action='store_true',
+    #          help='If enabled, skip this style checker.')
     register('--suppress', type=str, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
     register('--fail', default=True, action='store_true',
@@ -57,6 +97,12 @@ class PythonCheckStyleTask(PythonTask):
   def supports_passthru_args(cls):
     return True
 
+  def _is_checked(self, target):
+    return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
+
+  def register_plugin(self, plugin):
+    self._plugins.append(plugin)
+
   def get_nits(self, python_file):
     """Iterate over the instances style checker and yield Nits
     :param python_file: PythonFile Object
@@ -64,17 +110,22 @@ class PythonCheckStyleTask(PythonTask):
     if noqa_file_filter(python_file):
       return
 
-    for nit in self._checker(python_file):
-      if nit._line_number is None:
-        yield nit
-        continue
+    #Filter out any suppressed plugins
+    check_plugins = [plugin for plugin in self._plugins
+                     if self.excluder.should_include(python_file.filename, plugin['name'])]
 
-      nit_slice = python_file.line_range(nit._line_number)
-      for line_number in range(nit_slice.start, nit_slice.stop):
-        if noqa_line_filter(python_file, line_number):
-          break
-        else:
+    for plugin in check_plugins:
+      for nit in plugin['checker'](python_file):
+        if nit._line_number is None:
           yield nit
+          continue
+
+        nit_slice = python_file.line_range(nit._line_number)
+        for line_number in range(nit_slice.start, nit_slice.stop):
+          if noqa_line_filter(python_file, line_number):
+            break
+          else:
+            yield nit
 
   def check_file(self, filename):
     """Process python file looking for indications of problems.
@@ -106,13 +157,6 @@ class PythonCheckStyleTask(PythonTask):
     :param sources: iterable containing source file names.
     :return: Boolean indicating problems found
     """
-    self.options = self.get_options()
-    if self.options.skip:
-      return
-
-    excluder = FileExcluder(self.options.suppress, self.context.log)
-    sources = [src for src in sources if excluder.should_include(src, self._name)]
-
     should_fail = False
     print()
     for filename in sources:
@@ -123,6 +167,9 @@ class PythonCheckStyleTask(PythonTask):
 
   def execute(self):
     """Run Checkstyle on all found source files"""
+    if self.options.skip:
+      return
+
     targets = self.context.targets(self._is_checked)
     sources = self.calculate_sources(targets)
 

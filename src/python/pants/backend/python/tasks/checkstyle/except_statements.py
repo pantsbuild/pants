@@ -7,12 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 class ExceptStatements(CheckstylePlugin):
   """Do not allow non-3.x-compatible and/or dangerous except statements."""
+  subsystem = ExceptStatementsSubsystem
 
   @classmethod
   def blanket_excepts(cls, node):
@@ -42,12 +43,8 @@ class ExceptStatements(CheckstylePlugin):
         if handler.name and ' as ' not in except_suffix:
           yield self.error('T601', 'Old-style except statements forbidden.', handler)
 
-class ExceptStatementsCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(ExceptStatementsCheck, self).__init__(*args, **kwargs)
-    self._checker = ExceptStatements
-    self._name = 'ExceptStatements'
-
+class ExceptStatementsSubsystem(Subsystem):
+  options_scope = 'pycheck-except-statement'
   @classmethod
   def register_options(cls, register):
-    super(ExceptStatementsCheck, cls).register_options(register)
+    super(ExceptStatementsSubsystem, cls).register_options(register)

@@ -12,8 +12,8 @@ from functools import wraps
 
 from twitter.common.lang import Compatibility
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 ALL_LOWER_CASE_RE = re.compile(r'^[a-z][a-z\d]*$')
@@ -80,7 +80,6 @@ def is_constant(name):
 
 class PEP8VariableNames(CheckstylePlugin):
   """Enforces PEP8 recommendations for variable names.
-
   Specifically:
      UpperCamel class names
      lower_snake / _lower_snake / __lower_snake function names
@@ -88,6 +87,7 @@ class PEP8VariableNames(CheckstylePlugin):
      CLASS_LEVEL_CONSTANTS = {}
      GLOBAL_LEVEL_CONSTANTS = {}
   """
+  subsystem = VariableNamesSubsystem
 
   CLASS_GLOBAL_BUILTINS = frozenset((
     '__slots__',
@@ -145,12 +145,8 @@ class PEP8VariableNames(CheckstylePlugin):
                   is_reserved_with_trailing_underscore(function_def.name))):
         yield self.error('T002', 'Method names must be lower_snake_cased', function_def)
 
-class VariableNamesCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(VariableNamesCheck, self).__init__(*args, **kwargs)
-    self._checker = PEP8VariableNames
-    self._name = 'PEP8VariableNames'
-
+class VariableNamesSubsystem(Subsystem):
+  options_scope = 'pycheck-variable-names'
   @classmethod
   def register_options(cls, register):
-    super(VariableNamesCheck, cls).register_options(register)
+    super(VariableNamesSubsystem, cls).register_options(register)

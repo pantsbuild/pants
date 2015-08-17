@@ -7,22 +7,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-
-
 # TODO(wickman)
 #
 # 1. open(foo) should always be done in a with context.
 #
 # 2. if you see acquire/release on the same variable in a particular ast
 #    body, warn about context manager use.
-
-
+from pants.subsystem.subsystem import Subsystem
 
 
 class MissingContextManager(CheckstylePlugin):
   """Recommend the use of contextmanagers when it seems appropriate."""
+  subsystem = MissingCMSubsystem
 
   def nits(self):
     with_contexts = set(self.iter_ast_types(ast.With))
@@ -34,12 +31,8 @@ class MissingContextManager(CheckstylePlugin):
           call not in with_context_calls):
         yield self.warning('T802', 'open() calls should be made within a contextmanager.', call)
 
-class MissingContextManagerCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(MissingContextManagerCheck, self).__init__(*args, **kwargs)
-    self._checker = MissingContextManager
-    self._name = 'ClassFactoring'
-
+class MissingCMSubsystem(Subsystem):
+  options_scope = 'pycheck-context-manager'
   @classmethod
   def register_options(cls, register):
-    super(MissingContextManagerCheck, cls).register_options(register)
+    super(MissingCMSubsystem, cls).register_options(register)
