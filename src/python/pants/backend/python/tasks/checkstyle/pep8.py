@@ -84,9 +84,9 @@ class PEP8Checker(CheckstylePlugin):
   subsystem = PEP8Subsystem
 
   def __init__(self, *args, **kwargs):
-    super(PEP8Checker, self).__init__(self, *args, **kwargs)
+    super(PEP8Checker, self).__init__(*args, **kwargs)
     self.STYLE_GUIDE = pep8.StyleGuide(
-        max_line_length=self.subsystem.global_instance().get_options.max_length,
+        max_line_length=self.subsystem.global_instance().get_options().max_length,
         verbose=False,
         reporter=PantsReporter,
         ignore=self.subsystem.global_instance().get_options().ignore)

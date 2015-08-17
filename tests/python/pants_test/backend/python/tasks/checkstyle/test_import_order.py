@@ -20,7 +20,7 @@ IMPORT_CHUNKS = {
   ImportType.STDLIB: strip_newline("""
   import ast
   from collections import namedtuple
-  import time
+  import io
   """),
 
   ImportType.TWITTER: strip_newline("""
@@ -123,7 +123,7 @@ def test_multiple_imports_error():
   assert chunk_errors[0].severity == Nit.ERROR
   assert set(module_types) == set([ImportType.STDLIB, ImportType.TWITTER])
 
-  io = ImportOrder(PythonFile('import time, pkg_resources'))
+  io = ImportOrder(PythonFile('import io, pkg_resources'))
   import_chunks = list(io.iter_import_chunks())
   assert len(import_chunks) == 1
   module_types, chunk_errors = io.classify_imports(import_chunks[0])
