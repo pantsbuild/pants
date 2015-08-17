@@ -10,7 +10,15 @@ import pep8
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit, PythonFile
 from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.strutil import safe_shlex_split
+
+
+class PEP8Subsystem(Subsystem):
+  options_scope = 'pycheck-pep8'
+  @classmethod
+  def register_options(cls, register):
+    super(PEP8Subsystem, cls).register_options(register)
+    register('--ignore', type=list_option, default=DEFAULT_IGNORE_CODES,
+             help='Prevent test failure but still produce output for problems.')
 
 
 class PEP8Error(Nit):
@@ -83,11 +91,3 @@ class PEP8Checker(CheckstylePlugin):
   def nits(self):
     report = self.STYLE_GUIDE.check_files([self.python_file.filename])
     return report.twitter_errors
-
-class PEP8Subsystem(Subsystem):
-  options_scope = 'pycheck-pep8'
-  @classmethod
-  def register_options(cls, register):
-    super(PEP8Subsystem, cls).register_options(register)
-    register('--ignore', type=list_option, default=DEFAULT_IGNORE_CODES,
-             help='Prevent test failure but still produce output for problems.')

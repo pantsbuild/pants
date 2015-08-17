@@ -18,7 +18,8 @@ from pants.backend.python.tasks.checkstyle.future_compatibility import (FutureCo
                                                                         FutureCompatibilitySubsystem)
 from pants.backend.python.tasks.checkstyle.import_order import ImportOrder, ImportOrderSubsystem
 from pants.backend.python.tasks.checkstyle.indentation import Indentation, IndentationSubsystem
-from pants.backend.python.tasks.checkstyle.missing_contextmanager import MissingContextManager
+from pants.backend.python.tasks.checkstyle.missing_contextmanager import (MissingContextManager,
+                                                                          MissingContextManagerSubsystem)
 from pants.backend.python.tasks.checkstyle.new_style_classes import (NewStyleClasses,
                                                                      NewStyleClassesSubsystem)
 from pants.backend.python.tasks.checkstyle.newlines import Newlines, NewlinesSubsystem
@@ -28,7 +29,8 @@ from pants.backend.python.tasks.checkstyle.print_statements import (PrintStateme
 from pants.backend.python.tasks.checkstyle.pyflakes import FlakeCheckSubsystem, PyflakesChecker
 from pants.backend.python.tasks.checkstyle.trailing_whitespace import (TrailingWhitespace,
                                                                        TrailingWhitespaceSubsystem)
-from pants.backend.python.tasks.checkstyle.variable_names import PEP8VariableNames
+from pants.backend.python.tasks.checkstyle.variable_names import (PEP8VariableNames,
+                                                                  VariableNamesSubsystem)
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 
@@ -75,7 +77,7 @@ class PythonCheckStyleTask(PythonTask):
       FutureCompatibilitySubsystem, ImportOrderSubsystem, IndentationSubsystem,
       MissingContextManagerSubsystem, NewStyleClassesSubsystem, NewlinesSubsystem,
       PrintStatementsSubsystem, FlakeCheckSubsystem, TrailingWhitespaceSubsystem,
-      PEP8VariableNamesSubsystem
+      VariableNamesSubsystem
     )
 
   @classmethod
@@ -85,9 +87,8 @@ class PythonCheckStyleTask(PythonTask):
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
     register('--strict', default=False, action='store_true',
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
-    # Add this to subsystem
-    # register('--skip', default=False, action='store_true',
-    #          help='If enabled, skip this style checker.')
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
     register('--suppress', type=str, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
     register('--fail', default=True, action='store_true',

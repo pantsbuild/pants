@@ -11,6 +11,13 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
+class ClassFactoringSubsystem(Subsystem):
+  options_scope = 'pycheck-class-factoring'
+  @classmethod
+  def register_options(cls, register):
+    super(ClassFactoringSubsystem, cls).register_options(register)
+
+
 class ClassFactoring(CheckstylePlugin):
   """Enforces recommendations for accessing class attributes.
 
@@ -37,10 +44,3 @@ class ClassFactoring(CheckstylePlugin):
             'Instead of %s.%s use self.%s or cls.%s with instancemethods and classmethods '
             'respectively.' % (class_def.name, node.attr, node.attr, node.attr),
             node)
-
-
-class ClassFactoringSubsystem(Subsystem):
-  options_scope = 'pycheck-class-factoring'
-  @classmethod
-  def register_options(cls, register):
-    super(ClassFactoringSubsystem, cls).register_options(register)

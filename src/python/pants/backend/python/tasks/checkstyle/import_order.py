@@ -40,11 +40,17 @@ class ImportType(object):
     PACKAGE: 'package',
     THIRD_PARTY: '3rdparty'
   }
-  subsystem = ImportOrderSubsystem
 
   @classmethod
   def order_names(cls, import_order):
     return ' '.join(cls.NAMES.get(import_id, 'unknown') for import_id in import_order)
+
+
+class ImportOrderSubsystem(Subsystem):
+  options_scope = 'pycheck-import-order'
+  @classmethod
+  def register_options(cls, register):
+    super(ImportOrderSubsystem, cls).register_options(register)
 
 
 class ImportOrder(CheckstylePlugin):
@@ -55,6 +61,8 @@ class ImportOrder(CheckstylePlugin):
 
   PLAT_SPECIFIC_PATH = sysconfig.get_python_lib(plat_specific=1)
   STANDARD_LIB_PATH = sysconfig.get_python_lib(standard_lib=1)
+  subsystem = ImportOrderSubsystem
+
 
   @classmethod
   def extract_import_modules(cls, node):
@@ -189,10 +197,3 @@ class ImportOrder(CheckstylePlugin):
           self.python_file.tree))
 
     return errors
-
-
-class ImportOrderSubsystem(Subsystem):
-  options_scope = 'pycheck-import-order'
-  @classmethod
-  def register_options(cls, register):
-    super(ImportOrderSubsystem, cls).register_options(register)

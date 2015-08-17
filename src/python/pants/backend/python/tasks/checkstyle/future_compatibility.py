@@ -31,6 +31,13 @@ from pants.subsystem.subsystem import Subsystem
 #   __metaclass__
 
 
+class FutureCompatibilitySubsystem(Subsystem):
+  options_scope = 'pycheck-future-compat'
+  @classmethod
+  def register_options(cls, register):
+    super(FutureCompatibilitySubsystem, cls).register_options(register)
+
+
 class FutureCompatibility(CheckstylePlugin):
   """Warns about behavior that will likely break when moving to Python 3.x"""
   BAD_ITERS = frozenset(('iteritems', 'iterkeys', 'itervalues'))
@@ -62,9 +69,3 @@ class FutureCompatibility(CheckstylePlugin):
           if name.id == '__metaclass__':
             yield self.warning('T605',
                 'This metaclass style is deprecated and gone entirely in Python 3.x.', name)
-
-class FutureCompatibilitySubsystem(Subsystem):
-  options_scope = 'pycheck-future-compat'
-  @classmethod
-  def register_options(cls, register):
-    super(FutureCompatibilitySubsystem, cls).register_options(register)

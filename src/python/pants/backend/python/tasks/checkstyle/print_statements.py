@@ -12,6 +12,13 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
+class PrintStatementsSubsystem(Subsystem):
+  options_scope = 'pycheck-print-statements'
+  @classmethod
+  def register_options(cls, register):
+    super(PrintStatementsSubsystem, cls).register_options(register)
+
+
 class PrintStatements(CheckstylePlugin):
   """Enforce the use of print as a function and not a statement."""
 
@@ -28,9 +35,3 @@ class PrintStatements(CheckstylePlugin):
       stripped_line = logical_line[print_offset + len('print'):]
       if not self.FUNCTIONY_EXPRESSION.match(stripped_line):
         yield self.error('T607', 'Print used as a statement.', print_stmt)
-
-class PrintStatementsSubsystem(Subsystem):
-  options_scope = 'pycheck-print-statements'
-  @classmethod
-  def register_options(cls, register):
-    super(PrintStatementsSubsystem, cls).register_options(register)

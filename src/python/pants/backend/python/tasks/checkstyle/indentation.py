@@ -15,6 +15,13 @@ from pants.subsystem.subsystem import Subsystem
 # disabled it from pep8.py due to mismatched indentation styles.
 
 
+class IndentationSubsystem(Subsystem):
+  options_scope = 'pycheck-indentation'
+  @classmethod
+  def register_options(cls, register):
+    super(IndentationSubsystem, cls).register_options(register)
+
+
 class Indentation(CheckstylePlugin):
   """Enforce proper indentation."""
   INDENT_LEVEL = 2  # the one true way
@@ -35,9 +42,3 @@ class Indentation(CheckstylePlugin):
         indents.append(token_text)
       elif token_type is tokenize.DEDENT:
         indents.pop()
-
-class IndentationSubsystem(Subsystem):
-  options_scope = 'pycheck-indentation'
-  @classmethod
-  def register_options(cls, register):
-    super(IndentationSubsystem, cls).register_options(register)
