@@ -287,6 +287,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
+  def post_execute(self):
+    self._strategy.post_compile(filter(self.select, self.context.targets()))
+
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings):
     """Compiles sources for the given vts into the given output dir.
