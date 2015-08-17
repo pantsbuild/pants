@@ -314,7 +314,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def _create_context_jar(self, compile_context):
     """Jar up the compile_context to its output jar location.
-    
+
     TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
     allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
     compile inputs would make the compiler's analysis useless.

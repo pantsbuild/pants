@@ -129,9 +129,9 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     Temporary compile contexts are private to the strategy.
     """
     return CompileContext(target,
-                               self._analysis_file,
-                               self._classes_dir,
-                               self._sources_for_target(target))
+                          self._analysis_file,
+                          self._classes_dir,
+                          self._sources_for_target(target))
 
   def move(self, src, dst):
     if self.delete_scratch:
