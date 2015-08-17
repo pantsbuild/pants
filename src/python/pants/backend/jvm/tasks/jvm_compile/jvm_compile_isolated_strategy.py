@@ -117,7 +117,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                      self.context.run_tracker,
                                      self._worker_count)
 
-  def post_compile(self, targets):
+  def finalize_compile(self, targets):
     if self._jar:
       # Replace the classpath entry for each target with its jar'd representation.
       compile_classpaths = self.context.products.get_data('compile_classpath')

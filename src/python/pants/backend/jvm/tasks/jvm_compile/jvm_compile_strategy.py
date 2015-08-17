@@ -133,8 +133,8 @@ class JvmCompileStrategy(object):
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
 
-  def post_compile(self, targets):
-    """Executed once after all compiles."""
+  def finalize_compile(self, relevant_targets):
+    """Executed once after all targets have been compiled."""
     pass
 
   def class_name_for_class_file(self, compile_context, class_file_name):

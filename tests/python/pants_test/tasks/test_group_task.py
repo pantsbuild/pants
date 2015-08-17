@@ -125,6 +125,17 @@ class BaseGroupTaskTest(BaseTest):
     self.task = self.group_task(self._context, workdir='/not/real')
     self.task.execute()
 
+  def assertUnorderedPrefixEqual(self, expected, actual_iter):
+    """The ordering of the execution of some of these items isn't guaranteed.
+
+    https://groups.google.com/d/msg/pants-devel/Rer9_ytsyf8/gi8zokWNexYJ
+    """
+    actual = list(itertools.islice(actual_iter, len(expected)))
+    self.assertEqual(sorted(expected), sorted(actual))
+
+  def assertPrefixEqual(self, expected, actual_iter):
+    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
+
   def prepare_action(self, tag):
     return 'prepare', tag, self._context
 
@@ -133,6 +144,9 @@ class BaseGroupTaskTest(BaseTest):
 
   def prepare_execute_action(self, tag, chunks):
     return 'prepare_execute', tag, chunks
+
+  def finalize_execute_action(self, tag, chunks):
+    return 'finalize_execute', tag, chunks
 
   def pre_execute_action(self, tag):
     return 'pre_execute', tag
@@ -159,6 +173,9 @@ class BaseGroupTaskTest(BaseTest):
       def prepare_execute(me, chunks):
         self.recorded_actions.append(self.prepare_execute_action(name, chunks))
 
+      def finalize_execute(me, chunks):
+        self.recorded_actions.append(self.finalize_execute_action(name, chunks))
+
       def pre_execute(me):
         self.recorded_actions.append(self.pre_execute_action(name))
 
@@ -182,50 +199,47 @@ class GroupTaskTest(BaseGroupTaskTest):
     return [self.e, f]
 
   def test_groups(self):
-    # These items will be executed by GroupTask in order.
-    expected_prepare_actions = [
-        self.prepare_action('javac'),
-        self.prepare_action('scalac')]
+    """Compare the list of actions executed, with what we expected, in chunks."""
 
-    # The ordering of the execution of these items isn't guaranteed:
-    #
-    #  https://groups.google.com/d/msg/pants-devel/Rer9_ytsyf8/gi8zokWNexYJ
-    #
-    # So we store these separately, to do a special comparison later on.
-    expected_prepare_execute_actions = [
+    recorded_iter = iter(self.recorded_actions)
+
+    self.assertPrefixEqual([
+        self.prepare_action('javac'),
+        self.prepare_action('scalac')], recorded_iter)
+
+    self.assertUnorderedPrefixEqual([
         self.construct_action('javac'),
         self.construct_action('scalac'),
         self.pre_execute_action('javac'),
-        self.pre_execute_action('scalac'),
-        self.prepare_execute_action('javac', [[self.a], [self.c], [self.e]]),
-        self.prepare_execute_action('scalac', [[self.b], [self.d]])]
+        self.pre_execute_action('scalac')],
+      recorded_iter)
 
-    expected_execute_actions = [
+    self.assertUnorderedPrefixEqual([
+        self.prepare_execute_action('javac', [[self.a], [self.c], [self.e]]),
+        self.prepare_execute_action('scalac', [[self.b], [self.d]])],
+      recorded_iter)
+
+    # Compare the execute items in linear order
+    self.assertPrefixEqual([
         self.execute_chunk_action('javac', targets=[self.a]),
         self.execute_chunk_action('scalac', targets=[self.b]),
         self.execute_chunk_action('javac', targets=[self.c]),
         self.execute_chunk_action('scalac', targets=[self.d]),
-        self.execute_chunk_action('javac', targets=[self.e]),
+        self.execute_chunk_action('javac', targets=[self.e])],
+      recorded_iter)
+
+    self.assertUnorderedPrefixEqual([
+        self.finalize_execute_action('javac', [[self.a], [self.c], [self.e]]),
+        self.finalize_execute_action('scalac', [[self.b], [self.d]])],
+      recorded_iter)
+
+    self.assertUnorderedPrefixEqual([
         self.post_execute_action('javac'),
-        self.post_execute_action('scalac')]
+        self.post_execute_action('scalac')],
+      recorded_iter)
 
-    recorded_iter = iter(self.recorded_actions)
-
-    # Now, we compare the list of actions executed, with what we expected, in chunks. We first peel
-    # off the expected number of prepare actions from what was executed, and compare with the
-    # "expected_prepare_actions" list.
-    actual_prepare_actions = list(itertools.islice(recorded_iter, len(expected_prepare_actions)))
-    self.assertEqual(expected_prepare_actions, actual_prepare_actions)
-
-    # Next, we slice off the number of prepare execute actions from the array, store them
-    # separately, sort both the recorded elements and the expected elements, and compare.
-    actual_prepare_execute_actions = list(itertools.islice(recorded_iter,
-                                                           len(expected_prepare_execute_actions)))
-    self.assertEqual(sorted(expected_prepare_execute_actions),
-                     sorted(actual_prepare_execute_actions))
-
-    # Finally, compare the remaining items.
-    self.assertEqual(expected_execute_actions, list(recorded_iter))
+    # Ensure no more entries
+    self.assertEqual([], list(recorded_iter))
 
 
 class EmptyGroupTaskTest(BaseGroupTaskTest):
@@ -266,15 +280,23 @@ class TransitiveGroupTaskTest(BaseGroupTaskTest):
     return [self.d]
 
   def test_transitive_groups(self):
-    expected_execute_actions = [
-        self.execute_chunk_action('scalac', targets=[self.a]),
-        self.execute_chunk_action('javac', targets=[self.c]),
-        self.execute_chunk_action('scalac', targets=[self.d]),
-        self.post_execute_action('javac'),
-        self.post_execute_action('scalac')]
-
-    recorded = self.recorded_actions
+    recorded_iter = iter(self.recorded_actions)
 
     # expecting prepare/construct for java/scalac, then pre-execute/prepare_execute for
-    # javac/scalac: ignore 8 Finally, compare the remaining items.
-    self.assertEqual(expected_execute_actions, recorded[8:])
+    # javac/scalac: ignore 8
+    list(itertools.islice(recorded_iter, 8))
+
+    # Compare the execution in order.
+    self.assertPrefixEqual([
+        self.execute_chunk_action('scalac', targets=[self.a]),
+        self.execute_chunk_action('javac', targets=[self.c]),
+        self.execute_chunk_action('scalac', targets=[self.d])],
+      recorded_iter)
+
+    # And finalizing actions in any order
+    self.assertUnorderedPrefixEqual([
+        self.finalize_execute_action('javac', [[self.c]]),
+        self.finalize_execute_action('scalac', [[self.a], [self.d]]),
+        self.post_execute_action('javac'),
+        self.post_execute_action('scalac')],
+      recorded_iter)
