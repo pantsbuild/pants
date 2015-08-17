@@ -15,6 +15,7 @@ target(
     ':ivy_resolve',
     ':ivy_utils',
     ':junit_run',
+    ':junit_run_integration',
     ':jvm_platform_analysis',
     ':jvm_platform_analysis_integration',
     ':jvm_run',
@@ -201,6 +202,15 @@ python_tests(
     'src/python/pants/java:executor',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
+  name = 'junit_run_integration',
+  sources = ['test_junit_run_integration.py'],
+  dependencies = [
+    'src/python/pants/java/distribution',
+    'tests/python/pants_test:int-test',
   ]
 )
 
