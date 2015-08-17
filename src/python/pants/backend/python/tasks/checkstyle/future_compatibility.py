@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 # Warn on non 2.x/3.x compatible symbols:
@@ -36,6 +36,7 @@ class FutureCompatibility(CheckstylePlugin):
   BAD_ITERS = frozenset(('iteritems', 'iterkeys', 'itervalues'))
   BAD_FUNCTIONS = frozenset(('xrange',))
   BAD_NAMES = frozenset(('basestring', 'unicode'))
+  subsystem = FutureCompatibilitySubsystem
 
   def nits(self):
     for call in self.iter_ast_types(ast.Call):
@@ -62,12 +63,8 @@ class FutureCompatibility(CheckstylePlugin):
             yield self.warning('T605',
                 'This metaclass style is deprecated and gone entirely in Python 3.x.', name)
 
-class FutureCompatibilityCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(FutureCompatibilityCheck, self).__init__(*args, **kwargs)
-    self._checker = FutureCompatibility
-    self._name = 'FutureCompatibility'
-
+class FutureCompatibilitySubsystem(Subsystem):
+  options_scope = 'pycheck-future-compat'
   @classmethod
   def register_options(cls, register):
-    super(FutureCompatibilityCheck, cls).register_options(register)
+    super(FutureCompatibilitySubsystem, cls).register_options(register)

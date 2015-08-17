@@ -8,14 +8,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 import re
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 class PrintStatements(CheckstylePlugin):
   """Enforce the use of print as a function and not a statement."""
 
   FUNCTIONY_EXPRESSION = re.compile(r'^\s*\(.*\)\s*$')
+  subsystem = PrintStatementsSubsystem
 
   def nits(self):
     for print_stmt in self.iter_ast_types(ast.Print):
@@ -28,12 +29,8 @@ class PrintStatements(CheckstylePlugin):
       if not self.FUNCTIONY_EXPRESSION.match(stripped_line):
         yield self.error('T607', 'Print used as a statement.', print_stmt)
 
-class PrintStatementsCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(PrintStatementsCheck, self).__init__(*args, **kwargs)
-    self._checker = PrintStatements
-    self._name = 'PrintStatements'
-
+class PrintStatementsSubsystem(Subsystem):
+  options_scope = 'pycheck-print-statements'
   @classmethod
   def register_options(cls, register):
-    super(PrintStatementsCheck, cls).register_options(register)
+    super(PrintStatementsSubsystem, cls).register_options(register)

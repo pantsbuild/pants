@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 from distutils import sysconfig
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 class ImportType(object):
@@ -40,6 +40,7 @@ class ImportType(object):
     PACKAGE: 'package',
     THIRD_PARTY: '3rdparty'
   }
+  subsystem = ImportOrderSubsystem
 
   @classmethod
   def order_names(cls, import_order):
@@ -190,12 +191,8 @@ class ImportOrder(CheckstylePlugin):
     return errors
 
 
-class ImportOrderCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(ImportOrderCheck, self).__init__(*args, **kwargs)
-    self._checker = ImportOrder
-    self._name = 'ImportOrder'
-
+class ImportOrderSubsystem(Subsystem):
+  options_scope = 'pycheck-import-order'
   @classmethod
   def register_options(cls, register):
-    super(ImportOrderCheck, cls).register_options(register)
+    super(ImportOrderSubsystem, cls).register_options(register)

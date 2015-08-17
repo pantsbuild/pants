@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 class ClassFactoring(CheckstylePlugin):
@@ -22,6 +22,7 @@ class ClassFactoring(CheckstylePlugin):
 
   recommend using self.CONSTANT instead of Distiller.CONSTANT as otherwise
   it makes subclassing impossible."""
+  subsystem = ClassFactoringSubsystem
 
   def iter_class_accessors(self, class_node):
     for node in ast.walk(class_node):
@@ -38,12 +39,8 @@ class ClassFactoring(CheckstylePlugin):
             node)
 
 
-class ClassFactoringCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(ClassFactoringCheck, self).__init__(*args, **kwargs)
-    self._checker = ClassFactoring
-    self._name = 'ClassFactoring'
-
+class ClassFactoringSubsystem(Subsystem):
+  options_scope = 'pycheck-class-factoring'
   @classmethod
   def register_options(cls, register):
-    super(ClassFactoringCheck, cls).register_options(register)
+    super(ClassFactoringSubsystem, cls).register_options(register)

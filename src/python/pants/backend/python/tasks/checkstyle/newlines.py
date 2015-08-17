@@ -7,11 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 class Newlines(CheckstylePlugin):
+  subsystem = NewlinesSubsystem
+
   def iter_toplevel_defs(self):
     for node in self.python_file.tree.body:
       if isinstance(node, ast.FunctionDef) or isinstance(node, ast.ClassDef):
@@ -45,12 +47,8 @@ class Newlines(CheckstylePlugin):
               subnode)
 
 
-class NewlinesCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(NewlinesCheck, self).__init__(*args, **kwargs)
-    self._checker = Newlines
-    self._name = 'Newlines'
-
+class NewlinesSubsystem(Subsystem):
+  options_scope = 'pycheck-newlinesØ'
   @classmethod
   def register_options(cls, register):
-    super(NewlinesCheck, cls).register_options(register)
+    super(NewlinesSubsystem, cls).register_options(register)

@@ -7,15 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import tokenize
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 
 
 # TODO(wickman) Update this to sanitize line continuation styling as we have
 # disabled it from pep8.py due to mismatched indentation styles.
+
+
 class Indentation(CheckstylePlugin):
   """Enforce proper indentation."""
   INDENT_LEVEL = 2  # the one true way
+  subsystem = IndentationSubsystem
 
   def nits(self):
     indents = []
@@ -33,12 +36,8 @@ class Indentation(CheckstylePlugin):
       elif token_type is tokenize.DEDENT:
         indents.pop()
 
-class IndentationCheck(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(IndentationCheck, self).__init__(*args, **kwargs)
-    self._checker = Indentation
-    self._name = 'Indentation'
-
+class IndentationSubsystem(Subsystem):
+  options_scope = 'pycheck-indentation'
   @classmethod
   def register_options(cls, register):
-    super(IndentationCheck, cls).register_options(register)
+    super(IndentationSubsystem, cls).register_options(register)

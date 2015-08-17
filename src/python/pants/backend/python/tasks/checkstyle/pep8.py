@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from functools import partial
-
 import pep8
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit, PythonFile
 from pants.option.custom_types import list_option
+from pants.subsystem.subsystem import Subsystem
+from pants.util.strutil import safe_shlex_split
 
 
 class PEP8Error(Nit):
@@ -72,26 +71,23 @@ DEFAULT_IGNORE_CODES = (
 
 class PEP8Checker(CheckstylePlugin):
   """Enforce PEP8 checks from the pep8 tool."""
+  subsystem = PEP8Subsystem
 
-  def __init__(self, ignore_codes):
+  def __init__(self):
     self.STYLE_GUIDE = pep8.StyleGuide(
         max_line_length=100,
         verbose=False,
         reporter=TwitterReporter,
-        ignore=ignore_codes)
+        ignore=self.subsystem.global_instance().get_options().ignore)
 
   def nits(self):
     report = self.STYLE_GUIDE.check_files([self.python_file.filename])
     return report.twitter_errors
 
-class PEP8Check(PythonCheckStyleTask):
-  def __init__(self, *args, **kwargs):
-    super(PEP8Check, self).__init__(*args, **kwargs)
-    self._checker = partial(PEP8Checker, ignore_codes = self.get_options().ignore)
-    self._name = 'PEP8'
-
+class PEP8Subsystem(Subsystem):
+  options_scope = 'pycheck-pep8'
   @classmethod
   def register_options(cls, register):
-    super(PEP8Check, cls).register_options(register)
+    super(PEP8Subsystem, cls).register_options(register)
     register('--ignore', type=list_option, default=DEFAULT_IGNORE_CODES,
              help='Prevent test failure but still produce output for problems.')
