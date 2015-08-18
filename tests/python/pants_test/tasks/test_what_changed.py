@@ -335,7 +335,7 @@ class WhatChangedTest(BaseWhatChangedTest):
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
-  def test_deffered_sources(self):
+  def test_deferred_sources(self):
     self.add_to_build_file('root/proto', dedent("""
       java_protobuf_library(name='unpacked_jars',
         sources=from_target(':external-source'),
