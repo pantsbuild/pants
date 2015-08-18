@@ -11,11 +11,22 @@ import pytest
 
 from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask, PythonFile
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+from pants.subsystem.subsystem import Subsystem
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
+class RageSubsystem(Subsystem):
+  options_scope = 'pycheck-pep8'
+  @classmethod
+  def register_options(cls, register):
+    super(PEP8Subsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
+
 class Rage(CheckstylePlugin):
   """Dummy Checkstyle plugin that hates everything"""
+  subsystem = RageSubsystem
+
   def __init__(self, python_file):
     self.python_file = python_file
 
