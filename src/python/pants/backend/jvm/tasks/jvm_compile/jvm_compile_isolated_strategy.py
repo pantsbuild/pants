@@ -70,13 +70,11 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     return 'isolated'
 
   def compile_context(self, target):
-    # Generate a short unique path for the jar to allow for shorter classpaths.
-    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
-    hasher = sha1()
-    hasher.update(target.id)
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)
     classes_dir = os.path.join(self._classes_dir, target.id)
-    jar_file = os.path.join(self._jars_dir, hasher.hexdigest()[:12] + '.jar')
+    # Generate a short unique path for the jar to allow for shorter classpaths.
+    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
+    jar_file = os.path.join(self._jars_dir, '{}.jar'.format(sha1(target.id).hexdigest()[:12]))
     return IsolatedCompileContext(target,
                                   analysis_file,
                                   classes_dir,
