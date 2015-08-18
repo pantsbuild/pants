@@ -16,6 +16,7 @@ target(
     ':ivy_utils',
     ':junit_run',
     ':jvm_platform_analysis',
+    ':jvm_platform_analysis_integration',
     ':jvm_run',
     ':resources_task',
     ':prepare_resources',
@@ -173,6 +174,16 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'jvm_platform_analysis_integration',
+  sources = ['test_jvm_platform_analysis_integration.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
+)
 
 python_tests(
   name = 'junit_run',
