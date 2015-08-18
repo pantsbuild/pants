@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_mkdir
 class Watchman(ProcessManager):
   """Watchman process manager and helper class."""
 
-  SOCKET_TIMEOUT = 1
+  SOCKET_TIMEOUT_SECONDS = 1
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
@@ -42,7 +42,7 @@ class Watchman(ProcessManager):
       self._watchman_client = self._make_client()
     return self._watchman_client
 
-  def _make_client(self, timeout=SOCKET_TIMEOUT):
+  def _make_client(self, timeout=SOCKET_TIMEOUT_SECONDS):
     """Create a new watchman client using the BSER protocol over a UNIX socket."""
     return StreamableWatchmanClient(sockpath=self.socket, transport='local', timeout=timeout)
 
