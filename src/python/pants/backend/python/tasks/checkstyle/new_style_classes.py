@@ -24,12 +24,6 @@ class NewStyleClasses(CheckstylePlugin):
   """Enforce the use of new-style classes."""
   subsystem = NewStyleClassesSubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(NewStyleClasses, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   def nits(self):
     for class_def in self.iter_ast_types(ast.ClassDef):
       if not class_def.bases:

@@ -27,13 +27,6 @@ class PrintStatements(CheckstylePlugin):
   FUNCTIONY_EXPRESSION = re.compile(r'^\s*\(.*\)\s*$')
   subsystem = PrintStatementsSubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(PrintStatements, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
-
   def nits(self):
     for print_stmt in self.iter_ast_types(ast.Print):
       # In Python 3.x and in 2.x with __future__ print_function, prints show up as plain old

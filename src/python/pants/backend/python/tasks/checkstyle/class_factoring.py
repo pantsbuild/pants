@@ -33,13 +33,6 @@ class ClassFactoring(CheckstylePlugin):
   it makes subclassing impossible."""
   subsystem = ClassFactoringSubsystem
 
-
-  def __init__(self, *args, **kwargs):
-    super(ClassFactoring, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   def iter_class_accessors(self, class_node):
     for node in ast.walk(class_node):
       if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and (

@@ -65,12 +65,6 @@ class ImportOrder(CheckstylePlugin):
   STANDARD_LIB_PATH = sysconfig.get_python_lib(standard_lib=1)
   subsystem = ImportOrderSubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(ImportOrder, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   @classmethod
   def extract_import_modules(cls, node):
     if isinstance(node, ast.Import):

@@ -52,12 +52,6 @@ class PyflakesChecker(CheckstylePlugin):
   """Detect common coding errors via the pyflakes package."""
   subsystem = FlakeCheckSubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(PyflakesChecker, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   def nits(self):
     checker = FlakesChecker(self.python_file.tree, self.python_file.filename)
     for message in sorted(checker.messages, key=lambda msg: msg.lineno):

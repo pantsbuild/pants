@@ -102,14 +102,6 @@ class PEP8VariableNames(CheckstylePlugin):
     '__metaclass__',
   ))
 
-
-  def __init__(self, *args, **kwargs):
-    super(PEP8VariableNames, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
-
   def iter_class_methods(self, class_node):
     for node in class_node.body:
       if isinstance(node, ast.FunctionDef):

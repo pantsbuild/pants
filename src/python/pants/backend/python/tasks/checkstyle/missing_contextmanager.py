@@ -30,12 +30,6 @@ class MissingContextManager(CheckstylePlugin):
   """Recommend the use of contextmanagers when it seems appropriate."""
   subsystem = MissingContextManagerSubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(MissingContextManager, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   def nits(self):
     with_contexts = set(self.iter_ast_types(ast.With))
     with_context_calls = set(node.context_expr for node in with_contexts
