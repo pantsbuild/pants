@@ -27,13 +27,12 @@ class TestWatchman(BaseTest):
   TEST_DIR = '/path/to/a/fake/test'
   WATCHMAN_DIR = os.path.join(WORK_DIR, 'watchman')
   STATE_FILE = os.path.join(WATCHMAN_DIR, 'watchman.state')
-  HANDLERS = {'test': Watchman.EventHandler('test', {}, mock.Mock())}
+  HANDLERS = [Watchman.EventHandler(name='test', metadata={}, callback=mock.Mock())]
 
   def setUp(self):
     BaseTest.setUp(self)
-    with mock.patch.object(Watchman, '_resolve_watchman_path', **self.PATCH_OPTS) as mock_find:
-      mock_find.return_value = self.WATCHMAN_PATH
-      self.watchman = Watchman(self.WORK_DIR)
+    self.watchman = Watchman(self.WORK_DIR)
+    # self.watchman = Watchman(self.WORK_DIR, watchman_path=self.WATCHMAN_PATH)
 
   def test_client_property(self):
     self.assertIsInstance(self.watchman.client, pywatchman.client)
