@@ -21,6 +21,8 @@ class PEP8Subsystem(Subsystem):
              help='Prevent test failure but still produce output for problems.')
     register('--max-length', type=int, default=100,
              help='Max line length to use for PEP8 checks.')
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class PEP8Error(Nit):
@@ -85,6 +87,10 @@ class PEP8Checker(CheckstylePlugin):
 
   def __init__(self, *args, **kwargs):
     super(PEP8Checker, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
+
     self.STYLE_GUIDE = pep8.StyleGuide(
         max_line_length=self.subsystem.global_instance().get_options().max_length,
         verbose=False,

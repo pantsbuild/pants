@@ -16,11 +16,19 @@ class NewStyleClassesSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(NewStyleClassesSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class NewStyleClasses(CheckstylePlugin):
   """Enforce the use of new-style classes."""
   subsystem = NewStyleClassesSubsystem
+
+  def __init__(self, *args, **kwargs):
+    super(NewStyleClasses, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   def nits(self):
     for class_def in self.iter_ast_types(ast.ClassDef):

@@ -20,12 +20,21 @@ class IndentationSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(IndentationSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class Indentation(CheckstylePlugin):
   """Enforce proper indentation."""
   INDENT_LEVEL = 2  # the one true way
   subsystem = IndentationSubsystem
+
+
+  def __init__(self, *args, **kwargs):
+    super(Indentation, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   def nits(self):
     indents = []
