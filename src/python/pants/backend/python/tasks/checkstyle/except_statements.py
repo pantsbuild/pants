@@ -16,11 +16,19 @@ class ExceptStatementsSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(ExceptStatementsSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class ExceptStatements(CheckstylePlugin):
   """Do not allow non-3.x-compatible and/or dangerous except statements."""
   subsystem = ExceptStatementsSubsystem
+
+  def __init__(self, *args, **kwargs):
+    super(ExceptStatements, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   @classmethod
   def blanket_excepts(cls, node):

@@ -16,6 +16,8 @@ class ClassFactoringSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(ClassFactoringSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class ClassFactoring(CheckstylePlugin):
@@ -30,6 +32,13 @@ class ClassFactoring(CheckstylePlugin):
   recommend using self.CONSTANT instead of Distiller.CONSTANT as otherwise
   it makes subclassing impossible."""
   subsystem = ClassFactoringSubsystem
+
+
+  def __init__(self, *args, **kwargs):
+    super(ClassFactoring, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   def iter_class_accessors(self, class_node):
     for node in ast.walk(class_node):

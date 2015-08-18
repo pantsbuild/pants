@@ -16,10 +16,18 @@ class NewlinesSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(NewlinesSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class Newlines(CheckstylePlugin):
   subsystem = NewlinesSubsystem
+
+  def __init__(self, *args, **kwargs):
+    super(Newlines, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   def iter_toplevel_defs(self):
     for node in self.python_file.tree.body:

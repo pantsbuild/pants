@@ -51,6 +51,8 @@ class ImportOrderSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(ImportOrderSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class ImportOrder(CheckstylePlugin):
@@ -63,6 +65,11 @@ class ImportOrder(CheckstylePlugin):
   STANDARD_LIB_PATH = sysconfig.get_python_lib(standard_lib=1)
   subsystem = ImportOrderSubsystem
 
+  def __init__(self, *args, **kwargs):
+    super(ImportOrder, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   @classmethod
   def extract_import_modules(cls, node):

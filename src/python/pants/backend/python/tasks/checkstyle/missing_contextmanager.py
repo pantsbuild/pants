@@ -22,11 +22,19 @@ class MissingContextManagerSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(MissingContextManagerSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class MissingContextManager(CheckstylePlugin):
   """Recommend the use of contextmanagers when it seems appropriate."""
   subsystem = MissingContextManagerSubsystem
+
+  def __init__(self, *args, **kwargs):
+    super(MissingContextManager, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
 
   def nits(self):
     with_contexts = set(self.iter_ast_types(ast.With))

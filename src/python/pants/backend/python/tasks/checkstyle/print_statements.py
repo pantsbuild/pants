@@ -17,6 +17,8 @@ class PrintStatementsSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PrintStatementsSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class PrintStatements(CheckstylePlugin):
@@ -24,6 +26,13 @@ class PrintStatements(CheckstylePlugin):
 
   FUNCTIONY_EXPRESSION = re.compile(r'^\s*\(.*\)\s*$')
   subsystem = PrintStatementsSubsystem
+
+  def __init__(self, *args, **kwargs):
+    super(PrintStatements, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
+
 
   def nits(self):
     for print_stmt in self.iter_ast_types(ast.Print):

@@ -82,6 +82,8 @@ class VariableNamesSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(VariableNamesSubsystem, cls).register_options(register)
+    register('--skip', default=False, action='store_true',
+             help='If enabled, skip this style checker.')
 
 
 class PEP8VariableNames(CheckstylePlugin):
@@ -99,6 +101,14 @@ class PEP8VariableNames(CheckstylePlugin):
     '__slots__',
     '__metaclass__',
   ))
+
+
+  def __init__(self, *args, **kwargs):
+    super(PEP8VariableNames, self).__init__(*args, **kwargs)
+    # Disable check if skip is specified
+    if self.subsystem.global_instance().get_options().skip:
+      self.nits = lambda : []
+
 
   def iter_class_methods(self, class_node):
     for node in class_node.body:
