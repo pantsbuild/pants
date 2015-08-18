@@ -87,10 +87,6 @@ class PEP8Checker(CheckstylePlugin):
 
   def __init__(self, *args, **kwargs):
     super(PEP8Checker, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
     self.STYLE_GUIDE = pep8.StyleGuide(
         max_line_length=self.subsystem.global_instance().get_options().max_length,
         verbose=False,

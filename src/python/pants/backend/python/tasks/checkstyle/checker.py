@@ -119,6 +119,9 @@ class PythonCheckStyleTask(PythonTask):
       check_plugins = self._plugins
 
     for plugin in check_plugins:
+      if plugin['checker'].subsystem.global_instance().get_options().skip:
+        return
+
       for nit in plugin['checker'](python_file):
         if nit._line_number is None:
           yield nit

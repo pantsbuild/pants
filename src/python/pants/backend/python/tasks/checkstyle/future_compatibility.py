@@ -47,12 +47,6 @@ class FutureCompatibility(CheckstylePlugin):
   BAD_NAMES = frozenset(('basestring', 'unicode'))
   subsystem = FutureCompatibilitySubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(FutureCompatibility, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   def nits(self):
     for call in self.iter_ast_types(ast.Call):
       if isinstance(call.func, ast.Attribute):

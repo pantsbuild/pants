@@ -29,13 +29,6 @@ class Indentation(CheckstylePlugin):
   INDENT_LEVEL = 2  # the one true way
   subsystem = IndentationSubsystem
 
-
-  def __init__(self, *args, **kwargs):
-    super(Indentation, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   def nits(self):
     indents = []
 

@@ -26,12 +26,6 @@ class TrailingWhitespace(CheckstylePlugin):
   """Warn on invalid trailing whitespace."""
   subsystem = TrailingWhitespaceSubsystem
 
-  def __init__(self, *args, **kwargs):
-    super(TrailingWhitespace, self).__init__(*args, **kwargs)
-    # Disable check if skip is specified
-    if self.subsystem.global_instance().get_options().skip:
-      self.nits = lambda : []
-
   @classmethod
   def build_exception_map(cls, tokens):
     """Generates a set of ranges where we accept trailing slashes, specifically within comments
