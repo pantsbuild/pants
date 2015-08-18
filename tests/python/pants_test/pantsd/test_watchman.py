@@ -31,8 +31,9 @@ class TestWatchman(BaseTest):
 
   def setUp(self):
     BaseTest.setUp(self)
-    self.watchman = Watchman(self.WORK_DIR)
-    # self.watchman = Watchman(self.WORK_DIR, watchman_path=self.WATCHMAN_PATH)
+    with mock.patch.object(Watchman, '_resolve_watchman_path', **self.PATCH_OPTS) as mock_find:
+      mock_find.return_value = self.WATCHMAN_PATH
+      self.watchman = Watchman(self.WORK_DIR)
 
   def test_client_property(self):
     self.assertIsInstance(self.watchman.client, pywatchman.client)
