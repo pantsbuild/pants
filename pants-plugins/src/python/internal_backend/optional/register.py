@@ -16,5 +16,4 @@ def register_goals():
   task(name='python-eval', action=PythonEval).install('compile')
   task(name='checkstyle', action=Checkstyle).install('compile')
   task(name='scalastyle', action=Scalastyle).install('compile')
-
-  task(name='pythonstyle', action=PythonCheckStyleTask).install('python-style').with_description('')
+  task(name='pythonstyle', action=PythonCheckStyleTask).install('compile')
