@@ -122,15 +122,19 @@ class JobExistsError(UnexecutableGraphError):
 class ThreadSafeCounter(object):
   def __init__(self):
     self.lock = threading.Lock()
-    self.counter = 0
+    self._counter = 0
+
+  def get(self):
+    with self.lock:
+      return self._counter
 
   def increment(self):
     with self.lock:
-      self.counter += 1
+      self._counter += 1
 
   def decrement(self):
     with self.lock:
-      self.counter -= 1
+      self._counter -= 1
 
 class ExecutionGraph(object):
   """A directed acyclic graph of work to execute.
@@ -143,6 +147,7 @@ class ExecutionGraph(object):
     """
 
     :param job_list Job: list of Jobs to schedule and run.
+    :param job_sizes: list of estimated job sizes used for prioritization.
     """
     self._dependencies = defaultdict(list)
     self._dependees = defaultdict(list)
@@ -241,9 +246,7 @@ class ExecutionGraph(object):
     completed_dependencies = defaultdict(int)
 
     heap = queue.PriorityQueue()
-    # this should really be just an atomic counter but I don't know how to do that nicely
-    # if I make it a number, python says "unresolved reference"
-    in_flight = ThreadSafeCounter()
+    jobs_in_flight = ThreadSafeCounter()
 
     def submit_jobs(job_keys):
       def worker(worker_key, work):
@@ -253,15 +256,15 @@ class ExecutionGraph(object):
         except Exception as e:
           result = (worker_key, FAILED, e)
         finished_queue.put(result)
-        in_flight.decrement()
+        jobs_in_flight.decrement()
 
       for job_key in job_keys:
-        # minus because we need jobs with larger priority first
+        # minus because jobs with larger priority should go first
         heap.put((-self._job_priority[job_key], job_key))
 
-      while heap.qsize() > 0 and in_flight.counter < pool.num_workers:
+      while heap.qsize() > 0 and jobs_in_flight.get() < pool.num_workers:
         priority, job_key = heap.get()
-        in_flight.increment()
+        jobs_in_flight.increment()
         status_table.mark_as(QUEUED, job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
