@@ -9,6 +9,7 @@ import os
 import shutil
 import zipfile
 from collections import OrderedDict, defaultdict
+from hashlib import sha1
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import IsolatedCompileContext
@@ -51,7 +52,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
     self._logs_dir = os.path.join(workdir, 'isolated-logs')
-    self._jars_dir = os.path.join(workdir, 'isolated-jars')
+    self._jars_dir = os.path.join(workdir, 'jars')
 
     self._capture_log = options.capture_log
     self._jar = options.jar
@@ -69,10 +70,13 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     return 'isolated'
 
   def compile_context(self, target):
+    # Generate a short unique path for the jar to allow for shorter classpaths.
+    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
+    hasher = sha1()
+    hasher.update(target.id)
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)
     classes_dir = os.path.join(self._classes_dir, target.id)
-    # TODO: this will be a fairly long path. should use an id hash to shorten it if possible
-    jar_file = os.path.join(self._jars_dir, target.id + '.jar')
+    jar_file = os.path.join(self._jars_dir, hasher.hexdigest()[:12] + '.jar')
     return IsolatedCompileContext(target,
                                   analysis_file,
                                   classes_dir,
