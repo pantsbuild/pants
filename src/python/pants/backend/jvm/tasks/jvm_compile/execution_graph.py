@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import Queue as queue
 import threading
 import traceback
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from pants.base.worker_pool import Work
 
@@ -144,6 +144,7 @@ class ExecutionGraph(object):
 
     :param job_list Job: list of Jobs to schedule and run.
     """
+    self._dependencies = defaultdict(list)
     self._dependees = defaultdict(list)
     self._jobs = {}
     self._job_keys_as_scheduled = []
@@ -161,11 +162,13 @@ class ExecutionGraph(object):
 
     if job_sizes is None:
       job_sizes = [1] * len(job_list)
+    else:
+      assert len(job_sizes) == len(job_list)
 
     self._job_size = {job.key: job_size for job, job_size in zip(job_list, job_sizes)}
 
-    self._job_priority = {}
-    self._compute_job_priorities()
+    self._job_priority = defaultdict(int)
+    self._compute_job_priorities(job_list)
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -184,23 +187,31 @@ class ExecutionGraph(object):
     if len(dependency_keys) == 0:
       self._job_keys_with_no_dependencies.append(key)
 
-    for dep_name in dependency_keys:
-      self._dependees[dep_name].append(key)
+    self._dependencies[key] = dependency_keys
+    for dependency_key in dependency_keys:
+      self._dependees[dependency_key].append(key)
 
-  def _compute_job_priorities(self):
-    def compute_job_priority(v):
-      if self._job_priority.get(v) is not None:
-        return self._job_priority[v]
+  def _compute_job_priorities(self, job_list):
+    """Walks the dependency graph breadth-first, starting from the most dependent tasks,
+     and computes the job priority as the sum of the jobs sizes along the critical path."""
+    queue = deque()
+    for job in job_list:
+      if len(self._dependees[job.key]) == 0:
+        self._job_priority[job.key] = self._job_size[job.key]
+        queue.append(job.key)
 
-      max_dependee_priority = 0
-      for dependee_key in self._dependees[v]:
-        max_dependee_priority = max(max_dependee_priority, compute_job_priority(dependee_key))
+    satisfied_dependees_count = defaultdict(int)
 
-      self._job_priority[v] = self._job_size[v] + max_dependee_priority
-      return self._job_priority[v]
+    while len(queue) > 0:
+      job_key = queue.popleft()
+      for dependency_key in self._dependencies[job_key]:
+        self._job_priority[dependency_key] = \
+          max(self._job_priority[dependency_key],
+              self._job_size[dependency_key] + self._job_priority[job_key])
+        satisfied_dependees_count[dependency_key] += 1
+        if satisfied_dependees_count[dependency_key] == len(self._dependees[dependency_key]):
+          queue.append(dependency_key)
 
-    for job_key in self._job_keys_with_no_dependencies:
-      compute_job_priority(job_key)
 
   def execute(self, pool, log):
     """Runs scheduled work, ensuring all dependencies for each element are done before execution.

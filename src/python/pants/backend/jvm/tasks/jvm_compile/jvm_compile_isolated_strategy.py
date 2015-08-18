@@ -34,6 +34,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       register('--worker-count', advanced=True, type=int, default=1,
                help='The number of concurrent workers to use compiling with {task} with the '
                     'isolated strategy.'.format(task=compile_task_name))
+    register('--size-estimator', advanced=True,
+             choices=["linecount", "filecount", "filesize"], default="filesize",
+             help='The method of target size estimation.')
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
@@ -58,7 +61,28 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       worker_count = 1
     self._worker_count = worker_count
 
+    self._size_estimator = self.size_estimator_by_name(options.size_estimator)
+
     self._worker_pool = None
+
+  @staticmethod
+  def size_estimator_by_name(estimation_strategy_name):
+
+    def file_line_count(source_file_name):
+      with open(source_file_name, 'rb') as fh:
+        return sum(1 for line in fh)
+
+    if estimation_strategy_name == "linecount":
+      # job size is the total line count in the target
+      return lambda sources: sum([file_line_count(filepath) for filepath in sources])
+    elif estimation_strategy_name == "filecount":
+      # job size is the number of files in the target
+      return lambda sources: len(sources)
+    elif estimation_strategy_name == "filesize":
+      # job size is the total byte size of files in the target
+      return lambda sources: sum([os.path.getsize(filepath) for filepath in sources])
+    else:
+      raise NotImplementedError()
 
   def name(self):
     return 'isolated'
@@ -253,18 +277,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                       on_success=vts.update,
                       on_failure=vts.force_invalidate))
 
-      def file_line_count(source_file_name):
-        with open(source_file_name, 'rb') as fh:
-          return sum(1 for line in fh)
-
-      # job size is the total line count in the target:
-      job_sizes.append(sum([file_line_count(filepath) for filepath in compile_context.sources]))
-
-      # job size is the number of files in the target:
-      # job_sizes.append(len(compile_context.sources))
-
-      # job size is the total byte size of files in the target:
-      # job_sizes.append(sum([os.path.getsize(filepath) for filepath in compile_context.sources]))
+      job_sizes.append(self._size_estimator(compile_context.sources))
 
     return jobs, job_sizes
 
