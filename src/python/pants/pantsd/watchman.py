@@ -113,16 +113,23 @@ class Watchman(ProcessManager):
     self.write_socket(self._sock_file)
 
   def watch_project(self, path):
-    """Issues the watch-project command to watchman to begin watching the buildroot."""
+    """Issues the watch-project command to watchman to begin watching the buildroot.
+
+       :param str path: the path to the watchman project root/pants build root.
+    """
     # TODO(kwlzn): this can fail with SocketTimeout - add retry.
     return self.client.query('watch-project', os.path.realpath(path))
 
-  def subscribed(self, build_root, handler_dict):
-    """Bulk subscribe helper for StreamableWatchmanClient."""
+  def subscribed(self, build_root, handlers):
+    """Bulk subscribe helper for StreamableWatchmanClient.
+
+       :param str build_root: the build_root for all subscriptions.
+       :param iterable handlers: a sequence of Watchman.EventHandler namedtuple objects.
+    """
     command_list = [['subscribe',
                      build_root,
-                     name,
-                     handler.metadata] for name, handler in handler_dict.items()]
+                     handler.name,
+                     handler.metadata] for handler in handlers]
 
     self._logger.debug('watchman command_list is: {}'.format(command_list))
 
