@@ -168,14 +168,13 @@ object Compiler {
  */
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
-  def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Unit = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Unit = {
     val progress =
       new SimpleCompileProgress(
         setup.consoleLog.logPhases,
         setup.consoleLog.printProgress,
         setup.consoleLog.heartbeatSecs
       )(log)
-    val reporter = new LoggerReporter(maximumErrors = 100, log, identity)
     compile(inputs, cwd, reporter, Some(progress))(log)
   }
 

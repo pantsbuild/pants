@@ -26,7 +26,6 @@ class LoggersSpec extends WordSpec with MustMatchers {
         Loggers.create(
           Level.Debug,
           false,
-          Seq(),
           ConsoleOut.printWriterOut(new PrintWriter(stdout)),
           Some(captureFile)
         )
