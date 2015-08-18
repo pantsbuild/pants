@@ -20,12 +20,8 @@ from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
+from pants.util.osutil import get_os_id
 
-
-_ID_BY_OS = {
-  'linux': lambda release, machine: ('linux', machine),
-  'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
-}
 
 _DEFAULT_PATH_BY_ID = {
   ('linux', 'x86_64'): ['linux', 'x86_64'],
@@ -104,18 +100,19 @@ class BinaryUtil(object):
 
     sysname, _, release, _, machine = uname_func()
     try:
-      os_id = _ID_BY_OS[sysname.lower()]
+      os_id = get_os_id(uname_func=uname_func)
     except KeyError:
+      os_id = None
+    if os_id is None:
       raise self.MissingMachineInfo("Pants has no binaries for {}".format(sysname))
 
     try:
-      middle_path = self._path_by_id[os_id(release, machine)]
+      middle_path = self._path_by_id[os_id]
     except KeyError:
       raise self.MissingMachineInfo(
         "Update --binaries-path-by-id to find binaries for {sysname} {machine} {release}.".format(
           sysname=sysname, release=release, machine=machine))
     return os.path.join(supportdir, *(middle_path + [version, name]))
-
 
   def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.

@@ -73,7 +73,7 @@ class ScroogeGen(NailgunTask):
 
   @classmethod
   def global_subsystems(cls):
-    return (ThriftDefaults,)
+    return super(ScroogeGen, cls).global_subsystems() + (ThriftDefaults,)
 
   @classmethod
   def product_types(cls):

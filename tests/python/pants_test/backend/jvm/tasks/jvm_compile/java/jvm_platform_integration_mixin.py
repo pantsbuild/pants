@@ -69,7 +69,7 @@ class JvmPlatformIntegrationMixin(object):
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()
-          + ['--jvm-compile-strategy={}'.format(strategy), 'compile.checkstyle', '--skip', spec]
+          + ['--strategy={}'.format(strategy), 'compile.checkstyle', '--skip', spec]
           + more_args,
           workdir, config)
         self.assert_success(pants_run)
@@ -207,10 +207,10 @@ class JvmPlatformIntegrationMixin(object):
         def compile_diamond(platform):
           return self.run_pants_with_workdir(['--jvm-platform-platforms={}'.format(platforms),
                                               '--jvm-platform-default-platform={}'.format(platform),
-                                              '--jvm-compile-strategy=isolated',
                                               '-ldebug',
                                               'compile'] + self.get_pants_compile_args() +
-                                              ['{}:diamond'.format(tmpdir)], workdir=workdir)
+                                              ['--strategy=isolated',
+                                               '{}:diamond'.format(tmpdir)], workdir=workdir)
 
         # We shouldn't be able to compile this with -source=6.
         self.assert_failure(compile_diamond('java6'), 'Diamond.java was compiled successfully with '

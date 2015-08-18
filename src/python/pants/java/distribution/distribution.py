@@ -15,13 +15,17 @@ from contextlib import contextmanager
 
 from six import string_types
 
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.base.revision import Revision
+from pants.subsystem.subsystem import SubsystemError
 from pants.util.contextutil import temporary_dir
 
 
 logger = logging.getLogger(__name__)
 
 
+# TODO(gmalmquist): Make Distribution a subsystem that depends on JVM.
+# (see discussion on https://rbcommons.com/s/twitter/r/2657/)
 class Distribution(object):
   """Represents a java distribution - either a JRE or a JDK installed on the local system.
 
@@ -137,6 +141,13 @@ class Distribution(object):
       return cls._Location.from_home(home) if home else None
 
     def search_path():
+      try:
+        for location in JVM.global_instance().get_jdk_paths():
+          yield cls._Location.from_home(location)
+      except SubsystemError:
+        logger.warning('Java distribution requested before JVM subsystem initialized.')
+        pass
+
       yield env_home('JDK_HOME')
       yield env_home('JAVA_HOME')
 
