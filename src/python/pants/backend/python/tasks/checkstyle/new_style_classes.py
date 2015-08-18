@@ -12,7 +12,7 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class NewStyleClassesSubsystem(Subsystem):
-  options_scope = 'pycheck-newstyle-classesØ'
+  options_scope = 'pycheck-newstyle-classes'
   @classmethod
   def register_options(cls, register):
     super(NewStyleClassesSubsystem, cls).register_options(register)

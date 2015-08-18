@@ -142,7 +142,6 @@ class ImportOrder(CheckstylePlugin):
     for node in chunk:
       errors.extend(self.import_errors(node))
       module_types = self.classify_import_node(node)
-      print(module_types, self.extract_import_modules(node))
       if len(module_types) > 1:
         errors.append(self.error('T403',
             'Import statement imports from multiple module types: %s.'
