@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
+from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -59,11 +59,14 @@ class Export(ConsoleTask):
 
   @staticmethod
   def _jar_id(jar):
-    """Create a string identifier for the M2Coordinate key.
-    :param M2Coordinate jar: key for a resolved jar
+    """Create a string identifier for the IvyModuleRef key.
+    :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
     """
-    return str(jar)
+    if jar.rev:
+      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
+    else:
+      return '{0}:{1}'.format(jar.org, jar.name)
 
   @staticmethod
   def _exclude_id(jar):
@@ -179,7 +182,7 @@ class Export(ConsoleTask):
         info['targets'].append(self._address(dep.address))
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
-            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+            target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
           # Add all the jars pulled in by this jar_library
           target_libraries.update(get_transitive_jars(dep))
         if isinstance(dep, Resources):
