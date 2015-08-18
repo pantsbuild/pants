@@ -121,10 +121,11 @@ class Watchman(ProcessManager):
     return self.client.query('watch-project', os.path.realpath(path))
 
   def subscribed(self, build_root, handlers):
-    """Bulk subscribe helper for StreamableWatchmanClient.
+    """Bulk subscribe generator for StreamableWatchmanClient.
 
        :param str build_root: the build_root for all subscriptions.
        :param iterable handlers: a sequence of Watchman.EventHandler namedtuple objects.
+       :yields: a stream of tuples in the form (subscription_name: str, subscription_event: dict).
     """
     command_list = [['subscribe',
                      build_root,

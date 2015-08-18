@@ -14,20 +14,14 @@ import pywatchman
 class StreamableWatchmanClient(pywatchman.client):
   """A watchman client subclass that provides for interruptable unilateral queries."""
 
-  # Ensure 'subscribe' responses are tagged as unilateral in support of pipelining.
-  unilateral = ['log', 'subscription', 'subscribe']
-
   def stream_query(self, commands):
-    """A streaming, bulk form of pywatchman.client.query(). This will pipeline a set of queries to
-       watchman over the UNIX socket and multiplex events in a continously yielding generator (with
-       per-event keying possible off of subscription name). Note that batch-mode operation (e.g.
-       passing a sequence of commands) is generally only suitable for the 'subscription' command.
+    """A generator of watchman events that allows queries to be pipelined and multiplexed. This
+       continuously yields unilateral events and subscribe events, or None until an error condition
+       or non-unilateral event (aside from subscribe) is received, at which point the generator
+       ceases.
 
-       For unilateral commands with a timeout, this is also non-blocking such that it is possible
-       to gracefully interrupt the execution via the caller whether we have a result or not (by
-       continuously yielding runtime context). The caller is expected to handle empty yields by
-       None-checking the return value in the iterating loop. To disable this behavior, you can
-       pass an __init__(timeout=None) parameter to block indefinitely on response.
+       The generator will yield None on socket timeouts unless the client's timeout has been set to
+       None, in which case it will block indefinitely waiting on responses.
 
        :param iterable commands: An iterable of commands to send to watchman - e.g. one or more
                                  subscribe commands.
@@ -56,8 +50,9 @@ class StreamableWatchmanClient(pywatchman.client):
         yield
       else:
         if 'error' in result:
-          raise pywatchman.WatchmanError('error from watchman: {}'.format())
-        elif self.isUnilateralResponse(result):
+          raise pywatchman.WatchmanError('error from watchman: {}'.format(result['error']))
+        elif self.isUnilateralResponse(result) or 'subscribe' in result:
           yield result
         else:
+          yield result
           break
