@@ -144,17 +144,22 @@ class ImportOrder(CheckstylePlugin):
       errors.extend(self.import_errors(node))
       module_types = self.classify_import_node(node)
       if len(module_types) > 1:
-        errors.append(self.error('T403',
-            'Import statement imports from multiple module types: %s.'
-            % ImportType.order_names(module_types), node))
+        errors.append(self.error(
+          'T403',
+          'Import statement imports from multiple module types: {types}.'.format(
+            types=ImportType.order_names(module_types)),
+          node))
       if ImportType.UNKNOWN in module_types:
         errors.append(self.warning('T404', 'Unclassifiable import.', node))
       all_module_types.update(module_types)
     if len(chunk) > 0 and len(all_module_types) > 1:
       errors.append(
-          self.error('T405',
-              'Import block starting here contains imports from multiple module types: %s.'
-              % ImportType.order_names(all_module_types), chunk[0].lineno))
+          self.error(
+            'T405',
+            'Import block starting here contains imports '
+            'from multiple module types: {types}.'.format(
+              types=ImportType.order_names(all_module_types)),
+            chunk[0].lineno))
     return all_module_types, errors
 
   # TODO(wickman) Classify imports within top-level try/except ImportError blocks.
@@ -192,7 +197,7 @@ class ImportOrder(CheckstylePlugin):
 
     if numbered_module_order != sorted(numbered_module_order):
       errors.append(self.error('T406',
-          'Out of order import chunks: Got %s and expect %s.' % (
+          'Out of order import chunks: Got {} and expect {}.'.format(
           ImportType.order_names(numbered_module_order),
           ImportType.order_names(sorted(numbered_module_order))),
           self.python_file.tree))

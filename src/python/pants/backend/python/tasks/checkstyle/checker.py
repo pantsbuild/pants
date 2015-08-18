@@ -142,7 +142,7 @@ class PythonCheckStyleTask(PythonTask):
     try:
       python_file = PythonFile.parse(filename)
     except SyntaxError as e:
-      print('%s:SyntaxError: %s' % (filename, e))
+      print('{filename}:SyntaxError: {error}'.format(filename=filename, error=e))
       return True
 
     # If the user specifies an invalid severity use comment

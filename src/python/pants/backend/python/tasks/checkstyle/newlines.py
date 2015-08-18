@@ -44,7 +44,7 @@ class Newlines(CheckstylePlugin):
     for node in self.iter_toplevel_defs():
       previous_blank_lines = self.previous_blank_lines(node.lineno)
       if node.lineno > 2 and previous_blank_lines != 2:
-        yield self.error('T302', 'Expected 2 blank lines, found %d' % previous_blank_lines,
+        yield self.error('T302', 'Expected 2 blank lines, found {}'.format(previous_blank_lines),
             node)
     for node in self.iter_ast_types(ast.ClassDef):
       for subnode in node.body:
@@ -52,5 +52,5 @@ class Newlines(CheckstylePlugin):
           continue
         previous_blank_lines = self.previous_blank_lines(subnode.lineno)
         if subnode.lineno - node.lineno > 1 and previous_blank_lines != 1:
-          yield self.error('T301', 'Expected 1 blank lines, found %d' % previous_blank_lines,
+          yield self.error('T301', 'Expected 1 blank lines, found {}'.format(previous_blank_lines),
               subnode)

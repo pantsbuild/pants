@@ -43,6 +43,5 @@ class ClassFactoring(CheckstylePlugin):
     for class_def in self.iter_ast_types(ast.ClassDef):
       for node in self.iter_class_accessors(class_def):
         yield self.warning('T800',
-            'Instead of %s.%s use self.%s or cls.%s with instancemethods and classmethods '
-            'respectively.' % (class_def.name, node.attr, node.attr, node.attr),
-            node)
+            'Instead of {name}.{attr} use self.{attr} or cls.{attr} with instancemethods and '
+            'classmethods respectively.'.format(name=class_def.name, attr=node.attr))
