@@ -166,8 +166,7 @@ class _Goal(object):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""
     ret = set()
     for task_type in self.task_types():
-      ret.update(task_type.global_subsystems())
-      ret.update(task_type.task_subsystems())
+      ret.update([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()])
     return ret
 
   def ordered_task_names(self):

@@ -155,9 +155,9 @@ class BaseTest(unittest.TestCase):
         raise TaskError('You must set a scope on your task type before using it in tests.')
       optionables.add(task_type)
       extra_scopes.update([si.scope for si in task_type.known_scope_infos()])
-      optionables.update(Subsystem.closure(set(task_type.global_subsystems()) |
-                                           set(task_type.task_subsystems()) |
-                                           self._build_configuration.subsystems()))
+      optionables.update(Subsystem.closure(
+        set([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()]) |
+            self._build_configuration.subsystems()))
 
     # Now default the option values and override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.

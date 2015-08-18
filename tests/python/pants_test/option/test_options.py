@@ -50,12 +50,12 @@ class OptionsTest(unittest.TestCase):
       options.register(GLOBAL_SCOPE, *args, **kwargs)
 
     register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
-    register_global('-n', '--num', type=int, default=99, recursive=True)
+    register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('-x', '--xlong', action='store_true', recursive=True)
     register_global('--y', action='append', type=int)
     register_global('--pants-foo')
     register_global('--bar-baz')
-    register_global('--store-true-flag', action='store_true')
+    register_global('--store-true-flag', action='store_true', fingerprint=True)
     register_global('--store-false-flag', action='store_false')
     register_global('--store-true-def-true-flag', action='store_true', default=True)
     register_global('--store-true-def-false-flag', action='store_true', default=False)
@@ -617,11 +617,12 @@ class OptionsTest(unittest.TestCase):
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
 
   def test_get_fingerprintable_for_scope(self):
-    val = 'blah blah blah'
-    options = self._parse('./pants compile.scala --modifycompile="{}" '
-                          '--modifylogs="durrrr"'.format(val))
+    # Note: tests handling recursive and non-recursive options from enclosing scopes correctly.
+    options = self._parse('./pants --store-true-flag --num=88 compile.scala --num=77 '
+                          '--modifycompile="blah blah blah" --modifylogs="durrrr"')
 
     pairs = options.get_fingerprintable_for_scope('compile.scala')
-    self.assertEquals(len(pairs), 1)
-    _, v = pairs[0]
-    self.assertEquals(v, val)
+    self.assertEquals(len(pairs), 3)
+    self.assertEquals(('', 'blah blah blah'), pairs[0])
+    self.assertEquals(('', True), pairs[1])
+    self.assertEquals((int, 77), pairs[2])
