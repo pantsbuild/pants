@@ -82,7 +82,7 @@ class PythonFile(object):
     return self.lines[self.line_range(line_number)]
 
   def __str__(self):
-    return 'PythonFile(%s)' % self.filename
+    return 'PythonFile({filename})'.format(filename=self.filename)
 
   @classmethod
   def parse(cls, filename):
@@ -210,7 +210,7 @@ class Nit(object):
 
   def __init__(self, code, severity, python_file, message, line_number=None):
     if severity not in self.SEVERITY:
-      raise ValueError('Severity should be one of %s' % ' '.join(self.SEVERITY.values()))
+      raise ValueError('Severity should be one of {}'.format(' '.join(self.SEVERITY.values())))
     self.python_file = python_file
     if not re.match(r'[A-Z]\d{3}', code):
       raise ValueError('Code must contain a prefix letter followed by a 3 digit number')
@@ -236,12 +236,12 @@ class Nit(object):
 
   @property
   def message(self):
-    return '%s:%-7s %s:%s %s' % (
-        self.code,
-        self.SEVERITY[self.severity],
-        self.python_file.filename,
-        self.line_number or '*',
-        self._message)
+    return '{code}:{severity:<7} {filename}:{linenum} {message}'.format(
+        code=self.code,
+        severity=self.SEVERITY[self.severity],
+        filename=self.python_file.filename,
+        linenum=self.line_number or '*',
+        message=self._message)
 
   @property
   def lines(self):

@@ -39,7 +39,8 @@ class Indentation(CheckstylePlugin):
         current_indent = len(token_text)
         if current_indent - last_indent != self.INDENT_LEVEL:
           yield self.error('T100',
-              'Indentation of %d instead of %d' % (current_indent - last_indent, self.INDENT_LEVEL),
+              'Indentation of {} instead of {}'.format(
+                current_indent - last_indent, self.INDENT_LEVEL),
               token_start[0])
         indents.append(token_text)
       elif token_type is tokenize.DEDENT:
