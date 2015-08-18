@@ -74,6 +74,9 @@ class ClasspathProducts(object):
     self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def add_jars_for_target(self, target, conf, resolved_jars):
+    """Adds jar classpath elements to the products of the provided target in a way that works with
+    excludes.
+    """
     self.add_jars_for_targets([target], conf, resolved_jars)
 
   def add_jars_for_targets(self, targets, conf, resolved_jars):
@@ -120,8 +123,7 @@ class ClasspathProducts(object):
       self._excludes.add_for_target(target, target.excludes)
 
   def _wrap_path_elements(self, classpath_elements):
-    wrapped_elements = [(element[0], ClasspathEntry(element[1])) for element in classpath_elements]
-    return wrapped_elements
+    return [(element[0], ClasspathEntry(element[1])) for element in classpath_elements]
 
   def _add_elements_for_target(self, target, elements):
     self._validate_classpath_tuples(elements, target)
@@ -133,8 +135,8 @@ class ClasspathProducts(object):
       self._validate_path_in_buildroot(classpath_tuple, target)
 
   def _validate_path_in_buildroot(self, classpath_tuple, target):
-    conf, resolved_jar = classpath_tuple
-    path = resolved_jar.path
+    conf, classpath_entry = classpath_tuple
+    path = classpath_entry.path
     if os.path.relpath(path, self._buildroot).startswith(os.pardir):
       raise TaskError(
         'Classpath entry {} for target {} is located outside the buildroot.'
