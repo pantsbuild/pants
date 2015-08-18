@@ -10,3 +10,21 @@ python_library(
     'src/python/pants/util:dirutil'
   ]
 )
+
+python_library(
+  name = 'watchman',
+  sources = ['watchman.py'],
+  dependencies = [
+    'src/python/pants/util:dirutil',
+    ':process_manager',
+    ':watchman_client'
+  ]
+)
+
+python_library(
+  name = 'watchman_client',
+  sources = ['watchman_client.py'],
+  dependencies = [
+    '3rdparty/python:pywatchman'
+  ]
+)
