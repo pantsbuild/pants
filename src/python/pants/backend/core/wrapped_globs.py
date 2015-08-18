@@ -19,6 +19,8 @@ def globs_matches(path, patterns):
   return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
 def matches_filespec(path, spec):
+  if spec is None:
+    return False
   if not globs_matches(path, spec.get('globs', [])):
     return False
   for spec in spec.get('exclude', []):

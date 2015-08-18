@@ -9,6 +9,7 @@ import os
 from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
+from pants.base.payload_field import DeferredSourcesField
 
 
 class SourceMapper(object):
@@ -59,7 +60,7 @@ class SpecSourceMapper(SourceMapper):
         self._build_graph.inject_address_closure(address)
         target = self._build_graph._target_addressable_to_target(address, addressable)
         sources = target.payload.get_field('sources')
-        if sources and sources.matches(source):
+        if sources and not isinstance(sources, DeferredSourcesField) and sources.matches(source):
           yield address
         if address.build_file.relpath == source:
           yield address

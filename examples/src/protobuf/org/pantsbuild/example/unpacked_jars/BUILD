@@ -10,7 +10,7 @@ unpacked_jars(name='external-source',
   include_patterns=[
     'com/squareup/testing/**/*.proto',
   ],
- )
+)
 
 jar_library(name='external-source-jars',
   jars=[
