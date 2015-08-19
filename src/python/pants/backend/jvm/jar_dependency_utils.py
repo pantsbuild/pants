@@ -60,19 +60,9 @@ class M2Coordinate(object):
     return hash(self._id)
 
   def __str__(self):
-    # https://maven.apache.org/pom.html#Maven_Coordinates
-    # Produces an unambiguous string representation of the coordinate
-    # org:name[:rev][;type_][#classifier]
-
-    org_name_rev_portion = ":".join(filter(None, (self.org, self.name, self.rev)))
-    if self.type_ and self.type_ != 'jar':
-      with_type = "{};{}".format(org_name_rev_portion, self.type_)
-    else:
-      with_type = org_name_rev_portion
-
-    if self.classifier:
-      with_classifier = "{}#{}".format(with_type, self.classifier)
-    else:
-      with_classifier = with_type
-
-    return with_classifier
+    # Doesn't follow https://maven.apache.org/pom.html#Maven_Coordinates
+    # Instead produces an unambiguous string representation of the coordinate
+    # org:name:rev:classifier:type_
+    # if any of the fields are None, it uses ''
+    # for example org=a, name=b, type_=jar -> a:b:::jar
+    return ':'.join(x or '' for x in self._id)
