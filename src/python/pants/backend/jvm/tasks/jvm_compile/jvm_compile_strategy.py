@@ -136,7 +136,7 @@ class JvmCompileStrategy(object):
   def validate_analysis(self, path):
     """Throws a TaskError for invalid analysis files."""
     try:
-      self._analysis_parser.validate_analysis(path)
+      self.analysis_parser.validate_analysis(path)
     except Exception as e:
       if self._clear_invalid_analysis:
         self.context.log.warn("Invalid analysis detected at path {} ... pants will remove these "
@@ -214,7 +214,7 @@ class JvmCompileStrategy(object):
     return list(ret)
 
   @property
-  def _analysis_parser(self):
+  def analysis_parser(self):
     return self._analysis_tools.parser
 
   # Compute any extra compile-time-only classpath elements.

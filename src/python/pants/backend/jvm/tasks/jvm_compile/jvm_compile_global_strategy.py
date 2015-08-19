@@ -16,15 +16,14 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
-from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.option.custom_types import list_option
-from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir
 
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
@@ -35,35 +34,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   @classmethod
   def register_options(cls, register, compile_task_name, supports_concurrent_execution):
-    register('--missing-deps', advanced=True, choices=['off', 'warn', 'fatal'], default='warn',
-             fingerprint=True,
-             help='Check for missing dependencies in code compiled with {0}. Reports actual '
-                  'dependencies A -> B where there is no transitive BUILD file dependency path '
-                  'from A to B. If fatal, missing deps are treated as a build error.'.format(
-               compile_task_name))
-
-    register('--missing-direct-deps', advanced=True, choices=['off', 'warn', 'fatal'],
-             default='off',
-             fingerprint=True,
-             help='Check for missing direct dependencies in code compiled with {0}. Reports actual '
-                  'dependencies A -> B where there is no direct BUILD file dependency path from '
-                  'A to B. This is a very strict check; In practice it is common to rely on '
-                  'transitive, indirect dependencies, e.g., due to type inference or when the main '
-                  'target in a BUILD file is modified to depend on other targets in the same BUILD '
-                  'file, as an implementation detail. However it may still be useful to use this '
-                  'on occasion. '.format(compile_task_name))
-
-    register('--missing-deps-whitelist', advanced=True, type=list_option,
-             fingerprint=True,
-             help="Don't report these targets even if they have missing deps.")
-
-    register('--unnecessary-deps', advanced=True, choices=['off', 'warn', 'fatal'], default='off',
-             fingerprint=True,
-             help='Check for declared dependencies in code compiled with {0} that are not needed. '
-                  'This is a very strict check. For example, generated code will often '
-                  'legitimately have BUILD dependencies that are unused in practice.'.format(
-               compile_task_name))
-
     register('--changed-targets-heuristic-limit', advanced=True, type=int, default=0,
              help='If non-zero, and we have fewer than this number of locally-changed targets, '
                   'partition them separately, to preserve stability when compiling repeatedly.')
@@ -86,26 +56,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     # The rough number of source files to build in each compiler pass.
     self._partition_size_hint = options.partition_size_hint
-
-    # Set up dep checking if needed.
-    def munge_flag(flag):
-      flag_value = getattr(options, flag, None)
-      return None if flag_value == 'off' else flag_value
-
-    check_missing_deps = munge_flag('missing_deps')
-    check_missing_direct_deps = munge_flag('missing_direct_deps')
-    check_unnecessary_deps = munge_flag('unnecessary_deps')
-
-    if check_missing_deps or check_missing_direct_deps or check_unnecessary_deps:
-      target_whitelist = options.missing_deps_whitelist
-      # Must init it here, so it can set requirements on the context.
-      self._dep_analyzer = JvmDependencyAnalyzer(self.context,
-                                                 check_missing_deps,
-                                                 check_missing_direct_deps,
-                                                 check_unnecessary_deps,
-                                                 target_whitelist)
-    else:
-      self._dep_analyzer = None
 
     # Computed lazily as needed.
     self._upstream_class_to_path = None
@@ -176,12 +126,12 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       valid_analysis_tmp = os.path.join(tmpdir, 'valid_analysis')
       newly_invalid_analysis_tmp = os.path.join(tmpdir, 'newly_invalid_analysis')
       invalid_analysis_tmp = os.path.join(tmpdir, 'invalid_analysis')
-      if self._analysis_parser.is_nonempty_analysis(self._analysis_file):
+      if self.analysis_parser.is_nonempty_analysis(self._analysis_file):
         with self.context.new_workunit(name='prepare-analysis'):
           self._analysis_tools.split_to_paths(self._analysis_file,
               [(invalid_sources + self._deleted_sources, newly_invalid_analysis_tmp)],
               valid_analysis_tmp)
-          if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
+          if self.analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
             self._analysis_tools.merge_from_paths(
               [self._invalid_analysis_file, newly_invalid_analysis_tmp], invalid_analysis_tmp)
           else:
@@ -392,7 +342,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       partitions.append((vts, de_duped_sources, analysis_file))
 
     # Split per-partition files out of the global invalid analysis.
-    if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file) and partitions:
+    if self.analysis_parser.is_nonempty_analysis(self._invalid_analysis_file) and partitions:
       with self.context.new_workunit(name='partition-analysis'):
         splits = [(x[1], x[2]) for x in partitions]
         # We have to pass the analysis for any deleted files through zinc, to give it
@@ -425,7 +375,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       if os.path.exists(analysis_file):  # The compilation created an analysis.
         # Merge the newly-valid analysis with our global valid analysis.
         new_valid_analysis = analysis_file + '.valid.new'
-        if self._analysis_parser.is_nonempty_analysis(self._analysis_file):
+        if self.analysis_parser.is_nonempty_analysis(self._analysis_file):
           with self.context.new_workunit(name='update-upstream-analysis'):
             self._analysis_tools.merge_from_paths([self._analysis_file, analysis_file],
                                                   new_valid_analysis)
@@ -440,12 +390,12 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         # Update the products with the latest classes. Must happen before the
         # missing dependencies check.
         register_vts([self.compile_context(t) for t in vts.targets])
-        if self._dep_analyzer:
-          # Check for missing dependencies.
-          actual_deps = self._analysis_parser.parse_deps_from_path(analysis_file,
-              lambda: self._compute_classpath_elements_by_class(compile_classpath), self._classes_dir)
-          with self.context.new_workunit(name='find-missing-dependencies'):
-            self._dep_analyzer.check(sources, actual_deps)
+        # if self._dep_analyzer:
+        #   # Check for missing dependencies.
+        #   actual_deps = self.analysis_parser.parse_deps_from_path(analysis_file,
+        #       lambda: self._compute_classpath_elements_by_class(compile_classpath), self._classes_dir)
+        #   with self.context.new_workunit(name='find-missing-dependencies'):
+        #     self._dep_analyzer.check(sources, actual_deps)
 
         # Kick off the background artifact cache write.
         if update_artifact_cache_vts_work:
@@ -453,7 +403,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                                         vts,
                                         update_artifact_cache_vts_work)
 
-      if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
+      if self.analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
         with self.context.new_workunit(name='trim-downstream-analysis'):
           # Trim out the newly-valid sources from our global invalid analysis.
           new_invalid_analysis = analysis_file + '.invalid.new'
@@ -494,7 +444,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     if os.path.exists(analysis_file):
       # Parse the global analysis once.
       buildroot = get_buildroot()
-      products = self._analysis_parser.parse_products_from_path(analysis_file,
+      products = self.analysis_parser.parse_products_from_path(analysis_file,
                                                                 self._classes_dir)
 
       # Then iterate over contexts (targets), and add the classes for their sources.
@@ -642,7 +592,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     """
     with self.context.new_workunit('find-deleted-sources'):
       if os.path.exists(self._analysis_file):
-        products = self._analysis_parser.parse_products_from_path(self._analysis_file,
+        products = self.analysis_parser.parse_products_from_path(self._analysis_file,
                                                                   self._classes_dir)
         buildroot = get_buildroot()
         old_srcs = products.keys()  # Absolute paths.
@@ -671,53 +621,3 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for f in changed_files:
       ret.update(targets_by_source.get(f, []))
     return list(ret)
-
-  def _compute_classpath_elements_by_class(self, classpath):
-    # Don't consider loose classes dirs in our classes dir. Those will be considered
-    # separately, by looking at products.
-    def non_product(path):
-      return path != self._classes_dir
-
-    if self._upstream_class_to_path is None:
-      self._upstream_class_to_path = {}
-      classpath_entries = filter(non_product, classpath)
-      for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
-        # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
-          with open_zip(cp_entry, 'r') as jar:
-            for cls in jar.namelist():
-              # First jar with a given class wins, just like when classloading.
-              if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
-                self._upstream_class_to_path[cls] = cp_entry
-        elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
-            for f in filter(lambda x: x.endswith('.class'), filenames):
-              cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
-              if not cls in self._upstream_class_to_path:
-                self._upstream_class_to_path[cls] = os.path.join(dirpath, f)
-    return self._upstream_class_to_path
-
-  def _find_all_bootstrap_jars(self):
-    def get_path(key):
-      return self.context.java_sysprops.get(key, '').split(':')
-
-    def find_jars_in_dirs(dirs):
-      ret = []
-      for d in dirs:
-        if os.path.isdir(d):
-          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
-      return ret
-
-    # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
-    # TODO: Support other JVMs? Not clear if there's a standard way to do so.
-    # May include loose classes dirs.
-    boot_classpath = get_path('sun.boot.class.path')
-
-    # Note that per the specs, overrides and extensions must be in jars.
-    # Loose class files will not be found by the JVM.
-    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
-    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
-
-    # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
-    return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.

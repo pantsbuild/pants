@@ -7,9 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from collections import defaultdict
+from pprint import pprint
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -17,29 +19,67 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
+from pants.option.custom_types import list_option
 
 
-class JvmDependencyAnalyzer(object):
-
-  def __init__(self,
-               context,
-               check_missing_deps,
-               check_missing_direct_deps,
-               check_unnecessary_deps,
-               target_whitelist):
-
-    self._context = context
-    self._check_missing_deps = check_missing_deps
-    self._check_missing_direct_deps = check_missing_direct_deps
-    self._check_unnecessary_deps = check_unnecessary_deps
-
-    # These targets we will not report as having any dependency issues even if they do.
-    self._target_whitelist = OrderedSet(target_whitelist)
+class JvmDependencyCheck(Task):
 
   @classmethod
-  def prepare(clsc, options, round_manager):
+  def prepare(cls, options, round_manager):
+    super(JvmDependencyCheck, cls).prepare(options, round_manager)
+    round_manager.require_data('classes_by_target')
     round_manager.require_data('ivy_jar_products')
     round_manager.require_data('ivy_resolve_symlink_map')
+    # round_manager.require_data('actual_source_deps')
+
+  @classmethod
+  def register_options(cls, register):
+    super(JvmDependencyCheck, cls).register_options(register)
+    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
+             fingerprint=True,
+             help='Check for missing dependencies in compiled code. Reports actual '
+                  'dependencies A -> B where there is no transitive BUILD file dependency path '
+                  'from A to B. If fatal, missing deps are treated as a build error.')
+
+    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'],
+             default='off',
+             fingerprint=True,
+             help='Check for missing direct dependencies in compiled code. Reports actual '
+                  'dependencies A -> B where there is no direct BUILD file dependency path from '
+                  'A to B. This is a very strict check; In practice it is common to rely on '
+                  'transitive, indirect dependencies, e.g., due to type inference or when the main '
+                  'target in a BUILD file is modified to depend on other targets in the same BUILD '
+                  'file, as an implementation detail. However it may still be useful to use this '
+                  'on occasion. ')
+
+    register('--missing-deps-whitelist', type=list_option, default=[],
+             fingerprint=True,
+             help="Don't report these targets even if they have missing deps.")
+
+    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
+             fingerprint=True,
+             help='Check for declared dependencies in compiled code that are not needed. '
+                  'This is a very strict check. For example, generated code will often '
+                  'legitimately have BUILD dependencies that are unused in practice.')
+
+  def __init__(self, *args, **kwargs):
+    super(JvmDependencyCheck, self).__init__(*args, **kwargs)
+
+    # Set up dep checking if needed.
+    def munge_flag(flag):
+      flag_value = self.get_options().get(flag, None)
+      return None if flag_value == 'off' else flag_value
+
+    self._check_missing_deps = munge_flag('missing_deps')
+    self._check_missing_direct_deps = munge_flag('missing_direct_deps')
+    self._check_unnecessary_deps = munge_flag('unnecessary_deps')
+    self._target_whitelist = self.get_options().missing_deps_whitelist
+
+  def execute(self):
+    for target in self.context.targets():
+      actual_source_deps = self.context.products.get_data('actual_source_deps').get(target, None)
+      if actual_source_deps is not None:
+        self.check(target.sources_relative_to_buildroot(), actual_source_deps)
 
   def _compute_targets_by_file(self):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
@@ -55,10 +95,10 @@ class JvmDependencyAnalyzer(object):
     jarlibs_by_id = defaultdict(set)
 
     # Compute src -> target.
-    with self._context.new_workunit(name='map_sources'):
+    with self.context.new_workunit(name='map_sources'):
       buildroot = get_buildroot()
       # Look at all targets in-play for this pants run. Does not include synthetic targets,
-      for target in self._context.targets():
+      for target in self.context.targets():
         if isinstance(target, JvmTarget):
           for src in target.sources_relative_to_buildroot():
             targets_by_file[os.path.join(buildroot, src)].add(target)
@@ -72,17 +112,17 @@ class JvmDependencyAnalyzer(object):
               targets_by_file[os.path.join(buildroot, src)].add(target)
 
     # Compute class -> target.
-    with self._context.new_workunit(name='map_classes'):
-      classes_by_target = self._context.products.get_data('classes_by_target')
+    with self.context.new_workunit(name='map_classes'):
+      classes_by_target = self.context.products.get_data('classes_by_target')
       for tgt, target_products in classes_by_target.items():
         for _, classes in target_products.abs_paths():
           for cls in classes:
             targets_by_file[cls].add(tgt)
 
     # Compute jar -> target.
-    with self._context.new_workunit(name='map_jars'):
+    with self.context.new_workunit(name='map_jars'):
       with IvyTaskMixin.symlink_map_lock:
-        all_symlinks_map = self._context.products.get_data('ivy_resolve_symlink_map').copy()
+        all_symlinks_map = self.context.products.get_data('ivy_resolve_symlink_map').copy()
         # We make a copy, so it's safe to use outside the lock.
 
       def register_transitive_jars_for_ref(ivyinfo, ref):
@@ -105,7 +145,7 @@ class JvmDependencyAnalyzer(object):
               for jarlib_target in jarlib_targets:
                 targets_by_file[symlink].add(jarlib_target)
 
-      ivy_products = self._context.products.get_data('ivy_jar_products')
+      ivy_products = self.context.products.get_data('ivy_jar_products')
       if ivy_products:
         for ivyinfos in ivy_products.values():
           for ivyinfo in ivyinfos:
@@ -117,7 +157,7 @@ class JvmDependencyAnalyzer(object):
   def _compute_transitive_deps_by_target(self):
     """Map from target to all the targets it depends on, transitively."""
     # Sort from least to most dependent.
-    sorted_targets = reversed(sort_targets(self._context.targets()))
+    sorted_targets = reversed(sort_targets(self.context.targets()))
     transitive_deps_by_target = defaultdict(set)
     # Iterate in dep order, to accumulate the transitive deps for each target.
     for target in sorted_targets:
@@ -141,6 +181,10 @@ class JvmDependencyAnalyzer(object):
 
     See docstring for _compute_missing_deps for details.
     """
+    print('=======================')
+    print(srcs)
+    for d in actual_deps:
+      print('>>>', d)
     if self._check_missing_deps or self._check_missing_direct_deps or self._check_unnecessary_deps:
       missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
         self._compute_missing_deps(srcs, actual_deps)
@@ -163,11 +207,11 @@ class JvmDependencyAnalyzer(object):
         for (tgt_pair, evidence) in missing_tgt_deps:
           evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
-          self._context.log.error(
+          self.context.log.error(
               'Missing BUILD dependency {} -> {} because:\n{}'
               .format(tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
         for (src_tgt, dep) in missing_file_deps:
-          self._context.log.error('Missing BUILD dependency {} -> {}'
+          self.context.log.error('Missing BUILD dependency {} -> {}'
                                   .format(src_tgt.address.reference(), shorten(dep)))
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
@@ -179,7 +223,7 @@ class JvmDependencyAnalyzer(object):
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
           evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
-          self._context.log.warn('Missing direct BUILD dependency {} -> {} because:\n{}'
+          self.context.log.warn('Missing direct BUILD dependency {} -> {} because:\n{}'
                                  .format(tgt_pair[0].address, tgt_pair[1].address, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
           raise TaskError('Missing direct deps.')
@@ -219,7 +263,7 @@ class JvmDependencyAnalyzer(object):
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
-      return not dep.startswith(self._context.java_home)
+      return not dep.startswith(self.context.java_home)
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection
@@ -241,7 +285,7 @@ class JvmDependencyAnalyzer(object):
     transitive_deps_by_target = self._compute_transitive_deps_by_target()
 
     # Find deps that are actual but not specified.
-    with self._context.new_workunit(name='scan_deps'):
+    with self.context.new_workunit(name='scan_deps'):
       missing_file_deps = OrderedSet()  # (src, src).
       missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
       missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.

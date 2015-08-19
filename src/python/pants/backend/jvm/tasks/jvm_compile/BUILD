@@ -10,7 +10,7 @@ target(
     ':anonymizer',
     ':java',
     ':jvm_compile',
-    ':jvm_dependency_analyzer',
+    ':jvm_dependency_check',
     ':scala',
   ],
 )
@@ -62,7 +62,6 @@ python_library(
   dependencies = [
     ':jvm_compile_global_strategy',
     ':jvm_compile_isolated_strategy',
-    ':jvm_dependency_analyzer',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
@@ -80,7 +79,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jvm_compile_strategy',
-    ':jvm_dependency_analyzer',
     ':resource_mapping',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
@@ -139,8 +137,8 @@ python_library(
 )
 
 python_library(
-  name = 'jvm_dependency_analyzer',
-  sources = ['jvm_dependency_analyzer.py'],
+  name = 'jvm_dependency_check',
+  sources = ['jvm_dependency_check.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
@@ -149,6 +147,8 @@ python_library(
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
