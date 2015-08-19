@@ -1,7 +1,7 @@
 package libB
 
 import (
-  "contrib/go/examples/src/go/libD"
+  "libD"
 )
 
 func Speak() {

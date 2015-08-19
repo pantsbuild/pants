@@ -13,3 +13,18 @@ python_library(
     'src/python/pants/util:memo',
   ],
 )
+
+python_library(
+  name='fetchers',
+  sources=['fetchers.py'],
+  dependencies=[
+    '3rdparty/python:requests',
+    '3rdparty/python:six',
+    'src/python/pants/fs',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
+  ],
+)

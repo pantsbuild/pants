@@ -1,8 +1,8 @@
 package libC
 
 import (
-  "contrib/go/examples/src/go/libD"
-  "contrib/go/examples/src/go/libE"
+  "libD"
+  "libE"
 )
 
 func Speak() {
