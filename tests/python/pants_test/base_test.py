@@ -143,10 +143,16 @@ class BaseTest(unittest.TestCase):
     self.options[scope].update(kwargs)
 
   def context(self, for_task_types=None, options=None, target_roots=None, console_outstream=None,
-              workspace=None):
+              workspace=None, for_subsystems=None):
 
     optionables = set()
     extra_scopes = set()
+
+    for_subsystems = for_subsystems or ()
+    for subsystem in for_subsystems:
+      if subsystem.options_scope is None:
+        raise TaskError('You must set a scope on your subsystem type before using it in tests.')
+      optionables.add(subsystem)
 
     for_task_types = for_task_types or ()
     for task_type in for_task_types:
