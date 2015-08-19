@@ -235,24 +235,37 @@ class Fetchers(Subsystem):
     return fetchers
 
   @memoized_method
+  def maybe_get_fetcher(self, import_path):
+    """Returns a :class:`Fetcher` capable of resolving the given remote import path.
+
+    :param string import_path: The remote import path to fetch.
+    :returns: A fetcher capable of fetching the given `import_path` or `None` if no capable fetcher
+              was found.
+    :rtype: :class:`Fetcher`
+    """
+    for matcher, fetcher in self._fetchers:
+      match = matcher.match(import_path)
+      if match and match.start() == 0:
+        return fetcher
+    return None
+
   def get_fetcher(self, import_path):
     """Returns a :class:`Fetcher` capable of resolving the given remote import path.
 
     :param string import_path: The remote import path to fetch.
     :returns: A fetcher capable of fetching the given `import_path`.
     :rtype: :class:`Fetcher`
-    :raises: :class:`Fetchers.UnfetchableRemote` if no fetcher was found that could handle the
-             given `import_path`.
+    :raises: :class:`Fetcher.UnfetchableRemote` if no fetcher is registered to handle the given
+             import path.
     """
-    for matcher, fetcher in self._fetchers:
-      match = matcher.match(import_path)
-      if match and match.start() == 0:
-        return fetcher
-    raise self.UnfetchableRemote(import_path)
+    fetcher = self.maybe_get_fetcher(import_path)
+    if not fetcher:
+      raise self.UnfetchableRemote(import_path)
+    return fetcher
 
 
 class ArchiveFetcher(Fetcher, Subsystem):
-  """A fetcher that knows how to find archives for remote import paths and unpack them."""
+  """A fetcher that knows how find archives for remote import paths and unpack them."""
 
   logger = logging.getLogger(__name__)
 

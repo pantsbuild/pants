@@ -10,10 +10,11 @@ import os
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.base.target import Target
+
+from pants.contrib.go.targets.go_target import GoTarget
 
 
-class GoRemoteLibrary(Target):
+class GoRemoteLibrary(GoTarget):
   """Represents a remote Go package."""
   # TODO(John Sirois): Consider a re-name and a semantics scan in the Go tasks.  A GoRemoteLibrary's
   # package can in fact be a GoBinary when materialized locally.  This suggests a name of
@@ -44,16 +45,7 @@ class GoRemoteLibrary(Target):
                                file.
     :raises: `ValueError` if the import_path does not lay within the remote root.
     """
-    package_path = os.path.relpath(import_path, remote_root)
-    return cls._normalize_package_path(package_path)
-
-  @classmethod
-  def _normalize_package_path(cls, package_path):
-    if package_path.startswith(os.pardir + os.sep):
-      raise ValueError('Relative package paths are not allowed. Given: {!r}'.format(package_path))
-    if os.path.isabs(package_path):
-      raise ValueError('Absolute package paths are not allowed. Given: {!r}'.format(package_path))
-    return '' if not package_path or package_path == os.curdir else package_path.lstrip('/')
+    return cls.package_path(remote_root, import_path)
 
   @classmethod
   def from_packages(cls, parse_context, rev='', packages=None, **kwargs):
@@ -65,7 +57,7 @@ class GoRemoteLibrary(Target):
                     default to the latest available.  It's highly recommended to not accept the
                     default and instead pin the rev explicitly for repeatable builds.
     """
-    for pkg in packages:
+    for pkg in packages or ('',):
       name = pkg or os.path.basename(parse_context.rel_path)
       parse_context.create_object(cls, name=name, pkg=pkg, rev=rev, **kwargs)
 
@@ -91,7 +83,7 @@ class GoRemoteLibrary(Target):
                                       'source root.')
 
     try:
-      package_path = self._normalize_package_path(pkg)
+      package_path = self.normalize_package_path(pkg)
     except ValueError as e:
       raise TargetDefinitionException(address.spec, str(e))
 
@@ -105,13 +97,20 @@ class GoRemoteLibrary(Target):
 
   @property
   def pkg(self):
+    """The remote package path that when joined to the `remote_root` forms the `import_path`"""
     return self.payload.pkg
 
   @property
   def rev(self):
+    """The version of the remote package."""
     return self.payload.rev
 
   @property
+  def remote_root(self):
+    """The remote package root prefix portion of the the full `import_path`"""
+    return os.path.relpath(self.address.spec_path, self.target_base)
+
+  @property
   def import_path(self):
-    rel_path = os.path.relpath(self.address.spec_path, self.target_base)
-    return os.path.join(rel_path, self.pkg) if self.pkg else rel_path
+    """The full remote import path as used in import statements in `.go` source files."""
+    return os.path.join(self.remote_root, self.pkg) if self.pkg else self.remote_root

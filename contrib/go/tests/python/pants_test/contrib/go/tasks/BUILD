@@ -9,6 +9,7 @@ target(
 target(
   name='unit',
   dependencies=[
+    ':go_buildgen',
     ':go_compile',
     ':go_fetch',
     ':go_workspace_task',
@@ -22,6 +23,23 @@ target(
     ':go_fetch_integration',
     ':go_run_integration',
     ':go_test_integration',
+  ]
+)
+
+python_tests(
+  name='go_buildgen',
+  sources=['test_go_buildgen.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go/targets:go_library',
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_buildgen',
+    'contrib/go/src/python/pants/contrib/go:plugin',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
+    'src/python/pants/base:target',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

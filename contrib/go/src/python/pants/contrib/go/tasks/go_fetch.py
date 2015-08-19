@@ -125,6 +125,7 @@ class GoFetch(GoTask):
         go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', pkg)
 
         for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
+          fetcher = self._get_fetcher(remote_import_path)
           remote_root = fetcher.root(remote_import_path)
           spec_path = os.path.join(go_remote_lib.target_base, remote_root)
 
