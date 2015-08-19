@@ -361,4 +361,3 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/proto:external-source-jars',
       workspace=self.workspace(files=['root/proto/BUILD'])
     )
-

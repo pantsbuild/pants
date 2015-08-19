@@ -79,11 +79,11 @@ class JmakeCompile(JvmCompile):
              help='Provide source compatibility with this release. Overrides the jvm platform '
                   'source.',
              deprecated_hint='The -source arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.43')
+             deprecated_version='0.0.44')
     register('--target', advanced=True, fingerprint=True,
              help='Generate class files for this JVM version. Overrides the jvm platform target.',
              deprecated_hint='The -target arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.43')
+             deprecated_version='0.0.44')
     cls.register_jvm_tool(register, 'jmake')
     cls.register_jvm_tool(register, 'java-compiler')
 
