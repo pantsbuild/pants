@@ -162,7 +162,7 @@ class Fetchers(Subsystem):
     cls._DEFAULT_FETCHERS[regex] = alias
 
   @classmethod
-  def dependencies(cls):
+  def subsystem_dependencies(cls):
     return tuple(f for f in set(cls._FETCHERS.values()) if issubclass(f, Subsystem))
 
   options_scope = 'fetchers'
