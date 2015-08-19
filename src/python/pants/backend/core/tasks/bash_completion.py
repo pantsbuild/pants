@@ -15,6 +15,7 @@ from pants.backend.core.tasks.task import TaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.goal.goal import Goal
+from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.scope import ScopeInfo
 
@@ -52,7 +53,7 @@ class BashCompletionTask(ConsoleTask):
     """
     autocomplete_options_by_scope = defaultdict(set)
     def get_from_parser(parser):
-      oschi = parser.get_help_info()
+      oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
       # We ignore advanced options, as they aren't intended to be used on the cmd line.
       option_help_infos = oschi.basic + oschi.recursive
       for ohi in option_help_infos:

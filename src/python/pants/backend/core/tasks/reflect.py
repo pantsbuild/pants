@@ -19,6 +19,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
 from pants.base.target import Target
 from pants.goal.goal import Goal
+from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -430,7 +431,9 @@ def bootstrap_option_values():
 
 
 def gen_glopts_reference_data(options):
-  return oref_template_data_from_help_info(options.get_parser(GLOBAL_SCOPE).get_help_info())
+  parser = options.get_parser(GLOBAL_SCOPE)
+  oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
+  return oref_template_data_from_help_info(oschi)
 
 
 def oref_template_data_from_help_info(oschi):
@@ -476,7 +479,8 @@ def gen_tasks_options_reference_data(options):
 
       doc_rst = indent_docstring_by_n(authored_task_type.__doc__ or '', 2)
       doc_html = rst_to_html(dedent_docstring(authored_task_type.__doc__))
-      oschi = options.get_parser(task_type.options_scope).get_help_info()
+      parser = options.get_parser(task_type.options_scope)
+      oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
       impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
       tasks.append(TemplateData(
           impl=impl,

@@ -24,9 +24,11 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     super(BenchmarkRun, cls).register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
     register('--memory', default=False, action='store_true', help='Enable memory profiling.')
-    register('--debug', action='store_true', recursive=True, help='Run the benchmark tool with in process debugging.')
+    register('--debug', action='store_true',
+             help='Run the benchmark tool with in process debugging.')
 
-    cls.register_jvm_tool(register, 'benchmark-tool', main=cls._CALIPER_MAIN, default=['//:benchmark-caliper-0.5'])
+    cls.register_jvm_tool(register, 'benchmark-tool', main=cls._CALIPER_MAIN,
+                          default=['//:benchmark-caliper-0.5'])
     cls.register_jvm_tool(register, 'benchmark-agent',
                           default=['//:benchmark-java-allocation-instrumenter-2.1'])
 
