@@ -401,12 +401,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       compile_classpath.add_for_target(compile_context.target, entries)
 
       if self._strategy.name() == 'global':
-        # TODO(cgibb): Fix isolated dependency parsing.
-        # TODO(cgibb): Only parse source dependencies if isrequired.
+        # TODO(cgibb): Figure out how to get this working with isolated strategy.
         def classpath_indexer():
           classpath = [path for (conf, path) in entries if conf in self._confs]
           return self._compute_classpath_elements_by_class(classpath,
                                                            compile_context.classes_dir)
+        # TODO(cgibb): Only parse source dependencies if isrequired.
         deps = self._strategy.analysis_parser.parse_deps_from_path(compile_context.analysis_file,
                                                                    classpath_indexer,
                                                                    compile_context.classes_dir)

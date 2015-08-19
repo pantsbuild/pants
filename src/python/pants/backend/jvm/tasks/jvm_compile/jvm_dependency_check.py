@@ -22,6 +22,7 @@ from pants.option.custom_types import list_option
 
 
 class JvmDependencyCheck(Task):
+  """Checks true dependencies of a JVM target and ensures they are consistent with BUILD files."""
 
   @classmethod
   def prepare(cls, options, round_manager):
