@@ -390,12 +390,6 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
         # Update the products with the latest classes. Must happen before the
         # missing dependencies check.
         register_vts([self.compile_context(t) for t in vts.targets])
-        # if self._dep_analyzer:
-        #   # Check for missing dependencies.
-        #   actual_deps = self.analysis_parser.parse_deps_from_path(analysis_file,
-        #       lambda: self._compute_classpath_elements_by_class(compile_classpath), self._classes_dir)
-        #   with self.context.new_workunit(name='find-missing-dependencies'):
-        #     self._dep_analyzer.check(sources, actual_deps)
 
         # Kick off the background artifact cache write.
         if update_artifact_cache_vts_work:

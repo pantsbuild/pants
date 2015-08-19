@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from collections import defaultdict
-from pprint import pprint
 
 from twitter.common.collections import OrderedSet
 
@@ -79,7 +78,7 @@ class JvmDependencyCheck(Task):
     for target in self.context.targets():
       actual_source_deps = self.context.products.get_data('actual_source_deps').get(target, None)
       if actual_source_deps is not None:
-        self.check(target.sources_relative_to_buildroot(), actual_source_deps)
+        self.check(target, actual_source_deps)
 
   def _compute_targets_by_file(self):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
@@ -176,14 +175,14 @@ class JvmDependencyCheck(Task):
       transitive_deps_by_target[target] = transitive_deps
     return transitive_deps_by_target
 
-  def check(self, srcs, actual_deps):
+  def check(self, src_tgt, actual_deps):
     """Check for missing deps.
 
     See docstring for _compute_missing_deps for details.
     """
     if self._check_missing_deps or self._check_missing_direct_deps or self._check_unnecessary_deps:
       missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
-        self._compute_missing_deps(srcs, actual_deps)
+        self._compute_missing_deps(src_tgt, actual_deps)
 
       buildroot = get_buildroot()
 
@@ -227,7 +226,7 @@ class JvmDependencyCheck(Task):
       if self._check_unnecessary_deps:
         raise TaskError('Unnecessary dep warnings not implemented yet.')
 
-  def _compute_missing_deps(self, srcs, actual_deps):
+  def _compute_missing_deps(self, src_tgt, actual_deps):
     """Computes deps that are used by the compiler but not specified in a BUILD file.
 
     These deps are bugs waiting to happen: the code may happen to compile because the dep was
@@ -244,15 +243,15 @@ class JvmDependencyCheck(Task):
 
     Returns a triple (missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps) where:
 
-    - missing_file_deps: a list of pairs (src_tgt, dep_file) where src_tgt requires dep_file, and
-      we're unable to map to a target (because its target isn't in the total set of targets in play,
+    - missing_file_deps: a list of dep_files where src_tgt requires dep_file, and we're unable
+      to map to a target (because its target isn't in the total set of targets in play,
       and we don't want to parse every BUILD file in the workspace just to find it).
 
-    - missing_tgt_deps: a list of pairs (src_tgt, dep_tgt) where src_tgt is missing a necessary
-                        transitive dependency on dep_tgt.
+    - missing_tgt_deps: a list of dep_tgt where src_tgt is missing a necessary transitive
+                        dependency on dep_tgt.
 
-    - missing_direct_tgt_deps: a list of pairs (src_tgt, dep_tgt) where src_tgt is missing a direct
-                               dependency on dep_tgt but has a transitive dep on it.
+    - missing_direct_tgt_deps: a list of dep_tgts where src_tgt is missing a direct dependency
+                               on dep_tgt but has a transitive dep on it.
 
     All paths in the input and output are absolute.
     """
@@ -287,27 +286,23 @@ class JvmDependencyCheck(Task):
       missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
       buildroot = get_buildroot()
-      abs_srcs = [os.path.join(buildroot, src) for src in srcs]
+      abs_srcs = [os.path.join(buildroot, src) for src in src_tgt.sources_relative_to_buildroot()]
       for src in abs_srcs:
-        src_tgt = next(iter(targets_by_file.get(src)))
-        if src_tgt is not None:
-          for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-            actual_dep_tgts = targets_by_file.get(actual_dep)
-            # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
-            # to be in our declared deps to be OK.
-            if actual_dep_tgts is None:
-              missing_file_deps.add((src_tgt, actual_dep))
-            elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
-              # Obviously intra-target deps are fine.
-              canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
-              if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
-                missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
-              elif canonical_actual_dep_tgt not in src_tgt.dependencies:
-                # The canonical dep is the only one a direct dependency makes sense on.
-                missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
-                    (src, actual_dep))
-        else:
-          raise TaskError('Requested dep info for unknown source file: {}'.format(src))
+        for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
+          actual_dep_tgts = targets_by_file.get(actual_dep)
+          # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
+          # to be in our declared deps to be OK.
+          if actual_dep_tgts is None:
+            missing_file_deps.add((src_tgt, actual_dep))
+          elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
+            # Obviously intra-target deps are fine.
+            canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
+            if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
+              missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
+            elif canonical_actual_dep_tgt not in src_tgt.dependencies:
+              # The canonical dep is the only one a direct dependency makes sense on.
+              missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
+                  (src, actual_dep))
 
     return (list(missing_file_deps),
             missing_tgt_deps_map.items(),

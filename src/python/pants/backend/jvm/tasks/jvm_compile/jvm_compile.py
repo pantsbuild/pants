@@ -9,7 +9,6 @@ import itertools
 import os
 import sys
 from collections import defaultdict
-from pprint import pprint
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -227,6 +226,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.create_analysis_tools(),
                                           self._name,
                                           self.select_source)
+    self._upstream_class_to_path = None
 
   def _fingerprint_strategy(self):
     return TaskIdentityFingerprintStrategy(self)
@@ -404,8 +404,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # TODO(cgibb): Fix isolated dependency parsing.
         # TODO(cgibb): Only parse source dependencies if isrequired.
         def classpath_indexer():
-          classpaths = [path for (conf, path) in entries if conf in self._confs]
-          return self._compute_classpath_elements_by_class(classpaths,
+          classpath = [path for (conf, path) in entries if conf in self._confs]
+          return self._compute_classpath_elements_by_class(classpath,
                                                            compile_context.classes_dir)
         deps = self._strategy.analysis_parser.parse_deps_from_path(compile_context.analysis_file,
                                                                    classpath_indexer,
@@ -413,28 +413,28 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         actual_source_deps[compile_context.target] = deps
 
   def _compute_classpath_elements_by_class(self, classpath, classes_dir):
-    # Don't consider loose classes dirs in our classes dir. Those will be considered
-    # separately, by looking at products.
-    def non_product(path):
-      return path != classes_dir
-    # TODO(cgibb): Cache upstream_class_to_path results.
-    upstream_class_to_path = {}
-    classpath_entries = filter(non_product, classpath)
-    for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
-      # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-      if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
-        with open_zip(cp_entry, 'r') as jar:
-          for cls in jar.namelist():
-            # First jar with a given class wins, just like when classloading.
-            if cls.endswith(b'.class') and not cls in upstream_class_to_path:
-              upstream_class_to_path[cls] = cp_entry
-      elif os.path.isdir(cp_entry):
-        for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
-          for f in filter(lambda x: x.endswith('.class'), filenames):
-            cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
-            if not cls in upstream_class_to_path:
-              upstream_class_to_path[cls] = os.path.join(dirpath, f)
-    return upstream_class_to_path
+    if self._upstream_class_to_path is None:
+      # Don't consider loose classes dirs in our classes dir. Those will be considered
+      # separately, by looking at products.
+      def non_product(path):
+        return path != classes_dir
+      self._upstream_class_to_path = {}
+      classpath_entries = filter(non_product, classpath)
+      for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
+        # Per the classloading spec, a 'jar' in this context can also be a .zip file.
+        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
+          with open_zip(cp_entry, 'r') as jar:
+            for cls in jar.namelist():
+              # First jar with a given class wins, just like when classloading.
+              if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
+                self._upstream_class_to_path[cls] = cp_entry
+        elif os.path.isdir(cp_entry):
+          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
+            for f in filter(lambda x: x.endswith('.class'), filenames):
+              cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
+              if not cls in self._upstream_class_to_path:
+                self._upstream_class_to_path[cls] = os.path.join(dirpath, f)
+    return self._upstream_class_to_path
 
   def _find_all_bootstrap_jars(self):
     def get_path(key):
