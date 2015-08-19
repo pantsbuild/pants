@@ -17,7 +17,7 @@ class ThriftBinary(object):
     options_scope = 'thrift-binary'
 
     @classmethod
-    def dependencies(cls):
+    def subsystem_dependencies(cls):
       return (BinaryUtil.Factory,)
 
     @classmethod
