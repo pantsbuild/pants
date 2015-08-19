@@ -180,13 +180,13 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
   def test_java_compile_missing_dep_analysis_whitelist(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist',
-      '--jvm-dep-check-compile-java-missing-deps=fatal',
+      '--compile-jvm-dep-check-missing-deps=fatal',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2'
     )
 
   def test_java_compile_missing_direct_dep_analysis_whitelist(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--jvm-dep-check-compile-java-missing-direct-deps=fatal',
+      '--compile-jvm-dep-check-missing-direct-deps=fatal',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist'
     )

@@ -30,7 +30,7 @@ class JvmDependencyCheck(Task):
     round_manager.require_data('classes_by_target')
     round_manager.require_data('ivy_jar_products')
     round_manager.require_data('ivy_resolve_symlink_map')
-    # round_manager.require_data('actual_source_deps')
+    round_manager.require_data('actual_source_deps')
 
   @classmethod
   def register_options(cls, register):
@@ -181,10 +181,6 @@ class JvmDependencyCheck(Task):
 
     See docstring for _compute_missing_deps for details.
     """
-    print('=======================')
-    print(srcs)
-    for d in actual_deps:
-      print('>>>', d)
     if self._check_missing_deps or self._check_missing_direct_deps or self._check_unnecessary_deps:
       missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
         self._compute_missing_deps(srcs, actual_deps)

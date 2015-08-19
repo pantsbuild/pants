@@ -399,30 +399,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       # are not available during compilation. https://github.com/pantsbuild/pants/issues/206
       entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
       compile_classpath.add_for_target(compile_context.target, entries)
-      # TODO(cgibb): only do this if isrequired
 
-
-    # if self.context.products.isrequired('actual_source_deps'):
-    def classpath_indexer():
-      classpaths = [path for (conf, path) in
-                    compile_classpath.get_for_target(compile_context.target)
-                    if conf in self._confs]
-      return self._compute_classpath_elements_by_class(classpaths,
-                                                       compile_context.classes_dir)
-    sources = []
-    deps = []
-    for compile_context in compile_contexts:
-      sources.extend(compile_context.sources)
-      deps.extend(
-          self._strategy.analysis_parser.parse_deps_from_path(compile_context.analysis_file,
-                                                              classpath_indexer,
-                                                              compile_context.classes_dir))
-
-    print('-------------------------')
-    print(compile_context.sources)
-    # for d in deps:
-    #   print('???', d)
-    actual_source_deps[compile_context.target] = deps
+      if self._strategy.name() == 'global':
+        # TODO(cgibb): Fix isolated dependency parsing.
+        # TODO(cgibb): Only parse source dependencies if isrequired.
+        def classpath_indexer():
+          classpaths = [path for (conf, path) in entries if conf in self._confs]
+          return self._compute_classpath_elements_by_class(classpaths,
+                                                           compile_context.classes_dir)
+        deps = self._strategy.analysis_parser.parse_deps_from_path(compile_context.analysis_file,
+                                                                   classpath_indexer,
+                                                                   compile_context.classes_dir)
+        actual_source_deps[compile_context.target] = deps
 
   def _compute_classpath_elements_by_class(self, classpath, classes_dir):
     # Don't consider loose classes dirs in our classes dir. Those will be considered
