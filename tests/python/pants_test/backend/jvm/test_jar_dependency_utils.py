@@ -11,11 +11,11 @@ from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 
 class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_string_representation(self):
-    org_name_ref = M2Coordinate(org='org.example', name='lib', ref='the-ref')
+    org_name_ref = M2Coordinate(org='org.example', name='lib', rev='the-ref')
     self.assertEquals('org.example:lib:the-ref', str(org_name_ref))
 
     org_name_ref_classifier = M2Coordinate(org='org.example', name='lib',
-                                           ref='the-ref', classifier='classify')
+                                           rev='the-ref', classifier='classify')
     self.assertEquals('org.example:lib:the-ref#classify', str(org_name_ref_classifier))
 
     org_name_classifier = M2Coordinate(org='org.example', name='lib',

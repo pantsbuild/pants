@@ -163,7 +163,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         resolved_jars = [new_resolved_jar_with_symlink_path(resolved_jar)
                          for resolved_jar in ivy_info.get_resolved_jars_for_jar_library(target,
                                                                                         memo=ivy_jar_memo)]
-        compile_classpath.add_jars_for_target(target, conf, resolved_jars)
+        compile_classpath.add_jars_for_targets([target], conf, resolved_jars)
 
     if self._report:
       self._generate_ivy_report(resolve_hash_name)

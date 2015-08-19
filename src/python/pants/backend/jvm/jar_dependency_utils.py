@@ -34,21 +34,21 @@ class ResolvedJar(object):
 class M2Coordinate(object):
   """Represents a fully qualified name of an artifact in a M2 repository."""
 
-  def __init__(self, org, name, ref=None, classifier=None, type_='jar'):
+  def __init__(self, org, name, rev=None, classifier=None, type_='jar'):
     """
     :param org: Maven equivalent of orgId
     :param name: Maven equivalent of groupId
     :param type_: Maven equivalent of packaging. Defaults to jar.
     :param classifier: Maven equivalent of classifier.
-    :param ref: Version of the artifact.
+    :param rev: Version of the artifact.
     """
     self.org = org
     self.name = name
     self.type_ = type_
-    self.ref = ref
+    self.rev = rev
     self.classifier = classifier
 
-    self._id = (org, name, ref, classifier, type_)
+    self._id = (org, name, rev, classifier, type_)
 
   def __eq__(self, other):
     return self._id == other._id
@@ -62,13 +62,13 @@ class M2Coordinate(object):
   def __str__(self):
     # https://maven.apache.org/pom.html#Maven_Coordinates
     # Produces an unambiguous string representation of the coordinate
-    # org:artifactId[:ref][;type_][#classifier]
+    # org:name[:rev][;type_][#classifier]
 
-    org_name_ref_portion = ":".join(filter(None, (self.org, self.name, self.ref)))
+    org_name_rev_portion = ":".join(filter(None, (self.org, self.name, self.rev)))
     if self.type_ and self.type_ != 'jar':
-      with_type = "{};{}".format(org_name_ref_portion, self.type_)
+      with_type = "{};{}".format(org_name_rev_portion, self.type_)
     else:
-      with_type = org_name_ref_portion
+      with_type = org_name_rev_portion
 
     if self.classifier:
       with_classifier = "{}#{}".format(with_type, self.classifier)

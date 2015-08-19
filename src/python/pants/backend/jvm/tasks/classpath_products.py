@@ -73,12 +73,6 @@ class ClasspathProducts(object):
     """Adds classpath path elements to the products of the provided target."""
     self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
-  def add_jars_for_target(self, target, conf, resolved_jars):
-    """Adds jar classpath elements to the products of the provided target in a way that works with
-    excludes.
-    """
-    self.add_jars_for_targets([target], conf, resolved_jars)
-
   def add_jars_for_targets(self, targets, conf, resolved_jars):
     """Adds jar classpath elements to the products of the provided targets in a way that works with
     excludes.
@@ -135,6 +129,12 @@ class ClasspathProducts(object):
       self._validate_path_in_buildroot(classpath_tuple, target)
 
   def _validate_path_in_buildroot(self, classpath_tuple, target):
+    """Validates that a classpath element is in the build root.
+
+    :param classpath_tuple: a 2-tuple of ivy_conf and ClasspathEntry
+    :param target: The target that the classpath tuple is being registered for
+    :raises: `TaskError` when the path is outside the build root
+    """
     conf, classpath_entry = classpath_tuple
     path = classpath_entry.path
     if os.path.relpath(path, self._buildroot).startswith(os.pardir):

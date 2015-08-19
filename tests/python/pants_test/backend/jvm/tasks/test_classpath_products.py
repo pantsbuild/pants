@@ -49,7 +49,7 @@ class ClasspathProductsTest(BaseTest):
 
     classpath_product = ClasspathProducts()
     with self.assertRaises(TaskError) as cm:
-      classpath_product.add_jars_for_target(a, 'default', [(resolved_example_jar_at('/dev/null'))])
+      classpath_product.add_jars_for_targets([a], 'default', [(resolved_example_jar_at('/dev/null'))])
 
     self.assertEqual(
       'Classpath entry /dev/null for target a:a is located outside the buildroot.',
@@ -100,7 +100,7 @@ class ClasspathProductsTest(BaseTest):
     classpath_product = ClasspathProducts()
     com_example_jar_path = self._example_jar_path()
     org_example_jar_path = os.path.join(self.build_root, 'ivy/jars/org.example/lib/123.4.jar')
-    classpath_product.add_jars_for_target(a, 'default',
+    classpath_product.add_jars_for_targets([a], 'default',
                                           [resolved_example_jar_at(com_example_jar_path),
                                            resolved_example_jar_at(org_example_jar_path,
                                                                    org='org.example')])
@@ -218,7 +218,7 @@ class ClasspathProductsTest(BaseTest):
     return os.path.join(self.build_root, 'ivy/jars/com.example/lib/jars/123.4.jar')
 
   def add_jar_classpath_element_for_path(self, classpath_product, target, example_jar_path):
-    classpath_product.add_jars_for_target(target, 'default', [resolved_example_jar_at(example_jar_path)])
+    classpath_product.add_jars_for_targets([target], 'default', [resolved_example_jar_at(example_jar_path)])
 
   def add_excludes_for_targets(self, classpath_product, *targets):
     classpath_product.add_excludes_for_targets(targets)

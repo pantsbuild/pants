@@ -143,7 +143,7 @@ class IvyInfo(object):
     """
     def to_resolved_jar(jar_module_ref, artifact_path):
       return ResolvedJar(coordinate=M2Coordinate(org=jar_module_ref.org, name=jar_module_ref.name,
-                                                 ref=jar_module_ref.rev,
+                                                 rev=jar_module_ref.rev,
                                                  classifier=jar_module_ref.classifier),
                          cache_path=artifact_path
       )
