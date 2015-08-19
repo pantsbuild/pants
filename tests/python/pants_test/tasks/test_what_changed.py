@@ -13,7 +13,7 @@ from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibr
 from pants.backend.core.from_target import FromTarget
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.what_changed import WhatChanged
-from pants.backend.core.wrapped_globs import RGlobs
+from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -42,6 +42,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       },
       context_aware_object_factories={
         'source_root': SourceRoot.factory,
+        'globs': Globs,
         'rglobs': RGlobs,
         'from_target': FromTarget,
       },
@@ -360,5 +361,18 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/proto:external-source',
       'root/proto:external-source-jars',
       workspace=self.workspace(files=['root/proto/BUILD'])
+    )
+
+  def test_globs_in_resources(self):
+    self.add_to_build_file('root/resources', dedent("""
+      resources(
+        name='resources',
+        sources=globs('*')
+      )
+    """))
+
+    self.assert_console_output(
+      'root/resources:resources',
+      workspace=self.workspace(files=['root/resources/foo/bar/baz.yml'])
     )
 
