@@ -3,8 +3,9 @@
 
 python_tests(
   name='subsystem',
-  sources=['test_subsystem.py'],
+  sources=['test_subsystem.py', 'test_subsystem_client_mixin.py'],
   dependencies=[
+    '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/option',
     'src/python/pants/subsystem',

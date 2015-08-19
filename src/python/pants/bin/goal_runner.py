@@ -105,7 +105,10 @@ class GoalRunner(object):
 
     known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]
 
-    # Add scopes for all needed subsystems.
+    # Add (global instance) scopes for all needed subsystems.  Even if we never use the
+    # global instance of some subsystem we still need to register options on it, so that
+    # other instances of that subsystem can inherit option values from it, and so that
+    # ArgSplitter will recogize that scope prefix.
     subsystems = Subsystem.closure(set(self.subsystems) |
                                    Goal.subsystems() |
                                    build_configuration.subsystems())
@@ -169,17 +172,17 @@ class GoalRunner(object):
     return self.options.for_global_scope()
 
   def register_options(self, subsystems):
-    # Standalone global options.
+    # Register standalone global options.
     GlobalOptionsRegistrar.register_options_on_scope(self.options)
 
-    # Options for subsystems.
+    # Register options for global subsystems (and their dependencies).
     for subsystem in subsystems:
       subsystem.register_options_on_scope(self.options)
 
     # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
     # be a subsystem?
     for goal in Goal.all():
-      # Register task options.
+      # Register task options (and their dependencies).
       goal.register_options(self.options)
 
   def _expand_goals_and_specs(self):

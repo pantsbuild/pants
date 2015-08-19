@@ -82,7 +82,6 @@ class OptionsTest(unittest.TestCase):
     options.register('test', '--xlong', type=int)
 
     # For the design doc example test.
-    options.register('compile', '--c', type=int, recursive=True)
     options.register('compile.java', '--b', type=str, default='foo')
 
     # Test deprecated options with a scope
@@ -308,21 +307,15 @@ class OptionsTest(unittest.TestCase):
       'PANTS_COMPILE_C': '66'
     }
 
-    options = self._parse('./pants --a=1 compile --b=2 compile.java --a=3 --c=4',
+    options = self._parse('./pants --a=1 compile --b=2 compile.java --a=3',
                           env=env, config=config)
 
     self.assertEqual(1, options.for_global_scope().a)
     self.assertEqual(99, options.for_global_scope().b)
-    with self.assertRaises(AttributeError):
-      _ = options.for_global_scope().c
-
     self.assertEqual(1, options.for_scope('compile').a)
     self.assertEqual(2, options.for_scope('compile').b)
-    self.assertEqual(66, options.for_scope('compile').c)
-
     self.assertEqual(3, options.for_scope('compile.java').a)
     self.assertEqual('foo', options.for_scope('compile.java').b)
-    self.assertEqual(4, options.for_scope('compile.java').c)
 
   def test_file_spec_args(self):
     with tempfile.NamedTemporaryFile() as tmp:

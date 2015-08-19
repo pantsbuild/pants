@@ -41,24 +41,24 @@ class CacheSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
-    register('--read', action='store_true', default=True, recursive=True,
+    register('--read', action='store_true', default=True,
              help='Read build artifacts from cache, if available.')
-    register('--write', action='store_true', default=True, recursive=True,
+    register('--write', action='store_true', default=True,
              help='Write build artifacts to cache, if available.')
-    register('--overwrite', action='store_true', recursive=True,
+    register('--overwrite', action='store_true',
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
-    register('--read-from', type=list_option, recursive=True,
+    register('--read-from', type=list_option,
              help='The URIs of artifact caches to read from. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')
-    register('--write-to', type=list_option, recursive=True,
+    register('--write-to', type=list_option,
              help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')
-    register('--compression-level', advanced=True, type=int, default=5, recursive=True,
+    register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
-    register('--max-entries-per-target', advanced=True, recursive=True, type=int, default=None,
+    register('--max-entries-per-target', advanced=True, type=int, default=None,
              help='Maximum number of old cache files to keep per task target pair')
 
   @classmethod
