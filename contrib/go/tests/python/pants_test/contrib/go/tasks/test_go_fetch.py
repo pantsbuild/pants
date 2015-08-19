@@ -27,7 +27,7 @@ class GoFetchTest(TaskTestBase):
   def task_type(cls):
     return GoFetch
 
-  def test_get_remote_import_ids(self):
+  def test_get_remote_import_paths(self):
     go_fetch = self.create_task(self.context())
     self.create_file('src/github.com/u/a/a.go', contents="""
       package a

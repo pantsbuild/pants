@@ -126,18 +126,10 @@ class GoFetch(GoTask):
 
         for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
           remote_root = fetcher.root(remote_import_path)
-
-          remote_pkg = os.path.relpath(remote_import_path, remote_root)
-          if remote_pkg == os.curdir:
-            remote_pkg = ''
-
           spec_path = os.path.join(go_remote_lib.target_base, remote_root)
 
-          # TODO(John Sirois): How to refer to remote_pkg when its empty?
-          # Right now we're using `os.path.basename(remote_root)` but if that clashes with a pkg
-          # within the remote_root, we need to have a convention to break the ambiguity and allow
-          # both to be referenced.
-          target_name = remote_pkg or os.path.basename(remote_root)
+          package_path = GoRemoteLibrary.remote_package_path(remote_root, remote_import_path)
+          target_name = package_path or os.path.basename(remote_root)
 
           address = SyntheticAddress(spec_path, target_name)
           if address not in all_known_addresses:
@@ -146,7 +138,7 @@ class GoFetch(GoTask):
               # implicit synthetic remote target for all other packages in the same remote root.
               implicit_ok = any(spec_path == a.spec_path for a in all_known_addresses)
 
-              remote_lib = self._resolve(go_remote_lib, address, remote_pkg, implicit_ok)
+              remote_lib = self._resolve(go_remote_lib, address, package_path, implicit_ok)
               resolved_remote_libs.add(remote_lib)
               all_known_addresses.add(address)
             except self.UndeclaredRemoteLibError as e:
@@ -176,7 +168,7 @@ class GoFetch(GoTask):
     :type: :class:`pants.contrib.go.targets.go_remote_library.GoRemoteLibrary`
     :param address: The address of the remote library that should own `pkg`.
     :type: :class:`pants.base.Address`
-    :param string pkg: The remote package whose owning target nedds to be resolved.
+    :param string pkg: The remote package path whose owning target needs to be resolved.
     :param bool implict_ok: `False` if the given `address` must be defined in a BUILD file on disk;
                             otherwise a remote library to own `pkg` will always be created and
                             returned.

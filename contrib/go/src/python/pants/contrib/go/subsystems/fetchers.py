@@ -86,13 +86,18 @@ class Fetchers(Subsystem):
     Fetcher implementations need not be registered unless one of the following is true:
     1. You wish to provide an alias to refer to the fetcher with for configuration.
     2. The fetcher class is a :class:`pants.subsystem.subsystem.Subsystem` that needs to be
-       available for further configuration of it's own.
+       available for further configuration of its own.
 
     Un-advertised Non-Subsystem fetchers can be configured by their fully qualified class names.
 
     If a namespace is supplied, the fetcher class will be registered both by its fully qualified
     class name (the default), and under an alias formed from the namespace dotted with the simple
-    class name of the fetcher.
+    class name of the fetcher.  If the supplied namespace is the empty string (''), then the alias
+    becomes just the simple class name of the fetcher.  For example, for the fetcher class
+    `medium.pants.go.UUCPFetcher` and a namespace of 'medium' the registered alias would be
+    'medium.UUCPFetcher'.  Supplying a namespace of '' would simply register 'UUCPFetcher'.  In
+    either case, the fully qualified class name of 'medium.pants.go.UUCPFetcher' would also be
+    registered as an alias for the fetcher type.
 
     :param type fetcher_class: The :class:`Fetcher` subclass to advertise.
     :param string namespace: An optional string to prefix the `fetcher_class`'s simple class
@@ -110,12 +115,12 @@ class Fetchers(Subsystem):
     if not issubclass(fetcher_class, Fetcher):
       raise cls.InvalidAdvertisement('The {} type is not a Fetcher'.format(fetcher_class))
 
-    fetcher_class_name = cls._fully_qualified_class_name(fetcher_class)
-    cls._FETCHERS[fetcher_class_name] = fetcher_class
+    fully_qualified_fetcher_class_name = cls._fully_qualified_class_name(fetcher_class)
+    cls._FETCHERS[fully_qualified_fetcher_class_name] = fetcher_class
     if namespace is not None:
       namespaced_key = ('{}.{}'.format(namespace, fetcher_class.__name__) if namespace
                         else fetcher_class.__name__)
-      if namespaced_key != fetcher_class_name:
+      if namespaced_key != fully_qualified_fetcher_class_name:
         existing_alias = cls._FETCHERS.get(namespaced_key)
         if existing_alias and existing_alias != fetcher_class:
           raise cls.ConflictingAdvertisement('Cannot advertise {} as {!r} which already aliases {}'
@@ -164,6 +169,12 @@ class Fetchers(Subsystem):
 
   @classmethod
   def register_options(cls, register):
+    # TODO(John Sirois): Introduce a fetchers option that assigns names to fetchers for re-use
+    # in mapping below which will change from a dict to a list of 2-tuples (regex, named_fetcher).
+    # This will allow for the user configuring a fetcher several different ways and then controlling
+    # match order by placing fetchers at the head of the list to handle special cases before
+    # falling through to more general matchers.
+    # Tracked at: https://github.com/pantsbuild/pants/issues/2018
     register('--mapping', metavar='<mapping>', type=dict_option, default=cls._DEFAULT_FETCHERS,
              advanced=True,
              help="A mapping from a remote import path matching regex to a fetcher type to use "
@@ -230,7 +241,8 @@ class Fetchers(Subsystem):
     :param string import_path: The remote import path to fetch.
     :returns: A fetcher capable of fetching the given `import_path`.
     :rtype: :class:`Fetcher`
-    :raises: :class:`
+    :raises: :class:`Fetchers.UnfetchableRemote` if no fetcher was found that could handle the
+             given `import_path`.
     """
     for matcher, fetcher in self._fetchers:
       match = matcher.match(import_path)
@@ -240,7 +252,7 @@ class Fetchers(Subsystem):
 
 
 class ArchiveFetcher(Fetcher, Subsystem):
-  """A fetcher that knows how find archives for remote import paths and unpack them."""
+  """A fetcher that knows how to find archives for remote import paths and unpack them."""
 
   logger = logging.getLogger(__name__)
 
@@ -276,7 +288,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
                   "1. The default revision string to use when no `rev` is supplied; ie 'HEAD' or "
                   "'master' for git.\n"
                   "2. An integer indicating the number of leading path components to strip from "
-                  "files upacked from the the archive.\n"
+                  "files upacked from the archive.\n"
                   "\n"
                   "An example configuration that works against github.com is:\n"
                   "{r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':\n"
