@@ -40,12 +40,18 @@ class Optionable(AbstractClass):
     """
 
   @classmethod
-  def register_options_on_scope(cls, options):
+  def register_options_on_scope(cls, options, scope=None):
     """Trigger registration of this optionable's options.
+
+    :param options: Register on parsers obtained from this Options instance.
+    :param scope: Register on the parser for this scope. If unspecified, use this
+                  Optionable class's scope.  We use this when registering subsystem
+                  options for per-optionable subsystems.
 
     Subclasses should not generally need to override this method.
     """
-    cls.register_options(options.registration_function_for_optionable(cls))
+    scope = scope or cls.options_scope
+    cls.register_options(options.registration_function_for_optionable(cls, scope))
 
   def __init__(self):
     # Check that the instance's class defines options_scope.

@@ -191,17 +191,17 @@ class Options(object):
     """Register an option in the given scope, using argparse params."""
     self.get_parser(scope).register(*args, **kwargs)
 
-  def registration_function_for_optionable(self, optionable_class):
+  def registration_function_for_optionable(self, optionable_class, scope):
     """Returns a function for registering argparse args on the given scope."""
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
       kwargs['registering_class'] = optionable_class
-      self.register(optionable_class.options_scope, *args, **kwargs)
+      self.register(scope, *args, **kwargs)
     # Clients can access the bootstrap option values as register.bootstrap.
     register.bootstrap = self.bootstrap_option_values()
     # Clients can access the scope as register.scope.
-    register.scope = optionable_class.options_scope
+    register.scope = scope
     return register
 
   def get_parser(self, scope):

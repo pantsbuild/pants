@@ -212,7 +212,10 @@ class Parser(object):
     """
     if self._frozen:
       raise RegistrationError('Cannot register option {0} in scope {1} after registering options '
-                              'in any of its inner scopes.'.format(args[0], self._scope))
+                              'in any of its inner scopes.'.format(args[0], self.scope))
+
+    if not args:
+      raise ParseError('No option names provided for some option in scope {0}'.format(self.scope))
 
     # Prevent further registration in enclosing scopes.
     ancestor = self._parent_parser
@@ -223,6 +226,9 @@ class Parser(object):
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
     if 'recursive' in kwargs:
+      if self.scope != GLOBAL_SCOPE:
+        raise ParseError('Attempting to register option {0} in scope {1} with recursive=True, '
+                         'but only global options can be recursive.'.format(args[0], self.scope))
       kwargs['recursive_root'] = True  # So we can distinguish the original registrar.
     self._register(dest, args, kwargs)  # Note: May modify kwargs (to remove recursive_root).
 

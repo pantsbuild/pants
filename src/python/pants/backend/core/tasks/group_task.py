@@ -281,8 +281,10 @@ class GroupTask(Task):
               yield scope
 
         @classmethod
-        def register_options_on_scope(cls, options):
+        def register_options_on_scope(cls, options, scope=None):
           for member_type in cls._member_types():
+            # Note: we ignore the passed-in scope (which will be None anyway), as we want to
+            # register each member on their own scope.
             member_type.register_options_on_scope(options)
 
         @classmethod

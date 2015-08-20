@@ -14,7 +14,7 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
 
   def run_repl(self, target, program, repl_args=None):
     """Run a repl for the given target with the given input, and return stdout_data"""
-    command = ['repl']
+    command = ['repl.scala']
     if repl_args:
       command.extend(repl_args)
     command.extend([target, '--quiet'])

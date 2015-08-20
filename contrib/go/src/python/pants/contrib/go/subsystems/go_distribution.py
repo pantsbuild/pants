@@ -29,10 +29,10 @@ class GoDistribution(object):
 
     @classmethod
     def register_options(cls, register):
-      register('--supportdir', recursive=True, advanced=True, default='bin/go',
+      register('--supportdir', advanced=True, default='bin/go',
                help='Find the go distributions under this dir.  Used as part of the path to lookup '
                     'the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', recursive=True, advanced=True, default='1.4.2',
+      register('--version', advanced=True, default='1.4.2',
                help='Go distribution version.  Used as part of the path to lookup the distribution '
                     'with --binary-util-baseurls and --pants-bootstrapdir')
 

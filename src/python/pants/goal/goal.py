@@ -163,7 +163,10 @@ class _Goal(object):
         yield scope_info
 
   def subsystems(self):
-    """Returns all subsystem types used by tasks in this goal, in no particular order."""
+    """Returns all subsystem types used by tasks in this goal, in no particular order.
+
+    Returns types of global and task-specific subsystem dependencies.
+    """
     ret = set()
     for task_type in self.task_types():
       ret.update([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()])

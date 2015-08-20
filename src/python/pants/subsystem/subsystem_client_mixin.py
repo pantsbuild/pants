@@ -32,7 +32,13 @@ class SubsystemDependency(namedtuple('_SubsystemDependency', ('subsystem_cls', '
 
 
 class SubsystemClientMixin(object):
-  """A mixin for declaring dependencies on subsystems."""
+  """A mixin for declaring dependencies on subsystems.
+
+  Must only be mixed in to the left of Optionable, e.g.,
+
+  class Foo(SubsystemClientMixin, Optionable, Bar):
+    ...
+  """
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -67,3 +73,13 @@ class SubsystemClientMixin(object):
     if hasattr(cls, 'task_subsystems'):
       for subsys in cls.task_subsystems():
         yield SubsystemDependency(subsys, cls.options_scope)
+
+  @classmethod
+  def register_options_on_scope(cls, options, scope=None):
+    # Register on the Optionable we're mixed in to.
+    super(SubsystemClientMixin, cls).register_options_on_scope(options, scope)
+    # Register on non-global dependencies. Global dependencies are gathered in GoalRunner and
+    # their options are registered there.
+    for dep in cls.subsystem_dependencies_iter():
+      if dep.scope != GLOBAL_SCOPE:
+        dep.subsystem_cls.register_options_on_scope(options, dep.options_scope())
