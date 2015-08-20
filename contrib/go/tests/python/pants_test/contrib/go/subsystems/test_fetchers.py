@@ -57,7 +57,8 @@ class FetchersTest(unittest.TestCase):
 
 class GopkgInFetcherTest(unittest.TestCase):
 
-  def do_fetch(self, import_path, github_api_responses, expected_fetch=None):
+  def do_fetch(self, import_path, version_override=None, github_api_responses=None,
+               expected_fetch=None):
     # Simulate a series of github api calls to list refs for the given import paths.
     # Optionally asserts an expected fetch call to the underlying fetcher.
     with subsystem_instance(GopkgInFetcher) as fetcher:
@@ -65,14 +66,14 @@ class GopkgInFetcherTest(unittest.TestCase):
       fetcher._do_get.side_effect = github_api_responses
       fetcher._do_fetch = mock.Mock(spec=fetcher._do_fetch)
       with temporary_dir() as dest:
-        fetcher.fetch(import_path, dest)
+        fetcher.fetch(import_path, dest, rev=version_override)
       if expected_fetch:
         expected_url, expected_rev = expected_fetch
         fetcher._do_fetch.assert_called_once_with(expected_url, dest, expected_rev)
 
   def test_no_tags_or_branches(self):
     with self.assertRaises(GopkgInFetcher.NoVersionsError):
-      self.do_fetch('gopkg.in/check.v1', [], [])
+      self.do_fetch('gopkg.in/check.v1', github_api_responses=([], []))
 
   def test_invalid_tags_or_branches(self):
     with self.assertRaises(GopkgInFetcher.NoMatchingVersionError):
@@ -96,7 +97,23 @@ class GopkgInFetcherTest(unittest.TestCase):
                                                                requests.RequestException()))
 
   def test_tag_match_exact(self):
-    self.do_fetch('gopkg.in/check.v1', github_api_responses=([{'ref': 'refs/tags/v1'}], []))
+    self.do_fetch('gopkg.in/check.v1',
+                  github_api_responses=([{'ref': 'refs/tags/v1'}], []),
+                  expected_fetch=('github.com/go-check/check', 'v1'))
+
+  def test_user_protocol(self):
+    self.do_fetch('gopkg.in/fred/bob.v5',
+                  github_api_responses=([{'ref': 'refs/tags/v5.5'}], []),
+                  expected_fetch=('github.com/fred/bob', 'v5.5'))
+
+  def test_version_override(self):
+    no_api_call = AssertionError('Expected no github API calls with a version override from the '
+                                 'BUILD file.')
+    self.do_fetch('gopkg.in/fred/bob.v5',
+                  version_override='17cd821d58c93fa395c239dfbd8e12a42c17b743',
+                  github_api_responses=(no_api_call, no_api_call),
+                  expected_fetch=('github.com/fred/bob',
+                                  '17cd821d58c93fa395c239dfbd8e12a42c17b743'))
 
   def test_tag_match_major_beats_minor(self):
     self.do_fetch('gopkg.in/check.v1',

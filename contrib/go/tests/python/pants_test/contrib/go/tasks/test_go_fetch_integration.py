@@ -40,7 +40,7 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
     #    -> github.com/kr/pretty (testing)
     #       -> github.com/kr/text (testing)
     args = ['test.go',
-            '--remote'
+            '--remote',
             'contrib/go/examples/3rdparty/go/github.com/bitly/go-simplejson']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
