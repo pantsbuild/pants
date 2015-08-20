@@ -51,9 +51,21 @@ class NailgunProcessGroup(ProcessGroup):
                                current build root.
     """
     with self._NAILGUN_KILL_LOCK:
+      def terminate(nailgun_proc):
+        logger.info('killing nailgun server pid={pid}'.format(pid=nailgun_proc.pid))
+        nailgun_proc.terminate()
+
+      threads = []
       for proc in self._iter_nailgun_instances(everywhere):
-        logger.info('killing nailgun server pid={pid}'.format(pid=proc.pid))
-        proc.terminate()
+        thread = threading.Thread(target=terminate, args=proc)
+        thread.start()
+
+        threads.append(thread)
+
+      for thread in threads:
+        thread.join()
+
+      logger.info('Done killing nailgun servers.')
 
 
 # TODO: Once we integrate standard logging into our reporting framework, we can consider making
