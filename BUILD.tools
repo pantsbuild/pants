@@ -75,7 +75,7 @@ jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
 
 jar_library(name = 'zinc',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.8')
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.9')
             ])
 
 SBT_REV = '0.13.9'
