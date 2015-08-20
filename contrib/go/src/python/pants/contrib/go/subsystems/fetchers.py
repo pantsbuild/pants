@@ -297,6 +297,8 @@ class ArchiveFetcher(Fetcher, Subsystem):
              default=10 * 1024,  # 10KB in case jumbo frames are in play.
              help='The number of bytes of archive content to buffer in memory before flushing to '
                   'disk when downloading an archive.')
+    register('--retries', default=1, advanced=True,
+             help='How many times to retry to fetch a remote library.')
 
   @memoized_property
   def _matchers(self):
@@ -358,7 +360,12 @@ class ArchiveFetcher(Fetcher, Subsystem):
   def _download(self, url):
     # TODO(jsirois): Wrap with workunits, progress meters, checksums.
     self.logger.info('Downloading {}...'.format(url))
-    with closing(requests.get(url, stream=True)) as res:
+    session = requests.session()
+    # Override default http adapters with a retriable one.
+    retriable_http_adapter = requests.adapters.HTTPAdapter(max_retries=self.get_options().retries)
+    session.mount("http://", retriable_http_adapter)
+    session.mount("https://", retriable_http_adapter)
+    with closing(session.get(url, stream=True)) as res:
       if not res.status_code == requests.codes.ok:
         raise self.FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
       with temporary_file() as archive_fp:
