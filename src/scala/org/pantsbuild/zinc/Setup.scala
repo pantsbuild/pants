@@ -11,7 +11,8 @@ import sbt.Path._
 import scala.collection.JavaConverters._
 
 /**
- * All setup options for a zinc compiler.
+ * All identity-affecting options for a zinc compiler. All fields in this struct
+ * must have a useful definition of equality.
  */
 case class Setup(
   scalaCompiler: File,
@@ -21,8 +22,7 @@ case class Setup(
   compilerInterfaceSrc: File,
   javaHome: Option[File],
   forkJava: Boolean,
-  cacheDir: File,
-  consoleLog: ConsoleOptions)
+  cacheDir: File)
 
 /**
  * Jar file description for locating jars.
@@ -63,7 +63,7 @@ object Setup {
   def apply(settings: Settings): Setup = {
     val scalaJars = selectScalaJars(settings.scala)
     val (sbtInterface, compilerInterfaceSrc) = selectSbtJars(settings.sbt)
-    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava, settings.consoleLog)
+    setup(scalaJars.compiler, scalaJars.library, scalaJars.extra, sbtInterface, compilerInterfaceSrc, settings.javaHome, settings.forkJava)
   }
 
   /**
@@ -76,8 +76,7 @@ object Setup {
     sbtInterface: File,
     compilerInterfaceSrc: File,
     javaHomeDir: Option[File],
-    forkJava: Boolean,
-    consoleLog: ConsoleOptions): Setup =
+    forkJava: Boolean): Setup =
   {
     val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
@@ -87,7 +86,7 @@ object Setup {
     val compilerInterfaceJar = normalise(compilerInterfaceSrc)
     val javaHome             = javaHomeDir map normalise
     val cacheDir             = zincCacheDir
-    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir, consoleLog)
+    Setup(compilerJar, libraryJar, extraJars, sbtInterfaceJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
   }
 
   /**

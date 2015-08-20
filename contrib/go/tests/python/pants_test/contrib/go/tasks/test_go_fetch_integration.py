@@ -15,3 +15,18 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
             'contrib/go/examples/src/go/server']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
+
+  def test_issues_1998(self):
+    # Only the 3 explicit targets below are defined on disk, the 2 implicit AdRoll/goamz targets
+    # are created on the fly at the same rev as the explicit github.com/AdRoll/goamz:dynamodb and
+    # they're hydrated from the same downloaded tarball.
+    #
+    # github.com/AdRoll/goamz:dynamodb
+    # -> github.com/AdRoll/goamz/aws (implicit)
+    # -> github.com/AdRoll/goamz:dynamodb/dynamizer (implicit)
+    #    -> github.com/cbroglie/mapstructure
+    # -> github.com/bitly/go-simplejson
+    args = ['compile',
+            'contrib/go/examples/3rdparty/go/github.com/AdRoll/goamz:dynamodb']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)

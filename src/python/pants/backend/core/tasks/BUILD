@@ -334,6 +334,7 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
     'src/python/pants/reporting',
+    'src/python/pants/subsystem',
     'src/python/pants/util:meta',
   ],
 )

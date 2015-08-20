@@ -53,6 +53,11 @@ class ApacheThriftGen(SimpleCodegenTask):
   def task_subsystems(cls):
     return super(ApacheThriftGen, cls).task_subsystems() + (ThriftBinary.Factory,)
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return (super(ApacheThriftGen, cls).subsystem_dependencies() +
+            (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
+
   def __init__(self, *args, **kwargs):
     super(ApacheThriftGen, self).__init__(*args, **kwargs)
     self._thrift_defaults = ThriftDefaults.global_instance()

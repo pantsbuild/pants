@@ -244,6 +244,11 @@ class GroupTask(Task):
         _MEMBER_TYPES = []
 
         @classmethod
+        def subsystem_dependencies(cls):
+          return (super(SingletonGroupTask, cls).subsystem_dependencies() +
+                  tuple(s for mt in cls._member_types() for s in mt.subsystem_dependencies()))
+
+        @classmethod
         def global_subsystems(cls):
           return (super(SingletonGroupTask, cls).global_subsystems() +
             tuple(s for mt in cls._member_types() for s in mt.global_subsystems()))

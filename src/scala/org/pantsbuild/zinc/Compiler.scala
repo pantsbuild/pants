@@ -168,20 +168,10 @@ object Compiler {
  */
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Unit = {
-    val progress =
-      new SimpleCompileProgress(
-        setup.consoleLog.logPhases,
-        setup.consoleLog.printProgress,
-        setup.consoleLog.heartbeatSecs
-      )(log)
-    compile(inputs, cwd, reporter, Some(progress))(log)
-  }
-
   /**
    * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Unit = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
     import inputs._
     if (forceClean && Compiler.analysisIsEmpty(cacheFile)) {
       Util.cleanAllClasses(classesDirectory)
@@ -205,7 +195,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
         output = CompileOutput(classesDirectory),
         cache = Compiler.residentCache,
-        progress,
+        Some(progress),
         options = scalacOptions,
         javacOptions,
         previousAnalysis,

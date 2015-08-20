@@ -14,6 +14,7 @@ target(
     ':ivy_imports',
     ':ivy_resolve',
     ':ivy_utils',
+    ':jar_publish_unit_test',
     ':junit_run',
     ':junit_run_integration',
     ':jvm_platform_analysis',
@@ -161,6 +162,15 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/base:context_utils',
+  ]
+)
+
+python_tests(
+  name = 'jar_publish_unit_test',
+  sources = ['test_jar_publish_unit.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:jar_publish',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

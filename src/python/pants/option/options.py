@@ -246,13 +246,25 @@ class Options(object):
     Fingerprintable options are options registered via a "fingerprint=True" kwarg.
     """
     pairs = []
-    # This iterator will have already sorted the options, so their order is deterministic.
-    for (name, _, kwargs) in self.registration_args_iter_for_scope(scope):
-      if kwargs.get('fingerprint') is not True:
-        continue
-      val = self.for_scope(scope)[name]
-      val_type = kwargs.get('type', '')
-      pairs.append((val_type, val))
+    # Note that we iterate over options registered at `scope` and at all enclosing scopes, since
+    # option-using code can read those values indirectly via its own OptionValueContainer, so
+    # they can affect that code's output.
+    registration_scope = scope
+    while registration_scope is not None:
+      # This iterator will have already sorted the options, so their order is deterministic.
+      for (name, _, kwargs) in self.registration_args_iter_for_scope(registration_scope):
+        if kwargs.get('recursive') and not kwargs.get('recursive_root'):
+          continue  # We only need to fprint recursive options once.
+        if kwargs.get('fingerprint') is not True:
+          continue
+        # Note that we read the value from scope, even if the registration was on an enclosing
+        # scope, to get the right value for recursive options (and because this mirrors what
+        # option-using code does).
+        val = self.for_scope(scope)[name]
+        val_type = kwargs.get('type', '')
+        pairs.append((val_type, val))
+      registration_scope = (None if registration_scope == ''
+                            else registration_scope.rpartition('.')[0])
     return pairs
 
   def __getitem__(self, scope):

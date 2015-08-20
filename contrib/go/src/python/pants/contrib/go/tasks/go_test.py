@@ -5,8 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -42,8 +41,10 @@ class GoTest(GoWorkspaceTask):
 
   def _go_test(self, target):
     args = (self.get_options().build_and_test_flags.split()
-            + [target.address.spec_path]
+            + [target.import_path]
             + self.get_passthru_args())
-    self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
-                                workunit_factory=self.context.new_workunit,
-                                workunit_labels=[WorkUnitLabel.TEST])
+    result, go_cmd = self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
+                                                 workunit_factory=self.context.new_workunit,
+                                                 workunit_labels=[WorkUnitLabel.TEST])
+    if result != 0:
+      raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
