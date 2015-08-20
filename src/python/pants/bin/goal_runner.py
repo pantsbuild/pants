@@ -87,9 +87,7 @@ class GoalRunner(object):
     self.run_tracker = RunTracker.global_instance()
     self.reporting = Reporting.global_instance()
 
-    self.build_file_parser = BuildFileParser(self.build_configuration,
-                                             self.root_dir,
-                                             self.run_tracker)
+    self.build_file_parser = BuildFileParser(self.build_configuration, self.root_dir)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.build_file_type)
     self.build_graph = BuildGraph(self.address_mapper)
 
