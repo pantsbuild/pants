@@ -102,7 +102,7 @@ class GoFetch(GoTask):
           # Only fetch each remote root once.
           if not os.path.exists(root_dir):
             with temporary_dir() as tmp_fetch_root:
-              fetcher.fetch(go_remote_lib, dest=tmp_fetch_root)
+              fetcher.fetch(go_remote_lib.import_path, dest=tmp_fetch_root, rev=go_remote_lib.rev)
               safe_mkdir(root_dir)
               for path in os.listdir(tmp_fetch_root):
                 shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
@@ -116,7 +116,7 @@ class GoFetch(GoTask):
           # canonical owner target for the fetched files that 'child' targets (subpackages) can
           # depend on and share the fetch from.
           dest_dir = os.path.join(gopath, 'src', root)
-          safe_mkdir(dest_dir)
+          safe_mkdir(dest_dir, clean=True)
           for path in os.listdir(root_dir):
             os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
 
@@ -125,6 +125,7 @@ class GoFetch(GoTask):
         go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', pkg)
 
         for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
+          fetcher = self._get_fetcher(remote_import_path)
           remote_root = fetcher.root(remote_import_path)
           spec_path = os.path.join(go_remote_lib.target_base, remote_root)
 
@@ -198,7 +199,9 @@ class GoFetch(GoTask):
     """Returns the remote import paths declared by the given Go `pkg`."""
     out = self.go_dist.create_go_cmd('list', args=['-json', pkg], gopath=gopath).check_output()
     try:
-      imports = json.loads(out).get('Imports', [])
+      data = json.loads(out)
+      imports = data.get('Imports', [])
+      imports.extend(data.get('TestImports', []))
       return [imp for imp in imports if imp not in self.go_stdlib]
     except ValueError as e:
       save_file = os.path.join(gopath, '.errors', pkg, 'list.json')

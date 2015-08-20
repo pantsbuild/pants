@@ -25,6 +25,8 @@ class GoTest(GoWorkspaceTask):
   @classmethod
   def register_options(cls, register):
     super(GoTest, cls).register_options(register)
+    register('--remote', action='store_true',
+             help='Enables running tests found in go_remote_libraries.')
     register('--build-and-test-flags', default='',
              help='Flags to pass in to `go test` tool.')
 
@@ -35,7 +37,9 @@ class GoTest(GoWorkspaceTask):
   def execute(self):
     # Only executes the tests from the package specified by the target roots, so
     # we don't run the tests for _all_ dependencies of said package.
-    for target in filter(self.is_local_src, self.context.target_roots):
+    targets = filter(self.is_go if self.get_options().remote else self.is_local_src,
+                     self.context.target_roots)
+    for target in targets:
       self.ensure_workspace(target)
       self._go_test(target)
 
