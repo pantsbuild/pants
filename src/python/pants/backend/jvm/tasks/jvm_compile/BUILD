@@ -141,6 +141,7 @@ python_library(
   sources = ['jvm_dependency_check.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
