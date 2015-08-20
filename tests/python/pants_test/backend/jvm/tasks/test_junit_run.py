@@ -19,7 +19,7 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -85,7 +85,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.create_file(test_java_file_rel_path, content)
 
     # Invoke ivy to resolve classpath for junit.
-    distribution = Distribution.cached(jdk=True)
+    distribution = DistributionLocator.cached(jdk=True)
     executor = SubprocessExecutor(distribution=distribution)
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
     with subsystem_instance(IvySubsystem) as ivy_subsystem:

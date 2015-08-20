@@ -5,21 +5,22 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from unittest import skipIf
 
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.osutil import OS_ALIASES, get_os_name
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 def get_two_distributions():
-  try:
-    java7 = Distribution.locate(minimum_version='1.7', maximum_version='1.7.9999')
-    java8 = Distribution.locate(minimum_version='1.8', maximum_version='1.8.9999')
-    return java7, java8
-  except Distribution.Error:
-    return None
+  with subsystem_instance(DistributionLocator):
+    try:
+      java7 = DistributionLocator.locate(minimum_version='1.7', maximum_version='1.7.9999')
+      java8 = DistributionLocator.locate(minimum_version='1.8', maximum_version='1.8.9999')
+      return java7, java8
+    except DistributionLocator.Error:
+      return None
 
 
 class DistributionIntegrationTest(PantsRunIntegrationTest):
@@ -33,8 +34,8 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
     for (one, two) in ((java7, java8), (java8, java7)):
       target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
       run = self.run_pants(['run', target_spec], config={
-        'jvm': {
-          'jdk_paths': {
+        'jvm-distributions': {
+          'paths': {
             os_name: [one.home],
           }
         }
