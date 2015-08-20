@@ -16,7 +16,7 @@ import six.moves.urllib.request as urllib_request
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import list_option
+from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
@@ -27,7 +27,7 @@ _ID_BY_OS = {
   'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
 }
 
-_PATH_BY_ID = {
+_DEFAULT_PATH_BY_ID = {
   ('linux', 'x86_64'): ['linux', 'x86_64'],
   ('linux', 'amd64'): ['linux', 'x86_64'],
   ('linux', 'i386'): ['linux', 'i386'],
@@ -38,6 +38,7 @@ _PATH_BY_ID = {
   ('darwin', '12'): ['mac', '10.8'],
   ('darwin', '13'): ['mac', '10.9'],
   ('darwin', '14'): ['mac', '10.10'],
+  ('darwin', '15'): ['mac', '10.11'],
 }
 
 
@@ -59,12 +60,16 @@ class BinaryUtil(object):
       register('--fetch-timeout-secs', type=int, default=30, advanced=True,
                help='Timeout in seconds for url reads when fetching binary tools from the '
                     'repos specified by --baseurls')
+      register("--path-by-id", type=dict_option, advanced=True,
+               help='Maps output of uname for a machine to a binary search path.  e.g. '
+               '{ ("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"] }')
 
     @classmethod
     def create(cls):
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
-      return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir)
+      return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir,
+                        options.path_by_id)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -85,26 +90,34 @@ class BinaryUtil(object):
     """Internal error. --supportdir and --version must be registered in register_options()"""
     pass
 
-  @classmethod
-  def _select_binary_base_path(cls, supportdir, version, name):
+  def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
     """Calculate the base path.
 
     Exposed for associated unit tests.
     :param supportdir: the path used to make a path under --pants_bootstrapdir.
     :param version: the version number of the tool used to make a path under --pants-bootstrapdir.
     :param name: name of the binary to search for. (e.g 'protoc')
+    :param uname_func: method to use to emulate os.uname() in testing
     :returns: Base path used to select the binary file.
     """
-    sysname, _, release, _, machine = os.uname()
-    os_id = _ID_BY_OS[sysname.lower()]
-    if os_id:
-      middle_path = _PATH_BY_ID[os_id(release, machine)]
-      if middle_path:
-        return os.path.join(supportdir, *(middle_path + [version, name]))
-    raise cls.MissingMachineInfo('No {binary} binary found for: {machine_info}'
-                                 .format(binary=name, machine_info=(sysname, release, machine)))
+    uname_func = uname_func or os.uname
 
-  def __init__(self, baseurls, timeout_secs, bootstrapdir):
+    sysname, _, release, _, machine = uname_func()
+    try:
+      os_id = _ID_BY_OS[sysname.lower()]
+    except KeyError:
+      raise self.MissingMachineInfo("Pants has no binaries for {}".format(sysname))
+
+    try:
+      middle_path = self._path_by_id[os_id(release, machine)]
+    except KeyError:
+      raise self.MissingMachineInfo(
+        "Update --binaries-path-by-id to find binaries for {sysname} {machine} {release}.".format(
+          sysname=sysname, release=release, machine=machine))
+    return os.path.join(supportdir, *(middle_path + [version, name]))
+
+
+  def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -115,10 +128,15 @@ class BinaryUtil(object):
     :param int timeout_secs: Timeout in seconds for url reads.
     :param string bootstrapdir: Directory to use for caching binaries.  Uses this directory to
       search for binaries in, or download binaries to if needed.
+    :param dict path_by_id: Additional mapping from (sysname, id) -> (os, arch) for tool
+      directory naming
     """
     self._baseurls = baseurls
     self._timeout_secs = timeout_secs
     self._pants_bootstrapdir = bootstrapdir
+    self._path_by_id = _DEFAULT_PATH_BY_ID.copy()
+    if path_by_id:
+      self._path_by_id.update(path_by_id)
 
   @contextmanager
   def _select_binary_stream(self, supportdir, version, name, url_opener=None):
