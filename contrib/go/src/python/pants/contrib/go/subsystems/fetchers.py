@@ -391,6 +391,9 @@ class GopkgInFetcher(Fetcher, Subsystem):
   to the ArchiveFetcher to do the rest.
 
   The versioning URL scheme is described here: http://gopkg.in
+  NB: Unfortunately gopkg.in does not implement the <meta/> tag re-direction scheme defined in
+  `go help importpath` so we are forced to implement their re-direction protocol instead of using
+  the more general <meta/> tag protocol.
   """
   options_scope = 'gopkg.in'
 
@@ -515,25 +518,32 @@ class GopkgInFetcher(Fetcher, Subsystem):
           prefix, raw_ref = components
           yield raw_ref
 
+  class Match(namedtuple('Match', ['minor', 'patch', 'candidate'])):
+    """A gopkg.in major version match that is suitable for simple sorting of highest match."""
+
   def _select_highest_compatible(self, candidates, raw_rev):
     prefix = raw_rev + '.'
     matches = []
     for candidate in candidates:
       if candidate == raw_rev:
-        matches.append(((0, 0), candidate))
+        matches.append(self.Match(minor=0, patch=0, candidate=candidate))
       elif candidate.startswith(prefix):
         rest = candidate[len(prefix):]
         xs = rest.split('.', 1)
         try:
-          matches.append(((int(xs[0]), (0 if len(xs) == 1 else int(xs[1]))),
-                          candidate))
+          minor = int(xs[0])
+          patch = (0 if len(xs) == 1 else int(xs[1]))
+          matches.append(self.Match(minor, patch, candidate))
         except ValueError:
+          # The candidates come from all tag and branch names in the repo; so there could be
+          # 'vX.non_numeric_string' candidates that do not confirm to gopkg.in's 'vX.(Y.(Z))'
+          # scheme and so we just skip past those.
           pass
     if not matches:
       return None
     else:
-      _, candidate = max(matches, key=lambda t: t[0])
-      return candidate
+      match = max(matches, key=lambda match: match.candidate)
+      return match.candidate
 
 
 # All builtin fetchers should be advertised and registered as defaults here, 1st advertise,

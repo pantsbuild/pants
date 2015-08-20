@@ -116,6 +116,8 @@ class GoFetch(GoTask):
           # canonical owner target for the fetched files that 'child' targets (subpackages) can
           # depend on and share the fetch from.
           dest_dir = os.path.join(gopath, 'src', root)
+          # We may have been `invalidate`d and not `clean-all`ed so we need a new empty symlink
+          # chroot to avoid collision; thus `clean=True`.
           safe_mkdir(dest_dir, clean=True)
           for path in os.listdir(root_dir):
             os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
