@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import ast
 import codecs
-import io
 import itertools
 import re
 import textwrap
@@ -27,7 +26,7 @@ __all__ = (
 class OffByOneList(Sequence):
   def __init__(self, iterator):
     # Make sure we properly handle unicode chars in code files.
-    self._list = [x.decode('utf-8', errors='replace') for x in list(iterator)]
+    self._list = list(iterator)
 
   def __iter__(self):
     return iter(self._list)
@@ -67,13 +66,30 @@ class PythonFile(object):
   """Checkstyle wrapper for Python source files."""
   SKIP_TOKENS = frozenset((tokenize.COMMENT, tokenize.NL, tokenize.DEDENT))
 
+  def _remove_coding_header(self, blob):
+    """
+    There is a bug in ast.parse that cause it to throw a syntax error if
+    you have a header similar to...
+    # coding=utf-8,
+
+    we replace this line with something else to bypass the bug.
+    :param blob: file text contents
+    :return: adjusted blob
+    """
+    # Remove the # coding=utf-8 to avoid AST erroneous parse errors
+    #   https://bugs.python.org/issue22221
+    lines = [x.decode('utf-8', errors='replace') for x in blob.splitlines()]
+    if lines and 'coding=utf-8' in lines[0]:
+      lines[0] = '#remove coding'
+    return '\n'.join(lines).encode('ascii', errors='replace')
+
   def __init__(self, blob, filename='<expr>'):
-    self._blob = blob
-    self.tree = ast.parse(blob, filename)
-    self.lines = OffByOneList(blob.splitlines())
+    self._blob = self._remove_coding_header(blob)
+    self.tree = ast.parse(self._blob, filename)
+    self.lines = OffByOneList(self._blob.splitlines())
     self.filename = filename
     self.logical_lines = dict((start, (start, stop, indent))
-        for start, stop, indent in self.iter_logical_lines(blob))
+        for start, stop, indent in self.iter_logical_lines(self._blob))
 
   def __iter__(self):
     return iter(self.lines)
@@ -86,7 +102,7 @@ class PythonFile(object):
 
   @classmethod
   def parse(cls, filename):
-    with io.open(filename) as fp:
+    with codecs.open(filename) as fp:
        blob = fp.read()
     return cls(blob, filename)
 
@@ -236,7 +252,7 @@ class Nit(object):
 
   @property
   def message(self):
-    return '{code}:{severity:<7} {filename}:{linenum} {message}'.format(
+    return '{code}:{severity:<7}bobs your uncle {filename}:{linenum} {message}'.format(
         code=self.code,
         severity=self.SEVERITY[self.severity],
         filename=self.python_file.filename,
