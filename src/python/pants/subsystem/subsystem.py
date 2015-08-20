@@ -99,6 +99,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
   # TODO: A less clunky way to make option values available?
   _options = None
 
+  @classmethod
+  def set_options(cls, options):
+    cls._options = options
+
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
   _scoped_instances = {}
 

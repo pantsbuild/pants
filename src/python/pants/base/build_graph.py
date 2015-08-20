@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class BuildGraph(object):
-  """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
-  """
+  """A directed acyclic graph of Targets and dependencies. Not necessarily connected."""
 
   class DuplicateAddressError(AddressLookupError):
     """The same address appears multiple times in a dependency list"""
@@ -28,9 +27,8 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
-  def __init__(self, address_mapper, run_tracker=None):
+  def __init__(self, address_mapper):
     self._address_mapper = address_mapper
-    self.run_tracker = run_tracker
     self.reset()
 
   @property
