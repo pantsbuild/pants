@@ -4,7 +4,7 @@
 target(
   name='subsystems',
   dependencies=[
-    ':fetchers'
+    ':fetchers',
     ':go_distribution',
   ]
 )
