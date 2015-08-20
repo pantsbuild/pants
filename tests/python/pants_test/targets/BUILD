@@ -24,7 +24,17 @@ target(
   name = 'integration',
   dependencies = [
     ':scala_library_integration',
+    ':unknown_arguments_integration',
   ],
+)
+
+python_tests(
+  name = 'unknown_arguments_integration',
+  sources = ['test_unknown_arguments_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
 )
 
 python_tests(
