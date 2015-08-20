@@ -92,8 +92,10 @@ class Watchman(ProcessManager):
       raise self.InvalidCommandOutput(output)
 
   def launch(self):
-    """Launch and synchronously write metadata. This is possible due to watchman's built-in async
-       server startup - no double-forking required."""
+    """Launch and synchronously write metadata.
+
+    This is possible due to watchman's built-in async server startup - no double-forking required.
+    """
     cmd = self._construct_cmd((self.watchman_path, 'get-pid'),
                               state_file=self._state_file,
                               sock_file=self._sock_file,
@@ -115,7 +117,7 @@ class Watchman(ProcessManager):
   def watch_project(self, path):
     """Issues the watch-project command to watchman to begin watching the buildroot.
 
-       :param str path: the path to the watchman project root/pants build root.
+       :param string path: the path to the watchman project root/pants build root.
     """
     # TODO(kwlzn): this can fail with SocketTimeout - add retry.
     return self.client.query('watch-project', os.path.realpath(path))

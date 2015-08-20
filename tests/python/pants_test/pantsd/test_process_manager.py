@@ -254,12 +254,6 @@ class TestProcessManager(unittest.TestCase):
         with self.assertRaises(self.pm.NonResponsiveProcess):
           self.pm.terminate(kill_wait=.1, purge=False)
 
-  def test_run_subprocess(self):
-    test_str = '333'
-    proc = self.pm.run_subprocess(['echo', test_str])
-    proc.wait()
-    self.assertEqual(proc.communicate()[0].strip(), test_str)
-
   def test_get_subprocess_output(self):
     test_str = '333'
     self.assertEqual(self.pm.get_subprocess_output(['echo', '-n', test_str]), test_str)

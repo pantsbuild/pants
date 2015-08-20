@@ -263,22 +263,9 @@ class ProcessManager(object):
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
-  def monitor(self):
-    """Synchronously monitor the current process and actively keep it alive."""
-    raise NotImplementedError()
-
-  def _open_process(self, *args, **kwargs):
-    kwargs.setdefault('stdout', subprocess.PIPE)
-    kwargs.setdefault('stderr', subprocess.PIPE)
-    return subprocess.Popen(*args, **kwargs)
-
-  def run_subprocess(self, *args, **kwargs):
-    """Synchronously run a subprocess."""
-    return self._open_process(*args, **kwargs)
-
-  def get_subprocess_output(self, *args, **kwargs):
+  def get_subprocess_output(self, *args):
     try:
-      return subprocess.check_output(*args, **kwargs)
+      return subprocess.check_output(*args)
     except (OSError, subprocess.CalledProcessError) as e:
       raise self.ExecutionError(str(e))
 
