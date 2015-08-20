@@ -33,21 +33,10 @@ from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
-# TODO(ji): Add unit tests.
-# TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
-
 # The helper classes (_JUnitRunner and its subclasses) need to use
 # methods inherited by JUnitRun from Task. Rather than pass a reference
 # to the entire Task instance, we isolate the methods that are used
 # in a named tuple and pass that one around.
-
-# TODO(benjy): Why? This seems unnecessarily clunky. The runners only exist because we can't
-# (yet?) pick a Task type based on cmd-line flags. But they act "as-if" they were Task types,
-# so it seems prefectly reasonable for them to have a reference to the task.
-# This trick just makes debugging harder, and requires extra work when a runner implementation
-# needs some new thing from the task.
-# TODO(ji): (responding to benjy's) IIRC, I was carrying the reference to the Task in very early
-# versions, and jsirois suggested that I switch to the current form.
 _TaskExports = namedtuple('_TaskExports',
                           ['classpath',
                            'task_options',
@@ -380,7 +369,7 @@ class _JUnitRunner(object):
       classname = classname_or_srcfile
       yield classname + methodname
 
-
+#TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
 class _Coverage(_JUnitRunner):
   """Base class for emma-like coverage processors. Do not instantiate."""
 
@@ -732,6 +721,10 @@ class Cobertura(_Coverage):
       if result != 0:
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to report'".format(main, result))
+
+    if self._coverage_open:
+      coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
+      binary_util.ui_open(coverage_html_file)
 
 
 class JUnitRun(JvmToolTaskMixin, JvmTask):
