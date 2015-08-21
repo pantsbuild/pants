@@ -75,15 +75,6 @@ class JmakeCompile(JvmCompile):
     register('--use-jmake', advanced=True, action='store_true', default=True,
              fingerprint=True,
              help='Use jmake to compile Java targets')
-    register('--source', advanced=True, fingerprint=True,
-             help='Provide source compatibility with this release. Overrides the jvm platform '
-                  'source.',
-             deprecated_hint='The -source arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.44')
-    register('--target', advanced=True, fingerprint=True,
-             help='Generate class files for this JVM version. Overrides the jvm platform target.',
-             deprecated_hint='The -target arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.44')
     cls.register_jvm_tool(register, 'jmake')
     cls.register_jvm_tool(register, 'java-compiler')
 
@@ -146,15 +137,11 @@ class JmakeCompile(JvmCompile):
       raise TaskError("Set the target JVM version with the 'target' option or with the jvm "
                       "platform, not in 'args'.")
 
-    if self.get_options().source or self.get_options().target:
-      self.context.log.warn('--compile-java-source and --compile-java-target trample and override '
-                            'target jvm platform settings, and probably should not be used except '
-                            'for testing.')
-
-    source_level = self.get_options().source or settings.source_level
-    target_level = self.get_options().target or settings.target_level
+    source_level = settings.source_level
+    target_level = settings.target_level
     if source_level:
       args.extend(['-C-source', '-C{0}'.format(source_level)])
+
     if target_level:
       args.extend(['-C-target', '-C{0}'.format(target_level)])
 
