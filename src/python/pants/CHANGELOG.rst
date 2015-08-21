@@ -24,6 +24,9 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
+* Better caching for Python interpreters and requirements.
+  `RB #2679 <https://rbcommons.com/s/twitter/r/2679>`_
+
 * Fixup use of removed flag `compile.java --target` in integration tests.
   `RB #2680 <https://rbcommons.com/s/twitter/r/2680>`_
 
