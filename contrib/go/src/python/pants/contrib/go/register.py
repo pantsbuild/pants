@@ -11,6 +11,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
+from pants.contrib.go.tasks.go_binary_create import GoBinaryCreate
 from pants.contrib.go.tasks.go_buildgen import GoBuilden
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
@@ -36,5 +37,6 @@ def register_goals():
     'Automatically generate BUILD files.')
   task(name='go', action=GoFetch).install('resolve')
   task(name='go', action=GoCompile).install('compile')
+  task(name='go', action=GoBinaryCreate).install('binary')
   task(name='go', action=GoRun).install('run')
   task(name='go', action=GoTest).install('test')

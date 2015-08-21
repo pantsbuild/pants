@@ -1,11 +1,23 @@
 target(
   name='tasks',
   dependencies=[
+    ':go_binary_create',
     ':go_buildgen',
     ':go_compile',
     ':go_fetch',
     ':go_run',
     ':go_test',
+  ]
+)
+
+python_library(
+  name='go_binary_create',
+  sources=['go_binary_create.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ]
 )
 

@@ -9,6 +9,7 @@ target(
 target(
   name='unit',
   dependencies=[
+    ':go_binary_create',
     ':go_buildgen',
     ':go_compile',
     ':go_fetch',
@@ -23,6 +24,19 @@ target(
     ':go_fetch_integration',
     ':go_run_integration',
     ':go_test_integration',
+  ]
+)
+
+python_tests(
+  name='go_binary_create',
+  sources=['test_go_binary_create.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_binary_create',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

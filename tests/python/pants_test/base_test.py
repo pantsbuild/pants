@@ -134,6 +134,19 @@ class BaseTest(unittest.TestCase):
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
+  def buildroot_files(self, relpath=None):
+    """Returns the set of all files under the test build root.
+
+    :param string relpath: If supplied, only collect files from this subtree.
+    :returns: All file paths found.
+    :rtype: set
+    """
+    def scan():
+      for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or '')):
+        for f in files:
+          yield os.path.relpath(os.path.join(root, f), self.build_root)
+    return set(scan())
+
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
