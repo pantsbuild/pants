@@ -16,6 +16,11 @@ python_library(
 )
 
 python_library(
+  name = 'deadline',
+  sources = ['deadline.py']
+)
+
+python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [

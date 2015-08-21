@@ -5,6 +5,7 @@ target(
   name = 'util',
   dependencies = [
     ':contextutil',
+    ':deadline',
     ':dirutil',
     ':fileutil',
     ':memo',
@@ -19,6 +20,14 @@ python_tests(
   sources = ['test_contextutil.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'deadline',
+  sources = ['test_deadline.py'],
+  dependencies = [
+    'src/python/pants/util:deadline'
   ]
 )
 

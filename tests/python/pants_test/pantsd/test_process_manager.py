@@ -247,12 +247,26 @@ class TestProcessManager(unittest.TestCase):
       self.pm._kill(0)
       self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
+  @contextmanager
+  def setup_terminate(self, assert_purged=True):
+    with mock.patch.object(ProcessManager, '_kill', **PATCH_OPTS) as mock_kill, \
+         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive, \
+         mock.patch.object(ProcessManager, '_purge_metadata', **PATCH_OPTS) as mock_purge:
+      yield mock_kill, mock_alive
+      if assert_purged:
+        mock_purge.assert_called_once_with(self.pm)
+
+  def test_terminate_quick_death(self):
+    with self.setup_terminate() as (mock_kill, mock_alive):
+      mock_kill.side_effect = OSError('oops')
+      mock_alive.side_effect = [True, False]
+      self.pm.terminate(kill_wait=.1)
+
   def test_terminate(self):
-    with mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:
-      with mock.patch('os.kill', **PATCH_OPTS):
-        mock_alive.return_value = True
-        with self.assertRaises(self.pm.NonResponsiveProcess):
-          self.pm.terminate(kill_wait=.1, purge=False)
+    with self.setup_terminate(assert_purged=False) as (mock_kill, mock_alive):
+      mock_alive.return_value = True
+      with self.assertRaises(self.pm.NonResponsiveProcess):
+        self.pm.terminate(kill_wait=.1, purge=False)
 
   def test_get_subprocess_output(self):
     test_str = '333'

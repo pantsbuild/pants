@@ -16,6 +16,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
+from pants.util.deadline import Timeout, wait_until
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 
 
@@ -62,7 +63,7 @@ class ProcessManager(object):
   class Timeout(Exception): pass
 
   WAIT_INTERVAL = .1
-  KILL_WAIT = 1
+  KILL_WAIT = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
   def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=None):
@@ -223,6 +224,9 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
+  def is_dead(self):
+    return not self.is_alive()
+
   def is_alive(self):
     """Return a boolean indicating whether the process is running."""
     try:
@@ -246,22 +250,30 @@ class ProcessManager(object):
 
   def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
-    if self.is_alive():
+    alive = self.is_alive()
+    if alive:
       for signal_type in signal_chain:
         try:
           self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
                          .format(e=e, signal=signal_type, pid=self.pid))
-        time.sleep(kill_wait)
-        if not self.is_alive():
-          break
 
-    if not self.is_alive():
-      if purge: self._purge_metadata()
-    else:
+        try:
+          # Wait up to kill_wait seconds to terminate or move onto the next signal.
+          if wait_until(self.is_dead, kill_wait):
+            alive = False
+            break
+        except Timeout:
+          # Loop to the next signal on timeout.
+          pass
+
+    if alive:
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
+
+    if purge:
+      self._purge_metadata()
 
   def get_subprocess_output(self, *args):
     try:
