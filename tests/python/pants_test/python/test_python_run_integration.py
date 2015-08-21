@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pytest
 
+from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -17,6 +18,21 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_27(self):
     self._maybe_run_version('2.7')
+
+  def test_run_27_and_then_26(self):
+    with temporary_dir() as interpreters_cache:
+      pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+      pants_run_27 = self.run_pants(
+        command=['run', 'tests/python/pants_test/python:echo_interpreter_version_2.7'],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run_27)
+      pants_run_26 = self.run_pants(
+        command=['run', 'tests/python/pants_test/python:echo_interpreter_version_2.6',
+                 '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3'],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run_26)
 
   def test_die(self):
     command = ['run',
