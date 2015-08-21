@@ -21,7 +21,7 @@ from pants_test.base_test import BaseTest
 def resolved_example_jar_at(path, org='com.example', name='lib'):
   return ResolvedJar(M2Coordinate(org=org, name=name),
                      cache_path=path,
-                     path=path)
+                     pants_path=path)
 
 class ClasspathProductsTest(BaseTest):
   def test_single_classpath_element_no_excludes(self):
@@ -213,6 +213,19 @@ class ClasspathProductsTest(BaseTest):
     classpath = classpath_product.get_for_target(a)
 
     self.assertEqual([('default', example_jar_path)], classpath)
+
+  def test_jar_missing_pants_path_fails_adding(self):
+    b = self.make_target('b', JvmTarget)
+
+    classpath_products = ClasspathProducts()
+    with self.assertRaises(TaskError) as cm:
+      classpath_products.add_jars_for_targets([b], 'default',
+                                              [ResolvedJar(M2Coordinate(org='org', name='name'),
+                                                           cache_path='somewhere',
+                                                           pants_path=None)])
+    self.assertEqual(
+      'Jar: org:name:::jar has no specified path.',
+      str(cm.exception))
 
   def _example_jar_path(self):
     return os.path.join(self.build_root, 'ivy/jars/com.example/lib/jars/123.4.jar')

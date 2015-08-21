@@ -9,26 +9,26 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 class ResolvedJar(object):
   """Output from the resolve process."""
 
-  def __init__(self, coordinate, cache_path, path=None):
+  def __init__(self, coordinate, cache_path, pants_path=None):
     """
     :param M2Coordinate coordinate: Coordinate representing this resolved jar.
     :param string cache_path: Path to the artifact in the ivy cache
-    :param string path: Path to the symlink for the artifact in the pants work directory.
+    :param string pants_path: Path to the symlink for the artifact in the pants work directory.
     """
     self.coordinate = coordinate
     self.cache_path = cache_path
-    self.path = path
+    self.pants_path = pants_path
 
   def __eq__(self, other):
     return self.coordinate == other.coordinate and \
            self.cache_path == other.cache_path and \
-           self.path == other.path
+           self.pants_path == other.pants_path
 
   def __ne__(self, other):
     return not self == other
 
   def __hash__(self):
-    return hash((self.coordinate, self.cache_path, self.path))
+    return hash((self.coordinate, self.cache_path, self.pants_path))
 
 
 class M2Coordinate(object):
@@ -38,9 +38,9 @@ class M2Coordinate(object):
     """
     :param org: Maven equivalent of orgId
     :param name: Maven equivalent of groupId
-    :param type_: Maven equivalent of packaging. Defaults to jar.
-    :param classifier: Maven equivalent of classifier.
     :param rev: Version of the artifact.
+    :param classifier: Maven equivalent of classifier.
+    :param type_: Maven equivalent of packaging. Defaults to jar.
     """
     self.org = org
     self.name = name

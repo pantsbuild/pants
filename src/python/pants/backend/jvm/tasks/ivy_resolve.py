@@ -142,7 +142,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
           'Jar {resolved_jar} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
           spec=target.address.spec, resolved_jar=resolved_jar_without_symlink.cache_path, conf=conf))
 
-      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate, path=symlink_map[key],
+      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+                         pants_path=symlink_map[key],
                          cache_path=resolved_jar_without_symlink.cache_path)
 
     for conf in self.confs:

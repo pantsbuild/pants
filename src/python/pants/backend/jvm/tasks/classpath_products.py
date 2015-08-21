@@ -77,8 +77,12 @@ class ClasspathProducts(object):
     """Adds jar classpath elements to the products of the provided targets in a way that works with
     excludes.
     """
-    classpath_entries = [(conf, ArtifactClasspathEntry(jar.coordinate, jar.path))
-                         for jar in resolved_jars]
+    classpath_entries = []
+    for jar in resolved_jars:
+      if not jar.pants_path:
+        raise TaskError("Jar: {!s} has no specified path.".format(jar.coordinate))
+      classpath_entries.append((conf, ArtifactClasspathEntry(jar.coordinate, jar.pants_path)))
+
     for target in targets:
       self._add_elements_for_target(target, classpath_entries)
 

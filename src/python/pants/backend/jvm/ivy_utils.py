@@ -35,6 +35,11 @@ IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
 logger = logging.getLogger(__name__)
 
 
+
+class IvyResolveMappingError(Exception):
+  """Raised when there is a failure mapping the ivy resolve results to pants objects."""
+
+
 class IvyModuleRef(object):
 
   def __init__(self, org, name, rev, classifier=None):
@@ -53,7 +58,7 @@ class IvyModuleRef(object):
     return hash((self.org, self.name, self.rev, self.classifier))
 
   def __str__(self):
-    return 'IvyModuleRef({})'.format(':'.join([self.org, self.name, self.rev, self.classifier]))
+    return 'IvyModuleRef({})'.format(':'.join([self.org, self.name, self.rev, self.classifier or '']))
 
   @property
   def unversioned(self):
@@ -85,7 +90,7 @@ class IvyInfo(object):
 
   def add_module(self, module):
     if module.ref in self.modules_by_ref:
-      raise Exception("Already defined module {}, would be overwritten".format(module.ref))
+      raise IvyResolveMappingError("Already defined module {}, would be overwritten!".format(module.ref))
     self.modules_by_ref[module.ref] = module
     if not module.artifact:
       # Module was evicted, so do not record information about it
@@ -154,9 +159,8 @@ class IvyInfo(object):
       for classifier in jar.artifact_classifiers:
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-          resolved_jars.update(
-            to_resolved_jar(jar_module_ref, artifact_path)
-            for artifact_path in self._artifacts_by_ref[module_ref.unversioned])
+          for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
+            resolved_jars.add(to_resolved_jar(jar_module_ref, artifact_path))
     return resolved_jars
 
   def get_jars_for_ivy_module(self, jar, memo=None):

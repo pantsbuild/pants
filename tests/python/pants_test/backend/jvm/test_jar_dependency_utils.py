@@ -9,6 +9,7 @@ import unittest
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 
+
 class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_string_representation(self):
     org_name_ref = M2Coordinate(org='org.example', name='lib', rev='the-ref')
