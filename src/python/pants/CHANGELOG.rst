@@ -1,7 +1,7 @@
 RELEASE HISTORY
 ===============
 
-0.0.44 (8/21/2025)
+0.0.44 (8/21/2015)
 ------------------
 
 Release Notes
@@ -69,7 +69,7 @@ Small improvements, Refactoring and Tooling
 * Remove log options from the zinc Setup to fix performance issue
   `RB #2666 <https://rbcommons.com/s/twitter/r/2666>`_
 
-0.0.43 (8/19/2025)
+0.0.43 (8/19/2015)
 ------------------
 
 Release Notes
@@ -173,7 +173,7 @@ Small improvements, Refactoring and Tooling
 * Update the pants install documentation. #docfixit
   `RB #2631 <https://rbcommons.com/s/twitter/r/2631>`_
 
-0.0.42 (8/14/2025)
+0.0.42 (8/14/2015)
 ------------------
 
 Release Notes
@@ -297,7 +297,7 @@ Small improvements, Refactoring and Tooling
 * Add `pants_plugin` and `contrib_plugin` targets.
   `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
 
-0.0.41 (8/7/2025)
+0.0.41 (8/7/2015)
 -----------------
 
 Release Notes
