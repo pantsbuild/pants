@@ -141,6 +141,7 @@ class BuildConfiguration(object):
     type_aliases = self._exposed_objects.copy()
 
     registered_addressable_instances = []
+
     def registration_callback(address, addressable):
       registered_addressable_instances.append((address, addressable))
 
@@ -150,9 +151,17 @@ class BuildConfiguration(object):
                                         registration_callback=registration_callback)
       type_aliases[alias] = call_proxy
 
+    # Expose aliases for exposed objects and addressables in the BUILD file.
+    parse_globals = type_aliases.copy()
+
+    # Now its safe to add concrete addressable type to proxy mappings for context awares to use.
+    for alias, addressable_type in self._addressable_alias_map.items():
+      target_type = addressable_type.get_target_type()
+      proxy = type_aliases[alias]
+      type_aliases[target_type] = proxy
+
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
-    parse_globals = type_aliases.copy()
     for alias, object_factory in self._exposed_context_aware_object_factories.items():
       parse_globals[alias] = object_factory(parse_context)
 

@@ -42,6 +42,12 @@ object Main {
         settings.consoleLog.fileFilters,
         settings.consoleLog.msgFilters
       )
+    val progress =
+      new SimpleCompileProgress(
+        settings.consoleLog.logPhases,
+        settings.consoleLog.printProgress,
+        settings.consoleLog.heartbeatSecs
+      )(log)
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {
@@ -93,7 +99,7 @@ object Main {
     try {
       val compiler = Compiler(setup, log)
       log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(vinputs, cwd, reporter)(log)
+      compiler.compile(vinputs, cwd, reporter, progress)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>

@@ -1,6 +1,110 @@
 RELEASE HISTORY
 ===============
 
+0.0.43 (8/19/2025)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release makes the isolated jvm compile strategy viable out-of-the-box for use with large
+dependency graphs. Without it, `test.junit` and `run.jvm` performance slows down significantly
+due to the large number of loose classfile directories.
+
+Please try it out in your repo by grabbing a copy of `pants.ini.isolated
+<https://github.com/pantsbuild/pants/blob/master/pants.ini.isolated>`_ and using a command like::
+
+    ./pants --config-override=pants.ini.isolated test examples/{src,tests}/{scala,java}/::
+
+You'll like the results.  Just update your own `pants.ini` with the pants.ini.isolated settings to
+use it by default!
+
+In the medium term, we're interested in making the isolated strategy the default jvm compilation
+strategy, so your assistance and feedback is appreciated!
+
+Special thanks to Stu Hood and Nick Howard for lots of work over the past months to get this point.
+
+API Changes
+~~~~~~~~~~~
+
+* A uniform way of expressing Task and Subsystem dependencies.
+  `Issue #1957 <https://github.com/pantsbuild/pants/issues/1957>`_
+  `RB #2653 <https://rbcommons.com/s/twitter/r/2653>`_
+
+* Remove some coverage-related options from test.junit.
+  `RB #2639 <https://rbcommons.com/s/twitter/r/2639>`_
+
+* Bump mock and six 3rdparty versions to latest
+  `RB #2633 <https://rbcommons.com/s/twitter/r/2633>`_
+
+* Re-implement suppression of output from compiler workunits
+  `RB #2590 <https://rbcommons.com/s/twitter/r/2590>`_
+
+Bugfixes
+~~~~~~~~
+
+* Improved go remote library support.
+  `RB #2655 <https://rbcommons.com/s/twitter/r/2655>`_
+
+* Shorten isolation generated jar paths
+  `RB #2647 <https://rbcommons.com/s/twitter/r/2647>`_
+
+* Fix duplicate login options when publishing.
+  `RB #2560 <https://rbcommons.com/s/twitter/r/2560>`_
+
+* Fixed no attribute exception in changed goal.
+  `RB #2645 <https://rbcommons.com/s/twitter/r/2645>`_
+
+* Fix goal idea issues with mistakenly identifying a test folder as regular code, missing resources
+  folders, and resources folders overriding code folders.
+  `RB #2046 <https://rbcommons.com/s/twitter/r/2046>`_
+  `RB #2642 <https://rbcommons.com/s/twitter/r/2642>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support for running junit tests with different jvm versions.
+  `RB #2651 <https://rbcommons.com/s/twitter/r/2651>`_
+
+* Add support for jar'ing compile outputs in the isolated strategy.
+  `RB #2643 <https://rbcommons.com/s/twitter/r/2643>`_
+
+* Tests for 'java-resoures' and 'java-test-resources' in idea
+  `RB #2046 <https://rbcommons.com/s/twitter/r/2046>`_
+  `RB #2634 <https://rbcommons.com/s/twitter/r/2634>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Filter zinc compilation warnings at the Reporter level
+  `RB #2656 <https://rbcommons.com/s/twitter/r/2656>`_
+
+* Update to sbt 0.13.9.
+  `RB #2629 <https://rbcommons.com/s/twitter/r/2629>`_
+
+* Speeding up jvm-platform-validate step.
+  `Issue #1972 <https://github.com/pantsbuild/pants/issues/1972>`_
+  `RB #2626 <https://rbcommons.com/s/twitter/r/2626>`_
+
+* Added test that failed HTTP responses do not raise exceptions in artifact cache
+  `RB #2624 <https://rbcommons.com/s/twitter/r/2624>`_
+  `RB #2644 <https://rbcommons.com/s/twitter/r/2644>`_
+
+* Tweak to option default extraction for help display.
+  `RB #2640 <https://rbcommons.com/s/twitter/r/2640>`_
+
+* A few small install doc fixes.
+  `RB #2638 <https://rbcommons.com/s/twitter/r/2638>`_
+
+* Detect new package when doing ownership checks.
+  `RB #2637 <https://rbcommons.com/s/twitter/r/2637>`_
+
+* Use os.path.realpath on test tmp dirs to appease OSX.
+  `RB #2635 <https://rbcommons.com/s/twitter/r/2635>`_
+
+* Update the pants install documentation. #docfixit
+  `RB #2631 <https://rbcommons.com/s/twitter/r/2631>`_
+
 0.0.42 (8/14/2025)
 ------------------
 

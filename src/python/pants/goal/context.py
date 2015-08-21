@@ -238,16 +238,18 @@ class Context(object):
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
-  def add_new_target(self, address, target_type, dependencies=None, derived_from=None, **kwargs):
+  def add_new_target(self, address, target_type, target_base=None, dependencies=None,
+                     derived_from=None, **kwargs):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
     directory if needed and registering a source root.
     """
-    target_base = os.path.join(get_buildroot(), address.spec_path)
+    target_base = os.path.join(get_buildroot(), target_base or address.spec_path)
     if not os.path.exists(target_base):
       os.makedirs(target_base)
-    SourceRoot.register(address.spec_path)
+    if not SourceRoot.find_by_path(target_base):
+      SourceRoot.register(target_base)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 

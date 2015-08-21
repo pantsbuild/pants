@@ -23,6 +23,9 @@ def build_file_aliases():
       'go_library': GoLibrary,
       'go_binary': GoBinary,
       'go_remote_library': GoRemoteLibrary,
+    },
+    context_aware_object_factories={
+      'go_remote_libraries': BuildFileAliases.curry_context(GoRemoteLibrary.from_packages),
     }
   )
 

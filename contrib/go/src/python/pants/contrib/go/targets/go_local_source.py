@@ -23,3 +23,7 @@ class GoLocalSource(Target):
                                            key_arg='sources'),
     })
     super(GoLocalSource, self).__init__(address=address, payload=payload, **kwargs)
+
+  @property
+  def import_path(self):
+    return os.path.relpath(self.address.spec_path, self.target_base)
