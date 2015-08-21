@@ -131,11 +131,11 @@ class JmakeCompile(JvmCompile):
     args.extend(settings.args)
 
     if '-C-source' in args:
-      raise TaskError("Set the source Java version with the 'source' or with the jvm platform, not "
-                      "in 'args'.")
+      raise TaskError("Define a [jvm-platform] with the desired 'source' level instead of "
+                      "supplying one via 'args'.")
     if '-C-target' in args:
-      raise TaskError("Set the target JVM version with the 'target' option or with the jvm "
-                      "platform, not in 'args'.")
+      raise TaskError("Define a [jvm-platform] with the desired 'target' level instead of "
+                      "supplying one via 'args'.")
 
     source_level = settings.source_level
     target_level = settings.target_level
