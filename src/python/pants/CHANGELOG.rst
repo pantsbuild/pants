@@ -1,6 +1,71 @@
 RELEASE HISTORY
 ===============
 
+0.0.44 (8/21/2025)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+In this release Go support should be considered beta.  Most features you'd expect are implemented
+including a `buildgen.go` task that can maintain your Go BUILD files as inferred from just
+`go_binary` target definitions.  Yet to come is `doc` goal integration and an option to wire
+in-memory `buildgen.go` as an implicit bootstrap task in any pants run that includes Go targets.
+
+Also in this release is improved control over the tools pants uses, in particular JVM selection
+control.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove deprecated `[compile.java]` options.
+  `RB #2678 <https://rbcommons.com/s/twitter/r/2678>`_
+
+Bugfixes
+~~~~~~~~
+
+* Better caching for Python interpreters and requirements.
+  `RB #2679 <https://rbcommons.com/s/twitter/r/2679>`_
+
+* Fixup use of removed flag `compile.java --target` in integration tests.
+  `RB #2680 <https://rbcommons.com/s/twitter/r/2680>`_
+
+* Add support for fetching Go test deps.
+  `RB #2671 <https://rbcommons.com/s/twitter/r/2671>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Integrate Go with the binary goal.
+  `RB #2681 <https://rbcommons.com/s/twitter/r/2681>`_
+
+* Initial support for Go BUILD gen.
+  `RB #2676 <https://rbcommons.com/s/twitter/r/2676>`_
+
+* Adding jdk_paths option to jvm subsystem.
+  `RB #2657 <https://rbcommons.com/s/twitter/r/2657>`_
+
+* Allow specification of kwargs that are not currently known.
+  `RB #2662 <https://rbcommons.com/s/twitter/r/2662>`_
+
+* Allow os name map in binary_util to be configured externally
+  `RB #2663 <https://rbcommons.com/s/twitter/r/2663>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade the default Go distribution to 1.5.
+  `RB #2669 <https://rbcommons.com/s/twitter/r/2669>`_
+
+* Align JmakeCompile error messages with reality.
+  `RB #2682 <https://rbcommons.com/s/twitter/r/2682>`_
+
+* Fixing BUILD files which had integration tests running in :all.
+  `RB #2664 <https://rbcommons.com/s/twitter/r/2664>`_
+
+* Remove log options from the zinc Setup to fix performance issue
+  `RB #2666 <https://rbcommons.com/s/twitter/r/2666>`_
+
 0.0.43 (8/19/2025)
 ------------------
 
