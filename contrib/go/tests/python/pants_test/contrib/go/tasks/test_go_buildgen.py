@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from textwrap import dedent
 
 from pants.base.source_root import SourceRoot
@@ -24,7 +23,7 @@ class FakeFetcher(Fetcher):
   def root(self, import_path):
     return 'pantsbuild.org/fake'
 
-  def fetch(self, go_remote_library, dest):
+  def fetch(self, import_path, dest, rev=None):
     raise AssertionError('No fetches should be executed during go.buildgen')
 
 
@@ -33,13 +32,6 @@ class GoBuildgenTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return GoBuilden
-
-  def all_files(self):
-    def scan():
-      for root, dirs, files in os.walk(self.build_root):
-        for f in files:
-          yield os.path.relpath(os.path.join(root, f), self.build_root)
-    return set(scan())
 
   @property
   def alias_groups(self):
@@ -172,7 +164,7 @@ class GoBuildgenTest(TaskTestBase):
     fred = self.make_target('src/go/fred', GoBinary)
     context = self.context(target_roots=[fred])
     self.assertEqual([fred], context.target_roots)
-    pre_execute_files = self.all_files()
+    pre_execute_files = self.buildroot_files()
     task = self.create_task(context)
     task.execute()
 
@@ -186,19 +178,19 @@ class GoBuildgenTest(TaskTestBase):
   def test_stitch_deps(self):
     self.set_options(materialize=False)
     pre_execute_files = self.stitch_deps_local()
-    self.assertEqual(pre_execute_files, self.all_files())
+    self.assertEqual(pre_execute_files, self.buildroot_files())
 
   def test_stitch_deps_generate_builds(self):
     self.set_options(materialize=True)
     pre_execute_files = self.stitch_deps_local()
     self.assertEqual({'src/go/fred/BUILD', 'src/go/jane/BUILD'},
-                     self.all_files() - pre_execute_files)
+                     self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_generate_builds_custom_extension(self):
     self.set_options(materialize=True, extension='.gen')
     pre_execute_files = self.stitch_deps_local()
     self.assertEqual({'src/go/fred/BUILD.gen', 'src/go/jane/BUILD.gen'},
-                     self.all_files() - pre_execute_files)
+                     self.buildroot_files() - pre_execute_files)
 
   def stitch_deps_remote(self):
     self.set_options_for_scope(Fetchers.options_scope,
@@ -230,7 +222,7 @@ class GoBuildgenTest(TaskTestBase):
     fred = self.make_target('src/go/fred', GoBinary)
     context = self.context(target_roots=[fred])
     self.assertEqual([fred], context.target_roots)
-    pre_execute_files = self.all_files()
+    pre_execute_files = self.buildroot_files()
     task = self.create_task(context)
     task.execute()
 
@@ -249,7 +241,7 @@ class GoBuildgenTest(TaskTestBase):
   def test_stitch_deps_remote(self):
     self.set_options(remote=True, materialize=False)
     pre_execute_files = self.stitch_deps_remote()
-    self.assertEqual(pre_execute_files, self.all_files())
+    self.assertEqual(pre_execute_files, self.buildroot_files())
 
   def test_stitch_deps_remote_existing_rev_respected(self):
     self.set_options(remote=True, materialize=True)
@@ -260,7 +252,7 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual({'src/go/fred/BUILD',
                       'src/go/jane/BUILD',
                       '3rdparty/go/pantsbuild.org/fake/BUILD'},
-                     self.all_files() - pre_execute_files)
+                     self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_generate_builds(self):
     self.set_options(remote=True, materialize=True)
@@ -268,7 +260,7 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual({'src/go/fred/BUILD',
                       'src/go/jane/BUILD',
                       '3rdparty/go/pantsbuild.org/fake/BUILD'},
-                     self.all_files() - pre_execute_files)
+                     self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_disabled_fails(self):
     with self.assertRaises(GoBuilden.GenerationError) as exc:
