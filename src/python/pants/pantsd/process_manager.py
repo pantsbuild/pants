@@ -62,8 +62,8 @@ class ProcessManager(object):
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
 
-  WAIT_INTERVAL = .1
-  KILL_WAIT = 5
+  WAIT_INTERVAL_SEC = .1
+  KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
   def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=None):
@@ -159,7 +159,7 @@ class ProcessManager(object):
         raise self.Timeout('exceeded timeout of {sec} seconds while waiting for file {filename}'
                            .format(sec=timeout, filename=filename))
       else:
-        time.sleep(self.WAIT_INTERVAL)
+        time.sleep(self.WAIT_INTERVAL_SEC)
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
@@ -248,7 +248,7 @@ class ProcessManager(object):
     if self.pid:
       os.kill(self.pid, kill_sig)
 
-  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
+  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT_SEC, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
     alive = self.is_alive()
     if alive:
