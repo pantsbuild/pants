@@ -5,37 +5,68 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from textwrap import dedent
-
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
 
 class JavaWireLibraryTest(BaseTest):
 
-  @property
-  def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_wire_library': JavaWireLibrary})
-
   def setUp(self):
     super(JavaWireLibraryTest, self).setUp()
-    self.add_to_build_file('BUILD', dedent('''
-      java_wire_library(name='foo',
-        sources=[],
-        service_writer='com.squareup.wire.RetrofitServiceWriter'
-      )'''))
-    self.foo = self.target('//:foo')
-
-  def test_empty(self):
-    self.assertIsInstance(self.foo, JavaWireLibrary)
 
   def test_fields(self):
+    target = self.make_target('//:foo', JavaWireLibrary,
+                              registry_class='com.squareup.Registry',
+                              roots=['foo', 'bar'],
+                              enum_options=['one', 'two', 'three'],
+                              service_writer='com.squareup.wire.RetrofitServiceWriter')
+    self.assertEqual('com.squareup.Registry', target.payload.get_field_value('registry_class'))
+    self.assertEqual(['foo', 'bar'], target.payload.get_field_value('roots'))
+    self.assertEqual(['one', 'two', 'three'], target.payload.get_field_value('enum_options'))
+    self.assertFalse(target.payload.get_field_value('no_options'))
     self.assertEqual('com.squareup.wire.RetrofitServiceWriter',
-                     self.foo.payload.get_field_value('service_writer'))
-    self.assertEqual([], self.foo.payload.get_field_value('service_writer_options'))
-    self.assertEqual([], self.foo.payload.get_field_value('roots'))
+                     target.payload.get_field_value('service_writer'))
+    self.assertEqual([], target.payload.get_field_value('service_writer_options'))
+    self.assertIsNone(target.payload.get_field_value('service_factory'))
+    self.assertEqual([], target.payload.get_field_value('service_factory_options'))
 
   def test_label_fields(self):
-    self.assertTrue(self.foo.has_label('codegen'))
-    self.assertTrue(self.foo.has_label('exportable'))
+    target = self.make_target('//:foo', JavaWireLibrary)
+    self.assertTrue(target.has_label('codegen'))
+    self.assertTrue(target.has_label('exportable'))
+
+  def test_wire_service_options(self):
+    target = self.make_target('//:wire_service_options', JavaWireLibrary,
+                              service_writer='com.squareup.wire.RetrofitServiceWriter',
+                              service_writer_options=['foo', 'bar', 'baz'])
+    self.assertEquals(['foo', 'bar', 'baz'], target.payload.service_writer_options)
+
+  def test_wire_factory_options(self):
+    target = self.make_target('opts:factory_opts_test', JavaWireLibrary,
+                              service_factory='com.squareup.wire.java.SimpleServiceFactory',
+                              service_factory_options=['arg1', 'arg2'])
+    self.assertIsNone(target.payload.get_field_value('service_writer'))
+    self.assertEqual([], target.payload.get_field_value('service_writer_options'))
+    self.assertEqual('com.squareup.wire.java.SimpleServiceFactory',
+                     target.payload.get_field_value('service_factory'))
+    self.assertEquals(['arg1', 'arg2'], target.payload.service_factory_options)
+
+  def test_invalid_service_opts(self):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'Specify only one of "service_writer".*or "service_factory"'):
+      self.make_target('invalid:both', JavaWireLibrary,
+                       service_writer='com.squareup.wire.RetrofitServiceWriter',
+                       service_factory='com.squareup.wire.SimpleServiceFactory')
+
+  def test_invalid_service_writer_opts(self):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'service_writer_options requires setting service_writer'):
+      self.make_target('invalid:service_writer_opts', JavaWireLibrary,
+                       service_writer_options=['one', 'two'])
+
+  def test_invalid_service_factory_opts(self):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 r'service_factory_options requires setting service_factory'):
+      self.make_target('invalid:service_factory_opts', JavaWireLibrary,
+                       service_factory_options=['one', 'two'])

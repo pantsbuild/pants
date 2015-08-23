@@ -128,7 +128,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   @classmethod
   def _instance_for_scope(cls, scope):
     if cls._options is None:
-      raise SubsystemError('Subsystem not initialized yet.')
+      raise SubsystemError('Subsystem "{}" not initialized yet.'.format(scope))
     key = (cls, scope)
     if key not in cls._scoped_instances:
       cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))

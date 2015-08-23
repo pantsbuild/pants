@@ -23,7 +23,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(self.run_pants(['clean-all']))
 
     pants_run = self.run_pants(['compile',
-                                'examples/src/java/org/pantsbuild/example/wire/temperature'])
+                                'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
     self.assert_success(pants_run)
 
     expected_patterns = [
@@ -44,12 +44,12 @@ class WireIntegrationTest(PantsRunIntegrationTest):
   def test_bundle_wire_normal(self):
     pants_run = self.run_pants(['bundle',
                                 '--deployjar',
-                                'examples/src/java/org/pantsbuild/example/wire/temperature'])
+                                'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-temperature-example-bundle')
 
     java_run = subprocess.Popen(['java', '-cp', 'wire-temperature-example.jar',
-                                 'org.pantsbuild.example.wire.temperature.WireTemperatureExample'],
+                                 'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample'],
                                 stdout=subprocess.PIPE,
                                 cwd=out_path)
     java_retcode = java_run.wait()
