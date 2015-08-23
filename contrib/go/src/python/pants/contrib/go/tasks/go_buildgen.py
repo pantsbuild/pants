@@ -140,12 +140,12 @@ class GoTargetGenerator(object):
       return data.get('Name'), data.get('Imports', []) + data.get('TestImports', [])
 
 
-class GoBuilden(GoTask):
+class GoBuildgen(GoTask):
   """Automatically generates Go BUILD files."""
 
   @classmethod
   def global_subsystems(cls):
-    return super(GoBuilden, cls).global_subsystems() + (Fetchers,)
+    return super(GoBuildgen, cls).global_subsystems() + (Fetchers,)
 
   @classmethod
   def _default_template(cls):
@@ -238,12 +238,12 @@ class GoBuilden(GoTask):
   class GenerationError(TaskError):
     """Indicates an error generating Go targets."""
     def __init__(self, cause):
-      super(GoBuilden.GenerationError, self).__init__(str(cause))
+      super(GoBuildgen.GenerationError, self).__init__(str(cause))
       self.cause = cause
 
   def generate_targets(self, local_go_targets):
     # TODO(John Sirois): support multiple source roots like GOPATH does?
-    # The GOPATH's 1st element is read-write, the reast are read-only; ie: their sources build to
+    # The GOPATH's 1st element is read-write, the rest are read-only; ie: their sources build to
     # the 1st element's pkg/ and bin/ dirs.
     all_rooted_types = set()
     for types in SourceRoot.all_roots().values():

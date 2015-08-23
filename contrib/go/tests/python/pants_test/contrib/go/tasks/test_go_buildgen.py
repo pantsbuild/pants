@@ -16,7 +16,7 @@ from pants.contrib.go.subsystems.fetchers import Fetcher, Fetchers
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
-from pants.contrib.go.tasks.go_buildgen import GoBuilden, GoTargetGenerator
+from pants.contrib.go.tasks.go_buildgen import GoBuildgen, GoTargetGenerator
 
 
 class FakeFetcher(Fetcher):
@@ -31,7 +31,7 @@ class GoBuildgenTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return GoBuilden
+    return GoBuildgen
 
   @property
   def alias_groups(self):
@@ -263,7 +263,7 @@ class GoBuildgenTest(TaskTestBase):
                      self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_disabled_fails(self):
-    with self.assertRaises(GoBuilden.GenerationError) as exc:
+    with self.assertRaises(GoBuildgen.GenerationError) as exc:
       self.stitch_deps_remote()
     self.assertEqual(GoTargetGenerator.NewRemoteEncounteredButRemotesNotAllowedError,
                      type(exc.exception.cause))
