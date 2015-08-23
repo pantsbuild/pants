@@ -328,6 +328,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
+                    check_vts,
                     compile_vts,
                     register_vts,
                     update_artifact_cache_vts_work):
