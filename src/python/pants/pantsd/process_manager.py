@@ -16,7 +16,6 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.util.deadline import Timeout, wait_until
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 
 
@@ -63,6 +62,7 @@ class ProcessManager(object):
   class Timeout(Exception): pass
 
   WAIT_INTERVAL_SEC = .1
+  FILE_WAIT_SEC = 10
   KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
@@ -149,17 +149,37 @@ class ProcessManager(object):
     with safe_open(filename, 'wb') as f:
       f.write(payload)
 
-  def _wait_for_file(self, filename, timeout=10, want_content=True):
-    """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
-    start_time = time.time()
-    while 1:
-      if os.path.exists(filename) and (not want_content or os.path.getsize(filename)): return
+  def _deadline_until(self, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):
+    """Execute a function/closure repeatedly until a True condition or timeout is met.
 
-      if time.time() - start_time > timeout:
-        raise self.Timeout('exceeded timeout of {sec} seconds while waiting for file {filename}'
-                           .format(sec=timeout, filename=filename))
-      else:
-        time.sleep(self.WAIT_INTERVAL_SEC)
+    :param func closure: the function/closure to execute (should not block for long periods of time
+                         and must return True on success).
+    :param float timeout: the maximum amount of time to wait for a true result from the closure in
+                          seconds. N.B. this is timing based, so won't be exact if the runtime of
+                          the closure exceeds the timeout.
+    :param float wait_interval: the amount of time to sleep between closure invocations.
+    :raises: :class:`ProcessManager.Timeout` on execution timeout.
+    """
+    deadline = time.time() + timeout
+    while 1:
+      if closure():
+        return True
+      elif time.time() > deadline:
+        raise self.Timeout('exceeded timeout of {} seconds for {}'.format(timeout, closure))
+      elif wait_interval:
+        time.sleep(wait_interval)
+
+  def _wait_for_file(self, filename, timeout=FILE_WAIT_SEC, want_content=True):
+    """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
+    def file_waiter():
+      return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
+
+    try:
+      return self._deadline_until(file_waiter, timeout)
+    except self.Timeout:
+      # Re-raise with a more helpful exception message.
+      raise self.Timeout('exceeded timeout of {} seconds while waiting for file {} to appear'
+                         .format(timeout, filename))
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
@@ -225,10 +245,11 @@ class ProcessManager(object):
       return None
 
   def is_dead(self):
+    """Return a boolean indicating whether the process is dead or not."""
     return not self.is_alive()
 
   def is_alive(self):
-    """Return a boolean indicating whether the process is running."""
+    """Return a boolean indicating whether the process is running or not."""
     try:
       process = self._as_process()
       if not process:
@@ -259,13 +280,13 @@ class ProcessManager(object):
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
                          .format(e=e, signal=signal_type, pid=self.pid))
 
+        # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
-          # Wait up to kill_wait seconds to terminate or move onto the next signal.
-          if wait_until(self.is_dead, kill_wait):
+          if self._deadline_until(self.is_dead, kill_wait):
             alive = False
             break
-        except Timeout:
-          # Loop to the next signal on timeout.
+        except self.Timeout:
+          # Loop to the next kill signal on timeout.
           pass
 
     if alive:

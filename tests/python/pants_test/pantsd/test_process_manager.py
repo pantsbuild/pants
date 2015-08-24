@@ -120,6 +120,10 @@ class TestProcessManager(unittest.TestCase):
   def test_as_process_none(self):
     self.assertEqual(self.pm._as_process(), None)
 
+  def test_deadline_until(self):
+    with self.assertRaises(self.pm.Timeout):
+      self.pm._deadline_until(lambda: False, timeout=.1)
+
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
