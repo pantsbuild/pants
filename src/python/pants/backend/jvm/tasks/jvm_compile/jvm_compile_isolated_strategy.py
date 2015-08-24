@@ -203,10 +203,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         return False
       cached_vts, uncached_vts = check_vts([vts])
       if not cached_vts:
+        self.context.log.debug('Missed cache during double check for {}'.format(vts.target.address.spec))
         return False
       assert cached_vts == [vts], (
-          "Cache returned unexpected target: {} vs {}".format(cached_vts, [vts])
+          'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
       )
+      self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
       return True
 
     def work_for_vts(vts, compile_context, target_closure):
