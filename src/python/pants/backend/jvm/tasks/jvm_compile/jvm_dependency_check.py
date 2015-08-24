@@ -22,7 +22,7 @@ from pants.option.custom_types import list_option
 
 
 class JvmDependencyCheck(Task):
-  """Checks true dependencies of a JVM target and ensures they are consistent with BUILD files."""
+  """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -77,7 +77,7 @@ class JvmDependencyCheck(Task):
 
   def execute(self):
     for target in self.context.targets():
-      actual_source_deps = self.context.products.get_data('actual_source_deps').get(target, None)
+      actual_source_deps = self.context.products.get_data('actual_source_deps').get(target)
       if actual_source_deps is not None:
         self.check(target, actual_source_deps)
 

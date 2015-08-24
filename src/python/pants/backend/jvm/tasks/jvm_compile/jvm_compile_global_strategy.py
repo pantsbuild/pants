@@ -22,8 +22,8 @@ from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
 from pants.option.custom_types import list_option
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir
+from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
@@ -68,6 +68,8 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     # Sources (relative to buildroot) present in the last analysis that have since been deleted.
     # Populated in prepare_compile().
     self._deleted_sources = None
+
+    self._upstream_class_to_path = None
 
   def name(self):
     return 'global'
@@ -126,12 +128,12 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       valid_analysis_tmp = os.path.join(tmpdir, 'valid_analysis')
       newly_invalid_analysis_tmp = os.path.join(tmpdir, 'newly_invalid_analysis')
       invalid_analysis_tmp = os.path.join(tmpdir, 'invalid_analysis')
-      if self.analysis_parser.is_nonempty_analysis(self._analysis_file):
+      if self._analysis_parser.is_nonempty_analysis(self._analysis_file):
         with self.context.new_workunit(name='prepare-analysis'):
           self._analysis_tools.split_to_paths(self._analysis_file,
               [(invalid_sources + self._deleted_sources, newly_invalid_analysis_tmp)],
               valid_analysis_tmp)
-          if self.analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
+          if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
             self._analysis_tools.merge_from_paths(
               [self._invalid_analysis_file, newly_invalid_analysis_tmp], invalid_analysis_tmp)
           else:
@@ -342,7 +344,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       partitions.append((vts, de_duped_sources, analysis_file))
 
     # Split per-partition files out of the global invalid analysis.
-    if self.analysis_parser.is_nonempty_analysis(self._invalid_analysis_file) and partitions:
+    if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file) and partitions:
       with self.context.new_workunit(name='partition-analysis'):
         splits = [(x[1], x[2]) for x in partitions]
         # We have to pass the analysis for any deleted files through zinc, to give it
@@ -375,7 +377,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       if os.path.exists(analysis_file):  # The compilation created an analysis.
         # Merge the newly-valid analysis with our global valid analysis.
         new_valid_analysis = analysis_file + '.valid.new'
-        if self.analysis_parser.is_nonempty_analysis(self._analysis_file):
+        if self._analysis_parser.is_nonempty_analysis(self._analysis_file):
           with self.context.new_workunit(name='update-upstream-analysis'):
             self._analysis_tools.merge_from_paths([self._analysis_file, analysis_file],
                                                   new_valid_analysis)
@@ -397,7 +399,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                                         vts,
                                         update_artifact_cache_vts_work)
 
-      if self.analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
+      if self._analysis_parser.is_nonempty_analysis(self._invalid_analysis_file):
         with self.context.new_workunit(name='trim-downstream-analysis'):
           # Trim out the newly-valid sources from our global invalid analysis.
           new_invalid_analysis = analysis_file + '.invalid.new'
@@ -438,7 +440,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     if os.path.exists(analysis_file):
       # Parse the global analysis once.
       buildroot = get_buildroot()
-      products = self.analysis_parser.parse_products_from_path(analysis_file,
+      products = self._analysis_parser.parse_products_from_path(analysis_file,
                                                                 self._classes_dir)
 
       # Then iterate over contexts (targets), and add the classes for their sources.
@@ -586,7 +588,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     """
     with self.context.new_workunit('find-deleted-sources'):
       if os.path.exists(self._analysis_file):
-        products = self.analysis_parser.parse_products_from_path(self._analysis_file,
+        products = self._analysis_parser.parse_products_from_path(self._analysis_file,
                                                                   self._classes_dir)
         buildroot = get_buildroot()
         old_srcs = products.keys()  # Absolute paths.
@@ -615,3 +617,61 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for f in changed_files:
       ret.update(targets_by_source.get(f, []))
     return list(ret)
+
+  def parse_deps(self, classpath, compile_context):
+    def classpath_indexer():
+      return self._compute_classpath_elements_by_class(classpath)
+    return self._analysis_parser.parse_deps_from_path(compile_context.analysis_file,
+                                                      classpath_indexer,
+                                                      compile_context.classes_dir)
+
+  def _compute_classpath_elements_by_class(self, classpath):
+    """Computes a mapping of a .class file to its corresponding element on the given classpath."""
+    # Don't consider loose classes dirs in our classes dir. Those will be considered
+    # separately, by looking at products.
+    def non_product(path):
+      return path != self._classes_dir
+    classpath_entries = filter(non_product, classpath)
+
+    if self._upstream_class_to_path is None:
+      self._upstream_class_to_path = {}
+      for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
+        # Per the classloading spec, a 'jar' in this context can also be a .zip file.
+        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
+          with open_zip(cp_entry, 'r') as jar:
+            for cls in jar.namelist():
+              # First jar with a given class wins, just like when classloading.
+              if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
+                self._upstream_class_to_path[cls] = cp_entry
+        elif os.path.isdir(cp_entry):
+          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
+            for f in filter(lambda x: x.endswith('.class'), filenames):
+              cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
+              if not cls in self._upstream_class_to_path:
+                self._upstream_class_to_path[cls] = os.path.join(dirpath, f)
+    return self._upstream_class_to_path
+
+  def _find_all_bootstrap_jars(self):
+    def get_path(key):
+      return self.context.java_sysprops.get(key, '').split(':')
+
+    def find_jars_in_dirs(dirs):
+      ret = []
+      for d in dirs:
+        if os.path.isdir(d):
+          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
+      return ret
+
+    # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
+    # TODO: Support other JVMs? Not clear if there's a standard way to do so.
+    # May include loose classes dirs.
+    boot_classpath = get_path('sun.boot.class.path')
+
+    # Note that per the specs, overrides and extensions must be in jars.
+    # Loose class files will not be found by the JVM.
+    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
+    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
+
+    # Note that this order matters: it reflects the classloading order.
+    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
+    return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import os
 import sys
 from collections import defaultdict
 
@@ -21,8 +20,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_walk
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -81,7 +78,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   @classmethod
   def product_types(cls):
-    raise TaskError('Expected to be installed in GroupTask.')
+    raise TaskError('Expected to be installed in GroupTask, which has its own '
+                    'product_types implementation.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -401,64 +399,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
       compile_classpath.add_for_target(compile_context.target, entries)
 
-      if self._strategy.name() == 'global':
-        # TODO(cgibb): Figure out how to get this working with isolated strategy.
-        def classpath_indexer():
-          classpath = [path for (conf, path) in entries if conf in self._confs]
-          return self._compute_classpath_elements_by_class(classpath, compile_context)
-        # TODO(cgibb): Only parse source dependencies if isrequired.
-        deps = self._strategy.analysis_parser.parse_deps_from_path(compile_context.analysis_file,
-                                                                   classpath_indexer,
-                                                                   compile_context.classes_dir)
-        actual_source_deps[compile_context.target] = deps
-
-  def _compute_classpath_elements_by_class(self, classpath, compile_context):
-    upstream_class_to_path = self._upstream_class_to_paths.get(compile_context)
-    if upstream_class_to_path is None:
-      upstream_class_to_path = self._upstream_class_to_paths[compile_context] = {}
-      # Don't consider loose classes dirs in our classes dir. Those will be considered
-      # separately, by looking at products.
-      def non_product(path):
-        return path != compile_context.classes_dir
-      classpath_entries = filter(non_product, classpath)
-
-      for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
-        # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
-          with open_zip(cp_entry, 'r') as jar:
-            for cls in jar.namelist():
-              # First jar with a given class wins, just like when classloading.
-              if cls.endswith(b'.class') and not cls in upstream_class_to_path:
-                upstream_class_to_path[cls] = cp_entry
-        elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
-            for f in filter(lambda x: x.endswith('.class'), filenames):
-              cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
-              if not cls in upstream_class_to_path:
-                upstream_class_to_path[cls] = os.path.join(dirpath, f)
-    return upstream_class_to_path
-
-  def _find_all_bootstrap_jars(self):
-    def get_path(key):
-      return self.context.java_sysprops.get(key, '').split(':')
-
-    def find_jars_in_dirs(dirs):
-      ret = []
-      for d in dirs:
-        if os.path.isdir(d):
-          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
-      return ret
-
-    # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
-    # TODO: Support other JVMs? Not clear if there's a standard way to do so.
-    # May include loose classes dirs.
-    boot_classpath = get_path('sun.boot.class.path')
-
-    # Note that per the specs, overrides and extensions must be in jars.
-    # Loose class files will not be found by the JVM.
-    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
-    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
-
-    # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
-    return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
+      classpath = [path for (conf, path) in entries if conf in self._confs]
+      deps = self._strategy.parse_deps(classpath, compile_context)
+      actual_source_deps[compile_context.target] = deps

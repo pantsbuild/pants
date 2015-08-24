@@ -119,7 +119,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
       if os.path.exists(compile_context.analysis_file):
-        products = self.analysis_parser.parse_products_from_path(compile_context.analysis_file,
+        products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
                                                                   compile_context.classes_dir)
         for src, classes in products.items():
           relsrc = os.path.relpath(src, buildroot)
@@ -327,3 +327,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
           update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
+
+  def parse_deps(self, classpath, compile_context):
+    pass

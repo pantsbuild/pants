@@ -86,7 +86,6 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/option',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -123,6 +122,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:contextutil',
   ],
 )
 
