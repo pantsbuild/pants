@@ -51,10 +51,9 @@ class BuildFileParser(object):
   class ExecuteError(BuildFileParserError):
     """An exception was encountered executing code in the BUILD file"""
 
-  def __init__(self, build_configuration, root_dir, run_tracker=None):
+  def __init__(self, build_configuration, root_dir):
     self._build_configuration = build_configuration
     self._root_dir = root_dir
-    self.run_tracker = run_tracker
 
   @property
   def root_dir(self):

@@ -11,7 +11,7 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants.base.build_file_parser import BuildFileParser
@@ -20,20 +20,21 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.bin.plugin_resolver import PluginResolver
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
-from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
+from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
 from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
 from pants.util.filtering import create_filters, wrap_filters
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,7 @@ class SourceRootBootstrapper(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(SourceRootBootstrapper, cls).register_options(register)
-    # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load
-    # time.
+    # TODO: Get rid of this in favor of source root registration at backend load time.
     register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
              help='Initialize state by evaluating these buildfiles.')
 
@@ -64,20 +64,64 @@ class SourceRootBootstrapper(Subsystem):
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
-  def __init__(self, root_dir, exiter=sys.exit):
+  def __init__(self, root_dir, options_bootstrapper=None, working_set=None, exiter=sys.exit):
     """
-    :param root_dir: The root directory of the pants workspace.
-    :param exiter: An optional function that accepts an int exit code value and exits (for testing).
+    :param str root_dir: The root directory of the pants workspace (aka the "build root").
+    :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance. (Optional)
+    :param pkg_resources.WorkingSet working_set: The working set of the current run as returned by
+                                                 PluginResolver.resolve(). (Optional)
+    :param func exiter: An function that accepts an exit code value and exits (for tests, Optional).
     """
     self.root_dir = root_dir
+    self.options_bootstrapper = options_bootstrapper or OptionsBootstrapper()
+    self.working_set = working_set or PluginResolver(self.options_bootstrapper).resolve()
     self._exiter = exiter
 
-  @property
-  def subsystems(self):
-    # Subsystems used outside of any task.
-    return SourceRootBootstrapper, Reporting, RunTracker
+    self.goals = []
+    self.requested_goals = []
+    self.targets = []
+    self.options = None
+    self.build_configuration = self._setup_options(self.options_bootstrapper, self.working_set)
+    self.build_file_type = self._get_buildfile_type(self.options.for_global_scope().build_file_rev)
 
-  def setup(self, options_bootstrapper, working_set):
+    self.run_tracker = RunTracker.global_instance()
+    self.reporting = Reporting.global_instance()
+
+    self.build_file_parser = BuildFileParser(self.build_configuration, self.root_dir)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.build_file_type)
+    self.build_graph = BuildGraph(self.address_mapper)
+
+  @property
+  def spec_excludes(self):
+    # Note: Only call after register_options() has been called.
+    return self.options.for_global_scope().spec_excludes
+
+  @property
+  def global_options(self):
+    return self.options.for_global_scope()
+
+  @classmethod
+  def subsystems(cls):
+    # Subsystems used outside of any task.
+    return set([SourceRootBootstrapper, Reporting, RunTracker])
+
+  def _get_buildfile_type(self, build_file_rev):
+    """Selects the BuildFile type for use in a given pants run."""
+    if build_file_rev:
+      ScmBuildFile.set_rev(build_file_rev)
+      ScmBuildFile.set_scm(get_scm())
+      return ScmBuildFile
+    else:
+      return FilesystemBuildFile
+
+  def _setup_logging(self, global_options):
+    """Setup logging."""
+    # NB: quiet help says 'Squelches all console output apart from errors'.
+    level = 'ERROR' if global_options.quiet else global_options.level.upper()
+    setup_logging(level, log_dir=global_options.logdir)
+
+  def _setup_options(self, options_bootstrapper, working_set):
+    """Setup global options."""
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     global_bootstrap_options = bootstrap_options.for_global_scope()
 
@@ -101,14 +145,12 @@ class GoalRunner(object):
     build_configuration = load_plugins_and_backends(plugins, working_set, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
-    self.targets = []
-
     known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]
 
-    # Add scopes for all needed subsystems.
-    subsystems = Subsystem.closure(set(self.subsystems) |
-                                   Goal.subsystems() |
-                                   build_configuration.subsystems())
+    # Add scopes for all needed subsystems via a union of all known subsystem sets.
+    subsystems = Subsystem.closure(
+      self.subsystems() | Goal.subsystems() | build_configuration.subsystems()
+    )
     for subsystem in subsystems:
       known_scope_infos.append(subsystem.get_scope_info())
 
@@ -118,118 +160,97 @@ class GoalRunner(object):
 
     # Now that we have the known scopes we can get the full options.
     self.options = options_bootstrapper.get_full_options(known_scope_infos)
-    self.register_options(subsystems)
+    self._register_options(subsystems, self.options)
 
     # Make the options values available to all subsystems.
-    Subsystem._options = self.options
+    Subsystem.set_options(self.options)
 
-    # Now that we have options we can instantiate subsystems.
-    self.run_tracker = RunTracker.global_instance()
-    self.reporting = Reporting.global_instance()
+    return build_configuration
+
+  def setup(self):
     report = self.reporting.initial_reporting(self.run_tracker)
     self.run_tracker.start(report)
+
     url = self.run_tracker.run_info.get_info('report_url')
     if url:
       self.run_tracker.log(Report.INFO, 'See a report at: {}'.format(url))
     else:
       self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
-    self.build_file_parser = BuildFileParser(build_configuration=build_configuration,
-                                             root_dir=self.root_dir,
-                                             run_tracker=self.run_tracker)
-
-    rev = self.options.for_global_scope().build_file_rev
-    if rev:
-      ScmBuildFile.set_rev(rev)
-      ScmBuildFile.set_scm(get_scm())
-      build_file_type = ScmBuildFile
-    else:
-      build_file_type = FilesystemBuildFile
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, build_file_type)
-    self.build_graph = BuildGraph(run_tracker=self.run_tracker,
-                                  address_mapper=self.address_mapper)
-
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
       source_root_bootstrapper = SourceRootBootstrapper.global_instance()
       source_root_bootstrapper.bootstrap(self.address_mapper, self.build_file_parser)
 
-    self._expand_goals_and_specs()
+    self._expand_goals(self.options.goals)
+    self._expand_specs(self.options.target_specs, self.options.for_global_scope().fail_fast)
 
     # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
     self.run_tracker.run_info.add_scm_info()
 
-  @property
-  def spec_excludes(self):
-    # Note: Only call after register_options() has been called.
-    return self.options.for_global_scope().spec_excludes
-
-  @property
-  def global_options(self):
-    return self.options.for_global_scope()
-
-  def register_options(self, subsystems):
+  def _register_options(self, subsystems, options):
     # Standalone global options.
-    GlobalOptionsRegistrar.register_options_on_scope(self.options)
+    GlobalOptionsRegistrar.register_options_on_scope(options)
 
     # Options for subsystems.
     for subsystem in subsystems:
-      subsystem.register_options_on_scope(self.options)
+      subsystem.register_options_on_scope(options)
 
-    # TODO(benjy): Should Goals be subsystems? Or should the entire goal-running mechanism
-    # be a subsystem?
+    # TODO(benjy): Should Goals or the entire goal-running mechanism be a subsystem?
     for goal in Goal.all():
       # Register task options.
-      goal.register_options(self.options)
+      goal.register_options(options)
 
-  def _expand_goals_and_specs(self):
-    goals = self.options.goals
-    specs = self.options.target_specs
-    fail_fast = self.options.for_global_scope().fail_fast
-
+  def _expand_goals(self, goals):
+    """Check and populate the requested goals for a given run."""
     for goal in goals:
-      if self.address_mapper.from_cache(get_buildroot(), goal, must_exist=False).file_exists():
-        logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
+      if self.address_mapper.from_cache(self.root_dir, goal, must_exist=False).file_exists():
+        logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
     if self.options.print_help_if_requested():
       self._exiter(0)
 
-    self.requested_goals = goals
+    self.requested_goals.extend(self.options.goals)
+    self.goals.extend([Goal.by_name(goal) for goal in goals])
 
+  def _expand_specs(self, specs, fail_fast):
+    """Populate the BuildGraph and target list from a set of input specs."""
     with self.run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
-                                      spec_excludes=self.spec_excludes,
-                                      exclude_target_regexps=self.global_options.exclude_target_regexp)
+      spec_parser = CmdLineSpecParser(
+        self.root_dir,
+        self.address_mapper,
+        spec_excludes=self.spec_excludes,
+        exclude_target_regexps=self.global_options.exclude_target_regexp)
+
       with self.run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
         def filter_for_tag(tag):
           return lambda target: tag in map(str, target.tags)
+
         tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
+
         for spec in specs:
           for address in spec_parser.parse_addresses(spec, fail_fast):
             self.build_graph.inject_address_closure(address)
             tgt = self.build_graph.get_target(address)
             if tag_filter(tgt):
               self.targets.append(tgt)
-    self.goals = [Goal.by_name(goal) for goal in goals]
 
   def run(self):
-    def fail():
-      self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
-
     kill_nailguns = self.options.for_global_scope().kill_nailguns
+
     try:
       result = self._do_run()
       if result:
-        fail()
+        self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:
-      fail()
+      self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
       # On ctrl-c we always kill nailguns, otherwise they might keep running
       # some heavyweight compilation and gum up the system during a subsequent run.
       kill_nailguns = True
       raise
     except Exception:
-      fail()
+      self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
       raise
     finally:
       self.run_tracker.end()
@@ -240,23 +261,21 @@ class GoalRunner(object):
         # TODO: Make this more selective? Only kill nailguns that affect state?
         # E.g., checkstyle may not need to be killed.
         NailgunProcessGroup().killall()
+
     return result
+
+  def _has_quiet_task(self):
+    return any(goal.has_task_of_type(QuietTaskMixin) for goal in self.goals)
 
   def _do_run(self):
     # Update the reporting settings, now that we have flags etc.
-    def is_quiet_task():
-      for goal in self.goals:
-        if goal.has_task_of_type(QuietTaskMixin):
-          return True
-      return False
-
-    is_explain = self.global_options.explain
     if self.reporting.global_instance().get_options().invalidation_report:
       invalidation_report = InvalidationReport()
     else:
       invalidation_report = None
+
     self.reporting.update_reporting(self.global_options,
-                                    is_quiet_task() or is_explain,
+                                    self._has_quiet_task() or self.global_options.explain,
                                     self.run_tracker,
                                     invalidation_report=invalidation_report)
 
@@ -272,23 +291,15 @@ class GoalRunner(object):
       invalidation_report=invalidation_report
     )
 
-    unknown = []
-    for goal in self.goals:
-      if not goal.ordered_task_names():
-        unknown.append(goal)
-
-    if unknown:
-      context.log.error('Unknown goal(s): {}\n'.format(' '.join(goal.name for goal in unknown)))
+    unknown_goals = [goal.name for goal in self.goals if not goal.ordered_task_names()]
+    if unknown_goals:
+      context.log.error('Unknown goal(s): {}\n'.format(' '.join(unknown_goals)))
       return 1
 
     engine = RoundEngine()
     result = engine.execute(context, self.goals)
+
     if invalidation_report:
       invalidation_report.report()
+
     return result
-
-  def _setup_logging(self, global_options):
-    # NB: quiet help says 'Squelches all console output apart from errors'.
-    level = 'ERROR' if global_options.quiet else global_options.level.upper()
-
-    setup_logging(level, log_dir=global_options.logdir)

@@ -23,9 +23,12 @@ def test_version_request(version_flag):
     def exiter(exit_code):
       raise ExitException(exit_code)
 
-    goal_runner = GoalRunner(build_root, exiter=exiter)
     options_bootstrapper = OptionsBootstrapper(args=[version_flag])
 
     with pytest.raises(ExitException) as excinfo:
-      goal_runner.setup(options_bootstrapper=options_bootstrapper, working_set=WorkingSet())
+      GoalRunner(build_root,
+                 options_bootstrapper=options_bootstrapper,
+                 working_set=WorkingSet(),
+                 exiter=exiter)
+
     assert 0 == excinfo.value.exit_code
