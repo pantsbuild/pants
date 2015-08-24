@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import ast
+import os
 from distutils import sysconfig
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
@@ -61,8 +62,7 @@ class ImportOrder(CheckstylePlugin):
   #     in the current working directory that should be a package-absolute
   #     import (i.e. from __future__ import absolute_imports)
 
-  PLAT_SPECIFIC_PATH = sysconfig.get_python_lib(plat_specific=1)
-  STANDARD_LIB_PATH = sysconfig.get_python_lib(standard_lib=1)
+  STANDARD_LIB_PATH = os.path.realpath(sysconfig.get_python_lib(standard_lib=1))
   subsystem = ImportOrderSubsystem
 
   @classmethod
@@ -85,7 +85,8 @@ class ImportOrder(CheckstylePlugin):
       module = __import__(name)
     except ImportError:
       return ImportType.THIRD_PARTY
-    if not hasattr(module, '__file__') or module.__file__.startswith(cls.STANDARD_LIB_PATH):
+    if (not hasattr(module, '__file__') or
+          os.path.realpath(module.__file__).startswith(cls.STANDARD_LIB_PATH)):
       return ImportType.STDLIB
     # Assume anything we can't classify is third-party
     return ImportType.THIRD_PARTY
