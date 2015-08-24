@@ -14,6 +14,9 @@ from pex.platforms import Platform
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
+# in pants java since non-jvm backends depend on it to run things.
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
@@ -54,7 +57,8 @@ class PythonChrootTest(BaseTest):
       with subsystem_instance(ThriftBinary.Factory) as thrift_binary_factory:
         interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
         interpreter_cache.setup()
-        interpreters = list(interpreter_cache.matched_interpreters([self.python_setup.interpreter_requirement]))
+        interpreters = list(interpreter_cache.matched_interpreters([
+          self.python_setup.interpreter_requirement]))
         self.assertGreater(len(interpreters), 0)
         interpreter = interpreters[0]
 
@@ -122,16 +126,21 @@ class PythonChrootTest(BaseTest):
                               source='main.py',
                               dependencies=[antlr_target, antlr3])
 
-    with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
-      pex_builder.set_entry_point('test.main:word_up')
-      pex_builder.freeze()
-      pex = python_chroot.pex()
+    # TODO(John Sirois): This hacks around a direct but undeclared dependency
+    # `pants.java.distribution.distribution.Distribution` gained in
+    # https://rbcommons.com/s/twitter/r/2657
+    # Remove this once proper Subsystem dependency chains are re-established.
+    with subsystem_instance(JVM):
+      with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
+        pex_builder.set_entry_point('test.main:word_up')
+        pex_builder.freeze()
+        pex = python_chroot.pex()
 
-      process = pex.run(blocking=False, stdout=subprocess.PIPE)
-      stdout, _ = process.communicate()
+        process = pex.run(blocking=False, stdout=subprocess.PIPE)
+        stdout, _ = process.communicate()
 
-      self.assertEqual(0, process.returncode)
-      self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
+        self.assertEqual(0, process.returncode)
+        self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
 
   @contextmanager
   def do_test_thrift(self):
