@@ -5,9 +5,7 @@ target(
   name='java',
   dependencies=[
     ':jmake_analysis',
-    ':java_compile_jvm_platform_integration',
     ':java_compile_settings_partitioning',
-    ':zinc_compile_jvm_platform_integration',
   ],
 )
 

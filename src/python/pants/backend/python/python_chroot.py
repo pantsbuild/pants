@@ -255,13 +255,14 @@ class PythonChroot(object):
     context = self._python_repos.get_network_context()
 
     for platform in platforms:
+      requirements_cache_dir = os.path.join(self._python_setup.resolver_cache_dir, str(self._interpreter.identity))
       distributions[platform] = resolve(
         requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
         fetchers=fetchers,
         platform=platform,
         context=context,
-        cache=self._python_setup.resolver_cache_dir,
+        cache=requirements_cache_dir,
         cache_ttl=self._python_setup.resolver_cache_ttl)
 
     return distributions

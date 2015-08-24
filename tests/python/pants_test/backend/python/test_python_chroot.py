@@ -54,7 +54,7 @@ class PythonChrootTest(BaseTest):
       with subsystem_instance(ThriftBinary.Factory) as thrift_binary_factory:
         interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
         interpreter_cache.setup()
-        interpreters = list(interpreter_cache.matches([self.python_setup.interpreter_requirement]))
+        interpreters = list(interpreter_cache.matched_interpreters([self.python_setup.interpreter_requirement]))
         self.assertGreater(len(interpreters), 0)
         interpreter = interpreters[0]
 

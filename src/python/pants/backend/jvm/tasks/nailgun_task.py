@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.tasks.task import Task, TaskBase
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
@@ -29,6 +30,13 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5,
              help='Max attempts for nailgun connects.')
+
+  @classmethod
+  def global_subsystems(cls):
+    # TODO(gmalmquist): JVM subsystem dependency is required because Distribution queries it for
+    # jdk_paths when locating a jvm. Distribution should be refactored to be its own subsystem
+    # which depends on JVM, then NailgunTaskBase can depend on Distribution.
+    return super(NailgunTaskBase, cls).global_subsystems() + (JVM,)
 
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)

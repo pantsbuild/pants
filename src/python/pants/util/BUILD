@@ -43,6 +43,11 @@ python_library(
 )
 
 python_library(
+  name = 'osutil',
+  sources = ['osutil.py'],
+)
+
+python_library(
   name = 'strutil',
   sources = ['strutil.py'],
   dependencies = [

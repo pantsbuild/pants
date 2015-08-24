@@ -294,6 +294,8 @@ python_library(
     ':source_root',
     ':target_addressable',
     'src/python/pants/backend/core:wrapped_globs',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
   ],
 )
 

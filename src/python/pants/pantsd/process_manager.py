@@ -56,6 +56,8 @@ class ProcessGroup(object):
 class ProcessManager(object):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
+  class ExecutionError(Exception): pass
+  class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
 
@@ -261,16 +263,11 @@ class ProcessManager(object):
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
-  def monitor(self):
-    """Synchronously monitor the current process and actively keep it alive."""
-    raise NotImplementedError()
-
-  def _open_process(self, *args, **kwargs):
-    return subprocess.Popen(*args, **kwargs)
-
-  def run_subprocess(self, *args, **kwargs):
-    """Synchronously run a subprocess."""
-    return self._open_process(*args, **kwargs)
+  def get_subprocess_output(self, *args):
+    try:
+      return subprocess.check_output(*args)
+    except (OSError, subprocess.CalledProcessError) as e:
+      raise self.ExecutionError(str(e))
 
   def daemonize(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None,
                 write_pid=True):
