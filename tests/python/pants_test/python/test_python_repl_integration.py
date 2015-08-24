@@ -20,6 +20,7 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
     program = 'from pants_test.python.echo_interpreter_version import say_hello; say_hello()'
     pants_run = self.run_pants(command=command, stdin_data=program)
     output_lines = pants_run.stdout_data.rstrip().split('\n')
+    print(output_lines)
     self.assertEquals(len(output_lines), 3,
                       msg='Expected 3 lines, got:\n{}'.format('\n'.join(output_lines)))
     self.assertEquals('echo_interpreter_version loaded successfully.', output_lines[-2])
