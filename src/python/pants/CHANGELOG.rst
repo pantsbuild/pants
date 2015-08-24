@@ -1,6 +1,17 @@
 RELEASE HISTORY
 ===============
 
+0.0.45 (??/??/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+In this release, the methods `with_sources()`, `with_docs()` and `with_artifact()`
+were removed from the jar() syntax in BUILD files.   They have been deprecated since
+Pants version 0.0.29.
+
+
 0.0.44 (8/21/2015)
 ------------------
 
