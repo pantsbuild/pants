@@ -9,6 +9,7 @@ import Queue as queue
 import threading
 import traceback
 from collections import defaultdict, deque
+from heapq import heappop, heappush
 
 from pants.base.worker_pool import Work
 
@@ -20,12 +21,13 @@ class Job(object):
   keys of its dependent jobs.
   """
 
-  def __init__(self, key, fn, dependencies, on_success=None, on_failure=None):
+  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None):
     """
 
     :param key: Key used to reference and look up jobs
     :param fn callable: The work to perform
-    :param dependency_keys: List of keys for dependent jobs
+    :param dependencies: List of keys for dependent jobs
+    :param size: Estimated job size used for prioritization
     :param on_success: Zero parameter callback to run if job completes successfully. Run on main
                        thread.
     :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
@@ -33,6 +35,7 @@ class Job(object):
     self.key = key
     self.fn = fn
     self.dependencies = dependencies
+    self.size = size
     self.on_success = on_success
     self.on_failure = on_failure
 
@@ -58,8 +61,9 @@ CANCELED = 'Canceled'
 class StatusTable(object):
   DONE_STATES = {SUCCESSFUL, FAILED, CANCELED}
 
-  def __init__(self, keys):
+  def __init__(self, keys, pending_dependencies_count):
     self._statuses = {key: UNSTARTED for key in keys}
+    self._pending_dependencies_count = pending_dependencies_count
 
   def mark_as(self, state, key):
     self._statuses[key] = state
@@ -74,11 +78,14 @@ class StatusTable(object):
   def get(self, key):
     return self._statuses.get(key)
 
+  def mark_one_successful_dependency(self, key):
+    self._pending_dependencies_count[key] -= 1
+
+  def is_ready_to_submit(self, key):
+    return self._pending_dependencies_count[key] == 0
+
   def are_all_done(self):
     return all(s in self.DONE_STATES for s in self._statuses.values())
-
-  def are_all_successful(self, keys):
-    return all(stat is SUCCESSFUL for stat in [self._statuses[k] for k in keys])
 
   def has_failures(self):
     return any(stat is FAILED for stat in self._statuses.values())
@@ -143,11 +150,10 @@ class ExecutionGraph(object):
   global execution graph.
   """
 
-  def __init__(self, job_list, job_sizes=None):
+  def __init__(self, job_list):
     """
 
     :param job_list Job: list of Jobs to schedule and run.
-    :param job_sizes: list of estimated job sizes used for prioritization.
     """
     self._dependencies = defaultdict(list)
     self._dependees = defaultdict(list)
@@ -165,15 +171,7 @@ class ExecutionGraph(object):
     if len(self._job_keys_with_no_dependencies) == 0:
       raise NoRootJobError()
 
-    if job_sizes is None:
-      job_sizes = [1] * len(job_list)
-    else:
-      assert len(job_sizes) == len(job_list)
-
-    self._job_size = {job.key: job_size for job, job_size in zip(job_list, job_sizes)}
-
-    self._job_priority = defaultdict(int)
-    self._compute_job_priorities(job_list)
+    self._job_priority = self._compute_job_priorities(job_list)
 
   def format_dependee_graph(self):
     return "\n".join([
@@ -199,24 +197,28 @@ class ExecutionGraph(object):
   def _compute_job_priorities(self, job_list):
     """Walks the dependency graph breadth-first, starting from the most dependent tasks,
      and computes the job priority as the sum of the jobs sizes along the critical path."""
-    queue = deque()
+
+    job_size = {job.key: job.size for job in job_list}
+    job_priority = defaultdict(int)
+
+    bfs_queue = deque()
     for job in job_list:
       if len(self._dependees[job.key]) == 0:
-        self._job_priority[job.key] = self._job_size[job.key]
-        queue.append(job.key)
+        job_priority[job.key] = job_size[job.key]
+        bfs_queue.append(job.key)
 
     satisfied_dependees_count = defaultdict(int)
-
-    while len(queue) > 0:
-      job_key = queue.popleft()
+    while len(bfs_queue) > 0:
+      job_key = bfs_queue.popleft()
       for dependency_key in self._dependencies[job_key]:
-        self._job_priority[dependency_key] = \
-          max(self._job_priority[dependency_key],
-              self._job_size[dependency_key] + self._job_priority[job_key])
+        job_priority[dependency_key] = \
+          max(job_priority[dependency_key],
+              job_size[dependency_key] + job_priority[job_key])
         satisfied_dependees_count[dependency_key] += 1
         if satisfied_dependees_count[dependency_key] == len(self._dependees[dependency_key]):
-          queue.append(dependency_key)
+          bfs_queue.append(dependency_key)
 
+    return job_priority
 
   def execute(self, pool, log):
     """Runs scheduled work, ensuring all dependencies for each element are done before execution.
@@ -241,14 +243,19 @@ class ExecutionGraph(object):
     """
     log.debug(self.format_dependee_graph())
 
-    status_table = StatusTable(self._job_keys_as_scheduled)
+    status_table = StatusTable(self._job_keys_as_scheduled,
+                               {key: len(self._jobs[key].dependencies) for key in self._job_keys_as_scheduled})
     finished_queue = queue.Queue()
-    completed_dependencies = defaultdict(int)
 
-    heap = queue.PriorityQueue()
+    heap = []
     jobs_in_flight = ThreadSafeCounter()
 
-    def submit_jobs(job_keys):
+    def put_jobs_into_heap(job_keys):
+      for job_key in job_keys:
+        # minus because jobs with larger priority should go first
+        heappush(heap, (-self._job_priority[job_key], job_key))
+
+    def try_to_submit_jobs_from_heap():
       def worker(worker_key, work):
         try:
           work()
@@ -258,15 +265,15 @@ class ExecutionGraph(object):
         finished_queue.put(result)
         jobs_in_flight.decrement()
 
-      for job_key in job_keys:
-        # minus because jobs with larger priority should go first
-        heap.put((-self._job_priority[job_key], job_key))
-
-      while heap.qsize() > 0 and jobs_in_flight.get() < pool.num_workers:
-        priority, job_key = heap.get()
+      while len(heap) > 0 and jobs_in_flight.get() < pool.num_workers:
+        priority, job_key = heappop(heap)
         jobs_in_flight.increment()
         status_table.mark_as(QUEUED, job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
+
+    def submit_jobs(job_keys):
+      put_jobs_into_heap(job_keys)
+      try_to_submit_jobs_from_heap()
 
     try:
       submit_jobs(self._job_keys_with_no_dependencies)
@@ -277,6 +284,7 @@ class ExecutionGraph(object):
         except queue.Empty:
           log.debug("Waiting on \n  {}\n".format("\n  ".join(
             "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
+          try_to_submit_jobs_from_heap()
           continue
 
         finished_job = self._jobs[finished_key]
@@ -293,8 +301,8 @@ class ExecutionGraph(object):
 
           ready_dependees = []
           for dependee in direct_dependees:
-            completed_dependencies[dependee] += 1
-            if completed_dependencies[dependee] == len(self._jobs[dependee].dependencies):
+            status_table.mark_one_successful_dependency(dependee)
+            if status_table.is_ready_to_submit(dependee):
               ready_dependees.append(dependee)
 
           submit_jobs(ready_dependees)
