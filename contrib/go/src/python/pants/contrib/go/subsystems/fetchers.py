@@ -24,6 +24,8 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from six.moves.urllib.parse import urlparse
 
+from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
+
 
 class Fetcher(AbstractClass):
   """Knows how to interpret some remote import paths and fetch code to satisfy them."""
@@ -48,13 +50,14 @@ class Fetcher(AbstractClass):
     """
 
   @abstractmethod
-  def fetch(self, go_remote_library, dest):
+  def fetch(self, import_path, dest, rev=None):
     """Fetches to remote library to the given dest dir.
 
     The dest dir provided will be an existing empty directory.
 
-    :param go_remote_library: The library describing the remote package to fetch.
-    :type: :class:`pants.contrib.go.targets.go_remote_library.GoRemoteLibrary`
+    :param string import_path: The remote import path to fetch.
+    :param string rev: The version to fetch - may be `None` or empty indicating the latest version
+                       should be fetched.
     :param string dest: The path of an existing empty directory to extract package containing the
                         remote library's contents to.
     :raises: :class:`Fetcher.FetchError` if there was a problem fetching the remote package.
@@ -182,13 +185,13 @@ class Fetchers(Subsystem):
                   "or else an installed alias for a fetcher type; ie the builtin "
                   "`contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as 'ArchiveFetcher'.")
 
-  class GetFetchError(Exception):
+  class GetFetcherError(Exception):
     """Indicates an error finding an appropriate Fetcher."""
 
-  class UnfetchableRemote(GetFetchError):
+  class UnfetchableRemote(GetFetcherError):
     """Indicates no Fetcher claims the given remote import path."""
 
-  class InvalidFetcherError(GetFetchError):
+  class InvalidFetcherError(GetFetcherError):
     """Indicates an invalid Fetcher type or an un-instantiable Fetcher."""
 
   class InvalidFetcherModule(InvalidFetcherError):
@@ -235,30 +238,43 @@ class Fetchers(Subsystem):
     return fetchers
 
   @memoized_method
+  def maybe_get_fetcher(self, import_path):
+    """Returns a :class:`Fetcher` capable of resolving the given remote import path.
+
+    :param string import_path: The remote import path to fetch.
+    :returns: A fetcher capable of fetching the given `import_path` or `None` if no capable fetcher
+              was found.
+    :rtype: :class:`Fetcher`
+    """
+    for matcher, fetcher in self._fetchers:
+      match = matcher.match(import_path)
+      if match and match.start() == 0:
+        return fetcher
+    return None
+
   def get_fetcher(self, import_path):
     """Returns a :class:`Fetcher` capable of resolving the given remote import path.
 
     :param string import_path: The remote import path to fetch.
     :returns: A fetcher capable of fetching the given `import_path`.
     :rtype: :class:`Fetcher`
-    :raises: :class:`Fetchers.UnfetchableRemote` if no fetcher was found that could handle the
-             given `import_path`.
+    :raises: :class:`Fetcher.UnfetchableRemote` if no fetcher is registered to handle the given
+             import path.
     """
-    for matcher, fetcher in self._fetchers:
-      match = matcher.match(import_path)
-      if match and match.start() == 0:
-        return fetcher
-    raise self.UnfetchableRemote(import_path)
+    fetcher = self.maybe_get_fetcher(import_path)
+    if not fetcher:
+      raise self.UnfetchableRemote(import_path)
+    return fetcher
 
 
 class ArchiveFetcher(Fetcher, Subsystem):
-  """A fetcher that knows how to find archives for remote import paths and unpack them."""
+  """A fetcher that knows how find archives for remote import paths and unpack them."""
 
   logger = logging.getLogger(__name__)
 
   class UrlInfo(namedtuple('UrlInfo', ['url_format', 'default_rev', 'strip_level'])):
-    def rev(self, go_remote_library):
-      return go_remote_library.rev or self.default_rev
+    def rev(self, rev):
+      return rev or self.default_rev
 
   options_scope = 'archive-fetcher'
 
@@ -321,10 +337,10 @@ class ArchiveFetcher(Fetcher, Subsystem):
     match, _ = self._matcher(import_path)
     return match.string[:match.end()]
 
-  def fetch(self, go_remote_library, dest):
-    match, url_info = self._matcher(go_remote_library.import_path)
-    archive_url = match.expand(url_info.url_format).format(rev=url_info.rev(go_remote_library),
-                                                           pkg=go_remote_library.pkg)
+  def fetch(self, import_path, dest, rev=None):
+    match, url_info = self._matcher(import_path)
+    pkg = GoRemoteLibrary.remote_package_path(self.root(import_path), import_path)
+    archive_url = match.expand(url_info.url_format).format(rev=url_info.rev(rev), pkg=pkg)
     try:
       archiver = archiver_for_path(archive_url)
     except ValueError:
@@ -356,17 +372,20 @@ class ArchiveFetcher(Fetcher, Subsystem):
       with self._download(url) as download_path:
         yield download_path
 
-  @contextmanager
-  def _download(self, url):
-    # TODO(jsirois): Wrap with workunits, progress meters, checksums.
-    self.logger.info('Downloading {}...'.format(url))
+  def session(self):
     session = requests.session()
     # Override default http adapters with a retriable one.
     retriable_http_adapter = requests.adapters.HTTPAdapter(max_retries=self.get_options().retries)
     session.mount("http://", retriable_http_adapter)
     session.mount("https://", retriable_http_adapter)
-    with closing(session.get(url, stream=True)) as res:
-      if not res.status_code == requests.codes.ok:
+    return session
+
+  @contextmanager
+  def _download(self, url):
+    # TODO(jsirois): Wrap with workunits, progress meters, checksums.
+    self.logger.info('Downloading {}...'.format(url))
+    with closing(self.session().get(url, stream=True)) as res:
+      if res.status_code != requests.codes.ok:
         raise self.FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
       with temporary_file() as archive_fp:
         # NB: Archives might be very large so we play it safe and buffer them to disk instead of
@@ -378,7 +397,173 @@ class ArchiveFetcher(Fetcher, Subsystem):
         yield archive_fp.name
 
 
+class GopkgInFetcher(Fetcher, Subsystem):
+  """A fetcher implementing the URL re-writing protocol of gopkg.in.
+
+  The protocol rewrites a versioned remote import path scheme to a github URL + rev and delegates
+  to the ArchiveFetcher to do the rest.
+
+  The versioning URL scheme is described here: http://gopkg.in
+  NB: Unfortunately gopkg.in does not implement the <meta/> tag re-direction scheme defined in
+  `go help importpath` so we are forced to implement their re-direction protocol instead of using
+  the more general <meta/> tag protocol.
+  """
+  options_scope = 'gopkg.in'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return (ArchiveFetcher,)
+
+  @property
+  def _fetcher(self):
+    return ArchiveFetcher.global_instance()
+
+  def root(self, import_path):
+    return import_path
+
+  #VisibleForTesting
+  def _do_fetch(self, import_path, dest, rev=None):
+    return self._fetcher.fetch(import_path, dest, rev=rev)
+
+  def fetch(self, import_path, dest, rev=None):
+    github_root, github_rev = self._map_import_path(import_path, rev)
+    self._do_fetch(github_root, dest, rev=rev or github_rev)
+
+  _PACKAGE_AND_REV_RE = re.compile(r'(?P<package>[^/]+).(?P<rev>v[0-9]+)')
+
+  @memoized_method
+  def _map_import_path(self, import_path, rev=None):
+    components = import_path.split('/', 2)
+
+    domain = components.pop(0)
+    if 'gopkg.in' != domain:
+      raise self.FetchError('Can only fetch packages for pkgio.in, given: {}'.format(import_path))
+
+    user = components.pop(0) if len(components) == 2 else None
+
+    match = self._PACKAGE_AND_REV_RE.match(components[0])
+    if not match:
+      raise self.FetchError('Invalid gopkg.in package and rev in: {}'.format(import_path))
+    package, raw_rev = match.groups()
+
+    user = user or 'go-{}'.format(package)
+    rev = rev or self._find_highest_compatible(user, package, raw_rev)
+    root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
+    return root, rev
+
+  class ApiError(Fetcher.FetchError):
+    """Indicates a compatible version could not be found due to github API errors."""
+
+  class NoMatchingVersionError(Fetcher.FetchError):
+    """Indicates versions were found, but none matched."""
+
+  class NoVersionsError(Fetcher.FetchError):
+    """Indicates no versions were found even there there were no github API errors - unexpected."""
+
+  def _find_highest_compatible(self, user, repo, raw_rev):
+    # http://labix.org/gopkg.in defines v0 as master.
+    if raw_rev == 'v0':
+      return 'master'
+
+    candidates = set()
+    errors = []
+
+    def collect_refs(search):
+      try:
+        return candidates.update(self._iter_refs(user, repo, search))
+      except self.FetchError as e:
+        errors.append(e)
+
+    collect_refs('refs/tags')
+    highest_compatible = self._select_highest_compatible(candidates, raw_rev)
+    if highest_compatible:
+      return highest_compatible
+
+    collect_refs('refs/heads')
+    highest_compatible = self._select_highest_compatible(candidates, raw_rev)
+    if highest_compatible:
+      return highest_compatible
+
+    if len(errors) == 2:
+      raise self.ApiError('Failed to fetch both tags and branches:\n\t{}\n\t{}'
+                          .format(errors[0], errors[1]))
+    elif not candidates:
+      raise self.NoVersionsError('Found no tags or branches for github.com/{user}/{repo} - this '
+                                 'is unexpected.'.format(user=user, repo=repo))
+    elif errors:
+      raise self.FetchError('Found no tag or branch for github.com/{user}/{repo} to match {rev}, '
+                            'but encountered an error while searching:\n\t{}', errors.pop())
+    else:
+      raise self.NoMatchingVersionError('Found no tags or branches for github.com/{user}/{repo} '
+                                        'compatible with {rev} amongst these refs:\n\t{refs}'
+                                        .format(user=user, repo=repo, rev=raw_rev,
+                                                refs='\n\t'.join(sorted(candidates))))
+
+  # VisibleForTesting
+  def _do_get(self, url):
+    res = self._fetcher.session().get(url)
+    if res.status_code != requests.codes.ok:
+      raise self.FetchError('Failed to scan for the highest compatible version of {} ({} error)'
+                            .format(url, res.status_code))
+    return res.json()
+
+  def _do_get_json(self, url):
+    try:
+      return self._do_get(url)
+    except requests.RequestException as e:
+      raise self.FetchError('Failed to scan for the highest compatible version of {} ({} error)'
+                            .format(url, e))
+
+  def _iter_refs(self, user, repo, search):
+    # See: https://developer.github.com/v3/git/refs/#get-all-references
+    # https://api.github.com/repos/{user}/{repo}/git/refs/tags
+    # https://api.github.com/repos/{user}/{repo}/git/refs/heads
+    # [{"ref": "refs/heads/v1", ...}, ...]
+    url = ('https://api.github.com/repos/{user}/{repo}/git/{search}'
+           .format(user=user, repo=repo, search=search))
+
+    json = self._do_get_json(url)
+    for ref in json:
+      ref_name = ref.get('ref')
+      if ref_name:
+        components = ref_name.split(search + '/', 1)
+        if len(components) == 2:
+          prefix, raw_ref = components
+          yield raw_ref
+
+  class Match(namedtuple('Match', ['minor', 'patch', 'candidate'])):
+    """A gopkg.in major version match that is suitable for simple sorting of highest match."""
+
+  def _select_highest_compatible(self, candidates, raw_rev):
+    prefix = raw_rev + '.'
+    matches = []
+    for candidate in candidates:
+      if candidate == raw_rev:
+        matches.append(self.Match(minor=0, patch=0, candidate=candidate))
+      elif candidate.startswith(prefix):
+        rest = candidate[len(prefix):]
+        xs = rest.split('.', 1)
+        try:
+          minor = int(xs[0])
+          patch = (0 if len(xs) == 1 else int(xs[1]))
+          matches.append(self.Match(minor, patch, candidate))
+        except ValueError:
+          # The candidates come from all tag and branch names in the repo; so there could be
+          # 'vX.non_numeric_string' candidates that do not confirm to gopkg.in's 'vX.(Y.(Z))'
+          # scheme and so we just skip past those.
+          pass
+    if not matches:
+      return None
+    else:
+      match = max(matches, key=lambda match: match.candidate)
+      return match.candidate
+
+
 # All builtin fetchers should be advertised and registered as defaults here, 1st advertise,
 # then register:
+Fetchers.advertise(GopkgInFetcher, namespace='')
+Fetchers._register_default(r'^gopkg\.in/.*$', GopkgInFetcher)
+
 Fetchers.advertise(ArchiveFetcher, namespace='')
-Fetchers._register_default(r'github.com/.*', ArchiveFetcher)
+Fetchers._register_default(r'^bitbucket\.org/.*$', ArchiveFetcher)
+Fetchers._register_default(r'^github\.com/.*$', ArchiveFetcher)

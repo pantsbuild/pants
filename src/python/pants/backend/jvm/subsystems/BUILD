@@ -29,6 +29,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:strutil',
+    'src/python/pants/util:osutil',
   ],
 )
 

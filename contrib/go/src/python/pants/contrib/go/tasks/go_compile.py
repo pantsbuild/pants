@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -33,7 +32,7 @@ class GoCompile(GoWorkspaceTask):
     return ['exec_binary']
 
   def execute(self):
-    self.context.products.safe_create_data('exec_binary', lambda: defaultdict(str))
+    self.context.products.safe_create_data('exec_binary', lambda: {})
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True,
                           topological_order=True) as invalidation_check:
@@ -55,8 +54,8 @@ class GoCompile(GoWorkspaceTask):
   def _go_install(self, target, gopath):
     args = self.get_options().build_flags.split() + [target.import_path]
     result, go_cmd = self.go_dist.execute_go_cmd('install', gopath=gopath, args=args,
-                                         workunit_factory=self.context.new_workunit,
-                                         workunit_labels=[WorkUnitLabel.COMPILER])
+                                                 workunit_factory=self.context.new_workunit,
+                                                 workunit_labels=[WorkUnitLabel.COMPILER])
     if result != 0:
       raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
 

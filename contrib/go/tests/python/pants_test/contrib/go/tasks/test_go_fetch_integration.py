@@ -30,3 +30,17 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
             'contrib/go/examples/3rdparty/go/github.com/AdRoll/goamz:dynamodb']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
+
+  def test_issues2004(self):
+    # The target used here has test imports outside those used by the source code it tests (that
+    # code only depends on the stdlib).  These must be resolved for the test to be compiled and run:
+    #
+    # github.com/bitly/go-simplejson
+    # -> github.com/bmizerany/assert (testing)
+    #    -> github.com/kr/pretty (testing)
+    #       -> github.com/kr/text (testing)
+    args = ['test.go',
+            '--remote',
+            'contrib/go/examples/3rdparty/go/github.com/bitly/go-simplejson']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)

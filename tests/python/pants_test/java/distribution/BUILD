@@ -3,11 +3,23 @@
 
 python_tests(
   name = 'distribution',
-  sources = globs('*.py'),
+  sources = ['test_distribution.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':distribution_integration',
     'src/python/pants/base:revision',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
 )
+
+python_tests(
+  name = 'distribution_integration',
+  sources = ['test_distribution_integration.py'],
+  dependencies = [
+    'src/python/pants/java/distribution',
+    'src/python/pants/util:osutil',
+    'tests/python/pants_test:int-test',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+  ]
+)
+
