@@ -52,6 +52,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
+    'src/python/pants/help',
     'src/python/pants/option',
     ],
   )
@@ -263,6 +264,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
+    'src/python/pants/help',
     'src/python/pants/option',
   ],
 )
