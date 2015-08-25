@@ -16,7 +16,9 @@ from pants_test.subsystem.subsystem_util import create_subsystem
 class TestWatchmanLauncher(BaseTest):
   def setUp(self):
     BaseTest.setUp(self)
-    self.watchman_launcher = create_subsystem(WatchmanLauncher, pants_workdir='/pants_workdir')
+    self.watchman_launcher = create_subsystem(WatchmanLauncher,
+                                              pants_workdir='/pants_workdir',
+                                              level='info')
 
   def test_options_defaults(self):
     self.assertIsNone(self.watchman_launcher._watchman_path)

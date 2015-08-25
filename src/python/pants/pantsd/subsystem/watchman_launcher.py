@@ -27,7 +27,7 @@ class WatchmanLauncher(Subsystem):
 
     options = self.get_options()
     self._workdir = options.pants_workdir
-    self._watchman_path = options.watchman_path
+    self._watchman_path = options.path
     # N.B. watchman has 3 log levels: 0 == no logging, 1 == standard logging, 2 == verbose logging.
     self._watchman_log_level = '2' if options.level == 'debug' else '1'
 
