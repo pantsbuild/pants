@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
@@ -143,31 +144,46 @@ class PythonChrootTest(BaseTest):
         self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
 
   @contextmanager
-  def do_test_thrift(self):
+  def do_test_thrift(self, inspect_chroot=None):
     SourceRoot.register('src/thrift', PythonThriftLibrary)
+
+    self.create_file(relpath='src/thrift/core/identifiers.thrift', contents=dedent("""
+      namespace py core
+
+      const string HELLO = "Hello"
+      const string WORLD = "World!"
+    """))
+    core_const = self.make_target(spec='src/thrift/core',
+                                  target_type=PythonThriftLibrary,
+                                  sources=['identifiers.thrift'])
+
     self.create_file(relpath='src/thrift/test/const.thrift', contents=dedent("""
       namespace py test
 
-      const list<string> VALID_IDENTIFIERS = ["Hello", "World!"]
+      include "core/identifiers.thrift"
+
+      const list<string> MESSAGE = [identifiers.HELLO, identifiers.WORLD]
     """))
-    thrift_target = self.make_target(spec='src/thrift/test',
-                                     target_type=PythonThriftLibrary,
-                                     sources=['const.thrift'])
+    test_const = self.make_target(spec='src/thrift/test',
+                                  target_type=PythonThriftLibrary,
+                                  sources=['const.thrift'],
+                                  dependencies=[core_const])
 
     SourceRoot.register('src/python', PythonBinary)
+
     self.create_file(relpath='src/python/test/main.py', contents=dedent("""
-      from test.constants import VALID_IDENTIFIERS
+      from test.constants import MESSAGE
 
 
       def say_hello():
-        print(' '.join(VALID_IDENTIFIERS))
+        print(' '.join(MESSAGE))
     """))
     binary = self.make_target(spec='src/python/test',
                               target_type=PythonBinary,
                               source='main.py',
-                              dependencies=[thrift_target])
+                              dependencies=[test_const])
 
-    yield binary, thrift_target
+    yield binary, test_const
 
     with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
       pex_builder.set_entry_point('test.main:say_hello')
@@ -179,6 +195,9 @@ class PythonChrootTest(BaseTest):
 
       self.assertEqual(0, process.returncode)
       self.assertEqual('Hello World!', stdout.strip())
+
+      if inspect_chroot:
+        inspect_chroot(python_chroot)
 
   def test_thrift(self):
     with self.do_test_thrift():
@@ -204,3 +223,20 @@ class PythonChrootTest(BaseTest):
                                                            sources=['__init__.py', 'constants.py'],
                                                            derived_from=thrift_target)
       binary.inject_dependency(synthetic_pythrift_codegen_target.address)
+
+  def test_thrift_issues_2005(self):
+    # Issue #2005 highlighted the fact the PythonThriftBuilder was building both a given
+    # PythonThriftLibrary's thrift files as well as its transitive dependencies thrift files.
+    # We test here that the generated chroot only contains 1 copy of each thrift stub in the face
+    # of transitive thrift deps.
+    def inspect_chroot(python_chroot):
+      all_constants_files = set()
+      for root, _, files in os.walk(python_chroot.path()):
+        all_constants_files.update(os.path.join(root, f) for f in files if f == 'constants.py')
+
+      # If core/constants.py was included in test/ we'd have 2 copies of core/constants.py plus
+      # test/constants.py for a total of 3 constants.py files.
+      self.assertEqual(2, len(all_constants_files))
+
+    with self.do_test_thrift(inspect_chroot=inspect_chroot):
+      pass  # Our test takes place in inspect_chroot above
