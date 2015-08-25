@@ -18,9 +18,9 @@ from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 class FSEventService(PantsService):
   """Filesystem Event Service.
 
-     This is the primary service coupling to watchman and is responsible for subscribing to and
-     reading events from watchman's UNIX socket and firing callbacks in pantsd. Callbacks are
-     executed in a configurable threadpool but are generally expected to be short-lived.
+  This is the primary service coupling to watchman and is responsible for subscribing to and
+  reading events from watchman's UNIX socket and firing callbacks in pantsd. Callbacks are
+  executed in a configurable threadpool but are generally expected to be short-lived.
   """
 
   HANDLERS = {}
@@ -35,9 +35,9 @@ class FSEventService(PantsService):
   def register_simple_handler(cls, file_name, callback):
     """Registers a simple subscription and handler for files matching a specific name.
 
-       :param str name:      the subscription name as used by watchman
-       :param str file_name: the filename for the simple filename match (e.g. 'BUILD')
-       :param func callback: the callback to execute on each filesystem event
+    :param str name:      the subscription name as used by watchman
+    :param str file_name: the filename for the simple filename match (e.g. 'BUILD')
+    :param func callback: the callback to execute on each filesystem event
     """
     metadata = dict(fields=['name'], expression=['allof',
                                                  ['type', 'f'],
@@ -50,11 +50,11 @@ class FSEventService(PantsService):
   def register_handler(cls, name, metadata, callback):
     """Register subscriptions and their event handlers.
 
-       :param str name:      the subscription name as used by watchman
-       :param dict metadata: a dictionary of metadata to be serialized and passed to the watchman
-                             subscribe command. this should include the match expression as well
-                             as any required callback fields.
-       :param func callback: the callback to execute on each matching filesystem event
+    :param str name:      the subscription name as used by watchman
+    :param dict metadata: a dictionary of metadata to be serialized and passed to the watchman
+                          subscribe command. this should include the match expression as well
+                          as any required callback fields.
+    :param func callback: the callback to execute on each matching filesystem event
     """
     assert name not in cls.HANDLERS, 'duplicate handler name: {}'.format(name)
     assert (isinstance(metadata, dict) and
