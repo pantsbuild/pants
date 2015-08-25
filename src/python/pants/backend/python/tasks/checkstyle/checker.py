@@ -151,11 +151,9 @@ class PythonCheckStyleTask(PythonTask):
     should_fail = False
     fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
 
-    first_nit = True
-    for nit in self.get_nits(python_file):
-      if first_nit:
-        print()
-        first_nit = False
+    for i, nit in enumerate(self.get_nits(python_file)):
+      if i == 0:
+        print()  # add an extra newline to clean up the output only if we have nits
       if nit.severity >= severity:
         print('{nit}\n'.format(nit=nit))
       should_fail |= (nit.severity >= fail_threshold)
@@ -170,7 +168,6 @@ class PythonCheckStyleTask(PythonTask):
     :return: Boolean indicating problems found
     """
     should_fail = False
-    #print()
     for filename in sources:
       should_fail |= self.check_file(filename)
 
