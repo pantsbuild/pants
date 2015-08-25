@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import sys
-from textwrap import dedent
-
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.payload_field import PayloadField, stable_json_sha1
 from pants.base.validation import assert_list
 
@@ -33,7 +31,19 @@ class IvyArtifact(PayloadField):
   )
 
   def __init__(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
-    """ See the arguments in JarDependency.with_artifact(). """
+    """Declares a dependency on an artifact to be resolved externally.
+
+    :param name: The name of the published artifact. This name must not include revision.
+    :param type_: The type of the published artifact. It's usually the same as the artifact's file
+      extension, but not necessarily. For instance, ivy files are of type 'ivy' but have 'xml' as
+      their file extension.
+    :param ext: The file extension of the published artifact.
+    :param url: The url at which this artifact can be found if it isn't located at the standard
+      location in the repository.
+    :param configuration: The public configuration in which this artifact is published. The '*' wildcard can
+      be used to designate all public configurations.
+    :param classifier: The maven classifier of this artifact.
+    """
     self.name = name
     self.type_ = type_ or 'jar'
     self.ext = ext
@@ -88,8 +98,6 @@ class JarDependency(object):
       will properly hyperlink {\ @link}s.
     :param string type_: Artifact packaging type.
     :param string classifier: Classifier specifying the artifact variant to use.
-      Use multiple ``with_artifact`` statements to include multiple artifacts of the same org.name,
-      but with different classifiers.
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.
     :param list artifacts: A list of additional IvyArtifacts
@@ -104,7 +112,16 @@ class JarDependency(object):
     self.transitive = not intransitive
     self.apidocs = apidocs
     self.mutable = mutable
-    self.artifacts = tuple(assert_list(artifacts, expected_type=IvyArtifact, key_arg='artifacts'))
+
+    @deprecated('0.0.48',
+                hint_message='JarDependency now only specifies a single artifact, so the artifacts argument will be removed.')
+    def make_artifacts():
+      return tuple(assert_list(artifacts, expected_type=IvyArtifact, key_arg='artifacts'))
+
+    if artifacts:
+      self.artifacts = make_artifacts()
+    else:
+      self.artifacts = ()
 
     if ext or url or type_ or classifier:
       self.append_artifact(name,
@@ -114,11 +131,6 @@ class JarDependency(object):
                            classifier=classifier)
 
     self._configurations = ('default',)
-
-    # Support legacy method names
-    # TODO(John Sirois): introduce a deprecation cycle for these and then kill
-    self.withSources = self.with_sources
-    self.withDocs = self.with_docs
 
     if classifier:
       self.classifier = classifier
@@ -135,69 +147,23 @@ class JarDependency(object):
       raise ValueError('Cannot determine classifier. No explicit classifier is set and this jar '
                        'has more than 1 artifact: {}\n\t{}'.format(self, '\n\t'.join(map(str, self.artifacts))))
 
+
   def append_artifact(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
     """Append a new IvyArtifact to the list of artifacts for this jar."""
-    self.artifacts += (IvyArtifact(name, type_=type_, ext=ext, conf=conf, url=url, classifier=classifier), )
+    @deprecated('0.0.48',
+                hint_message='JarDependency now only specifies a single artifact, {} defines more than one.'.format(name))
+    def add_more_artifacts():
+      return self.artifacts + (IvyArtifact(name, type_=type_, ext=ext, conf=conf, url=url, classifier=classifier), )
+    if self.artifacts:
+      self.artifacts = add_more_artifacts()
+    else:
+      self.artifacts = (IvyArtifact(name, type_=type_, ext=ext, conf=conf, url=url, classifier=classifier), )
 
   @manual.builddict()
   def exclude(self, org, name=None):
     """Adds a transitive dependency of this jar to the exclude list."""
 
     self.excludes += (Exclude(org, name),)
-    return self
-
-  @manual.builddict()
-  def with_sources(self):
-    """This historically requested the artifact have its source jar fetched.
-    (This implies there *is* a source jar to fetch.) Used in contexts
-    that can use source jars (as of 2014, just eclipse and idea goals)."""
-    print("jar dependency org={org} name={name}:  with_sources() is now a noop and is deprecated."
-          .format(org=self.org, name=self.name), file=sys.stderr)
-    return self
-
-  @manual.builddict()
-  def with_docs(self):
-    """This historically requested the artifact have its javadoc jar fetched.
-    (This implies there *is* a javadoc jar to fetch.) Used in contexts
-    that can use source jars (as of 2014, just eclipse and idea goals)."""
-    print("jar dependency org={org} name={name}:  with_docs() is now a noop and is deprecated."
-          .format(org=self.org, name=self.name), file=sys.stderr)
-    return self
-
-  @manual.builddict()
-  def with_artifact(self, name=None, type_=None, ext=None, url=None, configuration=None,
-                    classifier=None):
-    """
-    Sets an alternative artifact to fetch or adds additional artifacts if called multiple times.
-
-    :param name: The name of the published artifact. This name must not include revision.
-    :param type_: The type of the published artifact. It's usually the same as the artifact's file
-      extension, but not necessarily. For instance, ivy files are of type 'ivy' but have 'xml' as
-      their file extension.
-    :param ext: The file extension of the published artifact.
-    :param url: The url at which this artifact can be found if it isn't located at the standard
-      location in the repository.
-    :param configuration: The public configuration in which this artifact is published. The '*' wildcard can
-      be used to designate all public configurations.
-    :param classifier: The maven classifier of this artifact.
-    """
-    print(dedent("""
-    jar(...).with_artifact(...) is deprecated. Instead, use:
-    jar(..., artifacts=[ivy_artifact(...), ...]).  You'll need to supply a name= argument
-    to ivy_artifact.""").strip(),
-          file=sys.stderr)
-    return self._with_artifact(name=name, type_=type_, ext=ext, url=url, configuration=configuration,
-                               classifier=classifier)
-
-  def _with_artifact(self, name=None, type_=None, ext=None, url=None, configuration=None,
-                    classifier=None):
-    artifact = IvyArtifact(name or self.name,
-                           type_=type_,
-                           ext=ext,
-                           url=url,
-                           conf=configuration,
-                           classifier=classifier)
-    self.artifacts += (artifact,)
     return self
 
   def __eq__(self, other):

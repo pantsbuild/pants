@@ -57,7 +57,6 @@ target(
     ':jvm_bundle_integration',
     ':jvm_run_integration',
     ':protobuf_integration',
-    ':wire_integration',
   ],
 )
 
@@ -352,15 +351,6 @@ python_tests(
   name = 'protobuf_integration',
   sources = ['test_protobuf_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
-  name = 'wire_integration',
-  sources = ['test_wire_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ],
 )

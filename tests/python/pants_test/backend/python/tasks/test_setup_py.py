@@ -16,6 +16,9 @@ from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
+# in pants java since non-jvm backends depend on it to run things.
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
@@ -23,6 +26,7 @@ from pants.base.source_root import SourceRoot
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 class TestSetupPy(PythonTaskTestBase):
@@ -73,7 +77,7 @@ class TestSetupPy(PythonTaskTestBase):
   @contextmanager
   def run_execute(self, target, recursive=False):
     self.set_options(recursive=recursive)
-    context = self.context(target_roots=[target], options=self.options)
+    context = self.context(target_roots=[target])
     setup_py = self.create_task(context)
     yield setup_py.execute()
 
@@ -343,15 +347,14 @@ class TestSetupPy(PythonTaskTestBase):
                               sources=['exported.g'],
                               module='exported',
                               provides=PythonArtifact(name='test.exported', version='0.0.0.'))
-    # TODO(John Sirois): Find a way to get easy access to pants option defaults.
-    self.set_options_for_scope('ivy',
-                               ivy_profile='2.4.0',
-                               ivy_settings=None,
-                               cache_dir=os.path.expanduser('~/.ivy2/pants'),
-                               http_proxy=None,
-                               https_proxy=None)
-    with self.run_execute(target) as created:
-      self.assertEqual([target], created)
+
+    # TODO(John Sirois): This hacks around a direct but undeclared dependency
+    # `pants.java.distribution.distribution.Distribution` gained in
+    # https://rbcommons.com/s/twitter/r/2657
+    # Remove this once proper Subsystem dependency chains are re-established.
+    with subsystem_instance(JVM):
+      with self.run_execute(target) as created:
+        self.assertEqual([target], created)
 
   def test_exported_thrift(self):
     SourceRoot.register('src/thrift', PythonThriftLibrary)

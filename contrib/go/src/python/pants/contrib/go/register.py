@@ -12,7 +12,7 @@ from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_binary_create import GoBinaryCreate
-from pants.contrib.go.tasks.go_buildgen import GoBuilden
+from pants.contrib.go.tasks.go_buildgen import GoBuildgen
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
 from pants.contrib.go.tasks.go_run import GoRun
@@ -33,7 +33,7 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='go', action=GoBuilden).install('buildgen').with_description(
+  task(name='go', action=GoBuildgen).install('buildgen').with_description(
     'Automatically generate BUILD files.')
   task(name='go', action=GoFetch).install('resolve')
   task(name='go', action=GoCompile).install('compile')

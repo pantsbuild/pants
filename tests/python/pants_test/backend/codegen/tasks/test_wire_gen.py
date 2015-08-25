@@ -11,6 +11,7 @@ from textwrap import dedent
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.register import build_file_aliases as register_codegen
+from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.wire_gen import WireGen
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.base.source_root import SourceRoot
@@ -20,6 +21,8 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class WireGenTest(TaskTestBase):
+
+  EXPECTED_TASK_PATH = ".pants.d/pants_backend_codegen_tasks_wire_gen_WireGen/isolated"
 
   @classmethod
   def task_type(cls):
@@ -188,3 +191,71 @@ class WireGenTest(TaskTestBase):
     result = task.sources_generated_by_target(target)
     os.chdir(previous_working_directory)
     self.assertEquals(OrderedSet(['org/pantsbuild/example/Foo.java']), OrderedSet(result))
+
+
+  def test_compiler_args(self):
+    SourceRoot.register('wire-src')
+    simple_wire_target = self.make_target('wire-src:simple-wire-target', JavaWireLibrary,
+                                          sources=['foo.proto'])
+    context = self.context(target_roots=[simple_wire_target])
+    task = self.create_task(context)
+    self.assertEquals([
+      '--java_out={}/{}/wire-src.simple-wire-target'.format(self.build_root, self.EXPECTED_TASK_PATH),
+      '--proto_path={}/wire-src'.format(self.build_root),
+      'foo.proto'],
+      task.format_args_for_target(simple_wire_target))
+
+  def test_compiler_args_wirev1(self):
+    SourceRoot.register('wire-src')
+    wire_targetv1 = self.make_target('wire-src:wire-targetv1', JavaWireLibrary,
+                                     sources=['bar.proto'],
+                                     service_writer='org.pantsbuild.DummyServiceWriter',
+                                     service_writer_options=['opt1', 'opt2'])
+    task = self.create_task(self.context(target_roots=[wire_targetv1]))
+    self.assertEquals([
+      '--java_out={}/{}/wire-src.wire-targetv1'.format(self.build_root, self.EXPECTED_TASK_PATH),
+      '--service_writer=org.pantsbuild.DummyServiceWriter',
+      '--service_writer_opt', 'opt1',
+      '--service_writer_opt', 'opt2',
+      '--proto_path={}/wire-src'.format(self.build_root),
+      'bar.proto'],
+      task.format_args_for_target(wire_targetv1))
+
+  def test_compiler_args_wirev2(self):
+    SourceRoot.register('wire-src')
+    wire_targetv2 = self.make_target('wire-src:wire-targetv2', JavaWireLibrary,
+                                     sources=['baz.proto'],
+                                     service_factory='org.pantsbuild.DummyServiceFactory',
+                                     service_factory_options=['v2opt1', 'v2opt2'])
+    task = self.create_task(self.context(target_roots=[wire_targetv2]))
+    self.assertEquals([
+      '--java_out={}/{}/wire-src.wire-targetv2'.format(self.build_root, self.EXPECTED_TASK_PATH),
+      '--service_factory=org.pantsbuild.DummyServiceFactory',
+      '--service_factory_opt', 'v2opt1',
+      '--service_factory_opt', 'v2opt2',
+      '--proto_path={}/wire-src'.format(self.build_root),
+      'baz.proto'],
+      task.format_args_for_target(wire_targetv2))
+
+  def test_compiler_args_all(self):
+    SourceRoot.register('wire-src')
+    kitchen_sink = self.make_target('wire-src:kitchen-sink', JavaWireLibrary,
+                                    sources=['foo.proto', 'bar.proto', 'baz.proto'],
+                                    registry_class='org.pantsbuild.Registry',
+                                    service_factory='org.pantsbuild.DummyServiceFactory',
+                                    no_options=True,
+                                    roots=['root1', 'root2', 'root3'],
+                                    enum_options=['enum1', 'enum2', 'enum3'],)
+    task = self.create_task(self.context(target_roots=[kitchen_sink]))
+    self.assertEquals([
+      '--java_out={}/{}/wire-src.kitchen-sink'.format(self.build_root, self.EXPECTED_TASK_PATH),
+      '--no_options',
+      '--service_factory=org.pantsbuild.DummyServiceFactory',
+      '--registry_class=org.pantsbuild.Registry',
+      '--roots=root1,root2,root3',
+      '--enum_options=enum1,enum2,enum3',
+      '--proto_path={}/wire-src'.format(self.build_root),
+      'foo.proto',
+      'bar.proto',
+      'baz.proto'],
+      task.format_args_for_target(kitchen_sink))

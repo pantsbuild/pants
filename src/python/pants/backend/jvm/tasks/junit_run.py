@@ -34,7 +34,6 @@ from pants.util.xml_parser import XmlParser
 
 
 # TODO(ji): Add unit tests.
-# TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
 
 # The helper classes (_JUnitRunner and its subclasses) need to use
 # methods inherited by JUnitRun from Task. Rather than pass a reference
@@ -380,7 +379,7 @@ class _JUnitRunner(object):
       classname = classname_or_srcfile
       yield classname + methodname
 
-
+#TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
 class _Coverage(_JUnitRunner):
   """Base class for emma-like coverage processors. Do not instantiate."""
 
@@ -732,6 +731,10 @@ class Cobertura(_Coverage):
       if result != 0:
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to report'".format(main, result))
+
+    if self._coverage_open:
+      coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
+      binary_util.ui_open(coverage_html_file)
 
 
 class JUnitRun(JvmToolTaskMixin, JvmTask):

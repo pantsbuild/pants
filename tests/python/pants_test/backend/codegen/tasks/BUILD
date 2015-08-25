@@ -112,3 +112,12 @@ python_tests(
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
+
+python_tests(
+  name = 'wire_integration',
+  sources = ['test_wire_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test:int-test',
+  ],
+)

@@ -13,6 +13,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/python/tasks/checkstyle:all',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:antlr_builder',
     'src/python/pants/backend/python:interpreter_cache',
