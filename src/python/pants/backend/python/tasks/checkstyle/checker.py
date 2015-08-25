@@ -68,9 +68,6 @@ class PythonCheckStyleTask(PythonTask):
     self.register_plugin(dict(name='variable-names', checker=PEP8VariableNames))
     self.register_plugin(dict(name='pep8', checker=PEP8Checker))
 
-
-
-
   @classmethod
   def global_subsystems(cls):
     return super(PythonTask, cls).global_subsystems() + (
