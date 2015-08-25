@@ -6,10 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import textwrap
+from collections import namedtuple
 
 import pytest
 
-from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask, PythonFile
+from pants.backend.python.tasks.checkstyle.checker import (PythonCheckStyleTask, PythonFile,
+                                                           lint_plugin)
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
@@ -77,7 +79,7 @@ class TestPyStyleTask(PythonTaskTestBase):
 
     PythonCheckStyleTask.options_scope = 'py.check'
     self.style_check = PythonCheckStyleTask(self._create_context(), ".")
-    self.style_check._plugins = [{'name': 'Troll', 'checker': Rage}]
+    self.style_check._plugins = [lint_plugin(name='Troll', checker=Rage)]
     self.style_check.options.suppress = None
 
   def test_noqa_line_filter_length(self):
