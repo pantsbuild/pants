@@ -600,7 +600,7 @@ class SetupPy(PythonTask):
     for target in targets:
       create(target)
 
-    executed = []  # Collected and returned for tests.
+    executed = {}  # Collected and returned for tests, processed target -> sdist|setup_dir
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:
@@ -608,12 +608,14 @@ class SetupPy(PythonTask):
           self.context.log.info('Running packager against {}'.format(setup_dir))
           setup_runner = Packager(setup_dir)
           tgz_name = os.path.basename(setup_runner.sdist())
-          self.context.log.info('Writing {}'.format(os.path.join(dist_dir, tgz_name)))
-          shutil.move(setup_runner.sdist(), os.path.join(dist_dir, tgz_name))
+          sdist_path = os.path.join(dist_dir, tgz_name)
+          self.context.log.info('Writing {}'.format(sdist_path))
+          shutil.move(setup_runner.sdist(), sdist_path)
           safe_rmtree(setup_dir)
+          executed[target] = sdist_path
         else:
           self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
           setup_runner = SetupPyRunner(setup_dir, self._run)
           setup_runner.run()
-        executed.append(target)
+          executed[target] = setup_dir
     return executed
