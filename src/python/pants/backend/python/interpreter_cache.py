@@ -99,7 +99,7 @@ class PythonInterpreterCache(object):
           continue
       self._interpreters.add(pi)
 
-  def matches(self, filters):
+  def matched_interpreters(self, filters):
     """Given some filters, yield any interpreter that matches at least one of them.
 
     :param filters: A sequence of strings that constrain the interpreter compatibility for this
@@ -120,17 +120,16 @@ class PythonInterpreterCache(object):
       cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
       for requirements agnostic to interpreter class.
     """
-    has_setup = False
     filters = self._default_filters if not any(filters) else filters
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self._setup_cached(filters)
-    if force:
-      has_setup = True
+    def unsatisfied_filters():
+      return filter(lambda filt: len(list(self._matching(self._interpreters, [filt]))) == 0, filters)
+    if force or len(unsatisfied_filters()) > 0:
       self._setup_paths(setup_paths, filters)
-    matches = list(self.matches(filters))
-    if len(matches) == 0 and not has_setup:
-      self._setup_paths(setup_paths, filters)
-      matches = list(self.matches(filters))
+    for filt in unsatisfied_filters():
+      self._logger('No valid interpreters found for {}!'.format(filt))
+    matches = list(self.matched_interpreters(filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
     return matches

@@ -14,6 +14,7 @@ target(
     ':ivy_imports',
     ':ivy_resolve',
     ':ivy_utils',
+    ':jar_publish_unit_test',
     ':junit_run',
     ':jvm_platform_analysis',
     ':jvm_run',
@@ -163,6 +164,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'jar_publish_unit_test',
+  sources = ['test_jar_publish_unit.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:jar_publish',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name = 'jvm_platform_analysis',
   sources = ['test_jvm_platform_analysis.py'],
   dependencies = [
@@ -173,6 +183,16 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'jvm_platform_analysis_integration',
+  sources = ['test_jvm_platform_analysis_integration.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
+)
 
 python_tests(
   name = 'junit_run',
@@ -189,6 +209,16 @@ python_tests(
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
+  name = 'junit_run_integration',
+  sources = ['test_junit_run_integration.py'],
+  dependencies = [
+    'src/python/pants/java/distribution',
+    'tests/python/pants_test:int-test',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

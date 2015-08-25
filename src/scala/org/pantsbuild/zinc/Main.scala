@@ -7,7 +7,7 @@ package org.pantsbuild.zinc
 import java.io.File
 import sbt.Level
 import xsbti.CompileFailed
-import org.pantsbuild.zinc.logging.Loggers
+import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
 
 /**
  * Command-line main class.
@@ -33,10 +33,21 @@ object Main {
       Loggers.create(
         settings.consoleLog.logLevel,
         settings.consoleLog.color,
-        settings.consoleLog.logFilters,
         captureLog = settings.captureLog
       )
     val isDebug = settings.consoleLog.logLevel == Level.Debug
+    val reporter =
+      Reporters.create(
+        log,
+        settings.consoleLog.fileFilters,
+        settings.consoleLog.msgFilters
+      )
+    val progress =
+      new SimpleCompileProgress(
+        settings.consoleLog.logPhases,
+        settings.consoleLog.printProgress,
+        settings.consoleLog.heartbeatSecs
+      )(log)
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {
@@ -88,7 +99,7 @@ object Main {
     try {
       val compiler = Compiler(setup, log)
       log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(vinputs, cwd)(log)
+      compiler.compile(vinputs, cwd, reporter, progress)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>

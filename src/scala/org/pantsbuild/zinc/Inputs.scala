@@ -9,7 +9,7 @@ import java.util.{ List => JList, Map => JMap }
 import sbt.Logger
 import sbt.Path._
 import sbt.compiler.IC
-import sbt.inc.{ Analysis, Locate }
+import sbt.inc.{ Analysis, Locate, ZincPrivateAnalysis }
 import scala.collection.JavaConverters._
 import xsbti.compile.CompileOrder
 
@@ -91,11 +91,14 @@ object Inputs {
           None
         case (k, v) =>
           // use analysis only if it was valid/non-empty
-          Compiler.analysisOption(v).map { analysis =>
+          Compiler.analysisOptionFor(v).map { analysis =>
             k -> analysis
           }
       }
-    val analysisMap      = (cp map { file => (file, allAnalysisFor(file, classes, upstreamAnalysis)) }).toMap
+    val analysisMap =
+      cp.map { file =>
+        file -> initialAnalysisFor(file, classes, upstreamAnalysis, incOptions.nameHashing)
+      }.toMap
     val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
     new Inputs(
       cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, definesClass(log, validUpstreamAnalysis, _),
@@ -143,19 +146,19 @@ object Inputs {
    * Get the possible cache location for a classpath entry. Checks the upstream analysis map
    * for the cache location, otherwise uses the default location for output directories.
    */
-  def cacheFor(file: File, exclude: File, mapped: Map[File, File]): Option[File] = {
+  private def cacheLocationFor(file: File, exclude: File, mapped: Map[File, File]): Option[File] =
     mapped.get(file) orElse {
       if (file.isDirectory && file != exclude) Some(defaultCacheLocation(file)) else None
     }
-  }
 
   /**
    * Get the analysis for a compile run, based on a classpath entry.
    * If not cached in memory, reads from the cache file, or creates empty analysis.
    */
-  def allAnalysisFor(file: File, exclude: File, mapped: Map[File, File]): Analysis = {
-    cacheFor(file, exclude, mapped) map Compiler.analysis getOrElse Analysis.Empty
-  }
+  def initialAnalysisFor(file: File, exclude: File, mapped: Map[File, File], nameHashing: Boolean): Analysis =
+    cacheLocationFor(file, exclude, mapped).flatMap(Compiler.analysisOptionFor).getOrElse {
+      ZincPrivateAnalysis.empty(nameHashing)
+    }
 
   /**
    * Normalise files and default the backup directory.

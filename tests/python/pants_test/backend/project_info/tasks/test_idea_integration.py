@@ -426,8 +426,14 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         if url == 'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_only':
           self.assertEquals('java-resource', type_attr)
           self.assertEquals('False', is_test_source)
+        # TODO(Eric Ayers) tests/resources/.../idearesourcesonly : this directory has no
+        # junit_tests depending on a target, so it is assumed to be plain resources.
+        # Since this is under .../tests, humans know this is supposed to be a test only
+        # resource.  Right now we don't have a good way of communicating
+        # that to the idea goal other than inferring from the presence of junit_tests in
+        # source_root, which may not be a reliable indicator.
         if url == 'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/resources_only':
-          self.assertEquals('java-test-resource', type_attr)
+          self.assertEquals('java-resource', type_attr)
           self.assertEquals('False', is_test_source)
         if url == 'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly':
           self.assertEquals('java-resource', type_attr)
@@ -441,11 +447,8 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/code',
         'testprojects/tests/resources/org/pantsbuild/testproject/idearesourcesonly',
         'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/code',
-
-        # TODO(Eric Ayers): These directories should be picked up but aren't currently
-        # because there are no references to them.
-        #'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_only',
-        #'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/resources_only'
+        'testprojects/src/java/org/pantsbuild/testproject/idearesourcesonly/resources_only',
+        'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly/resources_only'
       ]), found)
 
     self._idea_test([
@@ -453,7 +456,6 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/java/org/pantsbuild/testproject/idearesourcesonly::'
       ], check_func=do_check)
 
-  @pytest.mark.xfail
   def test_resource_and_code_content_type(self):
     """Folders containing just resources() targets should be marked as Resources in IntelliJ.
 
@@ -485,8 +487,6 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
         if url == 'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources':
           self.assertEquals('java-test-resource', type_attr)
           self.assertEquals('True', is_test_source)
-
-        # TODO(Eric Ayers) Both code directories are currently incorrectly tagged as resources
         if url == 'testprojects/src/java/org/pantsbuild/testproject/ideacodeandresources':
           self.assertEquals('', type_attr)
           self.assertEquals('False', is_test_source)
@@ -506,7 +506,6 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/ideacodeandresources::'
     ], check_func=do_check)
 
-  @pytest.mark.xfail
   def test_library_and_test_code(self):
     """Folders containing both junit_tests() and java_library() targets should be Test folders."""
 

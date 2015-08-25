@@ -16,13 +16,18 @@ from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
+# in pants java since non-jvm backends depend on it to run things.
+from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 class TestSetupPy(PythonTaskTestBase):
@@ -73,7 +78,7 @@ class TestSetupPy(PythonTaskTestBase):
   @contextmanager
   def run_execute(self, target, recursive=False):
     self.set_options(recursive=recursive)
-    context = self.context(target_roots=[target], options=self.options)
+    context = self.context(target_roots=[target])
     setup_py = self.create_task(context)
     yield setup_py.execute()
 
@@ -81,9 +86,10 @@ class TestSetupPy(PythonTaskTestBase):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
     with self.run_execute(target_map['foo'], recursive=False) as created:
-      self.assertEqual([target_map['foo']], created)
+      self.assertEqual([target_map['foo']], created.keys())
     with self.run_execute(target_map['foo'], recursive=True) as created:
-      self.assertEqual([target_map['baz'], target_map['bar'], target_map['foo']], created)
+      self.assertEqual({target_map['baz'], target_map['bar'], target_map['foo']},
+                       set(created.keys()))
 
   def test_reduced_dependencies_2(self):
     # foo --> baz
@@ -146,10 +152,10 @@ class TestSetupPy(PythonTaskTestBase):
     self.assertEqual(entry_points, {'foo_binary': 'foo.bin:foo'})
 
     with self.run_execute(foo, recursive=False) as created:
-      self.assertEqual([foo], created)
+      self.assertEqual([foo], created.keys())
 
     with self.run_execute(foo, recursive=True) as created:
-      self.assertEqual([foo], created)
+      self.assertEqual([foo], created.keys())
 
   def test_binary_target_injected_into_reduced_dependencies_with_provider(self):
     bar_bin_dep = self.create_python_library(
@@ -192,10 +198,10 @@ class TestSetupPy(PythonTaskTestBase):
     self.assertEqual(entry_points, {'bar_binary': 'bar.bin:bar'})
 
     with self.run_execute(bar, recursive=False) as created:
-      self.assertEqual([bar], created)
+      self.assertEqual([bar], created.keys())
 
     with self.run_execute(bar, recursive=True) as created:
-      self.assertEqual([bar_bin_dep, bar], created)
+      self.assertEqual({bar_bin_dep, bar}, set(created.keys()))
 
   def test_pants_contrib_case(self):
     def create_requirement_lib(name):
@@ -342,16 +348,15 @@ class TestSetupPy(PythonTaskTestBase):
                               antlr_version='3.1.3',
                               sources=['exported.g'],
                               module='exported',
-                              provides=PythonArtifact(name='test.exported', version='0.0.0.'))
-    # TODO(John Sirois): Find a way to get easy access to pants option defaults.
-    self.set_options_for_scope('ivy',
-                               ivy_profile='2.4.0',
-                               ivy_settings=None,
-                               cache_dir=os.path.expanduser('~/.ivy2/pants'),
-                               http_proxy=None,
-                               https_proxy=None)
-    with self.run_execute(target) as created:
-      self.assertEqual([target], created)
+                              provides=PythonArtifact(name='test.exported', version='0.0.0'))
+
+    # TODO(John Sirois): This hacks around a direct but undeclared dependency
+    # `pants.java.distribution.distribution.Distribution` gained in
+    # https://rbcommons.com/s/twitter/r/2657
+    # Remove this once proper Subsystem dependency chains are re-established.
+    with subsystem_instance(JVM):
+      with self.run_execute(target) as created:
+        self.assertEqual([target], created.keys())
 
   def test_exported_thrift(self):
     SourceRoot.register('src/thrift', PythonThriftLibrary)
@@ -363,13 +368,82 @@ class TestSetupPy(PythonTaskTestBase):
     target = self.make_target(spec='src/thrift/exported',
                               target_type=PythonThriftLibrary,
                               sources=['exported.thrift'],
-                              provides=PythonArtifact(name='test.exported', version='0.0.0.'))
-    # TODO(John Sirois): Find a way to get easy access to pants option defaults.
-    self.set_options_for_scope('binaries',
-                               baseurls=['https://dl.bintray.com/pantsbuild/bin/build-support'],
-                               fetch_timeout_secs=30)
+                              provides=PythonArtifact(name='test.exported', version='0.0.0'))
     with self.run_execute(target) as created:
-      self.assertEqual([target], created)
+      self.assertEqual([target], created.keys())
+
+  def test_exported_thrift_issues_2005(self):
+    # Issue #2005 highlighted the fact the PythonThriftBuilder was building both a given
+    # PythonThriftLibrary's thrift files as well as its transitive dependencies thrift files.
+    # We test here to ensure that independently published PythonThriftLibraries each only own their
+    # own thrift stubs and the proper dependency links exist between the distributions.
+
+    SourceRoot.register('src/thrift', PythonThriftLibrary)
+    self.create_file(relpath='src/thrift/exported/exported.thrift', contents=dedent("""
+      namespace py exported
+
+      const set<string> VALID_IDENTIFIERS = ["Hello", "World", "!"]
+    """))
+    target1 = self.make_target(spec='src/thrift/exported',
+                               target_type=PythonThriftLibrary,
+                               sources=['exported.thrift'],
+                               provides=PythonArtifact(name='test.exported', version='0.0.0'))
+
+    self.create_file(relpath='src/thrift/exported_dependee/exported_dependee.thrift',
+                     contents=dedent("""
+                       namespace py exported_dependee
+
+                       include "exported/exported.thrift"
+
+                       const set<string> ALIASED_IDENTIFIERS = exported.VALID_IDENTIFIERS
+                     """))
+    target2 = self.make_target(spec='src/thrift/exported_dependee',
+                               target_type=PythonThriftLibrary,
+                               sources=['exported_dependee.thrift'],
+                               dependencies=[target1],
+                               provides=PythonArtifact(name='test.exported_dependee',
+                                                       version='0.0.0'))
+
+    with self.run_execute(target2, recursive=True) as created:
+      self.assertEqual({target2, target1}, set(created.keys()))
+
+      @contextmanager
+      def extracted_sdist(target, expected_prefix):
+        sdist = created[target]
+        with temporary_dir() as chroot:
+          TGZ.extract(sdist, chroot)
+
+          all_py_files = set()
+          for root, _, files in os.walk(chroot):
+            all_py_files.update(os.path.join(root, f) for f in files if f.endswith('.py'))
+
+          def as_full_path(p):
+            return os.path.join(chroot, expected_prefix, p)
+
+          yield all_py_files, as_full_path
+
+      with extracted_sdist(target1, 'test.exported-0.0.0') as (py_files, path):
+        self.assertEqual({path('setup.py'),
+                          path('src/__init__.py'),
+                          path('src/exported/__init__.py'),
+                          path('src/exported/constants.py'),
+                          path('src/exported/ttypes.py')},
+                         py_files)
+
+        self.assertFalse(os.path.exists(path('src/test.exported.egg-info/requires.txt')))
+
+      with extracted_sdist(target2, 'test.exported_dependee-0.0.0') as (py_files, path):
+        self.assertEqual({path('setup.py'),
+                          path('src/__init__.py'),
+                          path('src/exported_dependee/__init__.py'),
+                          path('src/exported_dependee/constants.py'),
+                          path('src/exported_dependee/ttypes.py')},
+                         py_files)
+
+        requirements = path('src/test.exported_dependee.egg-info/requires.txt')
+        self.assertTrue(os.path.exists(requirements))
+        with open(requirements) as fp:
+          self.assertEqual('test.exported==0.0.0', fp.read().strip())
 
 
 def test_detect_namespace_packages():

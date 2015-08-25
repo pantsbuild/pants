@@ -16,7 +16,11 @@ from contextlib import contextmanager
 from six import string_types
 
 from pants.base.revision import Revision
+from pants.option.custom_types import dict_option
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
+from pants.util.memo import memoized_property
+from pants.util.osutil import OS_ALIASES, normalize_os_name
 
 
 logger = logging.getLogger(__name__)
@@ -32,141 +36,6 @@ class Distribution(object):
 
   class Error(Exception):
     """Indicates an invalid java distribution."""
-
-  _CACHE = {}
-
-  @classmethod
-  def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
-    def scan_constraint_match():
-      # Convert strings to Revision objects for apples-to-apples comparison.
-      max_version = cls._parse_java_version("maximum_version", maximum_version)
-      min_version = cls._parse_java_version("minimum_version", minimum_version)
-
-      for dist in cls._CACHE.values():
-        if min_version and dist.version < min_version:
-          continue
-        if max_version and dist.version > max_version:
-          continue
-        if jdk and not dist.jdk:
-          continue
-        return dist
-
-    key = (minimum_version, maximum_version, jdk)
-    dist = cls._CACHE.get(key)
-    if not dist:
-      dist = scan_constraint_match()
-      if not dist:
-        dist = cls.locate(minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
-      cls._CACHE[key] = dist
-    return dist
-
-  class _Location(namedtuple('Location', ['home_path', 'bin_path'])):
-    """Represents the location of a java distribution."""
-    @classmethod
-    def from_home(cls, home):
-      """Creates a location given the JAVA_HOME directory.
-
-      :param string home: The path of the JAVA_HOME directory.
-      :returns: The java distribution location.
-      """
-      return cls(home_path=home, bin_path=None)
-
-    @classmethod
-    def from_bin(cls, bin_path):
-      """Creates a location given the `java` executable parent directory.
-
-      :param string bin_path: The parent path of the `java` executable.
-      :returns: The java distribution location.
-      """
-      return cls(home_path=None, bin_path=bin_path)
-
-  # The `/usr/lib/jvm` dir is a common target of packages built for redhat and debian as well as
-  # other more exotic distributions.
-  _JAVA_DIST_DIR = '/usr/lib/jvm'
-
-  @classmethod
-  def _linux_java_homes(cls):
-    if os.path.isdir(cls._JAVA_DIST_DIR):
-      for path in os.listdir(cls._JAVA_DIST_DIR):
-        home = os.path.join(cls._JAVA_DIST_DIR, path)
-        if os.path.isdir(home):
-          yield cls._Location.from_home(home)
-
-  _OSX_JAVA_HOME_EXE = '/usr/libexec/java_home'
-
-  @classmethod
-  def _osx_java_homes(cls):
-    # OSX will have a java_home tool that can be used to locate a unix-compatible java home dir.
-    #
-    # See:
-    #   https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man1/java_home.1.html
-    #
-    # The `--xml` output looks like so:
-    # <?xml version="1.0" encoding="UTF-8"?>
-    # <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-    #                        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    # <plist version="1.0">
-    #   <array>
-    #     <dict>
-    #       ...
-    #       <key>JVMHomePath</key>
-    #       <string>/Library/Java/JavaVirtualMachines/jdk1.7.0_45.jdk/Contents/Home</string>
-    #       ...
-    #     </dict>
-    #     ...
-    #   </array>
-    # </plist>
-    if os.path.exists(cls._OSX_JAVA_HOME_EXE):
-      try:
-        plist = subprocess.check_output([cls._OSX_JAVA_HOME_EXE, '--failfast', '--xml'])
-        for distribution in plistlib.readPlistFromString(plist):
-          home = distribution['JVMHomePath']
-          yield cls._Location.from_home(home)
-      except subprocess.CalledProcessError:
-        pass
-
-  @classmethod
-  def locate(cls, minimum_version=None, maximum_version=None, jdk=False):
-    """Finds a java distribution that meets any given constraints and returns it.
-
-    First looks in JDK_HOME and JAVA_HOME if defined falling back to a search on the PATH.
-    Raises Distribution.Error if no suitable java distribution could be found.
-    """
-    def env_home(home_env_var):
-      home = os.environ.get(home_env_var)
-      return cls._Location.from_home(home) if home else None
-
-    def search_path():
-      yield env_home('JDK_HOME')
-      yield env_home('JAVA_HOME')
-
-      for location in cls._linux_java_homes():
-        yield location
-
-      for location in cls._osx_java_homes():
-        yield location
-
-      search_path = os.environ.get('PATH')
-      if search_path:
-        for bin_path in search_path.strip().split(os.pathsep):
-          yield cls._Location.from_bin(bin_path)
-
-    for location in filter(None, search_path()):
-      try:
-        dist = cls(home_path=location.home_path,
-                   bin_path=location.bin_path,
-                   minimum_version=minimum_version,
-                   maximum_version=maximum_version,
-                   jdk=jdk)
-        dist.validate()
-        logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
-                     .format(dist, minimum_version, maximum_version, jdk))
-        return dist
-      except (ValueError, cls.Error):
-        pass
-
-    raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
-                    .format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
 
   @staticmethod
   def _parse_java_version(name, version):
@@ -213,9 +82,7 @@ class Distribution(object):
 
     self._minimum_version = self._parse_java_version("minimum_version", minimum_version)
     self._maximum_version = self._parse_java_version("maximum_version", maximum_version)
-
     self._jdk = jdk
-
     self._is_jdk = False
     self._system_properties = None
     self._version = None
@@ -280,6 +147,11 @@ class Distribution(object):
           home = jdk_dir
       self._home = home
     return self._home
+
+  @property
+  def real_home(self):
+    """Real path to the distribution java.home (resolving links)."""
+    return os.path.realpath(self.home)
 
   @property
   def java(self):
@@ -395,3 +267,208 @@ class Distribution(object):
   def __repr__(self):
     return ('Distribution({!r}, minimum_version={!r}, maximum_version={!r} jdk={!r})'.format(
             self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
+
+
+class DistributionLocator(Subsystem):
+  """Subsystem that knows how to look up a java Distribution."""
+
+  class Error(Distribution.Error):
+    """Error locating a java distribution."""
+
+  class _Location(namedtuple('Location', ['home_path', 'bin_path'])):
+    """Represents the location of a java distribution."""
+    @classmethod
+    def from_home(cls, home):
+      """Creates a location given the JAVA_HOME directory.
+
+      :param string home: The path of the JAVA_HOME directory.
+      :returns: The java distribution location.
+      """
+      return cls(home_path=home, bin_path=None)
+
+    @classmethod
+    def from_bin(cls, bin_path):
+      """Creates a location given the `java` executable parent directory.
+
+      :param string bin_path: The parent path of the `java` executable.
+      :returns: The java distribution location.
+      """
+      return cls(home_path=None, bin_path=bin_path)
+
+  options_scope = 'jvm-distributions'
+  _CACHE = {}
+  # The `/usr/lib/jvm` dir is a common target of packages built for redhat and debian as well as
+  # other more exotic distributions.
+  _JAVA_DIST_DIR = '/usr/lib/jvm'
+  _OSX_JAVA_HOME_EXE = '/usr/libexec/java_home'
+
+  @classmethod
+  def register_options(cls, register):
+    super(DistributionLocator, cls).register_options(register)
+    human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
+                                          for key, val in OS_ALIASES.items())
+    register('--paths', advanced=True, recursive=True, type=dict_option,
+             help='Map of os names to lists of paths to jdks. These paths will be searched before '
+                  'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
+                  'when locating a jvm to use. The same OS can be specified via several different '
+                  'aliases, according to this map: {}'.format(human_readable_os_aliases))
+
+  @memoized_property
+  def _normalized_jdk_paths(self):
+    jdk_paths = self.get_options().paths or {}
+    normalized = {}
+    for name, paths in sorted(jdk_paths.items()):
+      rename = normalize_os_name(name)
+      if rename in normalized:
+        logger.warning('Multiple OS names alias to "{}"; combining results.'.format(rename))
+        normalized[rename].extend(paths)
+      else:
+        normalized[rename] = paths
+    return normalized
+
+  def get_jdk_paths(self, os_name=None):
+    jdk_paths = self._normalized_jdk_paths
+    if not jdk_paths:
+      return ()
+    if os_name is None:
+      os_name = os.uname()[0].lower()
+    os_name = normalize_os_name(os_name)
+    if os_name not in jdk_paths:
+      logger.warning('--jvm-distributions-paths was specified, but has no entry for "{}".'
+                     .format(os_name))
+    return jdk_paths.get(os_name, ())
+
+  @classmethod
+  def java_path_locations(cls):
+    for location in cls.global_instance().get_jdk_paths():
+      yield cls._Location.from_home(location)
+
+  @classmethod
+  def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
+    """Finds a java distribution that meets the given constraints and returns it.
+
+    First looks for a cached version that was previously located, otherwise calls locate().
+    :param minimum_version: minimum jvm version to look for (eg, 1.7).
+    :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+    :param bool jdk: whether the found java distribution is required to have a jdk.
+    :return: the Distribution.
+    :rtype: :class:`pants.java.distribution.Distribution`
+    """
+    def scan_constraint_match():
+      # Convert strings to Revision objects for apples-to-apples comparison.
+      max_version = Distribution._parse_java_version("maximum_version", maximum_version)
+      min_version = Distribution._parse_java_version("minimum_version", minimum_version)
+
+      for dist in cls._CACHE.values():
+        if min_version and dist.version < min_version:
+          continue
+        if max_version and dist.version > max_version:
+          continue
+        if jdk and not dist.jdk:
+          continue
+        return dist
+
+    key = (minimum_version, maximum_version, jdk)
+    dist = cls._CACHE.get(key)
+    if not dist:
+      dist = scan_constraint_match()
+      if not dist:
+        dist = cls.locate(minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
+      cls._CACHE[key] = dist
+    return dist
+
+  @classmethod
+  def locate(cls, minimum_version=None, maximum_version=None, jdk=False):
+    """Finds a java distribution that meets any given constraints and returns it.
+
+    First looks through the paths listed for this operating system in the --jvm-distributions-paths
+    map. Then looks in JDK_HOME and JAVA_HOME if defined, falling back to a search on the PATH.
+    Raises Distribution.Error if no suitable java distribution could be found.
+    :param minimum_version: minimum jvm version to look for (eg, 1.7).
+    :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+    :param bool jdk: whether the found java distribution is required to have a jdk.
+    :return: the located Distribution.
+    :rtype: :class:`pants.java.distribution.Distribution`
+    """
+    def search_path():
+      for location in cls.global_instance().java_path_locations():
+        yield location
+
+      for location in cls.environment_jvm_locations():
+        yield location
+
+    for location in filter(None, search_path()):
+      try:
+        dist = Distribution(home_path=location.home_path,
+                            bin_path=location.bin_path,
+                            minimum_version=minimum_version,
+                            maximum_version=maximum_version,
+                            jdk=jdk)
+        dist.validate()
+        logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
+                     .format(dist, minimum_version, maximum_version, jdk))
+        return dist
+      except (ValueError, Distribution.Error):
+        pass
+
+    raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
+                    .format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
+
+  @classmethod
+  def _linux_java_homes(cls):
+    if os.path.isdir(cls._JAVA_DIST_DIR):
+      for path in os.listdir(cls._JAVA_DIST_DIR):
+        home = os.path.join(cls._JAVA_DIST_DIR, path)
+        if os.path.isdir(home):
+          yield cls._Location.from_home(home)
+
+  @classmethod
+  def _osx_java_homes(cls):
+    # OSX will have a java_home tool that can be used to locate a unix-compatible java home dir.
+    #
+    # See:
+    #   https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man1/java_home.1.html
+    #
+    # The `--xml` output looks like so:
+    # <?xml version="1.0" encoding="UTF-8"?>
+    # <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    #                        "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    # <plist version="1.0">
+    #   <array>
+    #     <dict>
+    #       ...
+    #       <key>JVMHomePath</key>
+    #       <string>/Library/Java/JavaVirtualMachines/jdk1.7.0_45.jdk/Contents/Home</string>
+    #       ...
+    #     </dict>
+    #     ...
+    #   </array>
+    # </plist>
+    if os.path.exists(cls._OSX_JAVA_HOME_EXE):
+      try:
+        plist = subprocess.check_output([cls._OSX_JAVA_HOME_EXE, '--failfast', '--xml'])
+        for distribution in plistlib.readPlistFromString(plist):
+          home = distribution['JVMHomePath']
+          yield cls._Location.from_home(home)
+      except subprocess.CalledProcessError:
+        pass
+
+  @classmethod
+  def environment_jvm_locations(cls):
+    def env_home(home_env_var):
+      home = os.environ.get(home_env_var)
+      return cls._Location.from_home(home) if home else None
+
+    yield env_home('JDK_HOME')
+    yield env_home('JAVA_HOME')
+
+    for location in cls._linux_java_homes():
+      yield location
+
+    for location in cls._osx_java_homes():
+      yield location
+
+    search_path = os.environ.get('PATH')
+    if search_path:
+      for bin_path in search_path.strip().split(os.pathsep):
+        yield cls._Location.from_bin(bin_path)

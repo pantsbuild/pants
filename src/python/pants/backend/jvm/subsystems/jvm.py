@@ -5,9 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_split
+
+
+logger = logging.getLogger(__name__)
 
 
 class JVM(Subsystem):

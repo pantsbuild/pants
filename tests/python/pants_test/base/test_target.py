@@ -86,8 +86,8 @@ class TargetTest(BaseTest):
     self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
-    with self.assertRaises(Target.UnknownArguments) as cm:
-      context = self.context()
+    with self.assertRaises(Target.UnknownArguments.Error) as cm:
+      context = self.context(for_subsystems=[Target.UnknownArguments])
       build_file = self.add_to_build_file('foo/BUILD', dedent('''
       java_library(
         name='bar',

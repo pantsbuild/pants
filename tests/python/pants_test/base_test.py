@@ -134,6 +134,19 @@ class BaseTest(unittest.TestCase):
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
+  def buildroot_files(self, relpath=None):
+    """Returns the set of all files under the test build root.
+
+    :param string relpath: If supplied, only collect files from this subtree.
+    :returns: All file paths found.
+    :rtype: set
+    """
+    def scan():
+      for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or '')):
+        for f in files:
+          yield os.path.relpath(os.path.join(root, f), self.build_root)
+    return set(scan())
+
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
@@ -143,10 +156,16 @@ class BaseTest(unittest.TestCase):
     self.options[scope].update(kwargs)
 
   def context(self, for_task_types=None, options=None, target_roots=None, console_outstream=None,
-              workspace=None):
+              workspace=None, for_subsystems=None):
 
     optionables = set()
     extra_scopes = set()
+
+    for_subsystems = for_subsystems or ()
+    for subsystem in for_subsystems:
+      if subsystem.options_scope is None:
+        raise TaskError('You must set a scope on your subsystem type before using it in tests.')
+      optionables.add(subsystem)
 
     for_task_types = for_task_types or ()
     for task_type in for_task_types:
@@ -155,9 +174,9 @@ class BaseTest(unittest.TestCase):
         raise TaskError('You must set a scope on your task type before using it in tests.')
       optionables.add(task_type)
       extra_scopes.update([si.scope for si in task_type.known_scope_infos()])
-      optionables.update(Subsystem.closure(set(task_type.global_subsystems()) |
-                                           set(task_type.task_subsystems()) |
-                                           self._build_configuration.subsystems()))
+      optionables.update(Subsystem.closure(
+        set([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()]) |
+            self._build_configuration.subsystems()))
 
     # Now default the option values and override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.

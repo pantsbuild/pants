@@ -14,6 +14,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import relativize_paths, safe_mkdir
 
 
@@ -75,17 +76,12 @@ class JmakeCompile(JvmCompile):
     register('--use-jmake', advanced=True, action='store_true', default=True,
              fingerprint=True,
              help='Use jmake to compile Java targets')
-    register('--source', advanced=True, fingerprint=True,
-             help='Provide source compatibility with this release. Overrides the jvm platform '
-                  'source.',
-             deprecated_hint='The -source arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.43')
-    register('--target', advanced=True, fingerprint=True,
-             help='Generate class files for this JVM version. Overrides the jvm platform target.',
-             deprecated_hint='The -target arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.43')
     cls.register_jvm_tool(register, 'jmake')
     cls.register_jvm_tool(register, 'java-compiler')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JmakeCompile, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def select(self, target):
     return self.get_options().use_jmake and super(JmakeCompile, self).select(target)
@@ -108,7 +104,8 @@ class JmakeCompile(JvmCompile):
     return os.path.join(self._depfile_folder, 'global_depfile')
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, JMakeAnalysisParser(),
+                         JMakeAnalysis)
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
               log_file, settings):
@@ -140,21 +137,17 @@ class JmakeCompile(JvmCompile):
     args.extend(settings.args)
 
     if '-C-source' in args:
-      raise TaskError("Set the source Java version with the 'source' or with the jvm platform, not "
-                      "in 'args'.")
+      raise TaskError("Define a [jvm-platform] with the desired 'source' level instead of "
+                      "supplying one via 'args'.")
     if '-C-target' in args:
-      raise TaskError("Set the target JVM version with the 'target' option or with the jvm "
-                      "platform, not in 'args'.")
+      raise TaskError("Define a [jvm-platform] with the desired 'target' level instead of "
+                      "supplying one via 'args'.")
 
-    if self.get_options().source or self.get_options().target:
-      self.context.log.warn('--compile-java-source and --compile-java-target trample and override '
-                            'target jvm platform settings, and probably should not be used except '
-                            'for testing.')
-
-    source_level = self.get_options().source or settings.source_level
-    target_level = self.get_options().target or settings.target_level
+    source_level = settings.source_level
+    target_level = settings.target_level
     if source_level:
       args.extend(['-C-source', '-C{0}'.format(source_level)])
+
     if target_level:
       args.extend(['-C-target', '-C{0}'.format(target_level)])
 

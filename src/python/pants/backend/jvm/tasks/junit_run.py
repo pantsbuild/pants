@@ -20,8 +20,10 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
+from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
@@ -32,7 +34,6 @@ from pants.util.xml_parser import XmlParser
 
 
 # TODO(ji): Add unit tests.
-# TODO(ji): Add coverage in ci.run (https://github.com/pantsbuild/pants/issues/83)
 
 # The helper classes (_JUnitRunner and its subclasses) need to use
 # methods inherited by JUnitRun from Task. Rather than pass a reference
@@ -90,6 +91,10 @@ class _JUnitRunner(object):
     register('--cwd', advanced=True,
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this argument.')
+    register('--strict-jvm-version', action='store_true', default=False, advanced=True,
+             help='If true, will strictly require running junits with the same version of java as '
+                  'the platform -target level. Otherwise, the platform -target level will be '
+                  'treated as the minimum jvm to run.')
     register_jvm_tool(register,
                       'junit',
                       main=JUnitRun._MAIN,
@@ -110,6 +115,7 @@ class _JUnitRunner(object):
     self._batch_size = options.batch_size
     self._fail_fast = options.fail_fast
     self._working_dir = options.cwd or get_buildroot()
+    self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(task_exports.args)
     if options.suppress_output:
       self._args.append('-suppress-output')
@@ -253,8 +259,12 @@ class _JUnitRunner(object):
                  classpath_append=()):
     extra_jvm_options = extra_jvm_options or []
 
+    tests_by_properties = self._tests_by_properties(tests_to_targets,
+                                                    self._infer_workdir,
+                                                    lambda target: target.test_platform)
+
     result = 0
-    for workdir, tests in self._tests_by_workdir(tests_to_targets).items():
+    for (workdir, platform), tests in tests_by_properties.items():
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
@@ -264,8 +274,15 @@ class _JUnitRunner(object):
         complete_classpath.update(classpath_prepend)
         complete_classpath.update(classpath)
         complete_classpath.update(classpath_append)
+        if self._strict_jvm_version:
+          max_version = Revision(*(platform.target_level.components + [9999]))
+          distribution = DistributionLocator.cached(minimum_version=platform.target_level,
+                                                    maximum_version=max_version)
+        else:
+          distribution = DistributionLocator.cached(minimum_version=platform.target_level)
         with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
           self._context.log.debug('CWD = {}'.format(workdir))
+          self._context.log.debug('platform = {}'.format(platform))
           result += abs(execute_java(
             classpath=complete_classpath,
             main=main,
@@ -275,6 +292,7 @@ class _JUnitRunner(object):
             workunit_name='run',
             workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
+            distribution=distribution,
           ))
 
           if result != 0 and self._fail_fast:
@@ -293,11 +311,18 @@ class _JUnitRunner(object):
       return target.cwd
     return self._working_dir
 
-  def _tests_by_workdir(self, tests_to_targets):
-    workdirs = defaultdict(OrderedSet)
+  def _tests_by_property(self, tests_to_targets, get_property):
+    properties = defaultdict(OrderedSet)
     for test, target in tests_to_targets.items():
-      workdirs[self._infer_workdir(target)].add(test)
-    return {workdir: list(tests) for workdir, tests in workdirs.items()}
+      properties[get_property(target)].add(test)
+    return {property: list(tests) for property, tests in properties.items()}
+
+  def _tests_by_properties(self, tests_to_targets, *properties):
+    def combined_property(target):
+      return tuple(prop(target) for prop in properties)
+
+    return self._tests_by_property(tests_to_targets, combined_property)
+
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
@@ -354,7 +379,7 @@ class _JUnitRunner(object):
       classname = classname_or_srcfile
       yield classname + methodname
 
-
+#TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
 class _Coverage(_JUnitRunner):
   """Base class for emma-like coverage processors. Do not instantiate."""
 
@@ -707,6 +732,10 @@ class Cobertura(_Coverage):
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to report'".format(main, result))
 
+    if self._coverage_open:
+      coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
+      binary_util.ui_open(coverage_html_file)
+
 
 class JUnitRun(JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
@@ -720,6 +749,10 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, default='emma',
              help='Which coverage subsystem to use.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def prepare(cls, options, round_manager):

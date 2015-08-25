@@ -77,7 +77,7 @@ class PythonTask(Task):
     for target in targets:
       if target.is_python and hasattr(target, 'compatibility') and target.compatibility:
         targets_with_compatibilities.append(target)
-        compatible_with_target = list(self.interpreter_cache.matches(target.compatibility))
+        compatible_with_target = list(self.interpreter_cache.matched_interpreters(target.compatibility))
         allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
@@ -95,7 +95,7 @@ class PythonTask(Task):
   def select_interpreter(self, filters):
     """Subclasses can use this to be more specific about interpreter selection."""
     interpreters = self.interpreter_cache.select_interpreter(
-      list(self.interpreter_cache.matches(filters)))
+      list(self.interpreter_cache.matched_interpreters(filters)))
     if len(interpreters) != 1:
       raise TaskError('Unable to detect a suitable interpreter.')
     interpreter = interpreters[0]

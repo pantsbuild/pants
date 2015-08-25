@@ -11,7 +11,7 @@ from pants.backend.core.tasks.task import Task, TaskBase
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 
@@ -30,6 +30,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     register('--nailgun-connect-attempts', advanced=True, default=5,
              help='Max attempts for nailgun connects.')
 
+  @classmethod
+  def global_subsystems(cls):
+    return super(NailgunTaskBase, cls).global_subsystems() + (DistributionLocator,)
+
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
 
@@ -43,9 +47,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
     try:
-      self._dist = Distribution.cached(minimum_version=minimum_version,
-                                       maximum_version=maximum_version, jdk=jdk)
-    except Distribution.Error as e:
+      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
+                                              maximum_version=maximum_version, jdk=jdk)
+    except DistributionLocator.Error as e:
       raise TaskError(e)
 
   def create_java_executor(self):

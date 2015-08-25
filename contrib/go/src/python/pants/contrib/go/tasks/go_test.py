@@ -5,8 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -26,6 +25,8 @@ class GoTest(GoWorkspaceTask):
   @classmethod
   def register_options(cls, register):
     super(GoTest, cls).register_options(register)
+    register('--remote', action='store_true',
+             help='Enables running tests found in go_remote_libraries.')
     register('--build-and-test-flags', default='',
              help='Flags to pass in to `go test` tool.')
 
@@ -36,14 +37,18 @@ class GoTest(GoWorkspaceTask):
   def execute(self):
     # Only executes the tests from the package specified by the target roots, so
     # we don't run the tests for _all_ dependencies of said package.
-    for target in filter(self.is_local_src, self.context.target_roots):
+    targets = filter(self.is_go if self.get_options().remote else self.is_local_src,
+                     self.context.target_roots)
+    for target in targets:
       self.ensure_workspace(target)
       self._go_test(target)
 
   def _go_test(self, target):
     args = (self.get_options().build_and_test_flags.split()
-            + [target.address.spec_path]
+            + [target.import_path]
             + self.get_passthru_args())
-    self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
-                                workunit_factory=self.context.new_workunit,
-                                workunit_labels=[WorkUnitLabel.TEST])
+    result, go_cmd = self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
+                                                 workunit_factory=self.context.new_workunit,
+                                                 workunit_labels=[WorkUnitLabel.TEST])
+    if result != 0:
+      raise TaskError('{} failed with exit code {}'.format(go_cmd, result))

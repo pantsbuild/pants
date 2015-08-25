@@ -18,6 +18,7 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
 from pants.util.memo import memoized_property
 
@@ -262,7 +263,7 @@ class JvmDependencyCheck(Task):
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
-      return not dep.startswith(self.context.java_home)
+      return not dep.startswith(DistributionLocator.cached().real_home)
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection

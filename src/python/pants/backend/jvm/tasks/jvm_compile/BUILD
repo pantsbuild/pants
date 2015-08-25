@@ -37,6 +37,11 @@ python_library(
   ]
 )
 
+python_library(
+  name = 'compile_context',
+  sources = ['compile_context.py'],
+)
+
 # TODO(Eric Ayers) Create a BUILD file in the java/ subdirectory?
 python_library(
   name = 'java',
@@ -78,6 +83,7 @@ python_library(
   sources = ['jvm_compile_global_strategy.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':compile_context',
     ':jvm_compile_strategy',
     ':resource_mapping',
     'src/python/pants/backend/jvm/tasks:classpath_util',
@@ -95,6 +101,7 @@ python_library(
   name = 'jvm_compile_isolated_strategy',
   sources = ['jvm_compile_isolated_strategy.py'],
   dependencies = [
+    ':compile_context',
     ':execution_graph',
     ':jvm_compile_strategy',
     ':resource_mapping',

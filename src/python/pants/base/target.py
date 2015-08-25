@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 from hashlib import sha1
 
@@ -21,6 +22,11 @@ from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.source_root import SourceRoot
 from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
+from pants.option.custom_types import dict_option
+from pants.subsystem.subsystem import Subsystem
+
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractTarget(object):
@@ -120,11 +126,45 @@ class Target(AbstractTarget):
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses"""
 
-  class UnknownArguments(TargetDefinitionException):
-    """Unknown keyword arguments supplied to Target."""
-
   class IllegalArgument(TargetDefinitionException):
     """Argument that isn't allowed supplied to Target."""
+
+  class UnknownArguments(Subsystem):
+    """Subsystem for validating unknown keyword arguments."""
+
+    class Error(TargetDefinitionException):
+      """Unknown keyword arguments supplied to Target."""
+
+    options_scope = 'unknown-arguments'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--ignored', advanced=True, type=dict_option,
+               help='Map of target name to a list of keyword arguments that should be ignored if a '
+                    'target receives them unexpectedly. Typically used to allow usage of arguments '
+                    'in BUILD files that are not yet available in the current version of pants.')
+
+    @classmethod
+    def check(cls, target, kwargs):
+      cls.global_instance().check_unknown(target, kwargs)
+
+    def check_unknown(self, target, kwargs):
+      # NB(gmalmquist): Sure would be nice to be able to use the build-file-alias name here.
+      target_type_name = type(target).__name__
+      ignore_params = set((self.get_options().ignored or {}).get(target_type_name, ()))
+      unknown_args = { arg: value for arg, value in kwargs.items() if arg not in ignore_params }
+      ignored_args = { arg: value for arg, value in kwargs.items() if arg in ignore_params }
+      if ignored_args:
+        logger.debug('{target} ignoring the unimplemented arguments: {args}'
+                     .format(target=target.address.spec,
+                             args=', '.join('{} = {}'.format(key, val)
+                                            for key, val in ignored_args.items())))
+      if unknown_args:
+        error_message = '{target_type} received unknown arguments: {args}'
+        raise self.Error(target.address.spec, error_message.format(
+          target_type=type(target).__name__,
+          args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
+        ))
 
   LANG_DISCRIMINATORS = {
     'java': lambda t: t.is_jvm,
@@ -211,13 +251,8 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
-
     if kwargs:
-      error_message = '{target_type} received unknown arguments: {args}'
-      raise self.UnknownArguments(address.spec, error_message.format(
-        target_type=type(self).__name__,
-        args=''.join('\n  {} = {}'.format(key, value) for key, value in kwargs.items())
-      ))
+      self.UnknownArguments.check(self, kwargs)
 
   @property
   def tags(self):

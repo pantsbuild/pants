@@ -85,6 +85,13 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # But cache_me should be written.
       self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
 
+  # TODO(John Sirois): Factor up a shared utility for reuse by
+  # tests/python/pants_test/backend/core/tasks/test_cache_cleanup.py
+  def create_platform_args(self, version):
+    return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
+             .format(version=version)),
+            '--jvm-platform-default-platform=default']
+
   @provide_compile_strategies
   def test_java_compile_produces_different_artifact_depending_on_java_version(self, strategy):
     # Ensure that running java compile with java 6 and then java 7
@@ -95,7 +102,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile.java',
+      pants_run = self.run_pants(self.create_platform_args(6) +
+                                 ['compile.java',
                                   '--strategy={}'.format(strategy),
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
@@ -105,8 +113,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
-      pants_run = self.run_pants(['compile.java',
-                                  '--target=1.7',
+      pants_run = self.run_pants(self.create_platform_args(7) +
+                                 ['compile.java',
                                   '--strategy={}'.format(strategy),
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)

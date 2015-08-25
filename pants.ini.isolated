@@ -11,7 +11,6 @@ use_jmake: False
 
 [compile.zinc]
 strategy: isolated
-capture_log: True
 worker_count: 4
 zinc: [':zinc']
 jvm_options: [
@@ -21,8 +20,6 @@ jvm_options: [
   ]
 
 args: [
-    '-C-source', '-C1.7',
-    '-C-target', '-C1.7',
     '-S-encoding', '-SUTF-8',
     '-S-g:vars',
   ]

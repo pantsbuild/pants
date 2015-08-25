@@ -15,12 +15,14 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
 from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -79,10 +81,10 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
     Temporary compile contexts are private to the strategy.
     """
-    return self.CompileContext(target,
-                               self._analysis_file,
-                               self._classes_dir,
-                               self._sources_for_target(target))
+    return CompileContext(target,
+                          self._analysis_file,
+                          self._classes_dir,
+                          self._sources_for_target(target))
 
   def move(self, src, dst):
     if self.delete_scratch:
@@ -653,7 +655,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   def _find_all_bootstrap_jars(self):
     def get_path(key):
-      return self.context.java_sysprops.get(key, '').split(':')
+      return DistributionLocator.cached().system_properties.get(key, '').split(':')
 
     def find_jars_in_dirs(dirs):
       ret = []

@@ -6,12 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 from itertools import chain
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir
 
+from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_task import GoTask
 
 
@@ -72,27 +72,31 @@ class GoWorkspaceTask(GoTask):
 
     Adds the symlinks to the source files to required_links.
     """
-    src_dir = os.path.join(gopath, 'src', go_local_src.address.spec_path)
-    safe_mkdir(src_dir)
-    for src in go_local_src.sources_relative_to_buildroot():
-      src_link = os.path.join(src_dir, os.path.basename(src))
-      if not os.path.islink(src_link):
-        os.symlink(os.path.join(get_buildroot(), src), src_link)
-      required_links.add(src_link)
+    source_iter = (os.path.join(get_buildroot(), src)
+                   for src in go_local_src.sources_relative_to_buildroot())
+    return self._symlink_lib(gopath, go_local_src, source_iter, required_links)
 
   def _symlink_remote_lib(self, gopath, go_remote_lib, required_links):
-    """Creates a symlink from the given gopath to the directory of the given remote library.
+    """Creates symlinks from the given gopath to the source files of the given remote lib.
 
-    Adds the symlink to the remote lib to required_links.
+    Also duplicates directory structure leading to source files of package within
+    gopath, in order to provide isolation to the package.
+
+    Adds the symlinks to the source files to required_links.
     """
-    # Transforms github.com/user/lib --> $GOPATH/src/github.com/user
-    remote_lib_dir = os.path.join(gopath,
-                                  'src',
-                                  os.path.dirname(self.global_import_id(go_remote_lib)))
-    safe_mkdir(remote_lib_dir)
-    remote_lib_source_dir = self.context.products.get_data('go_remote_lib_src')[go_remote_lib]
-    remote_lib_link = os.path.join(remote_lib_dir,
-                                   os.path.basename(remote_lib_source_dir))
-    if not os.path.islink(remote_lib_link):
-      os.symlink(remote_lib_source_dir, remote_lib_link)
-    required_links.add(remote_lib_link)
+    def source_iter():
+      remote_lib_source_dir = self.context.products.get_data('go_remote_lib_src')[go_remote_lib]
+      for path in os.listdir(remote_lib_source_dir):
+        remote_src = os.path.join(remote_lib_source_dir, path)
+        if GoLocalSource.is_go_source(remote_src):
+          yield remote_src
+    return self._symlink_lib(gopath, go_remote_lib, source_iter(), required_links)
+
+  def _symlink_lib(self, gopath, lib, source_iter, required_links):
+    src_dir = os.path.join(gopath, 'src', lib.import_path)
+    safe_mkdir(src_dir)
+    for path in source_iter:
+      src_link = os.path.join(src_dir, os.path.basename(path))
+      if not os.path.islink(src_link):
+        os.symlink(path, src_link)
+      required_links.add(src_link)

@@ -8,6 +8,7 @@ junit_tests(
   resources=[
       ':readme',
       # Add a direct dependency on a non-test resources folder
+      # to make sure it stays non-test resources
       'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
       'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
    ],

@@ -5,15 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
-import shutil
 import subprocess
 import sys
+
+from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.code_generator import CodeGenerator
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_walk
 from pants.util.memo import memoized_property
 
 
@@ -29,7 +31,6 @@ class PythonThriftBuilder(CodeGenerator):
     super(PythonThriftBuilder, self).__init__(workdir, target, root_dir,
                                               target_suffix=target_suffix)
     self._thrift_binary_factory = thrift_binary_factory
-    self._workdir = os.path.join(workdir, 'py-thrift')
 
   @property
   def install_requires(self):
@@ -40,47 +41,28 @@ class PythonThriftBuilder(CodeGenerator):
     return self._thrift_binary_factory().path
 
   def run_thrifts(self):
-    """Generate Python thrift code.
+    """Generate Python thrift code."""
+    bases = OrderedSet()
 
-    Thrift fields conflicting with Python keywords are suffixed with a trailing
-    underscore (e.g.: from_).
-    """
+    def collect_bases(target):
+      if isinstance(target, PythonThriftLibrary):
+        bases.add(os.path.join(get_buildroot(), target.target_base))
 
-    def is_py_thrift(target):
-      return isinstance(target, PythonThriftLibrary)
+    self.target.walk(collect_bases)
 
-    all_thrifts = set()
-
-    def collect_sources(target):
-      abs_target_base = os.path.join(get_buildroot(), target.target_base)
-      for source in target.payload.sources.relative_to_buildroot():
-        source_root_relative_source = os.path.relpath(os.path.join(get_buildroot(), source), abs_target_base)
-        all_thrifts.add((abs_target_base, source_root_relative_source))
-
-    self.target.walk(collect_sources, predicate=is_py_thrift)
-
-    copied_sources = set()
-    for abs_base, relative_source in all_thrifts:
-      abs_source = os.path.join(abs_base, relative_source)
-      copied_source = os.path.join(self._workdir, relative_source)
-
-      safe_mkdir(os.path.dirname(copied_source))
-      shutil.copyfile(abs_source, copied_source)
-      copied_sources.add(copied_source)
-
-    for src in copied_sources:
-      if not self._run_thrift(src):
+    for source in self.target.payload.sources.relative_to_buildroot():
+      if not self._run_thrift(bases, os.path.join(get_buildroot(), source)):
         raise PythonThriftBuilder.CodeGenerationException(
-          "Could not generate .py from {}!".format(src))
+          "Could not generate .py from {}!".format(source))
 
-  def _run_thrift(self, source):
+  def _run_thrift(self, bases, source):
+    include_paths = list(itertools.chain.from_iterable(('-I', base) for base in bases))
+
     args = [
-        self._thrift_binary,
-        '--gen',
-        'py:new_style',
-        '-o', self.codegen_root,
-        '-I', self._workdir,
-        os.path.abspath(source)]
+             self._thrift_binary,
+             '--gen',
+             'py:new_style',
+             '-o', self.codegen_root] + include_paths + [source]
 
     po = subprocess.Popen(args, cwd=self.chroot.path())
     rv = po.wait()

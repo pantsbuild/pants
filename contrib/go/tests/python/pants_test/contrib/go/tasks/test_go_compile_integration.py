@@ -6,13 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 
 from pants.util.contextutil import temporary_dir
-from pants_test.contrib.go.tasks.go_tool import GoTool
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
-from pants.contrib.go.tasks.go_task import GoTask
+from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
 
 class GoCompileIntegrationTest(PantsRunIntegrationTest):
@@ -23,12 +22,12 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
               'contrib/go/examples/src/go/libA']
       pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
-      # TODO(jsirois): Kill this check and the GoTool utility by using Go subsystem
-      if GoTool.go_installed():
-        goos = subprocess.check_output(['go', 'env', 'GOOS']).strip()
-        goarch = subprocess.check_output(['go', 'env', 'GOARCH']).strip()
+      with subsystem_instance(GoDistribution.Factory) as factory:
+        go_dist = factory.create()
+        goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
+        goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
         expected_files = set('contrib.go.examples.src.go.{libname}.{libname}/'
-                             'pkg/{goos}_{goarch}/contrib/go/examples/src/go/{libname}.a'
+                             'pkg/{goos}_{goarch}/{libname}.a'
                              .format(libname=libname, goos=goos, goarch=goarch)
                              for libname in ('libA', 'libB', 'libC', 'libD', 'libE'))
         self.assert_contains_exact_files(os.path.join(workdir, 'compile', 'go'),

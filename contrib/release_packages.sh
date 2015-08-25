@@ -59,7 +59,7 @@ function pkg_go_install_test() {
   execute_packaged_pants_with_internal_backends \
     "extra_bootstrap_buildfiles='${ROOT}/contrib/go/BUILD'" \
       --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
-      compile.go contrib/go/examples::
+      test.go contrib/go/examples::
 }
 
 # Once individual (new) package is declared above, insert it into the array below)

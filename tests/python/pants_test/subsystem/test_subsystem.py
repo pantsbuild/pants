@@ -57,7 +57,7 @@ class SubsystemTest(unittest.TestCase):
       options_scope = 'a'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (DummySubsystem, SubsystemB)
 
     self.assertEqual({DummySubsystem, SubsystemA, SubsystemB}, Subsystem.closure((SubsystemA,)))
@@ -71,14 +71,14 @@ class SubsystemTest(unittest.TestCase):
       options_scope = 'b'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (DummySubsystem,)
 
     class SubsystemA(Subsystem):
       options_scope = 'a'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (DummySubsystem, SubsystemB)
 
     self.assertEqual({DummySubsystem, SubsystemB}, Subsystem.closure((SubsystemB,)))
@@ -94,21 +94,21 @@ class SubsystemTest(unittest.TestCase):
       options_scope = 'c'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (SubsystemA,)
 
     class SubsystemB(Subsystem):
       options_scope = 'b'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (SubsystemC,)
 
     class SubsystemA(Subsystem):
       options_scope = 'a'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (SubsystemB,)
 
     for root in SubsystemA, SubsystemB, SubsystemC:
