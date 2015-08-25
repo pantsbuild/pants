@@ -7,16 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from unittest import skipIf
 
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 def missing_jvm(version):
-  try:
-    Distribution.locate(minimum_version=version, maximum_version='{}.9999'.format(version))
-    return False
-  except Distribution.Error:
-    return True
+  with subsystem_instance(DistributionLocator):
+    try:
+      DistributionLocator.locate(minimum_version=version, maximum_version='{}.9999'.format(version))
+      return False
+    except DistributionLocator.Error:
+      return True
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):

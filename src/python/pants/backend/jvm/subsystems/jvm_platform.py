@@ -9,7 +9,7 @@ import logging
 
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -61,6 +61,10 @@ class JvmPlatform(Subsystem):
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmPlatform, cls).subsystem_dependencies() + (DistributionLocator,)
+
   def _parse_platform(self, name, platform):
     return JvmPlatformSettings(platform.get('source', platform.get('target')),
                                platform.get('target', platform.get('source')),
@@ -75,9 +79,9 @@ class JvmPlatform(Subsystem):
   @property
   def _fallback_platform(self):
     logger.warn('No default jvm platform is defined.')
-    source_level = JvmPlatform.parse_java_version(Distribution.cached().version)
+    source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
-    platform_name = '(Distribution.cached().version {})'.format(source_level)
+    platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
 
   @memoized_property

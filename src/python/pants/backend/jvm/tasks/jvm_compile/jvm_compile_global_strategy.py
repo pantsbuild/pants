@@ -23,6 +23,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -700,7 +701,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
 
   def _find_all_bootstrap_jars(self):
     def get_path(key):
-      return self.context.java_sysprops.get(key, '').split(':')
+      return DistributionLocator.cached().system_properties.get(key, '').split(':')
 
     def find_jars_in_dirs(dirs):
       ret = []

@@ -56,7 +56,7 @@ class JvmTarget(Target, Jarable):
       for compilation (that is, a key into the --jvm-platform-platforms dictionary). If unspecified,
       the platform will default to the first one of these that exist: (1) the default_platform
       specified for jvm-platform, (2) a platform constructed from whatever java version is returned
-      by Distribution.cached().version.
+      by DistributionLocator.cached().version.
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if sources_rel_path is None:
