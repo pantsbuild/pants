@@ -19,10 +19,8 @@ class WatchmanLauncher(Subsystem):
   @classmethod
   def register_options(cls, register):
     # TODO (kwlzn): this will go away quickly once watchman binary embedding happens.
-    register('--watchman-path', type=str, advanced=True, default=None, action='store',
+    register('--path', type=str, advanced=True, default=None, action='store',
              help='Watchman binary location (defaults to $PATH discovery).')
-    register('--watchman-log-level', type=str, advanced=True, default='1', action='store',
-             help='Watchman log level (0=off, 1=normal, 2=verbose).')
 
   def __init__(self, *args, **kwargs):
     Subsystem.__init__(self, *args, **kwargs)
@@ -30,7 +28,8 @@ class WatchmanLauncher(Subsystem):
     options = self.get_options()
     self._workdir = options.pants_workdir
     self._watchman_path = options.watchman_path
-    self._watchman_log_level = options.watchman_log_level
+    # N.B. watchman has 3 log levels: 0 == no logging, 1 == standard logging, 2 == verbose logging.
+    self._watchman_log_level = '2' if options.level == 'debug' else '1'
 
     self._logger = logging.getLogger(__name__)
     self._watchman = None
