@@ -86,6 +86,7 @@ python_library(
     'src/python/pants/base:target',
     'src/python/pants/base:worker_pool',
     'src/python/pants/option',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -148,8 +149,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

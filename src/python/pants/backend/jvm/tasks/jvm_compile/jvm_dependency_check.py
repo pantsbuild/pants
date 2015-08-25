@@ -19,6 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import list_option
+from pants.util.memo import memoized_property
 
 
 class JvmDependencyCheck(Task):
@@ -81,7 +82,8 @@ class JvmDependencyCheck(Task):
       if actual_source_deps is not None:
         self.check(target, actual_source_deps)
 
-  def _compute_targets_by_file(self):
+  @memoized_property
+  def targets_by_file(self):
     """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
 
     The value is usually a singleton, because a source or class file belongs to a single target.
@@ -115,9 +117,10 @@ class JvmDependencyCheck(Task):
     with self.context.new_workunit(name='map_classes'):
       classes_by_target = self.context.products.get_data('classes_by_target')
       for tgt, target_products in classes_by_target.items():
-        for _, classes in target_products.abs_paths():
+        for classes_dir, classes in target_products.rel_paths():
           for cls in classes:
-            targets_by_file[cls].add(tgt)
+            classname = cls[:-len('.class')].replace('/', '.')
+            targets_by_file[classname].add(tgt)
 
     # Compute jar -> target.
     with self.context.new_workunit(name='map_jars'):
@@ -277,7 +280,6 @@ class JvmDependencyCheck(Task):
     # TODO: If recomputing these every time becomes a performance issue, memoize for
     # already-seen targets and incrementally compute for new targets not seen in a previous
     # partition, in this or a previous chunk.
-    targets_by_file = self._compute_targets_by_file()
     transitive_deps_by_target = self._compute_transitive_deps_by_target()
 
     # Find deps that are actual but not specified.
@@ -290,7 +292,7 @@ class JvmDependencyCheck(Task):
       abs_srcs = [os.path.join(buildroot, src) for src in src_tgt.sources_relative_to_buildroot()]
       for src in abs_srcs:
         for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-          actual_dep_tgts = targets_by_file.get(actual_dep)
+          actual_dep_tgts = self.targets_by_file.get(actual_dep)
           # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
           # to be in our declared deps to be OK.
           if actual_dep_tgts is None:

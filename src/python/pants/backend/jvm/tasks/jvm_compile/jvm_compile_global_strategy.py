@@ -623,7 +623,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
       return self._compute_classpath_elements_by_class(classpath)
     return self._analysis_parser.parse_deps_from_path(compile_context.analysis_file,
                                                       classpath_indexer,
-                                                      compile_context.classes_dir)
+                                                      self._classes_dir)
 
   def _compute_classpath_elements_by_class(self, classpath):
     """Computes a mapping of a .class file to its corresponding element on the given classpath."""

@@ -400,5 +400,16 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       compile_classpath.add_for_target(compile_context.target, entries)
 
       classpath = [path for (conf, path) in entries if conf in self._confs]
-      deps = self._strategy.parse_deps(classpath, compile_context)
-      actual_source_deps[compile_context.target] = deps
+      dep_map = self._strategy.parse_deps(classpath, compile_context)
+
+      def normalize(dep):
+        if dep.endswith('.class'):
+          # Normalize the class path to class names
+          return self._strategy.class_name_for_class_file(compile_context, dep)
+        else:
+          return dep
+
+      actual_source_deps[compile_context.target] = {
+          f: [normalize(d) for d in dep_map[f]]
+          for f in dep_map
+        }
