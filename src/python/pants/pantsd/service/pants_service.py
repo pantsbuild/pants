@@ -25,7 +25,7 @@ class PantsService(threading.Thread, AbstractClass):
                                           should only ever be set by the service runner and is a
                                           fatal/one-time event for the service.
     """
-    threading.Thread.__init__(self)
+    super(PantsService, self).__init__()
     self.name = self.__class__.__name__
     self.daemon = True
     self._kill_switch = kill_switch

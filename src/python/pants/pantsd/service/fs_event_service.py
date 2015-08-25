@@ -26,7 +26,7 @@ class FSEventService(PantsService):
   HANDLERS = {}
 
   def __init__(self, build_root, max_workers, kill_switch):
-    PantsService.__init__(self, kill_switch)
+    super(FSEventService, self).__init__(kill_switch)
     self._build_root = os.path.realpath(build_root)
     self._max_workers = max_workers
     self._logger = logging.getLogger(__name__)
