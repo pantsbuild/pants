@@ -24,6 +24,7 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
 from pants.option.custom_types import list_option
@@ -90,7 +91,7 @@ class GoalRunner(object):
     # Get logging setup prior to loading backends so that they can log as needed.
     self._setup_logging(global_bootstrap_options)
 
-    # Add any extra paths to python path (eg for loading extra source backends)
+    # Add any extra paths to python path (e.g., for loading extra source backends).
     for path in global_bootstrap_options.pythonpath:
       sys.path.append(path)
       pkg_resources.fixup_namespace_packages(path)
@@ -192,7 +193,9 @@ class GoalRunner(object):
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.print_help_if_requested():
+    if self.options.help_request:
+      help_printer = HelpPrinter(self.options)
+      help_printer.print_help()
       self._exiter(0)
 
     self.requested_goals = goals
