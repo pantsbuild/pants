@@ -15,7 +15,7 @@ from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import relativize_paths
 from pants.util.meta import AbstractClass
@@ -78,7 +78,12 @@ class Executor(AbstractClass):
         raise ValueError('A valid distribution is required, given: {}'.format(distribution))
       distribution.validate()
     else:
-      distribution = Distribution.cached()
+      # TODO(gmalmquist): This introduces a dependency on the DistributionLocator subsystem for any
+      # code that uses Executor. This is bad and needs to be fixed -- perhaps by making distribution
+      # a required (rather than optional) argument. Maybe it would also be reasonable for
+      # Distribution to be able to create an executor instance?
+      # See https://github.com/pantsbuild/pants/issues/2056.
+      distribution = DistributionLocator.cached()
 
     self._distribution = distribution
 

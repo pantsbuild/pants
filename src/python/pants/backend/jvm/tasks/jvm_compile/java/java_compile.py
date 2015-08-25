@@ -14,6 +14,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import relativize_paths, safe_mkdir
 
 
@@ -78,6 +79,10 @@ class JmakeCompile(JvmCompile):
     cls.register_jvm_tool(register, 'jmake')
     cls.register_jvm_tool(register, 'java-compiler')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JmakeCompile, cls).subsystem_dependencies() + (DistributionLocator,)
+
   def select(self, target):
     return self.get_options().use_jmake and super(JmakeCompile, self).select(target)
 
@@ -99,7 +104,8 @@ class JmakeCompile(JvmCompile):
     return os.path.join(self._depfile_folder, 'global_depfile')
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, JMakeAnalysisParser(),
+                         JMakeAnalysis)
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
               log_file, settings):
