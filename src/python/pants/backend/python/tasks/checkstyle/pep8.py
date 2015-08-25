@@ -94,5 +94,6 @@ class PEP8Checker(CheckstylePlugin):
         ignore=self.subsystem.global_instance().get_options().ignore)
 
   def nits(self):
+    print('Checking {}...'.format(self.python_file.filename))
     report = self.STYLE_GUIDE.check_files([self.python_file.filename])
     return report.twitter_errors

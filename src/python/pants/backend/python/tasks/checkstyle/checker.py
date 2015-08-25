@@ -64,9 +64,11 @@ class PythonCheckStyleTask(PythonTask):
     self.register_plugin(dict(name='newlines', checker=Newlines))
     self.register_plugin(dict(name='print-statements', checker=PrintStatements))
     self.register_plugin(dict(name='pyflakes', checker=PyflakesChecker))
-    self.register_plugin(dict(name='tailing-whitespace', checker=TrailingWhitespace))
+    self.register_plugin(dict(name='trailing-whitespace', checker=TrailingWhitespace))
     self.register_plugin(dict(name='variable-names', checker=PEP8VariableNames))
     self.register_plugin(dict(name='pep8', checker=PEP8Checker))
+
+
 
 
   @classmethod
@@ -101,7 +103,8 @@ class PythonCheckStyleTask(PythonTask):
     return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
 
   def register_plugin(self, plugin):
-    self._plugins.append(plugin)
+    if not plugin['checker'].subsystem.global_instance().get_options().skip:
+      self._plugins.append(plugin)
 
   def get_nits(self, python_file):
     """Iterate over the instances style checker and yield Nits
@@ -110,6 +113,7 @@ class PythonCheckStyleTask(PythonTask):
     if noqa_file_filter(python_file):
       return
 
+    # print('Plugins: {}'.format(self._plugins))
     if self.options.suppress:
       # Filter out any suppressed plugins
       excluder = FileExcluder(self.options.suppress, self.context.log)
@@ -119,9 +123,6 @@ class PythonCheckStyleTask(PythonTask):
       check_plugins = self._plugins
 
     for plugin in check_plugins:
-      if plugin['checker'].subsystem.global_instance().get_options().skip:
-        return
-
       for nit in plugin['checker'](python_file):
         if nit._line_number is None:
           yield nit
