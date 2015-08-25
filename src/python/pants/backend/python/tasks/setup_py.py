@@ -600,7 +600,7 @@ class SetupPy(PythonTask):
     for target in targets:
       create(target)
 
-    executed = {}  # Collected and returned for tests, processed target -> sdist|setup_dir
+    executed = {}  # Collected and returned for tests, processed target -> sdist|setup_dir.
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:
