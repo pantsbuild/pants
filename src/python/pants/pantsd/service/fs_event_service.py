@@ -86,7 +86,7 @@ class FSEventService(PantsService):
     with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
       for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
         # On death, break from the loop and contextmgr to terminate callback threads.
-        if self._kill_switch.is_set(): break
+        if self.kill_switch.is_set(): break
 
         if event_data:
           # As we receive events from watchman, submit them asynchronously to the pool executor.
