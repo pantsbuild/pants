@@ -113,7 +113,6 @@ class PythonCheckStyleTask(PythonTask):
     if noqa_file_filter(python_file):
       return
 
-    # print('Plugins: {}'.format(self._plugins))
     if self.options.suppress:
       # Filter out any suppressed plugins
       excluder = FileExcluder(self.options.suppress, self.context.log)
