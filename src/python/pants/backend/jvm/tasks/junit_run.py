@@ -16,6 +16,7 @@ from six.moves import range
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -25,7 +26,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.shader import Shader
-from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
@@ -201,6 +201,18 @@ class _JUnitRunner(object):
     """
     pass
 
+  def preferred_jvm_distribution_for_targets(self, targets):
+    return self.preferred_jvm_distribution([target.platform for target in targets
+                                            if isinstance(target, JvmTarget)])
+
+  def preferred_jvm_distribution(self, platforms):
+    """Returns a jvm Distribution with a version that should work for all the platforms."""
+    if not platforms:
+      return DistributionLocator.cached()
+    min_version = max(platform.target_level for platform in platforms)
+    max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
+    return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
+
   def _collect_test_targets(self, targets):
     """Returns a mapping from test names to target objects for all tests that
     are included in targets. If self._tests_to_run is set, return {test: None}
@@ -274,16 +286,11 @@ class _JUnitRunner(object):
         complete_classpath.update(classpath_prepend)
         complete_classpath.update(classpath)
         complete_classpath.update(classpath_append)
-        if self._strict_jvm_version:
-          max_version = Revision(*(platform.target_level.components + [9999]))
-          distribution = DistributionLocator.cached(minimum_version=platform.target_level,
-                                                    maximum_version=max_version)
-        else:
-          distribution = DistributionLocator.cached(minimum_version=platform.target_level)
+        distribution = self.preferred_jvm_distribution([platform])
         with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
           self._context.log.debug('CWD = {}'.format(workdir))
           self._context.log.debug('platform = {}'.format(platform))
-          result += abs(execute_java(
+          result += abs(distribution.execute_java(
             classpath=complete_classpath,
             main=main,
             jvm_options=self._task_exports.jvm_options + extra_jvm_options,
@@ -292,7 +299,6 @@ class _JUnitRunner(object):
             workunit_name='run',
             workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
-            distribution=distribution,
           ))
 
           if result != 0 and self._fail_fast:
@@ -481,6 +487,7 @@ class Emma(_Coverage):
       for pattern in patterns:
         args.extend(['-filter', pattern])
       main = 'emma'
+      execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
       result = execute_java(classpath=self._emma_classpath,
                             main=main,
                             jvm_options=self._coverage_jvm_options,
@@ -530,6 +537,7 @@ class Emma(_Coverage):
                  '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
+    execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
     result = execute_java(classpath=self._emma_classpath,
                           main=main,
                           jvm_options=self._coverage_jvm_options,
@@ -618,6 +626,7 @@ class Cobertura(_Coverage):
         args.append('--listOfFilesToInstrument')
         args.append(instrumented_classes_file)
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
+        execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
         result = execute_java(classpath=cobertura_cp,
                               main=main,
                               jvm_options=self._coverage_jvm_options,
@@ -722,6 +731,7 @@ class Cobertura(_Coverage):
         report_format,
         ]
       main = 'net.sourceforge.cobertura.reporting.ReportMain'
+      execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
       result = execute_java(classpath=cobertura_cp,
                             main=main,
                             jvm_options=self._coverage_jvm_options,

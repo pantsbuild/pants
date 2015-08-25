@@ -149,7 +149,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants/java:util',
+    'src/python/pants/java/distribution',
     'src/python/pants/option',
   ],
 )

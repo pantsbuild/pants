@@ -22,6 +22,8 @@ python_tests(
   sources = ['test_shader.py'],
   dependencies = [
     'src/python/pants/java/jar:shader',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]

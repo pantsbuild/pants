@@ -19,9 +19,9 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.java import util
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
 
 
@@ -36,6 +36,10 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     register('--javadeps', type=list_option, default=['//:wire-runtime'],
              help='Runtime dependencies for wire-using Java code.')
     cls.register_jvm_tool(register, 'wire-compiler')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(WireGen, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
@@ -133,12 +137,13 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     # Invoke the generator once per target.  Because the wire compiler has flags that try to reduce
     # the amount of code emitted, Invoking them all together will break if one target specifies a
     # service_writer and another does not, or if one specifies roots and another does not.
+    execute_java = DistributionLocator.cached().execute_java
     for target in targets:
       args = self.format_args_for_target(target)
       if args:
-        result = util.execute_java(classpath=self.tool_classpath('wire-compiler'),
-                                   main='com.squareup.wire.WireCompiler',
-                                   args=args)
+        result = execute_java(classpath=self.tool_classpath('wire-compiler'),
+                              main='com.squareup.wire.WireCompiler',
+                              args=args)
         if result != 0:
           raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
 

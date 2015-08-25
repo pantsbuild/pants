@@ -13,8 +13,8 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.fs.fs import expand_path
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import CommandLineGrabber
-from pants.java.util import execute_java
 from pants.util.dirutil import safe_open
 
 
@@ -41,6 +41,10 @@ class JvmRun(JvmTask):
              help='Set the working directory. If no argument is passed, use the target path.')
     register('--main', metavar='<main class>',
              help='Invoke this class (overrides "main"" attribute in jvm_binary targets)')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmRun, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -92,9 +96,10 @@ class JvmRun(JvmTask):
     # python_binary, in which case we have to no-op and let python_run do its thing.
     # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
     if isinstance(binary, JvmBinary):
-      executor = CommandLineGrabber() if self.only_write_cmd_line else None
+      jvm = DistributionLocator.cached()
+      executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
-      result = execute_java(
+      result = jvm.execute_java(
         classpath=(self.classpath([target])),
         main=self.get_options().main or binary.main,
         executor=executor,

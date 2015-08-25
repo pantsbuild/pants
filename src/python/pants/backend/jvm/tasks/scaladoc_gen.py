@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.memo import memoized
 
@@ -20,6 +21,10 @@ class ScaladocGen(JvmdocGen):
   @classmethod
   def task_subsystems(cls):
     return super(ScaladocGen, cls).task_subsystems() + (ScalaPlatform,)
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmdocGen, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def execute(self):
     def is_scala(target):
@@ -49,7 +54,7 @@ class ScaladocGen(JvmdocGen):
 
     args.extend(sources)
 
-    java_executor = SubprocessExecutor()
+    java_executor = SubprocessExecutor(DistributionLocator.cached())
     runner = java_executor.runner(jvm_options=self.jvm_options,
                                   classpath=tool_classpath,
                                   main='scala.tools.nsc.ScalaDoc',

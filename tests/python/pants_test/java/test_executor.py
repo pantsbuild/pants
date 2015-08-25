@@ -12,7 +12,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.java.distribution.distribution import Distribution
-from pants.java.executor import SubprocessExecutor
+from pants.java.executor import Executor, SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 
@@ -73,3 +73,15 @@ class SubprocessExecutorTest(unittest.TestCase):
   def test_subprocess_classpath_relativize(self):
     with self.jre("FOO") as jre:
       self.do_test_executor_classpath_relativize(SubprocessExecutor(Distribution(bin_path=jre)))
+
+  def test_fails_with_bad_distribution(self):
+
+    class DefinitelyNotADistribution(object):
+      pass
+
+    with self.assertRaises(Executor.InvalidDistribution):
+      SubprocessExecutor(DefinitelyNotADistribution())
+
+  def test_fails_with_no_distribution(self):
+    with self.assertRaises(Executor.InvalidDistribution):
+      SubprocessExecutor(None)
