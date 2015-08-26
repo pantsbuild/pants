@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import threading
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -33,8 +32,7 @@ class TestFSEventService(BaseTest):
 
   def setUp(self):
     BaseTest.setUp(self)
-    self.event = threading.Event()
-    self.service = FSEventService(self.BUILD_ROOT, TestExecutor(), self.event)
+    self.service = FSEventService(self.BUILD_ROOT, TestExecutor())
     self.service.register_simple_handler('test', lambda x: True)
     self.service.register_simple_handler('test2', lambda x: False)
 
@@ -102,7 +100,7 @@ class TestFSEventService(BaseTest):
 
   def test_run_breaks_on_kill_switch(self):
     with self.mocked_run() as (mock_watchman, mock_watchman_launcher, mock_callback):
-      self.service._kill_switch.set()
+      self.service.terminate()
       mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
       self.service.run()
       assert not mock_callback.called

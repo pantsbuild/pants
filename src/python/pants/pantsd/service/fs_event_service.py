@@ -21,8 +21,8 @@ class FSEventService(PantsService):
   executed in a configurable threadpool but are generally expected to be short-lived.
   """
 
-  def __init__(self, build_root, executor, kill_switch):
-    super(FSEventService, self).__init__(kill_switch)
+  def __init__(self, build_root, executor):
+    super(FSEventService, self).__init__()
     self._build_root = os.path.realpath(build_root)
     self._executor = executor
     self._logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class FSEventService(PantsService):
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
       # On death, break from the loop and contextmgr to terminate callback threads.
-      if self.kill_switch: break
+      if self.is_killed: break
 
       if event_data:
         # As we receive events from watchman, submit them asynchronously to the executor.

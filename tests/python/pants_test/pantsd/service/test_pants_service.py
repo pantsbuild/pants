@@ -18,17 +18,15 @@ class RunnableTestService(PantsService):
 class TestPantsService(BaseTest):
   def setUp(self):
     BaseTest.setUp(self)
-    self.event = threading.Event()
-    self.service = RunnableTestService(self.event)
+    self.service = RunnableTestService()
 
   def test_init(self):
     self.assertTrue(self.service.name)
-    self.assertEquals(self.service._kill_switch, self.event)
 
   def test_run_abstract(self):
     with self.assertRaises(TypeError):
-      PantsService(self.event)
+      PantsService()
 
   def test_terminate(self):
     self.service.terminate()
-    assert self.service.kill_switch
+    assert self.service.is_killed

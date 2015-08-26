@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import threading
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
@@ -15,22 +16,19 @@ class PantsService(AbstractClass):
 
   class ServiceError(Exception): pass
 
-  def __init__(self, kill_switch):
-    """
-    :param `threading.Event` kill_switch: A threading.Event to facilitate graceful shutdown of
-                                          services. Subclasses should check if this is set by check-
-                                          ing the `kill_switch` property for a True value in their
-                                          core runtime. If True, the service should teardown and
-                                          gracefully exit. This should only ever be set by the
-                                          service runner and is a fatal/one-time event for the
-                                          service.
-    """
+  def __init__(self):
     super(PantsService, self).__init__()
     self.name = self.__class__.__name__
-    self._kill_switch = kill_switch
+    self._kill_switch = threading.Event()
 
   @property
-  def kill_switch(self):
+  def is_killed(self):
+    """A `threading.Event`-checking property to facilitate graceful shutdown of services.
+
+    Subclasses should check this property for a True value in their core runtime. If True, the
+    service should teardown and gracefully exit. This represents a fatal/one-time event for the
+    service.
+    """
     return self._kill_switch.is_set()
 
   @abstractmethod
