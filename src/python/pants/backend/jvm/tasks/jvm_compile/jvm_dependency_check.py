@@ -120,8 +120,8 @@ class JvmDependencyCheck(Task):
       for tgt, target_products in classes_by_target.items():
         for classes_dir, classes in target_products.rel_paths():
           for cls in classes:
-            classname = cls[:-len('.class')].replace('/', '.')
-            targets_by_file[classname].add(tgt)
+            targets_by_file[cls].add(tgt)
+            targets_by_file[os.path.join(classes_dir, cls)].add(tgt)
 
     # Compute jar -> target.
     with self.context.new_workunit(name='map_jars'):

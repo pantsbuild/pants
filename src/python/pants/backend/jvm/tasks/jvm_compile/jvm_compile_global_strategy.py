@@ -627,6 +627,7 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
                                                       classpath_indexer,
                                                       self._classes_dir)
 
+
   def _compute_classpath_elements_by_class(self, classpath):
     """Computes a mapping of a .class file to its corresponding element on the given classpath."""
     # Don't consider loose classes dirs in our classes dir. Those will be considered

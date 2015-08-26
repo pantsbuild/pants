@@ -228,5 +228,8 @@ class JvmCompileStrategy(object):
 
   @abstractmethod
   def parse_deps(self, classpath, compile_context):
-    """Parses the actual source dependencies of compile_context.target given a classpath."""
+    """Parses the actual source dependencies of compile_context.target given a classpath.
+
+    The returned source dependencies may be either absolute filepaths, or relative filepaths.
+    """
     pass
