@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-import concurrent.futures
-
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
@@ -25,10 +23,10 @@ class FSEventService(PantsService):
 
   HANDLERS = {}
 
-  def __init__(self, build_root, max_workers, kill_switch):
+  def __init__(self, build_root, executor, kill_switch):
     super(FSEventService, self).__init__(kill_switch)
     self._build_root = os.path.realpath(build_root)
-    self._max_workers = max_workers
+    self._executor = executor
     self._logger = logging.getLogger(__name__)
 
   @classmethod
@@ -83,26 +81,25 @@ class FSEventService(PantsService):
     subscriptions = self.HANDLERS.values()
 
     # Setup subscriptions and begin the main event firing loop.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-      for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
-        # On death, break from the loop and contextmgr to terminate callback threads.
-        if self.kill_switch.is_set(): break
+    for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
+      # On death, break from the loop and contextmgr to terminate callback threads.
+      if self.kill_switch.is_set(): break
 
-        if event_data:
-          # As we receive events from watchman, submit them asynchronously to the pool executor.
-          future = executor.submit(self.fire_callback, handler_name, event_data)
-          futures[future] = handler_name
+      if event_data:
+        # As we receive events from watchman, submit them asynchronously to the executor.
+        future = self._executor.submit(self.fire_callback, handler_name, event_data)
+        futures[future] = handler_name
 
-        # Process and log results for completed futures.
-        for completed_future in [future for future in futures if future.done()]:
-          handler_name = futures.pop(completed_future)
-          id_counter += 1
+      # Process and log results for completed futures.
+      for completed_future in [future for future in futures if future.done()]:
+        handler_name = futures.pop(completed_future)
+        id_counter += 1
 
-          # A true result indicates success.
-          if completed_future.result():
-            self._logger.debug('callback ID {} for {} succeeded'.format(id_counter, handler_name))
-          else:
-            self._logger.warning('callback ID {} for {} failed!'.format(id_counter, handler_name))
+        # A true result indicates success.
+        if completed_future.result():
+          self._logger.debug('callback ID {} for {} succeeded'.format(id_counter, handler_name))
+        else:
+          self._logger.warning('callback ID {} for {} failed!'.format(id_counter, handler_name))
 
     # TODO(@kwlzn): events from watchman can aggregate changes to multiple files per event. it may
     # make sense to split that list in the processing loop to take advantage of the threadpool.

@@ -15,7 +15,6 @@ python_library(
   dependencies = [
     ':pants_service',
     'src/python/pants/pantsd:watchman',
-    'src/python/pants/pantsd/subsystem:watchman_launcher',
-    '3rdparty/python:futures'
+    'src/python/pants/pantsd/subsystem:watchman_launcher'
   ]
 )
