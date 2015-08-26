@@ -1,0 +1,150 @@
+# coding=utf-8
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+import os
+import subprocess
+from abc import abstractmethod
+from collections import namedtuple
+
+from pants.binaries.binary_util import BinaryUtil
+from pants.fs.archive import TGZ
+from pants.subsystem.subsystem import Subsystem
+from pants.util.contextutil import temporary_dir
+from pants.util.memo import memoized_property
+from pants.util.meta import AbstractClass
+
+
+class NodeDistribution(object):
+  """Represents a self-bootstrapping Node distribution."""
+
+  class Factory(Subsystem):
+    options_scope = 'node-distribution'
+
+    @classmethod
+    def subsystem_dependencies(cls):
+      return (BinaryUtil.Factory,)
+
+    @classmethod
+    def register_options(cls, register):
+      register('--supportdir', advanced=True, default='bin/node',
+               help='Find the Node distributions under this dir.  Used as part of the path to '
+                    'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
+      register('--version', advanced=True, default='0.12.7',
+               help='Node distribution version.  Used as part of the path to lookup the '
+                    'distribution with --binary-util-baseurls and --pants-bootstrapdir')
+
+    def create(self):
+      # NB: create is an instance method to allow the user to choose global or scoped.
+      # It's not unreasonable to imagine multiple Node versions in play; for example: when
+      # transitioning from the 0.10.x series to the 0.12.x series.
+      binary_util = BinaryUtil.Factory.create()
+      options = self.get_options()
+      return NodeDistribution(binary_util, options.supportdir, options.version)
+
+  @classmethod
+  def _normalize_version(cls, version):
+    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z' and not
+    # 'X.Y.Z'.
+    return version if version.startswith('v') else 'v' + version
+
+  def __init__(self, binary_util, relpath, version):
+    self._binary_util = binary_util
+    self._relpath = relpath
+    self._version = self._normalize_version(version)
+
+  @property
+  def version(self):
+    """Returns the version of the Node distribution.
+
+    :returns: The Node distribution version number string.
+    :rtype: string
+    """
+    return self._version
+
+  @memoized_property
+  def path(self):
+    """Returns the root path of this node distribution.
+
+    :returns: The Node distribution root path.
+    :rtype: string
+    """
+    node_distribution = self._binary_util.select_binary(self._relpath, self.version, 'node.tar.gz')
+    distribution_workdir = os.path.dirname(node_distribution)
+    outdir = os.path.join(distribution_workdir, 'unpacked')
+    if not os.path.exists(outdir):
+      with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
+        TGZ.extract(node_distribution, tmp_dist)
+        os.rename(tmp_dist, outdir)
+    return os.path.join(outdir, 'node')
+
+  class Command(AbstractClass, namedtuple('Command', ['executable', 'args'])):
+    """Describes a command to be run using a Node distribution."""
+
+    @property
+    def cmd(self):
+      """The command line that will be executed when this command is spawned.
+
+      :returns: The full command line used to spawn this command as a list of strings.
+      :rtype: list
+      """
+      return [self._executable_path(self.executable)] + self.args
+
+    @abstractmethod
+    def _executable_path(self, executable):
+      """Resolves the full path of the given Node executable.
+
+      :returns: The full path of the executable.
+      :rtype: string
+      """
+
+    def run(self, **kwargs):
+      """Runs this command.
+
+      :param **kwargs: Any extra keyword arguments to pass along to `subprocess.Popen`.
+      :returns: A handle to the running command.
+      :rtype: :class:`subprocess.Popen`
+      """
+      return subprocess.Popen(self.cmd, **kwargs)
+
+    def check_output(self, **kwargs):
+      """Runs this command returning its captured stdout.
+
+      :param **kwargs: Any extra keyword arguments to pass along to `subprocess.Popen`.
+      :returns: The captured standard output stream of the command.
+      :rtype: string
+      :raises: :class:`subprocess.CalledProcessError` if the command fails.
+      """
+      return subprocess.check_output(self.cmd, **kwargs)
+
+    def __str__(self):
+      return ' '.join(self.cmd)
+
+  def node_command(self, args=None):
+    """Creates a command that can run `node`, passing the given args to it.
+
+    :param list args: An optional list of arguments to pass to `node`.
+    :returns: A `node` command that can be run later.
+    :rtype: :class:`NodeDistribution.Command`
+    """
+    # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
+    # `node` with no arguments is useful, it launches a REPL.
+    return self._create_command('node', args)
+
+  def npm_command(self, args):
+    """Creates a command that can run `npm`, passing the given args to it.
+
+    :param list args: A list of arguments to pass to `npm`.
+    :returns: An `npm` command that can be run later.
+    :rtype: :class:`NodeDistribution.Command`
+    """
+    return self._create_command('npm', args)
+
+  def _create_command(self, executable, args=None):
+    class NodeDistributionCommand(self.Command):
+      def _executable_path(_, executable):
+        return os.path.join(self.path, 'bin', executable)
+    return NodeDistributionCommand(executable, args or [])

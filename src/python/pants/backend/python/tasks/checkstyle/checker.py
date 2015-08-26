@@ -64,10 +64,9 @@ class PythonCheckStyleTask(PythonTask):
     self.register_plugin(dict(name='newlines', checker=Newlines))
     self.register_plugin(dict(name='print-statements', checker=PrintStatements))
     self.register_plugin(dict(name='pyflakes', checker=PyflakesChecker))
-    self.register_plugin(dict(name='tailing-whitespace', checker=TrailingWhitespace))
+    self.register_plugin(dict(name='trailing-whitespace', checker=TrailingWhitespace))
     self.register_plugin(dict(name='variable-names', checker=PEP8VariableNames))
     self.register_plugin(dict(name='pep8', checker=PEP8Checker))
-
 
   @classmethod
   def global_subsystems(cls):
@@ -101,7 +100,8 @@ class PythonCheckStyleTask(PythonTask):
     return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
 
   def register_plugin(self, plugin):
-    self._plugins.append(plugin)
+    if not plugin['checker'].subsystem.global_instance().get_options().skip:
+      self._plugins.append(plugin)
 
   def get_nits(self, python_file):
     """Iterate over the instances style checker and yield Nits
@@ -119,9 +119,6 @@ class PythonCheckStyleTask(PythonTask):
       check_plugins = self._plugins
 
     for plugin in check_plugins:
-      if plugin['checker'].subsystem.global_instance().get_options().skip:
-        return
-
       for nit in plugin['checker'](python_file):
         if nit._line_number is None:
           yield nit
@@ -150,7 +147,10 @@ class PythonCheckStyleTask(PythonTask):
 
     should_fail = False
     fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
-    for nit in self.get_nits(python_file):
+
+    for i, nit in enumerate(self.get_nits(python_file)):
+      if i == 0:
+        print()  # add an extra newline to clean up the output only if we have nits
       if nit.severity >= severity:
         print('{nit}\n'.format(nit=nit))
       should_fail |= (nit.severity >= fail_threshold)
@@ -165,7 +165,6 @@ class PythonCheckStyleTask(PythonTask):
     :return: Boolean indicating problems found
     """
     should_fail = False
-    print()
     for filename in sources:
       should_fail |= self.check_file(filename)
 

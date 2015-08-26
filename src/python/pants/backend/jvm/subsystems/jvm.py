@@ -6,12 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import os
 
-from pants.option.custom_types import dict_option, list_option
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
-from pants.util.osutil import OS_ALIASES, normalize_os_name
 from pants.util.strutil import safe_shlex_split
 
 
@@ -26,52 +23,21 @@ class JVM(Subsystem):
   def register_options(cls, register):
     super(JVM, cls).register_options(register)
     # TODO(benjy): Options to specify the JVM version?
-    register('--options', action='append', recursive=True, metavar='<option>...',
+    register('--options', action='append', metavar='<option>...',
              help='Run with these extra JVM options.')
-    register('--program-args', action='append', recursive=True, metavar='<arg>...',
+    register('--program-args', action='append', metavar='<arg>...',
              help='Run with these extra program args.')
-    register('--debug', action='store_true', recursive=True,
+    register('--debug', action='store_true',
              help='Run the JVM with remote debugging.')
-    register('--debug-port', advanced=True, recursive=True, type=int, default=5005,
+    register('--debug-port', advanced=True, type=int, default=5005,
              help='The JVM will listen for a debugger on this port.')
-    register('--debug-args', advanced=True, recursive=True, type=list_option,
+    register('--debug-args', advanced=True, type=list_option,
              default=[
                '-Xdebug',
                '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'
              ],
              help='The JVM remote-debugging arguments. {debug_port} will be replaced with '
                   'the value of the --debug-port option.')
-    human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
-                                         for key, val in OS_ALIASES.items())
-    register('--jdk-paths', advanced=True, recursive=True, type=dict_option,
-             help='Map of os names to lists of paths to jdks. These paths will be searched before '
-                  'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
-                  'when locating a jvm to use. The same OS can be specified via several different '
-                  'aliases, according to this map: {}'.format(human_readable_os_aliases))
-
-  @memoized_property
-  def _normalized_jdk_paths(self):
-    jdk_paths = self.get_options().jdk_paths or {}
-    normalized = {}
-    for name, paths in sorted(jdk_paths.items()):
-      rename = normalize_os_name(name)
-      if rename in normalized:
-        logger.warning('Multiple OS names alias to "{}"; combining results.'.format(rename))
-        normalized[rename].extend(paths)
-      else:
-        normalized[rename] = paths
-    return normalized
-
-  def get_jdk_paths(self, os_name=None):
-    jdk_paths = self._normalized_jdk_paths
-    if not jdk_paths:
-      return ()
-    if os_name is None:
-      os_name = os.uname()[0].lower()
-    os_name = normalize_os_name(os_name)
-    if os_name not in jdk_paths:
-      logger.warning('--jvm-jdk-paths was specified, but has no entry for "{}".'.format(os_name))
-    return jdk_paths.get(os_name, ())
 
   def get_jvm_options(self):
     """Return the options to run this JVM with.

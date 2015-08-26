@@ -141,7 +141,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
-             help='Used to limit the number of arguments passed to some subprocesses by breaking'
+             help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations')
     register('--print-exception-stacktrace', advanced=True, action='store_true',
              help='Print to console the full exception stack trace if encountered.')

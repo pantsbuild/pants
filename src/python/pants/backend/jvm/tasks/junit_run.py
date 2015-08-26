@@ -23,7 +23,7 @@ from pants.base.exceptions import TargetDefinitionException, TaskError, TestFail
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.shader import Shader
 from pants.java.util import execute_java
 from pants.util.contextutil import temporary_file_path
@@ -276,10 +276,10 @@ class _JUnitRunner(object):
         complete_classpath.update(classpath_append)
         if self._strict_jvm_version:
           max_version = Revision(*(platform.target_level.components + [9999]))
-          distribution = Distribution.cached(minimum_version=platform.target_level,
-                                             maximum_version=max_version)
+          distribution = DistributionLocator.cached(minimum_version=platform.target_level,
+                                                    maximum_version=max_version)
         else:
-          distribution = Distribution.cached(minimum_version=platform.target_level)
+          distribution = DistributionLocator.cached(minimum_version=platform.target_level)
         with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
           self._context.log.debug('CWD = {}'.format(workdir))
           self._context.log.debug('platform = {}'.format(platform))
@@ -749,6 +749,10 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, default='emma',
              help='Which coverage subsystem to use.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def prepare(cls, options, round_manager):
