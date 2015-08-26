@@ -126,7 +126,8 @@ class JvmDependencyCheck(Task):
     # Compute jar -> target.
     with self.context.new_workunit(name='map_jars'):
       with IvyTaskMixin.symlink_map_lock:
-        all_symlinks_map = self.context.products.get_data('ivy_resolve_symlink_map').copy()
+        m = self.context.products.get_data('ivy_resolve_symlink_map')
+        all_symlinks_map = m.copy() if m is not None else {}
         # We make a copy, so it's safe to use outside the lock.
 
       def register_transitive_jars_for_ref(ivyinfo, ref):
