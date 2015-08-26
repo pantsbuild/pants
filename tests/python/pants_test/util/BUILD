@@ -9,6 +9,7 @@ target(
     ':fileutil',
     ':memo',
     ':meta',
+    ':osutil',
     ':strutil',
     ':xml_parser',
   ]
@@ -47,6 +48,14 @@ python_tests(
   sources = ['test_filtering.py'],
   dependencies = [
     'src/python/pants/util:filtering',
+  ]
+)
+
+python_tests(
+  name = 'osutil',
+  sources = ['test_osutil.py'],
+  dependencies = [
+    'src/python/pants/util:osutil',
   ]
 )
 
