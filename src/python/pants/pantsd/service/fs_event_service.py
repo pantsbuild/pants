@@ -9,8 +9,8 @@ import logging
 import os
 
 from pants.pantsd.service.pants_service import PantsService
-from pants.pantsd.watchman import Watchman
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
+from pants.pantsd.watchman import Watchman
 
 
 class FSEventService(PantsService):
