@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from six import string_types
 
 from pants.base.revision import Revision
+from pants.java.util import execute_java
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
@@ -211,6 +212,9 @@ class Distribution(object):
     except self.Error:
       if self._jdk:
         raise
+
+  def execute_java(self, *args, **kwargs):
+    return execute_java(*args, distribution=self, **kwargs)
 
   def _get_version(self, java):
     if not self._version:

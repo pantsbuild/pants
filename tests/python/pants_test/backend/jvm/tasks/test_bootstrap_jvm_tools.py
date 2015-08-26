@@ -12,10 +12,12 @@ from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.shader import Shader
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 class JvmToolTask(JvmToolTaskMixin, Task):
@@ -53,15 +55,15 @@ class BootstrapJvmToolsTest(JvmToolTaskTestBase):
     self.assertEqual(1, len(ant_shaded_classpath))
 
     # Verify both the normal and shaded tools run successfully and produce the same output.
-    executor = SubprocessExecutor()
-
     def assert_run_ant_version(classpath):
-      process = executor.spawn(classpath, 'org.apache.tools.ant.Main', args=['-version'],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      out, err = process.communicate()
-      self.assertEqual(0, process.returncode)
-      self.assertTrue(out.strip().startswith('Apache Ant(TM) version 1.9.4'))
-      self.assertEqual('', err.strip())
+      with subsystem_instance(DistributionLocator):
+        executor = SubprocessExecutor(DistributionLocator.cached())
+        process = executor.spawn(classpath, 'org.apache.tools.ant.Main', args=['-version'],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        self.assertEqual(0, process.returncode)
+        self.assertTrue(out.strip().startswith('Apache Ant(TM) version 1.9.4'))
+        self.assertEqual('', err.strip())
 
     assert_run_ant_version(ant_classpath)
     assert_run_ant_version(ant_shaded_classpath)

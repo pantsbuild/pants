@@ -20,7 +20,8 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
-from pants.java.executor import Executor
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.jar.shader import Shader
 from pants.util.dirutil import safe_mkdir_for
 
@@ -75,6 +76,10 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     register('--jvm-options', action='append', metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
     cls.register_jvm_tool(register, 'jarjar')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def global_subsystems(cls):
@@ -141,7 +146,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def shader(self):
     if self._shader is None:
       jarjar = self.tool_jar('jarjar')
-      self._shader = Shader(jarjar)
+      self._shader = Shader(jarjar, SubprocessExecutor(DistributionLocator.cached()))
     return self._shader
 
   def _bootstrap_shaded_jvm_tool(self, key, scope, tools, main, custom_rules=None):
