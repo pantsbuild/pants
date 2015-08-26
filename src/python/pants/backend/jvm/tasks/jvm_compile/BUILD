@@ -86,6 +86,7 @@ python_library(
     ':compile_context',
     ':jvm_compile_strategy',
     ':resource_mapping',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
