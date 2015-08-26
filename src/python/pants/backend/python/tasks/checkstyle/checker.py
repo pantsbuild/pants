@@ -66,12 +66,24 @@ class PythonCheckStyleTask(PythonTask):
     return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
 
   @classmethod
-  def register_plugin(cls, plugin):
+  def clear_plugins(cls):
+    """Clear all current plugins registered"""
+    cls._plugins = []
+
+  @classmethod
+  def register_plugin(cls, name, checker):
+    """Register plugin to be used run as part of Python Style checks
+
+    :param name: (string) Name of the method plugin
+    :param checker: (CheckstylePlugin) Plugin subclass
+    """
+    plugin = lint_plugin(name=name, checker=checker)
     cls._plugins.append(plugin)
     cls._subsystems += (plugin.checker.subsystem, )
 
   def get_nits(self, python_file):
     """Iterate over the instances style checker and yield Nits
+
     :param python_file: PythonFile Object
     """
     if noqa_file_filter(python_file):
@@ -160,4 +172,4 @@ class PythonCheckStyleTask(PythonTask):
     return sources
 
 
-register_plugins(PythonCheckStyleTask, lint_plugin)
+register_plugins(PythonCheckStyleTask)

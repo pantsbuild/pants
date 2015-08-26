@@ -10,18 +10,17 @@ from collections import namedtuple
 
 import pytest
 
-from pants.backend.python.tasks.checkstyle.checker import (PythonCheckStyleTask, PythonFile,
-                                                           lint_plugin)
+from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask, PythonFile
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
 class RageSubsystem(Subsystem):
-  options_scope = 'pycheck-pep8'
+  options_scope = 'pycheck-Rage'
   @classmethod
   def register_options(cls, register):
-    super(PEP8Subsystem, cls).register_options(register)
+    super(Subsystem, cls).register_options(register)
     register('--skip', default=False, action='store_true',
              help='If enabled, skip this style checker.')
 
@@ -76,10 +75,11 @@ class TestPyStyleTask(PythonTaskTestBase):
   def setUp(self):
     """Setup PythonCheckStyleTask with Rage Checker"""
     super(TestPyStyleTask, self).setUp()
-
+    PythonCheckStyleTask.clear_plugins()
+    PythonCheckStyleTask.register_plugin(name='angry_test', checker=Rage)
     PythonCheckStyleTask.options_scope = 'py.check'
+
     self.style_check = PythonCheckStyleTask(self._create_context(), ".")
-    self.style_check._plugins = [lint_plugin(name='Troll', checker=Rage)]
     self.style_check.options.suppress = None
 
   def test_noqa_line_filter_length(self):
