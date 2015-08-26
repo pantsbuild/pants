@@ -83,7 +83,7 @@ class FSEventService(PantsService):
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
       # On death, break from the loop and contextmgr to terminate callback threads.
-      if self.kill_switch.is_set(): break
+      if self.kill_switch: break
 
       if event_data:
         # As we receive events from watchman, submit them asynchronously to the executor.
