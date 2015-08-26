@@ -23,9 +23,12 @@ class TestPantsService(BaseTest):
 
   def test_init(self):
     self.assertTrue(self.service.name)
-    self.assertTrue(self.service.daemon)
     self.assertEquals(self.service._kill_switch, self.event)
 
   def test_run_abstract(self):
     with self.assertRaises(TypeError):
       PantsService(self.event)
+
+  def test_terminate(self):
+    self.service.terminate()
+    assert self.service.kill_switch

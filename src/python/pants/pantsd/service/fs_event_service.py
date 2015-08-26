@@ -21,16 +21,14 @@ class FSEventService(PantsService):
   executed in a configurable threadpool but are generally expected to be short-lived.
   """
 
-  HANDLERS = {}
-
   def __init__(self, build_root, executor, kill_switch):
     super(FSEventService, self).__init__(kill_switch)
     self._build_root = os.path.realpath(build_root)
     self._executor = executor
     self._logger = logging.getLogger(__name__)
+    self._handlers = {}
 
-  @classmethod
-  def register_simple_handler(cls, file_name, callback):
+  def register_simple_handler(self, file_name, callback):
     """Registers a simple subscription and handler for files matching a specific name.
 
     :param str name:      the subscription name as used by watchman
@@ -41,11 +39,10 @@ class FSEventService(PantsService):
                                                  ['type', 'f'],
                                                  ['not', 'empty'],
                                                  ['name', file_name]])
-    cls.register_handler(file_name, metadata, callback)
-    return cls
+    self.register_handler(file_name, metadata, callback)
+    return self
 
-  @classmethod
-  def register_handler(cls, name, metadata, callback):
+  def register_handler(self, name, metadata, callback):
     """Register subscriptions and their event handlers.
 
     :param str name:      the subscription name as used by watchman
@@ -54,16 +51,15 @@ class FSEventService(PantsService):
                           as any required callback fields.
     :param func callback: the callback to execute on each matching filesystem event
     """
-    assert name not in cls.HANDLERS, 'duplicate handler name: {}'.format(name)
+    assert name not in self._handlers, 'duplicate handler name: {}'.format(name)
     assert (isinstance(metadata, dict) and
             'fields' in metadata and 'expression' in metadata), 'invalid handler metadata!'
-    cls.HANDLERS[name] = Watchman.EventHandler(name=name, metadata=metadata, callback=callback)
-    return cls
+    self._handlers[name] = Watchman.EventHandler(name=name, metadata=metadata, callback=callback)
+    return self
 
-  @classmethod
-  def fire_callback(cls, handler_name, event_data):
+  def fire_callback(self, handler_name, event_data):
     """Fire an event callback for a given handler."""
-    return cls.HANDLERS[handler_name].callback(event_data)
+    return self._handlers[handler_name].callback(event_data)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
@@ -78,7 +74,7 @@ class FSEventService(PantsService):
 
     futures = {}
     id_counter = 0
-    subscriptions = self.HANDLERS.values()
+    subscriptions = self._handlers.values()
 
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in watchman.subscribed(self._build_root, subscriptions):
