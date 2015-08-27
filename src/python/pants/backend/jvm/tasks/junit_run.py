@@ -320,6 +320,8 @@ class _JUnitRunner(object):
   def _tests_by_property(self, tests_to_targets, get_property):
     properties = defaultdict(OrderedSet)
     for test, target in tests_to_targets.items():
+      if target is None:
+        raise TaskError('Unknown target for test %{0}'.format(test))
       properties[get_property(target)].add(test)
     return {property: list(tests) for property, tests in properties.items()}
 
