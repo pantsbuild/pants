@@ -20,9 +20,11 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.source_root import SourceRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
+from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -110,12 +112,22 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
     # A check is done in the java_wire_library target  to make sure only one of --service_writer or
     # --service_factory is specified.
-    append_service_opts('service_writer',
-                        target.payload.service_writer,
-                        target.payload.service_writer_options)
-    append_service_opts('service_factory',
-                        target.payload.service_factory,
-                        target.payload.service_factory_options)
+    if self._wire_compiler_version < Revision(2, 0):
+      if target.payload.service_factory:
+        raise TaskError('{spec} used service_factory, which is not available before Wire 2.0. You '
+                        'should use service_writer instead.'
+                        .format(spec=target.address.spec))
+      append_service_opts('service_writer',
+                          target.payload.service_writer,
+                          target.payload.service_writer_options)
+    else:
+      if target.payload.service_writer:
+        raise TaskError('{spec} used service_writer, which is not available after Wire 2.0. You '
+                        'should use service_factory instead.'
+                        .format(spec=target.address.spec))
+      append_service_opts('service_factory',
+                          target.payload.service_factory,
+                          target.payload.service_factory_options)
 
     registry_class = target.payload.registry_class
     if registry_class:
@@ -127,8 +139,13 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     if target.payload.enum_options:
       args.append('--enum_options={0}'.format(','.join(target.payload.enum_options)))
 
-    args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
-                                                       SourceRoot.find(target))))
+    if self._wire_compiler_version < Revision(2, 0):
+      args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
+                                                         SourceRoot.find(target))))
+    else:
+      # NB(gmalmquist): Support for multiple --proto_paths was introduced in Wire 2.0.
+      for path in self._calculate_proto_paths(target):
+        args.append('--proto_path={0}'.format(path))
 
     args.extend(relative_sources)
     return args
@@ -146,6 +163,37 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
                               args=args)
         if result != 0:
           raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
+
+  @memoized_property
+  def _wire_compiler_version(self):
+    wire_compiler = self.tool_targets(self.context, 'wire_compiler')[0]
+    wire_compiler_jar = wire_compiler.jar_dependencies[0]
+    wire_compiler_version = wire_compiler_jar.rev
+    return Revision.lenient(wire_compiler_version)
+
+  def _calculate_proto_paths(self, target):
+    """Computes the set of paths that wire uses to lookup imported protos.
+
+    The protos under these paths are not compiled, but they are required to compile the protos that
+    imported.
+    :param target: the JavaWireLibrary target to compile.
+    :return: an ordered set of directories to pass along to wire.
+    """
+    proto_paths = OrderedSet()
+    proto_paths.add(os.path.join(get_buildroot(), SourceRoot.find(target)))
+
+    def collect_proto_paths(dep):
+      if not dep.has_sources():
+        return
+      for source in dep.sources_relative_to_buildroot():
+        if source.endswith('.proto'):
+          root = SourceRoot.find_by_path(source)
+          if root:
+            proto_paths.add(os.path.join(get_buildroot(), root))
+
+    collect_proto_paths(target)
+    target.walk(collect_proto_paths)
+    return proto_paths
 
   def _calculate_sources(self, targets):
     def add_to_gentargets(target):
