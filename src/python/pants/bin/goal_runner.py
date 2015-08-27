@@ -89,6 +89,9 @@ class GoalRunner(object):
     self.run_tracker = RunTracker.global_instance()
     self.reporting = Reporting.global_instance()
 
+    # Start the RunTracker as early as possible.
+    self._start_runtracker()
+
     self.build_file_type = self._get_buildfile_type(self.global_options.build_file_rev)
     self.build_file_parser = BuildFileParser(self.build_configuration, self.root_dir)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.build_file_type)
@@ -167,7 +170,7 @@ class GoalRunner(object):
 
     return options, build_configuration
 
-  def setup(self):
+  def _start_runtracker(self):
     report = self.reporting.initial_reporting(self.run_tracker)
     self.run_tracker.start(report)
 
@@ -177,6 +180,7 @@ class GoalRunner(object):
     else:
       self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
+  def setup(self):
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
     with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
       source_root_bootstrapper = SourceRootBootstrapper.global_instance()
