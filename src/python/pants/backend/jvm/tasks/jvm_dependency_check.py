@@ -38,7 +38,9 @@ class JvmDependencyCheck(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
-    register('--skip', default=False, help='Skip dependency check.')
+    register('--skip', default=False, action='store_true',
+             fingerprint=True,
+             help='Skip dependency check.')
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              fingerprint=True,
              help='Check for missing dependencies in compiled code. Reports actual '
@@ -215,27 +217,30 @@ class JvmDependencyCheck(Task):
       missing_tgt_deps = filter_whitelisted(missing_tgt_deps)
 
       if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
+        log_fn = (self.context.log.error if self._check_missing_deps == 'fatal'
+                  else self.context.log.warn)
         for (tgt_pair, evidence) in missing_tgt_deps:
           evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
-          self.context.log.error(
-              'Missing BUILD dependency {} -> {} because:\n{}'
-              .format(tgt_pair[0].address.reference(), tgt_pair[1].address.reference(), evidence_str))
+          log_fn('Missing BUILD dependency {} -> {} because:\n{}'
+                 .format(tgt_pair[0].address.reference(), tgt_pair[1].address.reference(),
+                         evidence_str))
         for (src_tgt, dep) in missing_file_deps:
-          self.context.log.error('Missing BUILD dependency {} -> {}'
-                                  .format(src_tgt.address.reference(), shorten(dep)))
+          log_fn('Missing BUILD dependency {} -> {}'
+                 .format(src_tgt.address.reference(), shorten(dep)))
         if self._check_missing_deps == 'fatal':
           raise TaskError('Missing deps.')
 
       missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
 
       if self._check_missing_direct_deps and missing_direct_tgt_deps:
-
+        log_fn = (self.context.log.error if self._check_missing_direct_deps == 'fatal'
+                  else self.context.log.warn)
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
           evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
-          self.context.log.warn('Missing direct BUILD dependency {} -> {} because:\n{}'
-                                 .format(tgt_pair[0].address, tgt_pair[1].address, evidence_str))
+          log_fn('Missing direct BUILD dependency {} -> {} because:\n{}'
+                 .format(tgt_pair[0].address, tgt_pair[1].address, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
           raise TaskError('Missing direct deps.')
 
