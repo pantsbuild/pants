@@ -40,6 +40,7 @@ from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
+from pants.backend.jvm.tasks.jvm_dependency_score import JvmDependencyScore
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
@@ -135,6 +136,8 @@ def register_goals():
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
       'Check that used dependencies have been requested.')
+  task(name='jvm-dep-score', action=JvmDependencyScore).install('compile').with_description(
+      'Calculate the percent of a dependency sources used vs. sources available.')
 
   # Generate documentation.
   task(name='javadoc', action=JavadocGen).install('doc').with_description('Create documentation.')
