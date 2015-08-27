@@ -10,7 +10,6 @@ target(
     ':anonymizer',
     ':java',
     ':jvm_compile',
-    ':jvm_dependency_check',
     ':scala',
   ],
 )
@@ -143,22 +142,6 @@ python_library(
 python_library(
   name = 'anonymizer',
   sources = ['anonymizer.py'],
-)
-
-python_library(
-  name = 'jvm_dependency_check',
-  sources = ['jvm_dependency_check.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_graph',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/util:memo',
-  ],
 )
 
 python_library(

@@ -390,8 +390,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         )
         add_products_by_target(unclaimed_classes)
 
-    # Register resource products.
     for compile_context in compile_contexts:
+      # Register resource products.
       extra_resources = self.extra_products(compile_context.target)
       # Add to resources_by_target (if it was requested).
       if resources_by_target is not None:
@@ -404,6 +404,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
       compile_classpath.add_for_target(compile_context.target, entries)
 
-      classpath = [path for (conf, path) in entries if conf in self._confs]
-      actual_source_deps[compile_context.target] = self._strategy.parse_deps(classpath,
-                                                                             compile_context)
+      if self.context.products.is_required_data('actual_source_deps'):
+        classpath = [path for (conf, path) in entries if conf in self._confs]
+        actual_source_deps[compile_context.target] = self._strategy.parse_deps(classpath,
+                                                                               compile_context)

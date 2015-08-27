@@ -29,14 +29,16 @@ class JvmDependencyCheck(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmDependencyCheck, cls).prepare(options, round_manager)
-    round_manager.require_data('classes_by_target')
-    round_manager.require_data('ivy_jar_products')
-    round_manager.require_data('ivy_resolve_symlink_map')
-    round_manager.require_data('actual_source_deps')
+    if not options.skip:
+      round_manager.require_data('classes_by_target')
+      round_manager.require_data('ivy_jar_products')
+      round_manager.require_data('ivy_resolve_symlink_map')
+      round_manager.require_data('actual_source_deps')
 
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
+    register('--skip', default=False, help='Skip dependency check.')
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              fingerprint=True,
              help='Check for missing dependencies in compiled code. Reports actual '
@@ -77,11 +79,19 @@ class JvmDependencyCheck(Task):
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
     self._target_whitelist = self.get_options().missing_deps_whitelist
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   def execute(self):
-    for target in self.context.targets():
-      actual_source_deps = self.context.products.get_data('actual_source_deps').get(target)
-      if actual_source_deps is not None:
-        self.check(target, actual_source_deps)
+    if self.get_options().skip:
+      return
+    with self.invalidated(self.context.targets(),
+                          invalidate_dependents=True) as invalidation_check:
+      for vt in invalidation_check.invalid_vts:
+        actual_source_deps = self.context.products.get_data('actual_source_deps').get(vt.target)
+        if actual_source_deps is not None:
+          self.check(vt.target, actual_source_deps)
 
   @memoized_property
   def targets_by_file(self):
