@@ -9,12 +9,13 @@ from textwrap import wrap
 
 from colors import blue, cyan, green, red
 
-from pants.option.help_info_extracter import HelpInfoExtracter
+from pants.help.help_info_extracter import HelpInfoExtracter
 
 
 class HelpFormatter(object):
-  def __init__(self, scope, show_advanced, color):
+  def __init__(self, scope, show_recursive, show_advanced, color):
     self._scope = scope
+    self._show_recursive = show_recursive
     self._show_advanced = show_advanced
     self._color = color
 
@@ -43,20 +44,20 @@ class HelpFormatter(object):
     def add_option(category, ohis):
       if ohis:
         lines.append('')
+        display_scope = scope or 'Global'
         if category:
-          lines.append(self._maybe_blue('{} {} options:'.format(scope, category)))
+          lines.append(self._maybe_blue('{} {} options:'.format(display_scope, category)))
         else:
-          lines.append(self._maybe_blue('{}:'.format(scope)))
+          lines.append(self._maybe_blue('{} options:'.format(display_scope)))
           if description:
             lines.append(description)
         lines.append(' ')
         for ohi in ohis:
           lines.extend(self.format_option(ohi))
     add_option('', oshi.basic)
-    if self._show_advanced:
-      # We only show recursive options if the user asked for advanced help,
-      # as this is an advanced concept.
+    if self._show_recursive:
       add_option('recursive', oshi.recursive)
+    if self._show_advanced:
       add_option('advanced', oshi.advanced)
     return lines
 

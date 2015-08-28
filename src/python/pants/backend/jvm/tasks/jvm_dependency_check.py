@@ -190,29 +190,28 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     transitive_deps_by_target = self._compute_transitive_deps_by_target()
 
     # Find deps that are actual but not specified.
-    with self.context.new_workunit(name='scan_deps'):
-      missing_file_deps = OrderedSet()  # (src, src).
-      missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
-      missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
+    missing_file_deps = OrderedSet()  # (src, src).
+    missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
+    missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
-      buildroot = get_buildroot()
-      abs_srcs = [os.path.join(buildroot, src) for src in src_tgt.sources_relative_to_buildroot()]
-      for src in abs_srcs:
-        for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-          actual_dep_tgts = self.targets_by_file.get(actual_dep)
-          # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
-          # to be in our declared deps to be OK.
-          if actual_dep_tgts is None:
-            missing_file_deps.add((src_tgt, actual_dep))
-          elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
-            # Obviously intra-target deps are fine.
-            canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
-            if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
-              missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
-            elif canonical_actual_dep_tgt not in src_tgt.dependencies:
-              # The canonical dep is the only one a direct dependency makes sense on.
-              missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
-                  (src, actual_dep))
+    buildroot = get_buildroot()
+    abs_srcs = [os.path.join(buildroot, src) for src in src_tgt.sources_relative_to_buildroot()]
+    for src in abs_srcs:
+      for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
+        actual_dep_tgts = self.targets_by_file.get(actual_dep)
+        # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
+        # to be in our declared deps to be OK.
+        if actual_dep_tgts is None:
+          missing_file_deps.add((src_tgt, actual_dep))
+        elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
+          # Obviously intra-target deps are fine.
+          canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
+          if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
+            missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
+          elif canonical_actual_dep_tgt not in src_tgt.dependencies:
+            # The canonical dep is the only one a direct dependency makes sense on.
+            missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
+                (src, actual_dep))
 
     return (list(missing_file_deps),
             missing_tgt_deps_map.items(),

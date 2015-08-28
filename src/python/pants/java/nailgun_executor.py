@@ -78,7 +78,7 @@ class NailgunExecutor(Executor, ProcessManager):
   _SELECT_WAIT = 1
   _PROCESS_NAME = b'java'
 
-  def __init__(self, identity, workdir, nailgun_classpath, distribution=None, ins=None,
+  def __init__(self, identity, workdir, nailgun_classpath, distribution, ins=None,
                connect_timeout=10, connect_attempts=5):
     Executor.__init__(self, distribution=distribution)
     ProcessManager.__init__(self, name=identity, process_name=self._PROCESS_NAME)

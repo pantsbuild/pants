@@ -12,7 +12,7 @@ python_library(
   name='go_binary',
   sources=['go_binary.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
+    ':go_local_source',
   ],
 )
 
@@ -20,7 +20,7 @@ python_library(
   name='go_library',
   sources=['go_library.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
+    ':go_local_source',
   ],
 )
 

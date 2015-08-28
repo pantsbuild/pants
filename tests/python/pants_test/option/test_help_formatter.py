@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.option.help_formatter import HelpFormatter
-from pants.option.help_info_extracter import OptionHelpInfo
+from pants.help.help_formatter import HelpFormatter
+from pants.help.help_info_extracter import OptionHelpInfo
 
 
 class OptionHelpFormatterTest(unittest.TestCase):
@@ -18,7 +18,8 @@ class OptionHelpFormatterTest(unittest.TestCase):
                          type=bool, default='MYDEFAULT', help='help for foo',
                          deprecated_version=None, deprecated_message=None, deprecated_hint=None)
 
-    lines = HelpFormatter(scope='', show_advanced=False, color=False).format_option(ohi)
+    lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
+                          color=False).format_option(ohi)
     self.assertEquals(len(lines), 2)
     self.assertEquals('--foo (default: MYDEFAULT)', lines[0])
     self.assertIn('help for foo', lines[1])
@@ -26,10 +27,10 @@ class OptionHelpFormatterTest(unittest.TestCase):
   def test_suppress_advanced(self):
     args = ['--foo']
     kwargs = {'advanced': True}
-    lines = HelpFormatter(scope='', show_advanced=False, color=False).format_options(
-      '', '', [(args, kwargs)])
+    lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
+                          color=False).format_options('', '', [(args, kwargs)])
     self.assertEquals(0, len(lines))
-    lines = HelpFormatter(scope='', show_advanced=True, color=False).format_options(
-      '', '', [(args, kwargs)])
+    lines = HelpFormatter(scope='', show_recursive=True, show_advanced=True,
+                          color=False).format_options('', '', [(args, kwargs)])
     print(lines)
     self.assertEquals(5, len(lines))

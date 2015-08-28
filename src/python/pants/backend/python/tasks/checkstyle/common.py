@@ -252,7 +252,7 @@ class Nit(object):
 
   @property
   def message(self):
-    return '{code}:{severity:<7}bobs your uncle {filename}:{linenum} {message}'.format(
+    return '{code}:{severity:<7} {filename}:{linenum} {message}'.format(
         code=self.code,
         severity=self.SEVERITY[self.severity],
         filename=self.python_file.filename,

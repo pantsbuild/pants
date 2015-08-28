@@ -46,6 +46,14 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
 class HelpInfoExtracter(object):
   """Extracts information useful for displaying help from option registration args."""
 
+  @classmethod
+  def get_option_scope_help_info_from_parser(cls, parser):
+    """Returns a dict of help information for the options registered on the given parser.
+
+    Callers can format this dict into cmd-line help, HTML or whatever.
+    """
+    return cls(parser.scope).get_option_scope_help_info(parser.registration_args)
+
   @staticmethod
   def compute_default(kwargs):
     """Compute the default value to display in help for an option registered with these kwargs."""

@@ -9,8 +9,8 @@ import unittest
 
 from mock import mock
 
+from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.custom_types import dict_option, list_option
-from pants.option.help_info_extracter import HelpInfoExtracter
 
 
 class HelpInfoExtracterTest(unittest.TestCase):

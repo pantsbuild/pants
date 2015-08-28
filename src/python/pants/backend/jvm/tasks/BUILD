@@ -69,6 +69,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/ivy',
+    'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
@@ -352,6 +353,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/fs',
     'src/python/pants/java:executor',
+    'src/python/pants/java/distribution',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
@@ -447,7 +449,7 @@ python_library(
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
     'src/python/pants/console:stty_utils',
-    'src/python/pants/java:util',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:strutil',
   ],
 )
@@ -459,6 +461,7 @@ python_library(
     ':jvmdoc_gen',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/java:executor',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:memo',
   ],
 )

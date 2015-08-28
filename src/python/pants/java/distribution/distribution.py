@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from six import string_types
 
 from pants.base.revision import Revision
+from pants.java.util import execute_java
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
@@ -212,6 +213,9 @@ class Distribution(object):
       if self._jdk:
         raise
 
+  def execute_java(self, *args, **kwargs):
+    return execute_java(*args, distribution=self, **kwargs)
+
   def _get_version(self, java):
     if not self._version:
       self._version = self._parse_java_version('java.version',
@@ -307,7 +311,7 @@ class DistributionLocator(Subsystem):
     super(DistributionLocator, cls).register_options(register)
     human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
                                           for key, val in OS_ALIASES.items())
-    register('--paths', advanced=True, recursive=True, type=dict_option,
+    register('--paths', advanced=True, type=dict_option,
              help='Map of os names to lists of paths to jdks. These paths will be searched before '
                   'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
                   'when locating a jvm to use. The same OS can be specified via several different '

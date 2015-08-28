@@ -23,15 +23,15 @@ class JVM(Subsystem):
   def register_options(cls, register):
     super(JVM, cls).register_options(register)
     # TODO(benjy): Options to specify the JVM version?
-    register('--options', action='append', recursive=True, metavar='<option>...',
+    register('--options', action='append', metavar='<option>...',
              help='Run with these extra JVM options.')
-    register('--program-args', action='append', recursive=True, metavar='<arg>...',
+    register('--program-args', action='append', metavar='<arg>...',
              help='Run with these extra program args.')
-    register('--debug', action='store_true', recursive=True,
+    register('--debug', action='store_true',
              help='Run the JVM with remote debugging.')
-    register('--debug-port', advanced=True, recursive=True, type=int, default=5005,
+    register('--debug-port', advanced=True, type=int, default=5005,
              help='The JVM will listen for a debugger on this port.')
-    register('--debug-args', advanced=True, recursive=True, type=list_option,
+    register('--debug-args', advanced=True, type=list_option,
              default=[
                '-Xdebug',
                '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'

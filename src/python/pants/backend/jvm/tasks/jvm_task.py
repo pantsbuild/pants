@@ -13,8 +13,8 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 class JvmTask(Task):
 
   @classmethod
-  def task_subsystems(cls):
-    return super(JvmTask, cls).task_subsystems() + (JVM,)
+  def subsystem_dependencies(cls):
+    return super(JvmTask, cls).subsystem_dependencies() + (JVM.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):

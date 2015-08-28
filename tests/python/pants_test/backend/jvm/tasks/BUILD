@@ -46,6 +46,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java/jar:shader',
     'src/python/pants/util:contextutil',
