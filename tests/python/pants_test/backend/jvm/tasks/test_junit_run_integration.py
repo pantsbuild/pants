@@ -49,4 +49,4 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
     self.assert_failure(pants_run)
-    self.assertIn("Unknown target for test", pants_run.stdout_data)
+    self.assertIn("No target found for test specifier", pants_run.stdout_data)
