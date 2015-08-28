@@ -14,6 +14,9 @@ from pants.backend.codegen.register import build_file_aliases as register_codege
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.wire_gen import WireGen
 from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_file
@@ -192,20 +195,27 @@ class WireGenTest(TaskTestBase):
     os.chdir(previous_working_directory)
     self.assertEquals(OrderedSet(['org/pantsbuild/example/Foo.java']), OrderedSet(result))
 
+  def _create_fake_wire_tool(self, version='1.6.0'):
+    self.make_target(':wire-compiler', JarLibrary, jars=[
+      JarDependency(org='com.squareup.wire', name='wire-compiler', rev=version),
+    ])
 
   def test_compiler_args(self):
+    self._create_fake_wire_tool()
     SourceRoot.register('wire-src')
     simple_wire_target = self.make_target('wire-src:simple-wire-target', JavaWireLibrary,
                                           sources=['foo.proto'])
     context = self.context(target_roots=[simple_wire_target])
     task = self.create_task(context)
     self.assertEquals([
-      '--java_out={}/{}/wire-src.simple-wire-target'.format(self.build_root, self.EXPECTED_TASK_PATH),
+      '--java_out={}/{}/wire-src.simple-wire-target'.format(self.build_root,
+                                                            self.EXPECTED_TASK_PATH),
       '--proto_path={}/wire-src'.format(self.build_root),
       'foo.proto'],
       task.format_args_for_target(simple_wire_target))
 
   def test_compiler_args_wirev1(self):
+    self._create_fake_wire_tool()
     SourceRoot.register('wire-src')
     wire_targetv1 = self.make_target('wire-src:wire-targetv1', JavaWireLibrary,
                                      sources=['bar.proto'],
@@ -221,7 +231,30 @@ class WireGenTest(TaskTestBase):
       'bar.proto'],
       task.format_args_for_target(wire_targetv1))
 
+  def test_compiler_wire2_with_writer_errors(self):
+    self._create_fake_wire_tool(version='2.0.0')
+    SourceRoot.register('wire-src')
+    wire_targetv1 = self.make_target('wire-src:wire-targetv1', JavaWireLibrary,
+                                     sources=['bar.proto'],
+                                     service_writer='org.pantsbuild.DummyServiceWriter',
+                                     service_writer_options=['opt1', 'opt2'])
+    task = self.create_task(self.context(target_roots=[wire_targetv1]))
+    with self.assertRaises(TaskError):
+      task.format_args_for_target(wire_targetv1)
+
+  def test_compiler_wire1_with_factory_errors(self):
+    self._create_fake_wire_tool()
+    SourceRoot.register('wire-src')
+    wire_targetv2 = self.make_target('wire-src:wire-targetv2', JavaWireLibrary,
+                                     sources=['baz.proto'],
+                                     service_factory='org.pantsbuild.DummyServiceFactory',
+                                     service_factory_options=['v2opt1', 'v2opt2'])
+    task = self.create_task(self.context(target_roots=[wire_targetv2]))
+    with self.assertRaises(TaskError):
+      task.format_args_for_target(wire_targetv2)
+
   def test_compiler_args_wirev2(self):
+    self._create_fake_wire_tool(version='2.0.0')
     SourceRoot.register('wire-src')
     wire_targetv2 = self.make_target('wire-src:wire-targetv2', JavaWireLibrary,
                                      sources=['baz.proto'],
@@ -238,6 +271,7 @@ class WireGenTest(TaskTestBase):
       task.format_args_for_target(wire_targetv2))
 
   def test_compiler_args_all(self):
+    self._create_fake_wire_tool(version='2.0.0')
     SourceRoot.register('wire-src')
     kitchen_sink = self.make_target('wire-src:kitchen-sink', JavaWireLibrary,
                                     sources=['foo.proto', 'bar.proto', 'baz.proto'],
@@ -259,3 +293,21 @@ class WireGenTest(TaskTestBase):
       'bar.proto',
       'baz.proto'],
       task.format_args_for_target(kitchen_sink))
+
+  def test_compiler_args_proto_paths(self):
+    self._create_fake_wire_tool(version='2.0.0')
+    SourceRoot.register('wire-src')
+    SourceRoot.register('wire-other-src')
+    parent_target = self.make_target('wire-other-src:parent-target', JavaWireLibrary,
+                                     sources=['bar.proto'])
+    simple_wire_target = self.make_target('wire-src:simple-wire-target', JavaWireLibrary,
+                                          sources=['foo.proto'], dependencies=[parent_target])
+    context = self.context(target_roots=[parent_target, simple_wire_target])
+    task = self.create_task(context)
+    self.assertEquals([
+      '--java_out={}/{}/wire-src.simple-wire-target'.format(self.build_root,
+                                                            self.EXPECTED_TASK_PATH),
+      '--proto_path={}/wire-src'.format(self.build_root),
+      '--proto_path={}/wire-other-src'.format(self.build_root),
+      'foo.proto'],
+      task.format_args_for_target(simple_wire_target))
