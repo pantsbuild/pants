@@ -226,11 +226,21 @@ class _JUnitRunner(object):
       # If there are some junit_test targets in the graph, find ones that match the requested
       # test(s).
       tests_with_targets = {}
+      unknown_tests = []
       for test in self._get_tests_to_run():
         # A test might contain #specific_method, which is not needed to find a target.
         test_class_name = test.partition('#')[0]
         target = tests_from_targets.get(test_class_name)
-        tests_with_targets[test] = target
+        if target is None:
+          unknown_tests.append(test)
+        else:
+          tests_with_targets[test] = target
+
+      if len(unknown_tests) > 0:
+        raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change " \
+                        "specifier or bring in the proper target(s)."
+                        .format("'\n  '".join(unknown_tests)))
+
       return tests_with_targets
     else:
       return tests_from_targets
