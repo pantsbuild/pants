@@ -53,64 +53,64 @@ class JvmDependencyAnalyzer(Task):
     jarlibs_by_id = defaultdict(set)
 
     # Compute src -> target.
-    with self.context.new_workunit(name='map_sources'):
-      buildroot = get_buildroot()
-      # Look at all targets in-play for this pants run. Does not include synthetic targets,
-      for target in self.context.targets():
-        if isinstance(target, JvmTarget):
-          for src in target.sources_relative_to_buildroot():
+    self.context.log.debug('Mapping sources...')
+    buildroot = get_buildroot()
+    # Look at all targets in-play for this pants run. Does not include synthetic targets,
+    for target in self.context.targets():
+      if isinstance(target, JvmTarget):
+        for src in target.sources_relative_to_buildroot():
+          targets_by_file[os.path.join(buildroot, src)].add(target)
+      elif isinstance(target, JarLibrary):
+        for jardep in target.jar_dependencies:
+          jarlibs_by_id[(jardep.org, jardep.name)].add(target)
+      # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
+      if isinstance(target, ScalaLibrary):
+        for java_source in target.java_sources:
+          for src in java_source.sources_relative_to_buildroot():
             targets_by_file[os.path.join(buildroot, src)].add(target)
-        elif isinstance(target, JarLibrary):
-          for jardep in target.jar_dependencies:
-            jarlibs_by_id[(jardep.org, jardep.name)].add(target)
-        # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
-        if isinstance(target, ScalaLibrary):
-          for java_source in target.java_sources:
-            for src in java_source.sources_relative_to_buildroot():
-              targets_by_file[os.path.join(buildroot, src)].add(target)
 
     # Compute class -> target.
-    with self.context.new_workunit(name='map_classes'):
-      classes_by_target = self.context.products.get_data('classes_by_target')
-      for tgt, target_products in classes_by_target.items():
-        for classes_dir, classes in target_products.rel_paths():
-          for cls in classes:
-            targets_by_file[cls].add(tgt)
-            targets_by_file[os.path.join(classes_dir, cls)].add(tgt)
+    self.context.log.debug('Mapping classes...')
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    for tgt, target_products in classes_by_target.items():
+      for classes_dir, classes in target_products.rel_paths():
+        for cls in classes:
+          targets_by_file[cls].add(tgt)
+          targets_by_file[os.path.join(classes_dir, cls)].add(tgt)
 
     # Compute jar -> target.
-    with self.context.new_workunit(name='map_jars'):
-      with IvyTaskMixin.symlink_map_lock:
-        m = self.context.products.get_data('ivy_resolve_symlink_map')
-        all_symlinks_map = m.copy() if m is not None else {}
-        # We make a copy, so it's safe to use outside the lock.
+    self.context.log.debug('Mapping jars...')
+    with IvyTaskMixin.symlink_map_lock:
+      m = self.context.products.get_data('ivy_resolve_symlink_map')
+      all_symlinks_map = m.copy() if m is not None else {}
+      # We make a copy, so it's safe to use outside the lock.
 
-      def register_transitive_jars_for_ref(ivyinfo, ref):
-        deps_by_ref_memo = {}
+    def register_transitive_jars_for_ref(ivyinfo, ref):
+      deps_by_ref_memo = {}
 
-        def get_transitive_jars_by_ref(ref1):
-          def create_collection(current_ref):
-            return {ivyinfo.modules_by_ref[current_ref].artifact}
-          return ivyinfo.traverse_dependency_graph(ref1, create_collection, memo=deps_by_ref_memo)
+      def get_transitive_jars_by_ref(ref1):
+        def create_collection(current_ref):
+          return {ivyinfo.modules_by_ref[current_ref].artifact}
+        return ivyinfo.traverse_dependency_graph(ref1, create_collection, memo=deps_by_ref_memo)
 
-        target_key = (ref.org, ref.name)
-        if target_key in jarlibs_by_id:
-          # These targets provide all the jars in ref, and all the jars ref transitively depends on.
-          jarlib_targets = jarlibs_by_id[target_key]
+      target_key = (ref.org, ref.name)
+      if target_key in jarlibs_by_id:
+        # These targets provide all the jars in ref, and all the jars ref transitively depends on.
+        jarlib_targets = jarlibs_by_id[target_key]
 
-          for jar_path in get_transitive_jars_by_ref(ref):
-            # Register that each jarlib_target provides jar (via all its symlinks).
-            symlink = all_symlinks_map.get(os.path.realpath(jar_path), None)
-            if symlink:
-              for jarlib_target in jarlib_targets:
-                targets_by_file[symlink].add(jarlib_target)
+        for jar_path in get_transitive_jars_by_ref(ref):
+          # Register that each jarlib_target provides jar (via all its symlinks).
+          symlink = all_symlinks_map.get(os.path.realpath(jar_path), None)
+          if symlink:
+            for jarlib_target in jarlib_targets:
+              targets_by_file[symlink].add(jarlib_target)
 
-      ivy_products = self.context.products.get_data('ivy_jar_products')
-      if ivy_products:
-        for ivyinfos in ivy_products.values():
-          for ivyinfo in ivyinfos:
-            for ref in ivyinfo.modules_by_ref:
-              register_transitive_jars_for_ref(ivyinfo, ref)
+    ivy_products = self.context.products.get_data('ivy_jar_products')
+    if ivy_products:
+      for ivyinfos in ivy_products.values():
+        for ivyinfo in ivyinfos:
+          for ref in ivyinfo.modules_by_ref:
+            register_transitive_jars_for_ref(ivyinfo, ref)
 
     return targets_by_file
 
