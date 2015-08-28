@@ -6,6 +6,7 @@ package org.pantsbuild.example.hello.main;
 import java.io.IOException;
 
 import org.pantsbuild.example.hello.greet.Greeting;
+import org.pantsbuild.example.hello.farewell.Goodbye;
 
 public class HelloMain {
 
@@ -15,6 +16,8 @@ public class HelloMain {
 
     // Target of other greeting is config'd in resource, so read that:
     System.out.println(Greeting.greetFromResource("org/pantsbuild/example/hello/world.txt"));
+
+    Goodbye.speak();
   }
 
   private HelloMain() {
