@@ -9,7 +9,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import list_option
-from pants.thrift_util import calculate_compile_sources
+from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
 class ThriftLintError(Exception):
