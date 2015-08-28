@@ -264,6 +264,11 @@ migrations = {
   ('compile.cpp-compile', 'cc_extensions'): ('compile.cpp', 'cc_extensions'),
 
   ('test.junit', 'coverage_html_open'): ('test.junit', 'coverage_open'),
+
+  # On by default.
+  ('compile.apt', 'jar'): None,
+  ('compile.java', 'jar'): None,
+  ('compile.zinc', 'jar'): None,
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
