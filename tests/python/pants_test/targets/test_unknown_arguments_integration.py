@@ -28,11 +28,10 @@ class TestUnknownArgumentsIntegration(PantsRunIntegrationTest):
                                                   for key, val in kwargs.items())))
       yield spec
 
-
   def test_future_params(self):
     param = 'nonexistant_parameter'
     with self.temp_target_spec(**{param: 'value'}) as spec:
-      run = self.run_pants(['--unknown-arguments-ignored={"JavaLibrary": ["nonexistant_parameter"]}',
+      run = self.run_pants(['--unknown-arguments-ignored={{"JavaLibrary": ["{}"]}}'.format(param),
                             '-ldebug',
                             'clean-all', spec])
       self.assert_success(run)

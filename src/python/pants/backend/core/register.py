@@ -39,7 +39,6 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -187,7 +186,3 @@ def register_goals():
 
   task(name='bash-completion', action=BashCompletionTask).install().with_description(
     'Dump bash shell script for autocompletion of pants command lines.')
-
-
-def global_subsystems():
-  return (Target.UnknownArguments,)
