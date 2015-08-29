@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
@@ -21,10 +20,6 @@ class NodeRemoteModule(NpmPackage):
                            accepted by npm including '' or '*' for unconstrained (the default) are
                            acceptable.  See: https://docs.npmjs.com/files/package.json#dependencies
     """
-    if 'dependencies' in kwargs:
-      raise TargetDefinitionException(address.spec,
-                                      'A node_remote_module does not accept dependencies; instead, '
-                                      'they are discovered during resolution (via npm install).')
     payload = payload or Payload()
     payload.add_fields({
       'version': PrimitiveField(version or '*'),  # Guard against/allow `None`.
