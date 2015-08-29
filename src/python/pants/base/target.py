@@ -166,6 +166,9 @@ class Target(AbstractTarget):
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
 
+  class IllegalArgument(TargetDefinitionException):
+    """Argument that isn't allowed supplied to Target."""
+
   LANG_DISCRIMINATORS = {
     'java': lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
