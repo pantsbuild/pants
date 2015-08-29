@@ -21,7 +21,7 @@ from pants.util.strutil import ensure_text
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   if not path.startswith(start):
-    raise Exception('{} is not a prefix of {}'.format(start, path))
+    raise ValueError('{} is not a prefix of {}'.format(start, path))
 
   # Confirm that the split occurs on a directory boundary.
   if start[-1] == '/':
@@ -29,7 +29,7 @@ def fast_relpath(path, start):
   elif path[len(start)] == '/':
     slash_offset = 1
   else:
-    raise Exception('{} is not a directory containing {}'.format(start, path))
+    raise ValueError('{} is not a directory containing {}'.format(start, path))
 
   return path[len(start)+slash_offset:]
 

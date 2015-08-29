@@ -282,6 +282,8 @@ ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_n
 
 scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been refactored into '
                          'two options: one for service deps, and one for structs deps.')
+compile_jar_note = ('The isolated jvm compile `jar` option is critical to performant operation '
+                    'and can no longer be disabled.')
 
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
@@ -374,6 +376,10 @@ notes = {
   ('test.junit', 'coverage_console'): 'Option no longer exists. Coverage always written to stdout.',
   ('test.junit', 'coverage_html'): 'Option no longer exists. Coverage always written to html file.',
   ('test.junit', 'coverage_xml'): 'Option no longer exists. Coverage always written to xml file.',
+
+  ('compile.apt', 'jar'): compile_jar_note,
+  ('compile.java', 'jar'): compile_jar_note,
+  ('compile.zinc', 'jar'): compile_jar_note,
 }
 
 
