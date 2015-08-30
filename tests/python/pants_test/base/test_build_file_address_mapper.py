@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.base.address import Address, BuildFileAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
+from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
 
@@ -20,42 +20,26 @@ from pants_test.base_test import BaseTest
 
 class BuildFileAddressMapperTest(BaseTest):
 
-  def setUp(self):
-    super(BuildFileAddressMapperTest, self).setUp()
-
   def test_resolve(self):
-    build_file = self.add_to_build_file('BUILD', dedent(
-      ''' target(
-        name = 'foo'
-      )
-      '''
-    ))
-
+    build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     address, addressable = self.address_mapper.resolve(Address.parse('//:foo'))
     self.assertIsInstance(address, BuildFileAddress)
     self.assertEqual(build_file, address.build_file)
     self.assertEqual('foo', address.target_name)
     self.assertEqual(address.target_name, addressable.addressable_name)
-    self.assertEqual(addressable.target_type, Dependencies)
+    self.assertEqual(addressable.target_type, Target)
 
   def test_resolve_spec(self):
-    self.add_to_build_file('BUILD', dedent(
-      '''
-      target(
-        name = 'foozle'
-      )
-
-      target(
-        name = 'baz',
-      )
-      '''
-    ))
+    self.add_to_build_file('BUILD', dedent("""
+      target(name='foozle')
+      target(name='baz')
+      """))
 
     with self.assertRaises(AddressLookupError):
       self.address_mapper.resolve_spec('//:bad_spec')
 
     dependencies_addressable = self.address_mapper.resolve_spec('//:foozle')
-    self.assertEqual(dependencies_addressable.target_type, Dependencies)
+    self.assertEqual(dependencies_addressable.target_type, Target)
 
   def test_scan_addresses(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
@@ -63,17 +47,18 @@ class BuildFileAddressMapperTest(BaseTest):
     subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
     with open(os.path.join(self.build_root, 'BUILD.invalid.suffix'), 'w') as invalid_build_file:
       invalid_build_file.write('target(name="foobar")')
-    self.assertEquals(set([BuildFileAddress(root_build_file, 'foo'),
-                           BuildFileAddress(subdir_build_file, 'bar'),
-                           BuildFileAddress(subdir_suffix_build_file, 'baz')]),
+    self.assertEquals({BuildFileAddress(root_build_file, 'target', 'foo'),
+                       BuildFileAddress(subdir_build_file, 'target', 'bar'),
+                       BuildFileAddress(subdir_suffix_build_file, 'target', 'baz')},
                       self.address_mapper.scan_addresses(root=self.build_root))
 
   def test_scan_addresses_with_excludes(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
-    subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     spec_excludes = [os.path.join(self.build_root, 'subdir')]
-    self.assertEquals(set([BuildFileAddress(root_build_file, 'foo')]),
-                      self.address_mapper.scan_addresses(root=self.build_root, spec_excludes=spec_excludes))
+    self.assertEquals({BuildFileAddress(root_build_file, 'target', 'foo')},
+                      self.address_mapper.scan_addresses(root=self.build_root,
+                                                         spec_excludes=spec_excludes))
 
   def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist
@@ -83,16 +68,10 @@ class BuildFileAddressMapperTest(BaseTest):
       self.address_mapper.spec_to_address('//non-existent-path:a')
 
   def test_raises_address_not_in_build_file(self):
-    build_file = self.add_to_build_file('BUILD', dedent(
-      '''
-      target(
-        name = 'foo'
-      )
-      '''
-    ))
+    self.add_to_build_file('BUILD', 'target(name="foo")')
 
     # Create an address that doesn't exist in an existing BUILD file
-    address = BuildFileAddress(build_file, 'bar')
+    address = Address.parse(':bar')
     with self.assertRaises(BuildFileAddressMapper.AddressNotInBuildFile):
       self.address_mapper.resolve(address)
 

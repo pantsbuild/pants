@@ -269,6 +269,8 @@ migrations = {
   ('compile.apt', 'jar'): None,
   ('compile.java', 'jar'): None,
   ('compile.zinc', 'jar'): None,
+
+  ('unknown-arguments', 'ignored'): None,
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -380,6 +382,11 @@ notes = {
   ('compile.apt', 'jar'): compile_jar_note,
   ('compile.java', 'jar'): compile_jar_note,
   ('compile.zinc', 'jar'): compile_jar_note,
+
+  ('unknown-arguments', 'ignored'): 'Target name keys are now expected to be the alias used in '
+                                    'BUILD files and not the target type\'s simple class name. '
+                                    'For example, if you had \'JavaLibrary\' key you\'d now use '
+                                    '\'java_library\' instead.'
 }
 
 

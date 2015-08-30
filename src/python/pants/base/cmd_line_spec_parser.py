@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet, maybe_list
 
-from pants.base.address import BuildFileAddress, parse_spec
+from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
 
@@ -164,7 +164,7 @@ class CmdLineSpecParser(object):
       spec_parts[0] = normalize_spec_path(spec_parts[0])
       spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        build_file = self._address_mapper.from_cache(self._root_dir, spec_path)
-        return set([BuildFileAddress(build_file, target_name)])
+        self._address_mapper.from_cache(self._root_dir, spec_path)
       except BuildFile.BuildFileError as e:
         raise self.BadSpecError(e)
+      return {SyntheticAddress(spec_path, target_name)}

@@ -5,318 +5,190 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from textwrap import dedent
 
-import pytest
-
-from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.register import build_file_aliases as register_jvm
-from pants.backend.jvm.targets.jvm_app import DirectoryReMapper
-from pants.base.address import BuildFileAddress
-from pants.base.address_lookup_error import AddressLookupError
+from pants.backend.core.wrapped_globs import Globs
+from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.base.address import SyntheticAddress
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.parse_context import ParseContext
 from pants_test.base_test import BaseTest
 
 
-class JvmAppTest(BaseTest):
+class BundleTestBase(BaseTest):
 
-  @property
-  def alias_groups(self):
-    return register_jvm()
+  def create_parse_context(self, spec_path):
+    return ParseContext(rel_path=spec_path, type_aliases={})
 
-  def setUp(self):
-    super(JvmAppTest, self).setUp()
-    self.create_dir('src/java/org/archimedes/buoyancy/config')
-    self.create_file('src/java/org/archimedes/buoyancy/config/densities.xml')
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_binary(name='bin')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_binary(name='bin2')
-    '''))
+  def create_bundle(self, rel_path, **kwargs):
+    parse_context = self.create_parse_context(rel_path)
+    return Bundle(parse_context, **kwargs)
+
+
+class JvmAppTest(BundleTestBase):
 
   def test_simple(self):
-    self.add_to_build_file('BUILD', dedent('''
-    jvm_app(name='foo',
-      basename='foo-app',
-      binary = ':foo-binary',
-    )
-    jvm_binary(name='foo-binary',
-      main='com.example.Foo',
-    )
-    '''))
+    binary_target = self.make_target(':foo-binary', JvmBinary, main='com.example.Foo')
+    app_target = self.make_target(':foo', JvmApp, basename='foo-app', binary=':foo-binary')
 
-    app_target = self.target('//:foo')
-    binary_target = self.target('//:foo-binary')
     self.assertEquals('foo-app', app_target.payload.basename)
     self.assertEquals('foo-app', app_target.basename)
     self.assertEquals(binary_target, app_target.binary)
     self.assertEquals([':foo-binary'], list(app_target.traversable_dependency_specs))
 
   def test_bad_basename(self):
-    build_file = self.add_to_build_file('BUILD', dedent('''
-    jvm_app(name='foo',
-      basename='foo',
-    )
-    '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.* foo.*basename must not equal name.'):
-      self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
+                                 r'Invalid target JvmApp.* basename must not equal name.'):
+      self.make_target(':foo', JvmApp, basename='foo')
+
+  def create_app(self, rel_path, name=None, **kwargs):
+    self.create_file(os.path.join(rel_path, 'config/densities.xml'))
+    return self.make_target(SyntheticAddress(rel_path, name or 'app').spec,
+                            JvmApp,
+                            bundles=[self.create_bundle(rel_path, fileset='config/densities.xml')],
+                            **kwargs)
 
   def test_binary_via_binary(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        binary=':bin',
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
-    binary = self.target('src/java/org/archimedes/buoyancy:bin')
-    self.assertEquals(app.binary, binary)
+    bin = self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
+    app = self.create_app('src/java/org/archimedes/buoyancy', binary=':bin')
+    self.assertEquals(app.binary, bin)
 
   def test_binary_via_dependencies(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        dependencies=[':bin'],
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
-    binary = self.target('src/java/org/archimedes/buoyancy:bin')
-    self.assertEquals(app.binary, binary)
+    bin = self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
+    app = self.create_app('src/java/org/archimedes/buoyancy', dependencies=[bin])
+    self.assertEquals(app.binary, bin)
 
   def test_degenerate_binaries(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        binary=':bin',
-        dependencies=[':bin'],
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
-    binary = self.target('src/java/org/archimedes/buoyancy:bin')
-    self.assertEquals(app.binary, binary)
+    bin = self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
+    app = self.create_app('src/java/org/archimedes/buoyancy', binary=':bin', dependencies=[bin])
+    self.assertEquals(app.binary, bin)
 
   def test_no_binary(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
+    app = self.create_app('src/java/org/archimedes/buoyancy')
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
-                                 r'buoyancy.*A JvmApp must define exactly one'):
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
+                                 r' A JvmApp must define exactly one'):
       app.binary
 
   def test_too_many_binaries_mixed(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        binary=':bin',
-        dependencies=[':bin2'],
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
+    self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
+    bin2 = self.make_target('src/java/org/archimedes/buoyancy:bin2', JvmBinary)
+    app = self.create_app('src/java/org/archimedes/buoyancy', binary=':bin', dependencies=[bin2])
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
-                                 r'buoyancy.*A JvmApp must define exactly one'):
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
+                                 r' A JvmApp must define exactly one'):
       app.binary
 
   def test_too_many_binaries_via_deps(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        dependencies=[':bin', ':bin2'],
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
+    bin = self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
+    bin2 = self.make_target('src/java/org/archimedes/buoyancy:bin2', JvmBinary)
+    app = self.create_app('src/java/org/archimedes/buoyancy', dependencies=[bin, bin2])
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
-                                 r'buoyancy.*A JvmApp must define exactly one'):
-
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
+                                 r' A JvmApp must define exactly one'):
       app.binary
 
   def test_not_a_binary(self):
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        binary=':bin',
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy2',
-        binary=':buoyancy',
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy:buoyancy2')
+    self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
+    self.create_app('src/java/org/archimedes/buoyancy', name='app', binary=':bin')
+    app = self.create_app('src/java/org/archimedes/buoyancy', name='app2', binary=':app')
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy/BUILD\), '
-                                r'buoyancy2.* Expected JvmApp binary dependency'):
+                                 r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app2\).*'
+                                 r' Expected JvmApp binary dependency'):
       app.binary
 
 
-class BundleTest(BaseTest):
-
-  @property
-  def alias_groups(self):
-    return register_core().merge(register_jvm())
+class BundleTest(BundleTestBase):
 
   def test_bundle_filemap_dest_bypath(self):
-    self.create_dir('src/java/org/archimedes/buoyancy/config')
-    self.create_file('src/java/org/archimedes/buoyancy/config/densities.xml')
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/buoyancy/BUILD', dedent('''
-      jvm_app(name='buoyancy',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(fileset='config/densities.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/buoyancy')
+    spec_path = 'src/java/org/archimedes/buoyancy'
+    densities = self.create_file(os.path.join(spec_path, 'config/densities.xml'))
+    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+
+    app = self.make_target(spec_path,
+                           JvmApp,
+                           dependencies=[unused],
+                           bundles=[self.create_bundle(spec_path, fileset='config/densities.xml')])
+
+    self.assertEqual(1, len(app.bundles))
     # after one big refactor, ../../../../../ snuck into this path:
-    self.assertEquals(app.bundles[0].filemap.values()[0],
-                      'config/densities.xml')
+    self.assertEqual({densities: 'config/densities.xml'}, app.bundles[0].filemap)
 
   def test_bundle_filemap_dest_byglobs(self):
-    self.create_dir('src/java/org/archimedes/tub/config')
-    self.create_file('src/java/org/archimedes/tub/config/one.xml')
-    self.create_file('src/java/org/archimedes/tub/config/two.xml')
-    self.add_to_build_file('src/java/org/archimedes/tub/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/tub/BUILD', dedent('''
-      jvm_app(name='tub',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(fileset=globs('config/*.xml'))
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/tub')
-    for k in app.bundles[0].filemap.keys():
-      if k.endswith('archimedes/tub/config/one.xml'):
-        onexml_key = k
-    self.assertEquals(app.bundles[0].filemap[onexml_key],
-                      'config/one.xml')
+    spec_path = 'src/java/org/archimedes/tub'
+    one = self.create_file(os.path.join(spec_path, 'config/one.xml'))
+    two = self.create_file(os.path.join(spec_path, 'config/two.xml'))
+    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+
+    parse_context = self.create_parse_context(spec_path)
+    globs = Globs(parse_context)
+    app = self.make_target(spec_path,
+                           JvmApp,
+                           dependencies=[unused],
+                           bundles=[Bundle(parse_context, fileset=globs('config/*.xml'))])
+
+    self.assertEqual(1, len(app.bundles))
+    self.assertEqual({one: 'config/one.xml', two: 'config/two.xml'}, app.bundles[0].filemap)
 
   def test_bundle_filemap_dest_relative(self):
-    self.create_dir('src/java/org/archimedes/crown/gold/config')
-    self.create_file('src/java/org/archimedes/crown/gold/config/five.xml')
-    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      jvm_app(name='crown',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(relative_to='gold', fileset='gold/config/five.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/crown')
-    for k in app.bundles[0].filemap.keys():
-      if k.endswith('archimedes/crown/gold/config/five.xml'):
-        fivexml_key = k
-    self.assertEquals(app.bundles[0].filemap[fivexml_key],
-                      'config/five.xml')
+    spec_path = 'src/java/org/archimedes/crown'
+    five = self.create_file(os.path.join(spec_path, 'gold/config/five.xml'))
+    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+
+    app = self.make_target(spec_path,
+                           JvmApp,
+                           dependencies=[unused],
+                           bundles=[self.create_bundle(spec_path,
+                                                       relative_to='gold',
+                                                       fileset='gold/config/five.xml')])
+
+    self.assertEqual(1, len(app.bundles))
+    self.assertEqual({five: 'config/five.xml'}, app.bundles[0].filemap)
 
   def test_bundle_filemap_dest_remap(self):
-    self.create_dir('src/java/org/archimedes/crown/config')
-    self.create_file('src/java/org/archimedes/crown/config/one.xml')
-    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      jvm_app(name='crown',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(mapper=DirectoryReMapper('src/java/org/archimedes/crown/config', 'gold/config'), fileset='config/one.xml')
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/crown')
-    for k in app.bundles[0].filemap.keys():
-      if k.endswith('archimedes/crown/config/one.xml'):
-        onexml_key = k
-    self.assertEquals(app.bundles[0].filemap[onexml_key],
-                      'gold/config/one.xml')
+    spec_path = 'src/java/org/archimedes/crown'
+    one = self.create_file(os.path.join(spec_path, 'config/one.xml'))
+    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+
+    mapper = DirectoryReMapper(os.path.join(spec_path, 'config'), 'gold/config')
+    app = self.make_target(spec_path,
+                           JvmApp,
+                           dependencies=[unused],
+                           bundles=[self.create_bundle(spec_path,
+                                                       mapper=mapper,
+                                                       fileset='config/one.xml')])
+
+    self.assertEqual(1, len(app.bundles))
+    self.assertEqual({one: 'gold/config/one.xml'}, app.bundles[0].filemap)
 
   def test_bundle_filemap_remap_base_not_exists(self):
     # Create directly
-    with pytest.raises(DirectoryReMapper.BaseNotExistsError):
+    with self.assertRaises(DirectoryReMapper.BaseNotExistsError):
       DirectoryReMapper("dummy/src/java/org/archimedes/crown/missing", "dummy")
 
-    # Used in the BUILD
-    self.create_dir('src/java/org/archimedes/crown/config')
-    self.create_file('src/java/org/archimedes/crown/config/one.xml')
-    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/crown/BUILD', dedent('''
-      jvm_app(name='crown',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(mapper=DirectoryReMapper('src/java/org/archimedes/crown/missing', 'gold/config'), fileset='config/one.xml')
-        ]
-      )
-    '''))
-
-    with pytest.raises(AddressLookupError):
-      self.target('src/java/org/archimedes/crown')
-
   def test_bundle_add(self):
-    self.create_dir('src/java/org/archimedes/volume/config/stone')
-    self.create_file('src/java/org/archimedes/volume/config/stone/dense.xml')
-    self.create_dir('src/java/org/archimedes/volume/config')
-    self.create_file('src/java/org/archimedes/volume/config/metal/dense.xml')
-    self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
-    self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
-      jvm_app(name='volume',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(relative_to='config', fileset=['config/stone/dense.xml', 'config/metal/dense.xml'])
-        ]
-      )
-    '''))
-    app = self.target('src/java/org/archimedes/volume')
-    for k in app.bundles[0].filemap.keys():
-      if k.endswith('archimedes/volume/config/stone/dense.xml'):
-        stonexml_key = k
-    self.assertEquals(app.bundles[0].filemap[stonexml_key],
-                      'stone/dense.xml')
+    spec_path = 'src/java/org/archimedes/volume'
+    stone_dense = self.create_file(os.path.join(spec_path, 'config/stone/dense.xml'))
+    metal_dense = self.create_file(os.path.join(spec_path, 'config/metal/dense.xml'))
+    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+
+    bundle = self.create_bundle(spec_path,
+                                relative_to='config',
+                                fileset=['config/stone/dense.xml', 'config/metal/dense.xml'])
+    app = self.make_target(spec_path, JvmApp, dependencies=[unused], bundles=[bundle])
+
+    self.assertEqual(1, len(app.bundles))
+    self.assertEqual({stone_dense: 'stone/dense.xml', metal_dense: 'metal/dense.xml'},
+                     app.bundles[0].filemap)
 
   def test_multiple_bundles(self):
-    self.create_dir('src/java/org/archimedes/volume/config/stone')
-    self.create_file('src/java/org/archimedes/volume/config/stone/dense.xml')
-    self.create_dir('src/java/org/archimedes/volume/config')
-    self.create_file('src/java/org/archimedes/volume/config/metal/dense.xml')
-    self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
-      jvm_binary(name='unused')
-    '''))
+    spec_path = 'src/java/org/archimedes/volume'
+    stone_dense = self.create_file(os.path.join(spec_path, 'config/stone/dense.xml'))
+    metal_dense = self.create_file(os.path.join(spec_path, 'config/metal/dense.xml'))
+    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+
     self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
       jvm_app(name='volume',
         dependencies=[':unused'],
@@ -333,30 +205,36 @@ class BundleTest(BaseTest):
       )
     '''))
 
-    app1 = self.target('src/java/org/archimedes/volume')
-    self.assertEquals(1, len(app1.bundles))
-    for k in app1.bundles[0].filemap.keys():
-      if k.endswith('archimedes/volume/config/stone/dense.xml'):
-        stonexml_key = k
-    self.assertEquals(app1.bundles[0].filemap[stonexml_key], 'stone/dense.xml')
+    app1 = self.make_target(SyntheticAddress(spec_path, 'app1').spec,
+                            JvmApp,
+                            dependencies=[unused],
+                            bundles=[self.create_bundle(spec_path,
+                                                        relative_to='config',
+                                                        fileset='config/stone/dense.xml')])
 
-    app2 = self.target('src/java/org/archimedes/volume:bathtub')
-    self.assertEquals(1, len(app2.bundles))
-    for k in app2.bundles[0].filemap.keys():
-      if k.endswith('archimedes/volume/config/metal/dense.xml'):
-        stonexml_key = k
-    self.assertEquals(app2.bundles[0].filemap[stonexml_key], 'config/metal/dense.xml')
+    app2 = self.make_target(SyntheticAddress(spec_path, 'app2').spec,
+                            JvmApp,
+                            dependencies=[unused],
+                            bundles=[self.create_bundle(spec_path,
+                                                        fileset='config/metal/dense.xml')])
+
+    self.assertEqual(1, len(app1.bundles))
+    self.assertEqual({stone_dense: 'stone/dense.xml'}, app1.bundles[0].filemap)
+
+    self.assertEqual(1, len(app2.bundles))
+    self.assertEqual({metal_dense: 'config/metal/dense.xml'}, app2.bundles[0].filemap)
 
   def test_globs_relative_to_build_root(self):
-    self.add_to_build_file('y/BUILD', dedent('''
-      java_library(name="y", sources=globs('*.java'))
-      jvm_app(name="app",
-        dependencies = ["y"],
-        bundles = [
-          bundle(relative_to="config", fileset=globs("z/*")),
-          bundle(relative_to="config", fileset=["a/b"])
-        ]
-      )'''))
-    graph = self.context().scan(self.build_root)
-    globs = graph.get_target_from_spec('y:app').globs_relative_to_buildroot()
-    self.assertEquals(['a/b', 'y/z/*'], sorted(globs['globs']))
+    unused = self.make_target('y', JvmBinary)
+
+    parse_context = self.create_parse_context('y')
+    globs = Globs(parse_context)
+    app = self.make_target('y:app',
+                           JvmApp,
+                           dependencies=[unused],
+                           bundles=[
+                             Bundle(parse_context, relative_to="config", fileset=globs("z/*")),
+                             Bundle(parse_context, relative_to="config", fileset=['a/b'])
+                           ])
+
+    self.assertEquals(['a/b', 'y/z/*'], sorted(app.globs_relative_to_buildroot()['globs']))

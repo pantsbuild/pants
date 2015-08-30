@@ -169,15 +169,15 @@ class BuildFileAddressMapper(object):
     :param spec: a spec to lookup in the map.
     :param relative_to: path the spec might be relative to
     :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
-    :returns a new BuildFileAddress instanace
+    :returns a new Address instance
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
-      build_file = self.from_cache(self.root_dir, spec_path)
+      self.from_cache(self.root_dir, spec_path)
     except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
-    return BuildFileAddress(build_file, name)
+    return SyntheticAddress(spec_path, name)
 
   def scan_buildfiles(self, root_dir, *args, **kwargs):
     """Looks for all BUILD files in root_dir or its descendant directories.

@@ -62,11 +62,13 @@ class JvmTarget(Target, Jarable):
     if sources_rel_path is None:
       sources_rel_path = address.spec_path
     payload = payload or Payload()
+    excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
+    configurations = ConfigurationsField(self.assert_list(configurations, key_arg='configurations'))
     payload.add_fields({
       'sources': self.create_sources_field(sources, sources_rel_path, address, key_arg='sources'),
       'provides': provides,
-      'excludes': ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes')),
-      'configurations': ConfigurationsField(self.assert_list(configurations, key_arg='configurations')),
+      'excludes': excludes,
+      'configurations': configurations,
       'platform': PrimitiveField(platform),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')

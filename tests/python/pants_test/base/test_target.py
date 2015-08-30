@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import Address
 from pants.base.payload import Payload
 from pants.base.payload_field import DeferredSourcesField
 from pants.base.target import Target
@@ -21,8 +20,8 @@ class TestDeferredSourcesTarget(Target):
     })
     super(TestDeferredSourcesTarget, self).__init__(payload=payload, *args, **kwargs)
 
-
 class TargetTest(BaseTest):
+
   def test_derived_from_chain(self):
     # add concrete target
     concrete = self.make_target('y:concrete', Target)
@@ -42,9 +41,10 @@ class TargetTest(BaseTest):
     self.assertSequenceEqual([], list(target.traversable_dependency_specs))
 
   def test_deferred_sources_payload_field(self):
+    foo = self.make_target(':foo', Target)
     target = self.make_target(':bar',
                               TestDeferredSourcesTarget,
-                              deferred_sources_address=Address.parse('//:foo'))
+                              deferred_sources_address=foo.address)
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
 

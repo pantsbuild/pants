@@ -12,7 +12,7 @@ from hashlib import sha1
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Address, Addresses
+from pants.base.address import Address, Addresses, BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -149,11 +149,11 @@ class Target(AbstractTarget):
       cls.global_instance().check_unknown(target, kwargs)
 
     def check_unknown(self, target, kwargs):
-      # NB(gmalmquist): Sure would be nice to be able to use the build-file-alias name here.
-      target_type_name = type(target).__name__
-      ignore_params = set((self.get_options().ignored or {}).get(target_type_name, ()))
-      unknown_args = { arg: value for arg, value in kwargs.items() if arg not in ignore_params }
-      ignored_args = { arg: value for arg, value in kwargs.items() if arg in ignore_params }
+      ignore_params = ()
+      if isinstance(target.address, BuildFileAddress):
+        ignore_params = set((self.get_options().ignored or {}).get(target.address.type_alias, ()))
+      unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
                      .format(target=target.address.spec,

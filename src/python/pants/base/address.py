@@ -197,16 +197,25 @@ class Address(AbstractClass):
 
 
 class BuildFileAddress(Address):
-  def __init__(self, build_file, target_name=None):
-    self.build_file = build_file
+  def __init__(self, build_file, type_alias, target_name=None):
     spec_path = os.path.dirname(build_file.relpath)
-    default_target_name = os.path.basename(spec_path)
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
-                                           target_name=target_name or default_target_name)
+                                           target_name=target_name or os.path.basename(spec_path))
+    self._build_file = build_file
+    self._type_alias = type_alias
+
+  @property
+  def build_file(self):
+    return self._build_file
+
+  @property
+  def type_alias(self):
+    return self._type_alias
 
   def __repr__(self):
-    return ("BuildFileAddress({build_file}, {target_name})"
+    return ("BuildFileAddress({build_file}, {type_alias}, {target_name})"
             .format(build_file=self.build_file,
+                    type_alias=self.type_alias,
                     target_name=self.target_name))
 
 
