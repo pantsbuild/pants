@@ -10,6 +10,7 @@ target(
     ':anonymizer',
     ':java',
     ':jvm_compile',
+    ':jvm_dependency_analyzer',
     ':scala',
   ],
 )
@@ -69,6 +70,7 @@ python_library(
   dependencies = [
     ':jvm_compile_global_strategy',
     ':jvm_compile_isolated_strategy',
+    ':jvm_dependency_analyzer',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
@@ -87,8 +89,8 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':compile_context',
     ':jvm_compile_strategy',
+    ':jvm_dependency_analyzer',
     ':resource_mapping',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
@@ -133,7 +135,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:contextutil',
   ],
 )
 
@@ -145,6 +146,20 @@ python_library(
 python_library(
   name = 'anonymizer',
   sources = ['anonymizer.py'],
+)
+
+python_library(
+  name = 'jvm_dependency_analyzer',
+  sources = ['jvm_dependency_analyzer.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+  ],
 )
 
 python_library(
