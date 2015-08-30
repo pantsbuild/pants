@@ -149,9 +149,7 @@ class Target(AbstractTarget):
       cls.global_instance().check_unknown(target, kwargs)
 
     def check_unknown(self, target, kwargs):
-      ignore_params = ()
-      if isinstance(target.address, BuildFileAddress):
-        ignore_params = set((self.get_options().ignored or {}).get(target.address.type_alias, ()))
+      ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
@@ -257,6 +255,23 @@ class Target(AbstractTarget):
     self._cached_transitive_fingerprint_map = {}
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
+
+  @property
+  def type_alias(self):
+    """Returns the type alias this target was constructed via.
+
+    For a target read from a BUILD file, this will be target alias, like 'java_library.
+    For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
+
+    The end result is that the type alias should be the most natural way to refer to this target's
+    type to the author of the target instance.
+
+    :rtype: string
+    """
+    if isinstance(self.address, BuildFileAddress):
+      return self.address.type_alias
+    else:
+      return type(self).__name__
 
   @property
   def tags(self):
