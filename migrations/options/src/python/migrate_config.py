@@ -19,11 +19,7 @@ migrations = {
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
   ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
-  ('jvm', 'missing_deps_target_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
-  ('compile.java', 'missing_deps'): ('compile.jvm-dep-check', 'missing_deps'),
-  ('compile.java', 'missing_direct_deps'): ('compile.jvm-dep-check', 'missing_direct_deps'),
-  ('compile.java', 'missing_deps_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
-  ('compile.java', 'unnecessary_deps'): ('compile.jvm-dep-check', 'unnecessary_deps'),
+  ('jvm', 'missing_deps_target_whitelist'): ('compile.java', 'missing_deps_whitelist'),
 
   ('java-compile', 'partition_size_hint'): ('compile.java', 'partition_size_hint'),
   ('java-compile', 'javac_args'): ('compile.java', 'args'),

@@ -179,7 +179,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run)
 
     # Now let's use the target whitelist, this should succeed.
-    config = {'compile.jvm-dep-check': {'missing_deps_whitelist': [whitelist]}}
+    config = {'compile.java': {'missing_deps_whitelist': [whitelist]}}
 
     pants_run = self.run_pants(args, config)
 
@@ -188,13 +188,13 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
   def test_java_compile_missing_dep_analysis_whitelist(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist',
-      '--compile-jvm-dep-check-missing-deps=fatal',
+      '--compile-java-missing-deps=fatal',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2'
     )
 
   def test_java_compile_missing_direct_dep_analysis_whitelist(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal',
+      '--compile-java-missing-direct-deps=fatal',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist'
     )
