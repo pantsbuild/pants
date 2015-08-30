@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.payload import Payload
 from pants.base.payload_field import DeferredSourcesField
 from pants.base.target import Target
@@ -44,7 +44,7 @@ class TargetTest(BaseTest):
   def test_deferred_sources_payload_field(self):
     target = self.make_target(':bar',
                               TestDeferredSourcesTarget,
-                              deferred_sources_address=SyntheticAddress.parse('//:foo'))
+                              deferred_sources_address=Address.parse('//:foo'))
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
 

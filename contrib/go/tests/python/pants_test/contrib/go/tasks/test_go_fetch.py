@@ -9,7 +9,7 @@ import os
 import shutil
 from collections import defaultdict
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.source_root import SourceRoot
 from pants.util.contextutil import temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -21,7 +21,7 @@ from pants.contrib.go.tasks.go_fetch import GoFetch
 
 class GoFetchTest(TaskTestBase):
 
-  address = SyntheticAddress.parse
+  address = Address.parse
 
   @classmethod
   def task_type(cls):

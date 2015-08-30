@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.target import Target
 from pants_test.base_test import BaseTest
 
@@ -64,8 +64,8 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[c])
     self.assertEquals([c, b, a], context.targets())
 
-    syn_b = context.add_new_target(SyntheticAddress.parse('syn_b'), Target, derived_from=b)
-    context.add_new_target(SyntheticAddress.parse('syn_d'), Target, derived_from=d)
+    syn_b = context.add_new_target(Address.parse('syn_b'), Target, derived_from=b)
+    context.add_new_target(Address.parse('syn_d'), Target, derived_from=d)
     # We expect syn_b to be included now since it has been synthesized during this run from an
     # in-play target.
     self.assertEquals([c, b, a, syn_b], context.targets())
@@ -80,7 +80,7 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[b])
     self.assertEquals([b], context.targets())
 
-    syn_with_deps = context.add_new_target(SyntheticAddress.parse('syn_with_deps'),
+    syn_with_deps = context.add_new_target(Address.parse('syn_with_deps'),
                                            Target,
                                            derived_from=b,
                                            dependencies=[a])
@@ -93,10 +93,7 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[b])
     self.assertEquals([b], context.targets())
 
-    syn_with_deps = context.add_new_target(SyntheticAddress.parse('syn_with_deps'),
-                                           Target,
-                                           dependencies=[a])
-
+    context.add_new_target(Address.parse('syn_with_deps'), Target, dependencies=[a])
     self.assertEquals([b], context.targets())
 
   def test_targets_include_synthetics_with_no_derived_from_injected_into_graph(self):
@@ -105,9 +102,7 @@ class ContextTest(BaseTest):
     context = self.context(target_roots=[b])
     self.assertEquals([b], context.targets())
 
-    syn_with_deps = context.add_new_target(SyntheticAddress.parse('syn_with_deps'),
-                                           Target,
-                                           dependencies=[a])
+    syn_with_deps = context.add_new_target(Address.parse('syn_with_deps'), Target, dependencies=[a])
     b.inject_dependency(syn_with_deps.address)
 
     self.assertEquals([b, syn_with_deps, a], context.targets())

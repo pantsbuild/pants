@@ -9,7 +9,7 @@ import os
 from textwrap import dedent
 
 from pants.backend.core.targets.dependencies import Dependencies
-from pants.base.address import BuildFileAddress, SyntheticAddress
+from pants.base.address import Address, BuildFileAddress
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
 from pants_test.base_test import BaseTest
@@ -31,7 +31,7 @@ class BuildFileAddressMapperTest(BaseTest):
       '''
     ))
 
-    address, addressable = self.address_mapper.resolve(SyntheticAddress.parse('//:foo'))
+    address, addressable = self.address_mapper.resolve(Address.parse('//:foo'))
     self.assertIsInstance(address, BuildFileAddress)
     self.assertEqual(build_file, address.build_file)
     self.assertEqual('foo', address.target_name)

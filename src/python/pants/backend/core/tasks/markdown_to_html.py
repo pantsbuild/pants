@@ -22,7 +22,7 @@ from six.moves import range
 
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.task import Task
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
@@ -332,7 +332,7 @@ class MarkdownToHtml(Task):
     def parse_url(spec):
       match = self.PANTS_LINK.match(spec)
       if match:
-        address = SyntheticAddress.parse(match.group(1), relative_to=get_buildroot())
+        address = Address.parse(match.group(1), relative_to=get_buildroot())
         page = self.context.build_graph.get_target(address)
         anchor = match.group(2) or ''
         if not page:
