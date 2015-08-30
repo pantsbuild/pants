@@ -3,3 +3,6 @@
 
 source_root('src/python', python_library)
 source_root('tests/python', python_library, python_tests)
+
+source_root('examples/3rdparty/node', node_remote_module)
+source_root('examples/src/node', node_module)
