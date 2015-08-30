@@ -82,6 +82,14 @@ class BaseTest(unittest.TestCase):
                   dependencies=None,
                   derived_from=None,
                   **kwargs):
+    """Creates a target and injects it into the test's build graph.
+
+    :param string spec: The target address spec that locates this target.
+    :param type target_type: The concrete target subclass to create this new target from.
+    :param list dependencies: A list of target instances this new target depends on.
+    :param derived_from: The target this new target was derived from.
+    :type derived_from: :class:`pants.base.target.Target`
+    """
     address = Address.parse(spec)
     target = target_type(name=address.target_name,
                          address=address,

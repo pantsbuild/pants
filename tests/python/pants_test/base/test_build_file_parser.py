@@ -212,11 +212,11 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
                                            repo=jvm_repo)
 
       parse_context.create_object('java_library',
-                                  name='%s-java' % base_name,
+                                  name='{}-java'.format(base_name),
                                   provides=provides_artifact(provides_java_name))
 
       parse_context.create_object('scala_library',
-                                  name='%s-scala' % base_name,
+                                  name='{}-scala'.format(base_name),
                                   provides=provides_artifact(provides_scala_name))
 
     return real_create_java_libraries

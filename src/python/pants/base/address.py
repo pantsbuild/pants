@@ -87,7 +87,7 @@ def parse_spec(spec, relative_to=None):
   return spec_path, target_name
 
 
-class Addresses (namedtuple('Addresses', ['addresses', 'rel_path'])):
+class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   """ Used as a sentinel type for identifying a list of string specs.
 
   addresses: list of string specs

@@ -260,7 +260,7 @@ class Target(AbstractTarget):
   def type_alias(self):
     """Returns the type alias this target was constructed via.
 
-    For a target read from a BUILD file, this will be target alias, like 'java_library.
+    For a target read from a BUILD file, this will be target alias, like 'java_library'.
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
 
     The end result is that the type alias should be the most natural way to refer to this target's
