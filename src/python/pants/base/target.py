@@ -166,6 +166,10 @@ class Target(AbstractTarget):
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
 
+  @classmethod
+  def subsystems(cls):
+    return super(Target, cls).subsystems() + (cls.UnknownArguments,)
+
   LANG_DISCRIMINATORS = {
     'java': lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
