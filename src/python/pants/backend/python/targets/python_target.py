@@ -23,7 +23,6 @@ class PythonTarget(Target):
   def __init__(self,
                address=None,
                payload=None,
-               sources_rel_path=None,
                sources=None,
                resources=None,  # Old-style resources (file list, Fileset).
                resource_targets=None,  # New-style resources (Resources target specs).
@@ -53,11 +52,9 @@ class PythonTarget(Target):
       agnostic to interpreter class.
     """
     self.address = address
-    if sources_rel_path is None:
-      sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
-      'sources': self.create_sources_field(sources, sources_rel_path, address, key_arg='sources'),
+      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'resources': self.create_sources_field(resources, address.spec_path, key_arg='resources'),
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),

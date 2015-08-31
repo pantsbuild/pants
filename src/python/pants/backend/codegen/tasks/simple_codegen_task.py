@@ -236,9 +236,14 @@ class SimpleCodegenTask(Task):
           address=synthetic_address,
           target_type=self.synthetic_target_type,
           dependencies=self.synthetic_target_extra_dependencies(target),
-          sources_rel_path=sources_rel_path,
           sources=relative_generated_sources,
           derived_from=target,
+
+          # TODO(John Sirois): This assumes - currently, a JvmTarget or PythonTarget which both
+          # happen to have this attribute for carrying publish metadata but share no interface
+          # that defines this canonical property.  Lift up an interface and check for it or else
+          # add a way for SimpleCodeGen subclasses to specify extra attribute names that should be
+          # copied over from the target to its derived target.
           provides=target.provides,
         )
         synthetic_target = self.target
