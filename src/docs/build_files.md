@@ -394,24 +394,20 @@ What happened to the `pants()` wrapper around targets?
 ------------------------------------------------------
 
 If you have an existing project using Pants and have recently upgraded, you
-may encounter this warning:
+may encounter this exception:
 
-    *** pants() wrapper is obsolete and will be removed in a future release.
+    AddressLookupError: name 'pants' is not defined
 
-or the BUILD may fail an error.
-
-    NameError: name 'pants' is not defined
-
-In pre-release versions of Pants, targets declared in the `dependencies`
-attribute had to be wrapped in a call to the `pants()` method.
+In previous versions of Pants, targets declared in the `dependencies`
+attribute had to be wrapped in a call to the `pants()` method:
 
     :::python
     java_library(name='foo',
         dependencies=[pants('bar')])
 
-The `pants()` method has since been replaced with a noop and as of Pants
-0.0.24 is officially deprecated. The above snippet should be re-written
-to use the target as a plain string.
+The `pants()` method has since been replaced with a noop and as of Pants 0.0.24 is officially
+deprecated. As of pants 0.0.46, use of this method now triggers an exception. Thus, the above
+snippet should be re-written to use the target as a plain string:
 
     :::python
     java_library(name='foo',
@@ -423,41 +419,3 @@ references from your BUILD files with a regular expression.
     :::bash
     # Run this command from the root of your repo.
     $ sed -i "" -e 's/pants(\([^)]*\))/\1/g' `find . -name "BUILD*"`
-
-Using an older version of Pants?
---------------------------------
-
-If you are following along in these examples and are using a version of
-pants prior to the 2014 open source release you might see one of the
-following messages:
-
-From a `python_*` target dependencies attribute:
-
-    AttributeError: 'str' object has no attribute 'resolve'
-
-From a `java_library` dependencies attribute:
-
-    The following targets could not be loaded:
-      src/java/com/twitter/foo/bar/baz =>
-        TargetDefinitionException: Error with src/java/com/foo/bar/baz/BUILD:baz:
-           Expected elements of list to be (<class 'twitter.pants.targets.external_dependency.ExternalDependency'>, <class 'twitter.pants.targets.anonymous.AnonymousDeps'>,
-             <class 'twitter.pants.base.target.Target'>), got value 3rdparty:guava of type <type 'str'>
-
-From a `java_library` resources attribute:
-
-    IOError: [Errno 2] No such file or directory: '/Users/pantsaddict/workspace/src/resources/com/foo/bar'
-
-From a `junit_tests` resources attribute:
-
-    ValueError: Expected elements of list to be <class 'twitter.pants.base.target.Target'>, got value tests/scala/foo/bar/baz/resources of type <type 'str'>
-
-From a `provides` repo attribute:
-
-    ValueError: repo must be Repository or Pants but was foo/bar/baz:baz
-
-All of these errors likely mean that you need to wrap the strings
-mentioned in the error message with the `pants()` wrapper function in
-your BUILD files. The open source Pants release deprecated the use of
-this wrapper and thus examples in this documentation don't include it.
-For more information, see the
-<a pantsref="build_pants_wrapper_gone">`pants` wrapper</a> notes above.
