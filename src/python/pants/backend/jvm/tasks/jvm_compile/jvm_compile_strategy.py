@@ -231,6 +231,4 @@ class JvmCompileStrategy(object):
 
     The dependencies are returned as relative paths.
     """
-    # TODO(cgibb): Change the AnalysisParser API to not take classpath_indexer + classes_dir
-    #              as parameters, since they are no longer used.
-    return self._analysis_parser.parse_deps_from_path(analysis_file, dict, "")
+    return self._analysis_parser.parse_deps_from_path(analysis_file)

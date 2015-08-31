@@ -49,7 +49,7 @@ class JMakeAnalysisParser(AnalysisParser):
       ret[src].append(clsfile)
     return ret
 
-  def parse_deps(self, lines_iter, classpath_indexer, classes_dir):
+  def parse_deps(self, lines_iter):
     buildroot = get_buildroot()
     self._expect_header(next(lines_iter), b'pcd entries')
     num_pcd_entries = self.parse_num_items(next(lines_iter))

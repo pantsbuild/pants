@@ -6,7 +6,6 @@ package org.pantsbuild.example.hello.main;
 import java.io.IOException;
 
 import org.pantsbuild.example.hello.greet.Greeting;
-import org.pantsbuild.example.hello.farewell.Goodbye;
 
 public class HelloMain {
 
