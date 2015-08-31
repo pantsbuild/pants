@@ -577,7 +577,7 @@ class Project(object):
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
         if not isinstance(target.address, BuildFileAddress):
-          return []  # Siblings don't make sense for synthetic addresses.
+          return []  # Siblings only make sense for BUILD files.
         candidates = self.target_util.get_all_addresses(target.address.build_file)
         for ancestor in target.address.build_file.ancestors():
           candidates.update(self.target_util.get_all_addresses(ancestor))

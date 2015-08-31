@@ -49,7 +49,7 @@ class BuildGraph(object):
     return address in self._target_by_address
 
   def get_target_from_spec(self, spec, relative_to=''):
-    """Converts `spec` into a SyntheticAddress and returns the result of `get_target`"""
+    """Converts `spec` into an address and returns the result of `get_target`"""
     return self.get_target(Address.parse(spec, relative_to=relative_to))
 
   def get_target(self, address):
