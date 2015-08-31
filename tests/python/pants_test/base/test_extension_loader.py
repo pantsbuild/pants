@@ -53,7 +53,7 @@ class DummyTarget(Target):
 
   @classmethod
   def subsystems(cls):
-    return super(DummyTarget, cls).subsystems() + (DummySubsystem1, )
+    return (DummySubsystem1,)
 
 
 class DummyObject1(object):
@@ -65,7 +65,7 @@ class DummyObject2(object):
 
   @classmethod
   def subsystems(cls):
-    return (DummySubsystem2, )
+    return (DummySubsystem2,)
 
 
 class DummyTask(Task):
@@ -133,8 +133,7 @@ class LoaderTest(unittest.TestCase):
       self.assertEqual(DummyTarget, registered_aliases.targets['bob'])
       self.assertEqual(DummyObject1, registered_aliases.objects['obj1'])
       self.assertEqual(DummyObject2, registered_aliases.objects['obj2'])
-      self.assertEqual(self.build_configuration.subsystems(),
-                       set([DummySubsystem1, DummySubsystem2]))
+      self.assertEqual(self.build_configuration.subsystems(), {DummySubsystem1, DummySubsystem2})
 
   def test_load_valid_partial_goals(self):
     def register_goals():
@@ -182,8 +181,8 @@ class LoaderTest(unittest.TestCase):
     their name (foo/bar/baz in fake module) is added as the requested entry point to the mocked
     metadata added to the returned dist.
 
-    :param str name: project_name for distribution (see pkg_resources)
-    :param str version: version for distribution (see pkg_resources)
+    :param string name: project_name for distribution (see pkg_resources)
+    :param string version: version for distribution (see pkg_resources)
     :param callable reg: Optional callable for goal registration entry point
     :param callable alias: Optional callable for build_file_aliases entry point
     :param callable after: Optional callable for load_after list entry point
@@ -275,8 +274,7 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(DummyTarget, registered_aliases.targets['pluginalias'])
     self.assertEqual(DummyObject1, registered_aliases.objects['FROMPLUGIN1'])
     self.assertEqual(DummyObject2, registered_aliases.objects['FROMPLUGIN2'])
-    self.assertEqual(self.build_configuration.subsystems(),
-                     {DummySubsystem1, DummySubsystem2})
+    self.assertEqual(self.build_configuration.subsystems(), {DummySubsystem1, DummySubsystem2})
 
   def test_subsystems(self):
     def global_subsystems():

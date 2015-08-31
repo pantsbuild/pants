@@ -49,6 +49,20 @@ python_tests(
 )
 
 python_tests(
+  name='thrift_linter_test',
+  sources=['test_thrift_linter.py'],
+  dependencies=[
+     '3rdparty/python:mock',
+     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_linter',
+     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
+     'src/python/pants/backend/codegen/targets:java',
+     'src/python/pants/base:build_file_aliases',
+     'tests/python/pants_test/tasks:task_test_base',
+     'tests/python/pants_test/testutils',
+  ],
+)
+
+python_tests(
   name='thrift_util',
   sources=['test_thrift_util.py'],
   dependencies=[

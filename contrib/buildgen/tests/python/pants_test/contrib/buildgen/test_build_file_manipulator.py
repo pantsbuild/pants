@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants_test.base_test import BaseTest
 
 from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
@@ -154,15 +154,15 @@ class BuildFileManipulatorTest(BaseTest):
     build_file = self.add_to_build_file('BUILD', simple_targets)
 
     for no_deps_name in ['no_deps', 'empty_deps', 'empty_deps_inline']:
-      no_deps = BuildFileManipulator.load(build_file, no_deps_name, set(['target_type']))
+      no_deps = BuildFileManipulator.load(build_file, no_deps_name, {'target_type'})
       self.assertEqual(tuple(no_deps.dependency_lines()), tuple())
-      no_deps.add_dependency(SyntheticAddress.parse(':fake_dep'))
+      no_deps.add_dependency(Address.parse(':fake_dep'))
       self.assertEqual(tuple(no_deps.dependency_lines()),
                        tuple(['  dependencies = [',
                               "    ':fake_dep',",
                               '  ],']))
-      no_deps.add_dependency(SyntheticAddress.parse(':b_fake_dep'))
-      no_deps.add_dependency(SyntheticAddress.parse(':a_fake_dep'))
+      no_deps.add_dependency(Address.parse(':b_fake_dep'))
+      no_deps.add_dependency(Address.parse(':a_fake_dep'))
       self.assertEqual(tuple(no_deps.dependency_lines()),
                        tuple(['  dependencies = [',
                               "    ':a_fake_dep',",
@@ -267,8 +267,8 @@ class BuildFileManipulatorTest(BaseTest):
 
     build_file = self.add_to_build_file('BUILD', self.multi_target_build_string)
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_bottom', set(['target_type']))
-    multi_targ_bfm.add_dependency(SyntheticAddress.parse(':new_dep'))
+    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_bottom', {'target_type'})
+    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
     build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
     self.assertEqual(build_file_str, expected_build_string)
 
@@ -301,8 +301,8 @@ class BuildFileManipulatorTest(BaseTest):
 
     build_file = self.add_to_build_file('BUILD', self.multi_target_build_string)
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_top', set(['target_type']))
-    multi_targ_bfm.add_dependency(SyntheticAddress.parse(':new_dep'))
+    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_top', {'target_type'})
+    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
     build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
     self.assertEqual(build_file_str, expected_build_string)
 
@@ -335,8 +335,8 @@ class BuildFileManipulatorTest(BaseTest):
 
     build_file = self.add_to_build_file('BUILD', self.multi_target_build_string)
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', set(['target_type']))
-    multi_targ_bfm.add_dependency(SyntheticAddress.parse(':new_dep'))
+    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', {'target_type'})
+    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
     build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
     self.assertEqual(build_file_str, expected_build_string)
 
@@ -370,8 +370,8 @@ class BuildFileManipulatorTest(BaseTest):
 
     build_file = self.add_to_build_file('BUILD', self.multi_target_build_string + '\n')
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', set(['target_type']))
-    multi_targ_bfm.add_dependency(SyntheticAddress.parse(':new_dep'))
+    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', {'target_type'})
+    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
     multi_targ_bfm.write(dry_run=False)
 
     with open(build_file.full_path, 'r') as bf:

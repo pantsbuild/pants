@@ -183,7 +183,7 @@ class JvmApp(Target):
     super_globs = super(JvmApp, self).globs_relative_to_buildroot()
     if super_globs:
       globs += super_globs['globs']
-    return {'globs' : globs}
+    return {'globs': globs}
 
   @property
   def traversable_dependency_specs(self):

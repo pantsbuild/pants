@@ -65,7 +65,7 @@ class Duplicate(JarRule):
     def __init__(self, path):
       """Creates a duplicate entry error for the given path.
 
-      :param str path: The path of the duplicate entry.
+      :param string path: The path of the duplicate entry.
       """
       assert path and isinstance(path, string_types), 'A non-empty path must be supplied.'
       super(Duplicate.Error, self).__init__('Duplicate entry encountered for path {}'.format(path))
@@ -107,7 +107,7 @@ class Duplicate(JarRule):
   def __init__(self, apply_pattern, action):
     """Creates a rule for handling duplicate jar entries.
 
-    :param str apply_pattern: A regular expression that matches duplicate jar entries this rule
+    :param string apply_pattern: A regular expression that matches duplicate jar entries this rule
       applies to.
     :param action: An action to take to handle one or more duplicate entries.  Must be one of:
       ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT`` or ``Duplicate.FAIL``.

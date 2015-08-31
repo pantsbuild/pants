@@ -39,6 +39,9 @@ python_library(
 python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+  ]
 )
 
 # TODO(Eric Ayers) Create a BUILD file in the java/ subdirectory?

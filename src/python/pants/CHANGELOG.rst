@@ -1,7 +1,7 @@
 RELEASE HISTORY
 ===============
 
-0.0.45 (??/??/2015)
+0.0.45 (8/28/2015)
 -------------------
 
 Release Notes
@@ -11,6 +11,89 @@ In this release, the methods `with_sources()`, `with_docs()` and `with_artifact(
 were removed from the jar() syntax in BUILD files.   They have been deprecated since
 Pants version 0.0.29.
 
+API Changes
+~~~~~~~~~~~
+
+* Remove with_artifact(), with_sources(), and with_docs() from JarDependency
+  `RB #2687 <https://rbcommons.com/s/twitter/r/2687>`_
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade zincutils to 0.3.1 for parse_deps bug fix
+  `RB #2705 <https://rbcommons.com/s/twitter/r/2705>`_
+
+* Fix PythonThriftBuilder to operate on 1 target.
+  `RB #2696 <https://rbcommons.com/s/twitter/r/2696>`_
+
+* Ensure stdlib check uses normalized paths.
+  `RB #2693 <https://rbcommons.com/s/twitter/r/2693>`_
+
+* Hack around a few Distribution issues in py tests.
+  `RB #2692 <https://rbcommons.com/s/twitter/r/2692>`_
+
+* Fix GoBuildgen classname and a comment typo.
+  `RB #2689 <https://rbcommons.com/s/twitter/r/2689>`_
+
+* Making --coverage-open work for cobertura.
+  `RB #2670 <https://rbcommons.com/s/twitter/r/2670>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Implementing support for Wire 2.0 multiple proto paths.
+  `RB #2717 <https://rbcommons.com/s/twitter/r/2717>`_
+
+* [pantsd] PantsService, FSEventService & WatchmanLauncher
+  `RB #2686 <https://rbcommons.com/s/twitter/r/2686>`_
+
+* Add NodeDistribution to seed a node backend.
+  `RB #2703 <https://rbcommons.com/s/twitter/r/2703>`_
+
+* Created DistributionLocator subsystem with jvm-distributions option-space.
+  `RB #2677 <https://rbcommons.com/s/twitter/r/2677>`_
+
+* Added support for wire 2.0 arguments and beefed up tests
+  `RB #2688 <https://rbcommons.com/s/twitter/r/2688>`_
+
+* Initial commit of checkstyle
+  `RB #2593 <https://rbcommons.com/s/twitter/r/2593>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Removed scan workunit; mapping workunits now debug
+  `RB #2721 <https://rbcommons.com/s/twitter/r/2721>`_
+
+* Implement caching for the thrift linter.
+  `RB #2718 <https://rbcommons.com/s/twitter/r/2718>`_
+
+* Refactor JvmDependencyAnalyzer into a task
+  `RB #2668 <https://rbcommons.com/s/twitter/r/2668>`_
+
+* Refactor plugin system to allow for easier extension by others
+  `RB #2706 <https://rbcommons.com/s/twitter/r/2706>`_
+
+* Indented code which prints warnings for unrecognized os's.
+  `RB #2713 <https://rbcommons.com/s/twitter/r/2713>`_
+
+* Fixup existing docs and add missing docs.
+  `RB #2708 <https://rbcommons.com/s/twitter/r/2708>`_
+
+* Requiring explicit dependency on the DistributionLocator subsystem.
+  `RB #2707 <https://rbcommons.com/s/twitter/r/2707>`_
+
+* Reorganize option help.
+  `RB #2695 <https://rbcommons.com/s/twitter/r/2695>`_
+
+* Set 'pants-reviews' as the default group.
+  `RB #2702 <https://rbcommons.com/s/twitter/r/2702>`_
+
+* Update to zinc 1.0.9 and sbt 0.13.9
+  `RB #2658 <https://rbcommons.com/s/twitter/r/2658>`_
+
+* Test the individual style checks and only disable the check that is currently failing CI
+  `RB #2697 <https://rbcommons.com/s/twitter/r/2697>`_
 
 0.0.44 (8/21/2015)
 ------------------

@@ -11,7 +11,7 @@ import subprocess
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -84,7 +84,7 @@ class GoTargetGenerator(object):
             remote_root = fetcher.root(import_path)
             remote_pkg_path = GoRemoteLibrary.remote_package_path(remote_root, import_path)
             name = remote_pkg_path or os.path.basename(import_path)
-            address = SyntheticAddress(os.path.join(self._remote_source_root, remote_root), name)
+            address = Address(os.path.join(self._remote_source_root, remote_root), name)
             found = self._build_graph.get_target(address)
             if not found:
               if not self._generate_remotes:
@@ -95,8 +95,8 @@ class GoTargetGenerator(object):
                                                         pkg=remote_pkg_path)
           else:
             # Recurse on local targets.
-            address = SyntheticAddress(os.path.join(self._local_source_root, import_path),
-                                       os.path.basename(import_path))
+            address = Address(os.path.join(self._local_source_root, import_path),
+                              os.path.basename(import_path))
             name, import_paths = self._list_deps(gopath, address)
             self._generate_missing(gopath, address, name, import_paths, visited)
           visited[import_path] = address

@@ -106,6 +106,8 @@ python_tests(
     'src/python/pants/backend/codegen/tasks:wire_gen',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
     'src/python/pants/base:validation',
     'src/python/pants/util:contextutil',
