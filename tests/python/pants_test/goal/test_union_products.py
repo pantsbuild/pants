@@ -27,6 +27,9 @@ class UnionProductsTest(BaseTest):
     self.assertEquals(self.products.get_for_target(a), OrderedSet([1, 2, 3]))
     self.assertEquals(self.products.get_for_target(b), OrderedSet([2, 3]))
     self.assertEquals(self.products.get_for_target(c), OrderedSet([3]))
+    self.assertEquals(self.products.get_for_target(a, transitive=False), OrderedSet([1]))
+    self.assertEquals(self.products.get_for_target(b, transitive=False), OrderedSet([2]))
+    self.assertEquals(self.products.get_for_target(c, transitive=False), OrderedSet([3]))
 
   def test_remove_for_target(self):
     c = self.make_target('c')
