@@ -23,6 +23,11 @@ from pants.util.memo import memoized_property
 
 
 class JvmDependencyAnalyzer(Task):
+  """Abstract class for tasks which need to analyze actual source dependencies.
+
+  Primary purpose is to provide a classfile --> target mapping, which subclasses can use in
+  determining which targets correspond to the actual source dependencies of any given target.
+  """
 
   @classmethod
   def prepare(cls, options, round_manager):
