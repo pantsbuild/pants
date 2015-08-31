@@ -104,8 +104,8 @@ class BaseTest(unittest.TestCase):
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
     for traversable_dependency_spec in target.traversable_dependency_specs:
-      traversable_dependency_address = SyntheticAddress.parse(traversable_dependency_spec,
-                                                              relative_to=address.spec_path)
+      traversable_dependency_address = Address.parse(traversable_dependency_spec,
+                                                     relative_to=address.spec_path)
       traversable_dependency_target = self.build_graph.get_target(traversable_dependency_address)
       if not traversable_dependency_target:
         raise ValueError('Tests must make targets for traversable dependency specs ahead of them '
@@ -232,7 +232,7 @@ class BaseTest(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
 
