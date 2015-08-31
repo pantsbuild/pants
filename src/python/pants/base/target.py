@@ -12,7 +12,7 @@ from hashlib import sha1
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Addresses, SyntheticAddress
+from pants.base.address import Address, Addresses, BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -149,11 +149,9 @@ class Target(AbstractTarget):
       cls.global_instance().check_unknown(target, kwargs)
 
     def check_unknown(self, target, kwargs):
-      # NB(gmalmquist): Sure would be nice to be able to use the build-file-alias name here.
-      target_type_name = type(target).__name__
-      ignore_params = set((self.get_options().ignored or {}).get(target_type_name, ()))
-      unknown_args = { arg: value for arg, value in kwargs.items() if arg not in ignore_params }
-      ignored_args = { arg: value for arg, value in kwargs.items() if arg in ignore_params }
+      ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
+      unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
                      .format(target=target.address.spec,
@@ -165,6 +163,10 @@ class Target(AbstractTarget):
           target_type=type(target).__name__,
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
+
+  @classmethod
+  def subsystems(cls):
+    return super(Target, cls).subsystems() + (cls.UnknownArguments,)
 
   LANG_DISCRIMINATORS = {
     'java': lambda t: t.is_jvm,
@@ -253,6 +255,23 @@ class Target(AbstractTarget):
     self._cached_transitive_fingerprint_map = {}
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
+
+  @property
+  def type_alias(self):
+    """Returns the type alias this target was constructed via.
+
+    For a target read from a BUILD file, this will be target alias, like 'java_library'.
+    For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
+
+    The end result is that the type alias should be the most natural way to refer to this target's
+    type to the author of the target instance.
+
+    :rtype: string
+    """
+    if isinstance(self.address, BuildFileAddress):
+      return self.address.type_alias
+    else:
+      return type(self).__name__
 
   @property
   def tags(self):
@@ -530,8 +549,7 @@ class Target(AbstractTarget):
         raise self.WrongNumberOfAddresses(
           "Expected a single address to from_target() as argument to {spec}"
           .format(spec=address.spec))
-      referenced_address = SyntheticAddress.parse(sources.addresses[0],
-                                                  relative_to=sources.rel_path)
+      referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
     elif isinstance(sources, FilesetWithSpec):
       filespec = sources.filespec

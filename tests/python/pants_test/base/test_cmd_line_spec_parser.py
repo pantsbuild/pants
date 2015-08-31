@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
@@ -119,14 +119,14 @@ class CmdLineSpecParserTest(BaseTest):
     def sort(addresses):
       return sorted(addresses, key=lambda address: address.spec)
 
-    self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
+    self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec)))
 
   def assert_parsed_list(self, cmdline_spec_list, expected):
     def sort(addresses):
       return sorted(addresses, key=lambda address: address.spec)
 
-    self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
+    self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
   def test_pants_dot_d_excluded(self):

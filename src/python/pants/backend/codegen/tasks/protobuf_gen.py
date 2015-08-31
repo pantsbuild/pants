@@ -18,7 +18,7 @@ from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -100,9 +100,8 @@ class ProtobufGen(SimpleCodegenTask):
     deps = OrderedSet()
     if target.imported_jars:
       # We need to add in the proto imports jars.
-      jars_address = SyntheticAddress(
-          os.path.relpath(self.codegen_workdir(target), get_buildroot()),
-          target.id + '-rjars')
+      jars_address = Address(os.path.relpath(self.codegen_workdir(target), get_buildroot()),
+                             target.id + '-rjars')
       jars_target = self.context.add_new_target(jars_address,
                                                 JarLibrary,
                                                 jars=target.imported_jars,

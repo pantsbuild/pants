@@ -12,8 +12,7 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -81,25 +80,52 @@ class BaseTest(unittest.TestCase):
                   spec='',
                   target_type=Target,
                   dependencies=None,
-                  resources=None,
                   derived_from=None,
                   **kwargs):
-    address = SyntheticAddress.parse(spec)
+    """Creates a target and injects it into the test's build graph.
+
+    :param string spec: The target address spec that locates this target.
+    :param type target_type: The concrete target subclass to create this new target from.
+    :param list dependencies: A list of target instances this new target depends on.
+    :param derived_from: The target this new target was derived from.
+    :type derived_from: :class:`pants.base.target.Target`
+    """
+    address = Address.parse(spec)
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self.build_graph,
                          **kwargs)
     dependencies = dependencies or []
-    dependencies.extend(resources or [])
 
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
                                    derived_from=derived_from)
+
+    # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
+    # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
+    for traversable_dependency_spec in target.traversable_dependency_specs:
+      traversable_dependency_address = Address.parse(traversable_dependency_spec,
+                                                     relative_to=address.spec_path)
+      traversable_dependency_target = self.build_graph.get_target(traversable_dependency_address)
+      if not traversable_dependency_target:
+        raise ValueError('Tests must make targets for traversable dependency specs ahead of them '
+                         'being traversed, {} tried to traverse {} which does not exist.'
+                         .format(target, traversable_dependency_address))
+      if traversable_dependency_target not in target.dependencies:
+        self.build_graph.inject_dependency(dependent=target.address,
+                                           dependency=traversable_dependency_address)
+        target.mark_transitive_invalidation_hash_dirty()
+
     return target
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'target': Dependencies})
+    # NB: In a normal pants deployment, 'target' is an alias for
+    # `pants.backend.core.targets.dependencies.Dependencies`.  We avoid that dependency on the core
+    # backend here since the `BaseTest` is used by lower level tests in base and since the
+    # `Dependencies` type itself is nothing more than an alias for Target that carries along a
+    # pydoc for the BUILD dictionary.
+    return BuildFileAliases.create(targets={'target': Target})
 
   def setUp(self):
     super(BaseTest, self).setUp()
@@ -211,7 +237,7 @@ class BaseTest(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
 

@@ -10,6 +10,8 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.util.dirutil import fast_relpath
+
 
 class ProductError(Exception): pass
 
@@ -78,9 +80,7 @@ class RootedProducts(object):
 
   def add_abs_paths(self, abs_paths):
     for abs_path in abs_paths:
-      if not abs_path.startswith(self._root):
-        raise Exception('{} is not under {}'.format(abs_path, self._root))
-      self._rel_paths.add(os.path.relpath(abs_path, self._root))
+      self._rel_paths.add(fast_relpath(abs_path, self._root))
 
   def add_rel_paths(self, rel_paths):
     self._rel_paths.update(rel_paths)

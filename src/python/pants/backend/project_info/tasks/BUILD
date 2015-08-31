@@ -98,10 +98,12 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':projectutils',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
