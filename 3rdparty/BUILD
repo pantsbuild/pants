@@ -122,6 +122,11 @@ jar_library(name='easymock',
               jar('org.easymock', 'easymock', '3.3.1')
             ])
 
+jar_library(name='gson',
+	    jars = [
+	      jar(org='com.google.code.gson', name='gson', rev='2.3.1')
+	    ])
+
 jar_library(name='guava-testlib',
             jars=[
               jar('com.google.guava', 'guava-testlib', '18.0')

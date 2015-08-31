@@ -13,6 +13,8 @@ python_library(
   name='shader',
   sources=['shader.py'],
   dependencies=[
-    'src/python/pants/util:contextutil'
+    'src/python/pants/util:contextutil',
+    'src/python/pants/java/distribution',
+    'src/python/pants/subsystem',
   ]
 )

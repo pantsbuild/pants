@@ -28,3 +28,15 @@ python_tests(
     'src/python/pants/util:dirutil',
   ]
 )
+
+python_tests(
+  name='shader_integration',
+  sources=['test_shader_integration.py'],
+  dependencies=[
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/java/distribution',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ],
+)

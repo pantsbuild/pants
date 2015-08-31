@@ -6,20 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from collections import namedtuple
 from contextlib import contextmanager
 
+from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolMixin
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
+from pants.subsystem.subsystem import Subsystem, SubsystemError
 from pants.util.contextutil import open_zip, temporary_file
 
 
-# TODO(John Sirois): Support shading given an input jar and a set of user-supplied rules (these
-# will come from target attributes) instead of only supporting auto-generating rules from the main
-# class of the input jar.
-class Shader(object):
-  """Creates shaded jars."""
-
-  class Error(Exception):
-    """Indicates an error shading a jar."""
+class Shading(object):
+  """Wrapper around relocate and exclude shading rules exposed in BUILD files."""
 
   class Rule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
     """Represents a transformation rule for a jar shading session."""
@@ -28,27 +27,181 @@ class Shader(object):
       return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
 
   SHADE_PREFIX = '__shaded_by_pants__.'
-  """The shading package."""
+  """The default shading package."""
 
-  @classmethod
-  def _package_rule(cls, package_name=None, recursive=False, shade=False):
-    args = dict(package=package_name,
-                capture='**' if recursive else '*',
-                dest_prefix=cls.SHADE_PREFIX if shade else '')
+  class Relocate(namedtuple('ShadingRule', ['from_pattern', 'shade_pattern', 'shade_prefix'])):
+    """Base class for shading relocation rules specifyable in BUILD files."""
 
-    if package_name:
-      return cls.Rule(from_pattern='{package}.{capture}'.format(**args),
-                      to_pattern='{dest_prefix}{package}.@1'.format(**args))
-    else:
-      return cls.Rule(from_pattern='{capture}'.format(**args),
-                      to_pattern='{dest_prefix}@1'.format(**args))
+    _wildcard_pattern = re.compile('[*]+')
+    _starts_with_number_pattern = re.compile('^[0-9]')
+    _illegal_package_char_pattern = re.compile('[^a-z0-9_]', re.I)
 
-  @classmethod
-  def _class_rule(cls, class_name, shade=False):
-    args = dict(class_name=class_name,
-                dest_prefix=cls.SHADE_PREFIX if shade else '')
+    @classmethod
+    def _infer_shaded_pattern_iter(cls, from_pattern, prefix=None):
+      if prefix:
+        yield prefix
+      last = 0
+      for i, match in enumerate(cls._wildcard_pattern.finditer(from_pattern)):
+        yield from_pattern[last:match.start()]
+        yield '@{}'.format(i+1)
+        last = match.end()
+      yield from_pattern[last:]
 
-    return cls.Rule(from_pattern=class_name, to_pattern='{dest_prefix}{class_name}'.format(**args))
+    @classmethod
+    def _sanitize_package_name(cls, name):
+      parts = name.split('.')
+      for i, part in enumerate(parts):
+        part = cls._illegal_package_char_pattern.sub('_', part)
+        if cls._starts_with_number_pattern.match(part):
+          part = '_{}'.format(part)
+        parts[i] = part
+      return '.'.join(filter(None, parts))
+
+    @classmethod
+    def new(cls, from_pattern, shade_pattern=None, shade_prefix=None):
+      """Creates a rule which shades jar entries from one pattern to another.
+
+      Examples: ::
+
+          # Rename everything in the org.foobar.example package
+          # to __shaded_by_pants__.org.foobar.example.
+          shading_relocate('org.foobar.example.**')
+
+          # Rename org.foobar.example.Main to __shaded_by_pants__.org.foobar.example.Main
+          shading_relocate('org.foobar.example.Main')
+
+          # Rename org.foobar.example.Main to org.foobar.example.NotMain
+          shading_relocate('org.foobar.example.Main', 'org.foobar.example.NotMain')
+
+          # Rename all 'Main' classes under any direct subpackage of org.foobar.
+          shading_relocate('org.foobar.*.Main')
+
+          # Rename org.foobar package to com.barfoo package
+          shading_relocate('org.foobar.**', 'com.barfoo.@1')
+
+          # Rename everything in org.foobar.example package to __hello__.org.foobar.example
+          shading_relocate('org.foobar.example.**', shade_prefix='__hello__')
+
+      :param string from_pattern: Any fully-qualified classname which matches this pattern will be
+        shaded. '*' is a wildcard that matches any individual package component, and '**' is a
+        wildcard that matches any trailing pattern (ie the rest of the string).
+      :param string shade_pattern: The shaded pattern to use, where ``@1``, ``@2``, ``@3``, etc are
+        references to the groups matched by wildcards (groups are numbered from left to right). If
+        omitted, this pattern is inferred from the input pattern, prefixed by the ``shade_prefix``
+        (if provided). (Eg, a ``from_pattern`` of ``com.*.foo.bar.**`` implies a default
+        ``shade_pattern`` of ``__shaded_by_pants__.com.@1.foo.@2``)
+      :param string shade_prefix: Prefix to prepend when generating a ``shade_pattern`` (if a
+        ``shade_pattern`` is not provided by the user). Defaults to '``__shaded_by_pants__.``'.
+      """
+      if shade_prefix is None:
+        # NB(gmalmquist): Have have to check "is None" rather than just one-lining this with an or
+        # statement, because the empty-string is a valid prefix which should not be replaced by the
+        # default prefix.
+        shade_prefix = Shading.SHADE_PREFIX
+      return cls(from_pattern, shade_pattern, shade_prefix)
+
+    def rule(self):
+      from_pattern = self.from_pattern
+      shade_prefix = self.shade_prefix
+      shade_pattern = self.shade_pattern or ''.join(self._infer_shaded_pattern_iter(from_pattern,
+                                                                                    shade_prefix))
+      return Shading.Rule(from_pattern, shade_pattern)
+
+  class Exclude(Relocate):
+    """Creates a rule which excludes the given pattern from shading."""
+
+    @classmethod
+    def new(cls, pattern):
+      """Creates a rule which excludes the given pattern from shading.
+
+      Examples: ::
+
+          # Don't shade the org.foobar.example.Main class
+          shading_exclude('org.foobar.example.Main')
+
+          # Don't shade anything under org.foobar.example
+          shading_exclude('org.foobar.example.**')
+
+      :param string pattern: Any fully-qualified classname which matches this pattern will NOT be
+        shaded. '*' is a wildcard that matches any individual package component, and '**' is a
+        wildcard that matches any trailing pattern (ie the rest of the string).
+      """
+      return super(Shading.Exclude, cls).new(pattern, shade_prefix='')
+
+  class RelocatePackage(Relocate):
+    """Convenience constructor for a package relocation rule."""
+
+    @classmethod
+    def new(self, package_name, shade_prefix=None, recursive=True):
+      """Convenience constructor for a package relocation rule.
+
+      Essentially equivalent to just using ``shading_relocate('package_name.**')``.
+
+      :param string package_name: Package name to shade (eg, ``org.pantsbuild.example``).
+      :param string shade_prefix: Optional prefix to apply to the package. Defaults to
+        ``__shaded_by_pants__.``.
+      :param bool recursive: Whether to rename everything under any subpackage of ``package_name``,
+        or just direct children of the package. (Defaults to True).
+      """
+      from_pattern = '{package}.{capture}'.format(package=package_name,
+                                                  capture='**' if recursive else '*')
+      return super(Shading.RelocatePackage, self).new(from_pattern=from_pattern,
+                                                      shade_prefix=shade_prefix)
+
+  class ExcludePackage(Relocate):
+    """Convenience constructor for a package exclusion rule."""
+
+    @classmethod
+    def new(cls, package_name, recursive=True):
+      """Convenience constructor for a package exclusion rule.
+
+      Essentially equivalent to just using ``shading_exclude('package_name.**')``.
+
+      :param string package_name: Package name to exclude (eg, ``org.pantsbuild.example``).
+      :param bool recursive: Whether to exclude everything under any subpackage of ``package_name``,
+        or just direct children of the package. (Defaults to True).
+      """
+      from_pattern = '{package}.{capture}'.format(package=package_name,
+                                                  capture='**' if recursive else '*')
+      return super(Shading.ExcludePackage, cls).new(from_pattern=from_pattern, shade_prefix='')
+
+
+class Shader(object):
+  """Creates shaded jars."""
+
+  class Error(Exception):
+    """Indicates an error shading a jar."""
+
+  class Factory(JvmToolMixin, Subsystem):
+    options_scope = 'shader'
+
+    class Error(SubsystemError):
+      """Error creating a Shader with the Shader.Factory subsystem."""
+
+    @classmethod
+    def subsystem_dependencies(cls):
+      return super(Shader.Factory, cls).subsystem_dependencies() + (DistributionLocator,)
+
+    @classmethod
+    def register_options(cls, register):
+      super(Shader.Factory, cls).register_options(register)
+      cls.register_jvm_tool(register, 'jarjar')
+
+    @classmethod
+    def create(cls, context, executor=None):
+      """Creates and returns a new Shader.
+
+      :param Executor executor: Optional java executor to run jarjar with.
+      """
+      if executor is None:
+        executor = SubprocessExecutor(DistributionLocator.cached())
+      classpath = cls.global_instance().tool_classpath_from_products(context.products, 'jarjar',
+                                                                     cls.options_scope)
+      if len(classpath) != 1:
+        raise cls.Error('JarJar classpath is expected to have exactly one jar!\nclasspath = {}'
+                        .format(':'.join(classpath)))
+      jarjar = classpath[0]
+      return Shader(jarjar, executor)
 
   @classmethod
   def exclude_package(cls, package_name=None, recursive=False):
@@ -60,7 +213,9 @@ class Shader(object):
                            `False` by default.
     :returns: A `Shader.Rule` describing the shading exclusion.
     """
-    return cls._package_rule(package_name, recursive, shade=False)
+    if not package_name:
+      return Shading.Exclude.new('**' if recursive else '*').rule()
+    return Shading.ExcludePackage.new(package_name, recursive=recursive).rule()
 
   @classmethod
   def exclude_class(cls, class_name):
@@ -69,7 +224,7 @@ class Shader(object):
     :param unicode class_name: A fully qualified classname, eg: `org.pantsbuild.tools.jar.Main`.
     :returns: A `Shader.Rule` describing the shading exclusion.
     """
-    return cls._class_rule(class_name, shade=False)
+    return Shading.Exclude.new(class_name).rule()
 
   @classmethod
   def shade_package(cls, package_name=None, recursive=False):
@@ -81,7 +236,9 @@ class Shader(object):
                            `False` by default.
     :returns: A `Shader.Rule` describing the packages to be shaded.
     """
-    return cls._package_rule(package_name, recursive, shade=True)
+    if not package_name:
+      return Shading.Relocate.new('**' if recursive else '*').rule()
+    return Shading.RelocatePackage.new(package_name, recursive=recursive).rule()
 
   @classmethod
   def shade_class(cls, class_name):
@@ -90,7 +247,7 @@ class Shader(object):
     :param unicode class_name: A fully qualified classname, eg: `org.pantsbuild.tools.jar.Main`.
     :returns: A `Shader.Rule` describing the class shading.
     """
-    return cls._class_rule(class_name, shade=True)
+    return Shading.Relocate.new(class_name).rule()
 
   @staticmethod
   def _iter_packages(paths):
@@ -205,6 +362,29 @@ class Shader(object):
     return rules
 
   @contextmanager
+  def binary_shader_for_rules(self, output_jar, jar, rules, jvm_options=None):
+    """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.
+
+    No default rules are applied; only the rules passed in as a parameter will be used.
+
+    :param unicode output_jar: The path to dump the shaded jar to; will be over-written if it
+                               exists.
+    :param unicode jar: The path to the jar file to shade.
+    :param list rules: The rules to apply for shading.
+    :param list jvm_options: an optional sequence of options for the underlying jvm
+    :returns: An `Executor.Runner` that can be `run()` to shade the given `jar`.
+    :rtype: :class:`pants.java.executor.Executor.Runner`
+    """
+    with temporary_file() as fp:
+      for rule in rules:
+        fp.write(rule.render())
+      fp.close()
+
+      yield self._executor.runner(classpath=[self._jarjar],
+                                  main='org.pantsbuild.jarjar.Main',
+                                  jvm_options=jvm_options,
+                                  args=['process', fp.name, jar, output_jar])
+
   def binary_shader(self, output_jar, main, jar, custom_rules=None, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.
 
@@ -224,13 +404,7 @@ class Shader(object):
     :param list custom_rules: An optional list of custom `Shader.Rule`s.
     :param list jvm_options: an optional sequence of options for the underlying jvm
     :returns: An `Executor.Runner` that can be `run()` to shade the given `jar`.
+    :rtype: :class:`pants.java.executor.Executor.Runner`
     """
-    with temporary_file() as fp:
-      for rule in self.assemble_binary_rules(main, jar, custom_rules=custom_rules):
-        fp.write(rule.render())
-      fp.close()
-
-      yield self._executor.runner(classpath=[self._jarjar],
-                                  main='org.pantsbuild.jarjar.Main',
-                                  jvm_options=jvm_options,
-                                  args=['process', fp.name, jar, output_jar])
+    all_rules = self.assemble_binary_rules(main, jar, custom_rules=custom_rules)
+    return self.binary_shader_for_rules(output_jar, jar, all_rules, jvm_options=jvm_options)

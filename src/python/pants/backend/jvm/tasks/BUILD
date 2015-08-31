@@ -70,12 +70,12 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/ivy',
-    'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 
@@ -290,6 +290,11 @@ python_library(
     ':jar_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/java/jar:shader',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:fileutil',
+    'src/python/pants/util:memo',
   ],
 )
 
