@@ -37,7 +37,7 @@ class DepmapTest(BaseDepmapTest):
           """.format(
         type=type,
         name=name,
-        deps=','.join("pants('{0}')".format(dep) for dep in list(deps)),
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)),
         extra=('' if not kwargs else ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items()))
       )))
 
@@ -51,13 +51,13 @@ class DepmapTest(BaseDepmapTest):
         type=type,
         entry_point=entry_point,
         name=name,
-        deps=','.join("pants('{0}')".format(dep) for dep in list(deps)))
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)))
       ))
 
     def create_jvm_app(path, name, type, binary, deps=()):
       self.add_to_build_file(path, dedent("""
           {type}(name='{name}',
-            dependencies=[pants('{binary}')],
+            dependencies=['{binary}'],
             bundles={deps}
           )
           """.format(
@@ -87,7 +87,7 @@ class DepmapTest(BaseDepmapTest):
     add_to_build_file('overlaps', 'one', 'jvm_binary', deps=['common/h', 'common/i'])
     self.add_to_build_file('overlaps', dedent("""
       java_library(name='two',
-        dependencies=[pants('overlaps:one')],
+        dependencies=['overlaps:one'],
         sources=[],
       )
     """))
@@ -100,13 +100,13 @@ class DepmapTest(BaseDepmapTest):
     self.add_to_build_file('src/java/a', dedent("""
       java_library(
         name='a_java',
-        resources=[pants('resources/a:a_resources')]
+        resources=['resources/a:a_resources']
       )
     """))
     self.add_to_build_file('src/java/a', dedent("""
       target(
         name='a_dep',
-        dependencies=[pants(':a_java')]
+        dependencies=[':a_java']
       )
     """))
 
