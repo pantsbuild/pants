@@ -42,7 +42,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:parse_context',
     'tests/python/pants_test:base_test',
   ]
 )

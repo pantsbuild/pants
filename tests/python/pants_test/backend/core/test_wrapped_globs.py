@@ -23,8 +23,8 @@ class FilesetRelPathWrapperTest(BaseTest):
         'java_library': JavaLibrary,
       },
       context_aware_object_factories={
-        'globs': Globs,
-        'rglobs': RGlobs,
+        'globs': Globs.factory,
+        'rglobs': RGlobs.factory,
       },
     )
 

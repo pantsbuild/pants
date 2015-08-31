@@ -13,21 +13,10 @@ from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.parse_context import ParseContext
 from pants_test.base_test import BaseTest
 
 
-class BundleTestBase(BaseTest):
-
-  def create_parse_context(self, spec_path):
-    return ParseContext(rel_path=spec_path, type_aliases={})
-
-  def create_bundle(self, rel_path, **kwargs):
-    parse_context = self.create_parse_context(rel_path)
-    return Bundle(parse_context, **kwargs)
-
-
-class JvmAppTest(BundleTestBase):
+class JvmAppTest(BaseTest):
 
   def test_simple(self):
     binary_target = self.make_target(':foo-binary', JvmBinary, main='com.example.Foo')
@@ -47,7 +36,7 @@ class JvmAppTest(BundleTestBase):
     self.create_file(os.path.join(rel_path, 'config/densities.xml'))
     return self.make_target(Address(rel_path, name or 'app').spec,
                             JvmApp,
-                            bundles=[self.create_bundle(rel_path, fileset='config/densities.xml')],
+                            bundles=[Bundle(rel_path, fileset='config/densities.xml')],
                             **kwargs)
 
   def test_binary_via_binary(self):
@@ -100,7 +89,7 @@ class JvmAppTest(BundleTestBase):
       app.binary
 
 
-class BundleTest(BundleTestBase):
+class BundleTest(BaseTest):
 
   def test_bundle_filemap_dest_bypath(self):
     spec_path = 'src/java/org/archimedes/buoyancy'
@@ -110,7 +99,7 @@ class BundleTest(BundleTestBase):
     app = self.make_target(spec_path,
                            JvmApp,
                            dependencies=[unused],
-                           bundles=[self.create_bundle(spec_path, fileset='config/densities.xml')])
+                           bundles=[Bundle(spec_path, fileset='config/densities.xml')])
 
     self.assertEqual(1, len(app.bundles))
     # after one big refactor, ../../../../../ snuck into this path:
@@ -122,12 +111,11 @@ class BundleTest(BundleTestBase):
     two = self.create_file(os.path.join(spec_path, 'config/two.xml'))
     unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
-    parse_context = self.create_parse_context(spec_path)
-    globs = Globs(parse_context)
+    globs = Globs(spec_path)
     app = self.make_target(spec_path,
                            JvmApp,
                            dependencies=[unused],
-                           bundles=[Bundle(parse_context, fileset=globs('config/*.xml'))])
+                           bundles=[Bundle(spec_path, fileset=globs('config/*.xml'))])
 
     self.assertEqual(1, len(app.bundles))
     self.assertEqual({one: 'config/one.xml', two: 'config/two.xml'}, app.bundles[0].filemap)
@@ -140,9 +128,9 @@ class BundleTest(BundleTestBase):
     app = self.make_target(spec_path,
                            JvmApp,
                            dependencies=[unused],
-                           bundles=[self.create_bundle(spec_path,
-                                                       relative_to='gold',
-                                                       fileset='gold/config/five.xml')])
+                           bundles=[Bundle(spec_path,
+                                           relative_to='gold',
+                                           fileset='gold/config/five.xml')])
 
     self.assertEqual(1, len(app.bundles))
     self.assertEqual({five: 'config/five.xml'}, app.bundles[0].filemap)
@@ -156,9 +144,7 @@ class BundleTest(BundleTestBase):
     app = self.make_target(spec_path,
                            JvmApp,
                            dependencies=[unused],
-                           bundles=[self.create_bundle(spec_path,
-                                                       mapper=mapper,
-                                                       fileset='config/one.xml')])
+                           bundles=[Bundle(spec_path, mapper=mapper, fileset='config/one.xml')])
 
     self.assertEqual(1, len(app.bundles))
     self.assertEqual({one: 'gold/config/one.xml'}, app.bundles[0].filemap)
@@ -174,9 +160,9 @@ class BundleTest(BundleTestBase):
     metal_dense = self.create_file(os.path.join(spec_path, 'config/metal/dense.xml'))
     unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
-    bundle = self.create_bundle(spec_path,
-                                relative_to='config',
-                                fileset=['config/stone/dense.xml', 'config/metal/dense.xml'])
+    bundle = Bundle(spec_path,
+                    relative_to='config',
+                    fileset=['config/stone/dense.xml', 'config/metal/dense.xml'])
     app = self.make_target(spec_path, JvmApp, dependencies=[unused], bundles=[bundle])
 
     self.assertEqual(1, len(app.bundles))
@@ -208,15 +194,14 @@ class BundleTest(BundleTestBase):
     app1 = self.make_target(Address(spec_path, 'app1').spec,
                             JvmApp,
                             dependencies=[unused],
-                            bundles=[self.create_bundle(spec_path,
-                                                        relative_to='config',
-                                                        fileset='config/stone/dense.xml')])
+                            bundles=[Bundle(spec_path,
+                                            relative_to='config',
+                                            fileset='config/stone/dense.xml')])
 
     app2 = self.make_target(Address(spec_path, 'app2').spec,
                             JvmApp,
                             dependencies=[unused],
-                            bundles=[self.create_bundle(spec_path,
-                                                        fileset='config/metal/dense.xml')])
+                            bundles=[Bundle(spec_path, fileset='config/metal/dense.xml')])
 
     self.assertEqual(1, len(app1.bundles))
     self.assertEqual({stone_dense: 'stone/dense.xml'}, app1.bundles[0].filemap)
@@ -225,16 +210,16 @@ class BundleTest(BundleTestBase):
     self.assertEqual({metal_dense: 'config/metal/dense.xml'}, app2.bundles[0].filemap)
 
   def test_globs_relative_to_build_root(self):
-    unused = self.make_target('y', JvmBinary)
+    spec_path = 'y'
+    unused = self.make_target(spec_path, JvmBinary)
 
-    parse_context = self.create_parse_context('y')
-    globs = Globs(parse_context)
+    globs = Globs(spec_path)
     app = self.make_target('y:app',
                            JvmApp,
                            dependencies=[unused],
                            bundles=[
-                             Bundle(parse_context, relative_to="config", fileset=globs("z/*")),
-                             Bundle(parse_context, relative_to="config", fileset=['a/b'])
+                             Bundle(spec_path, relative_to="config", fileset=globs("z/*")),
+                             Bundle(spec_path, relative_to="config", fileset=['a/b'])
                            ])
 
     self.assertEquals(['a/b', 'y/z/*'], sorted(app.globs_relative_to_buildroot()['globs']))

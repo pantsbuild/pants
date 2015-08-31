@@ -12,6 +12,7 @@ from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_manual import manual
 from pants.util.memo import memoized_property
 
 
@@ -52,11 +53,20 @@ class FilesetWithSpec(object):
 
 class FilesetRelPathWrapper(object):
 
-  def __init__(self, parse_context):
-    self.rel_path = parse_context.rel_path
+  @classmethod
+  @manual.builddict(factory=True)
+  def factory(cls, parse_context):
+    """A factory for using a `FilesetRelPathWrapper` as a context aware object factory."""
+    return cls(parse_context.rel_path)
+
+  def __init__(self, rel_path):
+    """
+    :param string rel_path: The path this file set will be relative to.
+    """
+    self._rel_path = rel_path
 
   def __call__(self, *args, **kwargs):
-    root = os.path.join(get_buildroot(), self.rel_path)
+    root = os.path.join(get_buildroot(), self._rel_path)
 
     excludes = kwargs.pop('exclude', [])
     if isinstance(excludes, string_types):

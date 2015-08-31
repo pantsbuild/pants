@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.core.wrapped_globs import Globs
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
-from twitter.common.dirutil.fileset import Fileset
 
 from pants.contrib.go.targets.go_target import GoTarget
 
@@ -33,14 +33,8 @@ class GoLocalSource(GoTarget):
     return cls.package_path(source_root, address.spec_path)
 
   def __init__(self, address=None, payload=None, **kwargs):
-    # TODO(John Sirois): Make pants.backend.core.wrapped_globs.Globs in the core backend
-    # constructable with just a rel_path. Right now it violates the Law of Demeter and
-    # fundamentally takes a ParseContext, which it doesn't actually need and which other backend
-    # consumers should not need to know about or create.
-    # Here we depend on twitter/commons which is less than ideal in core pants and even worse in a
-    # plugin.  We depend on it here to ensure the globbing is lazy and skipped if the target is
-    # never fingerprinted (eg: when running `./pants list`).
-    sources = Fileset.globs('*.go', root=os.path.join(get_buildroot(), address.spec_path))
+    globs = Globs(rel_path=os.path.join(get_buildroot(), address.spec_path))
+    sources = globs('*.go')
 
     payload = payload or Payload()
     payload.add_fields({

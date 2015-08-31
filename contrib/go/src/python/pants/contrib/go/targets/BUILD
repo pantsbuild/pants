@@ -28,8 +28,8 @@ python_library(
   name='go_local_source',
   sources=['go_local_source.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     ':go_target',
+    'src/python/pants/backend/core:wrapped_globs',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:payload',
   ],

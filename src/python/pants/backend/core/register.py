@@ -85,11 +85,11 @@ def build_file_aliases():
     },
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,
-      'globs': Globs,
+      'globs': Globs.factory,
       'from_target': FromTarget,
-      'rglobs': RGlobs,
+      'rglobs': RGlobs.factory,
       'source_root': SourceRoot.factory,
-      'zglobs': ZGlobs,
+      'zglobs': ZGlobs.factory,
     }
   )
 
