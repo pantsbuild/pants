@@ -195,12 +195,12 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       '--compile-jvm-dep-check-missing-deps=fatal'
     )
 
-  def test_java_compile_missing_direct_dep_analysis_whitelist_jmake(self):
+  @provide_compile_strategies
+  def test_java_compile_missing_direct_dep_analysis_whitelist_jmake(self, strategy):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      # NB: global only: jmake does not properly support upstream deps for isolated
-      'global',
+      strategy,
       '--compile-jvm-dep-check-missing-direct-deps=fatal'
     )
 
