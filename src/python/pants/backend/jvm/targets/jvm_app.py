@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from six import string_types
 from twitter.common.dirutil import Fileset
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
