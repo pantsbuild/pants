@@ -43,7 +43,7 @@ class JvmDependencyAnalyzer(Task):
     super(JvmDependencyAnalyzer, cls).register_options(register)
     register('--skip', default=False, action='store_true',
              fingerprint=True,
-             help='Skip dependency analysis.')
+             help='Skip this entire task.')
 
   @memoized_property
   def targets_by_file(self):
