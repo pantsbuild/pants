@@ -10,7 +10,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.exceptions import TaskError
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
@@ -90,7 +90,7 @@ class CheckstyleTest(NailgunTaskTestBase):
     self.create_file(relpath=os.path.join(rel_dir, '{name}.java'.format(name=name)),
                      contents=test_java_source)
 
-    return self.make_target(SyntheticAddress(spec_path=rel_dir, target_name=name).spec,
+    return self.make_target(Address(spec_path=rel_dir, target_name=name).spec,
                             JavaLibrary,
                             sources=['{}.java'.format(name)])
 

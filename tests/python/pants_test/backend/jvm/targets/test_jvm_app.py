@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants_test.base_test import BaseTest
@@ -45,7 +45,7 @@ class JvmAppTest(BundleTestBase):
 
   def create_app(self, rel_path, name=None, **kwargs):
     self.create_file(os.path.join(rel_path, 'config/densities.xml'))
-    return self.make_target(SyntheticAddress(rel_path, name or 'app').spec,
+    return self.make_target(Address(rel_path, name or 'app').spec,
                             JvmApp,
                             bundles=[self.create_bundle(rel_path, fileset='config/densities.xml')],
                             **kwargs)
@@ -105,7 +105,7 @@ class BundleTest(BundleTestBase):
   def test_bundle_filemap_dest_bypath(self):
     spec_path = 'src/java/org/archimedes/buoyancy'
     densities = self.create_file(os.path.join(spec_path, 'config/densities.xml'))
-    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+    unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
     app = self.make_target(spec_path,
                            JvmApp,
@@ -120,7 +120,7 @@ class BundleTest(BundleTestBase):
     spec_path = 'src/java/org/archimedes/tub'
     one = self.create_file(os.path.join(spec_path, 'config/one.xml'))
     two = self.create_file(os.path.join(spec_path, 'config/two.xml'))
-    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+    unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
     parse_context = self.create_parse_context(spec_path)
     globs = Globs(parse_context)
@@ -135,7 +135,7 @@ class BundleTest(BundleTestBase):
   def test_bundle_filemap_dest_relative(self):
     spec_path = 'src/java/org/archimedes/crown'
     five = self.create_file(os.path.join(spec_path, 'gold/config/five.xml'))
-    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+    unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
     app = self.make_target(spec_path,
                            JvmApp,
@@ -150,7 +150,7 @@ class BundleTest(BundleTestBase):
   def test_bundle_filemap_dest_remap(self):
     spec_path = 'src/java/org/archimedes/crown'
     one = self.create_file(os.path.join(spec_path, 'config/one.xml'))
-    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+    unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
     mapper = DirectoryReMapper(os.path.join(spec_path, 'config'), 'gold/config')
     app = self.make_target(spec_path,
@@ -172,7 +172,7 @@ class BundleTest(BundleTestBase):
     spec_path = 'src/java/org/archimedes/volume'
     stone_dense = self.create_file(os.path.join(spec_path, 'config/stone/dense.xml'))
     metal_dense = self.create_file(os.path.join(spec_path, 'config/metal/dense.xml'))
-    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+    unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
     bundle = self.create_bundle(spec_path,
                                 relative_to='config',
@@ -187,7 +187,7 @@ class BundleTest(BundleTestBase):
     spec_path = 'src/java/org/archimedes/volume'
     stone_dense = self.create_file(os.path.join(spec_path, 'config/stone/dense.xml'))
     metal_dense = self.create_file(os.path.join(spec_path, 'config/metal/dense.xml'))
-    unused = self.make_target(SyntheticAddress(spec_path, 'unused').spec, JvmBinary)
+    unused = self.make_target(Address(spec_path, 'unused').spec, JvmBinary)
 
     self.add_to_build_file('src/java/org/archimedes/volume/BUILD', dedent('''
       jvm_app(name='volume',
@@ -205,14 +205,14 @@ class BundleTest(BundleTestBase):
       )
     '''))
 
-    app1 = self.make_target(SyntheticAddress(spec_path, 'app1').spec,
+    app1 = self.make_target(Address(spec_path, 'app1').spec,
                             JvmApp,
                             dependencies=[unused],
                             bundles=[self.create_bundle(spec_path,
                                                         relative_to='config',
                                                         fileset='config/stone/dense.xml')])
 
-    app2 = self.make_target(SyntheticAddress(spec_path, 'app2').spec,
+    app2 = self.make_target(Address(spec_path, 'app2').spec,
                             JvmApp,
                             dependencies=[unused],
                             bundles=[self.create_bundle(spec_path,
