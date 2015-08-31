@@ -42,7 +42,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       },
       context_aware_object_factories={
         'source_root': SourceRoot.factory,
-        'rglobs': RGlobs,
+        'rglobs': RGlobs.factory,
         'from_target': FromTarget,
       },
       objects={
