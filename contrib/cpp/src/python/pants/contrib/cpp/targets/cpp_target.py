@@ -12,23 +12,16 @@ from pants.base.target import Target
 class CppTarget(Target):
   """A base class for all cpp targets."""
 
-  def __init__(self,
-               address=None,
-               payload=None,
-               sources_rel_path=None,
-               sources=None,
-               **kwargs):
+  def __init__(self, address=None, payload=None, sources=None, **kwargs):
     """
     :param sources: Source code files to build. Paths are relative to the BUILD
       file's directory.
     :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     """
-    if sources_rel_path is None:
-      sources_rel_path = address.spec_path
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources=sources,
-                                           sources_rel_path=sources_rel_path,
+                                           sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
     super(CppTarget, self).__init__(address=address, payload=payload, **kwargs)

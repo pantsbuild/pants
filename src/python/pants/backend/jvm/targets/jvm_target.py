@@ -26,7 +26,6 @@ class JvmTarget(Target, Jarable):
   def __init__(self,
                address=None,
                payload=None,
-               sources_rel_path=None,
                sources=None,
                provides=None,
                excludes=None,
@@ -59,13 +58,11 @@ class JvmTarget(Target, Jarable):
       by DistributionLocator.cached().version.
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
-    if sources_rel_path is None:
-      sources_rel_path = address.spec_path
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
     configurations = ConfigurationsField(self.assert_list(configurations, key_arg='configurations'))
     payload.add_fields({
-      'sources': self.create_sources_field(sources, sources_rel_path, address, key_arg='sources'),
+      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
       'excludes': excludes,
       'configurations': configurations,
