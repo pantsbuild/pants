@@ -16,8 +16,6 @@ public class HelloMain {
 
     // Target of other greeting is config'd in resource, so read that:
     System.out.println(Greeting.greetFromResource("org/pantsbuild/example/hello/world.txt"));
-
-    Goodbye.speak();
   }
 
   private HelloMain() {
