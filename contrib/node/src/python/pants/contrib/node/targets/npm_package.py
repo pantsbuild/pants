@@ -11,7 +11,11 @@ from pants.base.target import Target
 
 
 class NpmPackage(Target):
-  """Represents an NPM package."""
+  """Represents an abstract NPM package.
+
+  All NPM packages have a package name whether they are local or remote so this serves as a base
+  class for all concrete manifestations of NPM packages.
+  """
 
   def __init__(self, package_name=None, address=None, payload=None, **kwargs):
     """
