@@ -10,7 +10,7 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -90,7 +90,7 @@ class PythonTarget(Target):
       yield spec
     if self._provides:
       for spec in self._provides._binaries.values():
-        address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
+        address = Address.parse(spec, relative_to=self.address.spec_path)
         yield address.spec
 
   @property
@@ -102,7 +102,7 @@ class PythonTarget(Target):
     def binary_iter():
       if self.payload.provides:
         for key, binary_spec in self.payload.provides.binaries.items():
-          address = SyntheticAddress.parse(binary_spec, relative_to=self.address.spec_path)
+          address = Address.parse(binary_spec, relative_to=self.address.spec_path)
           yield (key, self._build_graph.get_target(address))
     return dict(binary_iter())
 
@@ -138,11 +138,11 @@ class PythonTarget(Target):
   def _synthesize_resources_target(self):
     # Create an address for the synthetic target.
     spec = self.address.spec + '_synthetic_resources'
-    synthetic_address = SyntheticAddress.parse(spec=spec)
+    synthetic_address = Address.parse(spec=spec)
     # For safety, ensure an address that's not used already, even though that's highly unlikely.
     while self._build_graph.contains_address(synthetic_address):
       spec += '_'
-      synthetic_address = SyntheticAddress.parse(spec=spec)
+      synthetic_address = Address.parse(spec=spec)
 
     self._build_graph.inject_synthetic_target(synthetic_address, Resources,
                                               sources=self.payload.resources.source_paths,

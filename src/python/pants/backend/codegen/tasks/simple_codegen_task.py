@@ -12,7 +12,7 @@ from abc import abstractmethod
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
@@ -222,7 +222,7 @@ class SimpleCodegenTask(Task):
         target_workdir = self.codegen_workdir(target)
         synthetic_name = target.id
         sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
-        synthetic_address = SyntheticAddress(sources_rel_path, synthetic_name)
+        synthetic_address = Address(sources_rel_path, synthetic_name)
         raw_generated_sources = list(self.codegen_strategy.find_sources(target))
         # Make the sources robust regardless of whether subclasses return relative paths, or
         # absolute paths that are subclasses of the workdir.

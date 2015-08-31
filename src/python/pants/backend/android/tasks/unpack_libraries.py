@@ -13,7 +13,7 @@ from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.fs.archive import ZIP
@@ -92,7 +92,7 @@ class UnpackLibraries(Task):
     archive_version = os.path.splitext(archive)[0].rpartition('-')[-1]
     jar_url = 'file://{0}'.format(jar_file)
     jar_dep = JarDependency(org=target.id, name=archive, rev=archive_version, url=jar_url)
-    address = SyntheticAddress(self.workdir, '{}-classes.jar'.format(archive))
+    address = Address(self.workdir, '{}-classes.jar'.format(archive))
     new_target = self.context.add_new_target(address, JarLibrary, jars=[jar_dep],
                                              derived_from=target)
     return new_target
@@ -107,7 +107,7 @@ class UnpackLibraries(Task):
     :rtype::class:`pants.backend.android.targets.AndroidResources`
     """
 
-    address = SyntheticAddress(self.workdir, '{}-resources'.format(archive))
+    address = Address(self.workdir, '{}-resources'.format(archive))
     new_target = self.context.add_new_target(address, AndroidResources,
                                              manifest=manifest, resource_dir=resource_dir,
                                              derived_from=target)
@@ -143,7 +143,7 @@ class UnpackLibraries(Task):
     if os.path.isfile(jar_file):
       deps.append(self.create_classes_jar_target(target, archive, jar_file))
 
-    address = SyntheticAddress(self.workdir, '{}-android_library'.format(archive))
+    address = Address(self.workdir, '{}-android_library'.format(archive))
     new_target = self.context.add_new_target(address, AndroidLibrary,
                                              manifest=manifest,
                                              include_patterns=target.include_patterns,

@@ -76,13 +76,6 @@ class Export(ConsoleTask):
     """
     return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
-  @staticmethod
-  def _address(address):
-    """
-    :type address: pants.base.address.SyntheticAddress
-    """
-    return '{0}:{1}'.format(address.spec_path, address.target_name)
-
   @classmethod
   def register_options(cls, register):
     super(Export, cls).register_options(register)
@@ -179,7 +172,7 @@ class Export(ConsoleTask):
       if isinstance(current_target, JarLibrary):
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
-        info['targets'].append(self._address(dep.address))
+        info['targets'].append(dep.address.spec)
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
@@ -190,7 +183,7 @@ class Export(ConsoleTask):
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
-          info['targets'].append(self._address(dep.address))
+          info['targets'].append(dep.address.spec)
           process_target(dep)
 
       if isinstance(current_target, JvmTarget):
@@ -203,7 +196,7 @@ class Export(ConsoleTask):
 
       if self.get_options().libraries:
         info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
-      targets_map[self._address(current_target.address)] = info
+      targets_map[current_target.address.spec] = info
 
     for target in targets:
       process_target(target)

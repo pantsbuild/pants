@@ -11,7 +11,7 @@ import re
 import sys
 from difflib import unified_diff
 
-from pants.base.address import BuildFileAddress, SyntheticAddress
+from pants.base.address import Address, BuildFileAddress
 
 
 logger = logging.getLogger(__name__)
@@ -338,7 +338,7 @@ class BuildFileManipulator(object):
     self._dependencies_by_address = {}
 
     for dep in dependencies:
-      dep_address = SyntheticAddress.parse(dep.spec, relative_to=build_file.spec_path)
+      dep_address = Address.parse(dep.spec, relative_to=build_file.spec_path)
       if dep_address in self._dependencies_by_address:
         raise BuildTargetParseError('The address {dep_address} occurred multiple times in the '
                                     'dependency specs for target {name} in {build_file}. '

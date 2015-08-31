@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
+from pants.base.address import Address, BuildFileAddress, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
@@ -125,7 +125,7 @@ class BuildFileAddressMapper(object):
   def resolve_spec(self, spec):
     """Converts a spec to an address and maps it using `resolve`"""
     try:
-      address = SyntheticAddress.parse(spec)
+      address = Address.parse(spec)
     except ValueError as e:
       raise self.InvalidAddressError(e)
     _, addressable = self.resolve(address)

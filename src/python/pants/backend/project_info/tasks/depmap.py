@@ -23,20 +23,6 @@ class Depmap(ConsoleTask):
     RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
     TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
-  @staticmethod
-  def _jar_id(jar):
-    if jar.rev:
-      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
-    else:
-      return '{0}:{1}'.format(jar.org, jar.name)
-
-  @staticmethod
-  def _address(address):
-    """
-    :type address: pants.base.address.SyntheticAddress
-    """
-    return '{0}:{1}'.format(address.spec_path, address.target_name)
-
   @classmethod
   def register_options(cls, register):
     super(Depmap, cls).register_options(register)
@@ -104,8 +90,6 @@ class Depmap(ConsoleTask):
             '{org}{sep}{name}').format(**params), is_internal_dep
 
   def _enumerate_visible_deps(self, dep, predicate):
-    dep_id, internal = self._dep_id(dep)
-
     dependencies = sorted([x for x in getattr(dep, 'dependencies', [])]) + sorted(
       [x for x in getattr(dep, 'jar_dependencies', [])] if not self.is_internal_only else [])
 

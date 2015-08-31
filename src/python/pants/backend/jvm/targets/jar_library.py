@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import six
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, JarsField
@@ -72,7 +72,7 @@ class JarLibrary(Target):
           .format(address=relative_to.spec,
                   found_class=type(spec).__name__))
 
-      lookup = SyntheticAddress.parse(spec, relative_to=relative_to.spec_path)
+      lookup = Address.parse(spec, relative_to=relative_to.spec_path)
       target = build_graph.get_target(lookup)
       if not isinstance(target, JarLibrary):
         raise JarLibrary.WrongTargetTypeError(

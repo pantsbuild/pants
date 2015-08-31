@@ -5,9 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
 from collections import namedtuple
 
+from pants.base.deprecated import deprecated
 from pants.util.meta import AbstractClass
 
 
@@ -113,14 +115,24 @@ class Address(AbstractClass):
   Where ``path/to/buildfile:targetname`` is the dependent target address.
   """
 
+  @classmethod
+  def parse(cls, spec, relative_to=''):
+    """Parses an address from its serialized form.
+
+    :param string spec: An address in string form <path>:<name>.
+    :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
+                               the missing spec_path part as `relative_to`.
+    :returns: A new address.
+    :rtype: :class:`pants.base.address.Address`
+    """
+    spec_path, target_name = parse_spec(spec, relative_to=relative_to)
+    return cls(spec_path, target_name)
+
   def __init__(self, spec_path, target_name):
     """
     :param string spec_path: The path from the root of the repo to this Target.
     :param string target_name: The name of a target this Address refers to.
     """
-    # TODO(John Sirois): AbstractClass / Interface should probably have this feature built in.
-    if type(self) == Address:
-      raise TypeError('Cannot instantiate abstract class Address')
     norm_path = os.path.normpath(spec_path)
     self._spec_path = norm_path if norm_path != '.' else ''
     self._target_name = target_name
@@ -149,6 +161,8 @@ class Address(AbstractClass):
     return ':{target_name}'.format(target_name=self._target_name)
 
   @property
+  @deprecated(removal_version='0.0.49',
+              hint_message='Use `not isinstance(address, BuildFileAddress)` instead.')
   def is_synthetic(self):
     return False
 
@@ -197,20 +211,18 @@ class BuildFileAddress(Address):
 
 
 class SyntheticAddress(Address):
-  @classmethod
-  def parse(cls, spec, relative_to=''):
-    """
-    :param string spec: an address in string form <path>:<name>
-    :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
-    the missing spec_path part as `relative_to`.
-    :return:
-    """
-    spec_path, target_name = parse_spec(spec, relative_to=relative_to)
-    return cls(spec_path, target_name)
+  deprecate_me = functools.partial(deprecated, removal_version='0.0.49')
 
-  def __repr__(self):
-    return "SyntheticAddress({spec})".format(spec=self.spec)
+  @classmethod
+  @deprecate_me(hint_message='Use `Address.parse(...)` instead.')
+  def parse(cls, *args, **kwargs):
+    return super(SyntheticAddress, cls).parse(*args, **kwargs)
+
+  @deprecate_me(hint_message='Use `Address(...)` instead.')
+  def __init__(self, *args, **kwargs):
+    super(SyntheticAddress, self).__init__(*args, **kwargs)
 
   @property
+  @deprecate_me(hint_message='Use `not isinstance(address, BuildFileAddress)` instead.')
   def is_synthetic(self):
     return True

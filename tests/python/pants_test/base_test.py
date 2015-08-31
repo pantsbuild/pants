@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 from textwrap import dedent
 
 from pants.backend.core.targets.dependencies import Dependencies
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -84,7 +84,7 @@ class BaseTest(unittest.TestCase):
                   resources=None,
                   derived_from=None,
                   **kwargs):
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self.build_graph,
@@ -211,7 +211,7 @@ class BaseTest(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
 

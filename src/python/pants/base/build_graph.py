@@ -11,7 +11,7 @@ from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 
 
@@ -49,8 +49,8 @@ class BuildGraph(object):
     return address in self._target_by_address
 
   def get_target_from_spec(self, spec, relative_to=''):
-    """Converts `spec` into a SyntheticAddress and returns the result of `get_target`"""
-    return self.get_target(SyntheticAddress.parse(spec, relative_to=relative_to))
+    """Converts `spec` into an address and returns the result of `get_target`"""
+    return self.get_target(Address.parse(spec, relative_to=relative_to))
 
   def get_target(self, address):
     """Returns the Target at `address` if it has been injected into the BuildGraph, otherwise None.
@@ -403,7 +403,7 @@ class BuildGraph(object):
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     # NB: This is an idempotent, short-circuiting call.
     self.inject_address_closure(address)
     return self.transitive_subgraph_of_addresses([address])

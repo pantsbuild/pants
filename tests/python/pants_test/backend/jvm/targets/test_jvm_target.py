@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.address import BuildFileAddress, SyntheticAddress
+from pants.base.address import Address, BuildFileAddress
 from pants.base.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
@@ -36,6 +36,6 @@ class JvmTargetTest(BaseTest):
     '''))
 
     self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
-    target = self.build_graph.get_target(SyntheticAddress.parse('//:foo'))
+    target = self.build_graph.get_target(Address.parse('//:foo'))
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':resource_target'], list(target.traversable_dependency_specs))

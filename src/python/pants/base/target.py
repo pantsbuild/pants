@@ -12,7 +12,7 @@ from hashlib import sha1
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Addresses, SyntheticAddress
+from pants.base.address import Address, Addresses
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -534,8 +534,7 @@ class Target(AbstractTarget):
         raise self.WrongNumberOfAddresses(
           "Expected a single address to from_target() as argument to {spec}"
           .format(spec=address.spec))
-      referenced_address = SyntheticAddress.parse(sources.addresses[0],
-                                                  relative_to=sources.rel_path)
+      referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
     elif isinstance(sources, FilesetWithSpec):
       filespec = sources.filespec
