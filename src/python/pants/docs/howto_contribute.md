@@ -153,18 +153,18 @@ Now that your change is complete, post it for review. We use `rbcommons.com` to 
 
 #### Posting the First Draft
 
-**Before posting your first review,** you need to both subscribe to the [pants-reviews 
+**Before posting your first review,** you need to both subscribe to the [pants-reviews
 Google Group](https://groups.google.com/forum/#!forum/pants-reviews) and create an
 [RBCommons](https://rbcommons.com) account.  Its critical that the email address you use for each
-of these is the same, and its also recommended that you have that same email address registered as
+of these is the same, and it's also recommended that you have that same email address registered as
 one of your [email addresses](https://github.com/settings/emails) with Github.
 
-_A special warning to `@twitter.com` contributors:_ The 
-twitter.com email domain does not permit emails being sent on behalf of its members by RBCommons.
-As such, you should use a personal email address or some other non-`@twitter.com` email address
-to subscribe to both RBCommons and pants-reviews.
+_A special warning to `@twitter.com` contributors:_ The twitter.com email domain does not permit
+emails being sent on behalf of its members by RBCommons. As such, you should use a personal email
+address or some other non-`@twitter.com` email address to subscribe to both RBCommons and
+pants-reviews.
 
-To create your RBCommons account, visit <https://rbcommons.com/account/login/> and click "Create 
+To create your RBCommons account, visit <https://rbcommons.com/account/login/> and click "Create
 one now.".  To sign up for pants-reviews@googlegroups.com, just browse to
 <https://groups.google.com/forum/#!forum/pants-reviews/join>.
 
