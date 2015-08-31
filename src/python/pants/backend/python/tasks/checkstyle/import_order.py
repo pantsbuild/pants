@@ -49,6 +49,7 @@ class ImportType(object):
 
 class ImportOrderSubsystem(Subsystem):
   options_scope = 'pycheck-import-order'
+
   @classmethod
   def register_options(cls, register):
     super(ImportOrderSubsystem, cls).register_options(register)

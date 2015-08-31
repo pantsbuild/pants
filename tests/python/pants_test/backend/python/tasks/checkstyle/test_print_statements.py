@@ -20,11 +20,13 @@ def test_print_override():
   """))
   assert len(list(ps.nits())) == 0
 
+
 def test_print_function():
   ps = PrintStatements(PythonFile.from_statement("""
     print("I do what I want")
   """))
   assert len(list(ps.nits())) == 0
+
 
 def test_print_statement():
   ps = PrintStatements(PythonFile.from_statement("""

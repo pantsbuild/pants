@@ -20,6 +20,7 @@ class FileDeps(ConsoleTask):
   Files are listed with absolute paths and any BUILD files implied in the transitive closure of
   targets are also included.
   """
+
   @classmethod
   def register_options(cls, register):
     super(FileDeps, cls).register_options(register)

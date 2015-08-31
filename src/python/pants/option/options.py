@@ -59,6 +59,7 @@ class Options(object):
     - The hard-coded value provided at registration time.
     - None.
   """
+
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.

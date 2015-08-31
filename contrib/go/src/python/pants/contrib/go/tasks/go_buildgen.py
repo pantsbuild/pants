@@ -211,6 +211,7 @@ class GoBuildgen(GoTask):
 
   class TemplateResult(namedtuple('TemplateResult', ['build_file_path', 'data', 'import_paths',
                                                      'needs_rev', 'rev'])):
+
     def log(self, logger):
       log = logger.warn if (self.needs_rev and not self.rev) else logger.info
       log('\t{} ({}){}'.format(self.build_file_path,
@@ -237,6 +238,7 @@ class GoBuildgen(GoTask):
 
   class GenerationError(TaskError):
     """Indicates an error generating Go targets."""
+
     def __init__(self, cause):
       super(GoBuildgen.GenerationError, self).__init__(str(cause))
       self.cause = cause

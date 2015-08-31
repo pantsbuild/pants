@@ -196,6 +196,7 @@ class BuildGraph(object):
       that would only be reachable through Targets that fail the predicate.
     """
     walked = set()
+
     def _walk_rec(address):
       if address not in walked:
         walked.add(address)
@@ -218,6 +219,7 @@ class BuildGraph(object):
     `walk_transitive_dependency_graph`.
     """
     walked = set()
+
     def _walk_rec(address):
       if address not in walked:
         walked.add(address)
@@ -411,10 +413,12 @@ class BuildGraph(object):
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected."""
+
   def __init__(self, cycle):
     Exception.__init__(self, 'Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
+
 
 def invert_dependencies(targets):
   """:return: the full graph of dependencies for `targets` and the list of roots."""
@@ -445,6 +449,7 @@ def invert_dependencies(targets):
     invert(target)
 
   return roots, inverted_deps
+
 
 def sort_targets(targets):
   """:return: the targets that `targets` depend on sorted from most dependent to least."""

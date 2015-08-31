@@ -37,6 +37,7 @@ def create_size_estimators():
     'constzero': lambda sources: 0
   }
 
+
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
 

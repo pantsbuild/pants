@@ -30,6 +30,7 @@ class ClasspathEntry(object):
   def __ne__(self, other):
     return self.path != other.path
 
+
 class ArtifactClasspathEntry(ClasspathEntry):
   def __init__(self, coordinate, path):
     super(ArtifactClasspathEntry, self).__init__(path)
@@ -41,6 +42,7 @@ class ArtifactClasspathEntry(ClasspathEntry):
   def __hash__(self):
     return hash((self.path, self.coordinate))
 
+
 def _matches_exclude(coordinate, exclude):
   if not coordinate.org == exclude.org:
     return False
@@ -50,6 +52,7 @@ def _matches_exclude(coordinate, exclude):
   if coordinate.name == exclude.name:
     return True
   return False
+
 
 def _not_excluded_filter(excludes):
   def not_excluded(path_tuple):

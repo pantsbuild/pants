@@ -231,7 +231,6 @@ class PlainTextReporter(Reporter):
 
   # Emit output from some tools and not others.
   # This is an arbitrary choice, but one that turns out to be useful to users in practice.
-
   def _show_output(self, workunit):
     tool_output_format = self._get_tool_output_format(workunit)
     return not tool_output_format == ToolOutputFormat.SUPPRESS

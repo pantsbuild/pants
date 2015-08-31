@@ -22,6 +22,7 @@ _DEFAULT_ANTLR_DEPS = {
   'antlr4': '//:antlr-4'
 }
 
+
 class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   class AmbiguousPackageError(TaskError):

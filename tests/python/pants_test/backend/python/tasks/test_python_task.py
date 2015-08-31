@@ -81,7 +81,6 @@ class PythonTaskTest(PythonTaskTestBase):
 
   # TODO(John Sirois): Test direct python_binary.source modification after moving
   # PythonTaskTestBase to self.make_target
-
   def test_cached_chroot_direct_dep_invalidation(self):
     with self.cached_chroot() as (chroot1, pex1):
       self.rebind_targets()

@@ -27,6 +27,7 @@ class Filter(ConsoleTask):
   Each of the filtering options may be specified multiple times, with an implied logical AND
   between them.
   """
+
   @classmethod
   def register_options(cls, register):
     super(Filter, cls).register_options(register)

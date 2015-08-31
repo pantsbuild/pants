@@ -33,10 +33,13 @@ FILE_TEXT = """
       return self._session
 """
 
+
 class MinimalCheckstylePlugin(CheckstylePlugin):
   """Minimal Checkstyle plugin used to test PythonFile interactions in Plugin"""
+
   def nits(self):
     return []
+
 
 @pytest.fixture
 def test_statement():
@@ -125,6 +128,7 @@ def test_off_by_one_enumeration(test_statement):
   """Test that enumerate is offset by one"""
   python_file = PythonFile(test_statement, 'keeper.py')
   assert list(python_file.enumerate()) == list(enumerate(test_statement.splitlines(), 1))
+
 
 @pytest.mark.parametrize("ln_test_input,ln_test_expected", [
   (['A123', 'You have a terrible taste in libraries'], None),

@@ -19,6 +19,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class MissingContextManagerSubsystem(Subsystem):
   options_scope = 'pycheck-context-manager'
+
   @classmethod
   def register_options(cls, register):
     super(MissingContextManagerSubsystem, cls).register_options(register)

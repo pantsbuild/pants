@@ -19,6 +19,7 @@ from pants.util.memo import memoized_property
 def globs_matches(path, patterns):
   return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
+
 def matches_filespec(path, spec):
   if spec is None:
     return False
@@ -28,6 +29,7 @@ def matches_filespec(path, spec):
     if matches_filespec(path, spec):
       return False
   return True
+
 
 class FilesetWithSpec(object):
   """A set of files that keeps track of how we got it.
@@ -157,6 +159,7 @@ class RGlobs(FilesetRelPathWrapper):
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
   """
+
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:
@@ -222,6 +225,7 @@ class ZGlobs(FilesetRelPathWrapper):
 
   Uses ``BUILD`` file's directory as the "working directory".
   """
+
   @staticmethod
   def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:

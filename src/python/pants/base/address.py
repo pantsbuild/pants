@@ -181,6 +181,7 @@ class Address(AbstractClass):
             self._target_name == other._target_name)
 
   _hash = None
+
   def __hash__(self):
     if self._hash is None:
       self._hash = hash((self._spec_path, self._target_name))

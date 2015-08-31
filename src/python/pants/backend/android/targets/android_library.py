@@ -18,6 +18,7 @@ from pants.util.memo import memoized_property
 class AndroidLibrary(ImportJarsMixin, AndroidTarget):
   """Android library projects that access Android API or Android resources.
   """
+
   def __init__(self, payload=None, libraries=None,
                include_patterns=None, exclude_patterns=None, **kwargs):
     """

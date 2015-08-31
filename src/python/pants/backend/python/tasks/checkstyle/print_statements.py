@@ -14,6 +14,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class PrintStatementsSubsystem(Subsystem):
   options_scope = 'pycheck-print-statements'
+
   @classmethod
   def register_options(cls, register):
     super(PrintStatementsSubsystem, cls).register_options(register)
