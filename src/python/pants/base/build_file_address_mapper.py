@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import Address, BuildFileAddress, parse_spec
+from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
@@ -165,19 +165,22 @@ class BuildFileAddressMapper(object):
     return self._build_file_type.from_cache(*args, **kwargs)
 
   def spec_to_address(self, spec, relative_to=''):
-    """A helper method for mapping a spec to the correct BuildFileAddress.
-    :param spec: a spec to lookup in the map.
-    :param relative_to: path the spec might be relative to
-    :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
-    :returns a new BuildFileAddress instanace
+    """A helper method for mapping a spec to the correct address.
+
+    :param string spec: A spec to lookup in the map.
+    :param string relative_to: Path the spec might be relative to
+    :raises :class:`pants.base.address_lookup_error.AddressLookupError` If the BUILD file cannot be
+            found in the path specified by the spec.
+    :returns: A new Address instance.
+    :rtype: :class:`pants.base.address.Address`
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
-      build_file = self.from_cache(self.root_dir, spec_path)
+      self.from_cache(self.root_dir, spec_path)
     except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
-    return BuildFileAddress(build_file, name)
+    return Address(spec_path, name)
 
   def scan_buildfiles(self, root_dir, *args, **kwargs):
     """Looks for all BUILD files in root_dir or its descendant directories.

@@ -31,7 +31,7 @@ class TestUnknownArgumentsIntegration(PantsRunIntegrationTest):
   def test_future_params(self):
     param = 'nonexistant_parameter'
     with self.temp_target_spec(**{param: 'value'}) as spec:
-      run = self.run_pants(['--unknown-arguments-ignored={{"JavaLibrary": ["{}"]}}'.format(param),
+      run = self.run_pants(['--unknown-arguments-ignored={{"java_library": ["{}"]}}'.format(param),
                             '-ldebug',
                             'clean-all', spec])
       self.assert_success(run)
@@ -42,7 +42,7 @@ class TestUnknownArgumentsIntegration(PantsRunIntegrationTest):
     future = 'nonexistant_parameter'
     unknown = 'unexpected_nonexistant_parameter'
     with self.temp_target_spec(**{future: 'value', unknown: 'other value'}) as spec:
-      run = self.run_pants(['--unknown-arguments-ignored={{"JavaLibrary": ["{}"]}}'.format(future),
+      run = self.run_pants(['--unknown-arguments-ignored={{"java_library": ["{}"]}}'.format(future),
                             'clean-all', spec])
       self.assert_failure(run)
       self.assertIn('Invalid target {}'.format(spec), run.stderr_data)

@@ -25,7 +25,6 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file',

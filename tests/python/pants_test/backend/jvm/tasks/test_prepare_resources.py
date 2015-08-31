@@ -10,7 +10,6 @@ import os
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
@@ -42,19 +41,19 @@ class PrepareResourcesTest(TaskTestBase):
     resources4 = self.make_target('resources:target4', target_type=Resources)
     jvm_target = self.make_target('jvm:target',
                                   target_type=JvmTarget,
-                                  resources=[resources1])
+                                  resources=[resources1.address.spec])
     java_library = self.make_target('java:target', target_type=JavaLibrary)
-    scala_library = self.make_target('scala:target',
-                                     target_type=ScalaLibrary,
-                                     resources=[resources4])
+    java_library2 = self.make_target('java:target2',
+                                     target_type=JavaLibrary,
+                                     resources=[resources4.address.spec])
     other_target = self.make_target('other:target',
                                     target_type=self.NonJvmResourcesUsingTarget,
-                                    resources=[resources3])
+                                    resources=[resources3.address.spec])
 
     task = self.create_task(self.context(target_roots=[resources2,
                                                        jvm_target,
                                                        java_library,
-                                                       scala_library,
+                                                       java_library2,
                                                        other_target]))
     relevant_resources_targets = task.find_all_relevant_resources_targets()
     self.assertEqual(sorted([self.target('resources:target1'), self.target('resources:target4')]),

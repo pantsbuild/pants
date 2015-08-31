@@ -87,7 +87,7 @@ def parse_spec(spec, relative_to=None):
   return spec_path, target_name
 
 
-class Addresses (namedtuple('Addresses', ['addresses', 'rel_path'])):
+class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   """ Used as a sentinel type for identifying a list of string specs.
 
   addresses: list of string specs
@@ -197,16 +197,42 @@ class Address(AbstractClass):
 
 
 class BuildFileAddress(Address):
-  def __init__(self, build_file, target_name=None):
-    self.build_file = build_file
+  """Represents the address of a type materialized from a BUILD file."""
+
+  def __init__(self, build_file, type_alias, target_name=None):
+    """
+    :param build_file: The build file that contains the object this address points to.
+    :type build_file: :class:`pants.base.build_file.BuildFile`
+    :param string type_alias: The type alias this address points to; eg: 'java_library'.
+    :param string target_name: The name of the target within the BUILD file; defaults to the default
+                               target, aka the name of the BUILD file parent dir.
+    """
     spec_path = os.path.dirname(build_file.relpath)
-    default_target_name = os.path.basename(spec_path)
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
-                                           target_name=target_name or default_target_name)
+                                           target_name=target_name or os.path.basename(spec_path))
+    self._build_file = build_file
+    self._type_alias = type_alias
+
+  @property
+  def build_file(self):
+    """The build file that contains the object this address points to.
+
+    :rtype: :class:`pants.base.build_file.BuildFile`
+    """
+    return self._build_file
+
+  @property
+  def type_alias(self):
+    """The type alias of the object this address points to; eg: 'java_library'.
+
+    :rtype: string
+    """
+    return self._type_alias
 
   def __repr__(self):
-    return ("BuildFileAddress({build_file}, {target_name})"
+    return ("BuildFileAddress({build_file}, {type_alias}, {target_name})"
             .format(build_file=self.build_file,
+                    type_alias=self.type_alias,
                     target_name=self.target_name))
 
 
