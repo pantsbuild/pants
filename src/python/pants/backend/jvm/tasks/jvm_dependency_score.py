@@ -34,7 +34,7 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
     register('--size-estimator',
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
-    register('--root-targets-only', default=False,
+    register('--root-targets-only', default=True,
              help='Score only the root targets, not their dependencies.')
 
   def execute(self):
@@ -83,7 +83,8 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
           if dep_tgt.derived_from != dep_tgt:
             targets_with_derivation.add(dep_tgt.derived_from)
 
-        self.context.log.info('Dependency usage for {}'.format(target.address.spec_path))
+        if target.dependencies:
+          self.context.log.info('Dependency usage for {}'.format(target.address.spec_path))
         for dep_tgt in target.dependencies:
           if dep_tgt == target or dep_tgt in targets_with_derivation:
             continue

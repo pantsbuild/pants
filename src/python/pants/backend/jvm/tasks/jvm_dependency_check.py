@@ -169,7 +169,7 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
-      return not dep.startswith(DistributionLocator.cached().real_home)
+      return dep not in self.bootstrap_jar_classfiles
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection

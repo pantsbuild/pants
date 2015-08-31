@@ -17,6 +17,8 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
+from pants.java.distribution.distribution import DistributionLocator
+from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_property
 
 
@@ -98,12 +100,13 @@ class JvmDependencyAnalyzer(Task):
         # These targets provide all the jars in ref, and all the jars ref transitively depends on.
         jarlib_targets = jarlibs_by_id[target_key]
 
-        for jar_path in get_transitive_jars_by_ref(ref):
+        for jar_file in get_transitive_jars_by_ref(ref):
           # Register that each jarlib_target provides jar (via all its symlinks).
-          symlink = all_symlinks_map.get(os.path.realpath(jar_path), None)
+          symlink = all_symlinks_map.get(os.path.realpath(jar_file), None)
           if symlink:
-            for jarlib_target in jarlib_targets:
-              targets_by_file[symlink].add(jarlib_target)
+            for cls in self._jar_classfiles(symlink):
+              for jarlib_target in jarlib_targets:
+                targets_by_file[cls].add(jarlib_target)
 
     ivy_products = self.context.products.get_data('ivy_jar_products')
     if ivy_products:
@@ -113,6 +116,47 @@ class JvmDependencyAnalyzer(Task):
             register_transitive_jars_for_ref(ivyinfo, ref)
 
     return targets_by_file
+
+  def _jar_classfiles(self, jar_file):
+    """Returns an iterator over the classfiles inside jar_file."""
+    with open_zip(jar_file, 'r') as jar:
+      for cls in jar.namelist():
+        if cls.endswith(b'.class'):
+          yield cls
+
+  @memoized_property
+  def bootstrap_jar_classfiles(self):
+    """Returns a set of classfiles from the JVM bootstrap jars."""
+    bootstrap_jar_classfiles = set()
+    for jar_file in self._find_all_bootstrap_jars():
+      for cls in self._jar_classfiles(jar_file):
+        bootstrap_jar_classfiles.add(cls)
+    return bootstrap_jar_classfiles
+
+  def _find_all_bootstrap_jars(self):
+    def get_path(key):
+      return DistributionLocator.cached().system_properties.get(key, '').split(':')
+
+    def find_jars_in_dirs(dirs):
+      ret = []
+      for d in dirs:
+        if os.path.isdir(d):
+          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
+      return ret
+
+    # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
+    # TODO: Support other JVMs? Not clear if there's a standard way to do so.
+    # May include loose classes dirs.
+    boot_classpath = get_path('sun.boot.class.path')
+
+    # Note that per the specs, overrides and extensions must be in jars.
+    # Loose class files will not be found by the JVM.
+    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
+    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
+
+    # Note that this order matters: it reflects the classloading order.
+    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
+    return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
 
   def _compute_transitive_deps_by_target(self):
     """Map from target to all the targets it depends on, transitively."""
