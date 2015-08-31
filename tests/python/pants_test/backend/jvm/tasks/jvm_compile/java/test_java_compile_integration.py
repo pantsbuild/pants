@@ -168,18 +168,20 @@ class JavaCompileIntegrationTest(BaseCompileIT):
              'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))
 
-  def _whitelist_test(self, target, strategy, fatal_flag, whitelist):
+  def _whitelist_test(self, target, whitelist_target, strategy, fatal_flag, args=None):
     """Ensure that a project missing dependencies fails if it is not whitelisted."""
 
     # First check that without the whitelist we do break the build.
-    with self.do_test_compile(target, strategy, extra_args=[fatal_flag], expect_failure=True):
+    extra_args = (args if args else []) + [fatal_flag]
+    with self.do_test_compile(target, strategy, extra_args=extra_args, expect_failure=True):
       # run failed as expected
       pass
 
     # Now let's use the target whitelist, this should succeed.
-    extra_args = [
+    extra_args = (args if args else []) + [
         fatal_flag,
-        '--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(whitelist)]
+        '--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(whitelist_target)
+      ]
     with self.do_test_compile(target, strategy, extra_args=extra_args):
       # run succeeded as expected
       pass
@@ -187,17 +189,28 @@ class JavaCompileIntegrationTest(BaseCompileIT):
   def test_java_compile_missing_dep_analysis_whitelist(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2',
       # NB: missing transitive deps are only possible with the global strategy
       'global',
-      '--compile-jvm-dep-check-missing-deps=fatal',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2'
+      '--compile-jvm-dep-check-missing-deps=fatal'
     )
 
-  def test_java_compile_missing_direct_dep_analysis_whitelist(self):
+  def test_java_compile_missing_direct_dep_analysis_whitelist_jmake(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      # TODO(stuhood): missing direct deps not correctly detected for isolated
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
+      # NB: global only: jmake does not properly support upstream deps for isolated
       'global',
+      '--compile-jvm-dep-check-missing-direct-deps=fatal'
+    )
+
+  @provide_compile_strategies
+  def test_java_compile_missing_direct_dep_analysis_whitelist_zinc(self, strategy):
+    self._whitelist_test(
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
+      strategy,
       '--compile-jvm-dep-check-missing-direct-deps=fatal',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist'
+      # Use zinc.
+      args=['--no-compile-java-use-jmake']
     )
