@@ -322,15 +322,6 @@ python_library(
 )
 
 python_library(
-  name = 'jvm_dependency_score',
-  sources = ['jvm_dependency_score.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/tasks/:jvm_dependency_analyzer',
-    'src/python/pants/base/:build_environment',
-  ]
-)
-
-python_library(
   name = 'jvm_platform_analysis',
   sources = ['jvm_platform_analysis.py'],
   dependencies = [
