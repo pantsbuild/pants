@@ -120,6 +120,11 @@ class BaseTest(unittest.TestCase):
 
   @property
   def alias_groups(self):
+    # NB: In a normal pants deployment, 'target' is an alias for
+    # `pants.backend.core.targets.dependencies.Dependencies`.  We avoid that dependency on the core
+    # backend here since the `BaseTest` is used by lower level tests in base and since the
+    # `Dependencies` type itself is nothing more than an alias for Target that carries along a
+    # pydoc for the BUILD dictionary.
     return BuildFileAliases.create(targets={'target': Target})
 
   def setUp(self):
