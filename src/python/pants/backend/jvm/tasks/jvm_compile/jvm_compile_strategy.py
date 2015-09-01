@@ -226,10 +226,9 @@ class JvmCompileStrategy(object):
     safe_mkdir(analysis_tmpdir)
     return analysis_tmpdir
 
-  @abstractmethod
-  def parse_deps(self, classpath, compile_context):
-    """Parses the actual source dependencies of compile_context.target given a classpath.
+  def parse_deps(self, analysis_file):
+    """Parses the actual source dependencies given an analysis file.
 
-    The returned source dependencies may be either absolute filepaths, or relative filepaths.
+    The dependencies are returned as relative paths.
     """
-    pass
+    return self._analysis_parser.parse_deps_from_path(analysis_file)

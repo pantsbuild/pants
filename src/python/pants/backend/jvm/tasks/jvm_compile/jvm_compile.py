@@ -405,6 +405,4 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       compile_classpath.add_for_target(compile_context.target, entries)
 
       if self.context.products.is_required_data('actual_source_deps'):
-        classpath = [path for (conf, path) in entries if conf in self._confs]
-        actual_source_deps[compile_context.target] = self._strategy.parse_deps(classpath,
-                                                                               compile_context)
+        actual_source_deps[compile_context.target] = self._strategy.parse_deps(compile_context.analysis_file)
