@@ -25,8 +25,26 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy
 
 
+def create_size_estimators():
+  def file_line_count(source_file_name):
+    with open(source_file_name, 'rb') as fh:
+      return sum(1 for line in fh)
+
+  return {
+    'linecount': lambda sources: sum([file_line_count(filepath) for filepath in sources]),
+    'filecount': lambda sources: len(sources),
+    'filesize': lambda sources: sum([os.path.getsize(filepath) for filepath in sources]),
+    'constzero': lambda sources: 0
+  }
+
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
+
+  size_estimators = create_size_estimators()
+
+  @classmethod
+  def size_estimator_by_name(cls, estimation_strategy_name):
+    return cls.size_estimators[estimation_strategy_name]
 
   @classmethod
   def register_options(cls, register, compile_task_name, supports_concurrent_execution):
@@ -34,6 +52,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       register('--worker-count', advanced=True, type=int, default=1,
                help='The number of concurrent workers to use compiling with {task} with the '
                     'isolated strategy.'.format(task=compile_task_name))
+    register('--size-estimator', advanced=True,
+             choices=list(cls.size_estimators.keys()), default='filesize',
+             help='The method of target size estimation.')
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
@@ -57,6 +78,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       # tasks that don't support concurrent execution have no worker_count registered
       worker_count = 1
     self._worker_count = worker_count
+
+    self._size_estimator = self.size_estimator_by_name(options.size_estimator)
 
     self._worker_pool = None
 
@@ -247,6 +270,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
                       create_work_for_vts(vts, compile_context, compile_target_closure),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
+                      self._size_estimator(compile_context.sources),
                       # If compilation and analysis work succeeds, validate the vts.
                       # Otherwise, fail it.
                       on_success=vts.update,
