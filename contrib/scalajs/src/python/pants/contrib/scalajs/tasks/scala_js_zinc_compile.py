@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.tasks.jvm_compile.scala.scala_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import BaseZincCompile
 
 from pants.contrib.scalajs.targets.scala_js_library import ScalaJSLibrary
 
 
-class ScalaJSZincCompile(ZincCompile):
+class ScalaJSZincCompile(BaseZincCompile):
   _language = 'scala-js'
   _file_suffix = '.scala'
 
@@ -28,3 +28,6 @@ class ScalaJSZincCompile(ZincCompile):
 
   def select(self, target):
     return isinstance(target, ScalaJSLibrary)
+
+  def select_source(self, source_file_path):
+    return source_file_path.endswith('.scala')

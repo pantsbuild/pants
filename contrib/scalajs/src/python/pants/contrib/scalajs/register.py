@@ -19,18 +19,17 @@ def build_file_aliases():
   return BuildFileAliases.create(
     targets={
       'scala_js_binary': ScalaJSBinary,
-      'scala_js_library': ScalaJSLibrary,
     },
   )
 
 def register_goals():
-  # Find the jvm-compile GroupTask (TODO: assert that it already existed and/or avoid the
-  # copy-pasta here) and insert the ScalaJSZincCompile task at the front.
-  jvm_compile = GroupTask.named(
-      'jvm-compilers',
-      product_type=['classes_by_target', 'classes_by_source'],
+  # Compilation.
+  scala_js_compile = GroupTask.named(
+      'scala-js-compiler',
+      product_type=['scala_js_ir'],
       flag_namespace=['compile'])
-  jvm_compile.add_member(ScalaJSZincCompile, first=True)
+  scala_js_compile.add_member(ScalaJSZincCompile)
+  task(name='scala-js', action=scala_js_compile).install('compile').with_description('Compile scala source code for javascript.')
 
   # Link ScalaJS IR into Javascript.
-  task(name='scala-js', action=ScalaJSLink).install('link').with_description('Link intermediate outputs.')
+  task(name='scala-js', action=ScalaJSLink).install('link').with_description('Link intermediate scala outputs to a javascript binary.')

@@ -16,6 +16,7 @@ from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSLink(NailgunTask):
+  """Link intermediate scala outputs to a javascript binary."""
 
   _SCALA_JS_CLI_MAIN = 'org.scalajs.cli.Scalajsld'
 
@@ -25,8 +26,10 @@ class ScalaJSLink(NailgunTask):
     # TODO: This option should cause target invalidation but doesn't.
     #   see https://github.com/pantsbuild/pants/issues/1273
     register('--full-opt', default=False, action='store_true',
+             fingerprint=True,
              help='Perform all optimizations; this is generally only useful for deployments.')
     register('--check-ir', default=False, action='store_true',
+             fingerprint=True,
              help='Perform (relatively costly) validity checks of IR before linking it.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')
@@ -35,9 +38,8 @@ class ScalaJSLink(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(ScalaJSLink, cls).prepare(options, round_manager)
-    # Require that compilation has completed.
-    round_manager.require_data('classes_by_target')
-    round_manager.require_data('compile_classpath')
+    # Require that scala_js compilation has completed.
+    round_manager.require_data('scala_js_ir')
 
   @classmethod
   def product_types(cls):
