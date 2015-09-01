@@ -39,7 +39,8 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
     register('--root-targets-only', default=True,
              help='Score only the root targets, not their dependencies.')
     register('--output-file', type=str,
-             help='Output score graph as JSON to this file, creating the file if necessary.')
+             help='Output score graph as JSON to this file, creating the file if necessary. '
+                  'If no file specified, score graph is outputted to stdout.')
 
   def execute(self):
     if self.get_options().skip:
@@ -96,6 +97,8 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
     if output_file:
       with open(output_file, 'w') as fh:
         fh.write(graph.to_json())
+    else:
+      graph.log_usage(self.context.log)
 
 
 class DepScoreGraph(dict):
@@ -132,16 +135,15 @@ class DepScoreGraph(dict):
           self._size_estimator(target.sources_relative_to_buildroot()) + dep_sum
     return self._job_size_cache[target]
 
-  def __str__(self):
-    buf = []
+  def log_usage(self, log):
     for _, node in self.items():
-      buf.append(node.target.address.spec_path)
+      log.info('Dependency usage for ' + node.target.address.spec_path)
       for child_node, percent_used in node.children.items():
-        buf.append('\t{target} --> {percent}%, job size: {size}'
-                   .format(target=child_node.target.address.spec_path,
-                           percent=percent_used,
-                           size=child_node.job_size))
-    return '\n'.join(buf)
+        log_fn = log.error if percent_used == 0 else log.info
+        log_fn('\t{target} --> {percent}%, job size: {size}'
+               .format(target=child_node.target.address.spec_path,
+                       percent=percent_used,
+                       size=child_node.job_size))
 
   def to_json(self):
     res_dict = {}
