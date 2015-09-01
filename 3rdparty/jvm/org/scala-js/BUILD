@@ -1,4 +1,4 @@
-SCALAJS_REV = '0.6.4'
+SCALAJS_REV = '0.6.5'
 
 jar_library(name = 'cli',
             jars = [
