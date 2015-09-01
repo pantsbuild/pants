@@ -18,11 +18,11 @@ class ScalaJSBinary(ScalaLibrary):
 
   @classmethod
   def subsystems(cls):
-    return super(ScalaJSBinary, cls).subsystems() + (ScalaJSPlatform, )
+    return super(ScalaJSBinary, cls).subsystems() + (ScalaJSPlatform,)
 
   @property
   def traversable_dependency_specs(self):
-    for spec in super(ScalaJSLibrary, self).traversable_dependency_specs:
-      yield spec
     for library_spec in ScalaJSPlatform.global_instance().runtime:
       yield library_spec
+    for spec in super(ScalaJSBinary, self).traversable_dependency_specs:
+      yield spec

@@ -24,7 +24,7 @@ def build_file_aliases():
 def register_goals():
   # Compilation.
   scala_js_compile = GroupTask.named(
-      'scala-js-compiler',
+      'scala-js-compile',
       product_type=['scala_js_ir'],
       flag_namespace=['compile'])
   scala_js_compile.add_member(ScalaJSZincCompile)

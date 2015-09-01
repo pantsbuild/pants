@@ -5,13 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import BaseZincCompile
 
 from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSZincCompile(BaseZincCompile):
-  _language = 'scala-js'
+  _name = 'scala-js'
   _file_suffix = '.scala'
 
   @classmethod
@@ -20,7 +22,7 @@ class ScalaJSZincCompile(BaseZincCompile):
     cls.register_jvm_tool(register, 'scala-js-compiler')
 
   def __init__(self, *args, **kwargs):
-    super(ZincCompile, self).__init__(*args, **kwargs)
+    super(ScalaJSZincCompile, self).__init__(*args, **kwargs)
 
     # A directory independent of any other classpath which can contain per-target
     # plugin resource files.

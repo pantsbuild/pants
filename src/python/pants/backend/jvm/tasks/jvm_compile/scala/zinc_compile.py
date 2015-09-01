@@ -35,8 +35,6 @@ class BaseZincCompile(JvmCompile):
 
   _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
 
-  _name = 'zinc'
-
   _supports_concurrent_execution = True
 
   @staticmethod
@@ -202,6 +200,8 @@ class BaseZincCompile(JvmCompile):
 
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code using Zinc."""
+
+  _name = 'zinc'
 
   @classmethod
   def register_options(cls, register):
