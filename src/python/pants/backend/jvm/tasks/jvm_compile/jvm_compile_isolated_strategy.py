@@ -275,7 +275,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                       # Otherwise, fail it.
                       on_success=vts.update,
                       on_failure=vts.force_invalidate))
-
     return jobs
 
   def compile_chunk(self,
