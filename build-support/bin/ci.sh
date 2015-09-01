@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# We use some subshell pipelines to collect target lists, make sure target collection failing
+# fails the build.
+set -o pipefail
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 cd ${REPO_ROOT}
 
@@ -119,7 +123,8 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
-    ./pants.pex --version
+    ./pants.pex --version && \
+    ./pants.pex --pants-version
   ) || die "Failed to bootstrap pants."
 fi
 
@@ -164,10 +169,11 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
-      --fail-slow \
-        $(./pants.pex list pants-plugins/tests/python:: | \
-            xargs ./pants.pex filter --filter-type=python_tests)
+    targets=$(
+      ./pants.pex list pants-plugins/tests/python:: | \
+      xargs ./pants.pex filter --filter-type=python_tests
+    ) && \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow ${targets}
   ) || die "Internal backend python test failure"
 fi
 
@@ -177,13 +183,16 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   banner "Running core python tests${shard_desc}"
   (
+    targets=$(
+      ./pants.pex list tests/python:: | \
+      xargs ./pants.pex filter --filter-type=python_tests | \
+      grep -v integration
+    ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
       --fail-slow \
       --coverage=paths:pants/ \
       --shard=${python_unit_shard} \
-        $(./pants.pex list tests/python:: | \
-            xargs ./pants.pex filter --filter-type=python_tests | \
-            grep -v integration)
+      ${targets}
   ) || die "Core python test failure"
 fi
 
@@ -204,10 +213,12 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} \
-      $(./pants.pex list tests/python:: | \
-          xargs ./pants.pex filter --filter-type=python_tests | \
-          grep integration)
+    targets=$(
+      ./pants.pex list tests/python:: | \
+      xargs ./pants.pex filter --filter-type=python_tests | \
+      grep integration
+    ) && \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} ${targets}
   ) || die "Pants Integration test failure"
 fi
 

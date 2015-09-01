@@ -17,6 +17,7 @@ from pants_test.base_test import BaseTest
 
 
 class PayloadTest(BaseTest):
+
   def test_excludes_field(self):
     empty = ExcludesField()
     empty_fp = empty.fingerprint()
@@ -36,96 +37,6 @@ class PayloadTest(BaseTest):
       JarsField([jar1, jar2]).fingerprint(),
       JarsField([jar2, jar1]).fingerprint(),
     )
-
-  def test_jars_field_artifacts(self):
-    jar1 = JarDependency('com', 'foo', '1.0.0').with_artifact('com', 'baz')
-    jar2 = JarDependency('com', 'foo', '1.0.0')
-
-    self.assertNotEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
-
-  def test_jars_field_artifacts_arg(self):
-    jar1 = JarDependency('com', 'foo', '1.0.0', artifacts=[IvyArtifact('com', 'baz')])
-    jar2 = JarDependency('com', 'foo', '1.0.0')
-
-    self.assertNotEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
-
-  def test_jars_field_artifacts_arg_vs_method(self):
-    jar1 = JarDependency('com', 'foo', '1.0.0', artifacts=[IvyArtifact('com', 'baz')])
-    jar2 = JarDependency('com', 'foo', '1.0.0').with_artifact('com', 'baz')
-
-    self.assertEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
-
-  def test_jars_field_artifacts(self):
-    jar1 = (JarDependency('com', 'foo', '1.0.0')
-              .with_artifact('com', 'baz')
-              .with_artifact('org', 'bat'))
-    jar2 = (JarDependency('com', 'foo', '1.0.0')
-              .with_artifact('org', 'bat')
-              .with_artifact('com', 'baz'))
-    jar3 = (JarDependency('com', 'foo', '1.0.0')
-              .with_artifact('org', 'bat'))
-
-    jar4 = JarDependency('com', 'foo', '1.0.0')
-
-    self.assertEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
-    self.assertNotEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar3]).fingerprint(),
-    )
-    self.assertNotEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar4]).fingerprint(),
-    )
-    self.assertNotEqual(
-      JarsField([jar3]).fingerprint(),
-      JarsField([jar4]).fingerprint(),
-    )
-
-  def test_jars_field_artifacts_ordering(self):
-    """JarDependencies throw away ordering information about their artifacts in the cache key.
-
-    But they do not throw it away in their internal representation!  In the future, this should be
-    fixed: either they should sort them as they are added and keep a canonical representation, or
-    the order information should be preserved.
-    """
-
-    jar1 = (JarDependency('com', 'foo', '1.0.0')
-              .with_artifact('com', 'baz')
-              .with_artifact('org', 'bat'))
-    jar2 = (JarDependency('com', 'foo', '1.0.0')
-              .with_artifact('org', 'bat')
-              .with_artifact('com', 'baz'))
-
-    self.assertEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-    )
-
-  def test_deprecated_jars_field_methods(self):
-    """with_sources() and with_docs() are now no-ops.  This test shows they don't affect
-    fingerprinting.
-    """
-    jar1 = (JarDependency('com', 'foo', '1.0.0'))
-    jar2 = (JarDependency('com', 'foo', '1.0.0')
-            .with_sources()
-            .with_docs())
-
-    self.assertEqual(
-      JarsField([jar1]).fingerprint(),
-      JarsField([jar2]).fingerprint(),
-      )
 
   def test_jars_field_apidocs(self):
     """apidocs are not properly rolled into the cache key right now.  Is this intentional?"""
@@ -263,6 +174,7 @@ class PayloadTest(BaseTest):
 
   def test_fingerprinted_field(self):
     class TestValue(FingerprintedMixin):
+
       def __init__(self, test_value):
         self.test_value = test_value
 

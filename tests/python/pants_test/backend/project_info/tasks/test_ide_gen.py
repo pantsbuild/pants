@@ -13,6 +13,7 @@ from pants_test.base_test import BaseTest
 
 
 class IdeGenTest(BaseTest):
+
   def test_collapse_source_root(self):
     source_set_list = []
     self.assertEquals([], Project._collapse_by_source_root(source_set_list))
@@ -42,3 +43,69 @@ class IdeGenTest(BaseTest):
     source_set2 = SourceSet("repo-root", "path/to/build", "org/pantsbuild/project", True)
     # Don't consider the test flag
     self.assertEquals(source_set1, source_set2)
+
+  def assert_dedup(self, expected, actual):
+    self.assertEquals([expected], actual)
+    # that test is not good enough, 'resources_only' and 'is_test' aren't considered keys for the set
+    self.assertEquals(expected.resources_only, actual[0].resources_only)
+    self.assertEquals(expected.is_test, actual[0].is_test)
+
+  def test_dedup_sources_simple(self):
+    self.assertEquals([
+      SourceSet('foo', 'bar', ''),
+      SourceSet('foo', 'bar', 'baz'),
+      SourceSet('foo', 'bar', 'foobar')
+    ],
+    Project.dedup_sources([
+      SourceSet('foo', 'bar', ''),
+      SourceSet('foo', 'bar', 'foobar'),
+      SourceSet('foo', 'bar', 'baz'),
+      SourceSet('foo', 'bar', 'baz'),
+      SourceSet('foo', 'bar', 'foobar'),
+      SourceSet('foo', 'bar', 'foobar'),
+      SourceSet('foo', 'bar', 'baz'),
+    ]))
+
+  def test_dedup_sources_resource_and_code(self):
+    """Show that a non-resources-only source set turns off the resources_only flag"""
+    deduped_sources = Project.dedup_sources([
+      SourceSet('foo', 'bar', 'baz', resources_only=True),
+      SourceSet('foo', 'bar', 'baz'),
+      SourceSet('foo', 'bar', 'baz', resources_only=True),
+    ])
+    self.assert_dedup(SourceSet('foo', 'bar', 'baz'), deduped_sources)
+
+  def test_dedup_test_sources(self):
+    """Show that a is_test on a non resources_only source set turns on is_test"""
+    deduped_sources = Project.dedup_sources([
+      SourceSet('foo', 'bar', 'baz', is_test=True),
+      SourceSet('foo', 'bar', 'baz'),
+      SourceSet('foo', 'bar', 'baz', is_test=True),
+    ])
+    self.assert_dedup(SourceSet('foo', 'bar', 'baz', is_test=True), deduped_sources)
+
+  def test_dedup_test_resources(self):
+    """Show that competting is_test values on a resources-only source set turns off is_test"""
+    deduped_sources = Project.dedup_sources([
+      SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
+      SourceSet('foo', 'bar', 'baz', is_test= False, resources_only=True),
+      SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
+    ])
+    self.assert_dedup(SourceSet('foo', 'bar', 'baz', resources_only=True), deduped_sources)
+
+  def test__only_test_resources(self):
+    deduped_sources = Project.dedup_sources([
+      SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
+      SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
+    ])
+    self.assert_dedup(SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
+                      deduped_sources)
+
+  def test_all_together(self):
+    deduped_sources = Project.dedup_sources([
+      SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=False),
+      SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
+      SourceSet('foo', 'bar', 'baz', is_test=False, resources_only=True),
+      SourceSet('foo', 'bar', 'baz', is_test=False, resources_only=False),
+    ])
+    self.assert_dedup(SourceSet('foo', 'bar', 'baz', is_test=True), deduped_sources)

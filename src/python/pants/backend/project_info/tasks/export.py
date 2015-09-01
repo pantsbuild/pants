@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -42,7 +42,7 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.1'
+  DEFAULT_EXPORT_VERSION='1.0.2'
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -74,14 +74,7 @@ class Export(ConsoleTask):
     :param Exclude jar: key for an excluded jar
     :returns: String representing the key as a maven coordinate
     """
-    return '{0}:{1}'.format(jar.org, jar.name)
-
-  @staticmethod
-  def _address(address):
-    """
-    :type address: pants.base.address.SyntheticAddress
-    """
-    return '{0}:{1}'.format(address.spec_path, address.target_name)
+    return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
   @classmethod
   def register_options(cls, register):
@@ -131,6 +124,7 @@ class Export(ConsoleTask):
         ivy_info = ivy_info_list[0]
 
     ivy_jar_memo = {}
+
     def process_target(current_target):
       """
       :type current_target:pants.base.target.Target
@@ -178,7 +172,7 @@ class Export(ConsoleTask):
       if isinstance(current_target, JarLibrary):
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
-        info['targets'].append(self._address(dep.address))
+        info['targets'].append(dep.address.spec)
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
@@ -189,7 +183,7 @@ class Export(ConsoleTask):
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
-          info['targets'].append(self._address(dep.address))
+          info['targets'].append(dep.address.spec)
           process_target(dep)
 
       if isinstance(current_target, JvmTarget):
@@ -202,7 +196,7 @@ class Export(ConsoleTask):
 
       if self.get_options().libraries:
         info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
-      targets_map[self._address(current_target.address)] = info
+      targets_map[current_target.address.spec] = info
 
     for target in targets:
       process_target(target)
@@ -223,24 +217,17 @@ class Export(ConsoleTask):
   def _resolve_jars_info(self):
     """Consults ivy_jar_products to export the external libraries.
 
-    :return: mapping of jar_id -> { 'default' : [ <jar_files> ],
-                                    'sources' : [ <jar_files> ],
-                                    'javadoc' : [ <jar_files> ],
+    :return: mapping of jar_id -> { 'default'     : <jar_file>,
+                                    'sources'     : <jar_file>,
+                                    'javadoc'     : <jar_file>,
+                                    <other_confs> : <jar_file>,
                                   }
     """
-    mapping = defaultdict(list)
+    mapping = defaultdict(dict)
     jar_data = self.context.products.get_data('ivy_jar_products')
-    jar_infos = get_jar_infos(ivy_products=jar_data, confs=['default', 'sources', 'javadoc'])
-    for ivy_module_ref, paths in jar_infos.iteritems():
-      conf_to_jarfile_map = OrderedDict()
-      for conf, pathlist in paths.iteritems():
-        # TODO(Eric Ayers): pathlist can contain multiple jars in the case where classifiers
-        # to resolve extra artifacts are used.  This only captures the first one, meaning the
-        # export is incomplete. See https://github.com/pantsbuild/pants/issues/1489
-        if pathlist:
-          conf_to_jarfile_map[conf] = pathlist[0]
-
-      mapping[self._jar_id(ivy_module_ref)] = conf_to_jarfile_map
+    jar_infos = get_jar_infos(ivy_products=jar_data)
+    for ivy_module_ref, conf_to_jarfile_map in jar_infos.iteritems():
+      mapping[self._jar_id(ivy_module_ref)].update(conf_to_jarfile_map)
     return mapping
 
   def _get_pants_target_alias(self, pants_target_type):
@@ -252,7 +239,8 @@ class Export(ConsoleTask):
     if pants_target_type in self.target_aliases_map:
       return self.target_aliases_map.get(pants_target_type)
     else:
-      raise TaskError('Unregistered target type {target_type}'.format(target_type=pants_target_type))
+      raise TaskError('Unregistered target type {target_type}'
+                      .format(target_type=pants_target_type))
 
   @staticmethod
   def _source_roots_for_target(target):

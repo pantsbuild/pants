@@ -8,12 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
-from pex.archiver import Archiver
-from pex.crawler import Crawler
-from pex.installer import EggInstaller
 from pex.interpreter import PythonIdentity, PythonInterpreter
-from pex.iterator import Iterator
-from pex.package import EggPackage, SourcePackage
+from pex.package import EggPackage, Package, SourcePackage
+from pex.resolver import resolve
 
 from pants.util.dirutil import safe_concurrent_create, safe_mkdir
 
@@ -102,7 +99,7 @@ class PythonInterpreterCache(object):
           continue
       self._interpreters.add(pi)
 
-  def matches(self, filters):
+  def matched_interpreters(self, filters):
     """Given some filters, yield any interpreter that matches at least one of them.
 
     :param filters: A sequence of strings that constrain the interpreter compatibility for this
@@ -123,17 +120,16 @@ class PythonInterpreterCache(object):
       cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
       for requirements agnostic to interpreter class.
     """
-    has_setup = False
     filters = self._default_filters if not any(filters) else filters
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self._setup_cached(filters)
-    if force:
-      has_setup = True
+    def unsatisfied_filters():
+      return filter(lambda filt: len(list(self._matching(self._interpreters, [filt]))) == 0, filters)
+    if force or len(unsatisfied_filters()) > 0:
       self._setup_paths(setup_paths, filters)
-    matches = list(self.matches(filters))
-    if len(matches) == 0 and not has_setup:
-      self._setup_paths(setup_paths, filters)
-      matches = list(self.matches(filters))
+    for filt in unsatisfied_filters():
+      self._logger('No valid interpreters found for {}!'.format(filt))
+    matches = list(self.matched_interpreters(filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
     return matches
@@ -145,7 +141,6 @@ class PythonInterpreterCache(object):
     if interpreter:
       return self._resolve_interpreter(interpreter, interpreter_dir,
                                        self._python_setup.wheel_requirement())
-
 
   def _resolve_interpreter(self, interpreter, interpreter_dir, requirement):
     """Given a :class:`PythonInterpreter` and a requirement, return an interpreter with the
@@ -160,42 +155,39 @@ class PythonInterpreterCache(object):
     if not interpreter_dir:
       interpreter_dir = os.path.join(self._cache_dir, str(interpreter.identity))
 
-    def installer_provider(sdist):
-      return EggInstaller(
-        Archiver.unpack(sdist),
-        strict=requirement.key != 'setuptools',
-        interpreter=interpreter)
-
-    egg = self._resolve_and_link(
-      requirement,
-      os.path.join(interpreter_dir, requirement.key),
-      installer_provider)
-
-    if egg:
-      return interpreter.with_extra(egg.name, egg.raw_version, egg.path)
+    target_link = os.path.join(interpreter_dir, requirement.key)
+    bdist = self._resolve_and_link(interpreter, requirement, target_link)
+    if bdist:
+      return interpreter.with_extra(bdist.name, bdist.raw_version, bdist.path)
     else:
       self._logger('Failed to resolve requirement {} for {}'.format(requirement, interpreter))
 
-  def _resolve_and_link(self, requirement, target_link, installer_provider):
+  def _resolve_and_link(self, interpreter, requirement, target_link):
     # Short-circuit if there is a local copy.
     if os.path.exists(target_link) and os.path.exists(os.path.realpath(target_link)):
-      egg = EggPackage(os.path.realpath(target_link))
-      if egg.satisfies(requirement):
-        return egg
+      bdist = Package.from_href(os.path.realpath(target_link))
+      if bdist.satisfies(requirement):
+        return bdist
 
-    fetchers = self._python_repos.get_fetchers()
-    context = self._python_repos.get_network_context()
-    iterator = Iterator(fetchers=fetchers, crawler=Crawler(context))
-    links = [link for link in iterator.iter(requirement) if isinstance(link, SourcePackage)]
+    # Since we're resolving to bootstrap a bare interpreter, we won't have wheel available.
+    # Explicitly set the precedence to avoid resolution of wheels or distillation of sdists into
+    # wheels.
+    precedence = (EggPackage, SourcePackage)
+    distributions = resolve(requirements=[requirement],
+                            fetchers=self._python_repos.get_fetchers(),
+                            interpreter=interpreter,
+                            context=self._python_repos.get_network_context(),
+                            precedence=precedence)
+    if not distributions:
+      return None
 
-    for link in links:
-      self._logger('    fetching {}'.format(link.url))
-      sdist = context.fetch(link)
-      self._logger('    installing {}'.format(sdist))
-      installer = installer_provider(sdist)
-      dist_location = installer.bdist()
-      target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
-      shutil.move(dist_location, target_location)
-      _safe_link(target_location, target_link)
-      self._logger('    installed {}'.format(target_location))
-      return EggPackage(target_location)
+    assert len(distributions) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
+                                     'found:\n\t{}'.format(requirement,
+                                                           '\n\t'.join(map(str, distributions))))
+
+    dist_location = distributions[0].location
+    target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
+    shutil.move(dist_location, target_location)
+    _safe_link(target_location, target_link)
+    self._logger('    installed {}'.format(target_location))
+    return Package.from_href(target_location)

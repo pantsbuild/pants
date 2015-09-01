@@ -7,8 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir
+from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
@@ -33,7 +32,7 @@ class CppLibraryCreate(CppTask):
     return True
 
   def execute(self):
-    with self.context.new_workunit(name='cpp-library', labels=[WorkUnit.TASK]):
+    with self.context.new_workunit(name='cpp-library', labels=[WorkUnitLabel.TASK]):
       targets = self.context.targets(self.is_library)
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
         lib_mapping = self.context.products.get('lib')
@@ -62,7 +61,7 @@ class CppLibraryCreate(CppTask):
     cmd.extend([output])
     cmd.extend(objects)
 
-    with self.context.new_workunit(name='cpp-link', labels=[WorkUnit.COMPILER]) as workunit:
+    with self.context.new_workunit(name='cpp-link', labels=[WorkUnitLabel.COMPILER]) as workunit:
       self.run_command(cmd, workunit)
 
     return output

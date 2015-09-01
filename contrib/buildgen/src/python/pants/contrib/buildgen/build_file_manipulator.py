@@ -11,7 +11,7 @@ import re
 import sys
 from difflib import unified_diff
 
-from pants.base.address import BuildFileAddress, SyntheticAddress
+from pants.base.address import Address, BuildFileAddress
 
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,8 @@ class BuildFileManipulator(object):
                                   .format(name=name, build_file=build_file))
 
     target_call = calls_by_name[name]
+    target_alias = target_call.func.id
+
     # lineno is 1-indexed
     target_interval_index = intervals.index(target_call.lineno - 1)
     target_start = intervals[target_interval_index]
@@ -204,7 +206,6 @@ class BuildFileManipulator(object):
                                     'Build file was: {build_file}.  Line number was: {lineno}'
                                     .format(build_file=build_file, lineno=keyword.value.lineno))
 
-
     # Same setup as for getting the target's interval
     target_call_intervals = [t.value.lineno - target_call.lineno for t in target_call.keywords]
     target_call_intervals.append(len(target_source_lines))
@@ -238,7 +239,6 @@ class BuildFileManipulator(object):
     #   print('\n'.join(target_source_lines[start:end]))
     #   print('\n\n')
     # print(target_call_intervals)
-
 
     def get_dependencies_node(target_call):
       for keyword in target_call.keywords:
@@ -314,6 +314,7 @@ class BuildFileManipulator(object):
       deps_end = -1
 
     return cls(name=name,
+               target_alias=target_alias,
                build_file=build_file,
                build_file_source_lines=source_lines,
                target_source_lines=target_source_lines,
@@ -323,6 +324,7 @@ class BuildFileManipulator(object):
 
   def __init__(self,
                name,
+               target_alias,
                build_file,
                build_file_source_lines,
                target_source_lines,
@@ -331,8 +333,9 @@ class BuildFileManipulator(object):
                dependencies_interval):
     """See BuildFileManipulator.load() for how to construct one as a user."""
     self.name = name
+    self.target_alias = target_alias
     self.build_file = build_file
-    self.target_address = BuildFileAddress(build_file, name)
+    self.target_address = BuildFileAddress(build_file, target_alias, name)
     self._build_file_source_lines = build_file_source_lines
     self._target_source_lines = target_source_lines
     self._target_interval = target_interval
@@ -340,7 +343,7 @@ class BuildFileManipulator(object):
     self._dependencies_by_address = {}
 
     for dep in dependencies:
-      dep_address = SyntheticAddress.parse(dep.spec, relative_to=build_file.spec_path)
+      dep_address = Address.parse(dep.spec, relative_to=build_file.spec_path)
       if dep_address in self._dependencies_by_address:
         raise BuildTargetParseError('The address {dep_address} occurred multiple times in the '
                                     'dependency specs for target {name} in {build_file}. '

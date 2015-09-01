@@ -6,7 +6,7 @@ package org.pantsbuild.example.hello.welcome
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.MustMatchers
+import org.scalatest.MustMatchers
 
 @RunWith(classOf[JUnitRunner])
 class WelSpec extends WordSpec with MustMatchers {

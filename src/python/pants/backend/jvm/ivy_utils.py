@@ -28,24 +28,31 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-IvyArtifact = namedtuple('IvyArtifact', ['path', 'classifier'])
-IvyModule = namedtuple('IvyModule', ['ref', 'artifacts', 'callers'])
+IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
 
 
 logger = logging.getLogger(__name__)
 
 
 class IvyModuleRef(object):
-  def __init__(self, org, name, rev):
+
+  def __init__(self, org, name, rev, classifier=None):
     self.org = org
     self.name = name
     self.rev = rev
+    self.classifier = classifier
 
   def __eq__(self, other):
-    return self.org == other.org and self.name == other.name and self.rev == other.rev
+    return self.org == other.org and \
+           self.name == other.name and \
+           self.rev == other.rev and \
+           self.classifier == other.classifier
 
   def __hash__(self):
-    return hash((self.org, self.name, self.rev))
+    return hash((self.org, self.name, self.rev, self.classifier))
+
+  def __str__(self):
+    return 'IvyModuleRef({})'.format(':'.join([self.org, self.name, self.rev, self.classifier]))
 
   @property
   def unversioned(self):
@@ -58,10 +65,16 @@ class IvyModuleRef(object):
     """
 
     # latest.integration is ivy magic meaning "just get the latest version"
-    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration')
+    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration', classifier=self.classifier)
+
+  @property
+  def unclassified(self):
+    """This returns an identifier for an IvyModuleRef without classifier information."""
+    return IvyModuleRef(name=self.name, org=self.org, rev=self.rev, classifier=None)
 
 
 class IvyInfo(object):
+
   def __init__(self):
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.
@@ -71,12 +84,12 @@ class IvyInfo(object):
 
   def add_module(self, module):
     self.modules_by_ref[module.ref] = module
-    if not module.artifacts:
+    if not module.artifact:
       # Module was evicted, so do not record information about it
       return
     for caller in module.callers:
       self._deps_by_caller[caller.unversioned].add(module.ref)
-    self._artifacts_by_ref[module.ref.unversioned].update(module.artifacts)
+    self._artifacts_by_ref[module.ref.unversioned].add(module.artifact)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
@@ -112,7 +125,7 @@ class IvyInfo(object):
     return acc
 
   def get_artifacts_for_jar_library(self, jar_library, memo=None):
-    """Collects IvyArtifact instances for the passed jar_library.
+    """Collects jars for the passed jar_library.
 
     Because artifacts are only fetched for the "winning" version of a module, the artifacts
     will not always represent the version originally declared by the library.
@@ -123,34 +136,29 @@ class IvyInfo(object):
     :param jar_library A JarLibrary to collect the transitive artifacts for.
     :param memo see `traverse_dependency_graph`
     :returns: all the artifacts for all of the jars in this library, including transitive deps
-    :rtype: list of IvyArtifact
+    :rtype: list of str
     """
     artifacts = OrderedSet()
+
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev)
-      valid_classifiers = jar.artifact_classifiers
-      artifacts_for_jar = []
-      for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-        artifacts_for_jar.extend(
-          artifact for artifact in self._artifacts_by_ref[module_ref.unversioned]
-          if artifact.classifier in valid_classifiers
-        )
-
-      artifacts.update(artifacts_for_jar)
+      for classifier in jar.artifact_classifiers:
+        jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
+        for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
+          artifacts.update(self._artifacts_by_ref[module_ref.unversioned])
     return artifacts
 
   def get_jars_for_ivy_module(self, jar, memo=None):
     """Collects dependency references of the passed jar
-    :param jar an IvyModuleRef for a third party dependency.
+    :param jar an JarDependency for a third party dependency.
     :param memo see `traverse_dependency_graph`
     """
 
-    ref = IvyModuleRef(jar.org, jar.name, jar.rev)
+    ref = IvyModuleRef(jar.org, jar.name, jar.rev, jar.classifier).unversioned
     def create_collection(dep):
       s = OrderedSet()
-      if ref != dep:
+      if ref != dep.unversioned:
         s.add(dep)
       return s
     return self.traverse_dependency_graph(ref, create_collection, memo)
@@ -296,16 +304,15 @@ class IvyUtils(object):
       name = module.get('name')
       for revision in module.findall('revision'):
         rev = revision.get('name')
-        artifacts = []
-        for artifact in revision.findall('artifacts/artifact'):
-          artifacts.append(IvyArtifact(path=artifact.get('location'),
-                                       classifier=artifact.get('extra-classifier')))
         callers = []
         for caller in revision.findall('caller'):
           callers.append(IvyModuleRef(caller.get('organisation'),
                                       caller.get('name'),
                                       caller.get('callerrev')))
-        ret.add_module(IvyModule(IvyModuleRef(org, name, rev), artifacts, callers))
+
+        for artifact in revision.findall('artifacts/artifact'):
+          ivy_module_ref = IvyModuleRef(org, name, rev, artifact.get('extra-classifier'))
+          ret.add_module(IvyModule(ivy_module_ref, artifact.get('location'), callers))
     return ret
 
   @classmethod
@@ -365,7 +372,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=maybe_list(confs), # Mustache doesn't like sets.
+        configurations=maybe_list(confs),  # Mustache doesn't like sets.
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)
@@ -378,9 +385,10 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def calculate_classpath(cls, targets, gather_excludes=True, automatic_excludes=True):
+  def calculate_classpath(cls, targets, gather_excludes=True):
     jars = OrderedDict()
-    excludes = set()
+    global_excludes = set()
+    provide_excludes = set()
     targets_processed = set()
 
     # Support the ivy force concept when we sanely can for internal dep conflicts.
@@ -408,29 +416,35 @@ class IvyUtils(object):
     def collect_excludes(target):
       target_excludes = target.payload.get_field_value('excludes')
       if target_excludes:
-        excludes.update(target_excludes)
+        global_excludes.update(target_excludes)
 
-    def collect_automatic_excludes(target):
+    def collect_provide_excludes(target):
       if not target.is_exported:
         return
-      # if a source dep is exported, it should always override remote/binary versions
-      # of itself, ie "round trip" dependencies
       logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
         target.provides.org, target.provides.name, target))
-      excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
+      provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     def collect_elements(target):
       targets_processed.add(target)
       collect_jars(target)
       if gather_excludes:
         collect_excludes(target)
-        if automatic_excludes:
-          collect_automatic_excludes(target)
+      collect_provide_excludes(target)
 
     for target in targets:
       target.walk(collect_elements, predicate=lambda target: target not in targets_processed)
 
-    return jars.values(), excludes
+    # If a source dep is exported (ie, has a provides clause), it should always override
+    # remote/binary versions of itself, ie "round trip" dependencies.
+    # TODO: Move back to applying provides excludes as target-level excludes when they are no
+    # longer global.
+    if provide_excludes:
+      additional_excludes = tuple(provide_excludes)
+      for coordinate, jar in jars.items():
+        jar.excludes += additional_excludes
+
+    return jars.values(), global_excludes
 
   @staticmethod
   def _resolve_conflict(existing, proposed):

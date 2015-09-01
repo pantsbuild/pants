@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from six import string_types
 
+from pants.option.errors import OptionsError
+from pants.option.scope import ScopeInfo
 from pants.util.meta import AbstractClass
 
 
@@ -15,6 +17,20 @@ class Optionable(AbstractClass):
 
   # Subclasses must override.
   options_scope = None
+  options_scope_category = None
+
+  @classmethod
+  def get_scope_info(cls):
+    """Returns a ScopeInfo instance representing this Optionable's options scope."""
+    if cls.options_scope is None or cls.options_scope_category is None:
+      raise OptionsError(
+        '{} must set options_scope and options_scope_category.'.format(cls.__name__))
+    return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
+
+  @classmethod
+  def get_description(cls):
+    # First line of docstring.
+    return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0]
 
   @classmethod
   def register_options(cls, register):

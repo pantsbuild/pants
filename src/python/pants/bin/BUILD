@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'bin',
-  sources = ['goal_runner.py', 'pants_exe.py'],
-  dependencies = [
+  name='bin',
+  sources=globs('*.py'),
+  dependencies=[
+    '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/backend/python:python_setup',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_address_mapper',
@@ -21,11 +23,14 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
+    'src/python/pants/help',
     'src/python/pants/logging',
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
+    'src/python/pants/util:memo',
   ],
 )
 
@@ -34,9 +39,9 @@ python_library(
 # $ pip install pantsbuild.pants
 # $ pants
 python_binary(
-  name = 'pants',
-  entry_point = 'pants.bin.pants_exe:main',
-  dependencies = [
+  name='pants',
+  entry_point='pants.bin.pants_exe:main',
+  dependencies=[
     ':bin',
   ],
 )
@@ -45,9 +50,9 @@ python_binary(
 # publishing in the `pantsbuild.pants` sdist as well as deps on backend plugins published as
 # separate sdists from the core `pantsbuild.pants` sdist that this repo uses.
 python_binary(
-  name = 'pants_local_binary',
-  entry_point = 'pants.bin.pants_exe:main',
-  dependencies = [
+  name='pants_local_binary',
+  entry_point='pants.bin.pants_exe:main',
+  dependencies=[
     ':bin',
     'pants-plugins/src/python/internal_backend:plugins',
     'src/python/pants/backend/android:plugin',

@@ -10,22 +10,26 @@ import os
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
+from hashlib import sha1
 
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
+from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.meta import AbstractClass
 
 
-class TaskBase(Optionable, AbstractClass):
+class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -49,6 +53,8 @@ class TaskBase(Optionable, AbstractClass):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+  options_scope_category = ScopeInfo.TASK
+
   # Tests may override this to provide a stable name despite the class name being a unique,
   # synthetic name.
   _stable_name = None
@@ -97,10 +103,11 @@ class TaskBase(Optionable, AbstractClass):
   def known_scope_infos(cls):
     """Yields ScopeInfo for all known scopes for this task, in no particular order."""
     # The task's own scope.
-    yield ScopeInfo(cls.options_scope, ScopeInfo.TASK)
+    yield cls.get_scope_info()
     # The scopes of any task-specific subsystems it uses.
-    for subsystem in cls.task_subsystems():
-      yield ScopeInfo(subsystem.subscope(cls.options_scope), ScopeInfo.TASK_SUBSYSTEM)
+    for dep in cls.subsystem_dependencies_iter():
+      if not dep.is_global():
+        yield dep.subsystem_cls.get_scope_info(subscope=dep.scope)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -174,6 +181,9 @@ class TaskBase(Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
+    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
+    self._fingerprint = None
+
   def get_options(self):
     """Returns the option values for this task's scope."""
     return self.context.options.for_scope(self.options_scope)
@@ -192,6 +202,33 @@ class TaskBase(Optionable, AbstractClass):
     workdir path to use.
     """
     return self._workdir
+
+  def _options_fingerprint(self, scope):
+    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+    hasher = sha1()
+    for (option_type, option_val) in pairs:
+      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
+      if fp is not None:
+        hasher.update(fp)
+    return hasher.hexdigest()
+
+  @property
+  def fingerprint(self):
+    """Returns a fingerprint for the identity of the task.
+
+    A task fingerprint is composed of the options the task is currently running under.
+    Useful for invalidating unchanging targets being executed beneath changing task
+    options that affect outputted artifacts.
+
+    A task's fingerprint is only valid afer the task has been fully initialized.
+    """
+    if not self._fingerprint:
+      hasher = sha1()
+      hasher.update(self._options_fingerprint(self.options_scope))
+      for dep in self.subsystem_dependencies_iter():
+        hasher.update(self._options_fingerprint(dep.options_scope()))
+      self._fingerprint = str(hasher.hexdigest())
+    return self._fingerprint
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -279,6 +316,7 @@ class TaskBase(Optionable, AbstractClass):
     # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
     # it in because JvmCompile already has the source->target mapping for other reasons, and also
     # to selectively enable this feature.
+    fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
     # We separate locally-modified targets from others by coloring them differently.

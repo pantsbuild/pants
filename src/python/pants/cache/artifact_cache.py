@@ -16,11 +16,14 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+
 class ArtifactCacheError(Exception):
   pass
 
+
 class NonfatalArtifactCacheError(Exception):
   pass
+
 
 class UnreadableArtifact(object):
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
@@ -44,6 +47,9 @@ class UnreadableArtifact(object):
   def __nonzero__(self):
     return self.__bool__()
 
+  def __str__(self):
+    return "key={} err={}".format(self.key, self.err)
+
 
 class ArtifactCache(object):
   """A map from cache key to a set of build artifacts.
@@ -60,6 +66,14 @@ class ArtifactCache(object):
     All artifacts must be under artifact_root.
     """
     self.artifact_root = artifact_root
+
+  def prune(self):
+    """Prune stale cache files
+
+    Remove old unused cache files
+    :return:
+    """
+    pass
 
   def insert(self, cache_key, paths, overwrite=False):
     """Cache the output of a build.
@@ -129,6 +143,7 @@ class ArtifactCache(object):
     """
     pass
 
+
 def call_use_cached_files(tup):
   """Importable helper for multi-proc calling of ArtifactCache.use_cached_files on a cache instance.
 
@@ -138,13 +153,19 @@ def call_use_cached_files(tup):
 
   :param tup: A tuple of an ArtifactCache and arg (eg CacheKey) for ArtifactCache.use_cached_files.
   """
-  cache, key = tup
-  res = cache.use_cached_files(key)
-  if res:
-    sys.stderr.write('.')
-  else:
-    sys.stderr.write(' ')
-  return res
+
+  try:
+    cache, key = tup
+    res = cache.use_cached_files(key)
+    if res:
+      sys.stderr.write('.')
+    else:
+      sys.stderr.write(' ')
+    return res
+  except NonfatalArtifactCacheError as e:
+    logger.warn('Error calling use_cached_files in artifact cache: {0}'.format(e))
+    return False
+
 
 def call_insert(tup):
   """Importable helper for multi-proc calling of ArtifactCache.insert on an ArtifactCache instance.
@@ -155,5 +176,9 @@ def call_insert(tup):
               eg (some_cache_instance, cache_key, [some_file, another_file], False)
 
   """
-  cache, key, files, overwrite = tup
-  return cache.insert(key, files, overwrite)
+  try:
+    cache, key, files, overwrite = tup
+    return cache.insert(key, files, overwrite)
+  except NonfatalArtifactCacheError as e:
+    logger.warn('Error while inserting into artifact cache: {0}'.format(e))
+    return False

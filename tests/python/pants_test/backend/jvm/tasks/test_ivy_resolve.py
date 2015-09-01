@@ -10,14 +10,12 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.ivy_utils import IvyArtifact as IvyUtilArtifact
-from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyUtils
+from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.base.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
@@ -52,7 +50,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
     jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
-    scala_lib = self.make_target('//:b', ScalaLibrary)
+    scala_lib = self.make_target('//:b', JavaLibrary)
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
@@ -63,15 +61,20 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
     # due to an ivy eviction where the declared version loses to a transitive version.
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0',
-                               artifacts=[IvyArtifact('guava16.0', classifier='default')])
+                               artifacts=[IvyArtifact('guava16.0')])
     winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1',
-                               artifacts=[IvyArtifact('guava16.0.1', classifier='default')])
+                               artifacts=[IvyArtifact('guava16.0.1')])
     losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
     winning_lib = self.make_target('//:b', JarLibrary, jars=[winning_dep])
     # Confirm that the same artifact was added to each target.
     context = self.context(target_roots=[losing_lib, winning_lib])
 
-    symlink_map = dict(bogus0='bogus0', bogus1='bogus1', unused='unused')
+    def artifact_path(name):
+      return os.path.join(self.build_root, 'ivy_artifact', name)
+
+    symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
+                   artifact_path('bogus1'): artifact_path('bogus1'),
+                   artifact_path('unused'): artifact_path('unused')}
     context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
 
@@ -94,25 +97,25 @@ class IvyResolveTest(JvmToolTaskTestBase):
       # resolve, it's possible that before it was evicted, it would
       # generate some resolution data.
 
-      artifact_1 = IvyUtilArtifact('bogus0', 'default')
-      unused_artifact = IvyUtilArtifact('unused', 'default')
+      artifact_1 = artifact_path('bogus0')
+      unused_artifact = artifact_path('unused')
 
       # Because guava 16.0 was evicted, it has no artifacts
       guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
-                          [], [])
+                          None, [])
       guava_1 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0.1'),
-                          [artifact_1], [])
+                          artifact_1, [])
       ivy_info.add_module(guava_0)
       ivy_info.add_module(guava_1)
 
-      artifact_dep_1 = IvyUtilArtifact('bogus1', 'default')
+      artifact_dep_1 = artifact_path('bogus1')
 
       # Because fake#dep 16.0 was evicted before it was resolved,
       # its deps are never examined, so we don't call add_module.
       guava_dep_0 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.0'),
-                              [], [guava_0.ref])
+                              None, [guava_0.ref])
       guava_dep_1 = IvyModule(IvyModuleRef('com.google.fake', 'dep', '16.0.1'),
-                              [artifact_dep_1], [guava_1.ref])
+                              artifact_dep_1, [guava_1.ref])
 
       ivy_info.add_module(guava_dep_0)
       ivy_info.add_module(guava_dep_1)
@@ -120,7 +123,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       # Add an unrelated module to ensure that it's not returned
       unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0')
       unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0'),
-                            [unused_artifact], [unrelated_parent])
+                            unused_artifact, [unrelated_parent])
       ivy_info.add_module(unrelated)
 
       ivy_products['default'] = [ivy_info]
@@ -132,7 +135,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
     self.assertEquals(losing_cp, winning_cp)
-    self.assertEquals(OrderedSet([(u'default', u'bogus0'), (u'default', u'bogus1')]), winning_cp)
+    self.assertEquals(OrderedSet([(u'default', artifact_path(u'bogus0')),
+                                  (u'default', artifact_path(u'bogus1'))]),
+                      winning_cp)
 
   def test_resolve_multiple_artifacts1(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
@@ -140,12 +145,15 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                                  artifacts=[IvyArtifact('junit')])
 
     no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
-    classifier_and_no_classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier_and_no_classifier])
+    classifier_and_no_classifier_lib = self.make_target('//:b',
+                                                        JarLibrary,
+                                                        jars=[classifier_and_no_classifier])
 
     compile_classpath = self.resolve([no_classifier_lib, classifier_and_no_classifier_lib])
 
     no_classifier_cp = compile_classpath.get_for_target(no_classifier_lib)
-    classifier_and_no_classifier_cp = compile_classpath.get_for_target(classifier_and_no_classifier_lib)
+    classifier_and_no_classifier_cp = compile_classpath.get_for_target(
+        classifier_and_no_classifier_lib)
 
     sources_jar = 'junit-4.12-sources.jar'
     regular_jar = 'junit-4.12.jar'
@@ -204,7 +212,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
-    target = self.make_target('//:a', ScalaLibrary)
+    target = self.make_target('//:a', JavaLibrary)
     self.assertTrue(self.resolve([target]))
 
   def test_resolve_symlinked_cache(self):
@@ -217,7 +225,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     """
     with temporary_dir() as realcachedir:
       with temporary_dir() as symlinkdir:
-        symlink_cache_dir=os.path.join(symlinkdir, 'symlinkedcache')
+        symlink_cache_dir = os.path.join(symlinkdir, 'symlinkedcache')
         os.symlink(realcachedir, symlink_cache_dir)
         self.set_options_for_scope('ivy', cache_dir=symlink_cache_dir)
 

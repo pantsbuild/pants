@@ -19,7 +19,11 @@ migrations = {
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
   ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
-  ('jvm', 'missing_deps_target_whitelist'): ('compile.java', 'missing_deps_whitelist'),
+  ('jvm', 'missing_deps_target_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
+  ('compile.java', 'missing_deps'): ('compile.jvm-dep-check', 'missing_deps'),
+  ('compile.java', 'missing_direct_deps'): ('compile.jvm-dep-check', 'missing_direct_deps'),
+  ('compile.java', 'missing_deps_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
+  ('compile.java', 'unnecessary_deps'): ('compile.jvm-dep-check', 'unnecessary_deps'),
 
   ('java-compile', 'partition_size_hint'): ('compile.java', 'partition_size_hint'),
   ('java-compile', 'javac_args'): ('compile.java', 'args'),
@@ -242,6 +246,31 @@ migrations = {
 
   ('python-setup', 'egg_cache_dir'): ('python_setup', 'resolver_cache_dir'),
   ('DEFAULT', 'python_chroot_requirements_ttl'): ('python-setup', 'resolver_cache_ttl'),
+
+  ('DEFAULT', 'pants_support_baseurls'): ('binaries', 'baseurls'),
+  ('DEFAULT', 'pants_support_fetch_timeout_secs'): ('binaries', 'fetch_timeout_secs'),
+
+  ('gen.thrift', 'supportdir'): ('thrift-binary', 'supportdir'),
+  ('gen.thrift', 'version'): ('thrift-binary', 'version'),
+
+  ('gen.thrift', 'java'): None,  # Notes only one to many migration: see notes below.
+  ('gen.thrift', 'python'): None,  # Notes only pure deletion migration: see notes below.
+
+  ('compile.zinc-java', 'enabled'): ('compile.java', 'use-jmake'),
+
+  ('compile.scala', 'args'): ('compile.zinc', 'args'),
+
+  ('compile.cpp-compile', 'cc_options'): ('compile.cpp', 'cc_options'),
+  ('compile.cpp-compile', 'cc_extensions'): ('compile.cpp', 'cc_extensions'),
+
+  ('test.junit', 'coverage_html_open'): ('test.junit', 'coverage_open'),
+
+  # On by default.
+  ('compile.apt', 'jar'): None,
+  ('compile.java', 'jar'): None,
+  ('compile.zinc', 'jar'): None,
+
+  ('unknown-arguments', 'ignored'): None,
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -255,6 +284,8 @@ ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_n
 
 scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been refactored into '
                          'two options: one for service deps, and one for structs deps.')
+compile_jar_note = ('The isolated jvm compile `jar` option is critical to performant operation '
+                    'and can no longer be disabled.')
 
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
@@ -263,9 +294,14 @@ notes = {
                          'move to a subsystem, which will fix this requirement.',
   ('jvm', 'debug_args'): 'For now must be defined for each JvmTask subtask separately.  Will soon '
                          'move to a subsystem, which will fix this requirement.',
-  ('java-compile', 'javac_args'): 'source and target args should be moved to separate source: and '
-                                  'target: options. Other args should be placed in args: and '
-                                  'prefixed with -C.',
+  ('java-compile', 'javac_args'): 'Source, target, and bootclasspath args should be specified in '
+                                  'the jvm-platform subsystem. Other args can be placed in args: '
+                                  'and prefixed with -C, or also be included in the jvm-platform '
+                                  'args.',
+  ('java-compile', 'source'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
+  ('java-compile', 'target'): 'source and target args should be defined using the jvm-platform '
+                              'subsystem, rathern than as arguments to java-compile.',
   ('jar-tool', 'bootstrap_tools'): 'Each JarTask sub-task can define this in its own section. or '
                                    'this can be defined for everyone in the DEFAULT section.',
   ('ivy-resolve', 'jvm_args'): 'If needed, this should be repeated in resolve.ivy, '
@@ -293,9 +329,9 @@ notes = {
                                      'idea and eclipse goals.',
   ('ide', 'extra_jvm_test_paths'): 'extra_jvm_test_paths now must be specified separately for '
                                    'idea and eclipse goals.',
-  ('ide', 'debug_port'):       'debug_port now must be specified separately for idea and eclipse '
-                               'goals.  Also, IDE goals now use their own debug setting and do not '
-                               'inherit from jvm configuration.',
+  ('ide', 'debug_port'): 'debug_port now must be specified separately for idea and eclipse '
+                         'goals.  Also, IDE goals now use their own debug setting and do not '
+                         'inherit from jvm configuration.',
 
   ('tasks', 'build_invalidator'): 'This is no longer configurable. The default will be used.',
 
@@ -305,6 +341,52 @@ notes = {
   ('resolve', 'ng_daemons'): ng_daemons_note,
   ('scrooge-gen', 'scala'): scrooge_gen_deps_note,
   ('scrooge-gen', 'java'): scrooge_gen_deps_note,
+
+  ('gen.thrift', 'version'): 'You can either set the apache thrift compiler version globally for '
+                             'java and python using the [thrift-binary] scope or else you can '
+                             'configure the languages separately using the '
+                             '[thrift-binary.gen.thrift] scope to control the version used for '
+                             'java.',
+
+  ('gen.thrift', 'java'): 'The java configuration has migrated from a single dict with 3 keys to '
+                          '3 options.\n'
+                          'The "gen" key has migrated to the `gen_options` option and the value '
+                          'should just be the option portion of the thrift --gen argument.  For '
+                          'example, if you had `"gen": "java:hashcode"` as your java dict entry '
+                          'you\'d now use the top-level option `gen_options: hashcode`.\n'
+                          'The "deps.structs" nested key has migrated to the `deps` option and the '
+                          'value remains the same.\n'
+                          'The "deps.service" nested key as migrated to the `service_deps` option '
+                          'and the value remains the same, but is now optional if service deps are '
+                          'the same as non-service deps.',
+
+  ('gen.thrift', 'python'): 'The python configuration for gen.thrift has never been used and '
+                            'should be removed.',
+
+  ('resolve.ivy', 'automatic_excludes'): 'Enabled by default.',
+  ('imports.ivy-imports', 'automatic_excludes'): 'Enabled by default.',
+
+  ('compile.zinc-java', 'enabled'): 'The enabled flag has moved from "enable zinc for java" '
+                                    'to "disable jmake for java", more precisely, instead of '
+                                    '--compile-zinc-java-enabled, use --no-compile-java-use-jmake',
+  ('compile.scala', 'args'): 'ALL `compile.scala` options have moved to `compile.zinc`.',
+
+  ('compile.cpp-compile', 'cc_options'): 'Value used to be a string, is now a list.',
+  ('compile.cpp-compile', 'cc_extensions'): 'Value used to be a string (but default was a list), '
+                                            'is now a list. Values also now include the dot, e.g.,'
+                                            'it\'s now .cpp, not cpp.',
+  ('test.junit', 'coverage_console'): 'Option no longer exists. Coverage always written to stdout.',
+  ('test.junit', 'coverage_html'): 'Option no longer exists. Coverage always written to html file.',
+  ('test.junit', 'coverage_xml'): 'Option no longer exists. Coverage always written to xml file.',
+
+  ('compile.apt', 'jar'): compile_jar_note,
+  ('compile.java', 'jar'): compile_jar_note,
+  ('compile.zinc', 'jar'): compile_jar_note,
+
+  ('unknown-arguments', 'ignored'): 'Target name keys are now expected to be the alias used in '
+                                    'BUILD files and not the target type\'s simple class name. '
+                                    'For example, if you had \'JavaLibrary\' key you\'d now use '
+                                    '\'java_library\' instead.'
 }
 
 
@@ -343,12 +425,14 @@ def check_option(cp, src, dst):
     if (src_section, src_key) in notes:
       print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
 
+
 def check_config_file(path):
   cp = Config.create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
 
   print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
+
   def section(s):
     return cyan('[{0}]'.format(s))
 
@@ -393,13 +477,13 @@ def check_config_file(path):
       value = value.strip()
       if value.startswith('['):
         try:
-          custom_types.list_type(value)
+          custom_types.list_option(value)
         except ParseError:
           print('Value of {key} in section {section} is not a valid '
                 'JSON list.'.format(key=green(key), section=section(sec)))
       elif value.startswith('{'):
         try:
-          custom_types.dict_type(value)
+          custom_types.dict_option(value)
         except ParseError:
           print('Value of {key} in section {section} is not a valid '
                 'JSON object.'.format(key=green(key), section=section(sec)))

@@ -21,6 +21,9 @@ Contrib plugins should generally follow 3 basic setup steps:
      src/python/pants/contrib/example/...
      tests/python/pants_test/contrib/example/...
    ```
+   The only hard requirement though is the `register.py` entry point file in the main src dir -
+   in this example: `contrib/example/src/python/pants/contrib/example/register.py`.
+
    Source roots for this layout would be added to contrib/example/BUILD:
    ```
    source_root('src/python', page, python_library, resources)
@@ -67,32 +70,37 @@ Contrib plugins should generally follow 3 basic setup steps:
      ]
    ```
 
-3. When you're ready for your plugin to be distributed, add a `provides` `contrib_setup_py`
-   descriptor to your main plugin BUILD target and register the plugin with the release script.
-   The `provides` descriptor just requires a name and description for your plugin suitable for
-   [pypi](https://pypi.python.org/pypi):
+3. When you're ready for your plugin to be distributed, convert your main `python_library` plugin
+   target to a `contrib_plugin` target and register the plugin with the release script.
+
+   The `contrib_plugin` target assumes 1 source of `register.py`; so, the sources argument should be
+   removed.  It still accepts dependencies and other python target arguments with some special
+   additions to help define the plugin distribution.  You'll need to supply a `distribution_name`
+   and a `description` of the plugin suitable for [pypi](https://pypi.python.org/pypi) as well as
+   parameters indicating which plugin entry points your plugin implements:
    ```python
-   python_library(
-      name='plugin',
-      sources=['register.py'],
-      provides=contrib_setup_py(
-        name='pantsbuild.pants.contrib.example',
-        description='An example pants contrib plugin.'
-      )
+   contrib_plugin(
+     name='plugin',
+     distribution_name='pantsbuild.pants.contrib.example',
+     description='An example pants contrib plugin.'
+     build_file_aliases=True,
+     register_goals=True,
    )
    ```
+   In this example, the plugin implements the `build_file_aliases` and `register_goals` entry point
+   methods, but a plugin may additionally implement the `global_subsystems` entry point method, in
+   which case it's `contrib_plugin` target would have a `global_subsystems=True,` entry as well.
+
    To register with the release script, add an entry to `contrib/release_packages.sh`:
    ```bash
    PKG_EXAMPLE=(
-     "pantsbuild.pants.example"
+     "pantsbuild.pants.contrib.example"
      "//contrib/example/src/python/pants/contrib/example:plugin"
      "pkg_example_install_test"
    )
    function pkg_example_install_test() {
-     PIP_ARGS="$@"
-     pip install ${PIP_ARGS} pantsbuild.pants.example==$(local_version) && \
      execute_packaged_pants_with_internal_backends \
-       "extra_backend_packages='pants.contrib.example'" \
+       --plugins="['pantsbuild.pants.contrib.example==$(local_version)']" \
        goals | grep "example-goal" &> /dev/null
    }
 

@@ -14,7 +14,7 @@ from pants_test.android.test_android_base import TestAndroidBase
 
 
 class SignApkTest(TestAndroidBase):
-  """Test the package signing methods in pants.backend.android.tasks.SignApk"""
+  """Test the package signing methods in pants.backend.android.tasks.SignApk."""
 
   _TEST_KEYSTORE = '%(homedir)s/.doesnt/matter/keystore_config.ini'
 
@@ -47,8 +47,8 @@ class SignApkTest(TestAndroidBase):
     task.execute()
 
   def test_no_location_defined(self):
+    task = self.create_task(self._get_context(location=''))
     with self.assertRaises(TaskError):
-      task = self.create_task(self._get_context(location=''))
       task.config_file
 
   def test_setting_location(self):
@@ -61,7 +61,7 @@ class SignApkTest(TestAndroidBase):
       key = self.FakeKeystore()
       target = android_binary
       self.assertEquals(SignApkTask.signed_package_name(target, key.build_type),
-                        'binary.debug.signed.apk')
+                        'org.pantsbuild.example.hello.debug.signed.apk')
 
   def test_setup_default_config(self):
     with temporary_dir() as temp:
@@ -70,9 +70,9 @@ class SignApkTest(TestAndroidBase):
       self.assertTrue(os.path.isfile(default_config))
 
   def test_setup_default_config_no_permission(self):
-    with self.assertRaises(TaskError):
-      with temporary_file() as temp:
-        os.chmod(temp.name, 0o400)
+    with temporary_file() as temp:
+      os.chmod(temp.name, 0o400)
+      with self.assertRaises(TaskError):
         SignApkTask.setup_default_config(temp.name)
 
   def test_render_args(self):
@@ -88,7 +88,7 @@ class SignApkTest(TestAndroidBase):
                          '-storepass', 'keystore_password',
                          '-keypass', 'key_password',
                          '-signedjar']
-        expected_args.extend(['{0}/{1}.{2}.signed.apk'.format(temp, target.app_name,
+        expected_args.extend(['{0}/{1}.{2}.signed.apk'.format(temp, target.manifest.package_name,
                                                               fake_key.build_type)])
         expected_args.extend(['unsigned_apk_product', 'key_alias'])
         self.assertEquals(expected_args, task._render_args(target, fake_key, 'unsigned_apk_product',

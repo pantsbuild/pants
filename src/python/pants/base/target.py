@@ -5,13 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 from hashlib import sha1
 
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Addresses, SyntheticAddress
+from pants.base.address import Address, Addresses, BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -21,6 +22,11 @@ from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.source_root import SourceRoot
 from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
+from pants.option.custom_types import dict_option
+from pants.subsystem.subsystem import Subsystem
+
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractTarget(object):
@@ -120,14 +126,50 @@ class Target(AbstractTarget):
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses"""
 
-  class UnknownArguments(TargetDefinitionException):
-    """Unknown keyword arguments supplied to Target."""
-
   class IllegalArgument(TargetDefinitionException):
     """Argument that isn't allowed supplied to Target."""
 
+  class UnknownArguments(Subsystem):
+    """Subsystem for validating unknown keyword arguments."""
+
+    class Error(TargetDefinitionException):
+      """Unknown keyword arguments supplied to Target."""
+
+    options_scope = 'unknown-arguments'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--ignored', advanced=True, type=dict_option,
+               help='Map of target name to a list of keyword arguments that should be ignored if a '
+                    'target receives them unexpectedly. Typically used to allow usage of arguments '
+                    'in BUILD files that are not yet available in the current version of pants.')
+
+    @classmethod
+    def check(cls, target, kwargs):
+      cls.global_instance().check_unknown(target, kwargs)
+
+    def check_unknown(self, target, kwargs):
+      ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
+      unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
+      if ignored_args:
+        logger.debug('{target} ignoring the unimplemented arguments: {args}'
+                     .format(target=target.address.spec,
+                             args=', '.join('{} = {}'.format(key, val)
+                                            for key, val in ignored_args.items())))
+      if unknown_args:
+        error_message = '{target_type} received unknown arguments: {args}'
+        raise self.Error(target.address.spec, error_message.format(
+          target_type=type(target).__name__,
+          args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
+        ))
+
+  @classmethod
+  def subsystems(cls):
+    return super(Target, cls).subsystems() + (cls.UnknownArguments,)
+
   LANG_DISCRIMINATORS = {
-    'java':   lambda t: t.is_jvm,
+    'java': lambda t: t.is_jvm,
     'python': lambda t: t.is_python,
   }
 
@@ -148,6 +190,7 @@ class Target(AbstractTarget):
   @classmethod
   def get_addressable_type(target_cls):
     class ConcreteTargetAddressable(TargetAddressable):
+
       @classmethod
       def get_target_type(cls):
         return target_cls
@@ -210,13 +253,25 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
-
     if kwargs:
-      error_message = '{target_type} received unknown arguments: {args}'
-      raise self.UnknownArguments(address.spec, error_message.format(
-        target_type=type(self).__name__,
-        args=''.join('\n  {} = {}'.format(key, value) for key, value in kwargs.items())
-      ))
+      self.UnknownArguments.check(self, kwargs)
+
+  @property
+  def type_alias(self):
+    """Returns the type alias this target was constructed via.
+
+    For a target read from a BUILD file, this will be target alias, like 'java_library'.
+    For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
+
+    The end result is that the type alias should be the most natural way to refer to this target's
+    type to the author of the target instance.
+
+    :rtype: string
+    """
+    if isinstance(self.address, BuildFileAddress):
+      return self.address.type_alias
+    else:
+      return type(self).__name__
 
   @property
   def tags(self):
@@ -266,6 +321,7 @@ class Target(AbstractTarget):
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
       hasher = sha1()
+
       def dep_hash_iter():
         for dep in self.dependencies:
           dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy)
@@ -292,6 +348,7 @@ class Target(AbstractTarget):
 
   def inject_dependency(self, dependency_address):
     self._build_graph.inject_dependency(dependent=self.address, dependency=dependency_address)
+
     def invalidate_dependee(dependee):
       dependee.mark_transitive_invalidation_hash_dirty()
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
@@ -492,14 +549,13 @@ class Target(AbstractTarget):
         raise self.WrongNumberOfAddresses(
           "Expected a single address to from_target() as argument to {spec}"
           .format(spec=address.spec))
-      referenced_address = SyntheticAddress.parse(sources.addresses[0],
-                                                  relative_to=sources.rel_path)
+      referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
     elif isinstance(sources, FilesetWithSpec):
       filespec = sources.filespec
     else:
       sources = sources or []
       assert_list(sources, key_arg=key_arg)
-      filespec = {'globs' : [os.path.join(sources_rel_path, src) for src in (sources or [])]}
+      filespec = {'globs': [os.path.join(sources_rel_path, src) for src in (sources or [])]}
 
     return SourcesField(sources=sources, sources_rel_path=sources_rel_path, filespec=filespec)

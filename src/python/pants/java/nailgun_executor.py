@@ -12,7 +12,9 @@ import re
 import select
 import threading
 import time
-from collections import namedtuple
+
+from six import string_types
+from twitter.common.collections import maybe_list
 
 from six import string_types
 from twitter.common.collections import maybe_list
@@ -36,11 +38,11 @@ class NailgunProcessGroup(ProcessGroup):
 
   def _iter_nailgun_instances(self, everywhere=False):
     def predicate(proc):
-      if proc.name == b'java':
+      if proc.name() == NailgunExecutor._PROCESS_NAME:
         if not everywhere:
-          return NailgunExecutor._PANTS_NG_ARG in proc.cmdline
+          return NailgunExecutor._PANTS_NG_ARG in proc.cmdline()
         else:
-          return any(arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX) for arg in proc.cmdline)
+          return any(arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX) for arg in proc.cmdline())
 
     return self.iter_instances(predicate)
 
@@ -77,11 +79,12 @@ class NailgunExecutor(Executor, ProcessManager):
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _SELECT_WAIT = 1
+  _PROCESS_NAME = b'java'
 
-  def __init__(self, identity, workdir, nailgun_classpath, distribution=None, ins=None,
+  def __init__(self, identity, workdir, nailgun_classpath, distribution, ins=None,
                connect_timeout=10, connect_attempts=5):
     Executor.__init__(self, distribution=distribution)
-    ProcessManager.__init__(self, name=identity)
+    ProcessManager.__init__(self, name=identity, process_name=self._PROCESS_NAME)
 
     if not isinstance(workdir, string_types):
       raise ValueError('Workdir must be a path string, not: {workdir}'.format(workdir=workdir))
@@ -107,7 +110,8 @@ class NailgunExecutor(Executor, ProcessManager):
   @property
   def fingerprint(self):
     """This provides the nailgun fingerprint of the running process otherwise None."""
-    return self._parse_fingerprint(self.as_process().cmdline)
+    if self.cmdline:
+      return self._parse_fingerprint(self.cmdline)
 
   def _create_owner_arg(self, workdir):
     # Currently the owner is identified via the full path to the workdir.
@@ -160,7 +164,12 @@ class NailgunExecutor(Executor, ProcessManager):
   def _check_nailgun_state(self, new_fingerprint):
     running = self.is_alive()
     updated = running and (self.fingerprint != new_fingerprint or
-                           self.exe != self._distribution.java)
+                           self.cmd != self._distribution.java)
+    logging.debug('Nailgun {nailgun} state: updated={up!s} running={run!s} fingerprint={old_fp} '
+                  'new_fingerprint={new_fp} distribution={old_dist} new_distribution={new_dist}'
+                  .format(nailgun=self._identity, up=updated, run=running,
+                          old_fp=self.fingerprint, new_fp=new_fingerprint,
+                          old_dist=self.cmd, new_dist=self._distribution.java))
     return running, updated
 
   def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
@@ -173,7 +182,8 @@ class NailgunExecutor(Executor, ProcessManager):
       running, updated = self._check_nailgun_state(new_fingerprint)
 
       if running and updated:
-        logger.debug('Killing ng server {server!r}'.format(server=self))
+        logger.debug('Found running nailgun server that needs updating, killing {server}'
+                     .format(server=self._identity))
         self.terminate()
 
       if (not running) or (running and updated):
@@ -223,8 +233,6 @@ class NailgunExecutor(Executor, ProcessManager):
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Synchronously spawn a new nailgun server."""
-    logger.debug('No nailgun server found with fingerprint {f}, spawning...'.format(f=fingerprint))
-
     # Truncate the nailguns stdout & stderr.
     self._write_file(self._ng_stdout, '')
     self._write_file(self._ng_stderr, '')

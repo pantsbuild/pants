@@ -10,10 +10,10 @@ import textwrap
 
 from twitter.common.confluence import Confluence, ConfluenceError
 
-from pants import binary_util
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+from pants.binaries import binary_util
 from pants.util.dirutil import safe_open
 
 
@@ -99,7 +99,7 @@ class ConfluencePublish(Task):
     ''').strip().format(address, content)
 
     pageopts = dict(
-      versionComment = 'updated by pants!'
+      versionComment='updated by pants!'
     )
     wiki = self.login()
     existing = wiki.getpage(space, title)

@@ -8,15 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, deque
+from contextlib import contextmanager
 
 from pants.backend.core.tasks.task import Task, TaskBase
 from pants.base.build_graph import invert_dependencies
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.goal import Goal
-from pants.option.scope import ScopeInfo
 
 
 class GroupMember(TaskBase):
+
   @classmethod
   def name(cls):
     """Returns a name for this group for display purposes.
@@ -62,6 +63,18 @@ class GroupMember(TaskBase):
     ``execute_chunk`` round by some group member - possibly this one.
 
     :param list targets: A list of targets that should be processed together (ie: 1 chunk)
+    """
+
+  def finalize_execute(self, chunks):
+    """Finalize execution of the group action across the given target chunks
+
+    Only called if chunks have been selected by this group member.
+
+    Chunks are guaranteed to be presented in least dependent to most dependent order and to contain
+    only directly or indirectly invalidated targets.
+
+    :param list chunks: A list of chunks, each chunk being a list of targets that should be
+      processed together.
     """
 
   def post_execute(self):
@@ -231,6 +244,11 @@ class GroupTask(Task):
         _MEMBER_TYPES = []
 
         @classmethod
+        def subsystem_dependencies(cls):
+          return (super(SingletonGroupTask, cls).subsystem_dependencies() +
+                  tuple(s for mt in cls._member_types() for s in mt.subsystem_dependencies()))
+
+        @classmethod
         def global_subsystems(cls):
           return (super(SingletonGroupTask, cls).global_subsystems() +
             tuple(s for mt in cls._member_types() for s in mt.global_subsystems()))
@@ -254,9 +272,9 @@ class GroupTask(Task):
           # We need this because task.py initializes a cache factory for every task type,
           # even if it's never used. This is slightly icky, but is better than forcing tasks
           # to explicitly call a cache setup method. And we want to kill GroupTask anyway.
-          yield ScopeInfo(cls.options_scope, ScopeInfo.TASK)
+          yield cls.get_scope_info()
           for subsystem in cls.task_subsystems():
-            yield ScopeInfo(subsystem.subscope(cls.options_scope), ScopeInfo.TASK_SUBSYSTEM)
+            yield subsystem.get_scope_info(subscope=cls.options_scope)
 
           for member_type in cls._member_types():
             for scope in member_type.known_scope_infos():
@@ -333,9 +351,19 @@ class GroupTask(Task):
     """GroupTask must be sub-classed to provide a group name."""
 
   def execute(self):
-    with self.context.new_workunit(name=self.group_name, labels=[WorkUnit.GROUP]):
+
+    @contextmanager
+    def workunit_for(group_member, desc):
+      log_config = WorkUnit.LogConfig(
+        level=group_member.get_options().level, colors=group_member.get_options().colors)
+      with self.context.new_workunit(name='{}-{}'.format(group_member.name(), desc),
+                                     log_config=log_config) as workunit:
+        yield workunit
+
+    with self.context.new_workunit(name=self.group_name, labels=[WorkUnitLabel.GROUP]):
       for group_member in self._group_members:
-        group_member.pre_execute()
+        with workunit_for(group_member, 'pre'):
+          group_member.pre_execute()
 
       # TODO(John Sirois): implement group-level invalidation? This might be able to be done in
       # prepare_execute though by members.
@@ -355,12 +383,20 @@ class GroupTask(Task):
 
       # prep
       for group_member, chunks in chunks_by_member.items():
-        group_member.prepare_execute(chunks)
+        with workunit_for(group_member, 'prepare'):
+          group_member.prepare_execute(chunks)
 
       # chunk zig zag
       for group_member, chunk in ordered_chunks:
-        group_member.execute_chunk(chunk)
+        with workunit_for(group_member, 'execute'):
+          group_member.execute_chunk(chunk)
 
       # finalize
+      for group_member, chunks in chunks_by_member.items():
+        with workunit_for(group_member, 'finalize'):
+          group_member.finalize_execute(chunks)
+
+      # complete
       for group_member in self._group_members:
-        group_member.post_execute()
+        with workunit_for(group_member, 'post'):
+          group_member.post_execute()

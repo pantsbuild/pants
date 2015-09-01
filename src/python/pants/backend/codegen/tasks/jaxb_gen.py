@@ -15,7 +15,7 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_mkdir
 
 
@@ -34,7 +34,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
       self.gen_langs.add(lang)
 
   def _compile_schema(self, args):
-    classpath = Distribution.cached(jdk=True).find_libs(['tools.jar'])
+    classpath = DistributionLocator.cached(jdk=True).find_libs(['tools.jar'])
     java_main = 'com.sun.tools.internal.xjc.Driver'
     return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
@@ -78,7 +78,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.JaxbGlobalCodegenStrategy,]
+    return [cls.IsolatedCodegenStrategy, cls.JaxbGlobalCodegenStrategy]
 
   def sources_generated_by_target(self, target):
     to_generate = []
@@ -141,7 +141,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     outdir = package.replace('.', '/')
     return [os.path.join(outdir, '{}.java'.format(name)) for name in names]
 
-
   class JaxbGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
+
     def find_sources(self, target):
       return self._task.sources_generated_by_target(target)

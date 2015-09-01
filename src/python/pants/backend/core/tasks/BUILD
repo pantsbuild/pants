@@ -52,6 +52,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
+    'src/python/pants/help',
     'src/python/pants/option',
     ],
   )
@@ -94,10 +95,11 @@ python_library(
   name = 'confluence_publish',
   sources = ['confluence_publish.py'],
   dependencies = [
-    ':common',
     '3rdparty/python/twitter/commons:twitter.common.confluence',
+    ':task',
     'src/python/pants/backend/core/targets:common',
-    'src/python/pants:binary_util',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -201,8 +203,8 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
-    'src/python/pants:binary_util',
   ],
 )
 
@@ -246,8 +248,8 @@ python_library(
     ':task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/reporting',
-    'src/python/pants:binary_util',
   ],
 )
 
@@ -262,6 +264,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
+    'src/python/pants/help',
     'src/python/pants/option',
   ],
 )
@@ -332,8 +335,8 @@ python_library(
     'src/python/pants/cache',
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
-    'src/python/pants/option',
     'src/python/pants/reporting',
+    'src/python/pants/subsystem',
     'src/python/pants/util:meta',
   ],
 )
@@ -345,7 +348,7 @@ python_library(
     ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:lazy_source_mapper',
+    'src/python/pants/base:source_mapper',
     'src/python/pants/goal:workspace',
   ],
 )

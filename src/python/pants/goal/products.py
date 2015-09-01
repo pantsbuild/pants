@@ -10,12 +10,15 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.util.dirutil import fast_relpath
+
 
 class ProductError(Exception): pass
 
 
 class UnionProducts(object):
   """Here, products for a target are the ordered union of the products for its transitive deps."""
+
   def __init__(self):
     # A map of target to OrderedSet of product members.
     self._products_by_target = defaultdict(OrderedSet)
@@ -30,17 +33,26 @@ class UnionProducts(object):
     for target in targets:
       self.add_for_target(target, products)
 
-  def get_for_target(self, target):
-    """Gets the transitive product deps for the given target."""
-    return self.get_for_targets([target])
+  def remove_for_target(self, target, products):
+    """Updates the products for a particular target, removing the given existing entries."""
+    for product in products:
+      self._products_by_target[target].discard(product)
 
-  def get_for_targets(self, targets):
+  def get_for_target(self, target, transitive=True):
+    """Gets the transitive product deps for the given target."""
+    return self.get_for_targets([target], transitive=transitive)
+
+  def get_for_targets(self, targets, transitive=True):
     """Gets the transitive product deps for the given targets, in order."""
     products = OrderedSet()
     visited = set()
     # Walk the targets transitively to aggregate their products. We do a breadth-first
     for target in targets:
-      for dep in target.closure(bfs=True):
+      if transitive:
+        deps = target.closure(bfs=True)
+      else:
+        deps = [target]
+      for dep in deps:
         if dep not in visited:
           products.update(self._products_by_target[dep])
           visited.add(dep)
@@ -65,15 +77,14 @@ class RootedProducts(object):
   """File products of a build that have a concept of a 'root' directory.
 
   E.g., classfiles, under a root package directory."""
+
   def __init__(self, root):
     self._root = root
     self._rel_paths = OrderedSet()
 
   def add_abs_paths(self, abs_paths):
     for abs_path in abs_paths:
-      if not abs_path.startswith(self._root):
-        raise Exception('{} is not under {}'.format(abs_path, self._root))
-      self._rel_paths.add(os.path.relpath(abs_path, self._root))
+      self._rel_paths.add(fast_relpath(abs_path, self._root))
 
   def add_rel_paths(self, rel_paths):
     self._rel_paths.update(rel_paths)
@@ -96,6 +107,7 @@ class RootedProducts(object):
 
 class MultipleRootedProducts(object):
   """A product consisting of multiple roots, with associated file products."""
+
   def __init__(self):
     self._rooted_products_by_root = {}
 

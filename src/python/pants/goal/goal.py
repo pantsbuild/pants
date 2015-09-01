@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.goal.error import GoalError
-from pants.option.scope import ScopeInfo
 
 
 class Goal(object):
@@ -156,8 +155,9 @@ class _Goal(object):
 
   def known_scope_infos(self):
     """Yields ScopeInfos for all known scopes under this goal."""
-    yield ScopeInfo(self.name, ScopeInfo.GOAL)
-    # Yield scopes for tasks in this goal.
+    # Note that we don't yield the goal's own scope. We don't need it (as we don't register
+    # options on it), and it's needlessly confusing when a task has the same name as its goal,
+    # in which case we shorten its scope to the goal's scope (e.g., idea.idea -> idea).
     for task_type in self.task_types():
       for scope_info in task_type.known_scope_infos():
         yield scope_info
@@ -166,8 +166,7 @@ class _Goal(object):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""
     ret = set()
     for task_type in self.task_types():
-      ret.update(task_type.global_subsystems())
-      ret.update(task_type.task_subsystems())
+      ret.update([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()])
     return ret
 
   def ordered_task_names(self):

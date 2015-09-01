@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -65,7 +65,7 @@ class ScalaLibrary(ExportableJvmLibrary):
   @property
   def java_sources(self):
     for spec in self._java_sources_specs:
-      address = SyntheticAddress.parse(spec, relative_to=self.address.spec_path)
+      address = Address.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(address)
       if target is None:
         raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))

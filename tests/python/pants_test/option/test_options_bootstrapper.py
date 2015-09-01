@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import temporary_file
+from pants.util.contextutil import temporary_file, temporary_file_path
 
 
 class BootstrapOptionsTest(unittest.TestCase):
@@ -39,6 +39,7 @@ class BootstrapOptionsTest(unittest.TestCase):
   def test_bootstrap_option_values(self):
     # Check all defaults.
     buildroot = get_buildroot()
+
     def br(path):
       # Returns the full path of the given path under the buildroot.
       return '{}/{}'.format(buildroot, path)
@@ -121,6 +122,28 @@ class BootstrapOptionsTest(unittest.TestCase):
       opts.register('fruit', '--apple')
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)
     self.assertEquals('/pear/banana', opts.for_scope('fruit').apple)
+
+  def test_full_options_caching(self):
+    with temporary_file_path() as config:
+      bootstrapper = OptionsBootstrapper(env={}, configpath=config, args=[])
+
+      opts1 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL),
+                                                               ScopeInfo('foo', ScopeInfo.TASK)])
+      opts2 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('foo', ScopeInfo.TASK),
+                                                               ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIs(opts1, opts2)
+
+      opts3 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL),
+                                                               ScopeInfo('foo', ScopeInfo.TASK),
+                                                               ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIs(opts1, opts3)
+
+      opts4 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIsNot(opts1, opts4)
+
+      opts5 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIs(opts4, opts5)
+      self.assertIsNot(opts1, opts5)
 
   def test_bootstrap_short_options(self):
     def parse_options(*args):

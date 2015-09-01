@@ -22,6 +22,7 @@ from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open
 
 
 class Version(object):
+
   def __init__(self, text):
     self._components = map(int, text.split('.'))
 
@@ -34,6 +35,7 @@ class Version(object):
 
 
 class VersionTest(unittest.TestCase):
+
   def test_equal(self):
     self.assertEqual(Version('1'), Version('1.0.0.0'))
     self.assertEqual(Version('1.0'), Version('1.0.0.0'))
@@ -65,6 +67,7 @@ def git_version():
 
 @pytest.mark.skipif("git_version() < Version('1.7.10')")
 class GitTest(unittest.TestCase):
+
   @staticmethod
   def init_repo(remote_name, remote):
     subprocess.check_call(['git', 'init'])
@@ -145,22 +148,24 @@ class GitTest(unittest.TestCase):
   def test_listdir(self):
     reader = self.git.repo_reader(self.initial_rev)
 
-    results = reader.listdir('.')
-    self.assertEquals(['README',
-                       'dir',
-                       'link-to-dir',
-                       'loop1',
-                       'loop2',
-                       'not-a-dir'],
-                      sorted(results))
+    for dirname in '.', './.':
+      results = reader.listdir(dirname)
+      self.assertEquals(['README',
+                         'dir',
+                         'link-to-dir',
+                         'loop1',
+                         'loop2',
+                         'not-a-dir'],
+                        sorted(results))
 
-    results = reader.listdir('dir')
-    self.assertEquals(['f',
-                       'not-absolute\u2764'.encode('utf-8'),
-                       'relative-dotdot',
-                       'relative-nonexistent',
-                       'relative-symlink'],
-                      sorted(results))
+    for dirname in 'dir', './dir':
+      results = reader.listdir('dir')
+      self.assertEquals(['f',
+                         'not-absolute\u2764'.encode('utf-8'),
+                         'relative-dotdot',
+                         'relative-nonexistent',
+                         'relative-symlink'],
+                        sorted(results))
 
     results = reader.listdir('link-to-dir')
     self.assertEquals(['f',
@@ -513,6 +518,7 @@ class GitTest(unittest.TestCase):
 
 
 class DetectWorktreeFakeGitTest(unittest.TestCase):
+
   @contextmanager
   def empty_path(self):
     with temporary_dir() as path:

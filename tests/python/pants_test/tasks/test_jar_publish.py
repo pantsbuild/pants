@@ -29,6 +29,7 @@ from pants_test.testutils.compile_strategy_utils import set_compile_strategies
 
 
 class JarPublishTest(TaskTestBase):
+
   @classmethod
   def task_type(cls):
     return JarPublish
@@ -257,11 +258,14 @@ class JarPublishTest(TaskTestBase):
     r = map(lambda x: TemplateData(classifier=x), ['a', 'b', 'c'])
     self.assertEquals(r, c)
 
+
 class FailNTimes:
+
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries
     self.exc_type = exc_type
     self.success = success
+
   def __call__(self, *args, **kwargs):
     self.tries -= 1
     if self.tries >= 0:
@@ -269,7 +273,9 @@ class FailNTimes:
     else:
       return self.success
 
+
 class FailNTimesTest(unittest.TestCase):
+
   def test_fail_n_times(self):
     with self.assertRaises(ValueError):
       foo = Mock()

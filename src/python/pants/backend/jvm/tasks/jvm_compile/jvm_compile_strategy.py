@@ -20,29 +20,6 @@ class JvmCompileStrategy(object):
   """An abstract base strategy for JVM compilation."""
 
   __metaclass__ = ABCMeta
-
-  class CompileContext(object):
-    """A context for the compilation of a target.
-
-    This can be used to differentiate between a partially completed compile in a temporary location
-    and a finalized compile in its permanent location.
-    """
-    def __init__(self, target, analysis_file, classes_dir, sources):
-      self.target = target
-      self.analysis_file = analysis_file
-      self.classes_dir = classes_dir
-      self.sources = sources
-
-    @property
-    def _id(self):
-      return (self.target, self.analysis_file, self.classes_dir)
-
-    def __eq__(self, other):
-      return self._id == other._id
-
-    def __hash__(self):
-      return hash(self._id)
-
   # Common code.
   # ------------
   @staticmethod
@@ -55,14 +32,15 @@ class JvmCompileStrategy(object):
 
   @classmethod
   @abstractmethod
-  def register_options(cls, register, language, supports_concurrent_execution):
+  def register_options(cls, register, compile_task_name, supports_concurrent_execution):
     """Registration for strategy-specific options.
 
     The abstract base class does not register any options itself: those are left to JvmCompile.
     """
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
-    self._language = language
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name,
+               sources_predicate):
+    self._compile_task_name = compile_task_name
     self.context = context
     self._analysis_tools = analysis_tools
 
@@ -155,6 +133,10 @@ class JvmCompileStrategy(object):
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
 
+  def finalize_compile(self, relevant_targets):
+    """Executed once after all targets have been compiled."""
+    pass
+
   def class_name_for_class_file(self, compile_context, class_file_name):
     if not class_file_name.endswith(".class"):
       return None
@@ -243,3 +225,11 @@ class JvmCompileStrategy(object):
         lambda: safe_rmtree(analysis_tmpdir))
     safe_mkdir(analysis_tmpdir)
     return analysis_tmpdir
+
+  @abstractmethod
+  def parse_deps(self, classpath, compile_context):
+    """Parses the actual source dependencies of compile_context.target given a classpath.
+
+    The returned source dependencies may be either absolute filepaths, or relative filepaths.
+    """
+    pass

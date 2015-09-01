@@ -15,7 +15,6 @@ from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
-from pants.java.distribution.distribution import Distribution
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import relativize_paths
 from pants.util.meta import AbstractClass
@@ -38,6 +37,9 @@ class Executor(AbstractClass):
 
   class Error(Exception):
     """Indicates an error launching a java program."""
+
+  class InvalidDistribution(ValueError):
+    """Indicates an invalid Distribution was used to construct this runner."""
 
   class Runner(object):
     """A re-usable executor that can run a configured java command line."""
@@ -67,19 +69,15 @@ class Executor(AbstractClass):
       :param string cwd: optionally set the working directory
       """
 
-  def __init__(self, distribution=None):
+  def __init__(self, distribution):
     """Constructs an Executor that can be used to launch java programs.
 
-    :param distribution: an optional validated java distribution to use when launching java
-      programs
+    :param distribution: a validated java distribution to use when launching java programs.
     """
-    if distribution:
-      if not isinstance(distribution, Distribution):
-        raise ValueError('A valid distribution is required, given: {}'.format(distribution))
-      distribution.validate()
-    else:
-      distribution = Distribution.cached()
-
+    if not hasattr(distribution, 'java') or not hasattr(distribution, 'validate'):
+      raise self.InvalidDistribution('A valid distribution is required, given: {}'
+                                     .format(distribution))
+    distribution.validate()
     self._distribution = distribution
 
   @property
@@ -124,7 +122,7 @@ class Executor(AbstractClass):
 
 class CommandLineGrabber(Executor):
   """Doesn't actually execute anything, just captures the cmd line."""
-  def __init__(self, distribution=None):
+  def __init__(self, distribution):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
@@ -174,7 +172,7 @@ class SubprocessExecutor(Executor):
     with environment_as(**cls._SCRUBBED_ENV):
       yield
 
-  def __init__(self, distribution=None):
+  def __init__(self, distribution):
     super(SubprocessExecutor, self).__init__(distribution=distribution)
     self._buildroot = get_buildroot()
 

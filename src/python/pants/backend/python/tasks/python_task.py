@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 import shutil
 import tempfile
@@ -20,6 +21,9 @@ from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.base import hash_utils
 from pants.base.exceptions import TaskError
+from pants.binaries.thrift_binary import ThriftBinary
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.ivy.ivy_subsystem import IvySubsystem
 
 
 class PythonTask(Task):
@@ -28,7 +32,11 @@ class PythonTask(Task):
 
   @classmethod
   def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + (PythonSetup, PythonRepos)
+    return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
+
+  @classmethod
+  def task_subsystems(cls):
+    return super(PythonTask, cls).task_subsystems() + (ThriftBinary.Factory,)
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
@@ -69,7 +77,7 @@ class PythonTask(Task):
     for target in targets:
       if target.is_python and hasattr(target, 'compatibility') and target.compatibility:
         targets_with_compatibilities.append(target)
-        compatible_with_target = list(self.interpreter_cache.matches(target.compatibility))
+        compatible_with_target = list(self.interpreter_cache.matched_interpreters(target.compatibility))
         allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
@@ -87,7 +95,7 @@ class PythonTask(Task):
   def select_interpreter(self, filters):
     """Subclasses can use this to be more specific about interpreter selection."""
     interpreters = self.interpreter_cache.select_interpreter(
-      list(self.interpreter_cache.matches(filters)))
+      list(self.interpreter_cache.matched_interpreters(filters)))
     if len(interpreters) != 1:
       raise TaskError('Unable to detect a suitable interpreter.')
     interpreter = interpreters[0]
@@ -97,6 +105,25 @@ class PythonTask(Task):
   @property
   def chroot_cache_dir(self):
     return PythonSetup.global_instance().chroot_cache_dir
+
+  @property
+  def ivy_bootstrapper(self):
+    return Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
+
+  @property
+  def thrift_binary_factory(self):
+    return ThriftBinary.Factory.scoped_instance(self).create
+
+  def create_chroot(self, interpreter, builder, targets, platforms, extra_requirements):
+    return PythonChroot(python_setup=PythonSetup.global_instance(),
+                        python_repos=PythonRepos.global_instance(),
+                        ivy_bootstrapper=self.ivy_bootstrapper,
+                        thrift_binary_factory=self.thrift_binary_factory,
+                        interpreter=interpreter,
+                        builder=builder,
+                        targets=targets,
+                        platforms=platforms,
+                        extra_requirements=extra_requirements)
 
   @contextmanager
   def cached_chroot(self, interpreter, pex_info, targets, platforms,
@@ -114,8 +141,8 @@ class PythonTask(Task):
     # The process of building a pex modifies it further.
     pex_info = pex_info or PexInfo.default()
 
-    path = self._chroot_path(PythonSetup.global_instance(), interpreter, pex_info, targets,
-                             platforms, extra_requirements, executable_file_content)
+    path = self._chroot_path(interpreter, pex_info, targets, platforms, extra_requirements,
+                             executable_file_content)
     if not os.path.exists(path):
       path_tmp = path + '.tmp'
       self._build_chroot(path_tmp, interpreter, pex_info, targets, platforms,
@@ -126,11 +153,8 @@ class PythonTask(Task):
     # created when that pex was built.
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
-    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
-    chroot = PythonChroot(
-      context=self.context,
-      python_setup=PythonSetup.global_instance(),
-      python_repos=PythonRepos.global_instance(),
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
+    chroot = self.create_chroot(
       interpreter=interpreter,
       builder=builder,
       targets=targets,
@@ -154,12 +178,9 @@ class PythonTask(Task):
   def _build_chroot(self, path, interpreter, pex_info, targets, platforms,
                      extra_requirements=None, executable_file_content=None):
     """Create a PythonChroot with the specified args."""
-    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info)
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
     with self.context.new_workunit('chroot'):
-      chroot = PythonChroot(
-        context=self.context,
-        python_setup=PythonSetup.global_instance(),
-        python_repos=PythonRepos.global_instance(),
+      chroot = self.create_chroot(
         interpreter=interpreter,
         builder=builder,
         targets=targets,
@@ -176,8 +197,8 @@ class PythonTask(Task):
       builder.freeze()
     return chroot
 
-  def _chroot_path(self, python_setup, interpreter, pex_info, targets, platforms,
-                   extra_requirements, executable_file_content):
+  def _chroot_path(self, interpreter, pex_info, targets, platforms, extra_requirements,
+                   executable_file_content):
     """Pick a unique, well-known directory name for the chroot with the specified parameters.
 
     TODO: How many of these do we expect to have? Currently they are all under a single
@@ -185,13 +206,25 @@ class PythonTask(Task):
     entries well. GC'ing old chroots may be enough of a solution, assuming this is even a problem.
     """
     fingerprint_components = [str(interpreter.identity)]
+
     if pex_info:
-      fingerprint_components.append(pex_info.dump())
-    fingerprint_components.extend(filter(None, [t.payload.fingerprint() for t in targets]))
+      # TODO(John Sirois): When https://rbcommons.com/s/twitter/r/2517/ lands, leverage the dump
+      # **kwargs to sort keys or else find some other better way to get a stable fingerprint of
+      # PexInfo.
+      fingerprint_components.append(json.dumps(json.loads(pex_info.dump()), sort_keys=True))
+
+    fingerprint_components.extend(sorted(t.transitive_invalidation_hash() for t in set(targets)))
+
     if platforms:
-      fingerprint_components.extend(platforms)
+      fingerprint_components.extend(sorted(set(platforms)))
+
     if extra_requirements:
-      fingerprint_components.extend([r.cache_key() for r in extra_requirements])
+      # TODO(John Sirois): The extras should be uniqified before fingerprinting, but
+      # PythonRequirement arguably does not have a proper __eq__.  For now we lean on the cache_key
+      # of unique PythonRequirement being unique - which is probably good enough (the cache key is
+      # narrower than the full scope of PythonRequirement attributes at present, thus the hedge).
+      fingerprint_components.extend(sorted(set(r.cache_key() for r in extra_requirements)))
+
     if executable_file_content is not None:
       fingerprint_components.append(executable_file_content)
 

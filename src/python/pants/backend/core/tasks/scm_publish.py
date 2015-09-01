@@ -10,11 +10,12 @@ import traceback
 from abc import abstractmethod
 
 from pants.base.exceptions import TaskError
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.scm.scm import Scm
 
 
 class Version(object):
+
   @staticmethod
   def parse(version):
     """Attempts to parse the given string as Semver, then falls back to Namedver."""
@@ -61,6 +62,7 @@ class Namedver(Version):
 
 
 class Semver(Version):
+
   @staticmethod
   def parse(version):
     components = version.split('.', 3)
@@ -140,9 +142,9 @@ class ScmPublishMixin(object):
     super(ScmPublishMixin, cls).register_options(register)
     register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
              help='Try pushing the pushdb to the SCM this many times before aborting.')
-    register('--restrict-push-branches', advanced=True, type=Options.list,
+    register('--restrict-push-branches', advanced=True, type=list_option,
              help='Allow pushes only from one of these branches.')
-    register('--restrict-push-urls', advanced=True, type=Options.list,
+    register('--restrict-push-urls', advanced=True, type=list_option,
              help='Allow pushes to only one of these urls.')
 
   @property
@@ -218,7 +220,7 @@ class ScmPublishMixin(object):
       try:
         log.debug("Trying scm push")
         scm.push()
-        break # success
+        break  # success
       except Scm.RemoteException as scm_exception:
         log.debug("Scm push failed, trying to refresh.")
         # This might fail in the event that there is a real conflict, throwing

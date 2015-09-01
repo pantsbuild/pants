@@ -11,14 +11,14 @@ import time
 from collections import defaultdict
 from textwrap import dedent
 
-from pants import binary_util
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.goal.products import UnionProducts
+from pants.binaries import binary_util
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
@@ -40,6 +40,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
     register('--override', action='append',
+             fingerprint=True,
              help='Specifies a jar dependency override in the form: '
              '[org]#[name]=(revision|url) '
              'Multiple overrides can be specified using repeated invocations of this flag. '
@@ -53,10 +54,12 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                   'in a browser (implies --report)')
     register('--outdir', help='Emit ivy report outputs in to this directory.')
     register('--args', action='append',
+             fingerprint=True,
              help='Pass these extra args to ivy.')
     register('--confs', action='append', default=['default'],
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--mutable-pattern',
+             fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
     cls.register_jvm_tool(register, 'xalan')
@@ -111,8 +114,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     targets = self.context.targets()
     self.context.products.safe_create_data('ivy_cache_dir', lambda: self._cachedir)
     compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       lambda: UnionProducts())
-
+                                                       lambda: ClasspathProducts())
+    compile_classpath.add_excludes_for_targets(targets)
     # After running ivy, we parse the resulting report, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
     _, resolve_hash_name = self.ivy_resolve(
@@ -139,21 +142,20 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       )
       # Build the symlink_map product
       ivy_info = ivy_info_list[0]
-      jar_library_targets = [ t  for t in targets if isinstance(t, JarLibrary) ]
+      jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
-        artifact_paths = []
-        for artifact in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
-          if artifact.path in symlink_map:
-            key = artifact.path
+        for artifact_location in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
+          if artifact_location in symlink_map:
+            key = artifact_location
           else:
-            key = os.path.realpath(artifact.path)
+            key = os.path.realpath(artifact_location)
           if key not in symlink_map:
             raise self.UnresolvedJarError(
               'Jar {artifact} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
-              spec=target.address.spec, artifact=artifact, conf=conf))
-          artifact_paths.append(symlink_map[key])
-        compile_classpath.add_for_target(target, [(conf, entry) for entry in artifact_paths])
+              spec=target.address.spec, artifact=artifact_location, conf=conf))
+          artifact_location = symlink_map[key]
+          compile_classpath.add_for_target(target, [(conf, artifact_location)])
 
     if self._report:
       self._generate_ivy_report(resolve_hash_name)

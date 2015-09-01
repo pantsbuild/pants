@@ -6,6 +6,7 @@ python_library(
   sources = ['address.py'],
   dependencies = [
     ':build_file',
+    'src/python/pants/base:deprecated',
     'src/python/pants/util:meta',
   ]
 )
@@ -203,10 +204,11 @@ python_library(
 )
 
 python_library(
-  name = 'lazy_source_mapper',
-  sources = ['lazy_source_mapper.py'],
+  name = 'source_mapper',
+  sources = ['source_mapper.py'],
   dependencies = [
     ':build_environment',
+    ':payload_field',
   ]
 )
 
@@ -287,12 +289,14 @@ python_library(
     ':build_environment',
     ':fingerprint_strategy',
     ':hash_utils',
-    ':lazy_source_mapper',
     ':payload',
     ':payload_field',
+    ':source_mapper',
     ':source_root',
     ':target_addressable',
     'src/python/pants/backend/core:wrapped_globs',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
   ],
 )
 
@@ -302,7 +306,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':addressable',
-    ':deprecated',
     ':exceptions',
   ],
 )
@@ -322,6 +325,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/rwbuf',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

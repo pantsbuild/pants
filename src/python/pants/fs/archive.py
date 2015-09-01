@@ -20,6 +20,7 @@ from pants.util.strutil import ensure_text
 
 
 class Archiver(AbstractClass):
+
   @classmethod
   def extract(cls, path, outdir):
     """Extracts an archive's contents to the specified outdir."""
@@ -121,3 +122,22 @@ def archiver(typename):
   if not archiver:
     raise ValueError('No archiver registered for {!r}'.format(typename))
   return archiver
+
+
+def archiver_for_path(path_name):
+  """Returns an Archiver for the given path name.
+
+  :param string path_name: The path name of the archive - need not exist.
+  :raises: :class:`ValueError` If the path name does not uniquely identify a supported archive type.
+  """
+  if path_name.endswith('.tar.gz'):
+    return TGZ
+  elif path_name.endswith('.tar.bz2'):
+    return TBZ2
+  else:
+    _, ext = os.path.splitext(path_name)
+    if ext:
+      ext = ext[1:]  # Trim leading '.'.
+    if not ext:
+      raise ValueError('Could not determine archive type of path {}'.format(path_name))
+    return archiver(ext)

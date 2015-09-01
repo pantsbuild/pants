@@ -8,11 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
+from pants.option.custom_types import file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import touch
 
@@ -63,9 +62,10 @@ class Scalastyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Scalastyle, cls).register_options(register)
-    register('--skip', action='store_true', help='Skip scalastyle.')
-    register('--config', advanced=True, help='Path to scalastyle config file.')
-    register('--excludes', advanced=True,
+    register('--skip', action='store_true', fingerprint=True, help='Skip scalastyle.')
+    register('--config', type=file_option, advanced=True, fingerprint=True,
+             help='Path to scalastyle config file.')
+    register('--excludes', type=file_option, advanced=True, fingerprint=True,
              help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
                   'and lines starting with \'#\' are ignored.) A file is skipped if its path '
                   '(relative to the repo root) matches any of these regexes.')

@@ -68,6 +68,7 @@ python_library(
   dependencies = [
     ':sdist_builder',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/util:dirutil'
   ]
 )
 
@@ -77,7 +78,6 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
     'src/python/pants/util:dirutil',
   ]
 )
@@ -129,11 +129,10 @@ python_library(
   name = 'thrift_builder',
   sources = ['thrift_builder.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':code_generator',
-    'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
-    'src/python/pants:thrift_util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ]
 )

@@ -17,6 +17,7 @@ from pants.reporting.report import Report
 
 class Work(object):
   """Represents multiple concurrent calls to the same callable."""
+
   def __init__(self, func, args_tuples, workunit_name=None):
     # A callable.
     self.func = func
@@ -49,10 +50,12 @@ class WorkerPool(object):
 
     self._shutdown_hooks = []
 
+    self.num_workers = num_workers
+
   def add_shutdown_hook(self, hook):
     self._shutdown_hooks.append(hook)
 
-  def submit_async_work(self, work,  workunit_parent=None, on_success=None, on_failure=None):
+  def submit_async_work(self, work, workunit_parent=None, on_success=None, on_failure=None):
     """Submit work to be executed in the background.
 
     - work: The work to execute.
@@ -99,6 +102,7 @@ class WorkerPool(object):
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
     work_iter = iter(filter(None, work_chain))
+
     def submit_next():
       try:
         self.submit_async_work(work_iter.next(), workunit_parent=workunit_parent,
@@ -163,6 +167,7 @@ class WorkerPool(object):
 
   def abort(self):
     self._pool.terminate()
+
 
 class SubprocPool(object):
   """Singleton for managing multiprocessing.Pool instances

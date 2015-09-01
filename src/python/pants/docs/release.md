@@ -147,13 +147,14 @@ Owners
 The following folks are set up to publish to pypi for
 pantsbuild.pants sdists:
 
-Name             | Email                 | PYPI Usename
------------------|-----------------------|-------------
-John Sirois      | john.sirois@gmail.com | john.sirois
-Benjy Weinberger | benjyw@gmail.com      | benjyw
-Eric Ayers       | zundel@squareup.com   | ericzundel
-Ity Kaul         | itykaul@gmail.com     | ity
-Stu Hood         | stuhood@gmail.com     | stuhood
+Name             | Email                      | PYPI Usename
+-----------------|----------------------------|-------------
+John Sirois      | john.sirois@gmail.com      | john.sirois
+Benjy Weinberger | benjyw@gmail.com           | benjyw
+Eric Ayers       | zundel@squareup.com        | ericzundel
+Ity Kaul         | itykaul@gmail.com          | ity
+Stu Hood         | stuhood@gmail.com          | stuhood
+Patrick Lawson   | patrick.a.lawson@gmail.com | Patrick.Lawson
 
 And the current list of packages that these folks can release can
 be obtained via:

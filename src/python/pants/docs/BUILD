@@ -25,6 +25,10 @@ page(
 page(
   name='dev_tasks',
   source='dev_tasks.md',
+  links=[
+    ':howto_plugin',
+    'src/docs:invoking',
+  ],
 )
 
 page(

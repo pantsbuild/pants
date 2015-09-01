@@ -10,29 +10,31 @@ import unittest
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress, parse_spec
-from pants.base.addressable import AddressableCallProxy
+from pants.base.address import Address, parse_spec
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.source_root import SourceRoot, SourceRootTree
 from pants.base.target import Target
 
 
 class TestTarget(Target):
+
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(TestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(TestTarget, self).__init__(target_name, Address.parse(spec), None)
 
 
 class NotTestTarget(Target):
+
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(NotTestTarget, self).__init__(target_name, Address.parse(spec), None)
 
 
 class AnotherTarget(Target):
+
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(AnotherTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(AnotherTarget, self).__init__(target_name, Address.parse(spec), None)
 
 
 class SourceRootTest(unittest.TestCase):
@@ -59,6 +61,24 @@ class SourceRootTest(unittest.TestCase):
     self.assertEquals(OrderedSet([TestTarget]), SourceRoot.types("tests"))
     self.assertEquals(OrderedSet(["tests"]), SourceRoot.roots(TestTarget))
 
+  def check_buildroot(self, buildroot_path):
+    self._assert_source_root_empty()
+
+    SourceRoot.register(buildroot_path, TestTarget)
+
+    self.assertEquals({".": OrderedSet([TestTarget])}, SourceRoot.all_roots())
+    self.assertEquals(OrderedSet([TestTarget]), SourceRoot.types("."))
+    self.assertEquals(OrderedSet(["."]), SourceRoot.roots(TestTarget))
+
+    target = TestTarget("//mock/foo/bar:baz")
+    self.assertEqual("", SourceRoot.find(target))
+
+  def test_register_buildroot_dot(self):
+    self.check_buildroot(".")
+
+  def test_register_buildroot_empty(self):
+    self.check_buildroot("")
+
   def test_register_none(self):
     self._assert_source_root_empty()
 
@@ -79,12 +99,21 @@ class SourceRootTest(unittest.TestCase):
 
   def test_here(self):
     target = TestTarget("//mock/foo/bar:baz")
-    proxy = AddressableCallProxy(addressable_type=target.get_addressable_type(),
-                                 build_file=None,
-                                 registration_callback=None)
     self.assertEqual("mock/foo/bar", SourceRoot.find(target))
-    SourceRoot("mock/foo").here(proxy)
+    SourceRoot("mock/foo").here()
     self.assertEqual("mock/foo", SourceRoot.find(target))
+
+  def check_here_buildroot(self, buildroot_path):
+    target = TestTarget("//mock/foo/bar:baz")
+    self.assertEqual("mock/foo/bar", SourceRoot.find(target))
+    SourceRoot(buildroot_path).here()
+    self.assertEqual("", SourceRoot.find(target))
+
+  def test_here_buildroot_dot(self):
+    self.check_buildroot(".")
+
+  def test_here_buildroot_empty(self):
+    self.check_buildroot("")
 
   def test_find(self):
     # When no source_root is registered, it should just return the path from the address
@@ -185,7 +214,7 @@ class SourceRootTest(unittest.TestCase):
                       msg="Failed for tree: {dump}".format(dump=tree._dump()))
 
   def _add_siblings1(self, tree, common_root):
-    tree.add_root(os.path.join(common_root, 'src/java'),[NotTestTarget])
+    tree.add_root(os.path.join(common_root, 'src/java'), [NotTestTarget])
     tree.add_root(os.path.join(common_root, 'src/resources'), [NotTestTarget])
     tree.add_root(os.path.join(common_root, 'tests/java'), [NotTestTarget, TestTarget])
     tree.add_root(os.path.join(common_root, 'tests/resources'), [NotTestTarget])

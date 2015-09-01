@@ -69,6 +69,7 @@ python_tests(
   name = 'python_run_integration',
   sources = ['test_python_run_integration.py'],
   dependencies = [
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
 )
@@ -86,8 +87,11 @@ python_tests(
   sources = ['test_interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:mock',
+    '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
+    'src/python/pants/backend/python:python_setup',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 

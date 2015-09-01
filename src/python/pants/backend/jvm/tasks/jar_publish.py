@@ -13,6 +13,7 @@ import pkgutil
 import shutil
 import sys
 from collections import OrderedDict, defaultdict
+from copy import copy
 
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
@@ -34,12 +35,13 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
-from pants.option.options import Options
+from pants.option.custom_types import dict_option, list_option
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
 
 class PushDb(object):
+
   @staticmethod
   def load(path):
     """Loads a pushdb maintained in a properties file at the given path."""
@@ -48,6 +50,7 @@ class PushDb(object):
       return PushDb(properties)
 
   class Entry(object):
+
     def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
       """Records the most recent push/release of an artifact.
 
@@ -211,6 +214,7 @@ class DependencyWriter(object):
 
 
 class PomWriter(DependencyWriter):
+
   def __init__(self, get_db, tag):
     super(PomWriter, self).__init__(
         get_db,
@@ -429,12 +433,12 @@ class JarPublish(ScmPublishMixin, JarTask):
                   'Or: --restart-at=src/java/com/twitter/common/base')
     register('--ivy_settings', advanced=True, default=None,
              help='Specify a custom ivysettings.xml file to be used when publishing.')
-    register('--jvm-options', advanced=True, type=Options.list,
+    register('--jvm-options', advanced=True, type=list_option,
              help='Use these jvm options when running Ivy.')
-    register('--repos', advanced=True, type=Options.dict,
+    register('--repos', advanced=True, type=dict_option,
              help='Settings for repositories that can be pushed to. See '
                   'https://pantsbuild.github.io/publish.html for details.')
-    register('--publish-extras', advanced=True, type=Options.dict,
+    register('--publish-extras', advanced=True, type=dict_option,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
     register('--individual-plugins', advanced=True, default=False, type=bool,
@@ -582,9 +586,11 @@ class JarPublish(ScmPublishMixin, JarTask):
     """Get the JVM options for ivy authentication, if needed."""
     # Get authentication for the publish repo if needed.
     if not repo.get('auth'):
+      # No need to copy here, as this list isn't modified by the caller.
       return self._jvm_options
 
-    jvm_options = self._jvm_options
+    # Create a copy of the options, so that the modification is appropriately transient.
+    jvm_options = copy(self._jvm_options)
     user = repo.get('username')
     password = repo.get('password')
     if user and password:

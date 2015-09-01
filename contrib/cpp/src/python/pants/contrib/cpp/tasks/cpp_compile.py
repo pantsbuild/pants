@@ -8,24 +8,23 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir
+from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
 
 class CppCompile(CppTask):
-  """Compiles object files from C++ sources."""
+  """Compile C++ sources into object files."""
 
   @classmethod
   def register_options(cls, register):
     super(CppCompile, cls).register_options(register)
-    register('--cc-options',
+    register('--cc-options', advanced=True, action='append', default=[], fingerprint=True,
              help='Append these options to the compiler command line.')
-    register('--cc-extensions',
-             default=['cc', 'cxx', 'cpp'],
-             help=('The list of extensions (without the .) to consider when '
-                   'determining if a file is a C++ source file.'))
+    register('--cc-extensions', advanced=True, action='append', fingerprint=True,
+             default=['.cc', '.cxx', '.cpp'],
+             help=('The list of extensions to consider when determining if a file is a '
+                   'C++ source file.'))
 
   @classmethod
   def product_types(cls):
@@ -40,7 +39,7 @@ class CppCompile(CppTask):
 
     def is_cc(source):
       _, ext = os.path.splitext(source)
-      return ext[1:] in self.get_options().cc_extensions
+      return ext in self.get_options().cc_extensions
 
     targets = self.context.targets(self.is_cpp)
 
@@ -51,7 +50,7 @@ class CppCompile(CppTask):
         for source in vt.target.sources_relative_to_buildroot():
           if is_cc(source):
             if not vt.valid:
-              with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.MULTITOOL]):
+              with self.context.new_workunit(name='cpp-compile', labels=[WorkUnitLabel.MULTITOOL]):
                 # TODO: Parallelise the compilation.
                 # TODO: Only recompile source files that have changed since the
                 #       object file was last written. Also use the output from
@@ -85,11 +84,10 @@ class CppCompile(CppTask):
     cmd.extend(['-c'])
     cmd.extend(('-I{0}'.format(i) for i in include_dirs))
     cmd.extend(['-o' + obj, abs_source])
-    if self.get_options().cc_options != None:
-      cmd.extend([self.get_options().cc_options])
+    cmd.extend(self.get_options().cc_options)
 
     # TODO: submit_async_work with self.run_command, [(cmd)] as a Work object.
-    with self.context.new_workunit(name='cpp-compile', labels=[WorkUnit.COMPILER]) as workunit:
+    with self.context.new_workunit(name='cpp-compile', labels=[WorkUnitLabel.COMPILER]) as workunit:
       self.run_command(cmd, workunit)
 
     self.context.log.info('Built c++ object: {0}'.format(obj))

@@ -5,25 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
-import os
 from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.register import build_file_aliases as register_jvm
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -50,7 +37,7 @@ class DepmapTest(BaseDepmapTest):
           """.format(
         type=type,
         name=name,
-        deps=','.join("pants('{0}')".format(dep) for dep in list(deps)),
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)),
         extra=('' if not kwargs else ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items()))
       )))
 
@@ -64,13 +51,13 @@ class DepmapTest(BaseDepmapTest):
         type=type,
         entry_point=entry_point,
         name=name,
-        deps=','.join("pants('{0}')".format(dep) for dep in list(deps)))
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)))
       ))
 
     def create_jvm_app(path, name, type, binary, deps=()):
       self.add_to_build_file(path, dedent("""
           {type}(name='{name}',
-            dependencies=[pants('{binary}')],
+            dependencies=['{binary}'],
             bundles={deps}
           )
           """.format(
@@ -81,7 +68,7 @@ class DepmapTest(BaseDepmapTest):
       ))
 
     add_to_build_file('common/a', 'a', 'target')
-    add_to_build_file('common/b', 'b', 'jar_library')
+    add_to_build_file('common/b', 'b', 'target')
     self.add_to_build_file('common/c', dedent("""
       java_library(name='c',
         sources=[],
@@ -100,7 +87,7 @@ class DepmapTest(BaseDepmapTest):
     add_to_build_file('overlaps', 'one', 'jvm_binary', deps=['common/h', 'common/i'])
     self.add_to_build_file('overlaps', dedent("""
       java_library(name='two',
-        dependencies=[pants('overlaps:one')],
+        dependencies=['overlaps:one'],
         sources=[],
       )
     """))
@@ -113,13 +100,13 @@ class DepmapTest(BaseDepmapTest):
     self.add_to_build_file('src/java/a', dedent("""
       java_library(
         name='a_java',
-        resources=[pants('resources/a:a_resources')]
+        resources=['resources/a:a_resources']
       )
     """))
     self.add_to_build_file('src/java/a', dedent("""
       target(
         name='a_dep',
-        dependencies=[pants(':a_java')]
+        dependencies=[':a_java']
       )
     """))
 
@@ -172,7 +159,6 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('common/a')]
     )
 
-  def test_jar_library(self):
     self.assert_console_output_ordered(
       'internal-common.b.b',
       targets=[self.target('common/b')],

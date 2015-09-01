@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import SyntheticAddress, parse_spec
+from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
@@ -15,6 +15,7 @@ from pants_test.base_test import BaseTest
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
 
 class BuildGraphTest(BaseTest):
+
   def inject_graph(self, root_spec, graph_dict):
     """Given a root spec, injects relevant targets from the graph represented by graph_dict.
 
@@ -35,20 +36,20 @@ class BuildGraphTest(BaseTest):
             "'{}'".format("','".join(targets)) if targets else ''
           )
       )
-    root_address = SyntheticAddress.parse(root_spec)
+    root_address = Address.parse(root_spec)
     self.build_graph.inject_address_closure(root_address)
     return root_address
 
   def test_target_invalid(self):
     self.add_to_build_file('a/BUILD', 'target(name="a")')
     with self.assertRaises(AddressLookupError):
-      self.build_graph.inject_address_closure(SyntheticAddress.parse('a:nope'))
+      self.build_graph.inject_address_closure(Address.parse('a:nope'))
 
     self.add_to_build_file('b/BUILD', 'target(name="a")')
     with self.assertRaises(AddressLookupError):
-      self.build_graph.inject_address_closure(SyntheticAddress.parse('b'))
+      self.build_graph.inject_address_closure(Address.parse('b'))
     with self.assertRaises(AddressLookupError):
-      self.build_graph.inject_address_closure(SyntheticAddress.parse('b:b'))
+      self.build_graph.inject_address_closure(Address.parse('b:b'))
 
   def test_transitive_closure_address(self):
     root_address = self.inject_graph('//:foo', {
@@ -62,12 +63,12 @@ class BuildGraphTest(BaseTest):
   def test_no_targets(self):
     self.add_to_build_file('empty/BUILD', 'pass')
     with self.assertRaises(AddressLookupError):
-      self.build_graph.inject_address_closure(SyntheticAddress.parse('empty'))
+      self.build_graph.inject_address_closure(Address.parse('empty'))
     with self.assertRaises(AddressLookupError):
-      self.build_graph.inject_address_closure(SyntheticAddress.parse('empty:foo'))
+      self.build_graph.inject_address_closure(Address.parse('empty:foo'))
 
   def test_contains_address(self):
-    a = SyntheticAddress.parse('a')
+    a = Address.parse('a')
     self.assertFalse(self.build_graph.contains_address(a))
     target = Target(name='a',
                     address=a,
@@ -200,7 +201,7 @@ class BuildGraphTest(BaseTest):
     self.assertIsInstance(BuildGraph.TransitiveLookupError(), AddressLookupError)
 
   def inject_address_closure(self, spec):
-    self.build_graph.inject_address_closure(SyntheticAddress.parse(spec))
+    self.build_graph.inject_address_closure(Address.parse(spec))
 
   def test_invalid_address(self):
     with self.assertRaisesRegexp(AddressLookupError,

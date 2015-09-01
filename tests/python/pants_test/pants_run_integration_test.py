@@ -9,8 +9,10 @@ import ConfigParser
 import os
 import subprocess
 import unittest
-from collections import namedtuple
+from collections import Counter, defaultdict, namedtuple
 from operator import eq, ne
+
+from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
@@ -19,6 +21,35 @@ from pants.util.dirutil import safe_mkdir, safe_open
 
 
 PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data', 'stderr_data'])
+
+
+def ensure_cached(expected_num_artifacts=None):
+  """Decorator for asserting cache writes in an integration test.
+
+  :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
+  :param expected_num_artifacts: Expected number of artifacts to be in the task's
+                                 cache after running the test. If unspecified, will
+                                 assert that the number of artifacts in the cache is
+                                 non-zero.
+  """
+  def decorator(test_fn):
+    def wrapper(self, *args, **kwargs):
+      with temporary_dir() as artifact_cache:
+        cache_args = '--cache-write-to=["{}"]'.format(artifact_cache)
+
+        test_fn(self, *args + (cache_args,), **kwargs)
+
+        num_artifacts = 0
+        for (root, _, files) in os.walk(artifact_cache):
+          print(root, files)
+          num_artifacts += len(files)
+
+        if expected_num_artifacts is None:
+          self.assertNotEqual(num_artifacts, 0)
+        else:
+          self.assertEqual(num_artifacts, expected_num_artifacts)
+    return wrapper
+  return decorator
 
 
 class PantsRunIntegrationTest(unittest.TestCase):
@@ -149,3 +180,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
+
+  def assert_contains_exact_files(self, directory, expected_files, ignore_links=True):
+    """Asserts that the only files which directory contains are expected_files.
+
+    :param str directory: Path to directory to search.
+    :param set expected_files: Set of filepaths relative to directory to search for.
+    :param bool ignore_links: Indicates to ignore any file links.
+    """
+    found = set()
+    for root, _, files in os.walk(directory):
+      for f in files:
+        p = os.path.join(root, f)
+        if ignore_links and os.path.islink(p):
+          continue
+        found.add(os.path.relpath(p, directory))
+
+    self.assertEqual(expected_files, found)
+
+  def normalize(self, s):
+    """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
+    return ''.join(strip_color(s).split())

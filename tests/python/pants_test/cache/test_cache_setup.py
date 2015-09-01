@@ -33,8 +33,10 @@ class DummyTask(Task):
 
 
 class MockPinger(object):
+
   def __init__(self, hosts_to_times):
     self._hosts_to_times = hosts_to_times
+
   # Returns a fake ping time such that the last host is always the 'fastest'.
   def pings(self, hosts):
     return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)
@@ -44,7 +46,7 @@ class TestCacheSetup(BaseTest):
 
   def test_select_best_url(self):
     log = MockLogger()
-    pinger = MockPinger({'host1':  5, 'host2:666': 3, 'host3': 7})
+    pinger = MockPinger({'host1': 5, 'host2:666': 3, 'host3': 7})
     cache_factory = CacheFactory(options={}, log=log, stable_name='test', pinger=pinger)
     spec = 'http://host1|https://host2:666/path/to|http://host3/path/'
     best = cache_factory.select_best_url(spec)

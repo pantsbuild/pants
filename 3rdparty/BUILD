@@ -70,10 +70,7 @@ jar_library(name='protobuf-2.4.1',
               jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1'),
             ])
 
-jar_library(name='protobuf-java',
-            dependencies = [
-              ':protobuf-2.4.1'
-            ])
+target(name='protobuf-java', dependencies = [':protobuf-2.4.1'])
 
 jar_library(name='protobuf-test-import',
             jars = [
@@ -83,7 +80,7 @@ jar_library(name='protobuf-test-import',
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.17.0'),
+              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.20.0'),
             ])
 
 jar_library(name='shapeless',
@@ -106,15 +103,14 @@ jar_library(name='libthrift-0.9.2',
               jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
             ])
 
-jar_library(name='thrift-0.9.2',
-            dependencies = [
-              ':commons-lang',
-              ':libthrift-0.9.2',
-              ':slf4j-api',
-            ])
+target(name='thrift-0.9.2',
+       dependencies = [
+         ':commons-lang',
+         ':libthrift-0.9.2',
+         ':slf4j-api',
+       ])
 
-jar_library(name='thrift',
-            dependencies = [ ':thrift-0.9.2' ])
+target(name='thrift', dependencies = [ ':thrift-0.9.2' ])
 
 
 ###############

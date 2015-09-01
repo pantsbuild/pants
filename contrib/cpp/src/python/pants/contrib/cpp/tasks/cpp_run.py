@@ -5,9 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.tasks.cpp_task import CppTask
@@ -36,7 +34,7 @@ class CppRun(CppTask):
   def execute(self):
     binary_target = self.require_single_root_target()
     if isinstance(binary_target, CppBinary):
-      with self.context.new_workunit(name='cpp-run', labels=[WorkUnit.RUN]) as workunit:
+      with self.context.new_workunit(name='cpp-run', labels=[WorkUnitLabel.RUN]) as workunit:
         cmd = [self.context.products.get_only('exe', binary_target)]
 
         args = self.get_options().args + self.get_passthru_args()

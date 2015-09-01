@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import os
 import shutil
@@ -30,7 +31,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,6 @@ class PythonChroot(object):
     PythonTests: 'tests'
   }
 
-  MEMOIZED_THRIFTS = {}
-
   class InvalidDependencyException(Exception):
     def __init__(self, target):
       Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
@@ -56,19 +55,20 @@ class PythonChroot(object):
   def get_platforms(platform_list):
     return tuple({Platform.current() if p == 'current' else p for p in platform_list})
 
-  # TODO: A little extra push and we can get rid of the 'context' argument.
   def __init__(self,
-               context,
                python_setup,
                python_repos,
+               ivy_bootstrapper,
+               thrift_binary_factory,
                interpreter,
                builder,
                targets,
                platforms,
                extra_requirements=None):
-    self.context = context
     self._python_setup = python_setup
     self._python_repos = python_repos
+    self._ivy_bootstrapper = ivy_bootstrapper
+    self._thrift_binary_factory = thrift_binary_factory
 
     self._interpreter = interpreter
     self._builder = builder
@@ -140,8 +140,9 @@ class PythonChroot(object):
 
   def _generate_requirement(self, library, builder_cls):
     library_key = self._key_generator.key_for_target(library)
-    builder = builder_cls(library, get_buildroot(),
-                          self.context.options, '-' + library_key.hash[:8])
+    builder = builder_cls(target=library,
+                          root_dir=get_buildroot(),
+                          target_suffix='-' + library_key.hash[:8])
 
     cache_dir = os.path.join(self._artifact_cache_root, library_key.id)
     if self._build_invalidator.needs_update(library_key):
@@ -153,14 +154,27 @@ class PythonChroot(object):
     return PythonRequirement(builder.requirement_string(), repository=cache_dir, use_2to3=True)
 
   def _generate_thrift_requirement(self, library):
-    return self._generate_requirement(library, PythonThriftBuilder)
+    thrift_builder = functools.partial(PythonThriftBuilder,
+                                       thrift_binary_factory=self._thrift_binary_factory,
+                                       workdir=safe_mkdtemp(dir=self.path(), prefix='thrift.'))
+    return self._generate_requirement(library, thrift_builder)
 
   def _generate_antlr_requirement(self, library):
-    return self._generate_requirement(library, PythonAntlrBuilder)
+    antlr_builder = functools.partial(PythonAntlrBuilder,
+                                      ivy_bootstrapper=self._ivy_bootstrapper,
+                                      workdir=safe_mkdtemp(dir=self.path(), prefix='antlr.'))
+    return self._generate_requirement(library, antlr_builder)
 
   def resolve(self, targets):
     children = defaultdict(OrderedSet)
+
     def add_dep(trg):
+      # Currently we handle all of our code generation, so we don't want to operate over any
+      # synthetic targets injected upstream.
+      # TODO(John Sirois): Revisit this when building a proper python product pipeline.
+      if trg.is_synthetic:
+        return
+
       for target_type, target_key in self._VALID_DEPENDENCIES.items():
         if isinstance(trg, target_type):
           children[target_key].add(trg)
@@ -181,11 +195,8 @@ class PythonChroot(object):
 
     generated_reqs = OrderedSet()
     if targets['thrifts']:
-      for thr in set(targets['thrifts']):
-        if thr not in self.MEMOIZED_THRIFTS:
-          self.MEMOIZED_THRIFTS[thr] = self._generate_thrift_requirement(thr)
-        generated_reqs.add(self.MEMOIZED_THRIFTS[thr])
-
+      for thr in targets['thrifts']:
+        generated_reqs.add(self._generate_thrift_requirement(thr))
       generated_reqs.add(PythonRequirement('thrift', use_2to3=True))
 
     for antlr in targets['antlrs']:
@@ -239,13 +250,14 @@ class PythonChroot(object):
     context = self._python_repos.get_network_context()
 
     for platform in platforms:
+      requirements_cache_dir = os.path.join(self._python_setup.resolver_cache_dir, str(self._interpreter.identity))
       distributions[platform] = resolve(
         requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
         fetchers=fetchers,
         platform=platform,
         context=context,
-        cache=self._python_setup.resolver_cache_dir,
+        cache=requirements_cache_dir,
         cache_ttl=self._python_setup.resolver_cache_ttl)
 
     return distributions

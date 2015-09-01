@@ -13,7 +13,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 
 
 class PythonEval(PythonTask):
@@ -49,7 +49,7 @@ class PythonEval(PythonTask):
       return compiled  # Collected and returned for tests
 
   def _compile_targets(self, invalid_vts):
-    with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
+    with self.context.new_workunit(name='eval-targets', labels=[WorkUnitLabel.MULTITOOL]):
       compiled = []
       failed = []
       for vt in invalid_vts:
@@ -138,7 +138,7 @@ class PythonEval(PythonTask):
                               executable_file_content=executable_file_content) as chroot:
         pex = chroot.pex()
         with self.context.new_workunit(name='eval',
-                                       labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
+                                       labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN, WorkUnitLabel.TOOL],
                                        cmd=' '.join(pex.cmdline())) as workunit:
           returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
           workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)

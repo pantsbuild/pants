@@ -7,13 +7,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.core.from_target import FromTarget
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.what_changed import WhatChanged
+from pants.backend.core.wrapped_globs import RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
@@ -22,6 +26,7 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class BaseWhatChangedTest(ConsoleTaskTestBase):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -29,12 +34,16 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'java_library': JavaLibrary,
         'python_library': PythonLibrary,
         'jar_library': JarLibrary,
+        'unpacked_jars': UnpackedJars,
         'resources': Resources,
         'java_thrift_library': JavaThriftLibrary,
+        'java_protobuf_library': JavaProtobufLibrary,
         'python_thrift_library': PythonThriftLibrary,
       },
       context_aware_object_factories={
         'source_root': SourceRoot.factory,
+        'rglobs': RGlobs.factory,
+        'from_target': FromTarget,
       },
       objects={
         'jar': JarDependency,
@@ -46,7 +55,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
     return WhatChanged
 
   def assert_console_output(self, *output, **kwargs):
-    options = { 'spec_excludes': [], 'exclude_target_regexp': [] }
+    options = {'spec_excludes': [], 'exclude_target_regexp': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options
@@ -54,9 +63,11 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
   def workspace(self, files=None, parent=None, diffspec=None, diff_files=None):
     class MockWorkspace(Workspace):
+
       def touched_files(_, p):
         self.assertEqual(parent or 'HEAD', p)
         return files or []
+
       def changes_in(_, ds):
         self.assertEqual(diffspec, ds)
         return diff_files or []
@@ -64,6 +75,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
+
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 
@@ -82,6 +94,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
 
 
 class WhatChangedTest(BaseWhatChangedTest):
+
   def setUp(self):
     super(WhatChangedTest, self).setUp()
 
@@ -157,7 +170,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.add_to_build_file('root/src/java/a', dedent("""
       java_library(
         name='a_java',
-        sources=['a.java'],
+        sources=rglobs("*.java"),
       )
     """))
 
@@ -191,7 +204,7 @@ class WhatChangedTest(BaseWhatChangedTest):
   def test_spec_excludes(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
-      options = { 'spec_excludes': 'root/src/py/1' },
+      options={'spec_excludes': 'root/src/py/1'},
       workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
     )
 
@@ -275,6 +288,16 @@ class WhatChangedTest(BaseWhatChangedTest):
       ),
     )
 
+  def test_diffspec_removed_files(self):
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      options={'diffspec': '42'},
+      workspace=self.workspace(
+        diffspec='42',
+        diff_files=['root/src/java/a/b/c/Foo.java'],
+      ),
+    )
+
   def test_include_dependees(self):
     self.assert_console_output(
       'root/src/py/dependency_tree/a:a',
@@ -310,4 +333,31 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/c:c',
       options={'include_dependees': 'transitive', 'exclude_target_regexp': [':b']},
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+  def test_deferred_sources(self):
+    self.add_to_build_file('root/proto', dedent("""
+      java_protobuf_library(name='unpacked_jars',
+        sources=from_target(':external-source'),
+      )
+
+      unpacked_jars(name='external-source',
+        libraries=[':external-source-jars'],
+        include_patterns=[
+          'com/squareup/testing/**/*.proto',
+        ],
+      )
+
+      jar_library(name='external-source-jars',
+        jars=[
+          jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),
+        ],
+      )
+    """))
+
+    self.assert_console_output(
+      'root/proto:unpacked_jars',
+      'root/proto:external-source',
+      'root/proto:external-source-jars',
+      workspace=self.workspace(files=['root/proto/BUILD'])
     )

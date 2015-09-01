@@ -8,19 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-import pytest
-from mock import MagicMock
-from twitter.common.collections import OrderedSet
-
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.tasks.ragel_gen import RagelGen, calculate_genfile
-from pants.base.address import SyntheticAddress
-from pants.base.build_environment import get_buildroot
-from pants.base.build_file_aliases import BuildFileAliases
-from pants.goal.context import Context
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_rmtree
-from pants_test.tasks.task_test_base import TaskTestBase, is_exe
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 ragel_file_contents = dedent("""
@@ -70,56 +61,21 @@ class RagelGenTest(TaskTestBase):
   def task_type(cls):
     return RagelGen
 
-  RAGEL = is_exe('ragel')
-  @property
-  def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_ragel_library': JavaRagelLibrary})
-
-  def setUp(self):
-    super(RagelGenTest, self).setUp()
-    self.task_outdir =  os.path.join(self.build_root, 'ragel', 'gen')
-
-  def tearDown(self):
-    super(RagelGenTest, self).tearDown()
-    safe_rmtree(self.task_outdir)
-
-  @pytest.mark.skipif('not RagelGenTest.RAGEL',
-                      reason='No ragel binary on the PATH.')
   def test_ragel_gen(self):
     self.create_file(relpath='test_ragel_gen/atoi.rl', contents=ragel_file_contents)
-    self.add_to_build_file('test_ragel_gen', dedent("""
-      java_ragel_library(name='atoi',
-        sources=['atoi.rl'],
-        dependencies=[]
-      )
-    """))
-
-    target = self.target('test_ragel_gen:atoi')
+    target = self.make_target(spec='test_ragel_gen:atoi',
+                              target_type=JavaRagelLibrary,
+                              sources=['atoi.rl'])
     task = self.create_task(self.context(target_roots=[target]))
 
-    task._ragel_binary = 'ragel'
-    task.invalidate_for_files = lambda: []
-    task._java_out = self.task_outdir
+    task.execute()
 
-    sources = [os.path.join(self.task_outdir, 'com/example/atoi/Parser.java')]
+    generated_files = []
+    outdir = task.codegen_workdir(target)
+    for root, _, files in os.walk(outdir):
+      generated_files.extend(os.path.relpath(os.path.join(root, f), outdir) for f in files)
 
-    try:
-      saved_add_new_target = Context.add_new_target
-      Context.add_new_target = MagicMock()
-      task.execute()
-      relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
-      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_ragel_gen.atoi')
-      address = SyntheticAddress.parse(spec=spec)
-      Context.add_new_target.assert_called_once_with(address,
-                                                     JavaRagelLibrary,
-                                                     derived_from=target,
-                                                     sources=sources,
-                                                     excludes=OrderedSet(),
-                                                     dependencies=OrderedSet(),
-                                                     provides=None)
-    finally:
-      Context.add_new_target = saved_add_new_target
-
+    self.assertEqual(['com/example/atoi/Parser.java'], generated_files)
 
   def test_smoke(self):
     with temporary_file() as fp:

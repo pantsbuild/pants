@@ -5,21 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
-import os
-from collections import defaultdict
-
-from twitter.common.collections import OrderedSet
-
-from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 
 
@@ -35,20 +22,6 @@ class Depmap(ConsoleTask):
     EXCLUDED = 'EXCLUDED'  # Excluded Target
     RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
     TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
-
-  @staticmethod
-  def _jar_id(jar):
-    if jar.rev:
-      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
-    else:
-      return '{0}:{1}'.format(jar.org, jar.name)
-
-  @staticmethod
-  def _address(address):
-    """
-    :type address: pants.base.address.SyntheticAddress
-    """
-    return '{0}:{1}'.format(address.spec_path, address.target_name)
 
   @classmethod
   def register_options(cls, register):
@@ -117,8 +90,6 @@ class Depmap(ConsoleTask):
             '{org}{sep}{name}').format(**params), is_internal_dep
 
   def _enumerate_visible_deps(self, dep, predicate):
-    dep_id, internal = self._dep_id(dep)
-
     dependencies = sorted([x for x in getattr(dep, 'dependencies', [])]) + sorted(
       [x for x in getattr(dep, 'jar_dependencies', [])] if not self.is_internal_only else [])
 

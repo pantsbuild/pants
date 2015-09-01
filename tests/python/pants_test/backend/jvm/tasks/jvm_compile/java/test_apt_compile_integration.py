@@ -10,6 +10,7 @@ from pants_test.testutils.compile_strategy_utils import provide_compile_strategi
 
 
 class AptCompileIntegrationTest(BaseCompileIT):
+
   @provide_compile_strategies
   def test_apt_compile(self, strategy):
     with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/processor',

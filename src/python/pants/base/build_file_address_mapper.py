@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
+from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
@@ -71,7 +71,7 @@ class BuildFileAddressMapper(object):
       slash = build.rfind('/')
       if slash < 0:
         return '', build
-      return build[:slash], build[slash+1:]
+      return build[:slash], build[slash + 1:]
 
     def are_siblings(a, b):  # Are the targets in the same directory?
       return path_parts(a)[0] == path_parts(b)[0]
@@ -95,7 +95,7 @@ class BuildFileAddressMapper(object):
 
     # Give different error messages depending on whether BUILD file was empty.
     if valid_specs:
-      one_of = ' one of' if len(valid_specs) > 1 else '' # Handle plurality, just for UX.
+      one_of = ' one of' if len(valid_specs) > 1 else ''  # Handle plurality, just for UX.
       raise self.AddressNotInBuildFile(
         '{target_name} was not found in BUILD file {build_file}. Perhaps you '
         'meant{one_of}: \n  {specs}'.format(target_name=wrong_target_name,
@@ -125,7 +125,7 @@ class BuildFileAddressMapper(object):
   def resolve_spec(self, spec):
     """Converts a spec to an address and maps it using `resolve`"""
     try:
-      address = SyntheticAddress.parse(spec)
+      address = Address.parse(spec)
     except ValueError as e:
       raise self.InvalidAddressError(e)
     _, addressable = self.resolve(address)
@@ -165,19 +165,22 @@ class BuildFileAddressMapper(object):
     return self._build_file_type.from_cache(*args, **kwargs)
 
   def spec_to_address(self, spec, relative_to=''):
-    """A helper method for mapping a spec to the correct BuildFileAddress.
-    :param spec: a spec to lookup in the map.
-    :param relative_to: path the spec might be relative to
-    :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
-    :returns a new BuildFileAddress instanace
+    """A helper method for mapping a spec to the correct address.
+
+    :param string spec: A spec to lookup in the map.
+    :param string relative_to: Path the spec might be relative to
+    :raises :class:`pants.base.address_lookup_error.AddressLookupError` If the BUILD file cannot be
+            found in the path specified by the spec.
+    :returns: A new Address instance.
+    :rtype: :class:`pants.base.address.Address`
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
-      build_file = self.from_cache(self.root_dir, spec_path)
+      self.from_cache(self.root_dir, spec_path)
     except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
-    return BuildFileAddress(build_file, name)
+    return Address(spec_path, name)
 
   def scan_buildfiles(self, root_dir, *args, **kwargs):
     """Looks for all BUILD files in root_dir or its descendant directories.

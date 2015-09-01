@@ -14,8 +14,8 @@ import mox
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, relative_symlink, relativize_paths,
-                                safe_mkdir)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir,
+                                relative_symlink, relativize_paths, safe_mkdir)
 
 
 class DirutilTest(unittest.TestCase):
@@ -27,6 +27,20 @@ class DirutilTest(unittest.TestCase):
 
   def tearDown(self):
     self._mox.UnsetStubs()
+
+  def test_fast_relpath(self):
+    def assertRelpathC(path, start):
+      self.assertEquals('c', fast_relpath(path, start))
+    assertRelpathC('/a/b/c', '/a/b')
+    assertRelpathC('/a/b/c', '/a/b/')
+    assertRelpathC('b/c', 'b')
+    assertRelpathC('b/c', 'b/')
+
+  def test_fast_relpath_invalid(self):
+    with self.assertRaises(ValueError):
+      fast_relpath('/a/b', '/a/baseball')
+    with self.assertRaises(ValueError):
+      fast_relpath('/a/baseball', '/a/b')
 
   def test_mkdtemp_setup_teardown(self):
     def faux_cleaner():
@@ -79,7 +93,7 @@ class DirutilTest(unittest.TestCase):
     self.assertEquals(['foo.jar', jar_relpath], relativized_classpath)
 
   def test_relative_symlink(self):
-    with temporary_dir() as tmpdir_1: # source and link in same dir
+    with temporary_dir() as tmpdir_1:  # source and link in same dir
       source = os.path.join(tmpdir_1, 'source')
       link = os.path.join(tmpdir_1, 'link')
       rel_path = os.path.relpath(source, os.path.dirname(link))
@@ -88,7 +102,7 @@ class DirutilTest(unittest.TestCase):
       self.assertEquals(rel_path, os.readlink(link))
 
   def test_relative_symlink_source_parent(self):
-    with temporary_dir() as tmpdir_1: # source in parent dir of link
+    with temporary_dir() as tmpdir_1:  # source in parent dir of link
       child = os.path.join(tmpdir_1, 'child')
       os.mkdir(child)
       source = os.path.join(tmpdir_1, 'source')
@@ -99,7 +113,7 @@ class DirutilTest(unittest.TestCase):
       self.assertEquals(rel_path, os.readlink(link))
 
   def test_relative_symlink_link_parent(self):
-    with temporary_dir() as tmpdir_1: # link in parent dir of source
+    with temporary_dir() as tmpdir_1:  # link in parent dir of source
       child = os.path.join(tmpdir_1, 'child')
       source = os.path.join(child, 'source')
       link = os.path.join(tmpdir_1, 'link')
@@ -109,21 +123,26 @@ class DirutilTest(unittest.TestCase):
       self.assertEquals(rel_path, os.readlink(link))
 
   def test_relative_symlink_same_paths(self):
-    with temporary_dir() as tmpdir_1: # source is link
+    with temporary_dir() as tmpdir_1:  # source is link
       source = os.path.join(tmpdir_1, 'source')
       with self.assertRaisesRegexp(ValueError, r'Path for link is identical to source'):
         relative_symlink(source, source)
 
   def test_relative_symlink_bad_source(self):
-    with temporary_dir() as tmpdir_1: # source is not absolute
+    with temporary_dir() as tmpdir_1:  # source is not absolute
       source = os.path.join('foo', 'bar')
       link = os.path.join(tmpdir_1, 'link')
       with self.assertRaisesRegexp(ValueError, r'Path for source.*absolute'):
         relative_symlink(source, link)
 
   def test_relative_symlink_bad_link(self):
-    with temporary_dir() as tmpdir_1: # link is not absolute
+    with temporary_dir() as tmpdir_1:  # link is not absolute
       source = os.path.join(tmpdir_1, 'source')
       link = os.path.join('foo', 'bar')
       with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
+
+  def test_get_basedir(self):
+    self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
+    self.assertEquals(get_basedir('/foo/bar/baz'), '')
+    self.assertEquals(get_basedir('foo'), 'foo')

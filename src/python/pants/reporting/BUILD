@@ -8,7 +8,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.threading',
     '3rdparty/python:ansicolors',
-    '3rdparty/python:psutil',
     '3rdparty/python:pystache',
     '3rdparty/python:six',
     ':report',
@@ -18,8 +17,10 @@ python_library(
     'src/python/pants/base:run_info',
     'src/python/pants/base:target',
     'src/python/pants/base:workunit',
+    'src/python/pants/option',
     'src/python/pants/pantsd:process_manager',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
     'src/python/pants/subsystem',
   ]
 )

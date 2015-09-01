@@ -17,7 +17,9 @@ from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
 
 logger = logging.getLogger(__name__)
 
+
 class BaseLocalArtifactCache(ArtifactCache):
+
   def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
@@ -34,7 +36,7 @@ class BaseLocalArtifactCache(ArtifactCache):
   @contextmanager
   def _tmpfile(self, cache_key, use):
     """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
-    with temporary_file(suffix=cache_key.id+use, root_dir=self._cache_root) as tmpfile:
+    with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root) as tmpfile:
       yield tmpfile
 
   @contextmanager
@@ -59,18 +61,43 @@ class BaseLocalArtifactCache(ArtifactCache):
     """Given a src path to an artifact tarball, store it and return stored artifact's path."""
     pass
 
+
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
-  def __init__(self, artifact_root, cache_root, compression):
+
+  def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
+    :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
     """
     super(LocalArtifactCache, self).__init__(artifact_root, compression)
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
-
+    self._max_entries_per_target = max_entries_per_target
     safe_mkdir(self._cache_root)
+
+  def prune(self, root):
+    """Prune stale cache files
+
+    If the user specifies the option --cache-target-max-entry then prune will remove all but n old
+    cache files for each target/task.
+
+    If the user has not specified the option --cache-target-max-entry then behavior is unchanged and
+    files will remain in cache indefinitely.
+
+    :param str root: The path under which cacheable artifacts will be cleaned
+    """
+
+    max_entries_per_target = self._max_entries_per_target
+    if os.path.isdir(root) and max_entries_per_target:
+      found_files = []
+      for old_file in os.listdir(root):
+        full_path = os.path.join(root, old_file)
+        found_files.append((full_path, os.path.getmtime(full_path)))
+      found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
+      for cur_file in found_files[self._max_entries_per_target:]:
+        safe_delete(cur_file[0])
 
   def has(self, cache_key):
     return os.path.isfile(self._cache_file_for_key(cache_key))
@@ -79,6 +106,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     dest = self._cache_file_for_key(cache_key)
     safe_mkdir_for(dest)
     os.rename(src, dest)
+    self.prune(os.path.dirname(dest))  # Remove old cache files.
     return dest
 
   def use_cached_files(self, cache_key):
@@ -113,6 +141,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
   This implementation does not have a backing _cache_root, and never
   actually stores files between calls, but is useful for handling file IO for a remote cache.
   """
+
   def __init__(self, artifact_root, compression):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.

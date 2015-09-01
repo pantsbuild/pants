@@ -19,6 +19,8 @@ python_library(
     ':javadoc_gen',
     ':junit_run',
     ':jvm_binary_task',
+    ':jvm_dependency_check',
+    ':jvm_platform_analysis',
     ':jvm_run',
     ':jvm_task',
     ':jvm_tool_task_mixin',
@@ -67,6 +69,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/ivy',
+    'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
     'src/python/pants/java/jar:shader',
@@ -105,8 +108,9 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':nailgun_task',
-    'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:cache_manager',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/java/jar:shader',
+    'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
   ],
@@ -117,9 +121,17 @@ python_library(
   sources = ['classpath_util.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+  ],
+)
+
+python_library(
+  name = 'classpath_products',
+  sources = ['classpath_products.py'],
+  dependencies = [
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/goal:products',
   ],
 )
 
@@ -150,13 +162,14 @@ python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
   dependencies = [
+    ':classpath_products',
     ':ivy_task_mixin',
     ':nailgun_task',
-    'src/python/pants:binary_util',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:cache_manager',
-    'src/python/pants/ivy',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/goal:products',
+    'src/python/pants/ivy',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
@@ -185,9 +198,7 @@ python_library(
     ':jar_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/fs',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -225,17 +236,17 @@ python_library(
   name = 'jar_task',
   sources = ['jar_task.py'],
   dependencies = [
-    ':nailgun_task',
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:jar_tool',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/java/jar:manifest',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
-    'src/python/pants:binary_util',
   ],
 )
 
@@ -261,12 +272,12 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/java/jar:shader',
     'src/python/pants/java:util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:xml_parser',
-    'src/python/pants:binary_util',
   ],
 )
 
@@ -281,6 +292,35 @@ python_library(
 )
 
 python_library(
+  name = 'jvm_dependency_check',
+  sources = ['jvm_dependency_check.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_graph',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
+  name = 'jvm_platform_analysis',
+  sources = ['jvm_platform_analysis.py'],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    'src/python/pants/backend/core/tasks:console_task',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
   name = 'jvm_run',
   sources = ['jvm_run.py'],
   dependencies = [
@@ -290,6 +330,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/fs',
     'src/python/pants/java:executor',
+    'src/python/pants/java/distribution',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
@@ -320,9 +361,9 @@ python_library(
   sources = ['jvmdoc_gen.py'],
   dependencies = [
     ':jvm_task',
-    'src/python/pants:binary_util',
     'src/python/pants/base:exceptions',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/util:dirutil',\
   ],
 )
 
@@ -385,7 +426,7 @@ python_library(
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
     'src/python/pants/console:stty_utils',
-    'src/python/pants/java:util',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:strutil',
   ],
 )
@@ -397,6 +438,7 @@ python_library(
     ':jvmdoc_gen',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/java:executor',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:memo',
   ],
 )
@@ -406,9 +448,9 @@ python_library(
   sources = ['scalastyle.py'],
   dependencies = [
     ':nailgun_task',
-    'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:cache_manager',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
+    'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/util:dirutil'
   ],

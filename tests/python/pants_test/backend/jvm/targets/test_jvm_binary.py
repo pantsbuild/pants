@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
-from textwrap import dedent
 
-from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jvm_binary import (Duplicate, JarRules, JvmBinary, ManifestEntries,
                                                   Skip)
-from pants.base.address import BuildFileAddress
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
 from pants.base.target import Target
@@ -20,6 +18,7 @@ from pants_test.base_test import BaseTest
 
 
 class JarRulesTest(unittest.TestCase):
+
   def test_jar_rule(self):
     dup_rule = Duplicate('foo', Duplicate.REPLACE)
     self.assertEquals('Duplicate(apply_pattern=foo, action=REPLACE)',
@@ -57,19 +56,9 @@ class JarRulesTest(unittest.TestCase):
 
 
 class JvmBinaryTest(BaseTest):
-  @property
-  def alias_groups(self):
-    return register_jvm()
 
   def test_simple(self):
-    self.add_to_build_file('BUILD', dedent('''
-    jvm_binary(name='foo',
-      main='com.example.Foo',
-      basename='foo-base',
-    )
-    '''))
-
-    target = self.target('//:foo')
+    target = self.make_target(':foo', JvmBinary, main='com.example.Foo', basename='foo-base')
     self.assertEquals('com.example.Foo', target.main)
     self.assertEquals('com.example.Foo', target.payload.main)
     self.assertEquals('foo-base', target.basename)
@@ -78,54 +67,37 @@ class JvmBinaryTest(BaseTest):
     self.assertEquals([], target.payload.deploy_excludes)
     self.assertEquals(JarRules.default(), target.deploy_jar_rules)
     self.assertEquals(JarRules.default(), target.payload.deploy_jar_rules)
-    self.assertEquals({}, target.payload.manifest_entries.entries);
+    self.assertEquals({}, target.payload.manifest_entries.entries)
 
   def test_default_base(self):
-    self.add_to_build_file('BUILD', dedent('''
-    jvm_binary(name='foo',
-      main='com.example.Foo',
-    )
-    '''))
-    target = self.target('//:foo')
+    target = self.make_target(':foo', JvmBinary, main='com.example.Foo')
     self.assertEquals('foo', target.basename)
 
   def test_deploy_jar_excludes(self):
-    self.add_to_build_file('BUILD', dedent('''
-    jvm_binary(name='foo',
-      main='com.example.Foo',
-      deploy_excludes=[exclude(org='example.com', name='foo-lib')],
-    )
-    '''))
-    target = self.target('//:foo')
+    target = self.make_target(':foo',
+                              JvmBinary,
+                              main='com.example.Foo',
+                              deploy_excludes=[Exclude(org='example.com', name='foo-lib')])
     self.assertEquals([Exclude(org='example.com', name='foo-lib')],
                       target.deploy_excludes)
 
   def test_deploy_jar_rules(self):
-    self.add_to_build_file('BUILD', dedent('''
-    jvm_binary(name='foo',
-      main='com.example.Foo',
-      deploy_jar_rules=jar_rules([Duplicate('foo', Duplicate.SKIP)],
-                                 default_dup_action=Duplicate.FAIL)
-    )
-    '''))
-    target = self.target('//:foo')
-    jar_rules =  target.deploy_jar_rules
+    target = self.make_target(':foo',
+                              JvmBinary,
+                              main='com.example.Foo',
+                              deploy_jar_rules=JarRules([Duplicate('foo', Duplicate.SKIP)],
+                                                        default_dup_action=Duplicate.FAIL))
+    jar_rules = target.deploy_jar_rules
     self.assertEquals(1, len(jar_rules.rules))
     self.assertEquals('foo', jar_rules.rules[0].apply_pattern.pattern)
     self.assertEquals(repr(Duplicate.SKIP),
-                      repr(jar_rules.rules[0].action)) # <object object at 0x...>
+                      repr(jar_rules.rules[0].action))  # <object object at 0x...>
     self.assertEquals(Duplicate.FAIL, jar_rules.default_dup_action)
 
   def test_bad_source_declaration(self):
-    build_file = self.add_to_build_file('BUILD', dedent('''
-        jvm_binary(name='foo',
-          main='com.example.Foo',
-          source=['foo.py'],
-        )
-        '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*foo.*source must be a single'):
-      self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
+      self.make_target(':foo', JvmBinary, main='com.example.Foo', source=['foo.py'])
 
   def test_bad_sources_declaration(self):
     with self.assertRaisesRegexp(Target.IllegalArgument,
@@ -133,26 +105,15 @@ class JvmBinaryTest(BaseTest):
       self.make_target('foo:foo', target_type=JvmBinary, main='com.example.Foo', sources=['foo.py'])
 
   def test_bad_main_declaration(self):
-    build_file = self.add_to_build_file('BUILD', dedent('''
-        jvm_binary(name='bar',
-          main=['com.example.Bar'],
-        )
-        '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*bar.*main must be a fully'):
-      self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'bar'))
+      self.make_target(':bar', JvmBinary, main=['com.example.Bar'])
 
   def test_bad_jar_rules(self):
-    build_file = self.add_to_build_file('BUILD', dedent('''
-        jvm_binary(name='foo',
-          main='com.example.Foo',
-          deploy_jar_rules='invalid',
-        )
-        '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                  r'Invalid target JvmBinary.*foo.*'
-                                  r'deploy_jar_rules must be a JarRules specification. got str'):
-      self.build_graph.inject_address_closure(BuildFileAddress(build_file, 'foo'))
+                                 r'Invalid target JvmBinary.*foo.*'
+                                 r'deploy_jar_rules must be a JarRules specification. got unicode'):
+      self.make_target(':foo', JvmBinary, main='com.example.Foo', deploy_jar_rules='invalid')
 
   def _assert_fingerprints_not_equal(self, fields):
     for field in fields:
@@ -167,12 +128,12 @@ class JvmBinaryTest(BaseTest):
     field2 = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.CONCAT)]))
     field3 = FingerprintedField(JarRules(rules=[Duplicate('bar', Duplicate.SKIP)]))
     field4 = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.SKIP),
-                                           Duplicate('bar', Duplicate.SKIP)]))
+                                                Duplicate('bar', Duplicate.SKIP)]))
     field5 = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.SKIP), Skip('foo')]))
     field6 = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.SKIP)],
-                                    default_dup_action=Duplicate.FAIL))
-    field6_same = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.SKIP)],
                                          default_dup_action=Duplicate.FAIL))
+    field6_same = FingerprintedField(JarRules(rules=[Duplicate('foo', Duplicate.SKIP)],
+                                              default_dup_action=Duplicate.FAIL))
     field7 = FingerprintedField(JarRules(rules=[Skip('foo')]))
     field8 = FingerprintedField(JarRules(rules=[Skip('bar')]))
     field8_same = FingerprintedField(JarRules(rules=[Skip('bar')]))
@@ -183,48 +144,36 @@ class JvmBinaryTest(BaseTest):
     self._assert_fingerprints_not_equal([field1, field2, field3, field4, field5, field6, field7])
 
   def test_manifest_entries(self):
-    self.add_to_build_file('BUILD', dedent('''
-        jvm_binary(name='foo',
-          main='com.example.Foo',
-          manifest_entries= {
-            'Foo-Field' : 'foo',
-          }
-        )
-        '''))
-    target = self.target('//:foo')
+    target = self.make_target(':foo',
+                              JvmBinary,
+                              main='com.example.Foo',
+                              manifest_entries={'Foo-Field': 'foo'})
     self.assertTrue(isinstance(target.payload.manifest_entries, ManifestEntries))
     entries = target.payload.manifest_entries.entries
-    self.assertEquals({ 'Foo-Field' : 'foo'}, entries)
+    self.assertEquals({'Foo-Field': 'foo'}, entries)
 
   def test_manifest_not_dict(self):
-    self.add_to_build_file('BUILD', dedent('''
-        jvm_binary(name='foo',
-          main='com.example.Foo',
-          manifest_entries= 'foo',
-        )
-        '''))
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmBinary\(BuildFileAddress\(.*BUILD\), foo\)\): '
-                                 r'manifest_entries must be a dict. got str'):
-       self.target('//:foo')
+                                 r'Invalid target JvmBinary.*foo.*: manifest_entries must be a '
+                                 r'dict. got unicode'):
+      self.make_target(':foo',
+                       JvmBinary,
+                       main='com.example.Foo',
+                       manifest_entries='foo')
 
   def test_manifest_bad_key(self):
-    self.add_to_build_file('BUILD', dedent('''
-        jvm_binary(name='foo',
-          main='com.example.Foo',
-          manifest_entries= {
-            jar(org='bad', name='bad', rev='bad') : 'foo',
-          }
-        )
-        '''))
     with self.assertRaisesRegexp(ManifestEntries.ExpectedDictionaryError,
-                                 r'entries must be dictionary of strings, got key bad-bad-bad type JarDependency'):
-      self.target('//:foo')
+                                 r'entries must be dictionary of strings, got key bad-bad-bad '
+                                 r'type JarDependency'):
+      self.make_target(':foo',
+                       JvmBinary,
+                       main='com.example.Foo',
+                       manifest_entries={JarDependency('bad', 'bad', 'bad'): 'foo'})
 
   def test_manifest_entries_fingerprint(self):
     field1 = ManifestEntries()
-    field2 = ManifestEntries({'Foo-Field' : 'foo'})
-    field2_same = ManifestEntries({'Foo-Field' : 'foo'})
-    field3 = ManifestEntries({'Foo-Field' : 'foo', 'Bar-Field' : 'bar'})
+    field2 = ManifestEntries({'Foo-Field': 'foo'})
+    field2_same = ManifestEntries({'Foo-Field': 'foo'})
+    field3 = ManifestEntries({'Foo-Field': 'foo', 'Bar-Field': 'bar'})
     self.assertEquals(field2.fingerprint(), field2_same.fingerprint())
     self._assert_fingerprints_not_equal([field1, field2, field3])

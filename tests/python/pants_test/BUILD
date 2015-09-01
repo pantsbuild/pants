@@ -25,10 +25,9 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:address',
     'src/python/pants/base:build_configuration',
+    'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_address_mapper',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:build_file_parser',
@@ -36,14 +35,15 @@ python_library(
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
     'src/python/pants/goal:products',
-    'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/option/util',
   ]
 )
 
@@ -51,19 +51,11 @@ python_library(
   name = 'int-test',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
+    '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
-)
-
-python_tests(
-  name = 'test_binary_util',
-  sources = ['test_binary_util.py',],
-  dependencies = [
-    ':base_test',
-    'src/python/pants:binary_util',
   ]
 )
 
@@ -74,17 +66,6 @@ python_tests(
     ':base_test',
     'src/python/pants/backend/maven_layout',
     'src/python/pants/base:build_file_aliases',
-  ]
-)
-
-python_tests(
-  name = 'test_thrift_util',
-  sources = ['test_thrift_util.py'],
-  dependencies = [
-    ':base_test',
-    'src/python/pants:thrift_util',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -102,9 +83,7 @@ target(
 target(
   name = 'all',
   dependencies = [
-    ':test_binary_util',
     ':test_maven_layout',
-    ':test_thrift_util',
     'tests/python/pants_test/android',
     'tests/python/pants_test/authentication:netrc',
     'tests/python/pants_test/backend',

@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -21,7 +21,9 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
   @classmethod
   def register_options(cls, register):
     super(ScalaPlatform, cls).register_options(register)
-    register('--runtime', advanced=True, type=Options.list, default=['//:scala-library'],
+    # No need to fingerprint --runtime, because it is automatically inserted as a
+    # dependency for the scala_library target.
+    register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.')
     cls.register_jvm_tool(register, 'scalac', default=['//:scala-compiler'])
 

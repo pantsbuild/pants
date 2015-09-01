@@ -19,17 +19,16 @@ from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.scm_build_file import ScmBuildFile
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup  # XXX(pl)
 from pants.logging.setup import setup_logging
+from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import ScopeInfo
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
@@ -49,7 +48,7 @@ class SourceRootBootstrapper(Subsystem):
     super(SourceRootBootstrapper, cls).register_options(register)
     # TODO: Get rid of bootstrap buildfiles in favor of source root registration at backend load
     # time.
-    register('--bootstrap-buildfiles', advanced=True, type=Options.list, default=[],
+    register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
              help='Initialize state by evaluating these buildfiles.')
 
   def bootstrap(self, address_mapper, build_file_parser):
@@ -66,43 +65,53 @@ class SourceRootBootstrapper(Subsystem):
 class GoalRunner(object):
   """Lists installed goals or else executes a named goal."""
 
-  def __init__(self, root_dir):
+  def __init__(self, root_dir, exiter=sys.exit):
     """
     :param root_dir: The root directory of the pants workspace.
+    :param exiter: An optional function that accepts an int exit code value and exits (for testing).
     """
     self.root_dir = root_dir
+    self._exiter = exiter
 
   @property
   def subsystems(self):
     # Subsystems used outside of any task.
     return SourceRootBootstrapper, Reporting, RunTracker
 
-  def setup(self):
-    options_bootstrapper = OptionsBootstrapper()
+  def setup(self, options_bootstrapper, working_set):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
+    global_bootstrap_options = bootstrap_options.for_global_scope()
+
+    # The pants_version may be set in pants.ini for bootstrapping, so we make sure the user actually
+    # requested the version on the command line before deciding to print the version and exit.
+    if global_bootstrap_options.is_flagged('pants_version'):
+      print(global_bootstrap_options.pants_version)
+      self._exiter(0)
 
     # Get logging setup prior to loading backends so that they can log as needed.
-    self._setup_logging(bootstrap_options.for_global_scope())
+    self._setup_logging(global_bootstrap_options)
 
-    # Add any extra paths to python path (eg for loading extra source backends)
-    for path in bootstrap_options.for_global_scope().pythonpath:
+    # Add any extra paths to python path (e.g., for loading extra source backends).
+    for path in global_bootstrap_options.pythonpath:
       sys.path.append(path)
       pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    plugins = bootstrap_options.for_global_scope().plugins
-    backend_packages = bootstrap_options.for_global_scope().backend_packages
-    build_configuration = load_plugins_and_backends(plugins, backend_packages)
+    plugins = global_bootstrap_options.plugins
+    backend_packages = global_bootstrap_options.backend_packages
+    build_configuration = load_plugins_and_backends(plugins, working_set, backend_packages)
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
     self.targets = []
 
-    known_scope_infos = [ScopeInfo.for_global_scope()]
+    known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]
 
     # Add scopes for all needed subsystems.
-    subsystems = (set(self.subsystems) | Goal.subsystems() | build_configuration.subsystems())
+    subsystems = Subsystem.closure(set(self.subsystems) |
+                                   Goal.subsystems() |
+                                   build_configuration.subsystems())
     for subsystem in subsystems:
-      known_scope_infos.append(ScopeInfo(subsystem.options_scope, ScopeInfo.GLOBAL_SUBSYSTEM))
+      known_scope_infos.append(subsystem.get_scope_info())
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
@@ -142,7 +151,7 @@ class GoalRunner(object):
                                   address_mapper=self.address_mapper)
 
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
-    with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnit.SETUP]):
+    with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
       source_root_bootstrapper = SourceRootBootstrapper.global_instance()
       source_root_bootstrapper.bootstrap(self.address_mapper, self.build_file_parser)
 
@@ -184,16 +193,18 @@ class GoalRunner(object):
         logger.warning(" Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.print_help_if_requested():
-      sys.exit(0)
+    if self.options.help_request:
+      help_printer = HelpPrinter(self.options)
+      help_printer.print_help()
+      self._exiter(0)
 
     self.requested_goals = goals
 
-    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnit.SETUP]):
+    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       spec_parser = CmdLineSpecParser(self.root_dir, self.address_mapper,
                                       spec_excludes=self.spec_excludes,
                                       exclude_target_regexps=self.global_options.exclude_target_regexp)
-      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnit.SETUP]):
+      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
         def filter_for_tag(tag):
           return lambda target: tag in map(str, target.tags)
         tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))

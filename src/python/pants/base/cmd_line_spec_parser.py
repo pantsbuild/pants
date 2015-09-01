@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet, maybe_list
 
-from pants.base.address import BuildFileAddress, parse_spec
+from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
 
@@ -129,9 +129,6 @@ class CmdLineSpecParser(object):
       addresses = set()
       spec_path = spec[:-len('::')]
       spec_dir = normalize_spec_path(spec_path)
-      if not os.path.isdir(os.path.join(self._root_dir, spec_dir)):
-        raise self.BadSpecError('Can only recursive glob directories and {0} is not a valid dir'
-                                .format(spec_dir))
       try:
         build_files = self._address_mapper.scan_buildfiles(self._root_dir, spec_dir,
                                                            spec_excludes=self._spec_excludes)
@@ -167,7 +164,7 @@ class CmdLineSpecParser(object):
       spec_parts[0] = normalize_spec_path(spec_parts[0])
       spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        build_file = self._address_mapper.from_cache(self._root_dir, spec_path)
-        return set([BuildFileAddress(build_file, target_name)])
+        self._address_mapper.from_cache(self._root_dir, spec_path)
       except BuildFile.BuildFileError as e:
         raise self.BadSpecError(e)
+      return {Address(spec_path, target_name)}

@@ -11,7 +11,6 @@ python_library(
 target(
   name = 'targets',
   dependencies = [
-    ':jar_library',
     ':java_agent',
     ':python_binary',
     ':python_target',
@@ -25,7 +24,17 @@ target(
   name = 'integration',
   dependencies = [
     ':scala_library_integration',
+    ':unknown_arguments_integration',
   ],
+)
+
+python_tests(
+  name = 'unknown_arguments_integration',
+  sources = ['test_unknown_arguments_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
 )
 
 python_tests(
@@ -36,16 +45,6 @@ python_tests(
     'src/python/pants/base:build_graph',
     'src/python/pants/backend/core/targets:common',
   ]
-)
-
-python_tests(
-  name = 'jar_library',
-  sources = ['test_jar_library.py'],
-  dependencies = [
-    ':base',
-    'src/python/pants/base:target',
-    'src/python/pants/backend/jvm/targets:jvm',
-    ]
 )
 
 python_tests(

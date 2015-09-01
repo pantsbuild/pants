@@ -22,6 +22,7 @@ from pants.fs.archive import ZIP
 
 logger = logging.getLogger(__name__)
 
+
 class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):
@@ -40,8 +41,7 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
 class UnpackJars(Task):
   """Looks for UnpackedJars targets and unpacks them.
 
-     Adds an entry to SourceRoot for the contents.  Initially only
-     supported by JavaProtobufLibrary.
+     Adds an entry to SourceRoot for the contents.
   """
 
   class InvalidPatternError(Exception):
@@ -56,13 +56,14 @@ class UnpackJars(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(UnpackJars, cls).prepare(options, round_manager)
     round_manager.require_data('ivy_imports')
 
   def _unpack_dir(self, unpacked_jars):
     return os.path.normpath(os.path.join(self._workdir, unpacked_jars.id))
 
   @classmethod
-  def _unpack_filter(cls, filename, include_patterns, exclude_patterns):
+  def _file_filter(cls, filename, include_patterns, exclude_patterns):
     """:return: True if the file should be allowed through the filter"""
     for exclude_pattern in exclude_patterns:
       if exclude_pattern.match(filename):
@@ -89,6 +90,34 @@ class UnpackJars(Task):
           .format(field_name=field_name, field_value=p, spec=spec, msg=e))
     return compiled_patterns
 
+  @classmethod
+  def calculate_unpack_filter(cls, includes=[], excludes=[], spec=None):
+    """Take regex patterns and return a filter function.
+
+    :param list includes: List of include patterns to pass to _file_filter.
+    :param list excludes: List of exclude patterns to pass to _file_filter.
+
+    """
+    include_patterns = cls._compile_patterns(includes,
+                                             field_name='include_patterns',
+                                             spec=spec)
+    exclude_patterns = cls._compile_patterns(excludes,
+                                             field_name='exclude_patterns',
+                                             spec=spec)
+    return lambda f: cls._file_filter(f, include_patterns, exclude_patterns)
+
+  # TODO(mateor) move unpack code that isn't jar-specific to fs.archive or an Unpack base class.
+
+  @classmethod
+  def get_unpack_filter(cls, unpacked_jars):
+    """Calculate a filter function from the include/exclude patterns of a Target.
+
+    :param Target unpacked_jars: A target with include_patterns and exclude_patterns attributes.
+    """
+    return cls.calculate_unpack_filter(includes=unpacked_jars.include_patterns,
+                                       excludes=unpacked_jars.exclude_patterns,
+                                       spec=unpacked_jars.address.spec)
+
   def _unpack(self, unpacked_jars):
     """Extracts files from the downloaded jar files and places them in a work directory.
 
@@ -100,14 +129,7 @@ class UnpackJars(Task):
     if not os.path.exists(unpack_dir):
       os.makedirs(unpack_dir)
 
-    include_patterns = self._compile_patterns(unpacked_jars.include_patterns,
-                                              field_name='include_patterns',
-                                              spec=unpacked_jars.address.spec)
-    exclude_patterns = self._compile_patterns(unpacked_jars.exclude_patterns,
-                                              field_name='exclude_patterns',
-                                              spec=unpacked_jars.address.spec)
-
-    unpack_filter = lambda f: self._unpack_filter(f, include_patterns, exclude_patterns)
+    unpack_filter = self.get_unpack_filter(unpacked_jars)
     products = self.context.products.get('ivy_imports')
     jarmap = products[unpacked_jars]
 

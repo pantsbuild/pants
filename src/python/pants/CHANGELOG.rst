@@ -1,6 +1,710 @@
 RELEASE HISTORY
 ===============
 
+0.0.45 (8/28/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+In this release, the methods `with_sources()`, `with_docs()` and `with_artifact()`
+were removed from the jar() syntax in BUILD files.   They have been deprecated since
+Pants version 0.0.29.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove with_artifact(), with_sources(), and with_docs() from JarDependency
+  `RB #2687 <https://rbcommons.com/s/twitter/r/2687>`_
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade zincutils to 0.3.1 for parse_deps bug fix
+  `RB #2705 <https://rbcommons.com/s/twitter/r/2705>`_
+
+* Fix PythonThriftBuilder to operate on 1 target.
+  `RB #2696 <https://rbcommons.com/s/twitter/r/2696>`_
+
+* Ensure stdlib check uses normalized paths.
+  `RB #2693 <https://rbcommons.com/s/twitter/r/2693>`_
+
+* Hack around a few Distribution issues in py tests.
+  `RB #2692 <https://rbcommons.com/s/twitter/r/2692>`_
+
+* Fix GoBuildgen classname and a comment typo.
+  `RB #2689 <https://rbcommons.com/s/twitter/r/2689>`_
+
+* Making --coverage-open work for cobertura.
+  `RB #2670 <https://rbcommons.com/s/twitter/r/2670>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Implementing support for Wire 2.0 multiple proto paths.
+  `RB #2717 <https://rbcommons.com/s/twitter/r/2717>`_
+
+* [pantsd] PantsService, FSEventService & WatchmanLauncher
+  `RB #2686 <https://rbcommons.com/s/twitter/r/2686>`_
+
+* Add NodeDistribution to seed a node backend.
+  `RB #2703 <https://rbcommons.com/s/twitter/r/2703>`_
+
+* Created DistributionLocator subsystem with jvm-distributions option-space.
+  `RB #2677 <https://rbcommons.com/s/twitter/r/2677>`_
+
+* Added support for wire 2.0 arguments and beefed up tests
+  `RB #2688 <https://rbcommons.com/s/twitter/r/2688>`_
+
+* Initial commit of checkstyle
+  `RB #2593 <https://rbcommons.com/s/twitter/r/2593>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Removed scan workunit; mapping workunits now debug
+  `RB #2721 <https://rbcommons.com/s/twitter/r/2721>`_
+
+* Implement caching for the thrift linter.
+  `RB #2718 <https://rbcommons.com/s/twitter/r/2718>`_
+
+* Refactor JvmDependencyAnalyzer into a task
+  `RB #2668 <https://rbcommons.com/s/twitter/r/2668>`_
+
+* Refactor plugin system to allow for easier extension by others
+  `RB #2706 <https://rbcommons.com/s/twitter/r/2706>`_
+
+* Indented code which prints warnings for unrecognized os's.
+  `RB #2713 <https://rbcommons.com/s/twitter/r/2713>`_
+
+* Fixup existing docs and add missing docs.
+  `RB #2708 <https://rbcommons.com/s/twitter/r/2708>`_
+
+* Requiring explicit dependency on the DistributionLocator subsystem.
+  `RB #2707 <https://rbcommons.com/s/twitter/r/2707>`_
+
+* Reorganize option help.
+  `RB #2695 <https://rbcommons.com/s/twitter/r/2695>`_
+
+* Set 'pants-reviews' as the default group.
+  `RB #2702 <https://rbcommons.com/s/twitter/r/2702>`_
+
+* Update to zinc 1.0.9 and sbt 0.13.9
+  `RB #2658 <https://rbcommons.com/s/twitter/r/2658>`_
+
+* Test the individual style checks and only disable the check that is currently failing CI
+  `RB #2697 <https://rbcommons.com/s/twitter/r/2697>`_
+
+0.0.44 (8/21/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+In this release Go support should be considered beta.  Most features you'd expect are implemented
+including a `buildgen.go` task that can maintain your Go BUILD files as inferred from just
+`go_binary` target definitions.  Yet to come is `doc` goal integration and an option to wire
+in-memory `buildgen.go` as an implicit bootstrap task in any pants run that includes Go targets.
+
+Also in this release is improved control over the tools pants uses, in particular JVM selection
+control.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove deprecated `[compile.java]` options.
+  `RB #2678 <https://rbcommons.com/s/twitter/r/2678>`_
+
+Bugfixes
+~~~~~~~~
+
+* Better caching for Python interpreters and requirements.
+  `RB #2679 <https://rbcommons.com/s/twitter/r/2679>`_
+
+* Fixup use of removed flag `compile.java --target` in integration tests.
+  `RB #2680 <https://rbcommons.com/s/twitter/r/2680>`_
+
+* Add support for fetching Go test deps.
+  `RB #2671 <https://rbcommons.com/s/twitter/r/2671>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Integrate Go with the binary goal.
+  `RB #2681 <https://rbcommons.com/s/twitter/r/2681>`_
+
+* Initial support for Go BUILD gen.
+  `RB #2676 <https://rbcommons.com/s/twitter/r/2676>`_
+
+* Adding jdk_paths option to jvm subsystem.
+  `RB #2657 <https://rbcommons.com/s/twitter/r/2657>`_
+
+* Allow specification of kwargs that are not currently known.
+  `RB #2662 <https://rbcommons.com/s/twitter/r/2662>`_
+
+* Allow os name map in binary_util to be configured externally
+  `RB #2663 <https://rbcommons.com/s/twitter/r/2663>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Watchman & StreamableWatchmanClient
+  `RB #2649 <https://rbcommons.com/s/twitter/r/2649>`_
+
+* Upgrade the default Go distribution to 1.5.
+  `RB #2669 <https://rbcommons.com/s/twitter/r/2669>`_
+
+* Align JmakeCompile error messages with reality.
+  `RB #2682 <https://rbcommons.com/s/twitter/r/2682>`_
+
+* Fixing BUILD files which had integration tests running in :all.
+  `RB #2664 <https://rbcommons.com/s/twitter/r/2664>`_
+
+* Remove log options from the zinc Setup to fix performance issue
+  `RB #2666 <https://rbcommons.com/s/twitter/r/2666>`_
+
+0.0.43 (8/19/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release makes the isolated jvm compile strategy viable out-of-the-box for use with large
+dependency graphs. Without it, `test.junit` and `run.jvm` performance slows down significantly
+due to the large number of loose classfile directories.
+
+Please try it out in your repo by grabbing a copy of `pants.ini.isolated
+<https://github.com/pantsbuild/pants/blob/master/pants.ini.isolated>`_ and using a command like::
+
+    ./pants --config-override=pants.ini.isolated test examples/{src,tests}/{scala,java}/::
+
+You'll like the results.  Just update your own `pants.ini` with the pants.ini.isolated settings to
+use it by default!
+
+In the medium term, we're interested in making the isolated strategy the default jvm compilation
+strategy, so your assistance and feedback is appreciated!
+
+Special thanks to Stu Hood and Nick Howard for lots of work over the past months to get this point.
+
+API Changes
+~~~~~~~~~~~
+
+* A uniform way of expressing Task and Subsystem dependencies.
+  `Issue #1957 <https://github.com/pantsbuild/pants/issues/1957>`_
+  `RB #2653 <https://rbcommons.com/s/twitter/r/2653>`_
+
+* Remove some coverage-related options from test.junit.
+  `RB #2639 <https://rbcommons.com/s/twitter/r/2639>`_
+
+* Bump mock and six 3rdparty versions to latest
+  `RB #2633 <https://rbcommons.com/s/twitter/r/2633>`_
+
+* Re-implement suppression of output from compiler workunits
+  `RB #2590 <https://rbcommons.com/s/twitter/r/2590>`_
+
+Bugfixes
+~~~~~~~~
+
+* Improved go remote library support.
+  `RB #2655 <https://rbcommons.com/s/twitter/r/2655>`_
+
+* Shorten isolation generated jar paths
+  `RB #2647 <https://rbcommons.com/s/twitter/r/2647>`_
+
+* Fix duplicate login options when publishing.
+  `RB #2560 <https://rbcommons.com/s/twitter/r/2560>`_
+
+* Fixed no attribute exception in changed goal.
+  `RB #2645 <https://rbcommons.com/s/twitter/r/2645>`_
+
+* Fix goal idea issues with mistakenly identifying a test folder as regular code, missing resources
+  folders, and resources folders overriding code folders.
+  `RB #2046 <https://rbcommons.com/s/twitter/r/2046>`_
+  `RB #2642 <https://rbcommons.com/s/twitter/r/2642>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support for running junit tests with different jvm versions.
+  `RB #2651 <https://rbcommons.com/s/twitter/r/2651>`_
+
+* Add support for jar'ing compile outputs in the isolated strategy.
+  `RB #2643 <https://rbcommons.com/s/twitter/r/2643>`_
+
+* Tests for 'java-resoures' and 'java-test-resources' in idea
+  `RB #2046 <https://rbcommons.com/s/twitter/r/2046>`_
+  `RB #2634 <https://rbcommons.com/s/twitter/r/2634>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Filter zinc compilation warnings at the Reporter level
+  `RB #2656 <https://rbcommons.com/s/twitter/r/2656>`_
+
+* Update to sbt 0.13.9.
+  `RB #2629 <https://rbcommons.com/s/twitter/r/2629>`_
+
+* Speeding up jvm-platform-validate step.
+  `Issue #1972 <https://github.com/pantsbuild/pants/issues/1972>`_
+  `RB #2626 <https://rbcommons.com/s/twitter/r/2626>`_
+
+* Added test that failed HTTP responses do not raise exceptions in artifact cache
+  `RB #2624 <https://rbcommons.com/s/twitter/r/2624>`_
+  `RB #2644 <https://rbcommons.com/s/twitter/r/2644>`_
+
+* Tweak to option default extraction for help display.
+  `RB #2640 <https://rbcommons.com/s/twitter/r/2640>`_
+
+* A few small install doc fixes.
+  `RB #2638 <https://rbcommons.com/s/twitter/r/2638>`_
+
+* Detect new package when doing ownership checks.
+  `RB #2637 <https://rbcommons.com/s/twitter/r/2637>`_
+
+* Use os.path.realpath on test tmp dirs to appease OSX.
+  `RB #2635 <https://rbcommons.com/s/twitter/r/2635>`_
+
+* Update the pants install documentation. #docfixit
+  `RB #2631 <https://rbcommons.com/s/twitter/r/2631>`_
+
+0.0.42 (8/14/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This was #docfixit week, so the release contains more doc and help improvements than usual.
+Thanks in particular to Benjy for continued `./pants help` polish!
+
+This release also add support for golang in the `contrib/go` package. Thanks to Cody Gibb and
+John Sirois for that work.
+
+API Changes
+~~~~~~~~~~~
+
+* Elevate the pants version to a first class option
+  `RB #2627 <https://rbcommons.com/s/twitter/r/2627>`_
+
+* Support pants plugin resolution for easier inclusion of published plugins
+  `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
+  `RB #2622 <https://rbcommons.com/s/twitter/r/2622>`_
+
+* Pin pex==1.0.3, alpha-sort & remove line breaks
+  `RB #2598 <https://rbcommons.com/s/twitter/r/2598>`_
+  `RB #2596 <https://rbcommons.com/s/twitter/r/2596>`_
+
+* Moved classifier from IvyArtifact to IvyModuleRef
+  `RB #2579 <https://rbcommons.com/s/twitter/r/2579>`_
+
+Bugfixes
+~~~~~~~~
+
+* Ignore 'NonfatalArtifactCacheError' when calling the artifact cache in the background
+  `RB #2624 <https://rbcommons.com/s/twitter/r/2624>`_
+
+* Re-Add debug option to benchmark run task, complain on no jvm targets, add test
+  `RB #2619 <https://rbcommons.com/s/twitter/r/2619>`_
+
+* Fixed what_changed for removed files
+  `RB #2589 <https://rbcommons.com/s/twitter/r/2589>`_
+
+* Disable jvm-platform-analysis by default
+  `Issue #1972 <https://github.com/pantsbuild/pants/issues/1972>`_
+  `RB #2618 <https://rbcommons.com/s/twitter/r/2618>`_
+
+* Fix ./pants help_advanced
+  `RB #2616 <https://rbcommons.com/s/twitter/r/2616>`_
+
+* Fix some more missing globs in build-file-rev mode.
+  `RB #2591 <https://rbcommons.com/s/twitter/r/2591>`_
+
+* Make jvm bundles output globs in filedeps with --globs.
+  `RB #2583 <https://rbcommons.com/s/twitter/r/2583>`_
+
+* Fix more realpath issues
+  `Issue #1933 <https://github.com/pantsbuild/pants/issues/1933>`_
+  `RB #2582 <https://rbcommons.com/s/twitter/r/2582>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow plaintext-reporter to be able to respect a task's --level and --colors options.
+  `RB #2580 <https://rbcommons.com/s/twitter/r/2580>`_
+  `RB #2614 <https://rbcommons.com/s/twitter/r/2614>`_
+
+* contrib/go: Support for Go
+  `RB #2544 <https://rbcommons.com/s/twitter/r/2544>`_
+
+* contrib/go: Setup a release sdist
+  `RB #2609 <https://rbcommons.com/s/twitter/r/2609>`_
+
+* contrib/go: Remote library support
+  `RB #2611 <https://rbcommons.com/s/twitter/r/2611>`_
+  `RB #2623 <https://rbcommons.com/s/twitter/r/2623>`_
+
+* contrib/go: Introduce GoDistribution
+  `RB #2595 <https://rbcommons.com/s/twitter/r/2595>`_
+
+* contrib/go: Integrate GoDistribution with GoTask
+  `RB #2600 <https://rbcommons.com/s/twitter/r/2600>`_
+
+* Add support for android compilation with contrib/scrooge
+  `RB #2553 <https://rbcommons.com/s/twitter/r/2553>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added more testimonials to the Powered By page. #docfixit
+  `RB #2625 <https://rbcommons.com/s/twitter/r/2625>`_
+
+* Fingerprint more task options; particularly scalastyle configs
+  `RB #2628 <https://rbcommons.com/s/twitter/r/2628>`_
+
+* Fingerprint jvm tools task options by default
+  `RB #2620 <https://rbcommons.com/s/twitter/r/2620>`_
+
+* Make most compile-related options advanced. #docfixit
+  `RB #2617 <https://rbcommons.com/s/twitter/r/2617>`_
+
+* Make almost all global options advanced. #docfixit
+  `RB #2602 <https://rbcommons.com/s/twitter/r/2602>`_
+
+* Improve cmd-line help output. #docfixit
+  `RB #2599 <https://rbcommons.com/s/twitter/r/2599>`_
+
+* Default `-Dscala.usejavacp=true` for ScalaRepl.
+  `RB #2613 <https://rbcommons.com/s/twitter/r/2613>`_
+
+* Additional Option details for the Task developers guide. #docfixit
+  `RB #2594 <https://rbcommons.com/s/twitter/r/2594>`_
+  `RB #2612 <https://rbcommons.com/s/twitter/r/2612>`_
+
+* Improve subsystem testing support in subsystem_util.
+  `RB #2603 <https://rbcommons.com/s/twitter/r/2603>`_
+
+* Cleanups to the tasks developer's guide #docfixit
+  `RB #2594 <https://rbcommons.com/s/twitter/r/2594>`_
+
+* Add the optionable class to ScopeInfo. #docfixit
+  `RB #2588 <https://rbcommons.com/s/twitter/r/2588>`_
+
+* Add `pants_plugin` and `contrib_plugin` targets.
+  `RB #2615 <https://rbcommons.com/s/twitter/r/2615>`_
+
+0.0.41 (8/7/2015)
+-----------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+Configuration for specifying scala/java compilation using zinc has
+changed in this release.
+
+You may need to combine `[compile.zinc-java]` and `[compile.scala]`
+into the new section `[compile.zinc]`
+
+The `migrate_config` tool will help you migrate your pants.ini settings
+for this new release.  Download the pants source code and run:
+
+.. code::
+
+  ./pants run migrations/options/src/python:migrate_config --  <path to your pants.ini>
+
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade pex to 1.0.2.
+  `RB #2571 <https://rbcommons.com/s/twitter/r/2571>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Fix ApacheThriftGen chroot normalization scope.
+  `RB #2568 <https://rbcommons.com/s/twitter/r/2568>`_
+
+* Fix crasher when no jvm_options are set
+  `RB #2578 <https://rbcommons.com/s/twitter/r/2578>`_
+
+* Handle recursive globs with build-file-rev
+  `RB #2572 <https://rbcommons.com/s/twitter/r/2572>`_
+
+* Fixup PythonTask chroot caching.
+  `RB #2567 <https://rbcommons.com/s/twitter/r/2567>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add "omnivorous" ZincCompile to consume both java and scala sources
+  `RB #2561 <https://rbcommons.com/s/twitter/r/2561>`_
+
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Do fewer classpath calculations in `junit_run`.
+  `RB #2576 <https://rbcommons.com/s/twitter/r/2576>`_
+
+* fix misc ws issues
+  `RB #2564 <https://rbcommons.com/s/twitter/r/2564>`_
+  `RB #2557 <https://rbcommons.com/s/twitter/r/2557>`_
+
+* Resurrect the --[no-]lock global flag
+  `RB #2563 <https://rbcommons.com/s/twitter/r/2563>`_
+
+* Avoid caching volatile ~/.cache/pants/stats dir.
+  `RB #2574 <https://rbcommons.com/s/twitter/r/2574>`_
+
+* remove unused imports
+  `RB #2556 <https://rbcommons.com/s/twitter/r/2556>`_
+
+* Moved logic which validates jvm platform dependencies.
+  `RB #2565 <https://rbcommons.com/s/twitter/r/2565>`_
+
+* Bypass the pip cache when testing released sdists.
+  `RB #2555 <https://rbcommons.com/s/twitter/r/2555>`_
+
+* Add an affordance for 1 flag implying another.
+  `RB #2562 <https://rbcommons.com/s/twitter/r/2562>`_
+
+* Make artifact cache `max-entries-per-target` option name match its behaviour
+  `RB #2550 <https://rbcommons.com/s/twitter/r/2550>`_
+
+* Improve stats upload.
+  `RB #2554 <https://rbcommons.com/s/twitter/r/2554>`_
+
+
+0.0.40 (7/31/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+The apache thrift gen for java code now runs in `-strict` mode by default, requiring
+all struct fields declare a field id.  You can use the following configuration in
+pants.ini to retain the old default behavior and turn strict checking off:
+
+.. code::
+
+  [gen.thrift]
+  strict: False
+
+The psutil dependency used by pants has been upgraded to 3.1.1. Supporting eggs have been uploaded
+to https://github.com/pantsbuild/cheeseshop/tree/gh-pages/third_party/python/dist. *Please note*
+that beyond this update, no further binary dependency updates will be provided at this location.
+
+API Changes
+~~~~~~~~~~~
+
+* Integrate the Android SDK, android-library
+  `RB #2528 <https://rbcommons.com/s/twitter/r/2528>`_
+
+Bugfixes
+~~~~~~~~
+
+* Guard against NoSuchProcess in the public API.
+  `RB #2551 <https://rbcommons.com/s/twitter/r/2551>`_
+
+* Fixup psutil.Process attribute accesses.
+  `RB #2549 <https://rbcommons.com/s/twitter/r/2549>`_
+
+* Removes type=Option.list from --compile-jvm-args option and --compile-scala-plugins
+  `RB #2536 <https://rbcommons.com/s/twitter/r/2536>`_
+  `RB #2547 <https://rbcommons.com/s/twitter/r/2547>`_
+
+* Prevent nailgun on nailgun violence when using symlinked java paths
+  `RB #2538 <https://rbcommons.com/s/twitter/r/2538>`_
+
+* Declaring product_types for simple_codegen_task.
+  `RB #2540 <https://rbcommons.com/s/twitter/r/2540>`_
+
+* Fix straggler usage of legacy psutil form
+  `RB #2546 <https://rbcommons.com/s/twitter/r/2546>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Added JvmPlatform subsystem and added platform arg to JvmTarget.
+  `RB #2494 <https://rbcommons.com/s/twitter/r/2494>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Resolve targets before creating PayloadField
+  `RB #2496 <https://rbcommons.com/s/twitter/r/2496>`_
+  `RB #2536 <https://rbcommons.com/s/twitter/r/2536>`_
+
+* Upgrade psutil to 3.1.1
+  `RB #2543 <https://rbcommons.com/s/twitter/r/2543>`_
+
+* Move thrift utils only used by scrooge to contrib/scrooge.
+  `RB #2535 <https://rbcommons.com/s/twitter/r/2535>`_
+
+* docs: add link to slackin self-invite
+  `RB #2537 <https://rbcommons.com/s/twitter/r/2537>`_
+
+* Add Clover Health to the Powered By page
+  `RB #2539 <https://rbcommons.com/s/twitter/r/2539>`_
+
+* Add Powered By page
+  `RB #2532 <https://rbcommons.com/s/twitter/r/2532>`_
+
+* Create test for java_antlr_library
+  `RB #2504 <https://rbcommons.com/s/twitter/r/2504>`_
+
+* Migrate ApacheThriftGen to SimpleCodegenTask.
+  `RB #2534 <https://rbcommons.com/s/twitter/r/2534>`_
+
+* Covert RagelGen to SimpleCodeGen.
+  `RB #2531 <https://rbcommons.com/s/twitter/r/2531>`_
+
+* Shade the Checkstyle task tool jar.
+  `RB #2533 <https://rbcommons.com/s/twitter/r/2533>`_
+
+* Support eggs for setuptools and wheel.
+  `RB #2529 <https://rbcommons.com/s/twitter/r/2529>`_
+
+0.0.39 (7/23/2015)
+------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Disallow jar_library targets without jars
+  `RB #2519 <https://rbcommons.com/s/twitter/r/2519>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup PythonChroot to ignore synthetic targets.
+  `RB #2523 <https://rbcommons.com/s/twitter/r/2523>`_
+
+* Exclude provides clauses regardless of soft_excludes
+  `RB #2524 <https://rbcommons.com/s/twitter/r/2524>`_
+
+* Fixed exclude id when name is None + added a test for excludes by just an org #1857
+  `RB #2518 <https://rbcommons.com/s/twitter/r/2518>`_
+
+* Fixup SourceRoot to handle the buildroot.
+  `RB #2514 <https://rbcommons.com/s/twitter/r/2514>`_
+
+* Fixup SetupPy handling of exported thrift.
+  `RB #2511 <https://rbcommons.com/s/twitter/r/2511>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Invalidate tasks based on BinaryUtil.version.
+  `RB #2516 <https://rbcommons.com/s/twitter/r/2516>`_
+
+* Remove local cache files
+  `Issue #1762 <https://github.com/pantsbuild/pants/issues/1762>`_
+  `RB #2506 <https://rbcommons.com/s/twitter/r/2506>`_
+
+* Option to expose intransitive target dependencies for the dependencies goal
+  `RB #2503 <https://rbcommons.com/s/twitter/r/2503>`_
+
+* Introduce Subsystem dependencies.
+  `RB #2509 <https://rbcommons.com/s/twitter/r/2509>`_
+  `RB #2515 <https://rbcommons.com/s/twitter/r/2515>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Increase robustness of ProcessManager.terminate() in the face of zombies.
+  `RB #2513 <https://rbcommons.com/s/twitter/r/2513>`_
+
+* A global isort fix.
+  `RB #2510 <https://rbcommons.com/s/twitter/r/2510>`_
+
+0.0.38 (7/21/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+A quick hotfix release to pick up a fix related to incorrectly specified scala targets.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove the with_description method from target.
+  `RB #2507 <https://rbcommons.com/s/twitter/r/2507>`_
+
+Bugfixes
+~~~~~~~~
+
+* Handle the case where there are no classes for a target.
+  `RB #2489 <https://rbcommons.com/s/twitter/r/2489>`_
+
+New Features
+~~~~~~~~~~~~
+
+None.
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor AntlrGen to use SimpleCodeGen.
+  `RB #2487 <https://rbcommons.com/s/twitter/r/2487>`_
+
+0.0.37 (7/20/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is the regularly scheduled release for 7/17/2015 (slightly behind schedule!)
+
+API Changes
+~~~~~~~~~~~
+
+* Unified support for process management, to prepare for a new daemon.
+  `RB #2490 <https://rbcommons.com/s/twitter/r/2490>`_
+
+* An iterator over Option registration args.
+  `RB #2478 <https://rbcommons.com/s/twitter/r/2478>`_
+
+* An iterator over OptionValueContainer keys.
+  `RB #2472 <https://rbcommons.com/s/twitter/r/2472>`_
+
+Bugfixes
+~~~~~~~~
+
+* Correctly classify files as resources or classes
+  `RB #2488 <https://rbcommons.com/s/twitter/r/2488>`_
+
+* Fix test bugs introduced during the target cache refactor.
+  `RB #2483 <https://rbcommons.com/s/twitter/r/2483>`_
+
+* Don't explicitly enumerate goal scopes: makes life easier for the IntelliJ pants plugin.
+  `RB #2500 <https://rbcommons.com/s/twitter/r/2500>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Switch almost all python tasks over to use cached chroots.
+  `RB #2486 <https://rbcommons.com/s/twitter/r/2486>`_
+
+* Add invalidation report flag to reporting subsystem.
+  `RB #2448 <https://rbcommons.com/s/twitter/r/2448>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a note about the pantsbuild slack team.
+  `RB #2491 <https://rbcommons.com/s/twitter/r/2491>`_
+
+* Upgrade pantsbuild/pants to apache thrift 0.9.2.
+  `RB #2484 <https://rbcommons.com/s/twitter/r/2484>`_
+
+* Remove unused --lang option from protobuf_gen.py
+  `RB #2485 <https://rbcommons.com/s/twitter/r/2485>`_
+
+* Update release docs to recommend both server-login and pypi sections.
+  `RB #2481 <https://rbcommons.com/s/twitter/r/2481>`_
+
 0.0.36 (7/14/2015)
 ------------------
 

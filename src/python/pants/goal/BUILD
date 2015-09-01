@@ -32,7 +32,6 @@ python_library(
   dependencies = [
     ':products',
     ':workspace',
-    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:source_root',
@@ -67,6 +66,7 @@ python_library(
   sources = ['products.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -76,6 +76,8 @@ python_library(
   dependencies = [
     ':aggregated_timings',
     ':artifact_cache_stats',
+    '3rdparty/python:requests',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',

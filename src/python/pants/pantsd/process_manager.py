@@ -40,7 +40,7 @@ class ProcessGroup(object):
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.cmdline[0], pid=process.pid, process_name=process.cmdline[0])
+    return ProcessManager(name=process.name(), pid=process.pid, process_name=process.name())
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
@@ -56,11 +56,14 @@ class ProcessGroup(object):
 class ProcessManager(object):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
+  class ExecutionError(Exception): pass
+  class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
 
-  WAIT_INTERVAL = .1
-  KILL_WAIT = 1
+  WAIT_INTERVAL_SEC = .1
+  FILE_WAIT_SEC = 10
+  KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
   def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=None):
@@ -74,26 +77,47 @@ class ProcessManager(object):
 
   @property
   def name(self):
+    """The logical name/label of the process."""
     return self._name
 
   @property
-  def exe(self):
-    try:
-      return self.as_process().cmdline[0]
-    except AssertionError:
-      return None
-
-  @property
   def process_name(self):
+    """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
     return self._process_name
 
   @property
+  def cmdline(self):
+    """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex'].
+
+    :returns: The command line or else `None` if the underlying process has died.
+    """
+    try:
+      process = self._as_process()
+      if process:
+        return process.cmdline()
+    except psutil.NoSuchProcess:
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+      pass
+    return None
+
+  @property
+  def cmd(self):
+    """The first element of the process commandline e.g. '/usr/bin/python2.7'.
+
+    :returns: The first element of the process command line or else `None` if the underlying
+              process has died.
+    """
+    return (self.cmdline or [None])[0]
+
+  @property
   def pid(self):
-    return self._pid or self.get_pid()
+    """The running processes pid (or None)."""
+    return self._pid or self._get_pid()
 
   @property
   def socket(self):
-    return self._socket or self.get_socket()
+    """The running processes socket/port information (or None)."""
+    return self._socket or self._get_socket()
 
   @staticmethod
   def _maybe_cast(x, caster):
@@ -102,9 +126,18 @@ class ProcessManager(object):
     except (TypeError, ValueError):
       return x
 
-  def as_process(self):
-    assert self.is_alive(), 'cannot get process for a non-running process'
-    if not self._process:
+  def _as_process(self):
+    """Returns a psutil `Process` object wrapping our pid.
+
+    NB: Even with a process object in hand, subsequent method calls against it can always raise
+    `NoSuchProcess`.  Care is needed to document the raises in the public API or else trap them and
+    do something sensible for the API.
+
+    :returns: a psutil Process object or else None if we have no pid.
+    :rtype: :class:`psutil.Process`
+    :raises: :class:`psutil.NoSuchProcess` if the process identified by our pid has died.
+    """
+    if self._process is None and self.pid:
       self._process = psutil.Process(self.pid)
     return self._process
 
@@ -116,27 +149,47 @@ class ProcessManager(object):
     with safe_open(filename, 'wb') as f:
       f.write(payload)
 
-  def _wait_for_file(self, filename, timeout=10, want_content=True):
-    """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
-    start_time = time.time()
-    while 1:
-      if os.path.exists(filename) and (not want_content or os.path.getsize(filename)): return
+  def _deadline_until(self, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):
+    """Execute a function/closure repeatedly until a True condition or timeout is met.
 
-      if time.time() - start_time > timeout:
-        raise self.Timeout('exceeded timeout of {sec} seconds while waiting for file {filename}'
-                           .format(sec=timeout, filename=filename))
-      else:
-        time.sleep(self.WAIT_INTERVAL)
+    :param func closure: the function/closure to execute (should not block for long periods of time
+                         and must return True on success).
+    :param float timeout: the maximum amount of time to wait for a true result from the closure in
+                          seconds. N.B. this is timing based, so won't be exact if the runtime of
+                          the closure exceeds the timeout.
+    :param float wait_interval: the amount of time to sleep between closure invocations.
+    :raises: :class:`ProcessManager.Timeout` on execution timeout.
+    """
+    deadline = time.time() + timeout
+    while 1:
+      if closure():
+        return True
+      elif time.time() > deadline:
+        raise self.Timeout('exceeded timeout of {} seconds for {}'.format(timeout, closure))
+      elif wait_interval:
+        time.sleep(wait_interval)
+
+  def _wait_for_file(self, filename, timeout=FILE_WAIT_SEC, want_content=True):
+    """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
+    def file_waiter():
+      return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
+
+    try:
+      return self._deadline_until(file_waiter, timeout)
+    except self.Timeout:
+      # Re-raise with a more helpful exception message.
+      raise self.Timeout('exceeded timeout of {} seconds while waiting for file {} to appear'
+                         .format(timeout, filename))
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
     self._wait_for_file(self.get_pid_path(), timeout)
-    return self.get_pid()
+    return self._get_pid()
 
   def await_socket(self, timeout):
     """Wait up to a given timeout for a process to write socket info."""
     self._wait_for_file(self.get_socket_path(), timeout)
-    return self.get_socket()
+    return self._get_socket()
 
   def get_metadata_dir(self):
     """Return a metadata path for the process.
@@ -177,58 +230,77 @@ class ProcessManager(object):
     self._maybe_init_metadata_dir()
     self._write_file(self.get_socket_path(), str(socket_info))
 
-  def get_pid(self):
+  def _get_pid(self):
     """Retrieve and return the running PID."""
     try:
       return self._maybe_cast(self._read_file(self.get_pid_path()), int) or None
     except (IOError, OSError):
       return None
 
-  def get_socket(self):
+  def _get_socket(self):
     """Retrieve and return the running processes socket info."""
     try:
       return self._maybe_cast(self._read_file(self.get_socket_path()), self._socket_type) or None
     except (IOError, OSError):
       return None
 
-  def is_alive(self, pid=None):
-    """Return a boolean indicating whether the process is running."""
-    return psutil.pid_exists(pid or self.pid)
-    # TODO: consider stale pidfile case and assertion of self.process_name == proc.cmdline[0]
+  def is_dead(self):
+    """Return a boolean indicating whether the process is dead or not."""
+    return not self.is_alive()
 
-  def kill(self, kill_sig):
+  def is_alive(self):
+    """Return a boolean indicating whether the process is running or not."""
+    try:
+      process = self._as_process()
+      if not process:
+        # Can happen if we don't find our pid.
+        return False
+      if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
+          (self.process_name and self.process_name != process.name())):  # Check for stale pids.
+        return False
+    except psutil.NoSuchProcess:
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+      return False
+
+    return True
+
+  def _kill(self, kill_sig):
     """Send a signal to the current process."""
-    os.kill(self.pid, kill_sig)
+    if self.pid:
+      os.kill(self.pid, kill_sig)
 
-  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
+  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT_SEC, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
-    if self.is_alive():
+    alive = self.is_alive()
+    if alive:
       for signal_type in signal_chain:
         try:
-          self.kill(signal_type)
+          self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
                          .format(e=e, signal=signal_type, pid=self.pid))
-        time.sleep(kill_wait)
-        if not self.is_alive():
-          break
 
-    if not self.is_alive():
-      if purge: self._purge_metadata()
-    else:
+        # Wait up to kill_wait seconds to terminate or move onto the next signal.
+        try:
+          if self._deadline_until(self.is_dead, kill_wait):
+            alive = False
+            break
+        except self.Timeout:
+          # Loop to the next kill signal on timeout.
+          pass
+
+    if alive:
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
-  def monitor(self):
-    """Synchronously monitor the current process and actively keep it alive."""
-    raise NotImplementedError()
+    if purge:
+      self._purge_metadata()
 
-  def _open_process(self, *args, **kwargs):
-    return subprocess.Popen(*args, **kwargs)
-
-  def run_subprocess(self, *args, **kwargs):
-    """Synchronously run a subprocess."""
-    return self._open_process(*args, **kwargs)
+  def get_subprocess_output(self, *args):
+    try:
+      return subprocess.check_output(*args)
+    except (OSError, subprocess.CalledProcessError) as e:
+      raise self.ExecutionError(str(e))
 
   def daemonize(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None,
                 write_pid=True):
@@ -239,6 +311,12 @@ class ProcessManager(object):
        and also makes the first child a session leader (which can still acquire a tty). By forking a
        second time, we ensure that the second child can never acquire a controlling terminal because
        it's no longer a session leader - but it now has its own separate process group.
+
+       Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
+       the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
+       below) due to the fact that the daemons that pants would run are typically personal user
+       daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
+       differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
@@ -248,7 +326,6 @@ class ProcessManager(object):
       if second_pid == 0:
         try:
           os.chdir(self._buildroot)
-          os.umask(0)
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logging.critical(traceback.format_exc())
@@ -277,7 +354,6 @@ class ProcessManager(object):
       try:
         os.setsid()
         os.chdir(self._buildroot)
-        os.umask(0)
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logging.critical(traceback.format_exc())

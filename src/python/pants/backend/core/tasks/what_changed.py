@@ -10,7 +10,7 @@ import re
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
-from pants.base.lazy_source_mapper import LazySourceMapper
+from pants.base.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
 
 
@@ -46,7 +46,7 @@ class ChangeCalculator(object):
   @property
   def _mapper(self):
     if self._mapper_cache is None:
-      self._mapper_cache = LazySourceMapper(self._address_mapper, self._build_graph, self._fast)
+      self._mapper_cache = SpecSourceMapper(self._address_mapper, self._build_graph, self._fast)
     return self._mapper_cache
 
   def changed_files(self):
@@ -60,7 +60,10 @@ class ChangeCalculator(object):
   def _directly_changed_targets(self):
     # Internal helper to find target addresses containing SCM changes.
     targets_for_source = self._mapper.target_addresses_for_source
-    return set(addr for src in self.changed_files() for addr in targets_for_source(src))
+    result = set()
+    for src in self.changed_files():
+      result.update(set(targets_for_source(src)))
+    return result
 
   def _find_changed_targets(self):
     # Internal helper to find changed targets, optionally including their dependees.

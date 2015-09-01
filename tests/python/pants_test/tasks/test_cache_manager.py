@@ -40,7 +40,9 @@ def print_vt(vt):
 
 
 class InvalidationCacheManagerTest(BaseTest):
+
   class TestInvalidationCacheManager(InvalidationCacheManager):
+
     def __init__(self, tmpdir):
       InvalidationCacheManager.__init__(self, AppendingCacheKeyGenerator(), tmpdir, True)
 

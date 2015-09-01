@@ -13,6 +13,8 @@ import warnings
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
+from pants.bin.plugin_resolver import PluginResolver
+from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class _Exiter(object):
@@ -60,7 +62,7 @@ def _run(exiter):
   warnings.simplefilter("default")
 
   # The GoalRunner will setup final logging below in `.setup()`, but span the gap until then.
-  logging.basicConfig()
+  logging.basicConfig(level=logging.INFO)
   # This routes the warnings we enabled above through our loggers instead of straight to stderr raw.
   logging.captureWarnings(True)
 
@@ -68,8 +70,13 @@ def _run(exiter):
   if not os.path.exists(root_dir):
     exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: {}'.format(root_dir))
 
+  options_bootstrapper = OptionsBootstrapper()
+
+  plugin_resolver = PluginResolver(options_bootstrapper)
+  working_set = plugin_resolver.resolve()
+
   goal_runner = GoalRunner(root_dir)
-  goal_runner.setup()
+  goal_runner.setup(options_bootstrapper, working_set)
   exiter.apply_options(goal_runner.options)
   result = goal_runner.run()
   exiter.do_exit(result)

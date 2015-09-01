@@ -46,6 +46,7 @@ _default_word_map = {
 
 # TODO: Move somewhere more general? Could also be used to anonymize source files.
 
+
 class TokenTranslator(object):
   """Processes tokens (typically from analysis files), mapping them to randomly chosen words.
 
@@ -57,7 +58,6 @@ class TokenTranslator(object):
   def _random_base64_string():
     n = random.randint(20, 200)
     return base64.b64encode(os.urandom(n))
-
 
   # Break on delimiters (digits, space, forward slash, dash, underscore, dollar, period) and on
   # upper-case letters.
@@ -156,6 +156,7 @@ class TranslationCapturer(TokenTranslator):
   they replace: We capture all strings that need anonymizing in one pass, and then anonymize in a
   second pass.
   """
+
   def handle_conversion(self, s, translation):
     return s  # Return the original string.
 
@@ -201,5 +202,6 @@ class Anonymizer(TokenTranslator):
   Useful for obfuscating real-life analysis files so we can use them in tests without
   leaking proprietary information.
   """
+
   def handle_conversion(self, s, translation):
     return translation

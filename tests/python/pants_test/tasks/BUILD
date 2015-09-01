@@ -51,18 +51,12 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':checkstyle_integration',
-    ':eclipse_integration',
-    ':ensime_integration',
-    ':idea_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
     ':junit_tests_integration',
     ':jvm_bundle_integration',
     ':jvm_run_integration',
     ':protobuf_integration',
-    ':scala_repl_integration',
-    ':wire_integration',
   ],
 )
 
@@ -111,15 +105,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'checkstyle_integration',
-  sources = ['test_checkstyle_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-    'src/python/pants/util:contextutil',
-  ]
-)
-
-python_tests(
   name = 'junit_tests_integration',
   sources = ['test_junit_tests_integration.py'],
   dependencies = [
@@ -165,14 +150,6 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'tests/python/pants_test:base_test',
   ]
-)
-
-python_tests(
-  name = 'scala_repl_integration',
-  sources = ['test_scala_repl_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
 )
 
 python_tests(
@@ -268,34 +245,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:filter',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_file_aliases',
-  ],
-)
-
-python_tests(
-  name = 'idea_integration',
-  sources = ['test_idea_integration.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
-  name = 'eclipse_integration',
-  sources = ['test_eclipse_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
-  name = 'ensime_integration',
-  sources = ['test_ensime_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
   ],
 )
 
@@ -407,15 +356,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'wire_integration',
-  sources = ['test_wire_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
   name = 'roots',
   sources = ['test_roots.py'],
   dependencies = [
@@ -489,10 +429,8 @@ python_tests(
   name = 'group_task',
   sources = ['test_group_task.py'],
   dependencies = [
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:group_task',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:target',
     'src/python/pants/engine:engine',
     'tests/python/pants_test:base_test',

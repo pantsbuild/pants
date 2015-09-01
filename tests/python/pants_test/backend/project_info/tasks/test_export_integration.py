@@ -19,11 +19,11 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     '--export-libraries-javadocs',
   ]
 
-  def run_export(self, test_target, workdir, load_libs = False, extra_args = list()):
+  def run_export(self, test_target, workdir, load_libs=False, extra_args=None):
     export_out_file = os.path.join(workdir, 'export_out.txt')
     args = ['export', '--output-file={out_file}'.format(out_file=export_out_file), test_target]
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
-    pants_run = self.run_pants_with_workdir(args + libs_args + extra_args, workdir)
+    pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
     self.assertTrue(os.path.exists(export_out_file),
                     msg='Could not find export output file in {out_file}'
@@ -38,9 +38,10 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      thrift_target_name = 'examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java'
+      thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
+                            '.precipitation-java')
       codegen_target = os.path.join(os.path.relpath(workdir, get_buildroot()),
-                                    'gen/thrift/combined/gen-java:%s' % thrift_target_name)
+                                    'gen/thrift/isolated/{0}:{0}'.format(thrift_target_name))
       self.assertIn(codegen_target, json_data.get('targets').keys())
 
   def test_export_json_transitive_jar(self):
@@ -54,17 +55,30 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      self.assertIsNone(json_data.get('libraries').get('com.typesafe.sbt:incremental-compiler:0.13.7'))
-      foo_target = json_data.get('targets').get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo')
+      self.assertIsNone(json_data
+                        .get('libraries')
+                        .get('com.typesafe.sbt:incremental-compiler:0.13.7'))
+      foo_target = (json_data
+                    .get('targets')
+                    .get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo'))
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
 
   def test_export_jar_path_with_excludes_soft(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
-      json_data = self.run_export(test_target, workdir, load_libs=True, extra_args=['--resolve-ivy-soft-excludes'])
-      self.assertIsNotNone(json_data.get('libraries').get('com.martiansoftware:nailgun-server:0.9.1'))
-      foo_target = json_data.get('targets').get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo')
+      json_data = self.run_export(test_target,
+                                  workdir,
+                                  load_libs=True,
+                                  extra_args=['--resolve-ivy-soft-excludes'])
+      self.assertIsNotNone(json_data
+                           .get('libraries')
+                           .get('com.martiansoftware:nailgun-server:0.9.1'))
+      self.assertIsNotNone(json_data.get('libraries').get('org.pantsbuild:jmake:1.3.8-10'))
+      foo_target = (json_data
+                    .get('targets')
+                    .get('testprojects/src/java/org/pantsbuild/testproject/exclude:foo'))
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
+      self.assertTrue('org.pantsbuild' in foo_target.get('excludes'))
 
   def test_export_jar_path(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -82,11 +96,13 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       )
       self.assertEquals(
         common_lang_lib_info.get('javadoc'),
-        os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/javadocs/commons-lang-2.5-javadoc.jar')
+        os.path.join(ivy_cache_dir,
+                     'commons-lang/commons-lang/javadocs/commons-lang-2.5-javadoc.jar')
       )
       self.assertEquals(
         common_lang_lib_info.get('sources'),
-        os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/sources/commons-lang-2.5-sources.jar')
+        os.path.join(ivy_cache_dir,
+                     'commons-lang/commons-lang/sources/commons-lang-2.5-sources.jar')
       )
 
   def test_dep_map_for_java_sources(self):
@@ -120,8 +136,10 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
         avro_lib_info.get('default'),
         os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
       )
-      # TODO(Eric Ayers): this BUILD file also requests the avro 'tests' jar using
-      # a classifier in the JarDependency.  See https://github.com/pantsbuild/pants/issues/1489
+      self.assertEquals(
+        avro_lib_info.get('tests'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
+      )
 
       # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
       #self.assertEquals(

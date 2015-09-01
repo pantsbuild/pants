@@ -13,11 +13,14 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailur
 
 
 class ImmediatelyExecutingPool(object):
+  num_workers = 1
+
   def submit_async_work(self, work):
     work.func(*work.args_tuples[0])
 
 
 class PrintLogger(object):
+
   def error(self, msg):
     print(msg)
 
@@ -34,18 +37,19 @@ def raising_fn():
 
 
 class ExecutionGraphTest(unittest.TestCase):
+
   def setUp(self):
     self.jobs_run = []
 
   def execute(self, exec_graph):
     exec_graph.execute(ImmediatelyExecutingPool(), PrintLogger())
 
-  def job(self, name, fn, dependencies, on_success=None, on_failure=None):
+  def job(self, name, fn, dependencies, size=0, on_success=None, on_failure=None):
     def recording_fn():
       self.jobs_run.append(name)
       fn()
 
-    return Job(name, recording_fn, dependencies, on_success, on_failure)
+    return Job(name, recording_fn, dependencies, size, on_success, on_failure)
 
   def test_single_job(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [])])
@@ -60,7 +64,6 @@ class ExecutionGraphTest(unittest.TestCase):
     self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ["B", "A"])
-
 
   def test_simple_binary_tree(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
@@ -97,7 +100,6 @@ class ExecutionGraphTest(unittest.TestCase):
     self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ["B", "C", "A"])
-
 
   def test_dependee_depends_on_dependency_of_its_dependency(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
@@ -143,7 +145,7 @@ class ExecutionGraphTest(unittest.TestCase):
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
-    self.assertEqual(["B", "F", "A"], self.jobs_run)
+    self.assertTrue(self.jobs_run == ["B", "F", "A"] or self.jobs_run == ["B", "A", "F"])
     self.assertEqual("Failed jobs: F", str(cm.exception))
 
   def test_failure_of_disconnected_job_does_not_cancel_non_dependents(self):
@@ -187,10 +189,62 @@ class ExecutionGraphTest(unittest.TestCase):
 
     self.assertEqual("Error in on_failure for A: I'm an error", str(cm.exception))
 
-
   def test_same_key_scheduled_twice_is_error(self):
     with self.assertRaises(JobExistsError) as cm:
       ExecutionGraph([self.job("Same", passing_fn, []),
                       self.job("Same", passing_fn, [])])
 
     self.assertEqual("Unexecutable graph: Job already scheduled u'Same'", str(cm.exception))
+
+  def test_priorities_for_chain_of_jobs(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 8),
+                                 self.job("B", passing_fn, ["A"], 4),
+                                 self.job("C", passing_fn, ["B"], 2),
+                                 self.job("D", passing_fn, ["C"], 1)])
+    self.assertEqual(exec_graph._job_priority, {"A": 15, "B": 7, "C": 3, "D": 1})
+    self.execute(exec_graph)
+    self.assertEqual(self.jobs_run, ["A", "B", "C", "D"])
+
+  def test_priorities_for_fork(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 4),
+                                 self.job("B", passing_fn, ["A"], 2),
+                                 self.job("C", passing_fn, ["A"], 1)])
+    self.assertEqual(exec_graph._job_priority, {"A": 6, "B": 2, "C": 1})
+    self.execute(exec_graph)
+    self.assertEqual(self.jobs_run, ["A", "B", "C"])
+
+  def test_priorities_for_mirrored_fork(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 4),
+                                 self.job("B", passing_fn, ["A"], 1),
+                                 self.job("C", passing_fn, ["A"], 2)])
+    self.assertEqual(exec_graph._job_priority, {"A": 6, "B": 1, "C": 2})
+    self.execute(exec_graph)
+    self.assertEqual(self.jobs_run, ["A", "C", "B"])
+
+  def test_priorities_for_diamond(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 8),
+                                 self.job("B", passing_fn, ["A"], 4),
+                                 self.job("C", passing_fn, ["A"], 2),
+                                 self.job("D", passing_fn, ["B", "C"], 1)])
+    self.assertEqual(exec_graph._job_priority, {"A": 13, "B": 5, "C": 3, "D": 1})
+    self.execute(exec_graph)
+    self.assertEqual(self.jobs_run, ["A", "B", "C", "D"])
+
+  def test_priorities_for_mirrored_diamond(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 8),
+                                 self.job("B", passing_fn, ["A"], 2),
+                                 self.job("C", passing_fn, ["A"], 4),
+                                 self.job("D", passing_fn, ["B", "C"], 1)])
+    self.assertEqual(exec_graph._job_priority, {"A": 13, "B": 3, "C": 5, "D": 1})
+    self.execute(exec_graph)
+    self.assertEqual(self.jobs_run, ["A", "C", "B", "D"])
+
+  def test_priorities_for_skewed_diamond(self):
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 1),
+                                 self.job("B", passing_fn, ["A"], 2),
+                                 self.job("C", passing_fn, ["B"], 4),
+                                 self.job("D", passing_fn, ["A"], 8),
+                                 self.job("E", passing_fn, ["C", "D"], 16)])
+    self.assertEqual(exec_graph._job_priority, {"A": 25, "B": 22, "C": 20, "D": 24, "E": 16})
+    self.execute(exec_graph)
+    self.assertEqual(self.jobs_run, ["A", "D", "B", "C", "E"])

@@ -5,37 +5,68 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import fnmatch
 import os
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_manual import manual
+from pants.util.memo import memoized_property
 
+
+def globs_matches(path, patterns):
+  return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
+
+def matches_filespec(path, spec):
+  if spec is None:
+    return False
+  if not globs_matches(path, spec.get('globs', [])):
+    return False
+  for spec in spec.get('exclude', []):
+    if matches_filespec(path, spec):
+      return False
+  return True
 
 class FilesetWithSpec(object):
-  """A set of files with that keeps track of how we got it.
+  """A set of files that keeps track of how we got it.
 
   The filespec is what globs or file list it came from.
   """
-  def __init__(self, rel_root, result, filespec):
+
+  def __init__(self, rel_root, filespec, files_calculator):
     self._rel_root = rel_root
-    self._result = result
     self.filespec = filespec
+    self._files_calculator = files_calculator
+
+  @memoized_property
+  def files(self):
+    return self._files_calculator()
 
   def __iter__(self):
-    return self._result.__iter__()
+    return self.files.__iter__()
 
   def __getitem__(self, index):
-    return self._result[index]
+    return self.files[index]
 
 
 class FilesetRelPathWrapper(object):
-  def __init__(self, parse_context):
-    self.rel_path = parse_context.rel_path
+
+  @classmethod
+  @manual.builddict(factory=True)
+  def factory(cls, parse_context):
+    """A factory for using a `FilesetRelPathWrapper` as a context aware object factory."""
+    return cls(parse_context.rel_path)
+
+  def __init__(self, rel_path):
+    """
+    :param string rel_path: The path this file set will be relative to.
+    """
+    self._rel_path = rel_path
 
   def __call__(self, *args, **kwargs):
-    root = os.path.join(get_buildroot(), self.rel_path)
+    root = os.path.join(get_buildroot(), self._rel_path)
 
     excludes = kwargs.pop('exclude', [])
     if isinstance(excludes, string_types):
@@ -47,20 +78,24 @@ class FilesetRelPathWrapper(object):
         excludes[i] = [exclude]
 
     for glob in args:
-      if(self._is_glob_dir_outside_root(glob, root)):
+      if self._is_glob_dir_outside_root(glob, root):
         raise ValueError('Invalid glob {}, points outside BUILD file root dir {}'.format(glob, root))
 
-    result = self.wrapped_fn(root=root, *args, **kwargs)
+    def files_calculator():
+      result = self.wrapped_fn(root=root, *args, **kwargs)
 
-    for exclude in excludes:
-      result -= exclude
+      for exclude in excludes:
+        result -= exclude
+
+      return result
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
-    return FilesetWithSpec(rel_root, result, filespec)
+    return FilesetWithSpec(rel_root, filespec, files_calculator)
 
-  def _is_glob_dir_outside_root(self, glob, root):
+  @staticmethod
+  def _is_glob_dir_outside_root(glob, root):
     # The assumption is that a correct glob starts with the root,
     # even after normalizing.
     glob_path = os.path.normpath(os.path.join(root, glob))
@@ -76,15 +111,16 @@ class FilesetRelPathWrapper(object):
 
     The globs are in zglobs format.
     """
-    result = {'globs' : [os.path.join(root, arg) for arg in args]}
+    result = {'globs': [os.path.join(root, arg) for arg in args]}
     if excludes:
       result['exclude'] = []
       for exclude in excludes:
         if hasattr(exclude, 'filespec'):
           result['exclude'].append(exclude.filespec)
         else:
-          result['exclude'].append({'globs' : [os.path.join(root, x) for x in exclude]})
+          result['exclude'].append({'globs': [os.path.join(root, x) for x in exclude]})
     return result
+
 
 class Globs(FilesetRelPathWrapper):
   """Returns Fileset containing matching files in same directory as this BUILD file.
@@ -162,10 +198,10 @@ class RGlobs(FilesetRelPathWrapper):
             beginning += os.path.sep
           if item.startswith('**'):
             # .../**/*.java
-            for ending in rglob_path(beginning + item, rest[i+1:]):
+            for ending in rglob_path(beginning + item, rest[i + 1:]):
               endings.append(ending)
             # .../*.java
-            for ending in rglob_path(beginning + item[3:], rest[i+1:]):
+            for ending in rglob_path(beginning + item[3:], rest[i + 1:]):
               endings.append(ending)
             return endings
           else:
@@ -179,6 +215,7 @@ class RGlobs(FilesetRelPathWrapper):
       rglobs.extend(rglob_path('', out))
 
     return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
+
 
 class ZGlobs(FilesetRelPathWrapper):
   """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.

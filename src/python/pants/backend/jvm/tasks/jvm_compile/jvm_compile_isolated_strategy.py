@@ -7,9 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+import zipfile
 from collections import OrderedDict, defaultdict
+from hashlib import sha1
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.compile_context import IsolatedCompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_strategy import JvmCompileStrategy
@@ -17,30 +20,55 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
+from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy
 
 
+def create_size_estimators():
+  def file_line_count(source_file_name):
+    with open(source_file_name, 'rb') as fh:
+      return sum(1 for line in fh)
+
+  return {
+    'linecount': lambda sources: sum([file_line_count(filepath) for filepath in sources]),
+    'filecount': lambda sources: len(sources),
+    'filesize': lambda sources: sum([os.path.getsize(filepath) for filepath in sources]),
+    'constzero': lambda sources: 0
+  }
+
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
 
-  @classmethod
-  def register_options(cls, register, language, supports_concurrent_execution):
-    if supports_concurrent_execution:
-      register('--worker-count', type=int, default=1, advanced=True,
-               help='The number of concurrent workers to use compiling {lang} sources with the isolated'
-                    ' strategy.'.format(lang=language))
-    register('--capture-log', action='store_true', default=False, advanced=True,
-            help='Capture compilation output to per-target logs.')
+  size_estimators = create_size_estimators()
 
-  def __init__(self, context, options, workdir, analysis_tools, language, sources_predicate):
+  @classmethod
+  def size_estimator_by_name(cls, estimation_strategy_name):
+    return cls.size_estimators[estimation_strategy_name]
+
+  @classmethod
+  def register_options(cls, register, compile_task_name, supports_concurrent_execution):
+    if supports_concurrent_execution:
+      register('--worker-count', advanced=True, type=int, default=1,
+               help='The number of concurrent workers to use compiling with {task} with the '
+                    'isolated strategy.'.format(task=compile_task_name))
+    register('--size-estimator', advanced=True,
+             choices=list(cls.size_estimators.keys()), default='filesize',
+             help='The method of target size estimation.')
+    register('--capture-log', advanced=True, action='store_true', default=False,
+             fingerprint=True,
+             help='Capture compilation output to per-target logs.')
+
+  def __init__(self, context, options, workdir, analysis_tools, compile_task_name,
+               sources_predicate):
     super(JvmCompileIsolatedStrategy, self).__init__(context, options, workdir, analysis_tools,
-                                                     language, sources_predicate)
+                                                     compile_task_name, sources_predicate)
 
     # Various working directories.
     self._analysis_dir = os.path.join(workdir, 'isolated-analysis')
     self._classes_dir = os.path.join(workdir, 'isolated-classes')
     self._logs_dir = os.path.join(workdir, 'isolated-logs')
+    self._jars_dir = os.path.join(workdir, 'jars')
 
     self._capture_log = options.capture_log
 
@@ -51,6 +79,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       worker_count = 1
     self._worker_count = worker_count
 
+    self._size_estimator = self.size_estimator_by_name(options.size_estimator)
+
     self._worker_pool = None
 
   def name(self):
@@ -59,10 +89,14 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def compile_context(self, target):
     analysis_file = JvmCompileStrategy._analysis_for_target(self._analysis_dir, target)
     classes_dir = os.path.join(self._classes_dir, target.id)
-    return self.CompileContext(target,
-                               analysis_file,
-                               classes_dir,
-                               self._sources_for_target(target))
+    # Generate a short unique path for the jar to allow for shorter classpaths.
+    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
+    jar_file = os.path.join(self._jars_dir, '{}.jar'.format(sha1(target.id).hexdigest()[:12]))
+    return IsolatedCompileContext(target,
+                                  analysis_file,
+                                  classes_dir,
+                                  jar_file,
+                                  self._sources_for_target(target))
 
   def _create_compile_contexts_for_targets(self, targets):
     compile_contexts = OrderedDict()
@@ -76,6 +110,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     safe_mkdir(self._analysis_dir)
     safe_mkdir(self._classes_dir)
     safe_mkdir(self._logs_dir)
+    safe_mkdir(self._jars_dir)
 
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
@@ -84,7 +119,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
 
-    with self.context.new_workunit('validate-{}-analysis'.format(self._language)):
+    with self.context.new_workunit('validate-{}-analysis'.format(self._compile_task_name)):
       for target in relevant_targets:
         cc = self.compile_context(target)
         safe_mkdir(cc.classes_dir)
@@ -92,7 +127,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         self.validate_analysis(cc.analysis_file)
 
     # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._language)) \
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._compile_task_name)) \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
@@ -100,6 +135,15 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       self._worker_pool = WorkerPool(workunit.parent,
                                      self.context.run_tracker,
                                      self._worker_count)
+
+  def finalize_compile(self, targets):
+    # Replace the classpath entry for each target with its jar'd representation.
+    compile_classpaths = self.context.products.get_data('compile_classpath')
+    for target in targets:
+      cc = self.compile_context(target)
+      for conf in self._confs:
+        compile_classpaths.remove_for_target(target, [(conf, cc.classes_dir)])
+        compile_classpaths.add_for_target(target, [(conf, cc.jar_file)])
 
   def invalidation_hints(self, relevant_targets):
     # No partitioning.
@@ -110,10 +154,11 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Build a mapping of srcs to classes for each context.
     classes_by_src_by_context = defaultdict(dict)
     for compile_context in compile_contexts:
-      # Walk the class directory to build a set of unclaimed classfiles.
+      # Walk the context's jar to build a set of unclaimed classfiles.
       unclaimed_classes = set()
-      for dirpath, _, filenames in safe_walk(compile_context.classes_dir):
-        unclaimed_classes.update(os.path.join(dirpath, f) for f in filenames)
+      with compile_context.open_jar(mode='r') as jar:
+        for name in jar.namelist():
+          unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
 
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
@@ -185,6 +230,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
             tmpdir, compile_context.target)
         if os.path.exists(compile_context.analysis_file):
            shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+        target, = vts.targets
         compile_vts(vts,
                     compile_context.sources,
                     tmp_analysis_file,
@@ -192,8 +238,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                     cp_entries,
                     compile_context.classes_dir,
                     log_file,
-                    progress_message)
+                    progress_message,
+                    target.platform)
         atomic_copy(tmp_analysis_file, compile_context.analysis_file)
+
+        # Jar the compiled output.
+        self._create_context_jar(compile_context)
 
         # Update the products with the latest classes.
         register_vts([compile_context])
@@ -220,6 +270,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
                       create_work_for_vts(vts, compile_context, compile_target_closure),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
+                      self._size_estimator(compile_context.sources),
                       # If compilation and analysis work succeeds, validate the vts.
                       # Otherwise, fail it.
                       on_success=vts.update,
@@ -280,6 +331,22 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       if os.path.exists(portable_analysis_file):
         self._analysis_tools.localize(portable_analysis_file, compile_context.analysis_file)
 
+  def _create_context_jar(self, compile_context):
+    """Jar up the compile_context to its output jar location.
+
+    TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
+    allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
+    compile inputs would make the compiler's analysis useless.
+      see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
+    """
+    root = compile_context.classes_dir
+    with compile_context.open_jar(mode='w') as jar:
+      for abs_sub_dir, dirnames, filenames in safe_walk(root):
+        for name in dirnames + filenames:
+          abs_filename = os.path.join(abs_sub_dir, name)
+          arcname = os.path.relpath(abs_filename, root)
+          jar.write(abs_filename, arcname)
+
   def _write_to_artifact_cache(self, vts, compile_context, get_update_artifact_cache_work):
     assert len(vts.targets) == 1
     assert vts.targets[0] == compile_context.target
@@ -296,16 +363,23 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # Collect the artifacts for this target.
     artifacts = []
+
+    def add_abs_products(p):
+      if p:
+        for _, paths in p.abs_paths():
+          artifacts.extend(paths)
+    # Resources.
     resources_by_target = self.context.products.get_data('resources_by_target')
-    if resources_by_target is not None:
-      for _, paths in resources_by_target[compile_context.target].abs_paths():
-        artifacts.extend(paths)
-    target_classes = self.context.products.get_data('classes_by_target').get(compile_context.target)
-    for _, classfiles in target_classes.abs_paths():
-      artifacts.extend(classfiles)
+    add_abs_products(resources_by_target.get(compile_context.target))
+    # Classes.
+    classes_by_target = self.context.products.get_data('classes_by_target')
+    add_abs_products(classes_by_target.get(compile_context.target))
+    # Log file.
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
       artifacts.append(log_file)
+    # Jar.
+    artifacts.append(compile_context.jar_file)
 
     # Get the 'work' that will publish these artifacts to the cache.
     # NB: the portable analysis_file won't exist until we finish.
@@ -319,3 +393,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
           update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
+
+  def parse_deps(self, classpath, compile_context):
+    # We intentionally pass in an empty string for classes_dir in order to receive
+    # relative paths, because we currently don't know (and don't need to know) what target
+    # provided the file.
+    return self._analysis_parser.parse_deps_from_path(compile_context.analysis_file, dict, '')

@@ -5,9 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.option.options import Options
+import logging
+
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_split
+
+
+logger = logging.getLogger(__name__)
 
 
 class JVM(Subsystem):
@@ -18,15 +23,15 @@ class JVM(Subsystem):
   def register_options(cls, register):
     super(JVM, cls).register_options(register)
     # TODO(benjy): Options to specify the JVM version?
-    register('--options', action='append', recursive=True, metavar='<option>...',
+    register('--options', action='append', metavar='<option>...',
              help='Run with these extra JVM options.')
-    register('--program-args', action='append', recursive=True, metavar='<arg>...',
+    register('--program-args', action='append', metavar='<arg>...',
              help='Run with these extra program args.')
-    register('--debug', action='store_true', recursive=True,
+    register('--debug', action='store_true',
              help='Run the JVM with remote debugging.')
-    register('--debug-port', advanced=True, recursive=True, type=int, default=5005,
+    register('--debug-port', advanced=True, type=int, default=5005,
              help='The JVM will listen for a debugger on this port.')
-    register('--debug-args', advanced=True, recursive=True, type=Options.list,
+    register('--debug-args', advanced=True, type=list_option,
              default=[
                '-Xdebug',
                '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address={debug_port}'
@@ -45,7 +50,9 @@ class JVM(Subsystem):
     for opt in self.get_options().options:
       ret.extend(safe_shlex_split(opt))
 
-    if self.get_options().debug:
+    if (self.get_options().debug or
+        self.get_options().is_flagged('debug_port') or
+        self.get_options().is_flagged('debug_args')):
       debug_port = self.get_options().debug_port
       ret.extend(arg.format(debug_port=debug_port) for arg in self.get_options().debug_args)
     return ret

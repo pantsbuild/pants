@@ -16,6 +16,7 @@ from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
 class FilesystemBuildFileTest(BuildFileTestBase):
+
   def setUp(self):
     super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')

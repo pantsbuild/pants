@@ -21,6 +21,7 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class IvyImportsTest(NailgunTaskTestBase):
+
   @classmethod
   def task_type(cls):
     return IvyImports
@@ -91,7 +92,6 @@ class IvyImportsTest(NailgunTaskTestBase):
       # The second time through, it should be cached.  execute won't return any targets compiled
       # but should still populate the ivy_imports product by target.
       check_compile([])
-
 
   def verify_product_mapping(self, ivy_imports_product, target=None, org=None, name=None, conf=None,
       expected_jar_filenames=None):

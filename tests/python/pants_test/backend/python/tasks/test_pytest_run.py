@@ -15,10 +15,10 @@ import coverage
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import pushd
-from pants_test.backend.python.tasks.python_task_test import PythonTaskTest
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class PythonTestBuilderTestBase(PythonTaskTest):
+class PythonTestBuilderTestBase(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return PytestRun
@@ -89,6 +89,17 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           def test_two():
             assert 1 == core.two()
         """))
+    self.create_file(
+        'tests/test_core_red_in_class.py',
+        dedent("""
+          import unittest2 as unittest
+
+          import core
+
+          class CoreRedClassTest(unittest.TestCase):
+            def test_one_in_class(self):
+              self.assertEqual(1, core.two())
+        """))
     self.add_to_build_file(
         'tests',
         dedent("""
@@ -108,7 +119,20 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           python_tests(
             name='red',
             sources=[
-              'test_core_red.py'
+              'test_core_red.py',
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='red_in_class',
+            sources=[
+              'test_core_red_in_class.py',
             ],
             dependencies=[
               'lib:core'
@@ -146,6 +170,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.green = self.target('tests:green')
 
     self.red = self.target('tests:red')
+    self.red_in_class = self.target('tests:red_in_class')
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
 
@@ -154,6 +179,11 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
   def test_red(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
+
+  def test_red_test_in_class(self):
+    # for test in a class, the failure line is in the following format
+    # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
+    self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])

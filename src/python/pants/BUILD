@@ -24,27 +24,6 @@ page(name='readme',
   source='README.md',
 )
 
-# XXX move into base or thrift
-python_library(
-  name='binary_util',
-  sources=['binary_util.py'],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name='thrift_util',
-  sources=['thrift_util.py'],
-  dependencies=[
-    ':binary_util',
-  ],
-)
-
 python_library(
   name='version',
   sources=['version.py'],

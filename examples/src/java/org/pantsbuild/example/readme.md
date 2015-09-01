@@ -214,28 +214,51 @@ Pants uses Jmake, a dependency tracking compiler facade.
 Java7 vs Java6, Which Java
 --------------------------
 
-Normally, Pants uses the first java it finds in `JDK_HOME`, `JAVA_HOME`, or `PATH`. To specify a
-specific java version for just one pants invocation:
+Pants first looks through any jdks specified by the jdk_paths map in pants.ini, eg:
+
+    :::ini
+    [jvm]
+    jdk_paths = {
+        'macos': [
+          '/Library/Java/JavaVirtualMachines/jdk1.7.0_79.jdk',
+          '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
+        ],
+        'linux': [
+          '/usr/java/jdk1.7.0_80',
+        ]
+      }
+
+If no jvms are found there, Pants uses the first java it finds in `JDK_HOME`, `JAVA_HOME`,
+or `PATH`. If no jdk_paths are set, you can specify a specific java version for just one
+pants invocation:
 
     :::bash
     $ JDK_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 ./pants ...
 
-If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can use a
-`compile.java` command-line arg to specify Java version:
+If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can define
+jvm-platforms in pants.ini, and set what targets use which platforms. For example, in pants.ini:
+
+    :::ini
+    [jvm-platform]
+    default_platform: java6
+    platforms: {
+        'java6': {'source': '6', 'target': '6', 'args': [] },
+        'java7': {'source': '7', 'target': '7', 'args': [] },
+        'java8': {'source': '8', 'target': '8', 'args': [] },
+      }
+
+And then in a BUILD file:
+
+    :::python
+    java_library(name='my-library',
+      sources=globs('*.java'),
+      platform='java7',
+    )
+
+You can also override these on the cli:
 
     :::bash
-    ./pants bundle compile.java --target=7 --source=7 examples/src/java/org/pantsbuild/example/hello/main
-
-*BUT* beware: if you switch between Java versions, Pants doesn't realize
-when it needs to rebuild. If you build with version 7, change some code,
-then build with version 6, java 6 will try to understand java
-7-generated classfiles and fail. Thus, if you've been building with one
-Java version and are switching to another, you probably need to:
-
-    :::bash
-    $ ./pants clean-all
-
-so that the next build starts from scratch.
+    ./pants compile --jvm-platform-default-platform=java8 examples/src/java/org/pantsbuild/example/hello/main
 
 **Note:** Currently, pants is known to work with OpenJDK version 7 or greater,
 and Oracle JDK version 6 or greater.

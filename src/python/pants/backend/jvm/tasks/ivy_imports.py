@@ -26,6 +26,9 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types start
   @classmethod
   def product_types(cls):
+    # TODO(mateor) Create a more robust ivy_import product, that exposes the path to the jar
+    # and a slot for the metadata from the IvyModuleRef:
+    # https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/ivy_utils.py#L38-38
     return ['ivy_imports']  # Guaranteed to populate target => { builddir: [jar_filenames]}
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
@@ -87,7 +90,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     cached_targets = set(targets) - set(invalid_targets)
     for import_jars_target in cached_targets:
       mapdir = self.mapjar_workdir(import_jars_target)
-      for root, _, files in  safe_walk(mapdir):
+      for root, _, files in safe_walk(mapdir):
         jarfiles = []
         for f in files:
           # We only expect ivy to touch this directory, so it should be just a directory with the

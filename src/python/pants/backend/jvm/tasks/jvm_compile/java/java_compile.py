@@ -13,7 +13,8 @@ from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMake
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import relativize_paths, safe_mkdir
 
 
@@ -42,8 +43,9 @@ _JMAKE_ERROR_CODES = {
 _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.items())
 
 
-class JavaCompile(JvmCompile):
-  _language = 'java'
+class JmakeCompile(JvmCompile):
+  """Compile Java code using JMake."""
+  _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False
 
@@ -51,16 +53,18 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
+    workdir_gen = os.path.relpath(os.path.join(bootstrap_option_values.pants_workdir, 'gen'),
+                                  get_buildroot())
     return ('-C-encoding', '-CUTF-8', '-C-g', '-C-Tcolor',
             # Don't warn for generated code.
             '-C-Tnowarnprefixes',
-            '-C{0}'.format(os.path.join(bootstrap_option_values.pants_workdir, 'gen')),
+            '-C{0}'.format(workdir_gen),
             # Suppress warning for annotations with no processor - we know there are many of these!
             '-C-Tnowarnregex', '-C^(warning: )?No processor claimed any of these annotations: .*')
 
   @classmethod
   def get_warning_args_default(cls):
-    return ('-C-Xlint:all',   '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
+    return ('-C-Xlint:all', '-C-Xlint:-serial', '-C-Xlint:-path', '-C-deprecation')
 
   @classmethod
   def get_no_warning_args_default(cls):
@@ -68,14 +72,22 @@ class JavaCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(JavaCompile, cls).register_options(register)
-    register('--source', help='Provide source compatibility with this release.', advanced=True)
-    register('--target', help='Generate class files for this JVM version.', advanced=True)
+    super(JmakeCompile, cls).register_options(register)
+    register('--use-jmake', advanced=True, action='store_true', default=True,
+             fingerprint=True,
+             help='Use jmake to compile Java targets')
     cls.register_jvm_tool(register, 'jmake')
     cls.register_jvm_tool(register, 'java-compiler')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JmakeCompile, cls).subsystem_dependencies() + (DistributionLocator,)
+
+  def select(self, target):
+    return self.get_options().use_jmake and super(JmakeCompile, self).select(target)
+
   def __init__(self, *args, **kwargs):
-    super(JavaCompile, self).__init__(*args, **kwargs)
+    super(JmakeCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
     self._buildroot = get_buildroot()
@@ -92,14 +104,11 @@ class JavaCompile(JvmCompile):
     return os.path.join(self._depfile_folder, 'global_depfile')
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, JMakeAnalysisParser(),
+                         JMakeAnalysis)
 
-  # Make the java target language version part of the cache key hash,
-  # this ensures we invalidate if someone builds against a different version.
-  def _language_platform_version_info(self):
-    return [self.get_options().target] if self.get_options().target else []
-
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file, log_file):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings):
     relative_classpath = relativize_paths(classpath, self._buildroot)
     jmake_classpath = self.tool_classpath('jmake')
     args = [
@@ -120,31 +129,40 @@ class JavaCompile(JvmCompile):
       '-jcmainclass', 'org.pantsbuild.tools.compiler.Compiler',
       ])
 
-    if self.get_options().source:
-      args.extend(['-C-source', '-C{0}'.format(self.get_options().source)])
-    if self.get_options().target:
-      args.extend(['-C-target', '-C{0}'.format(self.get_options().target)])
-
-    if '-C-source' in self._args:
-      raise TaskError("Set the source Java version with the 'source' option, not in 'args'.")
-    if '-C-target' in self._args:
-      raise TaskError("Set the target JVM version with the 'target' option, not in 'args'.")
     if not self.get_options().colors:
       filtered_args = filter(lambda arg: not arg == '-C-Tcolor', self._args)
     else:
       filtered_args = self._args
     args.extend(filtered_args)
+    args.extend(settings.args)
+
+    if '-C-source' in args:
+      raise TaskError("Define a [jvm-platform] with the desired 'source' level instead of "
+                      "supplying one via 'args'.")
+    if '-C-target' in args:
+      raise TaskError("Define a [jvm-platform] with the desired 'target' level instead of "
+                      "supplying one via 'args'.")
+
+    source_level = settings.source_level
+    target_level = settings.target_level
+    if source_level:
+      args.extend(['-C-source', '-C{0}'.format(source_level)])
+
+    if target_level:
+      args.extend(['-C-target', '-C{0}'.format(target_level)])
 
     args.append('-C-Tdependencyfile')
     args.append('-C{}'.format(self._depfile))
 
+    jvm_options = list(self._jvm_options)
+
     args.extend(sources)
     result = self.runjava(classpath=jmake_classpath,
-                          main=JavaCompile._JMAKE_MAIN,
-                          jvm_options=self._jvm_options,
+                          main=JmakeCompile._JMAKE_MAIN,
+                          jvm_options=jvm_options,
                           args=args,
                           workunit_name='jmake',
-                          workunit_labels=[WorkUnit.COMPILER])
+                          workunit_labels=[WorkUnitLabel.COMPILER])
     if result:
       default_message = 'Unexpected error - JMake returned {}'.format(result)
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))

@@ -61,8 +61,7 @@ class IvyTaskMixin(object):
 
   The creation of the 'ivy_resolve_symlink_map' product is a side effect of
   running `def ivy_resolve`. The product is a map of paths in Ivy's resolve cache to
-  stable locations within the working copy. To consume the map, consume a parsed Ivy
-  report which will give you IvyArtifact instances: the artifact path is key.
+  stable locations within the working copy.
   """
 
   @classmethod
@@ -77,9 +76,6 @@ class IvyTaskMixin(object):
     register('--soft-excludes', action='store_true', default=False, advanced=True,
              help='If a target depends on a jar that is excluded by another target '
                   'resolve this jar anyway')
-    register('--automatic-excludes', action='store_true', default=True, advanced=True,
-             help='If a target in the graph provides an artifact, said artifact will automatically '
-                  'be excluded from Ivy resolution.')
 
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
@@ -223,11 +219,8 @@ class IvyTaskMixin(object):
     """
     mapdir = self.mapjar_workdir(target)
     safe_mkdir(mapdir, clean=True)
-    ivyargs = [
-      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
-                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
-      '-symlink',
-    ]
+    ivyargs = self._get_ivy_args(mapdir)
+
     confs = maybe_list(target.payload.get_field_value('configurations') or [])
     self.exec_ivy(mapdir,
                   [target],
@@ -276,10 +269,8 @@ class IvyTaskMixin(object):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
 
     if not jars:
-      automatic_excludes = self.get_options().automatic_excludes
       jars, excludes = IvyUtils.calculate_classpath(targets,
-                                                    gather_excludes=not use_soft_excludes,
-                                                    automatic_excludes=automatic_excludes)
+                                                    gather_excludes=not use_soft_excludes)
     else:
       excludes = set()
 
@@ -300,3 +291,15 @@ class IvyTaskMixin(object):
           raise TaskError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
       except runner.executor.Error as e:
         raise TaskError(e)
+
+  @staticmethod
+  def _get_ivy_args(mapdir):
+    # At least one task(android.unpack_libraries) relies on mapped jars filenames being unique and
+    # including the version number. This method is being used to create a regression test to
+    # protect that interest.
+    ivy_args = [
+      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
+                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
+      '-symlink',
+      ]
+    return ivy_args

@@ -9,7 +9,7 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.target import Target
 from pants.console.stty_utils import preserve_stty_settings
-from pants.java.util import execute_java
+from pants.java.distribution.distribution import DistributionLocator
 
 
 class ScalaRepl(JvmToolTaskMixin, JvmTask):
@@ -19,6 +19,10 @@ class ScalaRepl(JvmToolTaskMixin, JvmTask):
     register('--main', default='scala.tools.nsc.MainGenericRunner',
              help='The entry point for running the repl.')
     cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl'])
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ScalaRepl, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -40,13 +44,19 @@ class ScalaRepl(JvmToolTaskMixin, JvmTask):
       with preserve_stty_settings():
         classpath = self.classpath(targets, cp=tools_classpath)
 
+        # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way
+        # we do here (not passing -classpath as a program arg to scala.tools.nsc.MainGenericRunner).
+        jvm_options = self.jvm_options
+        if not any(opt.startswith('-Dscala.usejavacp=') for opt in jvm_options):
+          jvm_options.append('-Dscala.usejavacp=true')
+
         print('')  # Start REPL output on a new line.
         try:
           # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
-          execute_java(classpath=classpath,
-                       main=self.get_options().main,
-                       jvm_options=self.jvm_options,
-                       args=self.args)
+          DistributionLocator.cached().execute_java(classpath=classpath,
+                                                    main=self.get_options().main,
+                                                    jvm_options=jvm_options,
+                                                    args=self.args)
         except KeyboardInterrupt:
           # TODO(John Sirois): Confirm with Steve Gury that finally does not work on mac and an
           # explicit catch of KeyboardInterrupt is required.

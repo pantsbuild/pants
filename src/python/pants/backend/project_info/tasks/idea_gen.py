@@ -25,19 +25,19 @@ _TEMPLATE_BASEDIR = 'templates/idea'
 
 
 _VERSIONS = {
-  '9': '12', # 9 and 12 are ipr/iml compatible
-  '10': '12', # 10 and 12 are ipr/iml compatible
-  '11': '12', # 11 and 12 are ipr/iml compatible
+  '9': '12',  # 9 and 12 are ipr/iml compatible
+  '10': '12',  # 10 and 12 are ipr/iml compatible
+  '11': '12',  # 11 and 12 are ipr/iml compatible
   '12': '12'
 }
 
 
 _SCALA_VERSION_DEFAULT = '2.9'
 _SCALA_VERSIONS = {
-  '2.8':                  'Scala 2.8',
+  '2.8': 'Scala 2.8',
   _SCALA_VERSION_DEFAULT: 'Scala 2.9',
-  '2.10':                 'Scala 2.10',
-  '2.10-virt':            'Scala 2.10 virtualized'
+  '2.10': 'Scala 2.10',
+  '2.10-virt': 'Scala 2.10 virtualized'
 }
 
 
@@ -80,7 +80,6 @@ class IdeaGen(IdeGen):
                '.pants.d/resources',
                ],
              help='Adds folders to be excluded from the project configuration.')
-
 
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
@@ -134,7 +133,11 @@ class IdeaGen(IdeGen):
           return True
       return False
 
-    sibling_paths = SourceRoot.find_siblings_by_path(os.path.join(source_set.source_base, source_set.path))
+    if source_set.path:
+      path = os.path.join(source_set.source_base, source_set.path)
+    else:
+      path = source_set.source_base
+    sibling_paths = SourceRoot.find_siblings_by_path(path)
     for sibling_path in sibling_paths:
       if has_test_type(SourceRoot.types(sibling_path)):
         return True
@@ -150,11 +153,19 @@ class IdeaGen(IdeGen):
       else:
         is_test = source_set.is_test
 
+      if source_set.resources_only:
+        if source_set.is_test:
+          content_type = 'java-test-resource'
+        else:
+          content_type = 'java-resource'
+      else:
+        content_type = ''
+
       sources = TemplateData(
         path=root_relative_path,
         package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
         is_test=is_test,
-        content_type=source_set.content_type
+        content_type=content_type
       )
 
       return TemplateData(
@@ -209,12 +220,12 @@ class IdeaGen(IdeGen):
       root_dir=get_buildroot(),
       outdir=outdir,
       git_root=Git.detect_worktree(),
-      modules=[ configured_module ],
+      modules=[configured_module],
       java=TemplateData(
         encoding=self.java_encoding,
         maximum_heap_size=self.java_maximum_heap_size,
         jdk=self.java_jdk,
-        language_level ='JDK_1_{}'.format(self.java_language_level)
+        language_level='JDK_1_{}'.format(self.java_language_level)
       ),
       resource_extensions=list(project.resource_extensions),
       scala=scala,
@@ -234,24 +245,24 @@ class IdeaGen(IdeGen):
     safe_mkdir(os.path.abspath(self.intellij_output_dir))
 
     ipr = self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, self.project_template), project = configured_project))
+        Generator(pkgutil.get_data(__name__, self.project_template), project=configured_project))
     iml = self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, self.module_template), module = configured_module))
+        Generator(pkgutil.get_data(__name__, self.module_template), module=configured_module))
 
     if not self.nomerge:
       # Get the names of the components we generated, and then delete the
       # generated files.  Clunky, but performance is not an issue, and this
       # is an easy way to get those component names from the templates.
       extra_project_components = self._get_components_to_merge(existing_project_components, ipr)
-      extra_module_components =  self._get_components_to_merge(existing_module_components, iml)
+      extra_module_components = self._get_components_to_merge(existing_module_components, iml)
       os.remove(ipr)
       os.remove(iml)
 
       # Generate again, with the extra components.
       ipr = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.project_template),
-          project = configured_project.extend(extra_components = extra_project_components)))
+          project=configured_project.extend(extra_components=extra_project_components)))
       iml = self._generate_to_tempfile(Generator(pkgutil.get_data(__name__, self.module_template),
-          module = configured_module.extend(extra_components = extra_module_components)))
+          module=configured_module.extend(extra_components=extra_module_components)))
 
     self.context.log.info('Generated IntelliJ project in {directory}'
                            .format(directory=self.gen_project_workdir))
@@ -286,7 +297,7 @@ class IdeaGen(IdeGen):
       return []  # No existing components.
     dom = minidom.parse(path)
     # .ipr and .iml files both consist of <component> elements directly under a root element.
-    return [ (x.getAttribute('name'), x.toxml()) for x in dom.getElementsByTagName('component') ]
+    return [(x.getAttribute('name'), x.toxml()) for x in dom.getElementsByTagName('component')]
 
   def _get_components_to_merge(self, mergable_components, path):
     """Returns a list of the <component> fragments in mergable_components that are not
@@ -297,5 +308,5 @@ class IdeaGen(IdeGen):
     # superceding component names, ignoring the generated xml fragments.
     # This is fine, since performance is not an issue.
     generated_component_names = set(
-      [ name for (name, _) in self._parse_xml_component_elements(path) ])
-    return [ x[1] for x in mergable_components if x[0] not in generated_component_names]
+      [name for (name, _) in self._parse_xml_component_elements(path)])
+    return [x[1] for x in mergable_components if x[0] not in generated_component_names]

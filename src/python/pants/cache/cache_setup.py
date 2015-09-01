@@ -16,16 +16,23 @@ from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import Pinger
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
 class EmptyCacheSpecError(ArtifactCacheError): pass
-class LocalCacheSpecRequiredError(ArtifactCacheError): pass
-class CacheSpecFormatError(ArtifactCacheError): pass
-class InvalidCacheSpecError(ArtifactCacheError): pass
-class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
+
+class LocalCacheSpecRequiredError(ArtifactCacheError): pass
+
+
+class CacheSpecFormatError(ArtifactCacheError): pass
+
+
+class InvalidCacheSpecError(ArtifactCacheError): pass
+
+
+class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
 
 class CacheSetup(Subsystem):
@@ -34,31 +41,34 @@ class CacheSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
-    register('--read', action='store_true', default=True, recursive=True,
+    register('--read', action='store_true', default=True,
              help='Read build artifacts from cache, if available.')
-    register('--write', action='store_true', default=True, recursive=True,
+    register('--write', action='store_true', default=True,
              help='Write build artifacts to cache, if available.')
-    register('--overwrite', action='store_true', recursive=True,
+    register('--overwrite', advanced=True, action='store_true',
              help='If writing build artifacts to cache, overwrite existing artifacts '
                   'instead of skipping them.')
-    register('--read-from', type=Options.list, recursive=True,
+    register('--read-from', advanced=True, type=list_option,
              help='The URIs of artifact caches to read from. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')
-    register('--write-to', type=Options.list, recursive=True,
+    register('--write-to', advanced=True, type=list_option,
              help='The URIs of artifact caches to write to. Each entry is a URL of a RESTful '
                   'cache, a path of a filesystem cache, or a pipe-separated list of alternate '
                   'caches to choose from.')
-    register('--compression-level', advanced=True, type=int, default=5, recursive=True,
+    register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
+    register('--max-entries-per-target', advanced=True, type=int, default=None,
+             help='Maximum number of old cache files to keep per task target pair')
 
   @classmethod
   def create_cache_factory_for_task(cls, task):
-    return CacheFactory(cls.instance_for_task(task).get_options(),
+    return CacheFactory(cls.scoped_instance(task).get_options(),
                         task.context.log, task.stable_name())
 
 
 class CacheFactory(object):
+
   def __init__(self, options, log, stable_name, pinger=None):
     self._options = options
     self._log = log
@@ -140,7 +150,7 @@ class CacheFactory(object):
       path = os.path.join(parent_path, self._stable_name)
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
-      return LocalArtifactCache(artifact_root, path, compression)
+      return LocalArtifactCache(artifact_root, path, compression, self._options.max_entries_per_target)
 
     def create_remote_cache(urls, local_cache):
       best_url = self.select_best_url(urls)

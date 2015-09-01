@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.target import Target
@@ -16,6 +16,7 @@ from pants_test.base_test import BaseTest
 
 
 class CmdLineSpecParserTest(BaseTest):
+
   @property
   def alias_groups(self):
     return BuildFileAliases.create(
@@ -118,18 +119,18 @@ class CmdLineSpecParserTest(BaseTest):
     def sort(addresses):
       return sorted(addresses, key=lambda address: address.spec)
 
-    self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
+    self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec)))
 
   def assert_parsed_list(self, cmdline_spec_list, expected):
     def sort(addresses):
       return sorted(addresses, key=lambda address: address.spec)
 
-    self.assertEqual(sort(SyntheticAddress.parse(addr) for addr in expected),
+    self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
   def test_pants_dot_d_excluded(self):
-    expected_specs=[':root', 'a', 'a:b', 'a/b', 'a/b:c']
+    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
     self.add_to_build_file('.pants.d/some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
@@ -141,7 +142,7 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
   def test_exclude_malformed_build_file(self):
-    expected_specs=[':root', 'a', 'a:b', 'a/b', 'a/b:c']
+    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
     self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
@@ -152,7 +153,9 @@ class CmdLineSpecParserTest(BaseTest):
                                          exclude_target_regexps=[r'.*some/dir.*'])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
+
 class CmdLineSpecParserBadBuildTest(BaseTest):
+
   def setUp(self):
     super(CmdLineSpecParserBadBuildTest, self).setUp()
 

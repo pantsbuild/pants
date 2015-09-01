@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
-from pants.option.options import Options
+from pants.option.custom_types import list_option
 from pants.util.dirutil import relativize_path, safe_mkdir
 
 
@@ -29,7 +29,7 @@ class ResourcesTask(Task):
   @classmethod
   def register_options(cls, register):
     super(ResourcesTask, cls).register_options(register)
-    register('--confs', advanced=True, type=Options.list, default=['default'],
+    register('--confs', advanced=True, type=list_option, default=['default'],
              help='Prepare resources for these Ivy confs.')
 
   @classmethod

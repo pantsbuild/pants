@@ -7,16 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JavaCompile
+from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
-class JavaCompileIntegrationTest(PantsRunIntegrationTest):
+class JavaCompileIntegrationTest(BaseCompileIT):
 
   def _java_compile_produces_valid_analysis_file(self, workdir):
     # A bug was introduced where if a java compile was run twice, the second
@@ -66,10 +66,10 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
   def test_nocache(self, strategy):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir,
-          JavaCompile.stable_name(),
+          JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
       good_artifact_dir = os.path.join(cache_dir,
-          JavaCompile.stable_name(),
+          JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
@@ -85,17 +85,25 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       # But cache_me should be written.
       self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
 
+  # TODO(John Sirois): Factor up a shared utility for reuse by
+  # tests/python/pants_test/backend/core/tasks/test_cache_cleanup.py
+  def create_platform_args(self, version):
+    return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
+             .format(version=version)),
+            '--jvm-platform-default-platform=default']
+
   @provide_compile_strategies
   def test_java_compile_produces_different_artifact_depending_on_java_version(self, strategy):
     # Ensure that running java compile with java 6 and then java 7
     # produces two different artifacts.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JavaCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile.java',
+      pants_run = self.run_pants(self.create_platform_args(6) +
+                                 ['compile.java',
                                   '--strategy={}'.format(strategy),
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
@@ -105,8 +113,8 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
-      pants_run = self.run_pants(['compile.java',
-                                  '--target=1.7',
+      pants_run = self.run_pants(self.create_platform_args(7) +
+                                 ['compile.java',
                                   '--strategy={}'.format(strategy),
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
@@ -122,7 +130,7 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir,
-          JavaCompile.stable_name(),
+          JmakeCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main')
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
@@ -160,33 +168,49 @@ class JavaCompileIntegrationTest(PantsRunIntegrationTest):
              'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))
 
-  def _whitelist_test(self, target, fatal_flag, whitelist):
-    # We want to ensure that a project missing dependencies can be
-    # whitelisted so that the missing deps do not break the build.
-
-    args = ['compile', target, fatal_flag]
+  def _whitelist_test(self, target, whitelist_target, strategy, fatal_flag, args=None):
+    """Ensure that a project missing dependencies fails if it is not whitelisted."""
 
     # First check that without the whitelist we do break the build.
-    pants_run = self.run_pants(args, {})
-    self.assert_failure(pants_run)
+    extra_args = (args if args else []) + [fatal_flag]
+    with self.do_test_compile(target, strategy, extra_args=extra_args, expect_failure=True):
+      # run failed as expected
+      pass
 
     # Now let's use the target whitelist, this should succeed.
-    config = {'compile.java': {'missing_deps_whitelist': [whitelist]}}
-
-    pants_run = self.run_pants(args, config)
-
-    self.assert_success(pants_run)
+    extra_args = (args if args else []) + [
+        fatal_flag,
+        '--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(whitelist_target)
+      ]
+    with self.do_test_compile(target, strategy, extra_args=extra_args):
+      # run succeeded as expected
+      pass
 
   def test_java_compile_missing_dep_analysis_whitelist(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist',
-      '--compile-java-missing-deps=fatal',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2'
+      'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist2',
+      # NB: missing transitive deps are only possible with the global strategy
+      'global',
+      '--compile-jvm-dep-check-missing-deps=fatal'
     )
 
-  def test_java_compile_missing_direct_dep_analysis_whitelist(self):
+  def test_java_compile_missing_direct_dep_analysis_whitelist_jmake(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-java-missing-direct-deps=fatal',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist'
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
+      # NB: global only: jmake does not properly support upstream deps for isolated
+      'global',
+      '--compile-jvm-dep-check-missing-direct-deps=fatal'
+    )
+
+  @provide_compile_strategies
+  def test_java_compile_missing_direct_dep_analysis_whitelist_zinc(self, strategy):
+    self._whitelist_test(
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
+      strategy,
+      '--compile-jvm-dep-check-missing-direct-deps=fatal',
+      # Use zinc.
+      args=['--no-compile-java-use-jmake']
     )

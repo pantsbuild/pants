@@ -85,7 +85,7 @@ class Payload(object):
     `fingerprint()` also returns `None`.
 
     :param iterable<string> field_keys: A subset of fields to use for the fingerprint.  Defaults
-      to all fields.
+                                        to all fields.
     """
     field_keys = frozenset(field_keys or self._fields.keys())
     if field_keys not in self._fingerprint_memo_map:

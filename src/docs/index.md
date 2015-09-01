@@ -6,6 +6,13 @@ Pants is a build system for software projects in a variety of languages.
 It works particularly well for a source code repository that contains
 many distinct projects.
 
+Installing Pants
+----------------
+
+Learn how to install pants in your code repository and set up pants plugins.
+
++ [[Installing Pants|pants('src/docs:install')]]
+
 Getting started using Pants
 ---------------------------
 
@@ -52,11 +59,15 @@ News
 + [[2014-09-16 Announcement|pants('src/docs:announce_201409')]]
   "Hello Pants Build"
 
+Powered by Pants
+----------------
+
++ [[Find out why some organizations are using Pants|pants('src/docs:powered_by')]]
+
 Advanced Documentation
 ----------------------
 
 + [[Set up your Source Tree for Pants|pants('src/docs:setup_repo')]]
-+ [[Installing Pants|pants('src/docs:install')]]
 
 Pants Reference Documentation
 -----------------------------

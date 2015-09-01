@@ -12,16 +12,14 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_graph import BuildGraph
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.worker_pool import SubprocPool
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
-from pants.java.distribution.distribution import Distribution
 from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
 
@@ -38,6 +36,7 @@ class Context(object):
 
   class Log(object):
     """A logger facade that logs into the pants reporting framework."""
+
     def __init__(self, run_tracker):
       self._run_tracker = run_tracker
 
@@ -123,28 +122,6 @@ class Context(object):
     return self._workspace
 
   @property
-  def java_sysprops(self):
-    """The system properties of the JVM we use."""
-    # TODO: In the future we can use these to hermeticize the Java enivronment rather than relying
-    # on whatever's on the shell's PATH. E.g., you either specify a path to the Java home via a
-    # cmd-line flag or .pantsrc, or we infer one from java.home but verify that the java.version
-    # is a supported version.
-    if self._java_sysprops is None:
-      # TODO(John Sirois): Plumb a sane default distribution through 1 point of control
-      self._java_sysprops = Distribution.cached().system_properties
-    return self._java_sysprops
-
-  @property
-  def java_home(self):
-    """Find the java home for the JVM we use."""
-    # Implementation is a kind-of-insane hack: we run the jvm to get it to emit its
-    # system properties. On some platforms there are so many hard and symbolic links into
-    # the JRE dirs that it's actually quite hard to establish what path to use as the java home,
-    # e.g., for the purpose of rebasing. In practice, this seems to work fine.
-    # Note that for our purposes we take the parent of java.home.
-    return os.path.realpath(os.path.dirname(self.java_sysprops['java.home']))
-
-  @property
   def spec_excludes(self):
     return self._spec_excludes
 
@@ -164,7 +141,7 @@ class Context(object):
       # This is slightly funky, but the with-context usage is so pervasive and
       # useful elsewhere that it's worth the funkiness in this one place.
       workunit_parent_ctx = self.run_tracker.new_workunit_under_parent(
-        name=parent_workunit_name, labels=[WorkUnit.MULTITOOL], parent=background_root_workunit)
+        name=parent_workunit_name, labels=[WorkUnitLabel.MULTITOOL], parent=background_root_workunit)
       workunit_parent = workunit_parent_ctx.__enter__()
       done_hook = lambda: workunit_parent_ctx.__exit__(None, None, None)
     else:
@@ -190,7 +167,7 @@ class Context(object):
       # NB: in 2.x, wait() with timeout wakes up often to check, burning CPU. Oh well.
       res = SubprocPool.foreground().map_async(f, items)
       while not res.ready():
-        res.wait(60) # Repeatedly wait for up to a minute.
+        res.wait(60)  # Repeatedly wait for up to a minute.
         if not res.ready():
           self.log.debug('subproc_map result still not ready...')
       return res.get()
@@ -199,17 +176,18 @@ class Context(object):
       raise
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """Create a new workunit under the calling thread's current workunit."""
-    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd) as workunit:
+    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd, log_config=log_config) as workunit:
       yield workunit
 
   def acquire_lock(self):
     """ Acquire the global lock for the root directory associated with this context. When
     a goal requires serialization, it will call this to acquire the lock.
     """
-    if not self._lock.i_am_locking():
-      self._lock.acquire()
+    if self.options.for_global_scope().lock:
+      if not self._lock.i_am_locking():
+        self._lock.acquire()
 
   def release_lock(self):
     """Release the global lock if it's held.
@@ -237,16 +215,18 @@ class Context(object):
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
-  def add_new_target(self, address, target_type, dependencies=None, derived_from=None, **kwargs):
+  def add_new_target(self, address, target_type, target_base=None, dependencies=None,
+                     derived_from=None, **kwargs):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
     directory if needed and registering a source root.
     """
-    target_base = os.path.join(get_buildroot(), address.spec_path)
+    target_base = os.path.join(get_buildroot(), target_base or address.spec_path)
     if not os.path.exists(target_base):
       os.makedirs(target_base)
-    SourceRoot.register(address.spec_path)
+    if not SourceRoot.find_by_path(target_base):
+      SourceRoot.register(target_base)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 
@@ -307,10 +287,7 @@ class Context(object):
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""
-    address = SyntheticAddress.parse(spec)
-    # NB: This is an idempotent, short-circuiting call.
-    self.build_graph.inject_address_closure(address)
-    return self.build_graph.transitive_subgraph_of_addresses([address])
+    return self.build_graph.resolve(spec)
 
   def scan(self, root=None):
     """Scans and parses all BUILD files found under ``root``.

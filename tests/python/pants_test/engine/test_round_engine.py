@@ -18,6 +18,10 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     super(RoundEngineTest, self).setUp()
 
     self.set_options_for_scope('', explain=False)
+    for outer in ['goal1', 'goal2', 'goal3', 'goal4', 'goal5']:
+      for inner in ['task1', 'task2', 'task3', 'task4', 'task5']:
+        self.set_options_for_scope('{}.{}'.format(outer, inner),
+                                   level='info', colors=False)
     self._context = self.context()
     self.assertTrue(self._context.is_unlocked())
 
@@ -41,7 +45,10 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     return 'construct', tag, self._context
 
   def record(self, tag, product_types=None, required_data=None, alternate_target_roots=None):
+
     class RecordingTask(Task):
+      options_scope = tag
+
       @classmethod
       def product_types(cls):
         return product_types or []
@@ -68,8 +75,8 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
   def install_task(self, name, product_types=None, goal=None, required_data=None,
                    alternate_target_roots=None):
-    task = self.record(name, product_types, required_data, alternate_target_roots)
-    return super(RoundEngineTest, self).install_task(name=name, action=task, goal=goal)
+    task_type = self.record(name, product_types, required_data, alternate_target_roots)
+    return super(RoundEngineTest, self).install_task(name=name, action=task_type, goal=goal)
 
   def assert_actions(self, *expected_execute_ordering):
     expected_pre_execute_actions = set()

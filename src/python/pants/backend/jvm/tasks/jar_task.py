@@ -18,7 +18,7 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.binary_util import safe_args
+from pants.binaries.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
@@ -337,7 +337,6 @@ class JarTask(NailgunTask):
       self._context = context
       self._jar = jar
       self._manifest = Manifest()
-
 
     def add_target(self, target, recursive=False):
       """Adds the classes and resources for a target to an open jar.

@@ -14,8 +14,8 @@ from pants.backend.android.keystore.keystore_resolver import KeystoreResolver
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
-from pants.java.distribution.distribution import Distribution
+from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_mkdir
 
 
@@ -61,7 +61,7 @@ class SignApkTask(Task):
   @classmethod
   def signed_package_name(cls, target, build_type):
     """Get package name with 'build_type', a string KeyResolver mandates is in (debug, release)."""
-    return '{0}.{1}.signed.apk'.format(target.app_name, build_type)
+    return '{0}.{1}.signed.apk'.format(target.manifest.package_name, build_type)
 
   def __init__(self, *args, **kwargs):
     super(SignApkTask, self).__init__(*args, **kwargs)
@@ -88,9 +88,9 @@ class SignApkTask(Task):
   def distribution(self):
     if self._dist is None:
       # Currently no Java 8 for Android. I considered max=1.7.0_50. See comment in _render_args().
-      self._dist = Distribution.cached(minimum_version='1.6.0_00',
-                                       maximum_version='1.7.0_99',
-                                       jdk=True)
+      self._dist = DistributionLocator.cached(minimum_version='1.6.0_00',
+                                              maximum_version='1.7.0_99',
+                                              jdk=True)
     return self._dist
 
   def _render_args(self, target, key, unsigned_apk, outdir):
@@ -151,7 +151,7 @@ class SignApkTask(Task):
             safe_mkdir(outdir)
             args = self._render_args(target, keystores[key], unsigned_apk, outdir)
             with self.context.new_workunit(name='sign_apk',
-                                           labels=[WorkUnit.MULTITOOL]) as workunit:
+                                           labels=[WorkUnitLabel.MULTITOOL]) as workunit:
               returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                            stderr=workunit.output('stderr'))
               if returncode:

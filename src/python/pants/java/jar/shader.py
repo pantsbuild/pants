@@ -9,7 +9,6 @@ import os
 from collections import namedtuple
 from contextlib import contextmanager
 
-from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import open_zip, temporary_file
 
 
@@ -123,15 +122,14 @@ class Shader(object):
           paths.add(os.path.dirname(pathname))
       return cls._iter_packages(paths)
 
-  def __init__(self, jarjar, executor=None):
+  def __init__(self, jarjar, executor):
     """Creates a `Shader` the will use the given `jarjar` jar to create shaded jars.
 
     :param unicode jarjar: The path to the jarjar jar.
-    :param executor: An optional java `Executor` to use to create shaded jar files.  Defaults to a
-                    `SubprocessExecutor` that uses the default java distribution.
+    :param executor: A java `Executor` to use to create shaded jar files.
     """
     self._jarjar = jarjar
-    self._executor = executor or SubprocessExecutor()
+    self._executor = executor
     self._system_packages = None
 
   def _calculate_system_packages(self):

@@ -18,12 +18,11 @@ python_tests(
   sources = ['test_dependencies.py'],
   dependencies = [
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/project_info/tasks:dependencies',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
-    'src/python/pants/base:exceptions',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -34,32 +33,50 @@ python_tests(
   coverage = ['pants.backend.project_info.tasks.depmap'],
   dependencies = [
     'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:exceptions',
     'tests/python/pants_test/tasks:task_test_base',
   ]
+)
+
+python_tests(
+  name = 'eclipse_integration',
+  sources = ['test_eclipse_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name = 'ensime_integration',
+  sources = ['test_ensime_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/core:wrapped_globs',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:export',
+    'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:parse_context',
+    'src/python/pants/base:source_root',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -111,5 +128,15 @@ python_tests(
     'src/python/pants/base:source_root',
     'tests/python/pants_test:base_test',
   ]
+)
+
+python_tests(
+  name = 'idea_integration',
+  sources = ['test_idea_integration.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
 )
 

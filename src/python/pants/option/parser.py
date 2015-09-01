@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
-import sys
+import re
 import warnings
 from argparse import ArgumentParser, _HelpAction
 from collections import defaultdict
@@ -16,15 +16,15 @@ import six
 from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
-from pants.option.help_formatter import HelpFormatter
-from pants.option.help_info_extracter import HelpInfoExtracter
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
+from pants.option.scope import ScopeInfo
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
 # Note that subclassing ArgumentParser for this purpose is allowed by the argparse API.
 class CustomArgumentParser(ArgumentParser):
+
   def __init__(self, scope, *args, **kwargs):
     super(CustomArgumentParser, self).__init__(*args, **kwargs)
     self._scope = scope
@@ -162,9 +162,16 @@ class Parser(object):
         for dest in deprecated_dests:
           if namespace.get_rank(dest) == RankedValue.FLAG:
             warnings.warn('*** {}'.format(self._deprecated_message(dest)), DeprecationWarning,
-                          stacklevel=9999) # Out of range stacklevel to suppress printing src line.
+                          stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
     return namespace
 
+  @property
+  def registration_args(self):
+    """Returns the registration args, in registration order.
+
+    :return: A list of (args, kwargs) pairs.
+    """
+    return self._registration_args
 
   def registration_args_iter(self):
     """Returns an iterator over the registration arguments of each option in this parser.
@@ -172,31 +179,13 @@ class Parser(object):
     Each yielded item is a (dest, args, kwargs) triple.  `dest` is the canonical name that can be
     used to retrieve the option value, if the option has multiple names.
     See comment on self._registration_args above for caveats re (args, kwargs).
+
     For consistency, items are iterated over in lexicographical order, not registration order.
     """
     for args, kwargs in sorted(self._registration_args):
       if args:  # Otherwise all args have been shadowed, so ignore.
         dest = self._select_dest(args)
         yield dest, args, kwargs
-
-  def get_help_info(self):
-    """Returns a dict of help information for the options registered on this object.
-
-    Callers can format this dict into cmd-line help, HTML or whatever.
-    """
-    return HelpInfoExtracter(self._scope).get_option_scope_help_info(self._registration_args)
-
-  def format_help(self, header, show_advanced=False, color=None):
-    """Return a help message for the options registered on this object.
-
-    :param header: Value to display as a header.
-    :param bool show_advanced: Whether to display advanced options.
-    :param bool color: Whether to use color. If None, use color only if writing to a terminal.
-    """
-    if color is None:
-      color = sys.stdout.isatty()
-    help_formatter = HelpFormatter(scope=self._scope, show_advanced=show_advanced, color=color)
-    return '\n'.join(help_formatter.format_options(header, self._registration_args))
 
   def register(self, *args, **kwargs):
     """Register an option, using argparse params.
@@ -221,7 +210,12 @@ class Parser(object):
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
     if 'recursive' in kwargs:
+      if self._scope_info.category == ScopeInfo.SUBSYSTEM:
+        raise ParseError('Option {} in scope {} registered as recursive, but subsystem options '
+                         'may not set recursive=True.'.format(args[0], self.scope))
       kwargs['recursive_root'] = True  # So we can distinguish the original registrar.
+    if self._scope_info.category == ScopeInfo.SUBSYSTEM:
+      kwargs['subsystem'] = True
     self._register(dest, args, kwargs)  # Note: May modify kwargs (to remove recursive_root).
 
   def _deprecated_message(self, dest):
@@ -239,6 +233,9 @@ class Parser(object):
     hint = deprecated_hint or ''
     return '{}. {}'.format(message, hint)
 
+  _custom_kwargs = ('advanced', 'recursive', 'recursive_root', 'subsystem', 'registering_class',
+                    'fingerprint', 'deprecated_version', 'deprecated_hint')
+
   def _clean_argparse_kwargs(self, dest, args, kwargs):
     ranked_default = self._compute_default(dest, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
@@ -251,24 +248,22 @@ class Parser(object):
       self._arg_lists_by_arg[arg] = args_copy
     self._registration_args.append((args_copy, kwargs_with_default))
 
-    # For argparse registration, remove our custom kwargs.
-    argparse_kwargs = dict(kwargs_with_default)
-    argparse_kwargs.pop('advanced', False)
-    recursive = argparse_kwargs.pop('recursive', False)
-    argparse_kwargs.pop('recursive_root', False)
-    argparse_kwargs.pop('registering_class', None)
-    deprecated_version = argparse_kwargs.pop('deprecated_version', None)
-    deprecated_hint = argparse_kwargs.pop('deprecated_hint', '')
+    deprecated_version = kwargs.get('deprecated_version', None)
+    deprecated_hint = kwargs.get('deprecated_hint', '')
 
     if deprecated_version is not None:
       check_deprecated_semver(deprecated_version)
       self._deprecated_option_dests[dest] = (deprecated_version, deprecated_hint)
 
-    return argparse_kwargs, recursive
+    # For argparse registration, remove our custom kwargs.
+    argparse_kwargs = dict(kwargs_with_default)
+    for custom_kwarg in self._custom_kwargs:
+      argparse_kwargs.pop(custom_kwarg, None)
+    return argparse_kwargs
 
   def _register(self, dest, args, kwargs):
     """Register the option for parsing (recursively if needed)."""
-    argparse_kwargs, recursive = self._clean_argparse_kwargs(dest, args, kwargs)
+    argparse_kwargs = self._clean_argparse_kwargs(dest, args, kwargs)
     if is_boolean_flag(argparse_kwargs):
       inverse_args = self._create_inverse_args(args)
       if inverse_args:
@@ -281,7 +276,7 @@ class Parser(object):
     else:
       self._argparser.add_argument(*args, **argparse_kwargs)
 
-    if recursive:
+    if kwargs.get('recursive', False) or kwargs.get('subsystem', False):
       # Propagate registration down to inner scopes.
       for child_parser in self._child_parsers:
         kwargs.pop('recursive_root', False)
@@ -330,6 +325,8 @@ class Parser(object):
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
     return dest
 
+  _ENV_SANITIZER_RE = re.compile(r'[.-]')
+
   def _select_dest(self, args):
     """Select the dest name for the option.
 
@@ -357,7 +354,8 @@ class Parser(object):
       if udest.startswith('PANTS_'):
         env_vars.append(udest)
     else:
-      env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
+      sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', config_section.upper())
+      env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
     value_type = self.str_to_bool if is_boolean_flag(kwargs) else kwargs.get('type', str)
     env_val_str = None
     if self._env:

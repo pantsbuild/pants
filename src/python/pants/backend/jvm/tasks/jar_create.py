@@ -11,9 +11,7 @@ from contextlib import contextmanager
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
-from pants.fs.fs import safe_filename
-from pants.util.dirutil import safe_mkdir
+from pants.base.workunit import WorkUnitLabel
 
 
 def is_jvm_binary(target):
@@ -41,6 +39,7 @@ class JarCreate(JarTask):
   def register_options(cls, register):
     super(JarCreate, cls).register_options(register)
     register('--compressed', default=True, action='store_true',
+             fingerprint=True,
              help='Create compressed jars.')
 
   @classmethod
@@ -64,7 +63,7 @@ class JarCreate(JarTask):
 
   def execute(self):
     with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
-      with self.context.new_workunit(name='jar-create', labels=[WorkUnit.MULTITOOL]):
+      with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
         jar_mapping = self.context.products.get('jars')
 
         for vt in invalidation_check.all_vts:
