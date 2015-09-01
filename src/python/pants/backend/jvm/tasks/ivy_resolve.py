@@ -12,6 +12,7 @@ from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
@@ -130,6 +131,21 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     # stable symlinks within the working copy.
     ivy_jar_products = self._generate_ivy_jar_products(resolve_hash_name)
     symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
+    def new_resolved_jar_with_symlink_path(resolved_jar_without_symlink):
+      if resolved_jar_without_symlink.cache_path in symlink_map:
+        key = resolved_jar_without_symlink.cache_path
+      else:
+        key = os.path.realpath(resolved_jar_without_symlink.cache_path)
+
+      if key not in symlink_map:
+        raise self.UnresolvedJarError(
+          'Jar {resolved_jar} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
+          spec=target.address.spec, resolved_jar=resolved_jar_without_symlink.cache_path, conf=conf))
+
+      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+                         pants_path=symlink_map[key],
+                         cache_path=resolved_jar_without_symlink.cache_path)
+
     for conf in self.confs:
       ivy_jar_memo = {}
       ivy_info_list = ivy_jar_products[conf]
@@ -145,17 +161,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
-        for artifact_location in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
-          if artifact_location in symlink_map:
-            key = artifact_location
-          else:
-            key = os.path.realpath(artifact_location)
-          if key not in symlink_map:
-            raise self.UnresolvedJarError(
-              'Jar {artifact} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
-              spec=target.address.spec, artifact=artifact_location, conf=conf))
-          artifact_location = symlink_map[key]
-          compile_classpath.add_for_target(target, [(conf, artifact_location)])
+        resolved_jars = [new_resolved_jar_with_symlink_path(resolved_jar)
+                         for resolved_jar in ivy_info.get_resolved_jars_for_jar_library(target,
+                                                                                        memo=ivy_jar_memo)]
+        compile_classpath.add_jars_for_targets([target], conf, resolved_jars)
 
     if self._report:
       self._generate_ivy_report(resolve_hash_name)
