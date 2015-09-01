@@ -123,7 +123,10 @@ jar_library(name = 'scalastyle',
             ])
 
 target(name = 'scala-js-cli', dependencies=['3rdparty/jvm/org/scala-js:cli'])
-target(name = 'scala-js-compiler', dependencies=['3rdparty/jvm/org/scala-js:compiler'])
+target(name = 'scala-js-compiler', dependencies=[
+  '3rdparty/jvm/org/scala-js:compiler',
+  '3rdparty/jvm/org/scala-js:library',
+])
 target(name = 'scala-js-library', dependencies=['3rdparty/jvm/org/scala-js:library'])
 
 jar_library(name = 'checkstyle',

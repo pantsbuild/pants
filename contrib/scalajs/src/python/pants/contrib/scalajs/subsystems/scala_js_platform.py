@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.option.custom_types import list_option
+from pants.option.custom_types import target_list_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -17,7 +17,7 @@ class ScalaJSPlatform(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(ScalaJSPlatform, cls).register_options(register)
-    register('--runtime', advanced=True, type=list_option, default=['//:scala-js-library'],
+    register('--runtime', advanced=True, type=target_list_option, default=['//:scala-js-library'],
              help='Target specs pointing to the scala-js runtime libraries.')
 
   @property
