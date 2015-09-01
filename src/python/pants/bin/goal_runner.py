@@ -172,19 +172,12 @@ class ReportingInitializer(object):
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting):
-    self._root_dir = root_dir
-    self._options = options
-    self._build_config = build_config
-    self._run_tracker = run_tracker
-    self._reporting = reporting
+  def __init__(self, *args, **kwargs):
+    self._args = args
+    self._kwargs = kwargs
 
   def setup(self):
-    goal_runner = GoalRunner(self._root_dir,
-                             self._options,
-                             self._build_config,
-                             self._run_tracker,
-                             self._reporting)
+    goal_runner = GoalRunner(*self._args, **self._kwargs)
     goal_runner.setup()
     return goal_runner
 
@@ -197,7 +190,7 @@ class GoalRunner(object):
   def __init__(self, root_dir, options, build_config, run_tracker, reporting, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
-    :param Options options: A global, pre-initialized Options instance.
+    :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
