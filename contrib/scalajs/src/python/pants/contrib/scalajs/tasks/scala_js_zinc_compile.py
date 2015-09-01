@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import BaseZincCompile
 
-from pants.contrib.scalajs.targets.scala_js_library import ScalaJSLibrary
+from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSZincCompile(BaseZincCompile):

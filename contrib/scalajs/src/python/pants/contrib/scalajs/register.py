@@ -10,7 +10,6 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
-from pants.contrib.scalajs.targets.scala_js_library import ScalaJSLibrary
 from pants.contrib.scalajs.tasks.scala_js_link import ScalaJSLink
 from pants.contrib.scalajs.tasks.scala_js_zinc_compile import ScalaJSZincCompile
 
