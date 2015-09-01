@@ -21,6 +21,7 @@ python_library(
   sources = ['addressable.py'],
   dependencies = [
     ':address',
+    ':build_file_type_factory',
     'src/python/pants/util:meta',
   ]
 )
@@ -90,7 +91,16 @@ python_library(
     ':address',
     ':build_environment',
     ':build_file',
+    ':build_file_type_factory',
     ':build_graph',
+  ]
+)
+
+python_library(
+  name = 'build_file_type_factory',
+  sources = ['build_file_type_factory.py'],
+  dependencies = [
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -272,6 +282,7 @@ python_library(
   sources = ['source_root.py'],
   dependencies = [
     ':build_environment',
+    ':build_file_type_factory',
     ':build_manual',
     ':exceptions',
     ':parse_context',

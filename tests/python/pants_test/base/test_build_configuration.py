@@ -26,7 +26,7 @@ class BuildConfigurationTest(unittest.TestCase):
     class Fred(Target):
       pass
 
-    self.build_configuration.register_target_alias('fred', Fred)
+    self.build_configuration._register_target_alias('fred', Fred)
     aliases = self.build_configuration.registered_aliases()
     self.assertEqual({}, aliases.objects)
     self.assertEqual({}, aliases.context_aware_object_factories)
@@ -42,19 +42,19 @@ class BuildConfigurationTest(unittest.TestCase):
     target_call_proxy(name='jake')
     self.assertEqual(1, len(parse_state.registered_addressable_instances))
     name, target_proxy = parse_state.registered_addressable_instances.pop()
-    self.assertEqual('jake', target_proxy.name)
-    self.assertEqual(Fred, target_proxy.target_type)
+    self.assertEqual('jake', target_proxy.addressed_name)
+    self.assertEqual(Fred, target_proxy.addressed_type)
 
   def test_register_bad_target_alias(self):
     with self.assertRaises(TypeError):
-      self.build_configuration.register_target_alias('fred', object())
+      self.build_configuration._register_target_alias('fred', object())
 
     target = Target('fred', Address.parse('a:b'), BuildGraph(address_mapper=None))
     with self.assertRaises(TypeError):
-      self.build_configuration.register_target_alias('fred', target)
+      self.build_configuration._register_target_alias('fred', target)
 
   def test_register_exposed_object(self):
-    self.build_configuration.register_exposed_object('jane', 42)
+    self.build_configuration._register_exposed_object('jane', 42)
 
     aliases = self.build_configuration.registered_aliases()
     self.assertEqual({}, aliases.targets)
@@ -70,7 +70,7 @@ class BuildConfigurationTest(unittest.TestCase):
 
   def test_register_bad_exposed_object(self):
     with self.assertRaises(TypeError):
-      self.build_configuration.register_exposed_object('jane', Target)
+      self.build_configuration._register_exposed_object('jane', Target)
 
   def test_register_exposed_context_aware_function(self):
     self.do_test_exposed_context_aware_function(lambda context: lambda: context.rel_path)
@@ -113,7 +113,7 @@ class BuildConfigurationTest(unittest.TestCase):
 
   @contextmanager
   def do_test_exposed_context_aware_object(self, context_aware_object_factory):
-    self.build_configuration.register_exposed_context_aware_object_factory(
+    self.build_configuration._register_exposed_context_aware_object_factory(
         'george', context_aware_object_factory)
 
     aliases = self.build_configuration.registered_aliases()
@@ -134,4 +134,4 @@ class BuildConfigurationTest(unittest.TestCase):
 
   def test_register_bad_exposed_context_aware_object(self):
     with self.assertRaises(TypeError):
-      self.build_configuration.register_exposed_context_aware_object_factory('george', 1)
+      self.build_configuration._register_exposed_context_aware_object_factory('george', 1)

@@ -16,54 +16,61 @@ class BuildFileAliasesTest(unittest.TestCase):
     self.assertEqual(BuildFileAliases(targets={},
                                       objects={},
                                       context_aware_object_factories={},
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create())
 
     targets = {'jake': Target}
     self.assertEqual(BuildFileAliases(targets=targets,
                                       objects={},
                                       context_aware_object_factories={},
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(targets=targets))
 
     objects = {'jane': 42}
     self.assertEqual(BuildFileAliases(targets={},
                                       objects=objects,
                                       context_aware_object_factories={},
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(objects=objects))
 
     factories = {'jim': lambda ctx: 'bob'}
     self.assertEqual(BuildFileAliases(targets={},
                                       objects={},
                                       context_aware_object_factories=factories,
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(context_aware_object_factories=factories))
+
+    anonymous_targets = {Target}
+    self.assertEqual(BuildFileAliases(targets={},
+                                      objects={},
+                                      context_aware_object_factories={},
+                                      anonymous_targets=anonymous_targets),
+                     BuildFileAliases.create(anonymous_targets=anonymous_targets))
 
     self.assertEqual(BuildFileAliases(targets=targets,
                                       objects=objects,
                                       context_aware_object_factories={},
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(targets=targets, objects=objects))
 
     self.assertEqual(BuildFileAliases(targets=targets,
                                       objects={},
                                       context_aware_object_factories=factories,
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(targets=targets,
                                              context_aware_object_factories=factories))
 
     self.assertEqual(BuildFileAliases(targets={},
                                       objects=objects,
                                       context_aware_object_factories=factories,
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(objects=objects,
                                              context_aware_object_factories=factories))
 
     self.assertEqual(BuildFileAliases(targets=targets,
                                       objects=objects,
                                       context_aware_object_factories=factories,
-                                      addressables={}),
+                                      anonymous_targets=set()),
                      BuildFileAliases.create(targets=targets,
                                              objects=objects,
                                              context_aware_object_factories=factories))
@@ -88,12 +95,12 @@ class BuildFileAliasesTest(unittest.TestCase):
     first = BuildFileAliases(targets={'a': Target},
                              objects={'d': 2},
                              context_aware_object_factories={'e': e_factory},
-                             addressables={})
+                             anonymous_targets=set())
 
     second = BuildFileAliases(targets={},
                               objects={'c': 1, 'd': 42},
                               context_aware_object_factories={'f': f_factory},
-                              addressables={})
+                              anonymous_targets=set())
 
     expected = BuildFileAliases(
         # nothing to merge
@@ -103,5 +110,5 @@ class BuildFileAliasesTest(unittest.TestCase):
         # combine
         context_aware_object_factories={'e': e_factory, 'f': f_factory},
         # empty
-        addressables={})
+        anonymous_targets=set())
     self.assertEqual(expected, first.merge(second))

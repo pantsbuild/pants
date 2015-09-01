@@ -5,165 +5,204 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import inspect
 import logging
-from collections import namedtuple
+from collections import Iterable, namedtuple
 
-from pants.base.addressable import AddressableCallProxy
+from pants.base.addressable import Addressable, AddressableCallProxy
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.parse_context import ParseContext
 from pants.base.target import Target
+from pants.base.target_addressable import TargetAddressable
+from pants.subsystem.subsystem import Subsystem
 
 
 logger = logging.getLogger(__name__)
 
 
+def _is_subtype(clazz, obj):
+  return inspect.isclass(obj) and issubclass(obj, clazz)
+
+
 class BuildConfiguration(object):
-  """Stores the types and helper functions exposed to BUILD files as well as the commands and goals
-  that can operate on the targets defined in them.
-  """
+  """Stores the types and helper functions exposed to BUILD files."""
 
   ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
 
-  @staticmethod
-  def _is_target_type(obj):
-    return inspect.isclass(obj) and issubclass(obj, Target)
+  _is_addressable_type = functools.partial(_is_subtype, Addressable)
+  _is_subsystem_type = functools.partial(_is_subtype, Subsystem)
+  _is_target_type = functools.partial(_is_subtype, Target)
 
   def __init__(self):
-    self._target_aliases = {}
-    self._addressable_alias_map = {}
-    self._exposed_objects = {}
-    self._exposed_context_aware_object_factories = {}
+    self._target_by_alias = {}
+    self._anonymous_targets = set()
+    self._exposed_object_by_alias = {}
+    self._exposed_context_aware_object_factory_by_alias = {}
     self._subsystems = set()
-
-  def subsystems(self):
-    return self._subsystems
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
 
-    This dict isn't so useful for actually parsing BUILD files.
-    It's useful for generating things like
-    http://pantsbuild.github.io/build_dictionary.html
+    This returned aliases aren't so useful for actually parsing BUILD files.
+    They are useful for generating things like http://pantsbuild.github.io/build_dictionary.html.
+
+    :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
+              mappings.
+    :rtype: :class:`pants.base.build_file_aliases.BuildFileAliases`
     """
     return BuildFileAliases.create(
-        targets=self._target_aliases,
-        objects=self._exposed_objects,
-        addressables=self._addressable_alias_map,
-        context_aware_object_factories=self._exposed_context_aware_object_factories)
+        targets=self._target_by_alias,
+        objects=self._exposed_object_by_alias,
+        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias,
+        anonymous_targets=self._anonymous_targets)
 
   def register_aliases(self, aliases):
-    """Registers the given aliases to be exposed in parsed BUILD files."""
+    """Registers the given aliases to be exposed in parsed BUILD files.
+
+    :param aliases: The BuildFileAliases to register.
+    :type aliases: :class:`pants.base.build_file_aliases.BuildFileAliases`
+    """
+    if not isinstance(aliases, BuildFileAliases):
+      raise TypeError('The aliases must be a BuildFileAliases, given {}'.format(aliases))
+
     for alias, target_type in aliases.targets.items():
-      self.register_target_alias(alias, target_type)
+      self._register_target_alias(alias, target_type)
+
+    for anonymous_target_type in aliases.anonymous_targets:
+      self._register_anonymous_target(anonymous_target_type)
 
     for alias, obj in aliases.objects.items():
-      self.register_exposed_object(alias, obj)
+      self._register_exposed_object(alias, obj)
 
     for alias, context_aware_object_factory in aliases.context_aware_object_factories.items():
-      self.register_exposed_context_aware_object_factory(alias, context_aware_object_factory)
+      self._register_exposed_context_aware_object_factory(alias, context_aware_object_factory)
 
-  def register_target_alias(self, alias, target):
-    """Registers the given target type under the given alias."""
-    if not self._is_target_type(target):
-      raise TypeError('Only Target types can be registered via `register_target_alias`, '
-                      'given {0}'.format(target))
+  # TODO(John Sirois): Move all these checks to BuildFileAliases where they belong:
+  # See: https://github.com/pantsbuild/pants/issues/2124
+  def _register_target_alias(self, alias, target_type):
+    if not self._is_target_type(target_type):
+      raise TypeError('Only Target types can be registered via `register_target_alias`, given {}'
+                      .format(target_type))
 
-    if alias in self._target_aliases:
-      logger.debug('Target alias {alias} has already been registered. Overwriting!'
-                  .format(alias=alias))
-    self._target_aliases[alias] = target
-    self.register_addressable_alias(alias, target.get_addressable_type())
-    self._subsystems.update(target.subsystems())
+    if alias in self._target_by_alias:
+      logger.debug('Target alias {} has already been registered. Overwriting!'.format(alias))
 
-  def register_exposed_object(self, alias, obj):
-    """Registers the given object under the given alias.
+    self._target_by_alias[alias] = target_type
+    self._subsystems.update(target_type.subsystems())
 
-    The object must not be a target subclass.  Those should be registered via
-    `register_target_alias`.
-    """
+  def _register_anonymous_target(self, anonymous_target_type):
+    if not self._is_target_type(anonymous_target_type):
+      raise TypeError('Only Target types can be registered via `register_anonymous_target`, '
+                      'given {}'.format(anonymous_target_type))
+
+    self._anonymous_targets.add(anonymous_target_type)
+    self._subsystems.update(anonymous_target_type.subsystems())
+
+  def _register_exposed_object(self, alias, obj):
     if self._is_target_type(obj):
-      raise TypeError('The exposed object {0} is a Target - these should be registered '
+      raise TypeError('The exposed object {} is a Target - these should be registered '
                       'via `register_target_alias`'.format(obj))
+    if self._is_addressable_type(obj):
+      raise TypeError('The exposed object {} is an Addressable - these should be registered '
+                      'via `register_addressable_alias`'.format(obj))
 
-    if alias in self._exposed_objects:
-      logger.debug('Object alias {alias} has already been registered. Overwriting!'
-                  .format(alias=alias))
-    self._exposed_objects[alias] = obj
+    if alias in self._exposed_object_by_alias:
+      logger.debug('Object alias {} has already been registered. Overwriting!'.format(alias))
+
+    self._exposed_object_by_alias[alias] = obj
     # obj doesn't implement any common base class, so we have to test for this attr.
     if hasattr(obj, 'subsystems'):
       self.register_subsystems(obj.subsystems())
 
+  def _register_exposed_context_aware_object_factory(self, alias, context_aware_object_factory):
+    if self._is_target_type(context_aware_object_factory):
+      raise TypeError('The exposed context aware object factory {} is a Target - these '
+                      'should be registered via `register_target_alias`'
+                      .format(context_aware_object_factory))
+    if self._is_addressable_type(context_aware_object_factory):
+      raise TypeError('The exposed context aware object factory {} is an Addressable - these '
+                      'should be registered via `register_addressable_alias`'
+                      .format(context_aware_object_factory))
+    if not callable(context_aware_object_factory):
+      raise TypeError('The given context aware object factory {} must be a callable.'
+                      .format(context_aware_object_factory))
+
+    if alias in self._exposed_context_aware_object_factory_by_alias:
+      logger.debug('This context aware object factory alias {} has already been registered. '
+                   'Overwriting!'.format(alias))
+
+    self._exposed_context_aware_object_factory_by_alias[alias] = context_aware_object_factory
+
   def register_subsystems(self, subsystems):
-    """Registers the given subsystems."""
+    """Registers the given subsystem types.
+
+    :param subsystems: The subsystem types to register.
+    :type subsystems: :class:`collections.Iterable` containing
+                      :class:`pants.subsystem.subsystem.Subsystem` subclasses.
+    """
+    if not isinstance(subsystems, Iterable):
+      raise TypeError('The subsystems must be an iterable, given {}'.format(subsystems))
+    invalid_subsystems = [s for s in subsystems if not self._is_subsystem_type(s)]
+    if invalid_subsystems:
+      raise TypeError('The following items from the given subsystems are not Subsystem '
+                      'subclasses:\n\t{}'.format('\n\t'.join(map(str, invalid_subsystems))))
+
     self._subsystems.update(subsystems)
 
-  def register_addressable_alias(self, alias, addressable_type):
-    """Registers a general Addressable type under the given alias.
+  def subsystems(self):
+    """Returns the registered Subsystem types.
 
-    Addressables are the general mechanism for capturing the name and value of objects instantiated
-    in BUILD files.  Most notably, TargetAddressable is a subclass of Addressable, and
-    `register_target_alias` delegates to this method after noting the alias mapping for
-    other purposes.
-
-    Any Addressable with the appropriate `addressable_name` implementation which is registered
-    here and instantiated in a BUILD file will be accessible from the AddressMapper, regardless
-    of the type of instance it yields.
+    :rtype set
     """
-    if alias in self._addressable_alias_map:
-      logger.debug('Addressable alias {alias} has already been registered. Overwriting!'
-                  .format(alias=alias))
-    self._addressable_alias_map[alias] = addressable_type
-
-  def register_exposed_context_aware_object_factory(self, alias, context_aware_object_factory):
-    """Registers the given context aware object factory under the given alias.
-
-    Context aware object factories must be callables that take a single ParseContext argument
-    and return some object that will be exposed in the BUILD file parse context under `alias`.
-    """
-    if self._is_target_type(context_aware_object_factory):
-      raise TypeError('The exposed context aware object factory {factory} is a Target - these '
-                      'should be registered via `register_target_alias`'
-                      .format(factory=context_aware_object_factory))
-
-    if alias in self._exposed_context_aware_object_factories:
-      logger.debug('This context aware object factory alias {alias} has already been registered. '
-                  'Overwriting!'.format(alias=alias))
-
-    if callable(context_aware_object_factory):
-      self._exposed_context_aware_object_factories[alias] = context_aware_object_factory
-    else:
-      raise TypeError('The given context aware object factory {factory} must be a callable.'
-                      .format(factory=context_aware_object_factory))
+    return self._subsystems
 
   def initialize_parse_state(self, build_file):
-    """Creates a fresh parse state for the given build file."""
-    type_aliases = self._exposed_objects.copy()
+    """Creates a fresh parse state for the given build file.
+
+    :param build_file: The BUILD file to set up a new ParseState for.
+    :type build_file: :class:`pants.base.build_file.BuildFile`
+    :returns: A fresh ParseState for parsing the given `build_file` with.
+    :rtype: :class:`BuildConfiguration.ParseState`
+    """
+    # TODO(John Sirois): Introduce a factory method to seal the BuildConfiguration and add a check
+    # there that all anonymous types are covered by context aware object factories that are
+    # Macro instances.  Without this, we could have non-Macro context aware object factories being
+    # asked to be a BuildFileTypeFactory when they are not (in SourceRoot registration context).
+    # See: https://github.com/pantsbuild/pants/issues/2125
+    type_aliases = self._exposed_object_by_alias.copy()
 
     registered_addressable_instances = []
 
-    def registration_callback(address, addressable):
-      registered_addressable_instances.append((address, addressable))
+    def create_call_proxy(tgt_type, tgt_alias=None):
+      def registration_callback(address, addressable):
+        registered_addressable_instances.append((address, addressable))
+      addressable_factory = TargetAddressable.factory(target_type=tgt_type, alias=tgt_alias)
+      return AddressableCallProxy(addressable_factory=addressable_factory,
+                                  build_file=build_file,
+                                  registration_callback=registration_callback)
 
-    for alias, addressable_type in self._addressable_alias_map.items():
-      call_proxy = AddressableCallProxy(addressable_alias=alias,
-                                        addressable_type=addressable_type,
-                                        build_file=build_file,
-                                        registration_callback=registration_callback)
-      type_aliases[alias] = call_proxy
+    # Expose only aliased Addressable types.
+    for alias, target_type in self._target_by_alias.items():
+      proxy = create_call_proxy(target_type, alias)
+      type_aliases[alias] = proxy
 
-    # Expose aliases for exposed objects and addressables in the BUILD file.
+    # Expose aliases for exposed objects and targets in the BUILD file.
     parse_globals = type_aliases.copy()
 
-    # Now its safe to add concrete addressable type to proxy mappings for context awares to use.
-    for alias, addressable_type in self._addressable_alias_map.items():
-      target_type = addressable_type.get_target_type()
+    # Now its safe to add mappings from both the exposed and anonymous target types to their call
+    # proxies for context awares to use to manufacture targets by type instead of by alias.
+    for alias, target_type in self._target_by_alias.items():
       proxy = type_aliases[alias]
       type_aliases[target_type] = proxy
 
+    for anonymous_target_type in self._anonymous_targets:
+      proxy = create_call_proxy(anonymous_target_type)
+      type_aliases[anonymous_target_type] = proxy
+
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
-    for alias, object_factory in self._exposed_context_aware_object_factories.items():
+    for alias, object_factory in self._exposed_context_aware_object_factory_by_alias.items():
       parse_globals[alias] = object_factory(parse_context)
 
     return self.ParseState(registered_addressable_instances, parse_globals)
