@@ -63,66 +63,42 @@ class SourceRootBootstrapper(Subsystem):
       build_file_parser.parse_build_file_family(build_file)
 
 
-class GoalRunner(object):
-  """Lists installed goals or else executes a named goal."""
+class OptionsInitializer(object):
+  """Initializes global options and logging."""
 
-  def __init__(self, root_dir, options_bootstrapper=None, working_set=None, exiter=sys.exit):
+  def __init__(self, options_bootstrapper=None, working_set=None, exiter=sys.exit):
     """
-    :param str root_dir: The root directory of the pants workspace (aka the "build root").
-    :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance. (Optional)
+    :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance (Optional).
     :param pkg_resources.WorkingSet working_set: The working set of the current run as returned by
-                                                 PluginResolver.resolve(). (Optional)
+                                                 PluginResolver.resolve() (Optional).
     :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
     """
-    self.root_dir = root_dir
-    self.options_bootstrapper = options_bootstrapper or OptionsBootstrapper()
-    self.working_set = working_set or PluginResolver(self.options_bootstrapper).resolve()
+    self._options_bootstrapper = options_bootstrapper or OptionsBootstrapper()
+    self._working_set = working_set or PluginResolver(self._options_bootstrapper).resolve()
     self._exiter = exiter
 
-    self.goals = []
-    self.targets = []
-    self.requested_goals = []
-    self.options, self.build_configuration = self._setup_options(self.options_bootstrapper,
-                                                                 self.working_set)
-
-    # Now that we have options we can instantiate subsystems.
-    self.run_tracker = RunTracker.global_instance()
-    self.reporting = Reporting.global_instance()
-
-    # Start the RunTracker as early as possible.
-    self._start_runtracker()
-
-    self.build_file_type = self._get_buildfile_type(self.global_options.build_file_rev)
-    self.build_file_parser = BuildFileParser(self.build_configuration, self.root_dir)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.build_file_type)
-    self.build_graph = BuildGraph(self.address_mapper)
-
-  @property
-  def global_options(self):
-    return self.options.for_global_scope()
-
-  @property
-  def spec_excludes(self):
-    return self.global_options.spec_excludes
-
-  @classmethod
-  def subsystems(cls):
-    # Subsystems used outside of any task.
-    return set([SourceRootBootstrapper, Reporting, RunTracker])
-
-  def _get_buildfile_type(self, build_file_rev):
-    """Selects the BuildFile type for use in a given pants run."""
-    if build_file_rev:
-      ScmBuildFile.set_rev(build_file_rev)
-      ScmBuildFile.set_scm(get_scm())
-      return ScmBuildFile
-    else:
-      return FilesystemBuildFile
-
   def _setup_logging(self, global_options):
+    """Sets global logging."""
     # N.B. quiet help says 'Squelches all console output apart from errors'.
     level = 'ERROR' if global_options.quiet else global_options.level.upper()
     setup_logging(level, log_dir=global_options.logdir)
+
+    # This routes warnings through our loggers instead of straight to raw stderr.
+    logging.captureWarnings(True)
+
+  def _register_options(self, subsystems, options):
+    """Registers global options."""
+    # Standalone global options.
+    GlobalOptionsRegistrar.register_options_on_scope(options)
+
+    # Options for subsystems.
+    for subsystem in subsystems:
+      subsystem.register_options_on_scope(options)
+
+    # TODO(benjy): Should Goals or the entire goal-running mechanism be a Subsystem?
+    for goal in Goal.all():
+      # Register task options.
+      goal.register_options(options)
 
   def _setup_options(self, options_bootstrapper, working_set):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
@@ -152,7 +128,7 @@ class GoalRunner(object):
 
     # Add scopes for all needed subsystems via a union of all known subsystem sets.
     subsystems = Subsystem.closure(
-      self.subsystems() | Goal.subsystems() | build_configuration.subsystems()
+      GoalRunner.subsystems() | Goal.subsystems() | build_configuration.subsystems()
     )
     for subsystem in subsystems:
       known_scope_infos.append(subsystem.get_scope_info())
@@ -170,15 +146,100 @@ class GoalRunner(object):
 
     return options, build_configuration
 
-  def _start_runtracker(self):
-    report = self.reporting.initial_reporting(self.run_tracker)
-    self.run_tracker.start(report)
+  def setup(self):
+    return self._setup_options(self._options_bootstrapper, self._working_set)
 
-    url = self.run_tracker.run_info.get_info('report_url')
+
+class ReportingInitializer(object):
+  """Starts and provides logged info on the RunTracker and Reporting subsystems."""
+
+  def __init__(self, run_tracker=None, reporting=None):
+    self._run_tracker = run_tracker or RunTracker.global_instance()
+    self._reporting = reporting or Reporting.global_instance()
+
+  def setup(self):
+    """Start up the RunTracker and log reporting details."""
+    report = self._reporting.initial_reporting(self._run_tracker)
+    self._run_tracker.start(report)
+
+    url = self._run_tracker.run_info.get_info('report_url')
     if url:
-      self.run_tracker.log(Report.INFO, 'See a report at: {}'.format(url))
+      self._run_tracker.log(Report.INFO, 'See a report at: {}'.format(url))
     else:
-      self.run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
+      self._run_tracker.log(Report.INFO, '(To run a reporting server: ./pants server)')
+
+    return self._run_tracker, self._reporting
+
+
+class GoalRunnerFactory(object):
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting):
+    self._root_dir = root_dir
+    self._options = options
+    self._build_config = build_config
+    self._run_tracker = run_tracker
+    self._reporting = reporting
+
+  def setup(self):
+    goal_runner = GoalRunner(self._root_dir,
+                             self._options,
+                             self._build_config,
+                             self._run_tracker,
+                             self._reporting)
+    goal_runner.setup()
+    return goal_runner
+
+
+class GoalRunner(object):
+  """Lists installed goals or else executes a named goal."""
+
+  Factory = GoalRunnerFactory
+
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting, exiter=sys.exit):
+    """
+    :param str root_dir: The root directory of the pants workspace (aka the "build root").
+    :param Options options: A global, pre-initialized Options instance.
+    :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
+    :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
+    :param Reporting reporting: The global, pre-initialized Reporting instance.
+    :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
+    """
+    self.root_dir = root_dir
+    self.options = options
+    self.build_configuration = build_config
+    self.run_tracker = run_tracker
+    self.reporting = reporting
+    self._exiter = exiter
+
+    self.goals = []
+    self.targets = []
+    self.requested_goals = []
+
+    self.build_file_type = self._get_buildfile_type(self.global_options.build_file_rev)
+    self.build_file_parser = BuildFileParser(self.build_configuration, self.root_dir)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.build_file_type)
+    self.build_graph = BuildGraph(self.address_mapper)
+
+  @property
+  def global_options(self):
+    return self.options.for_global_scope()
+
+  @property
+  def spec_excludes(self):
+    return self.global_options.spec_excludes
+
+  @classmethod
+  def subsystems(cls):
+    # Subsystems used outside of any task.
+    return set([SourceRootBootstrapper, Reporting, RunTracker])
+
+  def _get_buildfile_type(self, build_file_rev):
+    """Selects the BuildFile type for use in a given pants run."""
+    if build_file_rev:
+      ScmBuildFile.set_rev(build_file_rev)
+      ScmBuildFile.set_scm(get_scm())
+      return ScmBuildFile
+    else:
+      return FilesystemBuildFile
 
   def setup(self):
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
@@ -186,24 +247,12 @@ class GoalRunner(object):
       source_root_bootstrapper = SourceRootBootstrapper.global_instance()
       source_root_bootstrapper.bootstrap(self.address_mapper, self.build_file_parser)
 
-    self._expand_goals(self.options.goals)
-    self._expand_specs(self.options.target_specs, self.global_options.fail_fast)
+    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
+      self._expand_goals(self.options.goals)
+      self._expand_specs(self.options.target_specs, self.global_options.fail_fast)
 
-    # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
-    self.run_tracker.run_info.add_scm_info()
-
-  def _register_options(self, subsystems, options):
-    # Standalone global options.
-    GlobalOptionsRegistrar.register_options_on_scope(options)
-
-    # Options for subsystems.
-    for subsystem in subsystems:
-      subsystem.register_options_on_scope(options)
-
-    # TODO(benjy): Should Goals or the entire goal-running mechanism be a Subsystem?
-    for goal in Goal.all():
-      # Register task options.
-      goal.register_options(options)
+      # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
+      self.run_tracker.run_info.add_scm_info()
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
@@ -222,26 +271,25 @@ class GoalRunner(object):
 
   def _expand_specs(self, specs, fail_fast):
     """Populate the BuildGraph and target list from a set of input specs."""
-    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      spec_parser = CmdLineSpecParser(
-        self.root_dir,
-        self.address_mapper,
-        spec_excludes=self.spec_excludes,
-        exclude_target_regexps=self.global_options.exclude_target_regexp
-      )
+    spec_parser = CmdLineSpecParser(
+      self.root_dir,
+      self.address_mapper,
+      spec_excludes=self.spec_excludes,
+      exclude_target_regexps=self.global_options.exclude_target_regexp
+    )
 
-      with self.run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
-        def filter_for_tag(tag):
-          return lambda target: tag in map(str, target.tags)
+    with self.run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
+      def filter_for_tag(tag):
+        return lambda target: tag in map(str, target.tags)
 
-        tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
+      tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
 
-        for spec in specs:
-          for address in spec_parser.parse_addresses(spec, fail_fast):
-            self.build_graph.inject_address_closure(address)
-            tgt = self.build_graph.get_target(address)
-            if tag_filter(tgt):
-              self.targets.append(tgt)
+      for spec in specs:
+        for address in spec_parser.parse_addresses(spec, fail_fast):
+          self.build_graph.inject_address_closure(address)
+          tgt = self.build_graph.get_target(address)
+          if tag_filter(tgt):
+            self.targets.append(tgt)
 
   def run(self):
     kill_nailguns = self.global_options.kill_nailguns

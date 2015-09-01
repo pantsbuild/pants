@@ -12,7 +12,7 @@ import traceback
 import warnings
 
 from pants.base.build_environment import get_buildroot
-from pants.bin.goal_runner import GoalRunner
+from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
 
 
 class _Exiter(object):
@@ -48,35 +48,42 @@ class _Exiter(object):
     # TODO(Jin Feng) Always output the unhandled exception details into a log file.
     self.exit_and_fail(msg)
 
+  def set_except_hook(self):
+    # Call the registration of the unhandled exception hook as early as possible in the code.
+    sys.excepthook = self.unhandled_exception_hook
+
 
 def _run(exiter):
-  # Place the registration of the unhandled exception hook as early as possible in the code.
-  sys.excepthook = exiter.unhandled_exception_hook
-
   # We want to present warnings to the user, set this up early to ensure all warnings are seen.
   # The "default" action displays a warning for a particular file and line number exactly once.
   # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete action
   # list.
-  warnings.simplefilter("default")
+  warnings.simplefilter('default')
 
-  # The GoalRunner will setup final logging below in `.setup()`, but span the gap until then.
-  logging.basicConfig(level=logging.INFO)
-  # This routes the warnings we enabled above through our loggers instead of straight to stderr raw.
-  logging.captureWarnings(True)
+  # Bootstrap options and logging.
+  options, build_config = OptionsInitializer().setup()
 
+  # Launch RunTracker as early as possible (just after Subsystem options are initialized).
+  run_tracker, reporting = ReportingInitializer().setup()
+
+  # Determine and check validity of the buildroot.
   root_dir = get_buildroot()
   if not os.path.exists(root_dir):
     exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: {}'.format(root_dir))
 
-  goal_runner = GoalRunner(root_dir)
-  goal_runner.setup()
-  exiter.apply_options(goal_runner.options)
+  # Apply exiter options.
+  exiter.apply_options(options)
+
+  # Setup and run GoalRunner.
+  goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()
   result = goal_runner.run()
   exiter.do_exit(result)
 
 
 def main():
   exiter = _Exiter()
+  exiter.set_except_hook()
+
   try:
     _run(exiter)
   except KeyboardInterrupt:
