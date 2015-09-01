@@ -38,7 +38,7 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   def select(self, target):
     """Transitively selects scala targets that are depended on by ScalaJSBinary targets.
-    
+
     TODO: This method implements a stateful, hacky workaround. The ability to select transitively
     should probably be baked into GroupTask.
     """

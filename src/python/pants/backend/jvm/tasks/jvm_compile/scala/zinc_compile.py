@@ -199,7 +199,7 @@ class BaseZincCompile(JvmCompile):
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
 
-                           
+
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code using Zinc."""
 

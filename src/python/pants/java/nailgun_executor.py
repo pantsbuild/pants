@@ -16,9 +16,6 @@ import time
 from six import string_types
 from twitter.common.collections import maybe_list
 
-from six import string_types
-from twitter.common.collections import maybe_list
-
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
